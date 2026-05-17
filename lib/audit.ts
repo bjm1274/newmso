@@ -1,6 +1,11 @@
-import { supabase } from './supabase';
 import { STORAGE_KEYS } from './storage-keys';
-import { mirrorRowsToD1, audit_logs as auditLogsTable } from './db';
+import {
+  audit_logs as auditLogsTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from './db';
+import { logD1BindingMissing } from './db/mirror-metrics';
 
 export type AuditAction = string;
 
@@ -126,6 +131,17 @@ export function readClientAuditActor() {
   }
 }
 
+// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
+async function requireD1ForAuditLogs(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[audit_logs] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
+
 export async function logAudit(
   action: AuditAction,
   targetType: string,
@@ -136,17 +152,9 @@ export async function logAudit(
 ) {
   const createdAt = new Date().toISOString();
   try {
-    await supabase.from('audit_logs').insert([{
-      user_id: userId || null,
-      user_name: userName || null,
-      action,
-      target_type: targetType,
-      target_id: targetId,
-      details,
-      created_at: createdAt,
-    }]);
-    // D1 미러 — details는 jsonb → text 변환
-    await mirrorRowsToD1(auditLogsTable, {
+    // D1 직접 INSERT — details(jsonb) → text(JSON.stringify) 변환
+    const db = await requireD1ForAuditLogs('logAudit');
+    await db.insert(auditLogsTable).values({
       id: crypto.randomUUID(),
       user_id: userId || null,
       user_name: userName || null,
@@ -155,7 +163,7 @@ export async function logAudit(
       target_id: targetId,
       details: JSON.stringify(details),
       created_at: createdAt,
-    }, { label: 'audit_logs' });
+    });
   } catch (e) {
     console.error('Audit log failed:', e);
   }

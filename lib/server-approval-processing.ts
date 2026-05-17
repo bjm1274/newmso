@@ -11,17 +11,37 @@ import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archiv
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-approval';
-import { isMissingColumnError } from '@/lib/supabase-compat';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
-import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import { insertNotificationsOrThrow, type NotificationRow } from './notification-utils';
 import {
-  mirrorRowsToD1,
   attendance as attendanceTable,
   attendances as attendancesTable,
   attendance_corrections as attendanceCorrectionsTable,
   staff_transfer_history as staffTransferHistoryTable,
   certificate_issuances as certificateIssuancesTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
 } from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+
+// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
+//
+// 본 파일은 결재 처리(승인 효과 반영) 헬퍼로 7+1개 dual-write 지점을 가졌으나,
+// Phase 8-C 부터는 D1 binding 을 직접 사용해 INSERT/UPSERT 한다.
+//
+// TODO(phase 8-D 이후): 본 파일은 500줄 초과 상태로 type 별 헬퍼 함수
+// (handlePersonnelOrder / handleLeaveAttendance / handleAttendanceFix /
+//  handleCertificateIssue) 로 분리 권장.
+async function requireD1ForApprovalProcessing(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[server-approval-processing] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
+}
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -54,37 +74,32 @@ function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {
   return statusMap[correctionTypeValue] || statusMap['정상반영'];
 }
 
-function isAttendanceCorrectionApprovalSchemaError(error: unknown) {
-  return ['attendance_date', 'requested_at', 'approval_status', 'approved_by', 'approved_at'].some((column) =>
-    isMissingColumnError(error, column)
-  );
-}
-
 async function upsertAttendanceCorrectionRows(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   correctionRows: Array<Record<string, unknown>>
 ) {
-  const primaryResult = await supabase.from('attendance_corrections').upsert(correctionRows, {
-    onConflict: 'staff_id,attendance_date',
-  });
+  if (correctionRows.length === 0) return;
 
-  if (!isAttendanceCorrectionApprovalSchemaError(primaryResult.error)) {
-    if (primaryResult.error) throw primaryResult.error;
-    // D1 미러 — (staff_id, attendance_date) 충돌 시 update
-    const d1Rows = correctionRows.map((r) => ({
-      id: crypto.randomUUID(),
-      staff_id: r.staff_id as string | null,
-      original_date: (r.original_date ?? null) as string | null,
-      attendance_date: (r.attendance_date ?? null) as string | null,
-      correction_type: (r.correction_type ?? null) as string | null,
-      reason: (r.reason ?? null) as string | null,
-      status: (r.status ?? '대기') as string,
-      requested_at: (r.requested_at ?? new Date().toISOString()) as string,
-      created_at: new Date().toISOString(),
-    }));
-    await mirrorRowsToD1(attendanceCorrectionsTable, d1Rows, {
-      label: 'attendance_corrections',
-      onConflict: 'update',
+  // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+  // attendance_corrections D1 스키마는 attendance_date 보유 → 항상 onConflictDoUpdate 사용.
+  // (Supabase 측 'approval_status'/'approved_by'/'approved_at' 컬럼은 D1엔 없으므로 row 매핑에서 자동 제외)
+  const db = await requireD1ForApprovalProcessing('attendance_corrections.upsert');
+  const d1Rows = correctionRows.map((r) => ({
+    id: crypto.randomUUID(),
+    staff_id: (r.staff_id ?? null) as string | null,
+    original_date: (r.original_date ?? null) as string | null,
+    attendance_date: (r.attendance_date ?? null) as string | null,
+    correction_type: (r.correction_type ?? null) as string | null,
+    reason: (r.reason ?? null) as string | null,
+    status: (r.status ?? '대기') as string,
+    requested_at: (r.requested_at ?? new Date().toISOString()) as string,
+    created_at: new Date().toISOString(),
+  }));
+
+  await db
+    .insert(attendanceCorrectionsTable)
+    .values(d1Rows)
+    .onConflictDoUpdate({
       target: [attendanceCorrectionsTable.staff_id, attendanceCorrectionsTable.attendance_date],
       set: {
         correction_type: sql`excluded.correction_type`,
@@ -93,58 +108,6 @@ async function upsertAttendanceCorrectionRows(
         requested_at: sql`excluded.requested_at`,
       },
     });
-    return;
-  }
-
-  for (const row of correctionRows) {
-    const { data: existingRow, error: existingRowError } = await supabase
-      .from('attendance_corrections')
-      .select('id')
-      .eq('staff_id', row.staff_id)
-      .eq('original_date', row.original_date)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingRowError) throw existingRowError;
-
-    if (existingRow?.id) {
-      const { error: updateError } = await supabase
-        .from('attendance_corrections')
-        .update({
-          status: '승인',
-          reason: row.reason,
-          correction_type: row.correction_type,
-        })
-        .eq('id', existingRow.id);
-
-      if (updateError) throw updateError;
-      continue;
-    }
-
-    const { error: insertError } = await supabase.from('attendance_corrections').insert({
-      staff_id: row.staff_id,
-      original_date: row.original_date,
-      reason: row.reason,
-      correction_type: row.correction_type,
-      status: '승인',
-    });
-
-    if (insertError) throw insertError;
-
-    // D1 미러 — 폴백 경로 단일 INSERT (attendance_date 부재 → onConflict 부적용)
-    await mirrorRowsToD1(attendanceCorrectionsTable, {
-      id: crypto.randomUUID(),
-      staff_id: row.staff_id as string | null,
-      original_date: (row.original_date ?? null) as string | null,
-      attendance_date: null,
-      correction_type: (row.correction_type ?? null) as string | null,
-      reason: (row.reason ?? null) as string | null,
-      status: '승인',
-      requested_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    }, { label: 'attendance_corrections' });
-  }
 }
 
 async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, item: ApprovalRow) {
@@ -226,8 +189,8 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
 
     const notificationRows = [...managerNotifications, ...senderNotification];
     if (notificationRows.length > 0) {
-      await supabase.from('notifications').insert(notificationRows);
-      await mirrorNotificationsToD1(notificationRows as NotificationRow[]);
+      // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+      await insertNotificationsOrThrow(notificationRows as NotificationRow[]);
     }
   } catch {
     // inventory workflow notification failure is non-blocking
@@ -332,17 +295,18 @@ export async function processFinalApprovalEffects(
           effective_date: getKoreanTodayString(),
           approval_id: item.id,
         };
-        await supabase.from('staff_transfer_history').insert(transferRow);
-        await mirrorRowsToD1(staffTransferHistoryTable, {
+        // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+        const transferDb = await requireD1ForApprovalProcessing('staff_transfer_history.insert');
+        await transferDb.insert(staffTransferHistoryTable).values({
           id: crypto.randomUUID(),
           staff_id: orderTargetId as string | null,
-          transfer_type: orderCategory as string | null,
+          transfer_type: (orderCategory ?? null) as string | null,
           before_value: (transferRow.before_value ?? null) as string | null,
           after_value: (transferRow.after_value ?? null) as string | null,
           effective_date: transferRow.effective_date,
           approval_id: (item.id ?? null) as string | null,
           created_at: new Date().toISOString(),
-        }, { label: 'staff_transfer_history' });
+        });
       }
 
       steps.push('personnel_order');
@@ -383,63 +347,48 @@ export async function processFinalApprovalEffects(
           supabase,
         );
 
+        // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+        const leaveDb = await requireD1ForApprovalProcessing('leave_attendance.upsert');
         for (let index = 0; index < days; index += 1) {
           const date = new Date(start);
           date.setDate(date.getDate() + index);
           const dateStr = formatKoreanDateKey(date);
 
-          await supabase.from('attendance').upsert(
-            {
+          await leaveDb
+            .insert(attendanceTable)
+            .values({
+              id: crypto.randomUUID(),
               staff_id: senderId,
               date: dateStr,
               status: leaveStatus.legacy,
-            },
-            { onConflict: 'staff_id,date' },
-          );
-          await mirrorRowsToD1(attendanceTable, {
-            id: crypto.randomUUID(),
-            staff_id: senderId,
-            date: dateStr,
-            status: leaveStatus.legacy,
-            created_at: new Date().toISOString(),
-          }, {
-            label: 'attendance',
-            onConflict: 'update',
-            target: [attendanceTable.staff_id, attendanceTable.date],
-            set: { status: sql`excluded.status` },
-          });
+              created_at: new Date().toISOString(),
+            })
+            .onConflictDoUpdate({
+              target: [attendanceTable.staff_id, attendanceTable.date],
+              set: { status: sql`excluded.status` },
+            });
 
-          await supabase.from('attendances').upsert(
-            {
+          await leaveDb
+            .insert(attendancesTable)
+            .values({
+              id: crypto.randomUUID(),
               staff_id: senderId,
               work_date: dateStr,
               status: leaveStatus.modern,
               check_in_time: null,
               check_out_time: null,
               work_hours_minutes: 0,
-            },
-            { onConflict: 'staff_id,work_date' },
-          );
-          await mirrorRowsToD1(attendancesTable, {
-            id: crypto.randomUUID(),
-            staff_id: senderId,
-            work_date: dateStr,
-            status: leaveStatus.modern,
-            check_in_time: null,
-            check_out_time: null,
-            work_hours_minutes: 0,
-            created_at: new Date().toISOString(),
-          }, {
-            label: 'attendances',
-            onConflict: 'update',
-            target: [attendancesTable.staff_id, attendancesTable.work_date],
-            set: {
-              status: sql`excluded.status`,
-              check_in_time: sql`excluded.check_in_time`,
-              check_out_time: sql`excluded.check_out_time`,
-              work_hours_minutes: sql`excluded.work_hours_minutes`,
-            },
-          });
+              created_at: new Date().toISOString(),
+            })
+            .onConflictDoUpdate({
+              target: [attendancesTable.staff_id, attendancesTable.work_date],
+              set: {
+                status: sql`excluded.status`,
+                check_in_time: sql`excluded.check_in_time`,
+                check_out_time: sql`excluded.check_out_time`,
+                work_hours_minutes: sql`excluded.work_hours_minutes`,
+              },
+            });
         }
 
         if (isAnnualLeaveType(leaveType)) {
@@ -477,38 +426,36 @@ export async function processFinalApprovalEffects(
       await upsertAttendanceCorrectionRows(supabase, correctionRows);
 
       const { att, atts } = resolveAttendanceCorrectionStatusPair(correctionType);
+      // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+      const fixDb = await requireD1ForApprovalProcessing('attendance_fix.upsert');
       for (const dateStr of itemMetaData.correction_dates as string[]) {
-        await supabase
-          .from('attendance')
-          .upsert({ staff_id: item.sender_id, date: dateStr, status: att }, { onConflict: 'staff_id,date' });
-        await mirrorRowsToD1(attendanceTable, {
-          id: crypto.randomUUID(),
-          staff_id: item.sender_id as string | null,
-          date: dateStr,
-          status: att,
-          created_at: new Date().toISOString(),
-        }, {
-          label: 'attendance',
-          onConflict: 'update',
-          target: [attendanceTable.staff_id, attendanceTable.date],
-          set: { status: sql`excluded.status` },
-        });
+        await fixDb
+          .insert(attendanceTable)
+          .values({
+            id: crypto.randomUUID(),
+            staff_id: item.sender_id as string | null,
+            date: dateStr,
+            status: att,
+            created_at: new Date().toISOString(),
+          })
+          .onConflictDoUpdate({
+            target: [attendanceTable.staff_id, attendanceTable.date],
+            set: { status: sql`excluded.status` },
+          });
 
-        await supabase
-          .from('attendances')
-          .upsert({ staff_id: item.sender_id, work_date: dateStr, status: atts }, { onConflict: 'staff_id,work_date' });
-        await mirrorRowsToD1(attendancesTable, {
-          id: crypto.randomUUID(),
-          staff_id: item.sender_id as string,
-          work_date: dateStr,
-          status: atts,
-          created_at: new Date().toISOString(),
-        }, {
-          label: 'attendances',
-          onConflict: 'update',
-          target: [attendancesTable.staff_id, attendancesTable.work_date],
-          set: { status: sql`excluded.status` },
-        });
+        await fixDb
+          .insert(attendancesTable)
+          .values({
+            id: crypto.randomUUID(),
+            staff_id: item.sender_id as string,
+            work_date: dateStr,
+            status: atts,
+            created_at: new Date().toISOString(),
+          })
+          .onConflictDoUpdate({
+            target: [attendancesTable.staff_id, attendancesTable.work_date],
+            set: { status: sql`excluded.status` },
+          });
       }
 
       steps.push('attendance_fix');
@@ -527,8 +474,9 @@ export async function processFinalApprovalEffects(
         purpose: (itemMetaData.purpose as string) || '제출용',
         issued_by: actorId || null,
       };
-      await supabase.from('certificate_issuances').insert(certRow);
-      await mirrorRowsToD1(certificateIssuancesTable, {
+      // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+      const certDb = await requireD1ForApprovalProcessing('certificate_issuances.insert');
+      await certDb.insert(certificateIssuancesTable).values({
         id: crypto.randomUUID(),
         staff_id: certRow.staff_id,
         cert_type: certRow.cert_type,
@@ -536,7 +484,7 @@ export async function processFinalApprovalEffects(
         purpose: certRow.purpose,
         issued_by: certRow.issued_by,
         issued_at: new Date().toISOString(),
-      }, { label: 'certificate_issuances' });
+      });
       steps.push('certificate_issue');
     } catch (error) {
       warnings.push(`증명서 발급 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);

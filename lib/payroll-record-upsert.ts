@@ -1,7 +1,12 @@
 import { sql } from 'drizzle-orm';
-import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
-import { mirrorRowsToD1, payroll_records as payrollRecordsTable } from '@/lib/db';
+import {
+  payroll_records as payrollRecordsTable,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from '@/lib/db';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type SupabaseMutationResult<T = unknown> = {
   data: T | null;
@@ -104,51 +109,60 @@ function normalizePayrollRecordForD1(record: Record<string, unknown>): Record<st
   return next;
 }
 
-async function mirrorPayrollUpsertToD1(payload: PayrollRecordPayload): Promise<void> {
-  const records = Array.isArray(payload) ? payload : [payload];
-  if (records.length === 0) return;
-  const normalized = records.map(normalizePayrollRecordForD1);
-  await mirrorRowsToD1(payrollRecordsTable, normalized as never, {
-    label: 'mirror:payroll_records',
-    onConflict: 'update',
-    target: [
-      payrollRecordsTable.staff_id,
-      payrollRecordsTable.year_month,
-      payrollRecordsTable.record_type,
-    ],
-    set: {
-      base_salary: sql`excluded.base_salary`,
-      meal_allowance: sql`excluded.meal_allowance`,
-      vehicle_allowance: sql`excluded.vehicle_allowance`,
-      childcare_allowance: sql`excluded.childcare_allowance`,
-      research_allowance: sql`excluded.research_allowance`,
-      other_taxfree: sql`excluded.other_taxfree`,
-      extra_allowance: sql`excluded.extra_allowance`,
-      overtime_pay: sql`excluded.overtime_pay`,
-      bonus: sql`excluded.bonus`,
-      night_duty_allowance: sql`excluded.night_duty_allowance`,
-      total_taxable: sql`excluded.total_taxable`,
-      total_taxfree: sql`excluded.total_taxfree`,
-      total_deduction: sql`excluded.total_deduction`,
-      net_pay: sql`excluded.net_pay`,
-      gross_pay: sql`excluded.gross_pay`,
-      attendance_deduction: sql`excluded.attendance_deduction`,
-      attendance_deduction_detail: sql`excluded.attendance_deduction_detail`,
-      deduction_detail: sql`excluded.deduction_detail`,
-      status: sql`excluded.status`,
-      severance_pay: sql`excluded.severance_pay`,
-      settlement_reason: sql`excluded.settlement_reason`,
-      settlement_date: sql`excluded.settlement_date`,
-      advance_pay: sql`excluded.advance_pay`,
-      national_pension: sql`excluded.national_pension`,
-      health_insurance: sql`excluded.health_insurance`,
-      long_term_care: sql`excluded.long_term_care`,
-      employment_insurance: sql`excluded.employment_insurance`,
-      income_tax: sql`excluded.income_tax`,
-      local_tax: sql`excluded.local_tax`,
-    },
-  });
+// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
+async function requireD1ForPayrollRecords(label: string) {
+  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    logD1BindingMissing({ label, backend });
+    throw new Error(`[payroll_records] D1 binding not available (${label})`);
+  }
+  return getD1Drizzle(d1);
 }
+
+// onConflict target 목록 — D1 unique index와 일치해야 함
+function resolveD1ConflictTargetColumns(conflictTarget: string) {
+  if (conflictTarget === PAYROLL_RECORD_LEGACY_CONFLICT_TARGET) {
+    return [payrollRecordsTable.staff_id, payrollRecordsTable.year_month];
+  }
+  return [
+    payrollRecordsTable.staff_id,
+    payrollRecordsTable.year_month,
+    payrollRecordsTable.record_type,
+  ];
+}
+
+const PAYROLL_UPDATE_SET = {
+  base_salary: sql`excluded.base_salary`,
+  meal_allowance: sql`excluded.meal_allowance`,
+  vehicle_allowance: sql`excluded.vehicle_allowance`,
+  childcare_allowance: sql`excluded.childcare_allowance`,
+  research_allowance: sql`excluded.research_allowance`,
+  other_taxfree: sql`excluded.other_taxfree`,
+  extra_allowance: sql`excluded.extra_allowance`,
+  overtime_pay: sql`excluded.overtime_pay`,
+  bonus: sql`excluded.bonus`,
+  night_duty_allowance: sql`excluded.night_duty_allowance`,
+  total_taxable: sql`excluded.total_taxable`,
+  total_taxfree: sql`excluded.total_taxfree`,
+  total_deduction: sql`excluded.total_deduction`,
+  net_pay: sql`excluded.net_pay`,
+  gross_pay: sql`excluded.gross_pay`,
+  attendance_deduction: sql`excluded.attendance_deduction`,
+  attendance_deduction_detail: sql`excluded.attendance_deduction_detail`,
+  deduction_detail: sql`excluded.deduction_detail`,
+  status: sql`excluded.status`,
+  severance_pay: sql`excluded.severance_pay`,
+  settlement_reason: sql`excluded.settlement_reason`,
+  settlement_date: sql`excluded.settlement_date`,
+  advance_pay: sql`excluded.advance_pay`,
+  national_pension: sql`excluded.national_pension`,
+  health_insurance: sql`excluded.health_insurance`,
+  long_term_care: sql`excluded.long_term_care`,
+  employment_insurance: sql`excluded.employment_insurance`,
+  income_tax: sql`excluded.income_tax`,
+  local_tax: sql`excluded.local_tax`,
+} as const;
 
 async function runPayrollRecordUpsert(
   payload: PayrollRecordPayload,
@@ -175,16 +189,27 @@ async function runPayrollRecordUpsert(
           ? PAYROLL_RECORD_LEGACY_CONFLICT_TARGET
           : conflictTarget;
 
-      const result = await supabase.from('payroll_records').upsert(nextPayload, {
-        onConflict: nextConflictTarget,
-      });
-
-      // Supabase 성공한 경우에만 D1 미러 (실패한 row를 미러하지 않음)
-      if (!result.error) {
-        await mirrorPayrollUpsertToD1(nextPayload);
+      // D1 직접 upsert — supabase.from('payroll_records').upsert() 대체
+      const records = Array.isArray(nextPayload) ? nextPayload : [nextPayload];
+      if (records.length === 0) {
+        return { data: [], error: null };
       }
 
-      return result;
+      try {
+        const db = await requireD1ForPayrollRecords('runPayrollRecordUpsert');
+        const normalized = records.map(normalizePayrollRecordForD1);
+        const targetCols = resolveD1ConflictTargetColumns(nextConflictTarget);
+        await db
+          .insert(payrollRecordsTable)
+          .values(normalized as never)
+          .onConflictDoUpdate({
+            target: targetCols,
+            set: PAYROLL_UPDATE_SET as never,
+          });
+        return { data: normalized, error: null };
+      } catch (err) {
+        return { data: null, error: err };
+      }
     },
     [...optionalColumns],
     cacheKey ? { cacheKey } : undefined,

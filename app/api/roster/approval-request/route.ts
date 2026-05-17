@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
-import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
+import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
 const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
@@ -498,13 +498,14 @@ export async function POST(request: Request) {
     let pushSentCount = 0;
 
     if (notificationRows.length > 0) {
-      const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
-      await mirrorNotificationsToD1(notificationRows as NotificationRow[]);
-      if (!notificationError) {
+      // Phase 8-C: D1 직접 INSERT — Supabase + mirror 2단 처리 대체.
+      // insertNotificationsOrThrow 가 실패 시 throw 하므로 try/catch 로 흐름 유지.
+      try {
+        await insertNotificationsOrThrow(notificationRows as NotificationRow[]);
         notifiedApproverCount = notificationRows.length;
         const pushResult = await dispatchImmediateApprovalPush(supabase, notificationRows);
         pushSentCount = pushResult.pushSentCount;
-      } else {
+      } catch (notificationError) {
         console.error('roster approval notification insert failed:', notificationError);
       }
     }
