@@ -27,6 +27,13 @@ export { getD1Binding, resolveDataBackend } from './get-binding';
 // Phase 2 — 일반화된 D1 미러 헬퍼 (테이블별 dual-write 확장용)
 export { mirrorRowsToD1, type MirrorOptions } from './mirror';
 
+// Phase 3-B — D1 미러 실패 구조화 로깅
+export {
+  logD1MirrorFailure,
+  logD1BindingMissing,
+  type MirrorFailureContext,
+} from './mirror-metrics';
+
 // Phase 1D — Postgres 함수의 TS 포트
 export {
   registerStaffFull,

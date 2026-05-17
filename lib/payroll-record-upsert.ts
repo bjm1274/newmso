@@ -109,7 +109,7 @@ async function mirrorPayrollUpsertToD1(payload: PayrollRecordPayload): Promise<v
   if (records.length === 0) return;
   const normalized = records.map(normalizePayrollRecordForD1);
   await mirrorRowsToD1(payrollRecordsTable, normalized as never, {
-    label: 'payroll_records',
+    label: 'mirror:payroll_records',
     onConflict: 'update',
     target: [
       payrollRecordsTable.staff_id,

@@ -21,6 +21,7 @@ import type { AnyColumn, SQL } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { getD1Binding, resolveDataBackend } from './get-binding';
 import { getD1Drizzle } from './client-d1';
+import { logD1MirrorFailure, logD1BindingMissing } from './mirror-metrics';
 
 export interface MirrorOptions<T extends SQLiteTable = SQLiteTable> {
   /**
@@ -68,7 +69,7 @@ export async function mirrorRowsToD1<T extends SQLiteTable>(
     if (backend === 'd1') {
       throw new Error(`[${label}] DATA_BACKEND=d1 but DB binding not available`);
     }
-    console.warn(`[${label}] dual-write skipped — D1 binding unavailable`);
+    logD1BindingMissing({ label, backend });
     return;
   }
 
@@ -92,9 +93,6 @@ export async function mirrorRowsToD1<T extends SQLiteTable>(
     await (query as Promise<unknown>);
   } catch (err) {
     if (backend === 'd1') throw err;
-    console.warn(`[${label}] D1 mirror failed`, {
-      count: list.length,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logD1MirrorFailure(err, { label, count: list.length, backend });
   }
 }

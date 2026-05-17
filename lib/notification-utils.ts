@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { getD1Binding, resolveDataBackend, getD1Drizzle, notifications as notificationsTable } from './db';
+import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
 import { sql } from 'drizzle-orm';
 
 const recentAdminAlertDispatches = new Map<string, number>();
@@ -56,7 +57,7 @@ export async function mirrorNotificationsToD1(
     if (backend === 'd1') {
       throw new Error('[notifications] DATA_BACKEND=d1 but DB binding not available');
     }
-    console.warn('[notifications] dual-write skipped — D1 binding unavailable');
+    logD1BindingMissing({ label: 'mirror:notifications', backend });
     return;
   }
 
@@ -69,10 +70,7 @@ export async function mirrorNotificationsToD1(
     await query;
   } catch (err) {
     if (backend === 'd1') throw err;
-    console.warn('[notifications] D1 mirror failed', {
-      count: rows.length,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    logD1MirrorFailure(err, { label: 'mirror:notifications', count: rows.length, backend });
   }
 }
 
