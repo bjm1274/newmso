@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -1508,169 +1509,36 @@ export default function NotificationSystem({
 
     let notificationRealtimeReady = false;
 
-    const nTableChannel = supabase.channel(`noti-db-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
-        emitIncomingNotification(payload.new as Record<string, unknown>);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          notificationRealtimeReady = true;
-          void fetchUnreadNotificationsSince(mountedAt);
-          void processDueTodoReminders();
-          void queuePayrollAnomalyAlert();
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          notificationRealtimeReady = false;
-        }
-      });
+    // Phase 5-C-4 — 8개 supabase.channel 호출을 notifications polling 1개로 통합.
+    // 비활성화된 7개 트리거 채널 (approvals/inventory/payroll/education/messages/
+    // attendance/word-filter)은 payload 기반 즉시 알림 생성에 의존했음. 서버
+    // cron이 notifications insert로 동일 효과를 줄 수 있는 경우만 동작.
+    // 일부 인앱 알림(결재 차례/재고 부족/단어 필터 등)은 사라짐 — 옵션 A
+    // trade-off. 운영 영향 큰 알림은 후속 phase에서 서버 cron 추가 검토.
+    let lastNotificationsSeenAt = mountedAt;
+    const unsubscribeNotifications = subscribeRealtime(
+      `noti-db-${uid}`,
+      [{ table: 'notifications' }],
+      () => {
+        notificationRealtimeReady = true;
+        const since = lastNotificationsSeenAt;
+        lastNotificationsSeenAt = new Date().toISOString();
+        void fetchUnreadNotificationsSince(since);
+        void syncBadge();
+      },
+      { pollIntervalMs: 3000 },
+    );
+    // initial: fetch once + prime metadata
+    void fetchUnreadNotificationsSince(mountedAt);
+    void processDueTodoReminders();
+    void queuePayrollAnomalyAlert();
 
-    // B. 결재 트리거 (채널명에 uid 포함 → 크로스유저 알림 누수 방지)
-    const approvalsCh = supabase.channel(`approvals-trigger-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'approvals' }, (p: any) => {
-        if (String(p.new.current_approver_id) === uid && p.new.status === '대기')
-          insertNoti(
-            { type: 'approval', title: `📋 새 결재 요청: ${p.new.title}`, body: `${p.new.sender_name || '신청자'}님이 결재를 요청했습니다.`, data: { id: p.new.id, type: 'approval' } },
-            `approval:insert:${String(p.new.id)}:${uid}`
-          );
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'approvals' }, (p: any) => {
-        const nextApproverId = String(p.new.current_approver_id || '');
-        const prevApproverId = String(p.old?.current_approver_id || '');
-        const nextStatus = String(p.new.status || '');
-        const prevStatus = String(p.old?.status || '');
-        if (
-          nextApproverId === uid &&
-          nextStatus === '대기' &&
-          (prevApproverId !== nextApproverId || prevStatus !== nextStatus)
-        )
-          insertNoti(
-            { type: 'approval', title: `📋 결재 차례: ${p.new.title}`, body: `${p.new.sender_name || '신청자'} 문서의 결재 순서입니다.`, data: { id: p.new.id, type: 'approval' } },
-            `approval:update:${String(p.new.id)}:${nextApproverId}:${nextStatus}`
-          );
-      })
-      .subscribe();
-
-    // C. 재고 부족
-    const inventoryCh = supabase.channel(`inventory-trigger-${uid}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' }, (p: any) => {
-        const nextStock = Number(p.new.stock || 0);
-        const nextMinStock = Number(p.new.min_stock || 0);
-        const prevStock = Number(p.old?.stock ?? Number.POSITIVE_INFINITY);
-        const prevMinStock = Number(p.old?.min_stock ?? nextMinStock);
-        const enteredLowStock = nextStock <= nextMinStock && (prevStock > prevMinStock || prevMinStock !== nextMinStock);
-        if (enteredLowStock && (user?.permissions?.inventory || user?.department === '행정팀'))
-          insertNoti(
-            { type: 'inventory', title: `⚠️ 재고 부족 경고`, body: `${p.new.item_name || p.new.name}: 현재 ${p.new.stock}개 (최소 ${p.new.min_stock}개)`, data: { id: p.new.id, type: 'inventory' } },
-            `inventory:low:${String(p.new.id)}:${nextStock}:${nextMinStock}`,
-            60000
-          );
-      })
-      .subscribe();
-
-    // D. 급여 정산
-    const payrollCh = supabase.channel(`payroll-trigger-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payroll_records' }, (p: any) => {
-        if (String(p.new.staff_id) === uid)
-          insertNoti(
-            { type: 'payroll', title: `💰 급여 정산 완료`, body: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 급여가 정산되었습니다.`, data: { id: p.new.id, type: 'payroll' } },
-            `payroll:${String(p.new.id)}`,
-            60000
-          );
-      })
-      .subscribe();
-
-    // E. 교육 기한 임박
-    const educationCh = supabase.channel(`education-trigger-${uid}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'education_records' }, (p: any) => {
-        const daysLeft = Math.ceil((new Date(p.new.deadline).getTime() - Date.now()) / 86400000);
-        const previousDaysLeft = p.old?.deadline
-          ? Math.ceil((new Date(p.old.deadline).getTime() - Date.now()) / 86400000)
-          : Number.POSITIVE_INFINITY;
-        if (daysLeft <= 7 && daysLeft > 0 && previousDaysLeft > 7 && String(p.new.staff_id) === uid)
-          insertNoti(
-            { type: 'education', title: `📚 교육 이수 기한 임박`, body: `${p.new.education_name}: ${daysLeft}일 남았습니다.`, data: { id: p.new.id, type: 'education' } },
-            `education:deadline:${String(p.new.id)}`,
-            3600000
-          );
-      })
-      .subscribe();
-
-    // F. 채팅 메시지
-    const messagesCh = supabase.channel(`messages-trigger-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (p: any) => {
-        if (useServerSideChatNotifications) return;
-        const msg = p.new;
-        if (String(msg.sender_id) === uid) return;
-        const [roomRes, senderRes] = await Promise.all([
-          supabase.from('chat_rooms').select('type, members, name').eq('id', msg.room_id).maybeSingle(),
-          msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-        ]);
-        if (roomRes.error || !roomRes.data) return;
-        const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: string) => String(id)) : [];
-        const isNoticeRoom = String(msg.room_id) === NOTICE_ROOM_ID || roomRes.data?.type === 'notice';
-        const canReceive = isNoticeRoom || members.includes(uid);
-        if (!canReceive) return;
-        const senderName = (senderRes.data as any)?.name || '알 수 없음';
-        const content = (msg.content || '').trim();
-        const isMention = user?.name && content.includes(`@${String(user.name)}`);
-        insertNoti({
-          type: isMention ? 'mention' : 'message',
-          title: isMention ? `📣 ${senderName}님이 멘션` : senderName,
-          body: (content || '📎 파일').slice(0, 80),
-          senderName,
-          data: {
-            room_id: msg.room_id,
-            id: msg.id,
-            sender_name: senderName,
-            room_name: typeof roomRes.data?.name === 'string' ? roomRes.data.name : '',
-          },
-        }, `message:${String(msg.id)}`);
-      })
-      .subscribe();
-
-    // G. 출퇴근
-    const attendanceCh = supabase.channel(`attendance-trigger-${uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (p: any) => {
-        if (String(p.new?.staff_id) !== uid) return;
-        const s = p.new.status; const isOut = p.new.check_out != null;
-        const statusKey = isOut ? 'checkout' : s === '지각' ? 'late' : 'checkin';
-        insertNoti({
-          type: 'attendance',
-          title: s === '지각' ? '⏰ 지각 등록' : isOut ? '⏰ 퇴근 처리됨' : '⏰ 출근 처리됨',
-          body: s === '지각' ? '오늘 출근이 지각으로 기록되었습니다.' : isOut ? '퇴근이 기록되었습니다.' : '정상 출근이 기록되었습니다.',
-          data: { id: p.new.id, type: 'attendance' },
-        }, `attendance:${String(p.new.id)}:${statusKey}`, 60000);
-      })
-      .subscribe();
-
-    // H. 마스터 전용 — 단어 필터 감지 알림
-    const isMaster = isNamedSystemMasterAccount(user);
-    const wordFilterCh = isMaster
-      ? supabase.channel(`word-filter-master-${uid}`)
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p: any) => {
-            const content: string = String(p.new?.content || '');
-            if (!content) return;
-            try {
-              const raw = localStorage.getItem(STORAGE_KEYS.BANNED_WORDS);
-              const banned: string[] = raw ? JSON.parse(raw) : [];
-              if (!banned.length) return;
-              const matched = banned.filter((w) => content.toLowerCase().includes(w.toLowerCase()));
-              if (!matched.length) return;
-              insertNoti(
-                {
-                  type: 'notification',
-                  title: `🔍 단어 필터 감지`,
-                  body: `필터 단어 "${matched[0]}" 포함 메시지가 발송되었습니다.`,
-                  data: { type: 'word_filter', room_id: p.new?.room_id, message_id: p.new?.id },
-                },
-                `word-filter:${String(p.new?.id)}`,
-              );
-            } catch { /* ignore */ }
-          })
-          .subscribe()
-      : null;
-
-    const channels = [nTableChannel, approvalsCh, inventoryCh, payrollCh, educationCh, messagesCh, attendanceCh, ...(wordFilterCh ? [wordFilterCh] : [])];
+    // 비활성화된 7개 supabase.channel (approvals/inventory/payroll/education/
+    // messages/attendance/word-filter trigger). 인앱 알림은 nTableChannel
+    // polling 1개로 통합 — notifications row가 도착하면 emitIncomingNotification.
+    // payload 기반 즉시 분석(예: 결재 차례 / 재고 부족 / 단어 필터)은 사라짐.
+    // 향후 phase: 서버 cron이 notifications insert로 보강.
+    void insertNoti; // 미사용 변수 경고 회피 (다른 곳에서 호출되는 helper)
 
     if (!didPrimeNotificationsRef.current) {
       didPrimeNotificationsRef.current = true;
@@ -1713,15 +1581,12 @@ export default function NotificationSystem({
       void processDueTodoReminders();
     }, { intervalMs: 60_000 });
 
-    const unbindHealthcheck = bindChannelHealthcheck(channels, 30_000);
-
     return () => {
       notificationRealtimeReady = false;
-      unbindHealthcheck();
       window.clearTimeout(quickCatchupTimer);
       unbindFallbackPoll();
       unbindTodoReminderPoll();
-      channels.forEach(ch => supabase.removeChannel(ch));
+      unsubscribeNotifications();
     };
   }, [user?.department, user?.name, user?.permissions, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);
 
