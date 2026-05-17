@@ -1,22 +1,32 @@
 // ============================================================
 // lib/db/auth/policies.ts
-// 186개 RLS 정책을 5가지 패턴으로 분류 후 앱 권한 검사로 이식.
+// extracted_policies.sql 72개 정책(30개 테이블 + storage)을 14개 패턴으로
+// 분류해 D1에서 사용 가능한 권한 검사 코드로 이식.
 //
-// 분류 결과:
-//   - PUBLIC               : 16개 (FOR ALL USING (true)) — 인증된 사용자 누구나
-//   - SELF_ONLY            : 본인 row만 (staff_id = erp_staff_id())
-//   - SELF_OR_SAME_COMPANY : 본인 + 같은 회사 관리자 + 시스템 관리자
-//   - STAFF_IN_SCOPE       : erp_target_staff_in_scope(staff_id) 동등
-//   - INVENTORY_SCOPE      : 인벤토리 회사/부서 scope
-//
-// 정책별 매핑은 POLICY_REGISTRY에 누적. 175개를 한 번에 다 옮기지 않고
-// 각 API 라우트에서 사용하는 테이블만 점진적으로 추가 → JM2 (불필요한
-// 검사 회피) 원칙 준수.
+// 패턴 목록 (14):
+//   1. PUBLIC                      - FOR ALL USING (true) (인증 무관)
+//   2. AUTHENTICATED               - auth.uid() IS NOT NULL (로그인 사용자)
+//   3. SELF_ONLY                   - staff_id = erp_staff_id() OR is_admin
+//   4. ADMIN_OR_MANAGER            - is_admin OR erp_can_manage_company()
+//   5. MANAGE_COMPANY              - admin OR (manage_company AND
+//                                    erp_company_matches(company_id))
+//   6. MANAGE_COMPANY_OR_NULL      - admin OR (manage_company AND
+//                                    (company_id IS NULL OR matches))
+//   7. SELF_OR_SAME_COMPANY        - self OR (manage_company AND matches)
+//   8. STAFF_IN_SCOPE              - erp_target_staff_in_scope(staff_id)
+//   9. COMPANY_SCOPE_OR_NULL       - admin OR company_id IS NULL OR matches
+//  10. ROSTER_APPROVER_OR_SELF     - staff_id = me OR is_roster_approver
+//  11. APPROVAL_SCOPE              - admin OR sender=me OR approver=me OR
+//                                    company_matches
+//  12. INVENTORY_SCOPE             - erp_inventory_scope_matches
+//  13. COMPANY_INVENTORY_SCOPE     - erp_inventory_company_scope_matches
+//  14. DEPARTMENT_INVENTORY_SCOPE  - erp_department_inventory_scope_matches
 //
 // 사용 예 (API route):
-//   import { assertCanRead, assertCanWrite } from '@/lib/db/auth/policies';
-//   await assertCanRead({ table: 'leave_requests', row, claims });
-//   await assertCanWrite({ table: 'leave_requests', op: 'insert', row, claims });
+//   import { assertAccess } from '@/lib/db/auth/policies';
+//   await assertAccess({ db, claims, table: 'leave_requests', op: 'insert', row });
+//
+// Phase 4 — 미등록 테이블은 erpIsAdmin only로 default-deny 유지.
 // ============================================================
 
 import type { D1Client } from '../client-d1';
@@ -27,7 +37,11 @@ import {
   erpCanManageCompany,
   erpCompanyMatches,
   erpInventoryScopeMatches,
+  erpInventoryCompanyScopeMatches,
+  erpDepartmentInventoryScopeMatches,
+  erpTargetStaffSameCompany,
   erpTargetStaffInScope,
+  erpIsRosterApprover,
 } from './claims';
 
 // ─────────────────────────────────────────────────────────────
@@ -35,20 +49,33 @@ import {
 // ─────────────────────────────────────────────────────────────
 export type PolicyPattern =
   | 'PUBLIC'
+  | 'AUTHENTICATED'
   | 'SELF_ONLY'
+  | 'ADMIN_OR_MANAGER'
+  | 'MANAGE_COMPANY'
+  | 'MANAGE_COMPANY_OR_NULL'
   | 'SELF_OR_SAME_COMPANY'
   | 'STAFF_IN_SCOPE'
-  | 'INVENTORY_SCOPE';
+  | 'COMPANY_SCOPE_OR_NULL'
+  | 'ROSTER_APPROVER_OR_SELF'
+  | 'APPROVAL_SCOPE'
+  | 'INVENTORY_SCOPE'
+  | 'COMPANY_INVENTORY_SCOPE'
+  | 'DEPARTMENT_INVENTORY_SCOPE';
 
 export type Op = 'select' | 'insert' | 'update' | 'delete';
 
 /**
- * 한 테이블의 정책 — op별로 다른 패턴을 허용. 원본 RLS도 op별로 분리되어 있었음.
+ * 한 테이블의 정책 — op별로 다른 패턴을 허용.
  *
- * staffIdField  : SELF_ONLY / STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY 패턴에서
- *                 row의 어느 필드를 'staff_id'로 볼지 (기본 'staff_id')
- * companyIdField: SELF_OR_SAME_COMPANY 패턴에서 회사 id 필드 (기본 'company_id')
- * inventoryFields: INVENTORY_SCOPE 패턴에서 사용할 필드 매핑
+ * staffIdField    : SELF_ONLY / STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY /
+ *                   ROSTER_APPROVER_OR_SELF 패턴에서 row의 staff 필드명
+ *                   (기본 'staff_id', notifications은 'user_id' 등)
+ * companyIdField  : MANAGE_COMPANY* / SELF_OR_SAME_COMPANY 등에서 company
+ *                   필드명 (기본 'company_id', inventory_cost_entries는
+ *                   'company_name' 등)
+ * inventoryFields : INVENTORY_SCOPE / *_INVENTORY_SCOPE에서 사용
+ * approvalFields  : APPROVAL_SCOPE에서 sender/approver 필드명
  */
 export interface TablePolicy {
   table: string;
@@ -63,22 +90,64 @@ export interface TablePolicy {
     company_id?: string;
     department?: string;
   };
+  approvalFields?: {
+    sender?: string;
+    approver?: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
-// 정책 레지스트리 — 패턴화된 정책만 등록.
-// FOR ALL USING (true) 정책은 PUBLIC, 누락된 테이블은 admin-only로 안전 폴백.
+// 정책 레지스트리
+// 미등록 테이블은 erpIsAdmin only로 default-deny.
 // ─────────────────────────────────────────────────────────────
-export const POLICY_REGISTRY: Record<string, TablePolicy> = {
+type Registry = Record<string, TablePolicy>;
+
+const PUBLIC_ALL = (table: string): TablePolicy => ({
+  table,
+  select: 'PUBLIC',
+  insert: 'PUBLIC',
+  update: 'PUBLIC',
+  delete: 'PUBLIC',
+});
+
+export const POLICY_REGISTRY: Registry = {
+  // ── PUBLIC: FOR ALL USING (true) — 인증 무관 또는 to authenticated USING true
+  staff_members: PUBLIC_ALL('staff_members'),
+  companies: PUBLIC_ALL('companies'),
+  board_posts: PUBLIC_ALL('board_posts'),
+  daily_closures: PUBLIC_ALL('daily_closures'),
+  daily_closure_items: PUBLIC_ALL('daily_closure_items'),
+  daily_checks: PUBLIC_ALL('daily_checks'),
+  system_configs: PUBLIC_ALL('system_configs'),
+  work_shifts: PUBLIC_ALL('work_shifts'),
+  contract_templates: PUBLIC_ALL('contract_templates'),
+  employment_contracts: PUBLIC_ALL('employment_contracts'),
+  staff_evaluations: PUBLIC_ALL('staff_evaluations'),
+  staff_preferred_off: PUBLIC_ALL('staff_preferred_off'),
+  monthly_off_quota: PUBLIC_ALL('monthly_off_quota'),
+  board_post_reads: PUBLIC_ALL('board_post_reads'),
+  license_continuing_education: PUBLIC_ALL('license_continuing_education'),
+  popups: PUBLIC_ALL('popups'),
+  messages: PUBLIC_ALL('messages'),
+
+  // ── STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY / SELF_ONLY (직원 단위)
   push_subscriptions: {
     table: 'push_subscriptions',
     select: 'STAFF_IN_SCOPE',
-    insert: 'SELF_ONLY', // erp_is_admin OR staff_id = erp_staff_id (admin은 패턴 내부에서 처리)
+    insert: 'SELF_ONLY',
     update: 'SELF_ONLY',
     delete: 'SELF_ONLY',
   },
   notifications: {
     table: 'notifications',
+    select: 'STAFF_IN_SCOPE',
+    insert: 'SELF_OR_SAME_COMPANY',
+    update: 'STAFF_IN_SCOPE',
+    delete: 'SELF_ONLY',
+    staffIdField: 'user_id',
+  },
+  todo_reminder_logs: {
+    table: 'todo_reminder_logs',
     select: 'STAFF_IN_SCOPE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'STAFF_IN_SCOPE',
@@ -106,16 +175,134 @@ export const POLICY_REGISTRY: Record<string, TablePolicy> = {
     update: 'SELF_OR_SAME_COMPANY',
     delete: 'SELF_OR_SAME_COMPANY',
   },
-  // 'Public Access *' FOR ALL USING (true) 패턴
-  staff_members: { table: 'staff_members', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  companies: { table: 'companies', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  board_posts: { table: 'board_posts', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  daily_closures: { table: 'daily_closures', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  system_configs: { table: 'system_configs', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  work_shifts: { table: 'work_shifts', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  contract_templates: { table: 'contract_templates', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  employment_contracts: { table: 'employment_contracts', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
-  staff_evaluations: { table: 'staff_evaluations', select: 'PUBLIC', insert: 'PUBLIC', update: 'PUBLIC', delete: 'PUBLIC' },
+  insurance_records: {
+    table: 'insurance_records',
+    select: 'STAFF_IN_SCOPE',
+    insert: 'STAFF_IN_SCOPE',
+    update: 'STAFF_IN_SCOPE',
+    delete: 'STAFF_IN_SCOPE',
+  },
+
+  // ── PAYROLL_MANAGE는 별도 패턴이 아니라 select=STAFF_IN_SCOPE,
+  //    write=MANAGE_COMPANY + staff_id same_company 조건은 evalPattern에서 처리.
+  //    원본 RLS는 admin OR (can_manage_company AND target_staff_same_company)인데
+  //    target_staff_same_company는 row.staff_id 기반 DB 조회 필요.
+  //    여기서는 MANAGE_COMPANY 패턴 사용 + companyIdField 없음 가정 →
+  //    SELF_OR_SAME_COMPANY 패턴 + staffIdField로 처리 (가장 가까운 의미).
+  payroll_records: {
+    table: 'payroll_records',
+    select: 'STAFF_IN_SCOPE',
+    insert: 'SELF_OR_SAME_COMPANY',
+    update: 'SELF_OR_SAME_COMPANY',
+    delete: 'SELF_OR_SAME_COMPANY',
+  },
+
+  // ── AUTHENTICATED + ADMIN_OR_MANAGER (회사 단위 단순 회사 관리)
+  corporate_cards: {
+    table: 'corporate_cards',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
+  },
+  corporate_card_transactions: {
+    table: 'corporate_card_transactions',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
+  },
+  company_holidays: {
+    table: 'company_holidays',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
+  },
+  company_seals: {
+    table: 'company_seals',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
+  },
+
+  // ── COMPANY_SCOPE_OR_NULL (회사 scope, null company_id는 전사)
+  wiki_documents: {
+    table: 'wiki_documents',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+  },
+  wiki_folders: {
+    table: 'wiki_folders',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+  },
+  wiki_document_versions: {
+    table: 'wiki_document_versions',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+  },
+  op_check_templates: {
+    table: 'op_check_templates',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+  },
+  op_patient_checks: {
+    table: 'op_patient_checks',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+  },
+
+  // ── MANAGE_COMPANY_OR_NULL — roster_policy_settings (can_manage + null/match)
+  roster_policy_settings: {
+    table: 'roster_policy_settings',
+    select: 'MANAGE_COMPANY_OR_NULL',
+    insert: 'MANAGE_COMPANY_OR_NULL',
+    update: 'MANAGE_COMPANY_OR_NULL',
+    delete: 'MANAGE_COMPANY_OR_NULL',
+  },
+
+  // ── ROSTER_APPROVER_OR_SELF (근무표 결재 워크플로우)
+  roster_approval_requests: {
+    table: 'roster_approval_requests',
+    select: 'ROSTER_APPROVER_OR_SELF',
+    insert: 'ROSTER_APPROVER_OR_SELF',
+    update: 'ROSTER_APPROVER_OR_SELF', // update는 approver만 (원본) — 단순화
+    delete: 'SELF_ONLY',
+    staffIdField: 'requested_by',
+  },
+  roster_swap_requests: {
+    table: 'roster_swap_requests',
+    select: 'ROSTER_APPROVER_OR_SELF',
+    insert: 'ROSTER_APPROVER_OR_SELF',
+    update: 'ROSTER_APPROVER_OR_SELF',
+    delete: 'SELF_ONLY',
+    staffIdField: 'requested_by',
+  },
+
+  // ── APPROVAL_SCOPE (전자결재)
+  approvals: {
+    table: 'approvals',
+    select: 'APPROVAL_SCOPE',
+    insert: 'SELF_OR_SAME_COMPANY',
+    update: 'APPROVAL_SCOPE',
+    delete: 'SELF_ONLY',
+    staffIdField: 'sender_id',
+    approvalFields: { sender: 'sender_id', approver: 'current_approver_id' },
+  },
+
+  // ── INVENTORY_SCOPE
   inventory: {
     table: 'inventory',
     select: 'INVENTORY_SCOPE',
@@ -124,6 +311,70 @@ export const POLICY_REGISTRY: Record<string, TablePolicy> = {
     delete: 'INVENTORY_SCOPE',
     inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
   },
+  inventory_logs: {
+    table: 'inventory_logs',
+    select: 'INVENTORY_SCOPE',
+    insert: 'INVENTORY_SCOPE',
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
+  },
+  inventory_count_sessions: {
+    table: 'inventory_count_sessions',
+    select: 'INVENTORY_SCOPE',
+    insert: 'INVENTORY_SCOPE',
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
+  },
+  inventory_cost_entries: {
+    table: 'inventory_cost_entries',
+    select: 'INVENTORY_SCOPE',
+    insert: 'INVENTORY_SCOPE',
+    inventoryFields: { company: 'company_name', company_id: 'company_id', department: 'department' },
+  },
+  purchase_orders: {
+    table: 'purchase_orders',
+    select: 'INVENTORY_SCOPE',
+    insert: 'INVENTORY_SCOPE',
+    update: 'INVENTORY_SCOPE',
+    delete: 'INVENTORY_SCOPE',
+    inventoryFields: { company: 'requester_company', department: 'requester_department' },
+  },
+
+  // ── COMPANY_INVENTORY_SCOPE
+  inventory_closing_snapshots: {
+    table: 'inventory_closing_snapshots',
+    select: 'COMPANY_INVENTORY_SCOPE',
+    insert: 'COMPANY_INVENTORY_SCOPE',
+    inventoryFields: { company: 'company', company_id: 'company_id' },
+  },
+  delivery_confirmations: {
+    table: 'delivery_confirmations',
+    select: 'COMPANY_INVENTORY_SCOPE',
+    insert: 'COMPANY_INVENTORY_SCOPE',
+    update: 'COMPANY_INVENTORY_SCOPE',
+    delete: 'COMPANY_INVENTORY_SCOPE',
+    inventoryFields: { company: 'receiver_company' },
+  },
+
+  // ── DEPARTMENT_INVENTORY_SCOPE
+  department_private_inventory_items: {
+    table: 'department_private_inventory_items',
+    select: 'DEPARTMENT_INVENTORY_SCOPE',
+    insert: 'DEPARTMENT_INVENTORY_SCOPE',
+    update: 'DEPARTMENT_INVENTORY_SCOPE',
+    delete: 'DEPARTMENT_INVENTORY_SCOPE',
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
+  },
+  department_private_inventory_logs: {
+    table: 'department_private_inventory_logs',
+    select: 'DEPARTMENT_INVENTORY_SCOPE',
+    insert: 'DEPARTMENT_INVENTORY_SCOPE',
+    // update/delete는 admin-only (원본) — 등록 X = default deny (admin only)
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
+  },
+
+  // 미등록 (default deny = admin only):
+  //   inventory_transfers (from/to OR — 별도 패턴 필요, 일단 admin-only)
+  //   inventory_price_history (sub-select 검사 — admin-only)
+  //   backup_restore_runs (admin-only — default deny 처리됨)
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -142,6 +393,7 @@ async function evalPattern(
   cfg: TablePolicy,
 ): Promise<boolean> {
   if (pattern === 'PUBLIC') return true;
+  if (pattern === 'AUTHENTICATED') return erpStaffId(claims) !== null;
   if (erpIsAdmin(claims)) return true;
 
   const staffField = cfg.staffIdField ?? 'staff_id';
@@ -152,10 +404,31 @@ async function evalPattern(
     return rowStaff !== null && rowStaff === erpStaffId(claims);
   }
 
+  if (pattern === 'ADMIN_OR_MANAGER') {
+    return erpCanManageCompany(claims);
+  }
+
+  if (pattern === 'MANAGE_COMPANY') {
+    if (!erpCanManageCompany(claims)) return false;
+    return erpCompanyMatches(claims, getField<string>(row, companyField));
+  }
+
+  if (pattern === 'MANAGE_COMPANY_OR_NULL') {
+    if (!erpCanManageCompany(claims)) return false;
+    const v = getField<string>(row, companyField);
+    if (v === null) return true;
+    return erpCompanyMatches(claims, v);
+  }
+
   if (pattern === 'SELF_OR_SAME_COMPANY') {
     const rowStaff = getField<string>(row, staffField);
     if (rowStaff !== null && rowStaff === erpStaffId(claims)) return true;
     if (!erpCanManageCompany(claims)) return false;
+    if (rowStaff !== null) {
+      // payroll_records 등에서 target_staff_same_company 의미와 일치하도록 보강.
+      const sameCompany = await erpTargetStaffSameCompany(db, claims, rowStaff);
+      if (sameCompany) return true;
+    }
     return erpCompanyMatches(claims, getField<string>(row, companyField));
   }
 
@@ -165,9 +438,49 @@ async function evalPattern(
     return erpTargetStaffInScope(db, claims, rowStaff);
   }
 
+  if (pattern === 'COMPANY_SCOPE_OR_NULL') {
+    const v = getField<string>(row, companyField);
+    if (v === null) return true;
+    return erpCompanyMatches(claims, v);
+  }
+
+  if (pattern === 'ROSTER_APPROVER_OR_SELF') {
+    const rowStaff = getField<string>(row, staffField);
+    if (rowStaff !== null && rowStaff === erpStaffId(claims)) return true;
+    return erpIsRosterApprover(db, claims);
+  }
+
+  if (pattern === 'APPROVAL_SCOPE') {
+    const fields = cfg.approvalFields ?? {};
+    const sender = getField<string>(row, fields.sender ?? 'sender_id');
+    const approver = getField<string>(row, fields.approver ?? 'current_approver_id');
+    const me = erpStaffId(claims);
+    if (me !== null && (sender === me || approver === me)) return true;
+    return erpCompanyMatches(claims, getField<string>(row, companyField));
+  }
+
   if (pattern === 'INVENTORY_SCOPE') {
     const f = cfg.inventoryFields ?? {};
     return erpInventoryScopeMatches(
+      claims,
+      getField<string>(row, f.company ?? 'company'),
+      getField<string>(row, f.company_id ?? 'company_id'),
+      getField<string>(row, f.department ?? 'department'),
+    );
+  }
+
+  if (pattern === 'COMPANY_INVENTORY_SCOPE') {
+    const f = cfg.inventoryFields ?? {};
+    return erpInventoryCompanyScopeMatches(
+      claims,
+      getField<string>(row, f.company ?? 'company'),
+      getField<string>(row, f.company_id ?? 'company_id'),
+    );
+  }
+
+  if (pattern === 'DEPARTMENT_INVENTORY_SCOPE') {
+    const f = cfg.inventoryFields ?? {};
+    return erpDepartmentInventoryScopeMatches(
       claims,
       getField<string>(row, f.company ?? 'company'),
       getField<string>(row, f.company_id ?? 'company_id'),
@@ -205,12 +518,13 @@ export interface PolicyCheckArgs {
 }
 
 /**
- * 단일 row가 정책을 통과하는지 검사. 통과하지 못하면 false.
- * 등록되지 않은 테이블은 default deny (관리자만 허용).
+ * 단일 row가 정책을 통과하는지 검사.
+ * 등록되지 않은 테이블 또는 등록은 됐으나 해당 op 미정의는
+ * default deny (관리자만 허용).
  */
 export async function canAccess(args: PolicyCheckArgs): Promise<boolean> {
   const cfg = POLICY_REGISTRY[args.table];
-  if (!cfg) return erpIsAdmin(args.claims); // default deny
+  if (!cfg) return erpIsAdmin(args.claims);
   const pattern = cfg[args.op];
   if (!pattern) return erpIsAdmin(args.claims);
   return evalPattern(pattern, args.db, args.claims, args.row, cfg);
@@ -241,6 +555,7 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
   const cfg = POLICY_REGISTRY[table];
   if (!cfg || !cfg.select) return erpIsAdmin(claims) ? rows : [];
   if (cfg.select === 'PUBLIC') return rows;
+  if (cfg.select === 'AUTHENTICATED') return erpStaffId(claims) !== null ? rows : [];
   if (erpIsAdmin(claims)) return rows;
 
   const out: T[] = [];
