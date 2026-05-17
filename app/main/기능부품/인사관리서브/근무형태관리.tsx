@@ -741,31 +741,32 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
       } as any,
     });
 
-    const writeShift = async (payload: any, id?: string) => {
-      if (id) {
-        const { error } = await supabase.from('work_shifts').update(payload).eq('id', id);
-        return error;
-      }
-      const { error } = await supabase.from('work_shifts').insert([payload]);
-      return error;
-    };
-
     const persistCompanyShift = async (companyName: string, id?: string) => {
-      const { fullPayload, minPayload } = buildPayloads(companyName);
-      let error = await writeShift(fullPayload, id);
-      if (error) {
-        console.warn('[전체] 실패:', error.message, '→ 최소 필드로 재시도');
-        error = await writeShift(minPayload, id);
+      const { fullPayload } = buildPayloads(companyName);
+      const body = id ? { ...fullPayload, id } : fullPayload;
+      const res = await fetch('/api/work-shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'same-origin',
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
       }
-      if (error) throw error;
     };
 
     const deactivateShiftRows = async (ids: string[]) => {
       if (ids.length === 0) return;
-      const { error } = await supabase.from('work_shifts').update({ is_active: false }).in('id', ids);
-      if (error) {
-        const retry = await supabase.from('work_shifts').delete().in('id', ids);
-        if (retry.error) throw retry.error;
+      const res = await fetch('/api/work-shifts/bulk-deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+        credentials: 'same-origin',
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
       }
     };
 
@@ -812,11 +813,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
     });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('work_shifts').update({ is_active: false }).in('id', group.ids);
-      if (error) {
-        const retry = await supabase.from('work_shifts').delete().in('id', group.ids);
-        if (retry.error) throw retry.error;
-      }
+      const res = await fetch('/api/work-shifts/bulk-deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: group.ids }),
+        credentials: 'same-origin',
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       fetchShifts();
     } catch (err: unknown) {
       toast('삭제에 실패했습니다.\n원인: ' + ((err as Error)?.message || ''), 'error');
