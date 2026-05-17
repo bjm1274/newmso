@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import { supabase } from './supabase';
+import { mirrorRowsToD1, system_settings as systemSettingsTable } from './db';
 
 export const LEAVE_POLICY_SETTINGS_KEY = 'leave_policy_rules_v1';
 
@@ -139,6 +141,25 @@ export async function saveLeavePolicySettings(selectedCompany: string, settings:
 
   const { error } = await supabase.from('system_settings').upsert(payload, { onConflict: 'key' });
   if (error) throw error;
+
+  // D1 미러 — value/updated_at만 (description은 D1 스키마에 없음)
+  await mirrorRowsToD1(
+    systemSettingsTable,
+    {
+      key: payload.key,
+      value: JSON.stringify(payload.value),
+      updated_at: payload.updated_at,
+    },
+    {
+      label: 'system_settings',
+      onConflict: 'update',
+      target: systemSettingsTable.key,
+      set: {
+        value: sql`excluded.value`,
+        updated_at: sql`excluded.updated_at`,
+      },
+    },
+  );
 
   writeLocalFallbackStore(nextStore);
   return nextStore;

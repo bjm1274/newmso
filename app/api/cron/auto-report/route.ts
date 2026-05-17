@@ -5,6 +5,7 @@ import {
   generateMonthlyPayrollReport,
   notifyRecipients,
 } from '@/lib/auto-report-generator';
+import { mirrorRowsToD1, generated_reports as generatedReportsTable } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,14 +55,28 @@ export async function GET(request: Request) {
           summary = report.summary;
         }
 
-        // generated_reports에 기록
-        await supabase.from('generated_reports').insert({
+        // generated_reports에 기록 — Supabase + D1 미러
+        const reportRow = {
           schedule_id: schedule.id,
           report_type: reportType,
           period,
           status: 'completed',
           summary,
-        });
+        };
+        await supabase.from('generated_reports').insert(reportRow);
+        await mirrorRowsToD1(
+          generatedReportsTable,
+          {
+            id: crypto.randomUUID(),
+            schedule_id: reportRow.schedule_id,
+            report_type: reportRow.report_type,
+            period: reportRow.period,
+            status: reportRow.status,
+            summary: JSON.stringify(reportRow.summary),
+            created_at: new Date().toISOString(),
+          },
+          { label: 'generated_reports' },
+        );
 
         // 스케줄 last_generated_at 업데이트
         await supabase

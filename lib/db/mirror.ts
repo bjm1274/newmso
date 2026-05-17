@@ -17,17 +17,28 @@
 //   - schema의 테이블 객체를 직접 전달 (타입 안전)
 // ============================================================
 
+import type { AnyColumn, SQL } from 'drizzle-orm';
 import type { SQLiteTable } from 'drizzle-orm/sqlite-core';
 import { getD1Binding, resolveDataBackend } from './get-binding';
 import { getD1Drizzle } from './client-d1';
 
-export interface MirrorOptions {
+export interface MirrorOptions<T extends SQLiteTable = SQLiteTable> {
   /**
    * 충돌 처리 정책:
    *   'do_nothing' — ON CONFLICT DO NOTHING (멱등 미러에 적합)
    *   'throw'      — 충돌 시 throw (기본)
+   *   'update'     — ON CONFLICT (target) DO UPDATE SET ... (upsert)
    */
-  onConflict?: 'do_nothing' | 'throw';
+  onConflict?: 'do_nothing' | 'throw' | 'update';
+  /**
+   * onConflict='update'일 때 충돌 컬럼(여러 개면 복합 unique).
+   * 예: [system_settings.key] 또는 [staff_job_categories.staff_id, ...job_category_id]
+   */
+  target?: AnyColumn | AnyColumn[];
+  /**
+   * onConflict='update'일 때 UPDATE SET 절. sql\`excluded.col\`로 새 값 참조 가능.
+   */
+  set?: Record<string, SQL | AnyColumn | unknown>;
   /**
    * 로그 식별자 — warn 메시지에 표시 ([mirror:audit_logs] 등)
    */
@@ -42,7 +53,7 @@ export interface MirrorOptions {
 export async function mirrorRowsToD1<T extends SQLiteTable>(
   table: T,
   rows: T['$inferInsert'] | T['$inferInsert'][],
-  options?: MirrorOptions,
+  options?: MirrorOptions<T>,
 ): Promise<void> {
   const list = Array.isArray(rows) ? rows : [rows];
   if (list.length === 0) return;
@@ -63,10 +74,22 @@ export async function mirrorRowsToD1<T extends SQLiteTable>(
 
   try {
     const db = getD1Drizzle(d1);
-    const query = options?.onConflict === 'do_nothing'
-      ? db.insert(table).values(list as never).onConflictDoNothing()
-      : db.insert(table).values(list as never);
-    await query;
+    const base = db.insert(table).values(list as never);
+    let query: unknown;
+    if (options?.onConflict === 'do_nothing') {
+      query = base.onConflictDoNothing();
+    } else if (options?.onConflict === 'update') {
+      if (!options.target || !options.set) {
+        throw new Error(`[${label}] onConflict='update' requires target + set`);
+      }
+      query = base.onConflictDoUpdate({
+        target: options.target as never,
+        set: options.set as never,
+      });
+    } else {
+      query = base;
+    }
+    await (query as Promise<unknown>);
   } catch (err) {
     if (backend === 'd1') throw err;
     console.warn(`[${label}] D1 mirror failed`, {

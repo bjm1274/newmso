@@ -8,6 +8,7 @@
 
 import { fetcher, invalidateCache } from '@/lib/fetcher';
 import { supabase } from '@/lib/supabase';
+import { mirrorRowsToD1, org_teams as orgTeamsTable } from '@/lib/db';
 
 const ORG_TTL = 300_000; // 5분
 
@@ -100,7 +101,16 @@ export type OrgTeamCreateInput = {
  */
 export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error: Error | null }> {
   const { error } = await supabase.from('org_teams').insert(input);
-  if (!error) invalidateOrgTeams(input.company_name);
+  if (!error) {
+    invalidateOrgTeams(input.company_name);
+    await mirrorRowsToD1(orgTeamsTable, {
+      id: crypto.randomUUID(),
+      company_name: input.company_name,
+      division: input.division,
+      team_name: input.team_name,
+      sort_order: input.sort_order,
+    }, { label: 'org_teams' });
+  }
   return { error: error as Error | null };
 }
 
