@@ -30,3 +30,10 @@ crons = [
   "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
   "0 0 * * *",    # /api/cron/unread-notification-repush (KST 09:00 — 안 읽은 공지/결재 1회 재알림)
 ]
+
+# Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)
+# 사용: env.DB 로 접근 → getD1Drizzle(env.DB)로 Drizzle 클라이언트 생성
+[[d1_databases]]
+binding = "DB"
+database_name = "pchos-d1"
+database_id = "e6e054c7-2bba-4a97-a740-b39a42906a74"
