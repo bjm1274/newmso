@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   isRelationMarkedMissing,
   rememberMissingRelation,
@@ -1847,42 +1848,22 @@ export default function ChatView({
     void syncNoticeRoomMembers(chatRooms);
   }, [chatRooms, syncNoticeRoomMembers]);
 
+  // Phase 5-C — Supabase Realtime channel → polling으로 전환.
+  // chat_rooms 테이블 변경(생성/이름변경/멤버변경/삭제) 감지 시 전체 리스트 refetch.
+  // 폴링 5초 + visibility hidden 자동 중단(polling-bus 내장).
   useEffect(() => {
-    const channel = supabase.channel('chat-rooms-list')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, (payload: Record<string, unknown>) => {
-        const eventType = String(payload.eventType || '');
-        const nextRoom = (payload.new as ChatRoom | null) || null;
-        const previousRoom = (payload.old as Partial<ChatRoom> | null) || null;
-        const roomId = String(nextRoom?.id || previousRoom?.id || '').trim();
-        if (!roomId) return;
-
-        setChatRooms((prev) => {
-          if (eventType === 'DELETE') {
-            return prev.filter((room: ChatRoom) => String(room.id) !== roomId);
-          }
-
-          if (!nextRoom?.id) return prev;
-          const existingIndex = prev.findIndex((room: ChatRoom) => String(room.id) === roomId);
-          const mergedRoom = {
-            ...(existingIndex >= 0 ? prev[existingIndex] : {}),
-            ...nextRoom,
-          } as ChatRoom;
-
-          if (!isRoomAccessibleToCurrentUser(mergedRoom)) {
-            return existingIndex >= 0
-              ? prev.filter((room: ChatRoom) => String(room.id) !== roomId)
-              : prev;
-          }
-
-          const nextRooms =
-            existingIndex >= 0
-              ? prev.map((room: ChatRoom, index: number) => (index === existingIndex ? mergedRoom : room))
-              : [...prev, mergedRoom];
-          return sortChatRoomsWithNoticeFirst(nextRooms);
+    return subscribeRealtime(
+      'chat-rooms-list',
+      [{ table: 'chat_rooms' }],
+      () => {
+        void fetchAllChatRooms({ force: true }).then((result) => {
+          if (result.error || !result.data) return;
+          const accessible = result.data.filter((room) => isRoomAccessibleToCurrentUser(room));
+          setChatRooms(sortChatRoomsWithNoticeFirst(accessible));
         });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      },
+      { pollIntervalMs: 5000 },
+    );
   }, [isRoomAccessibleToCurrentUser, sortChatRoomsWithNoticeFirst]);
   useChatRealtimeSubscriptions({
     userId: user?.id,
