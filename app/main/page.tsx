@@ -554,12 +554,26 @@ function MainPageContent() {
     }
   }, [mainMenu, resolveLegacyNavigation, subView, user]);
 
-  // 1-1. 강제 로그아웃 실시간 감지 (Session Security)
+  // Phase 5-C-1 — Supabase Realtime force-logout channel → 30초 polling.
+  // /api/auth/check-force-logout이 본인 staff row + force_logout_at 반환.
+  // visibility hidden 시 자동 중단(브라우저 setInterval 일시정지).
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase.channel(`force-logout-${user.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'staff_members', filter: `id=eq.${user.id}` }, (payload) => {
-        const safeNextUser = { ...(payload.new || {}) };
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch('/api/auth/check-force-logout', {
+          method: 'GET',
+          credentials: 'same-origin',
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          user?: Record<string, unknown>;
+        } | null;
+        if (!data?.ok || !data.user) return;
+
+        const safeNextUser = { ...data.user };
         delete safeNextUser.password;
         delete safeNextUser.passwd;
 
@@ -571,15 +585,22 @@ function MainPageContent() {
           persistClientUser(normalizedNextUser);
         }
 
-        const forceLogoutAt = payload.new.force_logout_at;
+        const forceLogoutAt = (data.user.force_logout_at as string | null | undefined) ?? null;
         if (isForceLogoutAfterLogin(forceLogoutAt, loginAt)) {
           toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
           void clearClientSession();
           window.location.href = '/';
         }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      } catch {
+        // 폴링 실패는 무시 (다음 tick에서 재시도)
+      }
+    };
+    void tick();
+    const interval = window.setInterval(() => void tick(), 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [clearClientSession, persistClientUser, user, user?.id, loginAt]);
 
   // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
