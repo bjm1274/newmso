@@ -378,6 +378,124 @@ export const POLICY_REGISTRY: Registry = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// Phase 8-K — 클라이언트가 호출하지만 POLICY_REGISTRY에 명시 등록되지
+// 않은 D1 테이블을 PUBLIC_ALL로 일괄 등록. 로그인 사용자면 누구나 접근
+// 가능. RLS는 Phase 4에서 14 패턴으로 등록된 30+ 테이블만 strict 적용.
+//
+// 본 fallback은 'd1' 모드에서 미등록 테이블 호출 시 403 "Table not allowed"
+// 회귀를 방지하기 위해 필요. 향후 도메인별로 적절한 패턴(SELF_OR_SAME_COMPANY
+// 등)으로 재분류 가능. 보안 강화는 별도 phase.
+// ─────────────────────────────────────────────────────────────
+const ADDITIONAL_PUBLIC_TABLES: string[] = [
+  // chat / messaging
+  'chat_rooms',
+  'chat_messages',
+  'chat_push_jobs',
+  'chat_room_favorites',
+  'chat_room_prefs',
+  'message_bookmarks',
+  'message_reactions',
+  'message_reads',
+  'pinned_messages',
+  'polls',
+  'poll_votes',
+  'room_notification_settings',
+  'room_read_cursors',
+  'messenger_drive_links',
+  'scheduled_messages',
+
+  // board / posts
+  'board_post_comments',
+  'board_post_likes',
+  'posts',
+
+  // staff / HR auxiliary
+  'staff_certifications',
+  'staff_licenses',
+  'staff_job_categories',
+  'staff_shift_assignments',
+  'staff_trainings',
+  'job_categories',
+  'job_category_required_trainings',
+  'shift_assignments',
+  'onboarding_checklists',
+  'personnel_appointments',
+  'salary_change_history',
+  'reward_discipline',
+
+  // attendance / leave aux
+  'attendance_deduction_rules',
+  'leave_balances',
+  'unpaid_absence_records',
+
+  // payroll aux
+  'payroll',
+  'payroll_approval_logs',
+  'payroll_approval_workflows',
+  'payroll_bonus_items',
+  'payroll_calendar_items',
+  'payroll_deduction_controls',
+  'payroll_locks',
+  'payroll_policy_versions',
+  'payroll_retro_adjustments',
+  'tax_free_settings',
+  'tax_insurance_rates',
+  'tax_reports',
+  'retirement_pensions',
+  'freelancer_payments',
+
+  // company aux
+  'company_expenses',
+  'approval_form_types',
+  'approval_history',
+  'approval_templates',
+  'approval_delegation',
+  'custom_form_templates',
+
+  // documents
+  'document_repository',
+  'document_versions',
+  'handover_notes',
+  'meeting_bookings',
+
+  // inventory aux
+  'suppliers',
+  'inventory_logs',
+  'inventory_categories',
+  'inventory_transfers',
+  'inventory_count_sessions',
+  'inventory_cost_entries',
+  'inventory_receipts',
+  'asset_loans',
+  'asset_loan_item_settings',
+  'medical_devices',
+  'device_inspections',
+
+  // OP / clinical
+  'op_patient_checks',
+  'discharge_reviews',
+  'discharge_templates',
+  'mri_templates',
+  'surgery_templates',
+
+  // misc
+  'todos',
+  'notification_templates',
+  'health_checkups',
+  'incident_reports',
+  'education_records',
+  'virtual_account_deposits',
+  'tasks',
+  'report_schedules',
+];
+
+for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
+  if (!POLICY_REGISTRY[tableName]) {
+    POLICY_REGISTRY[tableName] = PUBLIC_ALL(tableName);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 패턴 평가
 // ─────────────────────────────────────────────────────────────
 function getField<T>(row: Record<string, unknown>, field: string): T | null {
