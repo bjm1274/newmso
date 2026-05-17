@@ -18,7 +18,7 @@ NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
 #   ENABLE_D1_CLIENT=true로 /api/d1/query·/api/d1/mutate 라우팅.
 #   서버 mirror 헬퍼는 dual-write 모드 동작 그대로 (D1 binding 직접 사용).
 # 롤백 시 'dual-write'로 환원 + lib/supabase.ts ENABLE_D1_CLIENT=false 후 재배포.
-DATA_BACKEND = "d1"
+DATA_BACKEND = "dual-write"
 
 # Firebase Cloud Messaging (FCM) — 모바일 푸시 알림
 # 모두 NEXT_PUBLIC_* 접두사라 클라이언트 번들에 노출됨 (정상 — Firebase Console 도메인 화이트리스트로 보호).

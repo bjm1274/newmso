@@ -42,7 +42,7 @@ const realSupabase: SupabaseClient = createClient(url, key, {
 //
 // 운영 영향 발생 시 (예: 화면 깨짐, 'rpc() not supported' 다발) 이 플래그를
 // false로 되돌리고 재배포로 즉시 롤백.
-const ENABLE_D1_CLIENT = true;
+const ENABLE_D1_CLIENT = false;
 const isClientD1 = typeof window !== 'undefined' && ENABLE_D1_CLIENT;
 
 export const supabase = (isClientD1
