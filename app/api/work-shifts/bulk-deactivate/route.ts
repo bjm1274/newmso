@@ -3,15 +3,13 @@
 // 근무형태 일괄 비활성화 (실패 시 DELETE 폴백)
 //
 // 권한: admin / mso / hr / hr_근무형태
-// 동작:
-//   1) Supabase work_shifts SET is_active=false WHERE id IN (...)
-//      실패 시 DELETE WHERE id IN (...) 재시도 (legacy 호환)
-//   2) D1 미러 — Supabase가 deactivate면 update, delete면 D1도 delete
+// 동작: D1 work_shifts SET is_active=0 WHERE id IN (...)
+//       update 실패(FK 등) 시 DELETE WHERE id IN (...) 재시도 (legacy 호환)
 //
 // Phase 2.12 — 기존 클라이언트 deactivate 흐름의 서버 라우트화
+// Phase 8-D — supabase 직접 의존 제거, D1 직접 사용
 // ============================================================
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inArray } from 'drizzle-orm';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
@@ -19,8 +17,6 @@ import {
   work_shifts as workShiftsTable,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
-  logD1MirrorFailure,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -42,36 +38,6 @@ function hasPermission(user: SessionUser | null | undefined): boolean {
   );
 }
 
-function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server configuration is missing.');
-  return createClient(url, key);
-}
-
-async function mirrorToD1(ids: string[], deleted: boolean) {
-  try {
-    const backend = await resolveDataBackend();
-    if (backend === 'supabase') return;
-    const d1 = await getD1Binding();
-    if (!d1) return;
-    const db = getD1Drizzle(d1);
-    if (deleted) {
-      await db.delete(workShiftsTable).where(inArray(workShiftsTable.id, ids));
-    } else {
-      await db
-        .update(workShiftsTable)
-        .set({ is_active: 0 })
-        .where(inArray(workShiftsTable.id, ids));
-    }
-  } catch (err) {
-    logD1MirrorFailure(err, {
-      label: deleted ? 'mirror:work_shifts.delete' : 'mirror:work_shifts.deactivate',
-      count: ids.length,
-    });
-  }
-}
-
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -84,22 +50,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Invalid payload' }, { status: 400 });
     }
     const { ids } = parsed.data;
-    const supabase = createAdminClient();
 
-    const deactivate = await supabase
-      .from('work_shifts')
-      .update({ is_active: false })
-      .in('id', ids);
-    let deleted = false;
-    if (deactivate.error) {
-      const retry = await supabase.from('work_shifts').delete().in('id', ids);
-      if (retry.error) {
-        return NextResponse.json({ ok: false, error: retry.error.message }, { status: 500 });
-      }
-      deleted = true;
+    const d1 = await getD1Binding();
+    if (!d1) {
+      return NextResponse.json(
+        { ok: false, error: 'D1 binding not available' },
+        { status: 500 },
+      );
     }
+    const db = getD1Drizzle(d1);
 
-    await mirrorToD1(ids, deleted);
+    // is_active boolean → 0 (D1 SQLite는 integer 보관)
+    let deleted = false;
+    try {
+      await db
+        .update(workShiftsTable)
+        .set({ is_active: 0 })
+        .where(inArray(workShiftsTable.id, ids));
+    } catch (updateErr) {
+      // legacy 호환: update가 막힌 환경에서는 DELETE 재시도
+      try {
+        await db.delete(workShiftsTable).where(inArray(workShiftsTable.id, ids));
+        deleted = true;
+      } catch (deleteErr) {
+        const message =
+          deleteErr instanceof Error
+            ? deleteErr.message
+            : updateErr instanceof Error
+              ? updateErr.message
+              : 'work_shifts mutation failed';
+        return NextResponse.json({ ok: false, error: message }, { status: 500 });
+      }
+    }
 
     return NextResponse.json({ ok: true, count: ids.length, deleted });
   } catch (err) {

@@ -7,12 +7,10 @@
 //     기존 멤버 중 하나여야 함 (자기 자신을 추방 케이스 포함)
 //   - NOTICE/SELF 방의 자동 sync는 우회 검증
 //
-// 동작:
-//   1) Supabase chat_rooms UPDATE SET ... WHERE id = ?
-//   2) D1 미러 — drizzle update WHERE id = ?
+// 동작: D1 chat_rooms UPDATE SET ... WHERE id = ?
+//       members는 jsonb → JSON.stringify
 // ============================================================
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
@@ -20,8 +18,6 @@ import {
   chat_rooms as chatRoomsTable,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
-  logD1MirrorFailure,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -43,29 +39,14 @@ function userId(user: SessionUser | null | undefined): string | null {
   return trimmed || null;
 }
 
-function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server configuration is missing.');
-  return createClient(url, key);
-}
+type ChatRoomsUpdateSet = Partial<typeof chatRoomsTable.$inferInsert>;
 
-async function mirrorToD1(roomId: string, patch: z.infer<typeof PatchSchema>) {
-  try {
-    const backend = await resolveDataBackend();
-    if (backend === 'supabase') return;
-    const d1 = await getD1Binding();
-    if (!d1) return;
-    const db = getD1Drizzle(d1);
-    const setClause: Record<string, unknown> = {};
-    if (patch.name !== undefined) setClause.name = patch.name;
-    if (patch.type !== undefined) setClause.type = patch.type;
-    if (patch.members !== undefined) setClause.members = JSON.stringify(patch.members);
-    if (Object.keys(setClause).length === 0) return;
-    await db.update(chatRoomsTable).set(setClause).where(eq(chatRoomsTable.id, roomId));
-  } catch (err) {
-    logD1MirrorFailure(err, { label: 'mirror:chat_rooms.patch' });
-  }
+function buildChatRoomUpdateSet(patch: z.infer<typeof PatchSchema>): ChatRoomsUpdateSet {
+  const set: ChatRoomsUpdateSet = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.type !== undefined) set.type = patch.type;
+  if (patch.members !== undefined) set.members = JSON.stringify(patch.members);
+  return set;
 }
 
 export async function PATCH(
@@ -92,12 +73,21 @@ export async function PATCH(
       );
     }
 
-    const supabase = createAdminClient();
-    const { error } = await supabase.from('chat_rooms').update(parsed.data).eq('id', roomId);
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    const setClause = buildChatRoomUpdateSet(parsed.data);
+    if (Object.keys(setClause).length === 0) {
+      return NextResponse.json({ ok: true });
     }
-    await mirrorToD1(roomId, parsed.data);
+
+    const d1 = await getD1Binding();
+    if (!d1) {
+      return NextResponse.json(
+        { ok: false, error: 'D1 binding not available' },
+        { status: 500 },
+      );
+    }
+    const db = getD1Drizzle(d1);
+    await db.update(chatRoomsTable).set(setClause).where(eq(chatRoomsTable.id, roomId));
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error';

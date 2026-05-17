@@ -5,8 +5,14 @@
  * mutation(메시지 삭제) 후 자동 캐시 무효화.
  */
 
+import { eq } from 'drizzle-orm';
 import { fetcher, invalidateCache } from '@/lib/fetcher';
 import { supabase } from '@/lib/supabase';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  messages as messagesTable,
+} from '@/lib/db';
 
 const ROOM_TTL = 60_000; // 1분
 const MESSAGE_TTL = 30_000; // 30초 — 실시간성 우선
@@ -70,13 +76,21 @@ export async function deleteChatMessage(
   id: string,
   roomId?: string,
 ): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('messages').delete().eq('id', id);
-  if (!error) {
+  try {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      throw new Error('[chat-monitoring] D1 binding not available');
+    }
+    const db = getD1Drizzle(d1);
+    await db.delete(messagesTable).where(eq(messagesTable.id, id));
     if (roomId) {
       invalidateCache(`chat:messages:by-room:${roomId}`);
     } else {
       invalidateCache(/^chat:messages:by-room:/);
     }
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
   }
-  return { error: error as Error | null };
 }

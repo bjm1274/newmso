@@ -8,8 +8,14 @@
  * 가공은 컴포넌트에 위임.
  */
 
+import { eq } from 'drizzle-orm';
 import { fetcher, invalidateCache } from '@/lib/fetcher';
 import { supabase } from '@/lib/supabase';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  official_doc_log as officialDocLogTable,
+} from '@/lib/db';
 
 const DOC_TTL = 60_000; // 1분
 
@@ -72,17 +78,62 @@ export function invalidateOfficialDocs(): void {
   invalidateCache(/^official-docs:/);
 }
 
+// official_doc_log D1 컬럼 매핑 — is_received boolean → 0|1, 정의된 컬럼만 통과
+type OfficialDocLogUpdateSet = Partial<typeof officialDocLogTable.$inferInsert>;
+
+function buildOfficialDocLogUpdateSet(
+  payload: Partial<OfficialDocRow>,
+): OfficialDocLogUpdateSet {
+  const set: OfficialDocLogUpdateSet = {};
+  if (payload.sent_date !== undefined) set.sent_date = payload.sent_date ?? '';
+  if (payload.doc_number !== undefined) set.doc_number = payload.doc_number ?? '';
+  if (payload.title !== undefined) set.title = payload.title ?? '';
+  if (payload.recipient !== undefined) set.recipient = payload.recipient ?? '';
+  if (payload.manager !== undefined) set.manager = payload.manager ?? '';
+  if (payload.is_received !== undefined) {
+    set.is_received = payload.is_received ? 1 : 0;
+  }
+  if (payload.note !== undefined) set.note = payload.note ?? '';
+  if (payload.company !== undefined) set.company = payload.company ?? '';
+  return set;
+}
+
+async function requireOfficialDocsD1() {
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[official-docs] D1 binding not available');
+  }
+  return getD1Drizzle(d1);
+}
+
 export async function updateOfficialDoc(
   id: number,
   payload: Partial<OfficialDocRow>,
 ): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('official_doc_log').update(payload).eq('id', id);
-  if (!error) invalidateOfficialDocs();
-  return { error: error as Error | null };
+  try {
+    const set = buildOfficialDocLogUpdateSet(payload);
+    if (Object.keys(set).length === 0) {
+      invalidateOfficialDocs();
+      return { error: null };
+    }
+    const db = await requireOfficialDocsD1();
+    await db.update(officialDocLogTable).set(set).where(eq(officialDocLogTable.id, id));
+    invalidateOfficialDocs();
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
+  }
 }
 
 export async function deleteOfficialDoc(id: number): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('official_doc_log').delete().eq('id', id);
-  if (!error) invalidateOfficialDocs();
-  return { error: error as Error | null };
+  try {
+    const db = await requireOfficialDocsD1();
+    await db.delete(officialDocLogTable).where(eq(officialDocLogTable.id, id));
+    invalidateOfficialDocs();
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
+  }
 }

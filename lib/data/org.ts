@@ -6,9 +6,14 @@
  * - 팀 추가/삭제 같은 mutation 후에는 invalidateOrgTeams로 캐시 무효화 필수
  */
 
+import { eq } from 'drizzle-orm';
 import { fetcher, invalidateCache } from '@/lib/fetcher';
 import { supabase } from '@/lib/supabase';
-import { mirrorRowsToD1, org_teams as orgTeamsTable } from '@/lib/db';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  org_teams as orgTeamsTable,
+} from '@/lib/db';
 
 const ORG_TTL = 300_000; // 5분
 
@@ -96,29 +101,47 @@ export type OrgTeamCreateInput = {
   sort_order: number;
 };
 
+async function requireOrgD1() {
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[org] D1 binding not available');
+  }
+  return getD1Drizzle(d1);
+}
+
 /**
  * 팀 생성. 성공 시 해당 회사의 org:teams 캐시 자동 무효화.
  */
 export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('org_teams').insert(input);
-  if (!error) {
-    invalidateOrgTeams(input.company_name);
-    await mirrorRowsToD1(orgTeamsTable, {
+  try {
+    const db = await requireOrgD1();
+    await db.insert(orgTeamsTable).values({
       id: crypto.randomUUID(),
       company_name: input.company_name,
       division: input.division,
       team_name: input.team_name,
       sort_order: input.sort_order,
-    }, { label: 'org_teams' });
+      created_at: new Date().toISOString(),
+    });
+    invalidateOrgTeams(input.company_name);
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
   }
-  return { error: error as Error | null };
 }
 
 /**
  * 팀 삭제. company가 주어지면 캐시 무효화 범위를 좁힘.
  */
 export async function deleteOrgTeam(id: string, company?: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('org_teams').delete().eq('id', id);
-  if (!error) invalidateOrgTeams(company);
-  return { error: error as Error | null };
+  try {
+    const db = await requireOrgD1();
+    await db.delete(orgTeamsTable).where(eq(orgTeamsTable.id, id));
+    invalidateOrgTeams(company);
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
+  }
 }

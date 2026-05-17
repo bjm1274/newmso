@@ -1,6 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { supabase } from './supabase';
-import { mirrorRowsToD1, system_settings as systemSettingsTable } from './db';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  system_settings as systemSettingsTable,
+} from './db';
 
 export const LEAVE_POLICY_SETTINGS_KEY = 'leave_policy_rules_v1';
 
@@ -135,31 +139,31 @@ export async function saveLeavePolicySettings(selectedCompany: string, settings:
   const payload = {
     key: LEAVE_POLICY_SETTINGS_KEY,
     value: nextStore,
-    description: '휴일/대체휴무 및 근태 이상 탐지 규칙 설정',
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase.from('system_settings').upsert(payload, { onConflict: 'key' });
-  if (error) throw error;
+  // D1 직접 upsert — system_settings.key PK 충돌 시 value/updated_at 갱신
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[leave-policy-settings] D1 binding not available');
+  }
+  const db = getD1Drizzle(d1);
 
-  // D1 미러 — value/updated_at만 (description은 D1 스키마에 없음)
-  await mirrorRowsToD1(
-    systemSettingsTable,
-    {
+  // value는 D1 스키마에서 text — jsonb → JSON.stringify
+  await db
+    .insert(systemSettingsTable)
+    .values({
       key: payload.key,
       value: JSON.stringify(payload.value),
       updated_at: payload.updated_at,
-    },
-    {
-      label: 'system_settings',
-      onConflict: 'update',
+    })
+    .onConflictDoUpdate({
       target: systemSettingsTable.key,
       set: {
         value: sql`excluded.value`,
         updated_at: sql`excluded.updated_at`,
       },
-    },
-  );
+    });
 
   writeLocalFallbackStore(nextStore);
   return nextStore;

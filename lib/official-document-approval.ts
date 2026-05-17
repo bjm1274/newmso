@@ -1,6 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { mirrorRowsToD1, official_doc_log as officialDocLogTable } from '@/lib/db';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  official_doc_log as officialDocLogTable,
+} from '@/lib/db';
 
 export type OfficialDocRequest = {
   sent_date: string;
@@ -111,25 +115,23 @@ export async function syncOfficialDocumentLogFromApproval(
     company: request.company || String(approval.sender_company || '').trim(),
   };
 
-  const { error } = await supabase.from('official_doc_log').insert([payload]);
-  if (error) throw error;
-
-  // D1 미러 — is_received boolean → 0|1, id는 rowid 자동
-  await mirrorRowsToD1(
-    officialDocLogTable,
-    {
-      sent_date: payload.sent_date,
-      doc_number: payload.doc_number,
-      title: payload.title,
-      recipient: payload.recipient,
-      manager: payload.manager,
-      is_received: payload.is_received ? 1 : 0,
-      note: payload.note,
-      company: payload.company,
-      created_at: new Date().toISOString(),
-    } as never,
-    { label: 'official_doc_log' },
-  );
+  // D1 직접 INSERT — is_received boolean → 0|1, id는 INTEGER PK rowid 자동
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[official-document-approval] D1 binding not available');
+  }
+  const db = getD1Drizzle(d1);
+  await db.insert(officialDocLogTable).values({
+    sent_date: payload.sent_date,
+    doc_number: payload.doc_number,
+    title: payload.title,
+    recipient: payload.recipient,
+    manager: payload.manager,
+    is_received: payload.is_received ? 1 : 0,
+    note: payload.note,
+    company: payload.company,
+    created_at: new Date().toISOString(),
+  });
 
   return payload;
 }

@@ -6,7 +6,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateAnnualLeaveExpiryDate } from './annual-leave-promotion';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  annual_leave_promotion_logs as annualLeavePromotionLogsTable,
+  notifications as notificationsTable,
+} from './db';
 
 export type ExpiryResult = {
   staffId: string;
@@ -41,29 +46,38 @@ export async function processStaffLeaveExpiry(
     .eq('staff_id', staffId)
     .eq('expiry_date', expiryDateStr);
 
-  // 소멸 확정 로그 기록 (step=3)
-  await supabase.from('annual_leave_promotion_logs').insert({
+  // 소멸 확정 로그 기록 (step=3) + 소멸 알림 — D1 직접 INSERT
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[annual-leave-expiry] D1 binding not available');
+  }
+  const db = getD1Drizzle(d1);
+
+  const promotionMeta = {
+    action: 'expired',
+    expiry_date: expiryDateStr,
+    processed_at: now.toISOString(),
+  };
+  await db.insert(annualLeavePromotionLogsTable).values({
+    id: crypto.randomUUID(),
     staff_id: staffId,
     target_year: expiryDate.getFullYear(),
     step: 3, // 소멸 확정
     remain_days: remainingDays,
-    meta: {
-      action: 'expired',
-      expiry_date: expiryDateStr,
-      processed_at: now.toISOString(),
-    },
+    meta: JSON.stringify(promotionMeta),
+    created_at: now.toISOString(),
   });
 
   // 소멸 알림 발송
-  const expiryNotificationRow = {
+  await db.insert(notificationsTable).values({
+    id: crypto.randomUUID(),
     user_id: staffId,
     type: '연차소멸',
     title: '미사용 연차 소멸 안내',
     body: `${remainingDays}일의 미사용 연차가 소멸 처리되었습니다. (만료일: ${expiryDateStr})`,
     read_at: null,
-  };
-  await supabase.from('notifications').insert(expiryNotificationRow);
-  await mirrorNotificationsToD1([expiryNotificationRow] as NotificationRow[]);
+    created_at: now.toISOString(),
+  });
 
   return {
     staffId,
