@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  callAtomicStockUpdate,
+  callAtomicStockTransfer,
+} from '@/lib/inventory-stock-client';
 import type { StaffMember } from '@/types';
 import type { LooseRecord } from '@/lib/types';
 import {
@@ -89,11 +93,13 @@ export async function processInventoryIssue({
 
     if (destinationItem) {
       // 원자적 이관 RPC 시도 (출발지 차감 + 목적지 증가를 단일 트랜잭션으로)
-      const { data: transferResult, error: transferRpcError } = await supabase.rpc('atomic_stock_transfer', {
-        p_source_id: sourceItem.id,
-        p_dest_id: destinationItem.id,
-        p_quantity: transferQuantity,
+      const transferResp = await callAtomicStockTransfer({
+        sourceId: String(sourceItem.id ?? ''),
+        destId: String(destinationItem.id ?? ''),
+        quantity: transferQuantity,
       });
+      const transferResult = transferResp.ok ? transferResp.data : null;
+      const transferRpcError = transferResp.ok ? null : { message: transferResp.error };
 
       if (transferRpcError) {
         if (String(transferRpcError.message).includes('INSUFFICIENT_STOCK')) {
@@ -163,11 +169,13 @@ export async function processInventoryIssue({
       destinationInventoryId = String(destinationItem.id);
     } else {
       // 목적지에 품목이 없는 경우 - 출발지만 원자적 차감
-      const { data: srcResult, error: srcRpcError } = await supabase.rpc('atomic_stock_update', {
-        p_item_id: sourceItem.id,
-        p_delta: -transferQuantity,
-        p_min_allowed: 0,
+      const srcResp = await callAtomicStockUpdate({
+        itemId: String(sourceItem.id ?? ''),
+        delta: -transferQuantity,
+        minAllowed: 0,
       });
+      const srcResult = srcResp.ok ? srcResp.data : null;
+      const srcRpcError = srcResp.ok ? null : { message: srcResp.error };
       if (srcRpcError) {
         if (String(srcRpcError.message).includes('INSUFFICIENT_STOCK')) {
           throw new Error('INSUFFICIENT_STOCK');
@@ -244,11 +252,13 @@ export async function processInventoryIssue({
     }
   } else {
     // isSameLocation이거나 목적지 미지정: 출발지만 원자적 차감
-    const { data: srcOnlyResult, error: srcOnlyError } = await supabase.rpc('atomic_stock_update', {
-      p_item_id: sourceItem.id,
-      p_delta: -transferQuantity,
-      p_min_allowed: 0,
+    const srcOnlyResp = await callAtomicStockUpdate({
+      itemId: String(sourceItem.id ?? ''),
+      delta: -transferQuantity,
+      minAllowed: 0,
     });
+    const srcOnlyResult = srcOnlyResp.ok ? srcOnlyResp.data : null;
+    const srcOnlyError = srcOnlyResp.ok ? null : { message: srcOnlyResp.error };
     if (srcOnlyError) {
       if (String(srcOnlyError.message).includes('INSUFFICIENT_STOCK')) {
         throw new Error('INSUFFICIENT_STOCK');
@@ -368,12 +378,12 @@ export async function reverseInventoryIssue({
   const srcBeforeQty = Number(srcRow?.quantity ?? srcRow?.stock ?? 0);
 
   // SY INC. 재고 복원 (증가)
-  const { error: srcRpcErr } = await supabase.rpc('atomic_stock_update', {
-    p_item_id: sourceItemId,
-    p_delta: reverseQty,
-    p_min_allowed: 0,
+  const reverseResp = await callAtomicStockUpdate({
+    itemId: sourceItemId,
+    delta: reverseQty,
+    minAllowed: 0,
   });
-  if (srcRpcErr) {
+  if (!reverseResp.ok) {
     // RPC 미등록 fallback
     const { error } = await supabase.from('inventory').update({ quantity: srcBeforeQty + reverseQty, stock: srcBeforeQty + reverseQty }).eq('id', sourceItemId);
     if (error) throw error;

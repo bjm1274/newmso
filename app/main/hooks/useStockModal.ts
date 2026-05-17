@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { InventoryItem, StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { callAtomicStockUpdate } from '@/lib/inventory-stock-client';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import { getItemQuantity, getItemMinQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
@@ -103,12 +104,12 @@ export function useStockModal({
           }
         : {};
     try {
-      const { data: rpcResult, error: rpcError } = await supabase.rpc('atomic_stock_update', { p_item_id: item.id, p_delta: delta, p_min_allowed: 0 });
+      const rpcResult = await callAtomicStockUpdate({ itemId: item.id, delta, minAllowed: 0 });
       let prevQty: number;
       let nextQty: number;
 
-      if (rpcError) {
-        if (String(rpcError.message).includes('INSUFFICIENT_STOCK')) return toast('재고가 부족하여 출고할 수 없습니다.');
+      if (!rpcResult.ok) {
+        if (rpcResult.error.includes('INSUFFICIENT_STOCK')) return toast('재고가 부족하여 출고할 수 없습니다.');
         const currentQty = item.quantity ?? (item as Record<string, unknown>).stock as number ?? 0;
         const newStock = currentQty + delta;
         if (newStock < 0) return toast('재고가 부족하여 출고할 수 없습니다.');
@@ -117,7 +118,7 @@ export function useStockModal({
         prevQty = currentQty;
         nextQty = newStock;
       } else {
-        const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+        const row = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
         prevQty = row?.prev_qty ?? 0;
         nextQty = row?.next_qty ?? 0;
       }
