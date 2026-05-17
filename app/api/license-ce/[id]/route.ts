@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { computeEffectiveExpiry, getRenewalRule, addMonths } from '@/lib/license-renewal-policy';
+import { mirrorNotificationsToD1 } from '@/lib/notification-utils';
 
 export const runtime = 'nodejs';
 
@@ -177,7 +178,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // 승인 완료 알림 (직원에게)
     if (ceRow.staff_id) {
       try {
-        await sb.from('notifications').insert({
+        const notifRow = {
           user_id: ceRow.staff_id,
           type: 'license_ce_approved',
           title: '보수교육 이수증이 승인되었습니다',
@@ -189,7 +190,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             education_date: educationDate,
           },
           read_at: null,
-        });
+        };
+        await sb.from('notifications').insert(notifRow);
+        // Phase 2.10 — D1 notifications 미러
+        await mirrorNotificationsToD1([notifRow]);
       } catch {
         // 알림 실패는 메인 트랜잭션에 영향 없음
       }

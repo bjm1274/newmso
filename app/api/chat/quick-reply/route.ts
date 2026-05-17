@@ -6,6 +6,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { readSessionFromRequest } from '@/lib/server-session';
+import {
+  mirrorRowsToD1,
+  messages as messagesTable,
+  getD1Binding,
+  getD1Drizzle,
+  updateChatRoomLastMessage,
+  resolveDataBackend,
+} from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,12 +58,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 메시지 삽입
+    const trimmedContent = content.trim().slice(0, 2000);
     const { data: message, error: insertError } = await insertChatMessageWithFallback<{ id: string }>(
       supabase,
       {
         room_id,
         sender_id: senderId,
-        content: content.trim().slice(0, 2000),
+        content: trimmedContent,
       },
       'id',
     );
@@ -63,6 +72,35 @@ export async function POST(req: NextRequest) {
     if (insertError || !message) {
       console.error('[quick-reply] insert error:', insertError);
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
+    }
+
+    // Phase 2.10 — D1 미러: 메시지 본문 + chat_rooms.last_message 갱신 (Postgres 트리거 대체)
+    const messageCreatedAt = new Date().toISOString();
+    await mirrorRowsToD1(
+      messagesTable,
+      {
+        id: message.id,
+        room_id,
+        sender_id: senderId,
+        content: trimmedContent,
+        created_at: messageCreatedAt,
+      },
+      { label: 'mirror:messages.quick-reply', onConflict: 'do_nothing' },
+    );
+    try {
+      const backend = await resolveDataBackend();
+      if (backend !== 'supabase') {
+        const d1 = await getD1Binding();
+        if (d1) {
+          await updateChatRoomLastMessage(getD1Drizzle(d1), {
+            room_id,
+            created_at: messageCreatedAt,
+            content: trimmedContent,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[quick-reply] chat_rooms last_message D1 sync failed', err);
     }
 
     // 채팅 push 트리거 (비동기, 실패해도 무방)
