@@ -34,7 +34,7 @@ const nowIso = () => new Date().toISOString();
 export const BACKFILL_TABLES = {
   notifications: {
     name: 'notifications',
-    select: 'id, user_id, type, title, body, metadata, read_at, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
@@ -51,18 +51,18 @@ export const BACKFILL_TABLES = {
 
   audit_logs: {
     name: 'audit_logs',
-    select: 'id, user_id, user_name, action, target_table, target_id, details, ip_address, user_agent, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
       { name: 'user_id' },
       { name: 'user_name' },
       { name: 'action' },
-      { name: 'target_table' },
+      { name: 'target_type' },
       { name: 'target_id' },
       { name: 'details', coerce: 'json' },
       { name: 'ip_address' },
-      { name: 'user_agent' },
+      { name: 'actor_name' },
       { name: 'created_at' },
     ],
     defaults: { id: uuidDefault, created_at: nowIso },
@@ -70,7 +70,7 @@ export const BACKFILL_TABLES = {
 
   todo_reminder_logs: {
     name: 'todo_reminder_logs',
-    select: 'id, user_id, todo_id, reminder_at, sent_at, status, error_message, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
@@ -87,7 +87,7 @@ export const BACKFILL_TABLES = {
 
   org_teams: {
     name: 'org_teams',
-    select: 'id, company_name, department_name, team_name, sort_order, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
@@ -102,7 +102,7 @@ export const BACKFILL_TABLES = {
 
   system_settings: {
     name: 'system_settings',
-    select: 'key, value, updated_at',
+    select: '*',
     orderBy: 'key',
     columns: [
       { name: 'key' },
@@ -113,7 +113,7 @@ export const BACKFILL_TABLES = {
 
   generated_reports: {
     name: 'generated_reports',
-    select: 'id, schedule_id, report_type, period_start, period_end, generated_at, summary, recipients, status, error_message',
+    select: '*',
     orderBy: 'generated_at',
     columns: [
       { name: 'id' },
@@ -132,7 +132,7 @@ export const BACKFILL_TABLES = {
 
   official_doc_log: {
     name: 'official_doc_log',
-    select: 'id, doc_number, title, sender_name, receiver_name, is_received, received_at, sent_at, body, attachments, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'doc_number' },
@@ -151,7 +151,7 @@ export const BACKFILL_TABLES = {
 
   attendance: {
     name: 'attendance',
-    select: 'id, staff_id, date, check_in_at, check_out_at, status, note, created_at',
+    select: '*',
     orderBy: 'date',
     columns: [
       { name: 'id' },
@@ -168,7 +168,7 @@ export const BACKFILL_TABLES = {
 
   attendances: {
     name: 'attendances',
-    select: 'id, staff_id, work_date, work_type, status, reason, hours, created_at, updated_at',
+    select: '*',
     orderBy: 'work_date',
     columns: [
       { name: 'id' },
@@ -186,7 +186,7 @@ export const BACKFILL_TABLES = {
 
   attendance_corrections: {
     name: 'attendance_corrections',
-    select: 'id, staff_id, attendance_date, corrected_check_in_at, corrected_check_out_at, reason, status, created_at',
+    select: '*',
     orderBy: 'attendance_date',
     columns: [
       { name: 'id' },
@@ -203,7 +203,7 @@ export const BACKFILL_TABLES = {
 
   staff_transfer_history: {
     name: 'staff_transfer_history',
-    select: 'id, staff_id, transfer_date, from_company, from_department, to_company, to_department, reason, decided_by, created_at',
+    select: '*',
     orderBy: 'transfer_date',
     columns: [
       { name: 'id' },
@@ -222,7 +222,7 @@ export const BACKFILL_TABLES = {
 
   certificate_issuances: {
     name: 'certificate_issuances',
-    select: 'id, staff_id, cert_type, issued_at, document_url, issued_by, notes, created_at',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
@@ -239,7 +239,7 @@ export const BACKFILL_TABLES = {
 
   roster_policy_settings: {
     name: 'roster_policy_settings',
-    select: 'policy_type, policy_id, payload, updated_at',
+    select: '*',
     orderBy: 'policy_type',
     columns: [
       { name: 'policy_type' },
@@ -252,7 +252,7 @@ export const BACKFILL_TABLES = {
 
   messages: {
     name: 'messages',
-    select: 'id, room_id, sender_id, content, file_url, reply_to_id, is_deleted, edited_at, created_at, file_size_bytes, file_kind, file_name, album_id, album_index, album_total, message_type, sender_name',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
@@ -278,7 +278,7 @@ export const BACKFILL_TABLES = {
 
   push_subscriptions: {
     name: 'push_subscriptions',
-    select: 'id, staff_id, endpoint, p256dh, auth, created_at, fcm_token, device_id, platform, user_agent',
+    select: '*',
     orderBy: 'created_at',
     columns: [
       { name: 'id' },
