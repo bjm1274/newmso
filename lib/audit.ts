@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { STORAGE_KEYS } from './storage-keys';
+import { mirrorRowsToD1, audit_logs as auditLogsTable } from './db';
 
 export type AuditAction = string;
 
@@ -133,6 +134,7 @@ export async function logAudit(
   userId?: string,
   userName?: string
 ) {
+  const createdAt = new Date().toISOString();
   try {
     await supabase.from('audit_logs').insert([{
       user_id: userId || null,
@@ -141,8 +143,19 @@ export async function logAudit(
       target_type: targetType,
       target_id: targetId,
       details,
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
     }]);
+    // D1 미러 — details는 jsonb → text 변환
+    await mirrorRowsToD1(auditLogsTable, {
+      id: crypto.randomUUID(),
+      user_id: userId || null,
+      user_name: userName || null,
+      action,
+      target_type: targetType,
+      target_id: targetId,
+      details: JSON.stringify(details),
+      created_at: createdAt,
+    }, { label: 'audit_logs' });
   } catch (e) {
     console.error('Audit log failed:', e);
   }

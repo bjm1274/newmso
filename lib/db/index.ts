@@ -24,6 +24,9 @@ export type { DualWriteContext, DualWriteResult } from './dual-write';
 // Phase 2 — Next.js API route용 D1 binding 헬퍼
 export { getD1Binding, resolveDataBackend } from './get-binding';
 
+// Phase 2 — 일반화된 D1 미러 헬퍼 (테이블별 dual-write 확장용)
+export { mirrorRowsToD1, type MirrorOptions } from './mirror';
+
 // Phase 1D — Postgres 함수의 TS 포트
 export {
   registerStaffFull,

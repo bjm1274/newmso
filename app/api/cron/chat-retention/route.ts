@@ -5,6 +5,12 @@
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  cleanupChatMessagesByRetention,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from '@/lib/db';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -30,15 +36,61 @@ export async function GET(req: Request) {
     );
   }
 
-  const supabase = createClient(supabaseUrl, serviceKey);
-  const { data, error } = await supabase.rpc('cleanup_chat_messages_by_retention');
+  const backend = await resolveDataBackend();
 
-  if (error) {
+  let deletedSupabase = 0;
+  let deletedD1 = 0;
+  let supabaseError: unknown = null;
+  let d1Error: unknown = null;
+
+  // Supabase RPC — backend가 'd1'이 아닐 때만
+  if (backend !== 'd1') {
+    const supabase = createClient(supabaseUrl, serviceKey);
+    const { data, error } = await supabase.rpc('cleanup_chat_messages_by_retention');
+    if (error) {
+      supabaseError = error;
+    } else {
+      deletedSupabase = typeof data === 'number' ? data : 0;
+    }
+  }
+
+  // D1 cleanup — backend가 'supabase'가 아닐 때
+  if (backend !== 'supabase') {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      if (backend === 'd1') {
+        return NextResponse.json(
+          { error: 'DATA_BACKEND=d1 but DB binding not available', deleted: 0 },
+          { status: 500 }
+        );
+      }
+      console.warn('[chat-retention] dual-write D1 cleanup skipped — binding unavailable');
+    } else {
+      try {
+        deletedD1 = await cleanupChatMessagesByRetention(getD1Drizzle(d1));
+      } catch (err) {
+        d1Error = err;
+        if (backend === 'd1') {
+          return NextResponse.json(
+            { error: '채팅 보관 정리(D1) 중 오류가 발생했습니다.', deleted: 0 },
+            { status: 500 }
+          );
+        }
+        console.warn('[chat-retention] D1 cleanup failed', err);
+      }
+    }
+  }
+
+  // 진실원은 backend별로 다름
+  if (backend === 'd1') return NextResponse.json({ deleted: deletedD1, backend });
+  if (supabaseError) {
     return NextResponse.json(
       { error: '채팅 보관 정리 중 오류가 발생했습니다.', deleted: 0 },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ deleted: data ?? 0 });
+  return NextResponse.json({
+    deleted: deletedSupabase,
+    ...(backend === 'dual-write' ? { d1_deleted: deletedD1, d1_error: d1Error ? String(d1Error) : null } : {}),
+  });
 }

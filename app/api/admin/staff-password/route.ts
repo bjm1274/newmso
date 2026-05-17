@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { clearStaffPasswordWithFallback } from '@/lib/staff-password';
 import { updateStaffPasswordWithFallback } from '@/lib/staff-password';
+import { mirrorRowsToD1, audit_logs as auditLogsTable } from '@/lib/db';
 
 function createAdminSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,8 +37,8 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminSupabase();
-    const adminUserId = session.user?.id ?? session.user?.user_id ?? 'unknown';
-    const adminUserName = session.user?.name ?? session.user?.username ?? '';
+    const adminUserId = String(session.user?.id ?? session.user?.user_id ?? 'unknown');
+    const adminUserName = String(session.user?.name ?? session.user?.username ?? '');
 
     if (clearPassword) {
       const { error, clearedColumns } = await clearStaffPasswordWithFallback(supabase, staffId);
@@ -47,15 +48,26 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
       }
 
-      // 감사 로그 기록
+      // 감사 로그 기록 — Supabase + D1 미러
+      const clearAuditDetails = { clearedColumns };
       await supabase.from('audit_logs').insert({
         action: '비밀번호초기화',
         target_type: 'staff_members',
         target_id: staffId,
         user_id: adminUserId,
         user_name: adminUserName,
-        details: { clearedColumns },
+        details: clearAuditDetails,
       }).then(() => {}, () => {/* 감사 로그 실패는 무시 */});
+      await mirrorRowsToD1(auditLogsTable, {
+        id: crypto.randomUUID(),
+        action: '비밀번호초기화',
+        target_type: 'staff_members',
+        target_id: staffId,
+        user_id: adminUserId,
+        user_name: adminUserName,
+        details: JSON.stringify(clearAuditDetails),
+        created_at: new Date().toISOString(),
+      }, { label: 'audit_logs' });
 
       return NextResponse.json({ ok: true, cleared: true, clearedColumns });
     }
@@ -67,15 +79,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 
-    // 감사 로그 기록
+    // 감사 로그 기록 — Supabase + D1 미러
+    const updateAuditDetails = { updatedColumn };
     await supabase.from('audit_logs').insert({
       action: '비밀번호변경',
       target_type: 'staff_members',
       target_id: staffId,
       user_id: adminUserId,
       user_name: adminUserName,
-      details: { updatedColumn },
+      details: updateAuditDetails,
     }).then(() => {}, () => {/* 감사 로그 실패는 무시 */});
+    await mirrorRowsToD1(auditLogsTable, {
+      id: crypto.randomUUID(),
+      action: '비밀번호변경',
+      target_type: 'staff_members',
+      target_id: staffId,
+      user_id: adminUserId,
+      user_name: adminUserName,
+      details: JSON.stringify(updateAuditDetails),
+      created_at: new Date().toISOString(),
+    }, { label: 'audit_logs' });
 
     return NextResponse.json({ ok: true, updatedColumn });
   } catch (error) {

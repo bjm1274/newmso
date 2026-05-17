@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import { mirrorRowsToD1, todo_reminder_logs as todoReminderLogsTable } from './db';
 
 type DueTodoRow = {
   id: string | number;
@@ -178,36 +179,45 @@ export async function processDueTodoRemindersServer(
     if (notificationError && !duplicateNotification) {
       failed += 1;
       errors.push(`${todoId}: ${String(notificationError.message || notificationError)}`);
+      const failedLogRow = {
+        todo_id: todoId,
+        user_id: userId,
+        reminder_at: reminderAt,
+        notification_id: null,
+        status: 'failed',
+        title: '할 일 리마인더',
+        body: String(todo.content || '할 일'),
+      };
       await supabase.from('todo_reminder_logs').upsert(
-        [
-          {
-            todo_id: todoId,
-            user_id: userId,
-            reminder_at: reminderAt,
-            notification_id: null,
-            status: 'failed',
-            title: '할 일 리마인더',
-            body: String(todo.content || '할 일'),
-          },
-        ],
+        [failedLogRow],
         { onConflict: 'user_id,todo_id,reminder_at' }
+      );
+      // D1 미러 — unique index(user_id, todo_id, reminder_at)로 idempotent
+      await mirrorRowsToD1(
+        todoReminderLogsTable,
+        { id: crypto.randomUUID(), ...failedLogRow },
+        { label: 'todo_reminder_logs', onConflict: 'do_nothing' }
       );
       continue;
     }
 
+    const sentLogRow = {
+      todo_id: todoId,
+      user_id: userId,
+      reminder_at: reminderAt,
+      notification_id: notificationId,
+      status: duplicateNotification ? 'duplicate' : 'sent',
+      title: '할 일 리마인더',
+      body: String(todo.content || '할 일'),
+    };
     await supabase.from('todo_reminder_logs').upsert(
-      [
-        {
-          todo_id: todoId,
-          user_id: userId,
-          reminder_at: reminderAt,
-          notification_id: notificationId,
-          status: duplicateNotification ? 'duplicate' : 'sent',
-          title: '할 일 리마인더',
-          body: String(todo.content || '할 일'),
-        },
-      ],
+      [sentLogRow],
       { onConflict: 'user_id,todo_id,reminder_at' }
+    );
+    await mirrorRowsToD1(
+      todoReminderLogsTable,
+      { id: crypto.randomUUID(), ...sentLogRow },
+      { label: 'todo_reminder_logs', onConflict: 'do_nothing' }
     );
 
     loggedKeys.add(logKey);
