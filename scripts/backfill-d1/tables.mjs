@@ -114,20 +114,17 @@ export const BACKFILL_TABLES = {
   generated_reports: {
     name: 'generated_reports',
     select: '*',
-    orderBy: 'generated_at',
+    orderBy: 'created_at',
     columns: [
       { name: 'id' },
       { name: 'schedule_id' },
       { name: 'report_type' },
-      { name: 'period_start' },
-      { name: 'period_end' },
-      { name: 'generated_at' },
-      { name: 'summary', coerce: 'json' },
-      { name: 'recipients', coerce: 'json' },
+      { name: 'period' },
       { name: 'status' },
-      { name: 'error_message' },
+      { name: 'summary', coerce: 'json' },
+      { name: 'created_at' },
     ],
-    defaults: { id: uuidDefault, generated_at: nowIso },
+    defaults: { id: uuidDefault, created_at: nowIso },
   },
 
   official_doc_log: {
@@ -204,17 +201,15 @@ export const BACKFILL_TABLES = {
   staff_transfer_history: {
     name: 'staff_transfer_history',
     select: '*',
-    orderBy: 'transfer_date',
+    orderBy: 'created_at',
     columns: [
       { name: 'id' },
       { name: 'staff_id' },
-      { name: 'transfer_date' },
-      { name: 'from_company' },
-      { name: 'from_department' },
-      { name: 'to_company' },
-      { name: 'to_department' },
-      { name: 'reason' },
-      { name: 'decided_by' },
+      { name: 'transfer_type' },
+      { name: 'before_value', coerce: 'json' },
+      { name: 'after_value', coerce: 'json' },
+      { name: 'effective_date' },
+      { name: 'approval_id' },
       { name: 'created_at' },
     ],
     defaults: { id: uuidDefault, created_at: nowIso },
@@ -223,32 +218,22 @@ export const BACKFILL_TABLES = {
   certificate_issuances: {
     name: 'certificate_issuances',
     select: '*',
-    orderBy: 'created_at',
+    orderBy: 'issued_at',
     columns: [
       { name: 'id' },
       { name: 'staff_id' },
       { name: 'cert_type' },
-      { name: 'issued_at' },
-      { name: 'document_url' },
+      { name: 'serial_no' },
+      { name: 'purpose' },
       { name: 'issued_by' },
-      { name: 'notes' },
-      { name: 'created_at' },
+      { name: 'issued_at' },
     ],
-    defaults: { id: uuidDefault, created_at: nowIso },
+    defaults: { id: uuidDefault, issued_at: nowIso },
   },
 
-  roster_policy_settings: {
-    name: 'roster_policy_settings',
-    select: '*',
-    orderBy: 'policy_type',
-    columns: [
-      { name: 'policy_type' },
-      { name: 'policy_id' },
-      { name: 'payload', coerce: 'json' },
-      { name: 'updated_at' },
-    ],
-    defaults: { updated_at: nowIso },
-  },
+  // roster_policy_settings — Supabase에 테이블 없음 (마이그레이션 미적용).
+  // dual-write는 적용됐으나 backfill 대상이 없으므로 정의 제외.
+  // 향후 Supabase에 테이블 생성 시 다시 추가.
 
   messages: {
     name: 'messages',

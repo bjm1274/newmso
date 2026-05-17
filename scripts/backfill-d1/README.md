@@ -53,10 +53,13 @@ npx wrangler d1 execute pchos-d1 --command="SELECT COUNT(*) FROM notifications" 
 | 10 | attendance_corrections | unique=(staff_id, attendance_date) |
 | 11 | staff_transfer_history | 단순 |
 | 12 | certificate_issuances | 단순 |
-| 13 | roster_policy_settings | payload jsonb → text, unique=(policy_type, policy_id) |
-| 14 | messages | unique=id (FK reply_to_id self) |
-| 15 | payroll_records | jsonb 컬럼 다수, unique=(staff_id, year_month, record_type) |
-| 16 | push_subscriptions | unique=(staff_id, endpoint) |
+| 13 | messages | unique=id (FK reply_to_id self) |
+| 14 | payroll_records | jsonb 컬럼 다수, unique=(staff_id, year_month, record_type) |
+| 15 | push_subscriptions | unique=(staff_id, endpoint) |
+
+> `roster_policy_settings`는 D1 dual-write는 적용돼 있으나 Supabase
+> 측 테이블이 아직 없어 backfill 대상에서 제외. Supabase에 생성된 뒤
+> [tables.mjs](./tables.mjs)에 항목 복원하면 된다.
 
 자세한 컬럼/변환 정의는 [tables.mjs](./tables.mjs) 참고.
 
