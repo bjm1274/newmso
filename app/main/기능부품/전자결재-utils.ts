@@ -266,6 +266,8 @@ export function normalizeComposeFormType(value?: string) {
   if (value === '휴가신청' || value === 'leave') return '연차/휴가';
   if (value === 'report' || value === '보고서작성' || value === '보고서 작성') return '보고서작성';
   if (value === 'official_document_dispatch' || value === '공문발송' || value === '공문서대장') return '공문발송';
+  // 기존 라벨 '양식신청'은 '증명서발급'으로 정규화 (DB 호환성을 위한 매핑)
+  if (value === '양식신청' || value === 'generic') return '증명서발급';
   return value;
 }
 

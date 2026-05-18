@@ -67,7 +67,7 @@ export default function ApprovalFormTypePicker({
     const seen = new Set<string>();
     const result: FormPickerOption[] = [];
     for (const option of allOptions) {
-      if (option.normalized === '양식신청') continue;
+      if (option.normalized === '증명서발급') continue;
       if (!lastDraftByType[option.normalized]) continue;
       if (seen.has(option.normalized)) continue;
       seen.add(option.normalized);

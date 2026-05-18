@@ -125,7 +125,8 @@ export function PayrollAndCertificatesHub({
           .select('id', { count: 'exact', head: true })
           .eq('sender_id', user.id)
           .eq('status', '승인')
-          .eq('type', '양식신청'),
+          // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
+          .in('type', ['양식신청', '증명서발급']),
       ]);
 
       setSummary({

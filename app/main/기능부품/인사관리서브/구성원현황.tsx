@@ -36,6 +36,7 @@ import CertTransferPanel from './교육자격인사이동패널';
 import RiskActionDialog from './RiskActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { formatWon as libFormatWon } from '@/lib/date-formatter';
+import { getWeeklyRotationShiftIds } from '@/lib/contract-shift-rotation';
 
 const formatWon = (amount: number) => libFormatWon(Math.round(amount || 0));
 
@@ -45,7 +46,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
   return {
     성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 면허기타내용: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-    연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
+    연차총개수: 0, 연차사용개수: 0, 근무형태ID: '', 근무형태IDs: [] as string[],
     고용형태: '정규직' as string, 계약종료일: '' as string,
     probation_months: 0,
     base_salary: 0,
@@ -192,6 +193,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
+  // 다중 근무형태(주간 로테이션) 선택 UI 상태
+  const [새근무형태표시, 새근무형태표시설정] = useState(false);
+  const [추가근무형태ID, 추가근무형태ID설정] = useState('');
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
@@ -315,15 +319,102 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     };
   };
 
-  const getVisibleShiftOptions = (companyName: string) =>
-    근무형태목록
-      .filter((shift: StaffMember) => {
+  // 다중 근무형태(주간 로테이션) 헬퍼 — 신버전 구성원현황/index.tsx와 동일 로직(JM4)
+  const getShiftCompanyName = (shift: StaffMember) =>
+    String(shift?.company_name || shift?.company || '').trim();
+  const sortShiftOptions = (list: StaffMember[]) =>
+    [...list].sort((a: StaffMember, b: StaffMember) => 한글정렬(a?.name || '', b?.name || ''));
+  const normalizeShiftIdList = (values: unknown[]): string[] =>
+    Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+  const getStaffFormShiftIds = (form: typeof 신규직원): string[] =>
+    normalizeShiftIdList([
+      form.근무형태ID,
+      ...(Array.isArray(form.근무형태IDs) ? form.근무형태IDs : []),
+    ]);
+  const findShiftById = (shiftId: string) =>
+    근무형태목록.find((shift: StaffMember) => String(shift.id) === String(shiftId));
+  const getVisibleShiftOptions = (companyName: string) => {
+    const selectedCompany = String(companyName || '').trim();
+    return sortShiftOptions(
+      근무형태목록.filter((shift: StaffMember) => {
         const isActive = shift?.is_active !== false;
-        const shiftCompany = shift?.company_name || shift?.company || '';
-
-        return isActive && shiftCompany === companyName;
+        const shiftCompany = getShiftCompanyName(shift);
+        return isActive && (!selectedCompany || !shiftCompany || shiftCompany === selectedCompany);
       })
-      .sort((a: StaffMember, b: StaffMember) => 한글정렬(a?.name || '', b?.name || ''));
+    );
+  };
+
+  const 선택근무형태IDs = useMemo(
+    () => getStaffFormShiftIds(신규직원),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [신규직원.근무형태ID, 신규직원.근무형태IDs],
+  );
+  const 추가가능근무형태목록 = useMemo(
+    () =>
+      getVisibleShiftOptions(신규직원.사업체).filter(
+        (shift: StaffMember) => !선택근무형태IDs.includes(String(shift.id)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [신규직원.사업체, 선택근무형태IDs, 근무형태목록],
+  );
+
+  const 대표근무형태설정 = (shiftId: string) => {
+    try {
+      const nextShiftId = String(shiftId || '').trim();
+      신규직원설정((prev) => {
+        if (!nextShiftId) {
+          return { ...prev, 근무형태ID: '', 근무형태IDs: [] };
+        }
+        const previousPrimary = String(prev.근무형태ID || '').trim();
+        const restShiftIds = getStaffFormShiftIds(prev).filter(
+          (id) => id !== previousPrimary && id !== nextShiftId,
+        );
+        return { ...prev, 근무형태ID: nextShiftId, 근무형태IDs: [nextShiftId, ...restShiftIds] };
+      });
+    } catch (error) {
+      console.error('대표 근무형태 설정 실패:', error);
+      toast('근무형태 변경 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  const 추가근무형태선택창열기 = () => {
+    const nextDefault = 추가가능근무형태목록[0]?.id ? String(추가가능근무형태목록[0].id) : '';
+    추가근무형태ID설정(nextDefault);
+    새근무형태표시설정((value) => !value);
+  };
+
+  const 추가근무형태반영 = () => {
+    try {
+      const shiftId = String(추가근무형태ID || '').trim();
+      if (!shiftId) {
+        toast('추가할 근무형태를 선택하세요.', 'warning');
+        return;
+      }
+      신규직원설정((prev) => {
+        const currentIds = getStaffFormShiftIds(prev);
+        if (currentIds.includes(shiftId)) return prev;
+        const nextIds = currentIds.length > 0 ? [...currentIds, shiftId] : [shiftId];
+        return { ...prev, 근무형태ID: nextIds[0] || '', 근무형태IDs: nextIds };
+      });
+      추가근무형태ID설정('');
+      새근무형태표시설정(false);
+    } catch (error) {
+      console.error('근무형태 추가 실패:', error);
+      toast('근무형태 추가 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  const 근무형태제거 = (shiftId: string) => {
+    try {
+      신규직원설정((prev) => {
+        const nextIds = getStaffFormShiftIds(prev).filter((id) => id !== shiftId);
+        return { ...prev, 근무형태ID: nextIds[0] || '', 근무형태IDs: nextIds };
+      });
+    } catch (error) {
+      console.error('근무형태 제거 실패:', error);
+      toast('근무형태 제거 중 오류가 발생했습니다.', 'error');
+    }
+  };
 
   useEffect(() => {
     const loadCompanyOptions = async () => {
@@ -503,16 +594,22 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, []);
 
   useEffect(() => {
-    if (!신규직원.근무형태ID) return;
-
-    const hasSelectedShift = getVisibleShiftOptions(신규직원.사업체).some(
-      (shift: StaffMember) => shift.id === 신규직원.근무형태ID
+    const visibleShiftIds = new Set(
+      getVisibleShiftOptions(신규직원.사업체).map((shift: StaffMember) => String(shift.id)),
     );
-
-    if (!hasSelectedShift) {
-      신규직원설정((prev) => ({ ...prev, 근무형태ID: '' }));
+    const filteredIds = 선택근무형태IDs.filter((shiftId) => visibleShiftIds.has(shiftId));
+    if (
+      filteredIds.length !== 선택근무형태IDs.length ||
+      신규직원.근무형태ID !== (filteredIds[0] || '')
+    ) {
+      신규직원설정((prev) => ({
+        ...prev,
+        근무형태ID: filteredIds[0] || '',
+        근무형태IDs: filteredIds,
+      }));
     }
-  }, [신규직원.사업체, 신규직원.근무형태ID, 근무형태목록]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [신규직원.사업체, 선택근무형태IDs.join('|'), 근무형태목록]);
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -773,6 +870,32 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       const weeklyWorkingHours = resolveWeeklyWorkingHours(신규직원, 40);
       const workingDaysPerWeek = resolveWorkingDaysPerWeek(신규직원, 5);
 
+      // 다중 근무형태 ID 정규화 (신버전 동일)
+      const selectedShiftIds = getStaffFormShiftIds(신규직원);
+      const primaryShiftId = selectedShiftIds[0] || '';
+      const existingStaffForPermissions =
+        편집모드 && 선택된직원ID
+          ? 직원목록.find((s: StaffMember) => String(s.id) === String(선택된직원ID))
+          : null;
+      const existingPermissions =
+        existingStaffForPermissions?.permissions &&
+        typeof existingStaffForPermissions.permissions === 'object' &&
+        !Array.isArray(existingStaffForPermissions.permissions)
+          ? (existingStaffForPermissions.permissions as Record<string, unknown>)
+          : {};
+      const existingWorkConditions =
+        existingPermissions.work_conditions &&
+        typeof existingPermissions.work_conditions === 'object' &&
+        !Array.isArray(existingPermissions.work_conditions)
+          ? (existingPermissions.work_conditions as Record<string, unknown>)
+          : {};
+      const nextWorkConditions = {
+        ...existingWorkConditions,
+        shift_group_ids: selectedShiftIds,
+        weekly_rotation_shift_ids: selectedShiftIds.slice(1),
+        secondary_shift_id: selectedShiftIds[1] || null,
+      };
+
       const commonData = {
         name: normalizeStaffName(신규직원.성명),
         phone: 신규직원.전화번호,
@@ -790,7 +913,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         resigned_at: dateOrNull(신규직원.퇴사일),
         status: 신규직원.상태,
         permissions: {
-          ...(편집모드 && 선택된직원ID ? 직원목록.find((s: StaffMember) => s.id === 선택된직원ID)?.permissions : {}),
+          ...existingPermissions,
           extension: 신규직원.내선번호 || null,
           employment_type: 신규직원.고용형태 || '정규직',
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
@@ -806,11 +929,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           probation_months: toIntegerOrFallback(신규직원.probation_months, 0),
           is_basic_living: 신규직원.is_basic_living,
           is_medical_benefit: 신규직원.is_medical_benefit,
-          other_welfare: 신규직원.other_welfare
+          other_welfare: 신규직원.other_welfare,
+          // ── 다중 근무형태 메타 (신버전과 동일 형식 유지) ─────────────
+          work_conditions: nextWorkConditions,
+          shift_group_ids: selectedShiftIds,
+          weekly_rotation_shift_ids: selectedShiftIds.slice(1),
+          secondary_shift_id: selectedShiftIds[1] || null,
         },
         annual_leave_total: 0,
         annual_leave_used: 0,
-        shift_id: 신규직원.근무형태ID || null,
+        shift_id: primaryShiftId || null,
         working_hours_per_week: weeklyWorkingHours > 0 ? weeklyWorkingHours : 40,
         working_days_per_week: workingDaysPerWeek > 0 ? workingDaysPerWeek : 5,
         base_salary: 신규직원.base_salary,
@@ -836,11 +964,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           annual_leave_used: 신규직원.연차사용개수,
         };
 
-        const updatePayload = {
+        const updatePayload: Record<string, unknown> = {
           ...commonData,
           annual_leave_total: afterStaff.annual_leave_total,
           annual_leave_used: afterStaff.annual_leave_used,
         };
+        // ── 주민번호 안전 가드(JM5) ───────────────────────────────────
+        // 폼의 주민번호가 비어 있으면 DB 기존 값을 덮어쓰지 않음.
+        const residentDigits = String(신규직원.주민번호 ?? '').replace(/[^0-9]/g, '');
+        if (residentDigits.length === 0) {
+          delete updatePayload.resident_no;
+        }
         const forcedOmittedWorkConditionColumns = hasFractionalValue(updatePayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
@@ -1042,6 +1176,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const 첫면허 = 직원면허목록[0] ?? null;
     편집중면허ID설정(첫면허?.id ?? null);
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
+    // 다중 근무형태 IDs 추출 (신버전 동일 방식): permissions.shift_group_ids / weekly_rotation_shift_ids / secondary_shift_id
+    const 직원근무형태IDs = getWeeklyRotationShiftIds(직원 as unknown as Record<string, unknown>, 직원.shift_id);
     신규직원설정({
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue as string, 사업체: 직원.company || '박철홍정형외과',
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
@@ -1054,7 +1190,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       계좌정보: 직원.bank_account || '',
       임금정보: (직원.salary_info as string) || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
-      연차사용개수: (직원.annual_leave_used as number) || 0, 근무형태ID: (직원.shift_id as string) || '',
+      연차사용개수: (직원.annual_leave_used as number) || 0,
+      근무형태ID: 직원근무형태IDs[0] || (직원.shift_id as string) || '',
+      근무형태IDs: 직원근무형태IDs,
       base_salary: (직원.base_salary as number) || 0,
       meal_allowance: (직원.meal_allowance as number) ?? 0, night_duty_allowance: (직원.night_duty_allowance as number) ?? 0,
       vehicle_allowance: (직원.vehicle_allowance as number) ?? 0, childcare_allowance: (직원.childcare_allowance as number) ?? 0, research_allowance: (직원.research_allowance as number) ?? 0,
@@ -1078,6 +1216,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       working_days_per_week: resolveWorkingDaysPerWeek(직원, 5)
     });
     편집모드설정(true);
+
+    // ── 주민번호 보정 fetch (JM5) ────────────────────────────────────
+    // 직원 부트스트랩 select(STAFF_BOOTSTRAP_COLUMNS)에 resident_no가 빠져 있어
+    // 편집 진입 시 빈 값으로 시작 → 그대로 저장하면 빈 문자열로 덮어쓰는 버그가 있었음.
+    // 주민번호는 전역 메모리에 띄우지 않고 편집 시점에만 별도 select.
+    const staffId = String(직원.id);
+    supabase
+      .from('staff_members')
+      .select('resident_no')
+      .eq('id', staffId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        const fetched = String((data as { resident_no?: string | null }).resident_no ?? '');
+        if (!fetched) return;
+        신규직원설정((prev) => {
+          const current = String(prev.주민번호 ?? '');
+          if (current.replace(/[^0-9]/g, '').length > 0) return prev;
+          const raw = fetched.replace(/[^0-9]/g, '').slice(0, 13);
+          const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
+          return { ...prev, 주민번호: formatted };
+        });
+      });
   };
 
   const 닫기함수 = () => {
@@ -1085,6 +1246,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     편집중면허ID설정(null);
     프로필사진파일설정(null);
     프로필사진미리보기설정(null);
+    // 다중 근무형태 추가 패널 상태 초기화
+    추가근무형태ID설정('');
+    새근무형태표시설정(false);
     const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
@@ -1651,7 +1815,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
-                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
+                          <select value={신규직원.사업체} onChange={e => { 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '', 근무형태IDs: [] }); 추가근무형태ID설정(''); 새근무형태표시설정(false); }} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
                             <option value="">사업체 선택</option>
                             {availableCompanyOptions.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
@@ -1770,8 +1934,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       )}
                       <div className="space-y-2">
-                        <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
-                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-shift-select">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[12px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                          <button
+                            type="button"
+                            onClick={추가근무형태선택창열기}
+                            className="text-[11px] font-bold text-[var(--accent)] flex items-center gap-0.5 hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 rounded-[var(--radius-md)]"
+                            aria-label="근무형태 추가 패널 열기"
+                          >
+                            + 새 유형 추가
+                          </button>
+                        </div>
+                        <select
+                          value={신규직원.근무형태ID}
+                          onChange={e => 대표근무형태설정(e.target.value)}
+                          className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none"
+                          data-testid="new-staff-shift-select"
+                          aria-label="대표 근무형태 선택"
+                        >
                           <option value="">근무형태 선택</option>
                           {getVisibleShiftOptions(신규직원.사업체).map((s: StaffMember) => (
                             <option key={s.id} value={s.id}>
@@ -1779,8 +1959,93 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             </option>
                           ))}
                         </select>
+                        {선택근무형태IDs.length > 0 && (
+                          <div className="space-y-2" data-testid="new-staff-selected-shifts">
+                            {선택근무형태IDs.map((shiftId, index) => {
+                              const shift = findShiftById(shiftId) as StaffMember | undefined;
+                              const startTime = String(shift?.start_time || '').slice(0, 5);
+                              const endTime = String(shift?.end_time || '').slice(0, 5);
+                              const timeLabel = startTime || endTime ? `${startTime || '-'}~${endTime || '-'}` : '시간 미설정';
+                              return (
+                                <div key={shiftId} className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-[12px] font-bold text-[var(--foreground)]">
+                                      {index === 0 ? '대표 ' : `${index + 1}번째 `}
+                                      {String(shift?.name || '근무형태')}
+                                    </p>
+                                    <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                                      {timeLabel}
+                                      {shift?.shift_type ? ` · ${String(shift.shift_type)}` : ''}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => 근무형태제거(shiftId)}
+                                    className="shrink-0 rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                                    data-testid={`new-staff-remove-shift-${shiftId}`}
+                                    aria-label="근무형태 제거"
+                                  >
+                                    제거
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {새근무형태표시 && (
+                          <div className="bg-blue-500/10 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-3 animate-in fade-in slide-in-from-top-2">
+                            <p className="text-[11px] font-bold text-blue-700">회사 근무형태에서 추가</p>
+                            {추가가능근무형태목록.length > 0 ? (
+                              <>
+                                <select
+                                  value={추가근무형태ID}
+                                  onChange={e => 추가근무형태ID설정(e.target.value)}
+                                  className="w-full p-2.5 text-xs font-bold bg-[var(--card)] rounded-[var(--radius-md)] border border-blue-100 outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                                  data-testid="new-staff-extra-shift-select"
+                                  aria-label="추가할 근무형태 선택"
+                                >
+                                  {추가가능근무형태목록.map((shift: StaffMember) => (
+                                    <option key={shift.id} value={shift.id}>
+                                      {String(shift.name || '근무형태')} ({String(shift.start_time || '').slice(0, 5)}~{String(shift.end_time || '').slice(0, 5)})
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="flex gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={추가근무형태반영}
+                                    className="flex-1 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                                    data-testid="new-staff-extra-shift-add-button"
+                                  >
+                                    선택 추가
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => 새근무형태표시설정(false)}
+                                    className="px-3 py-2 bg-[var(--card)] text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-bold text-blue-700">
+                                  선택 가능한 회사 근무형태가 없습니다.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => 새근무형태표시설정(false)}
+                                  className="px-3 py-2 bg-[var(--card)] text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                                >
+                                  닫기
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] ml-1">
-                          회사·조직에 등록된 근무유형만 선택할 수 있습니다. 새 근무유형은 근무유형 관리에서 추가하세요.
+                          회사·조직에 등록된 근무유형만 선택할 수 있습니다. 새 근무유형은 근무유형 관리에서 추가하세요. 대표 근무형태 외에 추가 유형을 등록하면 주간 로테이션 스케줄로 활용됩니다.
                         </p>
                       </div>
                     </div>

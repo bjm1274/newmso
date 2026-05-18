@@ -82,14 +82,34 @@ export default function MyDocuments(props: MyDocumentsProps) {
         setIsLoading(false);
     };
 
+    // JM2: 부모에서 매번 새 객체 참조로 latestContract를 내려보내도 실질적인 값이
+    // 같으면 setContracts를 호출하지 않도록 primitive deps로 좁힌다. 또한 prev와
+    // 비교해서 동일하면 같은 배열 참조를 그대로 반환해 자식 자체의 불필요한 리렌더도 차단.
+    const latestContractId = props.latestContract?.id;
+    const latestContractStatus = props.latestContract?.status;
+    const latestContractSignedAt = props.latestContract?.signed_at;
+    const latestContractRequestedAt = props.latestContract?.requested_at;
     useEffect(() => {
-        if (props.latestContract) {
-            setContracts((prev) => {
-                const next = prev.filter((contract) => String(contract.id) !== String(props.latestContract?.id));
-                return [props.latestContract!, ...next];
-            });
-        }
-    }, [props.latestContract]);
+        const next = props.latestContract;
+        if (!next) return;
+        setContracts((prev) => {
+            const existing = prev.find((contract) => String(contract.id) === String(next.id));
+            // 이미 같은 id의 동일 상태 항목이 prev 맨 앞에 있으면 변경 불필요.
+            if (
+                existing &&
+                prev[0] &&
+                String(prev[0].id) === String(next.id) &&
+                prev[0].status === next.status &&
+                prev[0].signed_at === next.signed_at &&
+                prev[0].requested_at === next.requested_at
+            ) {
+                return prev;
+            }
+            const filtered = prev.filter((contract) => String(contract.id) !== String(next.id));
+            return [next, ...filtered];
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [latestContractId, latestContractStatus, latestContractSignedAt, latestContractRequestedAt]);
 
     useEffect(() => {
         const handleContractSigned = () => {

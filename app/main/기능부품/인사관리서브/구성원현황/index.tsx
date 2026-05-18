@@ -822,11 +822,19 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
           annual_leave_total: 신규직원.연차총개수,
           annual_leave_used: 신규직원.연차사용개수,
         };
-        const updatePayload = {
+        const updatePayload: Record<string, unknown> = {
           ...commonData,
           annual_leave_total: afterStaff.annual_leave_total,
           annual_leave_used: afterStaff.annual_leave_used,
         };
+        // ── 주민번호 안전 가드 ──────────────────────────────────────
+        // 폼의 주민번호가 비어 있으면 DB 기존 값을 덮어쓰지 않음.
+        // 부트스트랩 select에서 resident_no가 빠져 있어 비동기 보정 실패 시
+        // 빈 문자열로 update되는 사고를 방지 (JM5).
+        const residentDigits = String(신규직원.주민번호 ?? '').replace(/[^0-9]/g, '');
+        if (residentDigits.length === 0) {
+          delete updatePayload.resident_no;
+        }
         const salaryChangeEffectiveDate = dateOrNull(신규직원.salary_change_effective_date);
         const salaryChangeReason = String(신규직원.salary_change_reason || '').trim();
         const salaryChangeRows = buildSalaryChangeRows({
@@ -1283,12 +1291,32 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
     편집모드설정(true);
 
     // 서브 테이블 데이터 비동기 로드
+    // ── 주민번호 보정 fetch ─────────────────────────────────────────
+    // 직원 부트스트랩 select(STAFF_BOOTSTRAP_COLUMNS)에 resident_no가 빠져 있어
+    // 편집 진입 시 빈 값으로 시작 → 그대로 저장하면 빈 문자열로 덮어쓰는 버그가 있었음.
+    // 보안(JM5) 차원에서 주민번호는 전역 메모리에 띄우지 않고, 편집 시점에만 별도 select.
     const staffId = String(직원.id);
     Promise.all([
+      supabase.from('staff_members').select('resident_no').eq('id', staffId).maybeSingle(),
       supabase.from('staff_licenses').select('*').eq('staff_id', staffId).order('is_primary', { ascending: false }),
       supabase.from('staff_job_categories').select('*').eq('staff_id', staffId),
       supabase.from('staff_shift_assignments').select('*').eq('staff_id', staffId).order('priority'),
-    ]).then(([licRes, jobRes, shiftRes]) => {
+    ]).then(([staffRes, licRes, jobRes, shiftRes]) => {
+      // 주민번호 보정: 폼 state의 주민번호가 비어 있고 DB에 값이 있으면 채움.
+      // (사용자가 이미 폼에서 수정 중이라면 덮어쓰지 않음)
+      const fetchedResidentNo =
+        staffRes && !staffRes.error && staffRes.data
+          ? String((staffRes.data as { resident_no?: string | null }).resident_no ?? '')
+          : '';
+      if (fetchedResidentNo) {
+        신규직원설정((prev) => {
+          const current = String(prev.주민번호 ?? '');
+          if (current.replace(/[^0-9]/g, '').length > 0) return prev;
+          const raw = fetchedResidentNo.replace(/[^0-9]/g, '').slice(0, 13);
+          const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
+          return { ...prev, 주민번호: formatted };
+        });
+      }
       const loadedLicenses: LicenseRow[] = (licRes.data ?? []).map((r: Record<string, unknown>) => ({
         _key: String(r.id ?? crypto.randomUUID()),
         license_type: (r.license_type as LicenseRow['license_type']) ?? null,

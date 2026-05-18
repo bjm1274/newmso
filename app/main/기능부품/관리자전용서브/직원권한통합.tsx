@@ -30,6 +30,68 @@ const APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY = 'approval_doc_number_prefix';
 const APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY = 'approval_doc_number_include_department';
 const APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY = 'approval_doc_number_date_mode';
 const APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY = 'approval_doc_number_sequence_padding';
+/**
+ * permissions JSON 안에 함께 저장되지만 권한이 아닌 개인 고유 데이터 키 목록.
+ * 권한 복사 시 이 키들은 원본에서 가져오지 않고 대상자의 값을 그대로 유지한다.
+ * (사진, 연락처, 계좌, 면허, 고용·근무 조건, 급여 개인 설정 등)
+ */
+const NON_PERMISSION_PERSONAL_KEYS: readonly string[] = [
+  // 프로필 사진
+  'profile_photo_path',
+  'profile_photo_url',
+  'profile_photo_updated_at',
+  // 개인 연락처 / 금융
+  'extension',
+  'bank_name',
+  'bank_account',
+  // 면허
+  'license_no',
+  'license_date',
+  'license_note',
+  // 고용 / 계약
+  'employment_type',
+  'current_work_type',
+  'contract_end_date',
+  'probation_months',
+  // 급여 개인 설정
+  'payroll_allowances',
+  'insurance',
+  'is_medical_benefit',
+  // 근무 개인 설정
+  'work_conditions',
+  'shift_group_ids',
+  'weekly_rotation_shift_ids',
+  'secondary_shift_id',
+] as const;
+
+/**
+ * 원본 직원의 permissions에서 권한 키만 추려내고, 대상자의 개인 데이터 키는
+ * 그대로 유지하도록 병합한 permissions 객체를 반환한다.
+ * 사진·계좌·면허 등 비-권한 개인 데이터는 절대 복사되지 않는다.
+ */
+function buildPermissionsForCopy(
+  sourcePermissions: Record<string, unknown> | null | undefined,
+  targetPermissions: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const source = sourcePermissions && typeof sourcePermissions === 'object' ? sourcePermissions : {};
+  const target = targetPermissions && typeof targetPermissions === 'object' ? targetPermissions : {};
+  const personalKeySet = new Set<string>(NON_PERMISSION_PERSONAL_KEYS);
+
+  const result: Record<string, unknown> = {};
+  // 1) 원본의 권한 키만 옮긴다 (개인 데이터 키는 제외)
+  for (const [key, value] of Object.entries(source)) {
+    if (personalKeySet.has(key)) continue;
+    result[key] = value;
+  }
+  // 2) 대상자의 개인 데이터 키는 그대로 보존
+  for (const key of personalKeySet) {
+    if (key in target) {
+      result[key] = target[key];
+    }
+  }
+  return result;
+}
+
 const APPROVAL_REFERENCE_TARGETS = [
   { key: 'all', label: '모든 문서' },
   { key: 'leave', label: '연차/휴가' },
@@ -39,7 +101,7 @@ const APPROVAL_REFERENCE_TARGETS = [
   { key: 'repair_request', label: '수리요청' },
   { key: 'draft_business', label: '업무기안' },
   { key: 'cooperation', label: '업무협조' },
-  { key: 'generic', label: '양식신청' },
+  { key: 'generic', label: '증명서발급' },
   { key: 'attendance_fix', label: '출결정정' },
   { key: 'personnel_order', label: '인사명령' },
 ] as const;
@@ -279,8 +341,13 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
 
     const actor = readClientAuditActor();
     setCopying(true);
-    const updates: { permissions: Record<string, any>; role?: string } = {
-      permissions: { ...(source.permissions || {}) },
+    // 권한만 복사하고 사진·계좌·면허 등 개인 데이터는 대상자 것을 유지한다.
+    const mergedPermissions = buildPermissionsForCopy(
+      source.permissions as Record<string, unknown> | null,
+      target.permissions as Record<string, unknown> | null,
+    );
+    const updates: { permissions: Record<string, unknown>; role?: string } = {
+      permissions: mergedPermissions,
     };
     if (copyRoleToo && source.role) {
       updates.role = source.role;
@@ -294,9 +361,16 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       afterPermissions: updates.permissions,
     }));
 
-    const { error } = await updateStaffRecord(target.id, updates);
-    setCopying(false);
-    if (error) {
+    try {
+      const { error } = await updateStaffRecord(target.id, updates);
+      setCopying(false);
+      if (error) {
+        toast('권한 복사 중 오류가 발생했습니다.', 'error');
+        return;
+      }
+    } catch (err) {
+      setCopying(false);
+      console.error('[권한복사] updateStaffRecord 실패', err);
       toast('권한 복사 중 오류가 발생했습니다.', 'error');
       return;
     }
@@ -427,12 +501,18 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
     const target = staffs.find((staff) => staff.id === selectedStaff.id);
     if (!source || !target) return null;
 
+    // 실제 복사 동작과 동일하게 비-권한 개인 데이터는 제외한 결과로 미리보기를 만든다.
+    const previewAfter = buildPermissionsForCopy(
+      source.permissions as Record<string, unknown> | null,
+      target.permissions as Record<string, unknown> | null,
+    );
+
     const review = buildPermissionReview({
       title: '권한 복사 미리보기',
       summary: `[${source.name}] 권한을 [${target.name}]에게 복사하면 변경되는 항목입니다.`,
       targetName: String(target.name || '-'),
       beforePermissions: target.permissions || {},
-      afterPermissions: source.permissions || {},
+      afterPermissions: previewAfter,
     });
 
     if (copyRoleToo && source.role !== target.role) {

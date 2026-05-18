@@ -43,7 +43,8 @@ type AttendanceRecord = {
   work_hours_minutes?: number | null;
 };
 
-type DaySortKey = 'default' | 'name' | 'status';
+// 'department' = 기본 정렬(부서→직급→이름), 'name' = 이름만, 'status' = 상태, 'checkIn' = 출근시각
+type DaySortKey = 'department' | 'name' | 'status' | 'checkIn';
 type DaySortDirection = 'asc' | 'desc';
 
 const STATUS_SORT_ORDER: Record<string, number> = {
@@ -61,12 +62,15 @@ const STATUS_SORT_ORDER: Record<string, number> = {
 type DayRow = {
   id: string;
   name: string;
+  department: string;
+  position: string;
   meta: string;
   statusLabel: string;
   statusBadge: ReturnType<typeof getAttendanceStatusMeta>;
   checkIn: string;
   checkOut: string;
   workMinutes: number;
+  checkInTimestamp: number;
   statusSortOrder: number;
 };
 
@@ -89,8 +93,9 @@ export function AttendanceCalendarDayPanel({
   selectedDate,
   attendanceMap,
 }: AttendanceCalendarDayPanelProps) {
+  // 기본 정렬: 부서 → 직급 → 이름 (정렬되지 않은 채 표시되는 문제 방지)
   const [sort, setSort] = useState<{ key: DaySortKey; direction: DaySortDirection }>({
-    key: 'default',
+    key: 'department',
     direction: 'asc',
   });
 
@@ -105,31 +110,49 @@ export function AttendanceCalendarDayPanel({
         const attendance = attendanceMap.get(buildAttendanceKey(staff.id, selectedDate));
         const resolved = resolveAttendanceStatus(attendance, isWeekendDate(selectedDate)) || 'missing';
         const statusBadge = getAttendanceStatusMeta(resolved);
+        const checkInTimestamp = attendance?.check_in_time
+          ? new Date(attendance.check_in_time).getTime()
+          : Number.POSITIVE_INFINITY;
         return {
           id: staff.id,
           name: staff.name,
+          department: staff.department,
+          position: staff.position,
           meta: `${staff.department} · ${staff.position}`,
           statusLabel: statusBadge.label,
           statusBadge,
           checkIn: formatTime(attendance?.check_in_time),
           checkOut: formatTime(attendance?.check_out_time),
           workMinutes: Number(attendance?.work_hours_minutes ?? 0),
+          checkInTimestamp,
           statusSortOrder: STATUS_SORT_ORDER[resolved] ?? STATUS_SORT_ORDER.missing,
         };
       }),
     [filtered, attendanceMap, selectedDate],
   );
 
+  // 정렬 결과는 useMemo로 캐싱 (JM2: 매 렌더마다 sort 호출 방지)
   const sortedRows = useMemo(() => {
-    if (sort.key === 'default') return baseRows;
     const next = [...baseRows];
+    const byDeptThenPosThenName = (left: DayRow, right: DayRow) => {
+      let cmp = nameCollator.compare(left.department || '', right.department || '');
+      if (cmp !== 0) return cmp;
+      cmp = nameCollator.compare(left.position || '', right.position || '');
+      if (cmp !== 0) return cmp;
+      return nameCollator.compare(left.name || '', right.name || '');
+    };
     next.sort((left, right) => {
       let compared = 0;
-      if (sort.key === 'name') {
+      if (sort.key === 'department') {
+        compared = byDeptThenPosThenName(left, right);
+      } else if (sort.key === 'name') {
         compared = nameCollator.compare(left.name || '', right.name || '');
         if (compared === 0) compared = nameCollator.compare(left.meta || '', right.meta || '');
       } else if (sort.key === 'status') {
         compared = left.statusSortOrder - right.statusSortOrder;
+        if (compared === 0) compared = nameCollator.compare(left.name || '', right.name || '');
+      } else if (sort.key === 'checkIn') {
+        compared = left.checkInTimestamp - right.checkInTimestamp;
         if (compared === 0) compared = nameCollator.compare(left.name || '', right.name || '');
       }
       return sort.direction === 'asc' ? compared : -compared;
@@ -137,7 +160,7 @@ export function AttendanceCalendarDayPanel({
     return next;
   }, [baseRows, sort, nameCollator]);
 
-  const toggleSort = (nextKey: Exclude<DaySortKey, 'default'>) => {
+  const toggleSort = (nextKey: DaySortKey) => {
     setSort((cur) =>
       cur.key === nextKey
         ? { key: cur.key, direction: cur.direction === 'asc' ? 'desc' : 'asc' }
@@ -145,7 +168,7 @@ export function AttendanceCalendarDayPanel({
     );
   };
 
-  const indicator = (target: Exclude<DaySortKey, 'default'>): string => {
+  const indicator = (target: DaySortKey): string => {
     if (sort.key !== target) return '↕';
     return sort.direction === 'asc' ? '↑' : '↓';
   };
@@ -204,42 +227,33 @@ export function AttendanceCalendarDayPanel({
           일별 출퇴근 현황
           <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span>
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">정렬</span>
-          <button
-            type="button"
-            data-testid="attendance-calendar-sort-name"
-            onClick={() => toggleSort('name')}
-            aria-pressed={sort.key === 'name'}
-            aria-label="직원 이름순 정렬"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-colors ${
-              sort.key === 'name'
-                ? 'bg-[var(--accent)] text-white'
-                : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-foreground'
-            }`}
-          >
-            <span>이름</span>
-            <span aria-hidden="true" className="text-[10px] font-black">
-              {indicator('name')}
-            </span>
-          </button>
-          <button
-            type="button"
-            data-testid="attendance-calendar-sort-status"
-            onClick={() => toggleSort('status')}
-            aria-pressed={sort.key === 'status'}
-            aria-label="근태 상태순 정렬"
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-colors ${
-              sort.key === 'status'
-                ? 'bg-[var(--accent)] text-white'
-                : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-foreground'
-            }`}
-          >
-            <span>상태</span>
-            <span aria-hidden="true" className="text-[10px] font-black">
-              {indicator('status')}
-            </span>
-          </button>
+          {([
+            { id: 'department', label: '부서', testId: 'attendance-calendar-sort-department', aria: '부서·직급·이름순 정렬' },
+            { id: 'name', label: '이름', testId: 'attendance-calendar-sort-name', aria: '직원 이름순 정렬' },
+            { id: 'status', label: '상태', testId: 'attendance-calendar-sort-status', aria: '근태 상태순 정렬' },
+            { id: 'checkIn', label: '출근시각', testId: 'attendance-calendar-sort-checkin', aria: '출근시각순 정렬' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              data-testid={opt.testId}
+              onClick={() => toggleSort(opt.id)}
+              aria-pressed={sort.key === opt.id}
+              aria-label={opt.aria}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-colors ${
+                sort.key === opt.id
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-foreground'
+              }`}
+            >
+              <span>{opt.label}</span>
+              <span aria-hidden="true" className="text-[10px] font-black">
+                {indicator(opt.id)}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
       <div className="p-3">

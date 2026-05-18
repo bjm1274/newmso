@@ -19,7 +19,7 @@ export const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'draft_business', name: '업무기안' },
   { slug: 'cooperation', name: '업무협조' },
   { slug: 'official_document_dispatch', name: '공문발송' },
-  { slug: 'generic', name: '양식신청' },
+  { slug: 'generic', name: '증명서발급' },
   { slug: 'attendance_fix', name: '출결정정' },
   { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
 ] as const;

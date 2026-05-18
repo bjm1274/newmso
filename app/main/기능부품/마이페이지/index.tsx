@@ -152,43 +152,67 @@ function MyPageMain({
   }, [user?.auth_user_id, user?.employee_no, user?.id, user?.name]);
 
   // 미서명 계약서 확인
+  // JM2: 동일 id/상태이면 setLatestContract/setPendingContract 호출을 생략하여
+  // 자식 컴포넌트에 매번 새 객체 참조가 흘러가지 않도록 한다.
   useEffect(() => {
     if (!user?.id) return;
+    let cancelled = false;
+    const isSameContract = (
+      a: EmploymentContractRecord | null,
+      b: EmploymentContractRecord | null,
+    ): boolean => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      return (
+        String(a.id) === String(b.id) &&
+        a.status === b.status &&
+        a.signed_at === b.signed_at &&
+        a.requested_at === b.requested_at
+      );
+    };
     const checkPendingContracts = async () => {
-      const [{ data: nextPending }, { data: nextLatest }] = await Promise.all([
-        supabase
-          .from('employment_contracts')
-          .select('*')
-          .eq('staff_id', user.id as string)
-          .eq('status', '서명대기')
-          .order('requested_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('employment_contracts')
-          .select('*')
-          .eq('staff_id', user.id as string)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+      try {
+        const [{ data: nextPending }, { data: nextLatest }] = await Promise.all([
+          supabase
+            .from('employment_contracts')
+            .select('*')
+            .eq('staff_id', user.id as string)
+            .eq('status', '서명대기')
+            .order('requested_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('employment_contracts')
+            .select('*')
+            .eq('staff_id', user.id as string)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        if (cancelled) return;
 
-      const nextLatestContract = (nextLatest as EmploymentContractRecord | null) ?? null;
-      const nextPendingContract =
-        (nextPending as EmploymentContractRecord | null) ??
-        (nextLatestContract && !nextLatestContract.signed_at ? nextLatestContract : null);
+        const nextLatestContract = (nextLatest as EmploymentContractRecord | null) ?? null;
+        const nextPendingContract =
+          (nextPending as EmploymentContractRecord | null) ??
+          (nextLatestContract && !nextLatestContract.signed_at ? nextLatestContract : null);
 
-      setLatestContract(nextLatestContract);
+        setLatestContract((prev) => (isSameContract(prev, nextLatestContract) ? prev : nextLatestContract));
 
-      if (nextPendingContract) {
-        setPendingContract(nextPendingContract);
-        setShowSignaturePad(true);
-      } else {
-        setPendingContract(null);
-        setShowSignaturePad(false);
+        if (nextPendingContract) {
+          setPendingContract((prev) => (isSameContract(prev, nextPendingContract) ? prev : nextPendingContract));
+          setShowSignaturePad((prev) => (prev ? prev : true));
+        } else {
+          setPendingContract((prev) => (prev === null ? prev : null));
+          setShowSignaturePad((prev) => (prev === false ? prev : false));
+        }
+      } catch {
+        // JM3: 계약서 조회 실패 시 기존 상태 유지 — 사용자에 노출할 필요 없음.
       }
     };
     void checkPendingContracts();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   // 이번 달 근태 실 데이터 fetch (mount 1회, JM2: realtime 없음)
@@ -352,9 +376,35 @@ function MyPageMain({
     }
   }, [activeTab, recordsView]);
 
+  // JM2: user 객체 참조가 매 렌더마다 새로 들어와도 실제 값이 동일하면 재계산 차단.
+  // 이전에는 deps가 [user] 였기 때문에 상위에서 user를 새 객체로 내려보낼 때마다
+  // setProfileSummary가 호출되어 마이페이지 전체가 끊임없이 리렌더되는 원인이 됨.
+  // 프로필 요약에 실제로 필요한 primitive만 deps로 좁혀서 안정화한다.
+  const profileSummaryDeps = useMemo(
+    () => ({
+      id: (user as Record<string, unknown> | undefined)?.id,
+      name: (user as Record<string, unknown> | undefined)?.name,
+      position: (user as Record<string, unknown> | undefined)?.position,
+      department: (user as Record<string, unknown> | undefined)?.department,
+      employee_no: (user as Record<string, unknown> | undefined)?.employee_no,
+      photo_url: (user as Record<string, unknown> | undefined)?.photo_url,
+      avatar_url: (user as Record<string, unknown> | undefined)?.avatar_url,
+      profile_photo_updated_at: (user as Record<string, unknown> | undefined)?.profile_photo_updated_at,
+    }),
+    [
+      (user as Record<string, unknown> | undefined)?.id,
+      (user as Record<string, unknown> | undefined)?.name,
+      (user as Record<string, unknown> | undefined)?.position,
+      (user as Record<string, unknown> | undefined)?.department,
+      (user as Record<string, unknown> | undefined)?.employee_no,
+      (user as Record<string, unknown> | undefined)?.photo_url,
+      (user as Record<string, unknown> | undefined)?.avatar_url,
+      (user as Record<string, unknown> | undefined)?.profile_photo_updated_at,
+    ],
+  );
   useEffect(() => {
-    setProfileSummary(buildProfileSummary(user));
-  }, [user]);
+    setProfileSummary(buildProfileSummary(profileSummaryDeps as Record<string, unknown>));
+  }, [profileSummaryDeps]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

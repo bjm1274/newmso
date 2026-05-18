@@ -121,8 +121,9 @@ export default function ApprovalComposerView({
   const activeFormLabel = builtinFormTypes.includes(formType)
     ? formType
     : customFormTypes.find((customForm) => customForm.slug === formType)?.name ?? formType;
-  const selectedDraft = formType !== '양식신청' ? lastDraftByType[formType] : null;
-  const showDocumentBody = formType !== '양식신청';
+  // '증명서발급' 양식은 자체 양식 컴포넌트가 본문을 대체하므로 일반 문서 본문/이전 기안 노출 제외
+  const selectedDraft = formType !== '증명서발급' ? lastDraftByType[formType] : null;
+  const showDocumentBody = formType !== '증명서발급';
   const isOfficialDispatch = formType === '공문발송';
   const isEditingApproval = Boolean(editingApproval?.id);
 
@@ -348,7 +349,7 @@ export default function ApprovalComposerView({
                     formTitle={formTitle}
                     setFormTitle={setFormTitle}
                   />
-                ) : formType === '양식신청' ? (
+                ) : formType === '증명서발급' ? (
                   <FormRequest user={user} staffs={staffs} approverLine={approverLine} ccLine={ccLine} />
                 ) : formType === '출결정정' ? (
                   <AttendanceCorrectionForm

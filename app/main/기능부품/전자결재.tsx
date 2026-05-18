@@ -382,7 +382,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
     return {
       slug: rawSlug || rawType || 'generic',
-      name: rawName || rawType || '양식신청',
+      name: rawName || rawType || '증명서발급',
     };
   }, [customFormTypes]);
 
@@ -529,7 +529,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       { name: '연장근무', slug: 'overtime' },
       { name: '비품구매', slug: 'purchase' },
       { name: '출결정정', slug: 'attendance_fix' },
-      { name: '양식신청', slug: 'generic' }
+      { name: '증명서발급', slug: 'generic' }
     ];
 
     const normalizeRows = (rows: Record<string, unknown>[]) =>

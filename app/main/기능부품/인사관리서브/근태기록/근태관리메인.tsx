@@ -7,7 +7,6 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import { isActiveStaff } from '@/lib/active-staff';
-import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import AttendanceIssueAnalysisSuite from '../근태이상통합분석';
 import LeaveManagement from '../휴가신청/휴가관리메인';
@@ -15,6 +14,7 @@ import AttendanceDeductionSimulator from '../휴가신청/근태차감시뮬레�
 import AttendanceAnomalyPanel from '../휴가신청/근태이상탐지';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import AttendanceBulkEditModal from './근태일괄수정모달';
 
 type StaffMember = {
   id: string;
@@ -358,11 +358,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const [swapData, setSwapData] = useState<{ staffId: string; date: string; currentShiftId: string | null } | null>(null);
   const [pendingSwaps, setPendingSwaps] = useState<any[]>([]);
   
-  const [bulkRangeType, setBulkRangeType] = useState<'day' | 'week' | 'month' | 'custom'>('day');
-  const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [bulkEndDate, setBulkEndDate] = useState(new Date().toISOString().slice(0, 10));
-  const [bulkStatus, setBulkStatus] = useState<string>('absent');
-  const [bulkSaving, setBulkSaving] = useState(false);
+  // 일괄 수정 모달 내부 상태는 AttendanceBulkEditModal에서 자체 관리한다.
 
   const filtered = useMemo(
     () => selectedCo === '전체' ? staffs : staffs.filter((s: StaffMember) => s.company === selectedCo),
@@ -1136,15 +1132,120 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     },
   ], [attendanceMap, selectedDate]);
 
+  // 일별 출퇴근 현황 정렬 상태: 기본 부서→직급→이름, 토글로 이름·상태·출근시각 정렬 가능
+  type DayPanelSortKey = 'default' | 'name' | 'status' | 'checkIn';
+  type DayPanelSortDir = 'asc' | 'desc';
+  const [dayPanelSort, setDayPanelSort] = useState<{ key: DayPanelSortKey; dir: DayPanelSortDir }>({
+    key: 'default',
+    dir: 'asc',
+  });
+
+  const nameCollator = useMemo(
+    () => new Intl.Collator('ko-KR', { numeric: true, sensitivity: 'base' }),
+    [],
+  );
+
+  // 상태 정렬 우선순위: 출근→지각→조퇴→결근→휴가→휴일→기록없음
+  const STATUS_ORDER: Record<string, number> = useMemo(
+    () => ({
+      present: 0,
+      late: 1,
+      early_leave: 2,
+      absent: 3,
+      annual_leave: 4,
+      sick_leave: 4,
+      half_leave: 4,
+      holiday: 5,
+      missing: 6,
+    }),
+    [],
+  );
+
+  // 일별 패널용 정렬된 직원 목록 (JM2: useMemo로 매 렌더 sort 회피)
+  const sortedDayPanelStaffs = useMemo(() => {
+    const next = [...filtered];
+    const byDeptThenPosThenName = (a: StaffMember, b: StaffMember) => {
+      let cmp = nameCollator.compare(a.department || '', b.department || '');
+      if (cmp !== 0) return cmp;
+      cmp = nameCollator.compare(a.position || '', b.position || '');
+      if (cmp !== 0) return cmp;
+      return nameCollator.compare(a.name || '', b.name || '');
+    };
+    if (dayPanelSort.key === 'default') {
+      next.sort(byDeptThenPosThenName);
+      return next;
+    }
+    next.sort((a, b) => {
+      let compared = 0;
+      if (dayPanelSort.key === 'name') {
+        compared = nameCollator.compare(a.name || '', b.name || '');
+      } else if (dayPanelSort.key === 'status') {
+        const attA = attendanceMap.get(buildAttendanceKey(a.id, selectedDate));
+        const attB = attendanceMap.get(buildAttendanceKey(b.id, selectedDate));
+        const sA = resolveAttendanceStatus(attA, isWeekendDate(selectedDate)) || 'missing';
+        const sB = resolveAttendanceStatus(attB, isWeekendDate(selectedDate)) || 'missing';
+        compared = (STATUS_ORDER[sA] ?? 99) - (STATUS_ORDER[sB] ?? 99);
+      } else if (dayPanelSort.key === 'checkIn') {
+        const attA = attendanceMap.get(buildAttendanceKey(a.id, selectedDate));
+        const attB = attendanceMap.get(buildAttendanceKey(b.id, selectedDate));
+        const tA = attA?.check_in_time ? new Date(attA.check_in_time).getTime() : Number.POSITIVE_INFINITY;
+        const tB = attB?.check_in_time ? new Date(attB.check_in_time).getTime() : Number.POSITIVE_INFINITY;
+        compared = tA - tB;
+      }
+      if (compared === 0) compared = byDeptThenPosThenName(a, b);
+      return dayPanelSort.dir === 'asc' ? compared : -compared;
+    });
+    return next;
+  }, [filtered, dayPanelSort, attendanceMap, selectedDate, nameCollator, STATUS_ORDER]);
+
+  const toggleDayPanelSort = (key: Exclude<DayPanelSortKey, 'default'>) => {
+    setDayPanelSort((cur) =>
+      cur.key === key
+        ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: 'asc' },
+    );
+  };
+
+  const dayPanelSortIndicator = (key: Exclude<DayPanelSortKey, 'default'>): string => {
+    if (dayPanelSort.key !== key) return '↕';
+    return dayPanelSort.dir === 'asc' ? '↑' : '↓';
+  };
+
   const renderIntegratedDayPanel = () => (
     <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm" data-testid="attendance-calendar-day-panel">
-      <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/40">
+      <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/40 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <h3 className="text-lg font-bold text-foreground">일별 출퇴근 현황 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span></h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">정렬</span>
+          {([
+            { id: 'name', label: '이름' },
+            { id: 'status', label: '상태' },
+            { id: 'checkIn', label: '출근시각' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => toggleDayPanelSort(opt.id)}
+              aria-pressed={dayPanelSort.key === opt.id}
+              aria-label={`${opt.label}으로 정렬`}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-colors ${
+                dayPanelSort.key === opt.id
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:text-foreground'
+              }`}
+            >
+              <span>{opt.label}</span>
+              <span aria-hidden="true" className="text-[10px] font-black">
+                {dayPanelSortIndicator(opt.id)}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <ResponsiveTable<StaffMember>
           columns={dayPanelColumns}
-          rows={filtered}
+          rows={sortedDayPanelStaffs}
           keyField="id"
           emptyMessage="표시할 직원이 없습니다."
         />
@@ -1674,164 +1775,21 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           </div>
         )}
 
-        {/* 출퇴근 상태 일괄 수정 모달 */}
-        {bulkEditOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl shadow-sm max-w-md w-full p-4 space-y-4 transform transition-all">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <span className="text-2xl">⚡</span> 상태 일괄 수정
-                </h3>
-                <button onClick={() => setBulkEditOpen(false)} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] dark:hover:text-zinc-200 transition-colors">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">🗓️</span> 적용 기간</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'day', label: '하루 단위' },
-                      { id: 'week', label: '주 단위 (7일)' },
-                      { id: 'month', label: '월 단위' },
-                      { id: 'custom', label: '직접 선택' }
-                    ].map((o) => (
-                      <button
-                        key={o.id}
-                        type="button"
-                        onClick={() => setBulkRangeType(o.id as any)}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${bulkRangeType === o.id ? 'bg-blue-500/10 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-500/20 dark:border-blue-800 ring-1 ring-blue-500' : 'bg-transparent text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
-                          }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase mb-1.5 ml-1">시작일</p>
-                    <SmartDatePicker
-                      value={bulkStartDate}
-                      onChange={(val) => {
-                        setBulkStartDate(val);
-                        if (bulkRangeType === 'week') {
-                          const d = new Date(val);
-                          d.setDate(d.getDate() + 6);
-                          setBulkEndDate(d.toISOString().slice(0, 10));
-                        }
-                      }}
-                      className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
-                    />
-                  </div>
-                  {(bulkRangeType === 'custom' || bulkRangeType === 'week') && (
-                    <div className="flex-1">
-                      <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase mb-1.5 ml-1">종료일</p>
-                      <SmartDatePicker
-                        value={bulkEndDate}
-                        onChange={(val) => setBulkEndDate(val)}
-                        className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-2">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">📌</span> 변경할 상태</p>
-                  <select
-                    value={bulkStatus}
-                    onChange={(e) => setBulkStatus(e.target.value)}
-                    className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer transition-shadow"
-                  >
-                    <option value="present">🟢 정상 출근</option>
-                    <option value="absent">🔴 결근</option>
-                    <option value="half_leave">🔵 반차</option>
-                    <option value="annual_leave">🟣 연차</option>
-                    <option value="sick_leave">🩺 병가</option>
-                    <option value="holiday">⚪ 휴일</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4 border-t border-[var(--border-subtle)] dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setBulkEditOpen(false)}
-                  className="px-4 py-3 rounded-xl text-sm font-bold border border-[var(--border)] dark:border-zinc-700 text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 focus:outline-none transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    let start = bulkStartDate;
-                    let end = bulkStartDate;
-                    if (bulkRangeType === 'week') {
-                      const d = new Date(bulkStartDate);
-                      d.setDate(d.getDate() + 6);
-                      end = d.toISOString().slice(0, 10);
-                    } else if (bulkRangeType === 'month') {
-                      const [y, m] = bulkStartDate.split('-').map(Number);
-                      end = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
-                      start = `${y}-${String(m).padStart(2, '0')}-01`;
-                    } else if (bulkRangeType === 'custom') {
-                      start = bulkStartDate <= bulkEndDate ? bulkStartDate : bulkEndDate;
-                      end = bulkStartDate <= bulkEndDate ? bulkEndDate : bulkStartDate;
-                    }
-                    setBulkSaving(true);
-                    try {
-                      const staffIds = filtered.map((s: StaffMember) => s.id);
-                      const dates: string[] = [];
-                      const cur = new Date(start);
-                      const endD = new Date(end);
-                      while (cur <= endD) {
-                        dates.push(cur.toISOString().slice(0, 10));
-                        cur.setDate(cur.getDate() + 1);
-                      }
-                      if (['late', 'early_leave'].includes(bulkStatus)) {
-                        toast('지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
-                        return;
-                      }
-                      // 정상 출근 일괄 적용 시 회사 기본 시간(09:00~18:00)으로 출퇴근 기록 채움
-                      const isPresent = bulkStatus === 'present';
-                      const rows = staffIds.flatMap((staffId: string) =>
-                        dates.map((work_date) => ({
-                          staff_id: staffId,
-                          work_date,
-                          status: bulkStatus,
-                          ...(isPresent
-                            ? {
-                                check_in_time: `${work_date}T09:00:00+09:00`,
-                                check_out_time: `${work_date}T18:00:00+09:00`,
-                              }
-                            : {}),
-                        }))
-                      );
-                      for (const row of rows) {
-                        await supabase.from('attendances').upsert(row, { onConflict: 'staff_id,work_date' });
-                      }
-                      toast(`적용 완료: ${dates.length}일 × ${staffIds.length}명 = ${rows.length}건을 "${bulkStatus === 'present' ? '정상' : bulkStatus}"으로 수정했습니다.`, 'success');
-                      setBulkEditOpen(false);
-                      fetchAttendance();
-                    } catch (e) {
-                      console.error(e);
-                      toast('일괄 수정 중 오류가 발생했습니다.', 'error');
-                    } finally {
-                      setBulkSaving(false);
-                    }
-                  }}
-                  disabled={bulkSaving}
-                  className="px-4 py-3 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-all flex items-center justify-center min-w-[120px]"
-                >
-                  {bulkSaving ? (
-                    <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 처리 중...</span>
-                  ) : '적용하기'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 출퇴근 상태 일괄 수정 모달 — 직원 선택 후 일괄수정 적용 */}
+        <AttendanceBulkEditModal
+          open={bulkEditOpen}
+          onClose={() => setBulkEditOpen(false)}
+          staffs={filtered.map((s: StaffMember) => ({
+            id: s.id,
+            name: s.name,
+            position: s.position,
+            department: s.department,
+            company: s.company,
+          }))}
+          onApplied={() => {
+            fetchAttendance();
+          }}
+        />
 
         {viewMode === 'calendar' && (
           <div className="space-y-4">

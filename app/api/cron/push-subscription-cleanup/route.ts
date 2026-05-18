@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { runLicenseExpiryJobs, type LicenseExpiryJobsResult } from '@/lib/license-expiry-jobs';
 import {
+  runContractExpiryJobs,
+  type ContractExpiryJobResult,
+} from '@/lib/contract-expiry-jobs';
+import {
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
@@ -234,6 +238,19 @@ export async function GET(req: Request) {
       console.error('[push-subscription-cleanup] license jobs failed:', err);
     }
 
+    // 수습/계약 만료 7일 전 관리자 알림도 함께 실행
+    // (Workers Free Plan cron 5개 한도 → 별도 cron 대신 본 cron에 합침).
+    // 단독 잡 실패가 cleanup·license·retention 결과에 영향 없도록 try/catch 격리.
+    let contractJobs: ContractExpiryJobResult | null = null;
+    let contractError: string | null = null;
+    try {
+      const supabase = createAdminClient();
+      contractJobs = await runContractExpiryJobs(supabase);
+    } catch (err) {
+      contractError = err instanceof Error ? err.message : 'contract-expiry-jobs failed';
+      console.error('[push-subscription-cleanup] contract jobs failed:', err);
+    }
+
     // 알림/푸시잡 보관 정책 정리도 함께 (Supabase egress 절감)
     let retention: Awaited<ReturnType<typeof cleanupRetentionLogs>> | null = null;
     let retentionError: string | null = null;
@@ -250,6 +267,8 @@ export async function GET(req: Request) {
       ...result,
       licenseJobs,
       ...(licenseError ? { licenseError } : {}),
+      contractJobs,
+      ...(contractError ? { contractError } : {}),
       retention,
       ...(retentionError ? { retentionError } : {}),
     });
