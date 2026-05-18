@@ -20,9 +20,15 @@ function hasApprovalArchiveSignature(doc: Record<string, unknown> | null | undef
       || ((doc as Record<string, unknown>).meta_data as Record<string, unknown> | null | undefined)?.doc_number
       || ''
   );
+  // 결재 문서번호 패턴들: APRV-..., SYIN-ATD-..., SYIN-LEV-... 등 회사-종류-YYYYMMDD-순번
   if (/^APRV-/i.test(docNumber)) return true;
+  if (/^[A-Z][A-Z0-9]+-[A-Z]+-\d{8}-\d+$/i.test(docNumber)) return true;
+
   const content = String(doc.content || '');
   if (/^문서번호:\s*APRV-/im.test(content)) return true;
+  if (/^문서번호:\s*[A-Z][A-Z0-9]+-[A-Z]+-\d{8}-\d+/im.test(content)) return true;
+  // 가장 신뢰성 높은 시그니처: 결재 보관 헤더에 항상 들어가는 두 라벨이 모두 존재
+  if (/^기안자:/im.test(content) && /^기안일시:/im.test(content)) return true;
   return false;
 }
 
