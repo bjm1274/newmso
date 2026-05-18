@@ -203,10 +203,11 @@ window.onload = () => window.print();
     .info-table td.label{width:140px;font-weight:700;color:#111827;background:#f8fafc}
     .sign-block{margin-top:48px;text-align:center}
     .issued-label{font-size:13px;color:#64748b;margin-bottom:10px}
-    .company-row{display:inline-flex;align-items:center;justify-content:center;gap:16px}
-    .company-name{font-size:26px;font-weight:900;letter-spacing:-0.02em;color:#111827}
-    .seal{width:80px;height:80px;border-radius:999px;border:2px solid ${primaryColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:${primaryColor};background:#fff;overflow:hidden}
-    .seal img{max-width:100%;max-height:100%;object-fit:contain}
+    /* 회사명 끝에 직인이 살짝 겹치도록 배치(조작 방지). 직인 자체에는 테두리/배경 없음. */
+    .company-row{display:inline-flex;align-items:center;justify-content:center;gap:0}
+    .company-name{font-size:26px;font-weight:900;letter-spacing:-0.02em;color:#111827;position:relative;z-index:1}
+    .seal{width:90px;height:90px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:${primaryColor};background:transparent;overflow:visible;margin-left:-32px;position:relative;z-index:2}
+    .seal img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
     .footer-note{margin-top:24px;text-align:center;font-size:11px;color:#94a3b8}
     @media print{
       html,body{background:#fff;margin:0;padding:0}

@@ -337,14 +337,15 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
           {design.showSignArea ? (
             <div className="mt-auto pt-8 text-center">
               <p className="text-[12px] text-[var(--toss-gray-3)]">발급일자 {formatDateLabel(new Date().toISOString())}</p>
-              <div className="mt-4 flex justify-center">
-                <div className="relative inline-flex items-end pr-8">
+              {/* 직인은 회사명 끝에 겹치게 배치하여 위조 방지. 원형 테두리/배경 제거. */}
+              <div className="mt-4 flex justify-center items-center">
+                <div className="relative inline-flex items-end">
                   <div className="text-center">
                     <p className="text-[34px] font-black tracking-[-0.03em] text-[var(--foreground)]">{companyLabel}</p>
                     <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">대표자 / 직인</p>
                   </div>
                 </div>
-                <div className="-ml-5 relative flex h-[72px] w-[72px] items-center justify-center">
+                <div className="-ml-10 relative z-10 flex h-[72px] w-[72px] items-center justify-center">
                   {seals[companyName] ? (
                     <img
                       src={seals[companyName]}
@@ -352,7 +353,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                       className="relative h-[72px] w-[72px] rotate-12 object-contain opacity-95 mix-blend-multiply"
                     />
                   ) : (
-                    <div className="relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-double border-red-700 text-center text-[10px] font-black leading-4 text-red-700 opacity-80">
+                    <div className="relative flex h-[72px] w-[72px] items-center justify-center text-center text-[10px] font-black leading-4 text-red-700 opacity-80">
                       회사
                       <br />
                       직인

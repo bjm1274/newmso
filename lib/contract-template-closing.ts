@@ -209,9 +209,10 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
     signatureDataUrl,
   } = opts;
 
+  // 직인은 실 이미지만 표시(원형 테두리 제거). 회사명 끝 글자에 살짝 겹쳐 위조 방지.
   const sealHTML = sealUrl
-    ? `<img src="${escapeHTML(sealUrl)}" alt="직인" style="width:46px;height:46px;object-fit:contain;vertical-align:middle;margin-left:8px;mix-blend-mode:multiply;" />`
-    : `<span style="display:inline-block;margin-left:8px;padding:2px 10px;border:1.5px solid #c0392b;color:#c0392b;border-radius:999px;font-weight:bold;font-size:11px;">( 인 )</span>`;
+    ? `<img src="${escapeHTML(sealUrl)}" alt="직인" style="width:46px;height:46px;object-fit:contain;vertical-align:middle;margin-left:-14px;mix-blend-mode:multiply;position:relative;z-index:2;" />`
+    : `<span style="display:inline-block;margin-left:8px;color:#c0392b;font-weight:bold;font-size:11px;">( 인 )</span>`;
 
   const signatureHTML = signatureDataUrl
     ? `<img src="${escapeHTML(signatureDataUrl)}" alt="서명" style="height:34px;object-fit:contain;vertical-align:middle;" />`

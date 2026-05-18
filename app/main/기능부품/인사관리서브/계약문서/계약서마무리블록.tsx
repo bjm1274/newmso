@@ -70,7 +70,7 @@ export default function ContractClosingBlock(props: Props) {
                                         style={{ mixBlendMode: 'multiply' }}
                                     />
                                 ) : (
-                                    <span className="inline-flex items-center justify-center px-2 py-0.5 border-2 border-red-400/70 rounded-full text-red-500 font-black text-[10px] shrink-0">
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 text-red-500 font-black text-[10px] shrink-0">
                                         ( 인 )
                                     </span>
                                 )}

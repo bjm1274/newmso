@@ -346,8 +346,9 @@ window.onload = () => window.print();
     .reference strong{flex-shrink:0;color:${escapeHtml(design.primaryColor || '#155eef')};font-size:11px;font-weight:700}
     .approval-line{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;padding:0 28px 12px;break-inside:avoid}
     .sig-box{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;box-sizing:border-box;border:1px dashed ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.45))};border-radius:10px;padding:10px 12px;width:120px;min-height:104px;text-align:center;font-size:11px;color:#475569;background:#fff}
-    .seal{width:72px;height:72px;border-radius:999px;border:2px solid ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.75))};display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:10px;color:${escapeHtml(design.primaryColor || '#155eef')};overflow:hidden;background:#fff;flex-shrink:0}
-    .seal img{max-width:100%;max-height:100%;object-fit:contain}
+    /* 직인 주변 원형 테두리/배경 제거 — 위조 방지를 위해 실 직인 이미지만 노출 */
+    .seal{width:72px;height:72px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:10px;color:${escapeHtml(design.primaryColor || '#155eef')};overflow:visible;background:transparent;flex-shrink:0}
+    .seal img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
     .seal-trailing{margin-left:auto}
     @media print{
       html,body{background:#fff;padding:0;margin:0}

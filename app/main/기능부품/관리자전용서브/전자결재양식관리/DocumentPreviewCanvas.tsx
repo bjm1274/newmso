@@ -128,12 +128,12 @@ export default function DocumentPreviewCanvas({
                 </p>
               </div>
               {design.showSeal !== false && (
-                <div className="-ml-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-double border-[#b42318] bg-[var(--card)] text-center text-[10px] font-black leading-4 text-[#b42318] opacity-80">
+                <div className="-ml-8 relative z-10 flex h-[72px] w-[72px] items-center justify-center text-center text-[10px] font-black leading-4 text-[#b42318]">
                   {design.sealImageUrl ? (
                     <img
                       src={design.sealImageUrl}
                       alt=""
-                      className="h-full w-full rounded-full object-contain"
+                      className="h-full w-full object-contain mix-blend-multiply"
                     />
                   ) : (
                     <>
