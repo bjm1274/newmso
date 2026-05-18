@@ -122,6 +122,11 @@ export type IssuedCertificateContext = {
   sealImageUrl?: string | null;
   primaryColor?: string | null;
   borderColor?: string | null;
+  // 인사관리 발급 디자인과 동일하게 표시하기 위한 추가 메타
+  employeeNo?: string | null;
+  duty?: string | null;
+  rank?: string | null;
+  profilePhotoUrl?: string | null;
 };
 
 function getClosingText(certType: string) {
@@ -154,17 +159,25 @@ export function buildIssuedCertificatePrintHtml(
   context: IssuedCertificateContext = {},
   options?: { autoPrint?: boolean },
 ) {
+  // 인사관리 > 증명서 발급 화면(renderCertificatePaper)과 동일한 디자인으로 발급.
+  // 직원 본인이 마이페이지에서 보는 증명서도 동일한 출력 양식을 가지도록 통합.
   const certType = cert.cert_type || '증명서';
   const title = escapeHtml(certType);
   const serial = escapeHtml(cert.serial_no || '');
   const issuedAt = escapeHtml(formatDateLabel(cert.issued_at));
-  const purpose = escapeHtml(cert.purpose || '-');
   const staffName = escapeHtml(context.staffName || cert.staff_members?.name || '-');
   const companyLabel = escapeHtml(context.companyLabel || 'SY INC.');
   const department = escapeHtml(context.department || '-');
   const position = escapeHtml(context.position || '-');
+  const rankLabel = String(context.rank || '').trim();
+  const positionRank = [String(context.position || '').trim(), rankLabel].filter(Boolean).join(' / ') || '-';
+  const positionRankSafe = escapeHtml(positionRank);
   const joinedAt = escapeHtml(formatDateLabel(context.joinedAt));
+  const employeeNo = escapeHtml(context.employeeNo || '-');
+  const duty = escapeHtml(context.duty || '-');
   const sealUrl = escapeHtml(context.sealImageUrl || '');
+  const photoUrl = escapeHtml(context.profilePhotoUrl || '');
+  const photoInitial = escapeHtml(String(context.staffName || cert.staff_members?.name || '?').slice(0, 1));
   const primaryColor = escapeHtml(context.primaryColor || '#197c86');
   const borderColor = escapeHtml(context.borderColor || '#d7dee5');
   const closingText = escapeHtml(getClosingText(certType));
@@ -186,72 +199,105 @@ window.onload = () => window.print();
   <title>${title}${serial ? ` (${serial})` : ''}</title>
   <style>
     *,*::before,*::after{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;box-sizing:border-box}
-    @page{size:A4 portrait;margin:0}
-    body{margin:0;background:#f5f7fb;color:#111827;font-family:'Malgun Gothic','Noto Sans KR',sans-serif}
-    .sheet{position:relative;max-width:820px;margin:0 auto;background:#fff;border:1px solid ${borderColor};border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,.10);padding:32px 40px 48px}
-    .sheet::before{content:'';position:absolute;inset:0;background:url('/logo.png') center 52% / 140px 140px no-repeat;opacity:0.06;pointer-events:none;mix-blend-mode:multiply;z-index:0}
-    .sheet > *{position:relative;z-index:1}
-    h1{margin:0;font-size:30px;line-height:1.2;color:${primaryColor};letter-spacing:-0.02em}
-    .accent-bar{height:3px;background:${primaryColor};margin:14px 0 22px}
-    .meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0}
-    .meta-row{border:1px solid ${borderColor};border-radius:10px;padding:10px 14px;font-size:12px;background:#fff}
-    .meta-row strong{display:block;margin-bottom:2px;color:#64748b;font-size:11px;font-weight:600}
-    .closing{margin:28px 0;text-align:center;font-size:15px;font-weight:600;color:#111827}
-    .info-table{width:100%;border-collapse:collapse;border-top:2px solid ${primaryColor};border-bottom:2px solid ${primaryColor};font-size:12px}
-    .info-table tr td{padding:10px 14px;border-bottom:1px solid ${borderColor}}
-    .info-table tr:last-child td{border-bottom:none}
-    .info-table td.label{width:140px;font-weight:700;color:#111827;background:#f8fafc}
-    .sign-block{margin-top:48px;text-align:center}
-    .issued-label{font-size:13px;color:#64748b;margin-bottom:10px}
-    /* 회사명 끝에 직인이 살짝 겹치도록 배치(조작 방지). 직인 자체에는 테두리/배경 없음. */
-    .company-row{display:inline-flex;align-items:center;justify-content:center;gap:0}
-    .company-name{font-size:26px;font-weight:900;letter-spacing:-0.02em;color:#111827;position:relative;z-index:1}
-    .seal{width:90px;height:90px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:${primaryColor};background:transparent;overflow:visible;margin-left:-32px;position:relative;z-index:2}
-    .seal img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
-    .footer-note{margin-top:24px;text-align:center;font-size:11px;color:#94a3b8}
+    @page{size:A4 portrait;margin:8mm}
+    body{margin:0;background:#f5f7fb;color:#111827;font-family:'Noto Sans KR','Malgun Gothic',sans-serif}
+    .sheet{position:relative;max-width:780px;margin:0 auto;background:linear-gradient(180deg,#ffffff 0%,#fdfefe 78%,#f5f8fa 100%);border:1px solid ${borderColor};border-radius:6px;padding:20px;min-height:980px;overflow:hidden}
+    /* 배경 워터마크: 회사 로고 */
+    .watermark{position:absolute;left:50%;top:52%;width:128px;height:128px;transform:translate(-50%,-50%);object-fit:contain;opacity:0.06;mix-blend-mode:multiply;pointer-events:none}
+    .stack{position:relative;z-index:1;display:flex;flex-direction:column;height:100%}
+    /* 헤더: 로고 박스 + 제목 */
+    .header{display:flex;align-items:flex-start;gap:16px}
+    .logo-box{width:72px;height:72px;border:1px solid ${borderColor};border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .logo-box img{width:44px;height:44px;object-fit:contain}
+    .doc-title{font-size:34px;font-weight:900;letter-spacing:-0.04em;color:#111827;margin:4px 0 0;line-height:1.1}
+    .accent-bar{height:3px;width:100%;background:${primaryColor};margin:16px 0 0}
+    /* 사진 + 인적사항 */
+    .identity-row{display:grid;grid-template-columns:96px 1fr;gap:12px;margin-top:20px}
+    .photo-wrap{border:1px solid ${borderColor};border-radius:4px;overflow:hidden;background:#eef2f6}
+    .photo-wrap .photo{aspect-ratio:3/4;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .photo img{width:100%;height:100%;object-fit:cover}
+    .photo-fallback{font-size:38px;font-weight:900;color:#94a3b8}
+    .photo-caption{margin-top:4px;text-align:center;font-size:9px;font-weight:600;color:#94a3b8}
+    .identity-list{padding-top:2px}
+    .identity-row-item{display:grid;grid-template-columns:48px 8px 1fr;gap:6px;padding:4px 0;font-size:11px;align-items:start}
+    .identity-row-item:not(:last-child){border-bottom:1px solid ${borderColor}}
+    .identity-row-item .label{font-weight:700;color:#111827}
+    .identity-row-item .value{font-weight:500;color:#111827;line-height:1.35}
+    /* 본문 문구 */
+    .closing{margin:18px 0 0;text-align:center;font-size:14px;font-weight:600;color:#111827;line-height:1.6}
+    /* 본문 표: 위/아래 굵은 라인 + 행마다 라벨/콜론/값 */
+    .info-table{margin-top:18px;border-top:2px solid ${primaryColor};border-bottom:2px solid ${primaryColor};background:#fff}
+    .info-row{display:grid;grid-template-columns:96px 14px 1fr;gap:8px;padding:10px 16px;font-size:12px;align-items:start}
+    .info-row:not(:last-child){border-bottom:1px solid ${borderColor}}
+    .info-row .label{font-weight:700;color:#111827}
+    .info-row .value{font-weight:500;color:#111827;line-height:1.6}
+    /* 하단 발급 책임자: 회사명 끝에 직인이 살짝 겹치도록 배치 */
+    .sign-block{margin-top:auto;padding-top:32px;text-align:center}
+    .issued-label{font-size:12px;color:#94a3b8;margin-bottom:14px}
+    .company-row{display:inline-flex;align-items:flex-end;gap:0;justify-content:center}
+    .company-stack{text-align:center;padding-right:32px}
+    .company-name{font-size:30px;font-weight:900;letter-spacing:-0.03em;color:#111827;line-height:1.1}
+    .company-sub{margin-top:4px;font-size:12px;font-weight:500;color:#94a3b8}
+    .seal{width:72px;height:72px;display:inline-flex;align-items:center;justify-content:center;margin-left:-20px;position:relative;z-index:2}
+    .seal img{width:72px;height:72px;object-fit:contain;transform:rotate(12deg);mix-blend-mode:multiply;opacity:0.95}
+    .seal-fallback{font-size:10px;font-weight:900;line-height:1.3;color:#b42318}
     @media print{
-      html,body{background:#fff;margin:0;padding:0}
-      .sheet{box-shadow:none;border-radius:0;border:none;max-width:none;padding:14mm 14mm}
-      .sheet::before{background:url('/logo.png') center / 160px 160px no-repeat;opacity:0.10}
+      html,body{background:#fff !important;margin:0;padding:0}
+      .sheet{box-shadow:none;border-radius:0;border:none;max-width:none;padding:14mm}
     }
   </style>
 </head>
 <body>
   <main class="sheet" aria-label="${title}">
-    <header>
-      <h1>${title}</h1>
+    <img class="watermark" src="/logo.png" alt="" aria-hidden="true" />
+    <div class="stack">
+      <header class="header">
+        <div class="logo-box"><img src="/logo.png" alt="" /></div>
+        <h1 class="doc-title">${title}</h1>
+      </header>
       <div class="accent-bar" aria-hidden="true"></div>
-    </header>
 
-    <section class="meta-grid" aria-label="발급 정보">
-      ${serial ? `<div class="meta-row"><strong>발급번호</strong>${serial}</div>` : ''}
-      <div class="meta-row"><strong>발급일자</strong>${issuedAt}</div>
-      <div class="meta-row"><strong>용도</strong>${purpose}</div>
-      <div class="meta-row"><strong>발급기관</strong>${companyLabel}</div>
-    </section>
+      <section class="identity-row" aria-label="대상자 인적 사항">
+        <div>
+          <div class="photo-wrap">
+            <div class="photo">
+              ${photoUrl ? `<img src="${photoUrl}" alt="${staffName} 사진" />` : `<span class="photo-fallback">${photoInitial}</span>`}
+            </div>
+          </div>
+          <p class="photo-caption">사진</p>
+        </div>
+        <div class="identity-list">
+          <div class="identity-row-item"><span class="label">성명</span><span>:</span><span class="value">${staffName}</span></div>
+          <div class="identity-row-item"><span class="label">사번</span><span>:</span><span class="value">${employeeNo}</span></div>
+          <div class="identity-row-item"><span class="label">부서</span><span>:</span><span class="value">${department}</span></div>
+          <div class="identity-row-item"><span class="label">직위</span><span>:</span><span class="value">${position}</span></div>
+        </div>
+      </section>
 
-    <table class="info-table" aria-label="대상자 정보">
-      <tbody>
-        <tr><td class="label">성명</td><td>${staffName}</td></tr>
-        <tr><td class="label">소속</td><td>${companyLabel}</td></tr>
-        <tr><td class="label">부서</td><td>${department}</td></tr>
-        <tr><td class="label">직위</td><td>${position}</td></tr>
-        <tr><td class="label">입사일</td><td>${joinedAt}</td></tr>
-      </tbody>
-    </table>
+      <p class="closing">${closingText}</p>
 
-    <p class="closing">${closingText}</p>
+      <section class="info-table" aria-label="증명 사항">
+        <div class="info-row"><span class="label">근무부서</span><span>:</span><span class="value">${department}</span></div>
+        <div class="info-row"><span class="label">직위/직급</span><span>:</span><span class="value">${positionRankSafe}</span></div>
+        <div class="info-row"><span class="label">입사일자</span><span>:</span><span class="value">${joinedAt}</span></div>
+        <div class="info-row"><span class="label">담당업무</span><span>:</span><span class="value">${duty}</span></div>
+        <div class="info-row"><span class="label">발급일자</span><span>:</span><span class="value">${issuedAt}</span></div>
+        ${serial ? `<div class="info-row"><span class="label">발급번호</span><span>:</span><span class="value">${serial}</span></div>` : ''}
+      </section>
 
-    <section class="sign-block" aria-label="발급 책임자">
-      <div class="issued-label">발급일자 ${issuedAt}</div>
-      <div class="company-row">
-        <span class="company-name">${companyLabel} 대표</span>
-        <span class="seal" aria-label="${companyLabel} 직인">
-          ${sealUrl ? `<img src="${sealUrl}" alt="" />` : `${companyLabel}<br />직인`}
-        </span>
-      </div>
-      <p class="footer-note">본 문서는 ERP 시스템을 통해 전자 발급된 증명서입니다.</p>
-    </section>
+      <section class="sign-block" aria-label="발급 책임자">
+        <div class="issued-label">발급일자 ${issuedAt}</div>
+        <div class="company-row">
+          <div class="company-stack">
+            <p class="company-name">${companyLabel}</p>
+            <p class="company-sub">대표자 / 직인</p>
+          </div>
+          <div class="seal" aria-label="${companyLabel} 직인">
+            ${sealUrl ? `<img src="${sealUrl}" alt="" />` : `<span class="seal-fallback">회사<br/>직인</span>`}
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
   ${autoPrintScript}
 </body>

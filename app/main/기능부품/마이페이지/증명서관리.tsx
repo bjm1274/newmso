@@ -43,6 +43,16 @@ type CertificateContextStaff = {
   position?: string | null;
   joined_at?: string | null;
   join_date?: string | null;
+  employee_no?: string | null;
+  duty?: string | null;
+  job_duty?: string | null;
+  responsibility?: string | null;
+  role?: string | null;
+  rank?: string | null;
+  grade?: string | null;
+  level?: string | null;
+  profile_photo_url?: string | null;
+  permissions?: Record<string, unknown> | null;
 };
 
 // ─────────────────────────────────────────────
@@ -113,7 +123,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             .limit(20),
           supabase
             .from('staff_members')
-            .select('id, name, company, department, position, joined_at, join_date')
+            .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, permissions')
             .eq('id', effectiveUserId)
             .maybeSingle(),
         ]);
@@ -160,10 +170,26 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
     };
   }, [effectiveUserId]);
 
-  // ── 발행 컨텍스트 (회사명/직위/부서/입사일/직인) ──
+  // ── 발행 컨텍스트 (인사관리 발급 디자인과 동일하게 표시하기 위한 풍부한 메타) ──
   const issuedContext = useMemo<IssuedCertificateContext>(() => {
     const companyLabel =
       String(staffDetail?.company || (resolvedUser?.company as string) || '').trim() || 'SY INC.';
+    const dutyLabel =
+      (staffDetail?.duty as string | null) ||
+      (staffDetail?.job_duty as string | null) ||
+      (staffDetail?.responsibility as string | null) ||
+      (staffDetail?.role as string | null) ||
+      ((resolvedUser?.duty as string | undefined) ?? null) ||
+      ((resolvedUser?.role as string | undefined) ?? null);
+    const rankLabel =
+      (staffDetail?.rank as string | null) ||
+      (staffDetail?.grade as string | null) ||
+      (staffDetail?.level as string | null) ||
+      null;
+    const employeeNo =
+      (staffDetail?.employee_no as string | null) ||
+      ((resolvedUser?.employee_no as string | undefined) ?? null) ||
+      (staffDetail?.id ? String(staffDetail.id) : null);
     return {
       companyLabel,
       staffName: staffDetail?.name || (resolvedUser?.name as string) || null,
@@ -171,6 +197,10 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       department: staffDetail?.department || (resolvedUser?.department as string) || null,
       joinedAt: staffDetail?.joined_at || staffDetail?.join_date || null,
       sealImageUrl: sealUrl || null,
+      employeeNo,
+      duty: dutyLabel,
+      rank: rankLabel,
+      profilePhotoUrl: staffDetail?.profile_photo_url || null,
     };
   }, [resolvedUser, sealUrl, staffDetail]);
 
