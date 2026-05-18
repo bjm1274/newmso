@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 import { useGlobalShortcuts } from './기능부품/마이페이지/useGlobalShortcuts';
 
 import { toast } from '@/lib/toast';
-import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
+import { Suspense, startTransition, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
@@ -557,6 +557,13 @@ function MainPageContent() {
   // Phase 5-C-1 — Supabase Realtime force-logout channel → 30초 polling.
   // /api/auth/check-force-logout이 본인 staff row + force_logout_at 반환.
   // visibility hidden 시 자동 중단(브라우저 setInterval 일시정지).
+  // 주의: deps에 user 객체를 넣으면 tick 내부 persistClientUser → user 갱신 →
+  // effect 재실행 → 즉시 새 tick + 새 interval로 무한 폴링됨. user?.id만 deps에 두고
+  // 최신 user/loginAt은 ref로 참조한다.
+  const forceLogoutUserRef = useRef(user);
+  const forceLogoutLoginAtRef = useRef(loginAt);
+  useEffect(() => { forceLogoutUserRef.current = user; }, [user]);
+  useEffect(() => { forceLogoutLoginAtRef.current = loginAt; }, [loginAt]);
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -577,16 +584,17 @@ function MainPageContent() {
         delete safeNextUser.password;
         delete safeNextUser.passwd;
 
+        const currentUser = forceLogoutUserRef.current;
         const normalizedNextUser = normalizeProfileUser<ErpUser>({
-          ...user,
+          ...currentUser,
           ...safeNextUser,
         });
-        if (hasUserPayloadChanged(user, normalizedNextUser)) {
+        if (hasUserPayloadChanged(currentUser, normalizedNextUser)) {
           persistClientUser(normalizedNextUser);
         }
 
         const forceLogoutAt = (data.user.force_logout_at as string | null | undefined) ?? null;
-        if (isForceLogoutAfterLogin(forceLogoutAt, loginAt)) {
+        if (isForceLogoutAfterLogin(forceLogoutAt, forceLogoutLoginAtRef.current)) {
           toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
           void clearClientSession();
           window.location.href = '/';
@@ -601,7 +609,7 @@ function MainPageContent() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [clearClientSession, persistClientUser, user, user?.id, loginAt]);
+  }, [user?.id, clearClientSession, persistClientUser]);
 
   // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
   useEffect(() => {
