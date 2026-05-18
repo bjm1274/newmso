@@ -154,33 +154,55 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     const win = window.open('', '_blank');
     if (!win) return;
 
+    // 부모 페이지의 head를 통째로 복제해 Tailwind/globals.css/폰트가 새 창에서도 동일 적용되도록 한다.
+    // <base href> 로 상대 경로 정상화. 인쇄 새 창에 한정한 추가 스타일은 마지막에 덧붙여 우선 적용.
+    const baseHref = `${window.location.origin}/`;
+    const parentHeadHtml = document.head.innerHTML;
     const printStyles = `
       @page { size: A4 portrait; margin: 8mm; }
-      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      body { margin: 0; background: #fff; color: #111827; font-family: 'Noto Sans KR', sans-serif; }
-      .document-root { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 10mm 10mm; }
+      *,*::before,*::after { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+      html, body { margin: 0; padding: 0; background: #fff; color: #111827; }
+      img { max-width: 100%; max-height: 100%; }
+      .document-root { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 10mm; background: #fff; }
+      @media print {
+        html, body { background: #fff !important; }
+        .document-root { box-shadow: none !important; border: none !important; min-height: auto; }
+        .document-root, .document-root * { page-break-inside: avoid; }
+      }
     `;
 
-    win.document.write(`
-      <!doctype html>
-      <html lang="ko">
-        <head>
-          <meta charset="utf-8" />
-          <title>${selectedCertificate?.label || '증명서'}</title>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
-          <style>${printStyles}</style>
-        </head>
-        <body>
-          <div class="document-root">${printRef.current.innerHTML.replaceAll('__SERIAL__', nextSerial)}</div>
-        </body>
-      </html>
-    `);
+    win.document.open();
+    win.document.write(`<!doctype html>
+<html lang="ko">
+  <head>
+    <base href="${baseHref}" />
+    ${parentHeadHtml}
+    <style>${printStyles}</style>
+    <title>${selectedCertificate?.label || '증명서'}</title>
+  </head>
+  <body>
+    <div class="document-root">${printRef.current.innerHTML.replaceAll('__SERIAL__', nextSerial)}</div>
+  </body>
+</html>`);
     win.document.close();
-    win.focus();
-    win.print();
-    win.close();
+
+    // CSS/폰트/이미지 로드 후 인쇄. onafterprint로 창 닫기(race 방지).
+    const triggerPrint = () => {
+      try {
+        win.focus();
+        win.onafterprint = () => {
+          try { win.close(); } catch { /* ignore */ }
+        };
+        win.print();
+      } catch {
+        try { win.close(); } catch { /* ignore */ }
+      }
+    };
+    if (win.document.readyState === 'complete') {
+      window.setTimeout(triggerPrint, 600);
+    } else {
+      win.addEventListener('load', () => window.setTimeout(triggerPrint, 600));
+    }
   };
 
   const handleIssue = async () => {
