@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 import { useGlobalShortcuts } from './기능부품/마이페이지/useGlobalShortcuts';
 
 import { toast } from '@/lib/toast';
-import { Suspense, startTransition, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
@@ -554,62 +554,10 @@ function MainPageContent() {
     }
   }, [mainMenu, resolveLegacyNavigation, subView, user]);
 
-  // Phase 5-C-1 — Supabase Realtime force-logout channel → 30초 polling.
-  // /api/auth/check-force-logout이 본인 staff row + force_logout_at 반환.
-  // visibility hidden 시 자동 중단(브라우저 setInterval 일시정지).
-  // 주의: deps에 user 객체를 넣으면 tick 내부 persistClientUser → user 갱신 →
-  // effect 재실행 → 즉시 새 tick + 새 interval로 무한 폴링됨. user?.id만 deps에 두고
-  // 최신 user/loginAt은 ref로 참조한다.
-  const forceLogoutUserRef = useRef(user);
-  const forceLogoutLoginAtRef = useRef(loginAt);
-  useEffect(() => { forceLogoutUserRef.current = user; }, [user]);
-  useEffect(() => { forceLogoutLoginAtRef.current = loginAt; }, [loginAt]);
-  useEffect(() => {
-    if (!user?.id) return;
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const res = await fetch('/api/auth/check-force-logout', {
-          method: 'GET',
-          credentials: 'same-origin',
-        });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json().catch(() => null)) as {
-          ok?: boolean;
-          user?: Record<string, unknown>;
-        } | null;
-        if (!data?.ok || !data.user) return;
-
-        const safeNextUser = { ...data.user };
-        delete safeNextUser.password;
-        delete safeNextUser.passwd;
-
-        const currentUser = forceLogoutUserRef.current;
-        const normalizedNextUser = normalizeProfileUser<ErpUser>({
-          ...currentUser,
-          ...safeNextUser,
-        });
-        if (hasUserPayloadChanged(currentUser, normalizedNextUser)) {
-          persistClientUser(normalizedNextUser);
-        }
-
-        const forceLogoutAt = (data.user.force_logout_at as string | null | undefined) ?? null;
-        if (isForceLogoutAfterLogin(forceLogoutAt, forceLogoutLoginAtRef.current)) {
-          toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
-          void clearClientSession();
-          window.location.href = '/';
-        }
-      } catch {
-        // 폴링 실패는 무시 (다음 tick에서 재시도)
-      }
-    };
-    void tick();
-    const interval = window.setInterval(() => void tick(), 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [user?.id, clearClientSession, persistClientUser]);
+  // 강제 로그아웃 폴링은 제거됨. 효과는 다음 경로로 유지:
+  //  - 초기 페이지 진입 시 1회 (isForceLogoutAfterLogin 체크)
+  //  - 30분 세션 갱신 시 (/api/auth/session 응답에서 체크)
+  // 클라이언트당 초당 폴링이 발생하던 무한 루프를 정리하고, 로그인 유지가 기본 동작이 되도록 변경.
 
   // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
   useEffect(() => {
