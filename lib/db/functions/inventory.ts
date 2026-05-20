@@ -14,7 +14,7 @@
 //   - quantity가 NULL이면 stock으로 fallback, 둘 다 NULL이면 0
 // ============================================================
 
-import { sql } from 'drizzle-orm';
+import { sql, eq, inArray } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { inventory } from '../schema';
 
@@ -46,11 +46,12 @@ export class StockError extends Error {
 /**
  * atomic_stock_update TS 포트.
  *
- * 단일 UPDATE ... WHERE 절에서 조건부 갱신을 수행.
  *   - 행이 없으면 ITEM_NOT_FOUND
- *   - delta 적용 후 < p_min_allowed 면 INSUFFICIENT_STOCK
+ *   - delta 적용 후 < minAllowed 면 INSUFFICIENT_STOCK
  *
- * D1은 RETURNING을 지원하므로 prev/next를 한번에 받음.
+ * SQLite는 data-modifying CTE(WITH ... AS (UPDATE ...))를 지원하지 않으므로
+ * 단일 UPDATE ... RETURNING으로 원자적 처리한다. UPDATE의 SET·WHERE는 모두
+ * 갱신 전 행 값 기준으로 평가되므로 prev는 next - delta로 역산한다.
  */
 export async function atomicStockUpdate(
   db: D1Client,
@@ -58,66 +59,43 @@ export async function atomicStockUpdate(
   delta: number,
   minAllowed = 0,
 ): Promise<StockUpdateResult> {
-  // SQLite는 statement-level transaction이라 단일 UPDATE는 원자적.
-  // RETURNING 절에 prev(=quantity 갱신 전 값)를 함께 받기 위해
-  // CTE 또는 표현식을 사용. drizzle-orm의 .update().set()에 RETURNING
-  // 으로 next는 받을 수 있으나 prev는 별도 SELECT 필요.
-  //
-  // 정책: UPDATE ... SET quantity = q + d, stock = q + d
-  //       WHERE id = ? AND COALESCE(quantity, stock, 0) + d >= min
-  //       RETURNING (COALESCE(quantity, stock, 0)) AS prev_after,
-  //                 quantity AS next
-  // 단, RETURNING은 갱신 후 row를 반환하므로 prev를 별도로 받기 위해
-  // CTE 형태의 raw SQL 사용.
-  const rowsRaw = await db.run(sql`
-    WITH src AS (
-      SELECT id, COALESCE(quantity, stock, 0) AS prev
-      FROM inventory
-      WHERE id = ${itemId}
-    ),
-    upd AS (
-      UPDATE inventory
-      SET quantity = (SELECT prev FROM src) + ${delta},
-          stock    = (SELECT prev FROM src) + ${delta}
-      WHERE id = ${itemId}
-        AND EXISTS (SELECT 1 FROM src)
-        AND (SELECT prev FROM src) + ${delta} >= ${minAllowed}
-      RETURNING quantity AS next
+  const nextExpr = sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${delta}`;
+  const updated = await db
+    .update(inventory)
+    .set({ quantity: nextExpr, stock: nextExpr })
+    .where(
+      sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${delta} >= ${minAllowed}`,
     )
-    SELECT
-      (SELECT prev FROM src)            AS prev_qty,
-      (SELECT next FROM upd)            AS next_qty,
-      EXISTS(SELECT 1 FROM src)         AS found,
-      EXISTS(SELECT 1 FROM upd)         AS updated
-  `);
+    .returning({ next_qty: inventory.quantity });
 
-  const rows = ((rowsRaw as { results?: unknown[] }).results ?? []) as Array<{
-    prev_qty: number | null;
-    next_qty: number | null;
-    found: number;
-    updated: number;
-  }>;
-  const row = rows[0];
-  if (!row || row.found === 0) throw new StockError('ITEM_NOT_FOUND');
-  const prev = row.prev_qty ?? 0;
-  if (row.updated === 0) {
-    throw new StockError(
-      'INSUFFICIENT_STOCK',
-      `INSUFFICIENT_STOCK: prev=${prev}, delta=${delta}, next=${prev + delta}`,
-    );
+  if (updated.length > 0) {
+    const next = Number(updated[0].next_qty ?? 0);
+    return { prev_qty: next - delta, next_qty: next };
   }
-  return { prev_qty: prev, next_qty: row.next_qty ?? prev + delta };
+
+  // 0행 — 행 존재 여부로 ITEM_NOT_FOUND vs INSUFFICIENT_STOCK 판별
+  const found = await db
+    .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
+    .from(inventory)
+    .where(eq(inventory.id, itemId));
+  if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
+  const prev = Number(found[0].prev ?? 0);
+  throw new StockError(
+    'INSUFFICIENT_STOCK',
+    `INSUFFICIENT_STOCK: prev=${prev}, delta=${delta}, next=${prev + delta}`,
+  );
 }
 
 /**
  * atomic_stock_transfer TS 포트.
  *
- * 두 row를 동시에 변경. SQLite는 statement-level 원자성만 보장하므로
- * batch에 단일 SQL CTE로 묶어 전체를 atomic하게 처리.
- *
  * 정책:
- *   - source 차감 후 < 0 이면 INSUFFICIENT_STOCK
  *   - source 또는 dest row가 없으면 SOURCE_NOT_FOUND / DEST_NOT_FOUND
+ *   - source 차감 후 < 0 이면 INSUFFICIENT_STOCK
+ *
+ * SQLite는 data-modifying CTE를 지원하지 않으므로, 현재 수량을 먼저 조회해
+ * 검증한 뒤 양쪽을 절대값으로 batch UPDATE한다. D1 batch는 단일 트랜잭션
+ * (all-or-nothing)이라 두 UPDATE가 함께 커밋되거나 함께 롤백된다.
  */
 export async function atomicStockTransfer(
   db: D1Client,
@@ -125,64 +103,36 @@ export async function atomicStockTransfer(
   destId: string,
   quantity: number,
 ): Promise<StockTransferResult> {
-  const rowsRaw = await db.run(sql`
-    WITH src AS (
-      SELECT id, COALESCE(quantity, stock, 0) AS prev
-      FROM inventory WHERE id = ${sourceId}
-    ),
-    dst AS (
-      SELECT id, COALESCE(quantity, stock, 0) AS prev
-      FROM inventory WHERE id = ${destId}
-    ),
-    upd_src AS (
-      UPDATE inventory
-      SET quantity = (SELECT prev FROM src) - ${quantity},
-          stock    = (SELECT prev FROM src) - ${quantity}
-      WHERE id = ${sourceId}
-        AND EXISTS (SELECT 1 FROM src)
-        AND EXISTS (SELECT 1 FROM dst)
-        AND (SELECT prev FROM src) - ${quantity} >= 0
-      RETURNING quantity AS next
-    ),
-    upd_dst AS (
-      UPDATE inventory
-      SET quantity = (SELECT prev FROM dst) + ${quantity},
-          stock    = (SELECT prev FROM dst) + ${quantity}
-      WHERE id = ${destId}
-        AND EXISTS (SELECT 1 FROM upd_src)
-      RETURNING quantity AS next
-    )
-    SELECT
-      (SELECT prev FROM src)     AS src_prev,
-      (SELECT next FROM upd_src) AS src_next,
-      (SELECT prev FROM dst)     AS dst_prev,
-      (SELECT next FROM upd_dst) AS dst_next,
-      EXISTS(SELECT 1 FROM src)     AS src_found,
-      EXISTS(SELECT 1 FROM dst)     AS dst_found,
-      EXISTS(SELECT 1 FROM upd_src) AS src_updated
-  `);
+  const rows = await db
+    .select({
+      id: inventory.id,
+      prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)`,
+    })
+    .from(inventory)
+    .where(inArray(inventory.id, [sourceId, destId]));
 
-  const rows = ((rowsRaw as { results?: unknown[] }).results ?? []) as Array<{
-    src_prev: number | null; src_next: number | null;
-    dst_prev: number | null; dst_next: number | null;
-    src_found: number; dst_found: number; src_updated: number;
-  }>;
-  const row = rows[0];
-  if (!row) throw new StockError('ITEM_NOT_FOUND');
-  if (row.src_found === 0) throw new StockError('SOURCE_NOT_FOUND');
-  if (row.dst_found === 0) throw new StockError('DEST_NOT_FOUND');
-  if (row.src_updated === 0) {
+  const srcRow = rows.find((r) => r.id === sourceId);
+  const dstRow = rows.find((r) => r.id === destId);
+  if (!srcRow) throw new StockError('SOURCE_NOT_FOUND');
+  if (!dstRow) throw new StockError('DEST_NOT_FOUND');
+
+  const srcPrev = Number(srcRow.prev ?? 0);
+  const dstPrev = Number(dstRow.prev ?? 0);
+  if (srcPrev - quantity < 0) {
     throw new StockError(
       'INSUFFICIENT_STOCK',
-      `INSUFFICIENT_STOCK: prev=${row.src_prev ?? 0}, qty=${quantity}`,
+      `INSUFFICIENT_STOCK: prev=${srcPrev}, qty=${quantity}`,
     );
   }
-  return {
-    src_prev: row.src_prev ?? 0,
-    src_next: row.src_next ?? 0,
-    dst_prev: row.dst_prev ?? 0,
-    dst_next: row.dst_next ?? 0,
-  };
+  const srcNext = srcPrev - quantity;
+  const dstNext = dstPrev + quantity;
+
+  await db.batch([
+    db.update(inventory).set({ quantity: srcNext, stock: srcNext }).where(eq(inventory.id, sourceId)),
+    db.update(inventory).set({ quantity: dstNext, stock: dstNext }).where(eq(inventory.id, destId)),
+  ]);
+
+  return { src_prev: srcPrev, src_next: srcNext, dst_prev: dstPrev, dst_next: dstNext };
 }
 
 /**

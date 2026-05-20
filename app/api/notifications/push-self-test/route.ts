@@ -5,7 +5,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
-
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  push_subscriptions as pushSubscriptionsTable,
+  eq,
+} from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +20,14 @@ function getAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(url, key);
 }
+
+type SubRow = {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  fcm_token: string | null;
+};
 
 export async function POST(request: NextRequest) {
   const session = await readSessionFromRequest(request);
@@ -38,13 +52,34 @@ export async function POST(request: NextRequest) {
   };
 
   // ── 2. DB 구독 정보 확인 ──
-  const supabase = getAdminClient();
-  const { data: subs } = await supabase
-    .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth, fcm_token')
-    .eq('staff_id', staffId);
+  let subs: SubRow[] | null = null;
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: pushSubscriptionsTable.id,
+          endpoint: pushSubscriptionsTable.endpoint,
+          p256dh: pushSubscriptionsTable.p256dh,
+          auth: pushSubscriptionsTable.auth,
+          fcm_token: pushSubscriptionsTable.fcm_token,
+        })
+        .from(pushSubscriptionsTable)
+        .where(eq(pushSubscriptionsTable.staff_id, staffId));
+      subs = rows as SubRow[];
+    }
+  } else {
+    const supabase = getAdminClient();
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('id, endpoint, p256dh, auth, fcm_token')
+      .eq('staff_id', staffId);
+    subs = data as SubRow[] | null;
+  }
 
-  diagnostics.subscriptions = (subs || []).map((s: any) => ({
+  diagnostics.subscriptions = (subs || []).map((s) => ({
     endpoint: String(s.endpoint || '').slice(0, 60) + '...',
     hasP256dh: Boolean(s.p256dh),
     hasAuth: Boolean(s.auth),

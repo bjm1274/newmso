@@ -4,10 +4,12 @@
 //
 // 권한: 로그인 사용자
 // 동작:
-//   1) Supabase rpc('atomic_stock_transfer', { p_source_id, p_dest_id, p_quantity })
-//   2) D1 atomicStockTransfer TS 포트 호출 (best-effort)
-//      - SOURCE/DEST_NOT_FOUND: D1 backfill 미적용일 수 있어 skip
-//      - INSUFFICIENT_STOCK: Supabase가 진실원이라 mirror만 skip
+//   [d1 모드]  atomicStockTransfer TS 포트 직접 호출 (Supabase RPC 건너뜀)
+//   [dual/supabase 모드]
+//     1) Supabase rpc('atomic_stock_transfer', { p_source_id, p_dest_id, p_quantity })
+//     2) D1 atomicStockTransfer TS 포트 호출 (best-effort mirror)
+//        - SOURCE/DEST_NOT_FOUND: D1 backfill 미적용일 수 있어 skip
+//        - INSUFFICIENT_STOCK: Supabase가 진실원이라 mirror만 skip
 // ============================================================
 import { NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -79,6 +81,17 @@ export async function POST(request: Request) {
     }
     const { sourceId, destId, quantity } = parsed.data;
 
+    const backend = await resolveDataBackend();
+
+    // d1 모드: Supabase RPC를 건너뛰고 D1 직접 처리
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[stock-transfer] D1 binding not available');
+      const result = await atomicStockTransfer(getD1Drizzle(d1), sourceId, destId, quantity);
+      return NextResponse.json({ ok: true, data: result });
+    }
+
+    // supabase / dual 모드: Supabase RPC 우선, D1 mirror
     const supabase = createAdminClient();
     const { data, error } = await supabase.rpc('atomic_stock_transfer', {
       p_source_id: sourceId,
@@ -93,6 +106,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, data });
   } catch (err) {
+    if (err instanceof StockError) {
+      const statusMap: Record<string, number> = {
+        INSUFFICIENT_STOCK: 409,
+        SOURCE_NOT_FOUND: 404,
+        DEST_NOT_FOUND: 404,
+        ITEM_NOT_FOUND: 404,
+      };
+      const status = statusMap[err.code] ?? 500;
+      return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });
+    }
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

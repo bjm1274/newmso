@@ -13,6 +13,13 @@ import {
   loadExistingDedupeKeys,
   insertNotificationsChunked,
 } from './types';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  attendance as attendanceTable,
+  gte,
+} from '@/lib/db';
 
 type AttendanceRow = {
   id: string;
@@ -66,14 +73,35 @@ export async function checkAttendanceEvents(
   supabase: SupabaseClient,
 ): Promise<CheckJobResult> {
   const cutoff = new Date(Date.now() - ATTENDANCE_LOOKBACK_MIN * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('attendance')
-    .select('id, staff_id, date, check_in, check_out, status')
-    .gte('created_at', cutoff)
-    .limit(500);
-  if (error) return { detected: 0, created: 0, errors: [error.message] };
+  let rows: AttendanceRow[];
 
-  const rows = (data ?? []) as AttendanceRow[];
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) return { detected: 0, created: 0, errors: ['[check-attendance] D1 binding not available'] };
+    const db = getD1Drizzle(d1);
+    const d1Rows = await db
+      .select({
+        id: attendanceTable.id,
+        staff_id: attendanceTable.staff_id,
+        date: attendanceTable.date,
+        check_in: attendanceTable.check_in,
+        check_out: attendanceTable.check_out,
+        status: attendanceTable.status,
+      })
+      .from(attendanceTable)
+      .where(gte(attendanceTable.created_at, cutoff))
+      .limit(500);
+    rows = d1Rows as AttendanceRow[];
+  } else {
+    const { data, error } = await supabase
+      .from('attendance')
+      .select('id, staff_id, date, check_in, check_out, status')
+      .gte('created_at', cutoff)
+      .limit(500);
+    if (error) return { detected: 0, created: 0, errors: [error.message] };
+    rows = (data ?? []) as AttendanceRow[];
+  }
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(

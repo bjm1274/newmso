@@ -5,6 +5,25 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  messages as messagesTable,
+  chat_rooms as chatRoomsTable,
+  chat_push_jobs as chatPushJobsTable,
+  notifications as notificationsTable,
+  push_subscriptions as pushSubscriptionsTable,
+  staff_members as staffMembersTable,
+  room_notification_settings as roomNotificationSettingsTable,
+  eq,
+  and,
+  inArray,
+  isNull,
+  lte,
+  or,
+  lt,
+} from '@/lib/db';
 
 type MessageRow = {
   id: string;
@@ -219,7 +238,52 @@ export function shouldSuppressBoardAutoAnnouncementPush(
   return isNoticeRoom && parseBoardMessageMetaType(message.content) === 'board_post_link';
 }
 
+async function selectPendingChatPushJobsD1(limit: number) {
+  const nowIso = new Date().toISOString();
+  const staleThresholdIso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    return { jobs: [] as QueueJobRow[], supportsRetryColumns: true, missingQueueTable: false };
+  }
+  const db = getD1Drizzle(d1);
+  const { asc } = await import('drizzle-orm');
+  const rows = await db
+    .select({
+      id: chatPushJobsTable.id,
+      message_id: chatPushJobsTable.message_id,
+      room_id: chatPushJobsTable.room_id,
+      created_at: chatPushJobsTable.created_at,
+      attempt_count: chatPushJobsTable.attempt_count,
+      next_attempt_at: chatPushJobsTable.next_attempt_at,
+      dead_lettered_at: chatPushJobsTable.dead_lettered_at,
+    })
+    .from(chatPushJobsTable)
+    .where(
+      and(
+        isNull(chatPushJobsTable.processed_at),
+        isNull(chatPushJobsTable.dead_lettered_at),
+        lte(chatPushJobsTable.next_attempt_at, nowIso),
+        or(
+          isNull(chatPushJobsTable.processing_started_at),
+          lt(chatPushJobsTable.processing_started_at, staleThresholdIso),
+        ),
+      ),
+    )
+    .orderBy(asc(chatPushJobsTable.created_at))
+    .limit(limit);
+  return {
+    jobs: rows as QueueJobRow[],
+    supportsRetryColumns: true,
+    missingQueueTable: false,
+  };
+}
+
 async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    return selectPendingChatPushJobsD1(limit);
+  }
+
   const nowIso = new Date().toISOString();
   // 2분 이내 processing_started_at이 설정된 job은 현재 다른 경로(API)에서 처리 중 → 건너뜀
   const staleThresholdIso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
@@ -348,18 +412,33 @@ async function resolveThreadRootIdForMessage(
   const visited = new Set<string>();
   let resolvedRootId = currentParentId;
 
+  const backend = await resolveDataBackend();
+
   while (currentParentId && !visited.has(currentParentId)) {
     visited.add(currentParentId);
     resolvedRootId = currentParentId;
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, reply_to_id')
-      .eq('id', currentParentId)
-      .maybeSingle();
-
-    if (error || !data) break;
-    currentParentId = String(data.reply_to_id || '').trim();
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) break;
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({ id: messagesTable.id, reply_to_id: messagesTable.reply_to_id })
+        .from(messagesTable)
+        .where(eq(messagesTable.id, currentParentId))
+        .limit(1);
+      const data = rows[0] ?? null;
+      if (!data) break;
+      currentParentId = String(data.reply_to_id || '').trim();
+    } else {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, reply_to_id')
+        .eq('id', currentParentId)
+        .maybeSingle();
+      if (error || !data) break;
+      currentParentId = String(data.reply_to_id || '').trim();
+    }
   }
 
   return resolvedRootId || null;
@@ -401,6 +480,24 @@ function choosePreferredChatNotification(rows: ExistingChatNotificationRow[]) {
 
 async function getMutedUserIds(supabase: SupabaseClient, roomId: string) {
   try {
+    const backend = await resolveDataBackend();
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) return new Set<string>();
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({ user_id: roomNotificationSettingsTable.user_id })
+        .from(roomNotificationSettingsTable)
+        .where(
+          and(
+            eq(roomNotificationSettingsTable.room_id, roomId),
+            eq(roomNotificationSettingsTable.notifications_enabled, 0),
+          ),
+        );
+      return new Set(rows.map((row) => String(row.user_id)));
+    }
+
+    // 기존 Supabase 경로
     const { data, error } = await supabase
       .from('room_notification_settings')
       .select('user_id')
@@ -419,6 +516,19 @@ async function updateChatPushJobByMessageId(
   messageId: string,
   patch: Record<string, unknown>,
 ) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) return;
+    const db = getD1Drizzle(d1);
+    await db
+      .update(chatPushJobsTable)
+      .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+      .where(eq(chatPushJobsTable.message_id, messageId));
+    return;
+  }
+
+  // 기존 Supabase 경로
   const supportedPatch = getSupportedChatPushPatch(patch);
   if (Object.keys(supportedPatch).length === 0) return;
 
@@ -452,6 +562,19 @@ async function updateChatPushJobById(
   jobId: string,
   patch: Record<string, unknown>,
 ) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) return;
+    const db = getD1Drizzle(d1);
+    await db
+      .update(chatPushJobsTable)
+      .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+      .where(eq(chatPushJobsTable.id, jobId));
+    return;
+  }
+
+  // 기존 Supabase 경로
   const supportedPatch = getSupportedChatPushPatch(patch);
   if (Object.keys(supportedPatch).length === 0) return;
 
@@ -480,6 +603,88 @@ async function updateChatPushJobById(
   }
 }
 
+async function fetchMessageAndRoom(
+  supabase: SupabaseClient,
+  messageId: string,
+  roomId: string,
+): Promise<{ message: MessageRow | null; room: ChatRoomRow | null }> {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) return { message: null, room: null };
+    const db = getD1Drizzle(d1);
+    const [msgRows, roomRows] = await Promise.all([
+      db
+        .select({
+          id: messagesTable.id,
+          room_id: messagesTable.room_id,
+          sender_id: messagesTable.sender_id,
+          content: messagesTable.content,
+          reply_to_id: messagesTable.reply_to_id,
+          created_at: messagesTable.created_at,
+          file_url: messagesTable.file_url,
+          file_kind: messagesTable.file_kind,
+          album_id: messagesTable.album_id,
+          album_index: messagesTable.album_index,
+          album_total: messagesTable.album_total,
+        })
+        .from(messagesTable)
+        .where(eq(messagesTable.id, messageId))
+        .limit(1),
+      db
+        .select({
+          id: chatRoomsTable.id,
+          name: chatRoomsTable.name,
+          type: chatRoomsTable.type,
+          members: chatRoomsTable.members,
+        })
+        .from(chatRoomsTable)
+        .where(eq(chatRoomsTable.id, roomId))
+        .limit(1),
+    ]);
+
+    const rawMsg = msgRows[0] ?? null;
+    const rawRoom = roomRows[0] ?? null;
+
+    if (!rawMsg || !rawRoom) return { message: null, room: null };
+
+    // D1 members는 TEXT(JSON) → 파싱
+    let parsedMembers: string[] | null = null;
+    if (typeof rawRoom.members === 'string' && rawRoom.members.length > 0) {
+      try {
+        const parsed = JSON.parse(rawRoom.members) as unknown;
+        if (Array.isArray(parsed)) parsedMembers = parsed.map((m) => String(m));
+      } catch { parsedMembers = null; }
+    } else if (Array.isArray(rawRoom.members)) {
+      parsedMembers = (rawRoom.members as unknown[]).map((m) => String(m));
+    }
+
+    return {
+      message: rawMsg as MessageRow,
+      room: { ...rawRoom, members: parsedMembers } as ChatRoomRow,
+    };
+  }
+
+  // Supabase 경로
+  const [msgRes, roomRes] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('id, room_id, sender_id, content, reply_to_id, created_at, file_url, file_kind, album_id, album_index, album_total')
+      .eq('id', messageId)
+      .single(),
+    supabase
+      .from('chat_rooms')
+      .select('id, name, type, members')
+      .eq('id', roomId)
+      .single(),
+  ]);
+
+  if (msgRes.error || roomRes.error || !msgRes.data || !roomRes.data) {
+    return { message: null, room: null };
+  }
+  return { message: msgRes.data as MessageRow, room: roomRes.data as ChatRoomRow };
+}
+
 export async function dispatchChatPushForMessage(params: {
   roomId: string;
   messageId: string;
@@ -489,27 +694,15 @@ export async function dispatchChatPushForMessage(params: {
   const supabase = params.supabase || getAdminClient();
 
   // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
-  // processing_started_at 선점, 메시지/방 조회, 뮤트 목록 조회를 동시에 실행
-  const [, [messageRes, roomRes], mutedIdsEarly] = await Promise.all([
+  const [, fetchResult, mutedIdsEarly] = await Promise.all([
     updateChatPushJobByMessageId(supabase, params.messageId, {
       processing_started_at: new Date().toISOString(),
     }),
-    Promise.all([
-      supabase
-        .from('messages')
-        .select('id, room_id, sender_id, content, reply_to_id, created_at, file_url, file_kind, album_id, album_index, album_total')
-        .eq('id', params.messageId)
-        .single(),
-      supabase
-        .from('chat_rooms')
-        .select('id, name, type, members')
-        .eq('id', params.roomId)
-        .single(),
-    ]),
-    getMutedUserIds(supabase, params.roomId), // roomId는 params에서 이미 알고 있으므로 병렬 실행 가능
+    fetchMessageAndRoom(supabase, params.messageId, params.roomId),
+    getMutedUserIds(supabase, params.roomId),
   ]);
 
-  if (messageRes.error || roomRes.error || !messageRes.data || !roomRes.data) {
+  if (!fetchResult.message || !fetchResult.room) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
@@ -525,8 +718,8 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  const message = messageRes.data as MessageRow;
-  const room = roomRes.data as ChatRoomRow;
+  const message = fetchResult.message;
+  const room = fetchResult.room;
   const senderId = String(message.sender_id || '');
   const albumContext = getAlbumPushContext(message);
 
@@ -571,10 +764,20 @@ export async function dispatchChatPushForMessage(params: {
   const isNoticeRoom =
     String(room.id || '') === NOTICE_ROOM_ID || String(room.type || '').trim() === 'notice';
   if (members.length === 0 && isNoticeRoom) {
-    const { data: allStaff } = await supabase.from('staff_members').select('id');
-    members = ((allStaff || []) as Array<{ id: string | null }>)
-      .map((row) => String(row.id || '').trim())
-      .filter(Boolean);
+    const dispatchBackend = await resolveDataBackend();
+    if (dispatchBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const staffRows = await db.select({ id: staffMembersTable.id }).from(staffMembersTable);
+        members = staffRows.map((row) => String(row.id || '').trim()).filter(Boolean);
+      }
+    } else {
+      const { data: allStaff } = await supabase.from('staff_members').select('id');
+      members = ((allStaff || []) as Array<{ id: string | null }>)
+        .map((row) => String(row.id || '').trim())
+        .filter(Boolean);
+    }
   }
   if (members.length === 0) {
     await updateChatPushJobByMessageId(supabase, params.messageId, {
@@ -610,23 +813,51 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  const [subscriptionRes, senderRes] = await Promise.all([
-    supabase
-      .from('push_subscriptions')
-      .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
-      .in('staff_id', targetIds),
-    supabase
-      .from('staff_members')
-      .select('name')
-      .eq('id', senderId)
-      .maybeSingle(),
-  ]);
+  let subscriptions: PushSubscriptionRow[] = [];
+  let senderName = '새 메시지';
 
-  if (subscriptionRes.error) {
-    throw subscriptionRes.error;
+  const dispatchBackend2 = await resolveDataBackend();
+  if (dispatchBackend2 === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[chat-push-dispatch] D1 binding not available (subscriptions)');
+    const db = getD1Drizzle(d1);
+    const [subRows, senderRows] = await Promise.all([
+      db
+        .select({
+          id: pushSubscriptionsTable.id,
+          staff_id: pushSubscriptionsTable.staff_id,
+          endpoint: pushSubscriptionsTable.endpoint,
+          p256dh: pushSubscriptionsTable.p256dh,
+          auth: pushSubscriptionsTable.auth,
+          fcm_token: pushSubscriptionsTable.fcm_token,
+          created_at: pushSubscriptionsTable.created_at,
+        })
+        .from(pushSubscriptionsTable)
+        .where(inArray(pushSubscriptionsTable.staff_id, targetIds)),
+      db
+        .select({ name: staffMembersTable.name })
+        .from(staffMembersTable)
+        .where(eq(staffMembersTable.id, senderId))
+        .limit(1),
+    ]);
+    subscriptions = subRows as PushSubscriptionRow[];
+    senderName = String(senderRows[0]?.name || '새 메시지');
+  } else {
+    const [subscriptionRes, senderRes] = await Promise.all([
+      supabase
+        .from('push_subscriptions')
+        .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
+        .in('staff_id', targetIds),
+      supabase
+        .from('staff_members')
+        .select('name')
+        .eq('id', senderId)
+        .maybeSingle(),
+    ]);
+    if (subscriptionRes.error) throw subscriptionRes.error;
+    subscriptions = (subscriptionRes.data || []) as PushSubscriptionRow[];
+    senderName = String((senderRes.data as { name?: string } | null)?.name || '새 메시지');
   }
-
-  const senderName = String((senderRes.data as { name?: string } | null)?.name || '새 메시지');
   const title =
     room.type === 'notice'
       ? '공지 메시지'
@@ -636,25 +867,78 @@ export async function dispatchChatPushForMessage(params: {
 
   const previewBody = buildPreview(message);
   const threadRootId = await resolveThreadRootIdForMessage(supabase, message);
-  const { data: existingNotificationData, error: existingNotificationError } = await supabase
-    .from('notifications')
-    .select('id,user_id,type,metadata,created_at')
-    .in('user_id', targetIds)
-    .in('type', ['message', 'mention'])
-    .filter('metadata->>message_id', 'eq', params.messageId);
 
-  if (existingNotificationError) {
-    console.warn('chat notification legacy lookup failed', existingNotificationError);
-  }
-
+  // 기존 알림 조회 (중복 방지용)
   const existingNotificationsByUser = new Map<string, ExistingChatNotificationRow[]>();
-  for (const row of (existingNotificationData || []) as ExistingChatNotificationRow[]) {
-    const targetUserId = String(row.user_id || '').trim();
-    if (!targetUserId) continue;
-    existingNotificationsByUser.set(targetUserId, [
-      ...(existingNotificationsByUser.get(targetUserId) || []),
-      row,
-    ]);
+  const dispatchBackend3 = await resolveDataBackend();
+  if (dispatchBackend3 === 'd1') {
+    // D1에서는 metadata JSON 텍스트 full-scan으로 message_id 필터
+    // (JSONPath 필터 미지원) — metadata를 파싱 후 JS단에서 필터
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const notifRows = await db
+        .select({
+          id: notificationsTable.id,
+          user_id: notificationsTable.user_id,
+          type: notificationsTable.type,
+          metadata: notificationsTable.metadata,
+          created_at: notificationsTable.created_at,
+        })
+        .from(notificationsTable)
+        .where(
+          and(
+            inArray(notificationsTable.user_id, targetIds),
+            inArray(notificationsTable.type, ['message', 'mention']),
+          ),
+        )
+        .limit(500);
+
+      for (const row of notifRows) {
+        let parsedMeta: Record<string, unknown> | null = null;
+        if (typeof row.metadata === 'string' && row.metadata.length > 0) {
+          try {
+            const p = JSON.parse(row.metadata) as unknown;
+            if (p && typeof p === 'object' && !Array.isArray(p)) parsedMeta = p as Record<string, unknown>;
+          } catch { parsedMeta = null; }
+        }
+        // message_id 필터
+        if (!parsedMeta || String(parsedMeta.message_id || '') !== params.messageId) continue;
+        const notifRow: ExistingChatNotificationRow = {
+          id: String(row.id ?? ''),
+          user_id: String(row.user_id ?? ''),
+          type: row.type ?? null,
+          metadata: parsedMeta,
+          created_at: row.created_at ?? null,
+        };
+        const uid = String(notifRow.user_id || '').trim();
+        if (!uid) continue;
+        existingNotificationsByUser.set(uid, [
+          ...(existingNotificationsByUser.get(uid) || []),
+          notifRow,
+        ]);
+      }
+    }
+  } else {
+    const { data: existingNotificationData, error: existingNotificationError } = await supabase
+      .from('notifications')
+      .select('id,user_id,type,metadata,created_at')
+      .in('user_id', targetIds)
+      .in('type', ['message', 'mention'])
+      .filter('metadata->>message_id', 'eq', params.messageId);
+
+    if (existingNotificationError) {
+      console.warn('chat notification legacy lookup failed', existingNotificationError);
+    }
+
+    for (const row of (existingNotificationData || []) as ExistingChatNotificationRow[]) {
+      const targetUserId = String(row.user_id || '').trim();
+      if (!targetUserId) continue;
+      existingNotificationsByUser.set(targetUserId, [
+        ...(existingNotificationsByUser.get(targetUserId) || []),
+        row,
+      ]);
+    }
   }
 
   const staleNotificationIds = new Set<string>();
@@ -698,25 +982,59 @@ export async function dispatchChatPushForMessage(params: {
   });
 
   // 알림 DB 저장은 백그라운드로 — push 전송과 병렬 실행
-  const notificationInsertPromise =
+  const notificationInsertPromise: Promise<void> =
     notificationRows.length > 0
-      ? supabase
-          .from('notifications')
-          .upsert(notificationRows, { onConflict: 'id' })
-          .then(async ({ error }) => {
+      ? (async () => {
+          const notifBackend = await resolveDataBackend();
+          if (notifBackend === 'd1') {
+            const d1 = await getD1Binding();
+            if (!d1) return;
+            const db = getD1Drizzle(d1);
+            try {
+              for (const row of notificationRows) {
+                // metadata는 객체 → JSON.stringify
+                await db
+                  .insert(notificationsTable)
+                  .values({
+                    ...row,
+                    metadata: JSON.stringify(row.metadata),
+                  })
+                  .onConflictDoUpdate({
+                    target: notificationsTable.id,
+                    set: {
+                      title: row.title,
+                      body: row.body,
+                      metadata: JSON.stringify(row.metadata),
+                    },
+                  });
+              }
+            } catch (err) {
+              console.error('chat notification D1 insert failed', err);
+            }
+            if (staleNotificationIds.size > 0) {
+              try {
+                await db
+                  .delete(notificationsTable)
+                  .where(inArray(notificationsTable.id, Array.from(staleNotificationIds)));
+              } catch (err) {
+                console.error('chat notification D1 cleanup failed', err);
+              }
+            }
+          } else {
+            const { error } = await supabase
+              .from('notifications')
+              .upsert(notificationRows, { onConflict: 'id' });
             if (error) console.error('chat notification insert failed', error);
 
-            if (staleNotificationIds.size === 0) return;
-
-            const { error: cleanupError } = await supabase
-              .from('notifications')
-              .delete()
-              .in('id', Array.from(staleNotificationIds));
-
-            if (cleanupError) {
-              console.error('chat notification cleanup failed', cleanupError);
+            if (staleNotificationIds.size > 0) {
+              const { error: cleanupError } = await supabase
+                .from('notifications')
+                .delete()
+                .in('id', Array.from(staleNotificationIds));
+              if (cleanupError) console.error('chat notification cleanup failed', cleanupError);
             }
-          })
+          }
+        })()
       : Promise.resolve();
 
   let pushDisabled = false;
@@ -727,14 +1045,15 @@ export async function dispatchChatPushForMessage(params: {
   }
 
   // FCM 토큰이 있는 staff_id 집합 — 이 기기에는 FCM만 발송, Web Push 제외 (이중 발송 방지)
+  // FCM 토큰이 있는 staff_id 집합 — 이 기기에는 FCM만 발송, Web Push 제외 (이중 발송 방지)
   const staffIdsWithFcmToken = new Set<string>(
-    ((subscriptionRes.data || []) as PushSubscriptionRow[])
+    subscriptions
       .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
       .map((row) => String(row.staff_id))
   );
 
   const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
-  for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
+  for (const row of subscriptions) {
     if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
     if (!row.p256dh || !row.auth || !/^https?:\/\//i.test(String(row.endpoint))) continue;
     // FCM 토큰이 있는 사용자는 Web Push 제외 (FCM으로만 발송)
@@ -747,7 +1066,7 @@ export async function dispatchChatPushForMessage(params: {
   // 같은 staff_id에 잔재 fcm_token이 여러 개 남아있을 수 있으므로
   // 사용자당 가장 최근(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
   const latestFcmTokenByStaffId = new Map<string, { token: string; createdAt: number }>();
-  for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
+  for (const row of subscriptions) {
     if (!row.fcm_token || !row.staff_id || row.staff_id === senderId) continue;
     const token = String(row.fcm_token).trim();
     if (!token) continue;
@@ -829,10 +1148,24 @@ export async function dispatchChatPushForMessage(params: {
       });
       sent += fcmResult.success.length;
       if (fcmResult.expired.length > 0) {
-        await supabase
-          .from('push_subscriptions')
-          .update({ fcm_token: null })
-          .in('fcm_token', fcmResult.expired);
+        const fcmBackend = await resolveDataBackend();
+        if (fcmBackend === 'd1') {
+          const d1b = await getD1Binding();
+          if (d1b) {
+            const dbFcm = getD1Drizzle(d1b);
+            for (const expiredToken of fcmResult.expired) {
+              await dbFcm
+                .update(pushSubscriptionsTable)
+                .set({ fcm_token: null })
+                .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
+            }
+          }
+        } else {
+          await supabase
+            .from('push_subscriptions')
+            .update({ fcm_token: null })
+            .in('fcm_token', fcmResult.expired);
+        }
       }
     } catch (fcmErr) {
       console.error('[FCM] batch send failed, falling back to web push where possible:', fcmErr);
@@ -878,7 +1211,16 @@ export async function dispatchChatPushForMessage(params: {
   await Promise.all([notificationInsertPromise, webPushPromise]);
 
   if (expiredIds.length > 0) {
-    await supabase.from('push_subscriptions').delete().in('id', expiredIds);
+    const expiredBackend = await resolveDataBackend();
+    if (expiredBackend === 'd1') {
+      const d1b = await getD1Binding();
+      if (d1b) {
+        const dbExp = getD1Drizzle(d1b);
+        await dbExp.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, expiredIds));
+      }
+    } else {
+      await supabase.from('push_subscriptions').delete().in('id', expiredIds);
+    }
   }
 
   const hasUndeliveredWebPushTargets = uniqueSubscriptions.size > 0;

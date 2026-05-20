@@ -4,6 +4,16 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { mirrorNotificationsToD1, type NotificationRow } from '../notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  notifications as notificationsTable,
+  eq,
+  and,
+  inArray,
+  gte,
+} from '@/lib/db';
 
 export type CheckJobResult = {
   detected: number;
@@ -59,6 +69,40 @@ export async function loadExistingDedupeKeys(
   if (userIds.length === 0) return sent;
 
   const cutoff = dedupeCutoffIso();
+  const backend = await resolveDataBackend();
+
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[inapp-notification-jobs/types] D1 binding not available (loadExistingDedupeKeys)');
+    const db = getD1Drizzle(d1);
+    const chunkSize = 100;
+    for (let i = 0; i < userIds.length; i += chunkSize) {
+      const chunk = userIds.slice(i, i + chunkSize);
+      const rowsD1 = await db
+        .select({ user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
+        .from(notificationsTable)
+        .where(
+          and(
+            eq(notificationsTable.type, type),
+            inArray(notificationsTable.user_id, chunk),
+            gte(notificationsTable.created_at, cutoff),
+          )
+        );
+      for (const row of rowsD1) {
+        let metadata: Record<string, unknown> | null = null;
+        if (typeof row.metadata === 'string' && row.metadata.length > 0) {
+          try { metadata = JSON.parse(row.metadata) as Record<string, unknown>; } catch { metadata = null; }
+        } else if (row.metadata && typeof row.metadata === 'object') {
+          metadata = row.metadata as Record<string, unknown>;
+        }
+        const key = readDedupeKey(metadata);
+        const uid = String(row.user_id ?? '');
+        if (key && uid) sent.add(`${uid}|${key}`);
+      }
+    }
+    return sent;
+  }
+
   const chunkSize = 200;
   for (let i = 0; i < userIds.length; i += chunkSize) {
     const chunk = userIds.slice(i, i + chunkSize);
@@ -86,6 +130,38 @@ export async function insertNotificationsChunked(
   const errors: string[] = [];
   let created = 0;
   const chunkSize = 100;
+
+  const backend = await resolveDataBackend();
+
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[inapp-notification-jobs/types] D1 binding not available (insertNotificationsChunked)');
+    const db = getD1Drizzle(d1);
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      const d1Rows = chunk.map((row) => ({
+        id: crypto.randomUUID(),
+        user_id: row.user_id,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        // metadata는 JSON 컬럼 → D1 write 전 직렬화
+        metadata: row.metadata !== null && row.metadata !== undefined
+          ? JSON.stringify(row.metadata)
+          : null,
+        read_at: row.read_at ?? null,
+        created_at: new Date().toISOString(),
+      }));
+      try {
+        await db.insert(notificationsTable).values(d1Rows).onConflictDoNothing();
+        created += chunk.length;
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      }
+    }
+    return { created, errors };
+  }
+
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
     const { error } = await supabase.from('notifications').insert(chunk);

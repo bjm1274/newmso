@@ -10,6 +10,35 @@ import { selectSystemMasterStaffRows } from '@/lib/system-master-staff-query';
 import { processDueTodoRemindersServer } from '@/lib/todo-reminder-cron';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  staff_members as staffMembersTable,
+  audit_logs as auditLogsTable,
+  payroll_records as payrollRecordsTable,
+  chat_rooms as chatRoomsTable,
+  messages as messagesTable,
+  push_subscriptions as pushSubscriptionsTable,
+  approvals as approvalsTable,
+  backup_restore_runs as backupRestoreRunsTable,
+  chat_push_jobs as chatPushJobsTable,
+  todos as todosTable,
+  todo_reminder_logs as todoReminderLogsTable,
+  wiki_documents as wikiDocumentsTable,
+  wiki_document_versions as wikiDocumentVersionsTable,
+  eq,
+  and,
+  desc,
+  asc,
+  isNull,
+  isNotNull,
+  lte,
+  gte,
+  ne,
+  sql,
+  inArray,
+} from '@/lib/db';
 
 
 export const dynamic = 'force-dynamic';
@@ -342,7 +371,27 @@ async function safeRows<T>(
 
 async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
   try {
-    // Cloudflare Workers 호환: 로컬 파일시스템 대신 backup_restore_runs 테이블 조회
+    const backend = await resolveDataBackend();
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) return [];
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: backupRestoreRunsTable.id,
+          file_name: backupRestoreRunsTable.file_name,
+          started_at: backupRestoreRunsTable.started_at,
+        })
+        .from(backupRestoreRunsTable)
+        .orderBy(desc(backupRestoreRunsTable.started_at))
+        .limit(limit);
+      return rows.map((row) => ({
+        name: row.file_name || row.id,
+        created_at: row.started_at || new Date().toISOString(),
+        source: 'db' as const,
+      }));
+    }
+    // 기존 supabase 경로
     const client = getAdminClient();
     const { data, error } = await client
       .from('backup_restore_runs')
@@ -436,6 +485,26 @@ function groupDuplicateEndpoints(rows: PushSubscriptionRow[]) {
 }
 
 async function loadPushSubscriptionDiagnostics(supabase: ReturnType<typeof getAdminClient>) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[system-master] D1 binding not available (loadPushSubscriptionDiagnostics)');
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({
+        id: pushSubscriptionsTable.id,
+        staff_id: pushSubscriptionsTable.staff_id,
+        endpoint: pushSubscriptionsTable.endpoint,
+        platform: pushSubscriptionsTable.platform,
+        user_agent: pushSubscriptionsTable.user_agent,
+        device_id: pushSubscriptionsTable.device_id,
+        fcm_token: pushSubscriptionsTable.fcm_token,
+        created_at: pushSubscriptionsTable.created_at,
+      })
+      .from(pushSubscriptionsTable);
+    return rows as PushSubscriptionRow[];
+  }
+  // 기존 supabase 경로
   const extendedRes = await supabase
     .from('push_subscriptions')
     .select('id, staff_id, endpoint, platform, user_agent, device_id, fcm_token, created_at');
@@ -465,6 +534,30 @@ async function loadPushSubscriptionDiagnostics(supabase: ReturnType<typeof getAd
 }
 
 async function loadRecentPushFailures(supabase: ReturnType<typeof getAdminClient>) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[system-master] D1 binding not available (loadRecentPushFailures)');
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({
+        id: chatPushJobsTable.id,
+        room_id: chatPushJobsTable.room_id,
+        message_id: chatPushJobsTable.message_id,
+        attempt_count: chatPushJobsTable.attempt_count,
+        last_error: chatPushJobsTable.last_error,
+        created_at: chatPushJobsTable.created_at,
+        processing_started_at: chatPushJobsTable.processing_started_at,
+        next_attempt_at: chatPushJobsTable.next_attempt_at,
+        dead_lettered_at: chatPushJobsTable.dead_lettered_at,
+      })
+      .from(chatPushJobsTable)
+      .where(isNotNull(chatPushJobsTable.last_error))
+      .orderBy(desc(chatPushJobsTable.processing_started_at))
+      .limit(8);
+    return rows as PushFailureRow[];
+  }
+  // 기존 supabase 경로
   const failureRes = await supabase
     .from('chat_push_jobs')
     .select('id, room_id, message_id, attempt_count, last_error, created_at, processing_started_at, next_attempt_at, dead_lettered_at')
@@ -539,16 +632,37 @@ function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
 }
 
 async function cleanupPushSubscriptionsInternal(supabase: ReturnType<typeof getAdminClient>) {
-  const [subscriptionRes, staffRes] = await Promise.all([
-    supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
-    supabase.from('staff_members').select('id'),
-  ]);
+  const backend = await resolveDataBackend();
 
-  if (subscriptionRes.error) throw subscriptionRes.error;
-  if (staffRes.error) throw staffRes.error;
+  let rows: PushSubscriptionRow[];
+  let validStaffIds: Set<string>;
 
-  const validStaffIds = new Set((staffRes.data || []).map((row: { id: string | null }) => String(row.id || '')));
-  const rows = (subscriptionRes.data || []) as PushSubscriptionRow[];
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[system-master] D1 binding not available (cleanupPushSubscriptionsInternal)');
+    const db = getD1Drizzle(d1);
+    const [subRows, staffRows] = await Promise.all([
+      db.select({
+        id: pushSubscriptionsTable.id,
+        staff_id: pushSubscriptionsTable.staff_id,
+        endpoint: pushSubscriptionsTable.endpoint,
+      }).from(pushSubscriptionsTable),
+      db.select({ id: staffMembersTable.id }).from(staffMembersTable),
+    ]);
+    rows = subRows as PushSubscriptionRow[];
+    validStaffIds = new Set(staffRows.map((row) => String(row.id || '')));
+  } else {
+    const [subscriptionRes, staffRes] = await Promise.all([
+      supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
+      supabase.from('staff_members').select('id'),
+    ]);
+    if (subscriptionRes.error) throw subscriptionRes.error;
+    if (staffRes.error) throw staffRes.error;
+    rows = (subscriptionRes.data || []) as PushSubscriptionRow[];
+    validStaffIds = new Set((staffRes.data || []).map((row: { id: string | null }) => String(row.id || '')));
+  }
+
+  // 이하 공통 로직 — rows와 validStaffIds를 사용
   const deleteIds = new Set<string>();
   const validRows: PushSubscriptionRow[] = [];
 
@@ -603,10 +717,20 @@ async function cleanupPushSubscriptionsInternal(supabase: ReturnType<typeof getA
 
   const ids = Array.from(deleteIds);
   const chunkSize = 200;
-  for (let index = 0; index < ids.length; index += chunkSize) {
-    const chunk = ids.slice(index, index + chunkSize);
-    const { error } = await supabase.from('push_subscriptions').delete().in('id', chunk);
-    if (error) throw error;
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[system-master] D1 binding not available (cleanupPushSubscriptionsInternal delete)');
+    const db = getD1Drizzle(d1);
+    for (let index = 0; index < ids.length; index += chunkSize) {
+      const chunk = ids.slice(index, index + chunkSize);
+      await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, chunk));
+    }
+  } else {
+    for (let index = 0; index < ids.length; index += chunkSize) {
+      const chunk = ids.slice(index, index + chunkSize);
+      const { error } = await supabase.from('push_subscriptions').delete().in('id', chunk);
+      if (error) throw error;
+    }
   }
 
   return {
@@ -763,13 +887,26 @@ export async function GET(request: NextRequest) {
     const category = String(searchParams.get('category') || 'all').trim();
 
     const supabase = getAdminClient();
+    const backend = await resolveDataBackend();
 
     const { data: staffRows, error: staffError } = await selectSystemMasterStaffRows<StaffRow>(
-      async ({ select, orderColumn }) => {
+      async ({ select: _select, orderColumn: _orderColumn }) => {
+        if (backend === 'd1') {
+          const d1 = await getD1Binding();
+          if (!d1) return { data: null, error: { message: '[system-master] D1 binding not available' } };
+          const db = getD1Drizzle(d1);
+          const rows = await db
+            .select()
+            .from(staffMembersTable)
+            .orderBy(asc(staffMembersTable.employee_no))
+            .limit(500);
+          // 비밀번호 등 민감 필드는 sanitizeStaffRow에서 제거됨
+          return { data: (rows || []) as StaffRow[], error: null };
+        }
         const result = await supabase
           .from('staff_members')
-          .select(select)
-          .order(orderColumn, { ascending: true })
+          .select(_select)
+          .order(_orderColumn, { ascending: true })
           .limit(500);
 
         return {
@@ -787,22 +924,115 @@ export async function GET(request: NextRequest) {
     const staffMap = new Map<string, StaffRow>(safeStaffRows.map((staff) => [String(staff.id), staff]));
 
     if (scope === 'overview') {
-      const [staffCountRes, auditCountRes, payrollCountRes, roomCountRes, messageCountRes, auditRes, payrollRes, roomRes, messageRes] =
-        await Promise.all([
-          supabase.from('staff_members').select('id', { head: true, count: 'exact' }),
-          supabase.from('audit_logs').select('id', { head: true, count: 'exact' }),
-          supabase.from('payroll_records').select('id', { head: true, count: 'exact' }),
-          supabase.from('chat_rooms').select('id', { head: true, count: 'exact' }),
-          supabase.from('messages').select('id', { head: true, count: 'exact' }),
-          supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(40),
-          supabase.from('payroll_records').select(PAYROLL_RECORD_SELECT).order('created_at', { ascending: false }).limit(80),
-          supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
-          supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
-        ]);
+      let overviewData: {
+        staffCount: number;
+        auditCount: number;
+        payrollCount: number;
+        roomCount: number;
+        messageCount: number;
+        auditRows: AuditLogRow[];
+        payrollRows: PayrollRow[];
+        roomRows: ChatRoomRow[];
+        messageRows: ChatMessageRow[];
+      };
 
-      const rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available' }, { status: 500 });
+        const db = getD1Drizzle(d1);
+        const [
+          staffCountRows, auditCountRows, payrollCountRows, roomCountRows, messageCountRows,
+          auditRawRows, payrollRawRows, roomRawRows, messageRawRows,
+        ] = await Promise.all([
+          db.select({ id: staffMembersTable.id }).from(staffMembersTable).limit(10000),
+          db.select({ id: auditLogsTable.id }).from(auditLogsTable).limit(10000),
+          db.select({ id: payrollRecordsTable.id }).from(payrollRecordsTable).limit(10000),
+          db.select({ id: chatRoomsTable.id }).from(chatRoomsTable).limit(10000),
+          db.select({ id: messagesTable.id }).from(messagesTable).limit(100000),
+          db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.created_at)).limit(40),
+          db.select({
+            id: payrollRecordsTable.id,
+            staff_id: payrollRecordsTable.staff_id,
+            year_month: payrollRecordsTable.year_month,
+            status: payrollRecordsTable.status,
+            net_pay: payrollRecordsTable.net_pay,
+            created_at: payrollRecordsTable.created_at,
+          }).from(payrollRecordsTable).orderBy(desc(payrollRecordsTable.created_at)).limit(80),
+          db.select({
+            id: chatRoomsTable.id,
+            name: chatRoomsTable.name,
+            type: chatRoomsTable.type,
+            members: chatRoomsTable.members,
+            created_at: chatRoomsTable.created_at,
+            last_message_at: chatRoomsTable.last_message_at,
+          }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(80),
+          db.select({
+            id: messagesTable.id,
+            room_id: messagesTable.room_id,
+            sender_id: messagesTable.sender_id,
+            content: messagesTable.content,
+            file_url: messagesTable.file_url,
+            is_deleted: messagesTable.is_deleted,
+            created_at: messagesTable.created_at,
+            edited_at: messagesTable.edited_at,
+          }).from(messagesTable).orderBy(desc(messagesTable.created_at)).limit(80),
+        ]);
+        // chat_rooms.members는 D1에서 TEXT(JSON) → 파싱
+        const parsedRoomRows = (roomRawRows || []).map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.members === 'string') {
+            try { r.members = JSON.parse(r.members); } catch { r.members = []; }
+          }
+          return r as ChatRoomRow;
+        });
+        // audit_logs.details는 D1에서 TEXT(JSON) → 파싱
+        const parsedAuditRows = (auditRawRows || []).map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.details === 'string') {
+            try { r.details = JSON.parse(r.details) as LooseRecord; } catch { r.details = {}; }
+          }
+          return r as AuditLogRow;
+        });
+        overviewData = {
+          staffCount: staffCountRows.length,
+          auditCount: auditCountRows.length,
+          payrollCount: payrollCountRows.length,
+          roomCount: roomCountRows.length,
+          messageCount: messageCountRows.length,
+          auditRows: parsedAuditRows,
+          payrollRows: payrollRawRows as unknown as PayrollRow[],
+          roomRows: parsedRoomRows,
+          messageRows: messageRawRows as unknown as ChatMessageRow[],
+        };
+      } else {
+        const [staffCountRes, auditCountRes, payrollCountRes, roomCountRes, messageCountRes, auditRes, payrollRes, roomRes, messageRes] =
+          await Promise.all([
+            supabase.from('staff_members').select('id', { head: true, count: 'exact' }),
+            supabase.from('audit_logs').select('id', { head: true, count: 'exact' }),
+            supabase.from('payroll_records').select('id', { head: true, count: 'exact' }),
+            supabase.from('chat_rooms').select('id', { head: true, count: 'exact' }),
+            supabase.from('messages').select('id', { head: true, count: 'exact' }),
+            supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(40),
+            supabase.from('payroll_records').select(PAYROLL_RECORD_SELECT).order('created_at', { ascending: false }).limit(80),
+            supabase.from('chat_rooms').select(CHAT_ROOM_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
+            supabase.from('messages').select(CHAT_MESSAGE_ADMIN_SELECT).order('created_at', { ascending: false }).limit(80),
+          ]);
+        overviewData = {
+          staffCount: staffCountRes.count || 0,
+          auditCount: auditCountRes.count || 0,
+          payrollCount: payrollCountRes.count || 0,
+          roomCount: roomCountRes.count || 0,
+          messageCount: messageCountRes.count || 0,
+          auditRows: toLooseRecordArray<AuditLogRow>(auditRes.data),
+          payrollRows: toLooseRecordArray<PayrollRow>(payrollRes.data),
+          roomRows: toLooseRecordArray<ChatRoomRow>(roomRes.data),
+          messageRows: toLooseRecordArray<ChatMessageRow>(messageRes.data),
+        };
+      }
+
+      const rooms = overviewData.roomRows;
       const roomMap = new Map<string, ChatRoomRow>(rooms.map((room) => [String(room.id), room]));
-      const payrollRows = toLooseRecordArray<PayrollRow>(payrollRes.data);
+      const payrollRows = overviewData.payrollRows;
       const payrollItems = payrollRows.map((record) => {
         const staff = staffMap.get(String(record.staff_id));
         return {
@@ -816,36 +1046,56 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         summary: {
-          staffCount: staffCountRes.count || 0,
-          auditCount: auditCountRes.count || 0,
-          payrollCount: payrollCountRes.count || 0,
-          roomCount: roomCountRes.count || 0,
-          messageCount: messageCountRes.count || 0,
+          staffCount: overviewData.staffCount,
+          auditCount: overviewData.auditCount,
+          payrollCount: overviewData.payrollCount,
+          roomCount: overviewData.roomCount,
+          messageCount: overviewData.messageCount,
         },
-        recentAudits: toLooseRecordArray<AuditLogRow>(auditRes.data).map((log) =>
+        recentAudits: overviewData.auditRows.map((log) =>
           normalizeAuditLog(log, staffMap),
         ),
         sensitiveStaffs: safeStaffRows,
         recentPayrolls: payrollItems,
         chatRooms: rooms.map((room) => normalizeChatRoom(room, staffMap)),
-        recentMessages: toLooseRecordArray<ChatMessageRow>(messageRes.data).map((message) =>
+        recentMessages: overviewData.messageRows.map((message) =>
           normalizeMessage(message, roomMap, staffMap),
         ),
       });
     }
 
     if (scope === 'audit') {
-      const { data: auditRows, error: auditError } = await supabase
-        .from('audit_logs')
-        .select(AUDIT_LOG_SELECT)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      let auditRows: AuditLogRow[];
 
-      if (auditError) {
-        return NextResponse.json({ error: auditError.message }, { status: 500 });
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available' }, { status: 500 });
+        const db = getD1Drizzle(d1);
+        const rows = await db
+          .select()
+          .from(auditLogsTable)
+          .orderBy(desc(auditLogsTable.created_at))
+          .limit(limit);
+        auditRows = rows.map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.details === 'string') {
+            try { r.details = JSON.parse(r.details) as LooseRecord; } catch { r.details = {}; }
+          }
+          return r as AuditLogRow;
+        });
+      } else {
+        const { data, error: auditError } = await supabase
+          .from('audit_logs')
+          .select(AUDIT_LOG_SELECT)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        if (auditError) {
+          return NextResponse.json({ error: auditError.message }, { status: 500 });
+        }
+        auditRows = toLooseRecordArray<AuditLogRow>(data);
       }
 
-      const filtered = toLooseRecordArray<AuditLogRow>(auditRows)
+      const filtered = auditRows
         .map((log) => normalizeAuditLog(log, staffMap))
         .filter((log) => category === 'all' || log.category === category)
         .filter((log) => matchSearch(log, keyword));
@@ -865,57 +1115,130 @@ export async function GET(request: NextRequest) {
         : [];
       const wantOnlyBannedRooms = searchParams.get('flaggedRoomsOnly') === '1' && bannedWords.length > 0;
 
-      // 1. 메시지 조회 (keyword 또는 bannedWords 조건 반영)
-      let messageQuery = supabase
-        .from('messages')
-        .select(CHAT_MESSAGE_ADMIN_SELECT)
-        .order('created_at', { ascending: false })
-        .limit(chatLimit);
-      if (roomId) messageQuery = messageQuery.eq('room_id', roomId);
-      if (keyword) messageQuery = messageQuery.ilike('content', `%${keyword}%`);
+      let rawRooms: ChatRoomRow[];
+      let rawMessages: ChatMessageRow[];
+      let bannedRoomIds: Set<string>;
 
-      // 2. 단어 필터 매칭 메시지 조회 (전체 채팅방 식별용 — limit 별도)
-      const bannedWordsMessageQuery = bannedWords.length > 0
-        ? supabase
-            .from('messages')
-            .select('id, room_id, content')
-            .or(bannedWords.map((word) => `content.ilike.%${word.replace(/[,)]/g, '')}%`).join(','))
-            .order('created_at', { ascending: false })
-            .limit(5000)
-        : null;
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available (chats)' }, { status: 500 });
+        const db = getD1Drizzle(d1);
 
-      // 3. 채팅방 조회 (roomLimit 기본 2000, 최대 10000)
-      const roomQuery = supabase
-        .from('chat_rooms')
-        .select(CHAT_ROOM_ADMIN_SELECT)
-        .order('created_at', { ascending: false })
-        .limit(roomLimit);
+        // 1. 메시지 조회
+        const msgBaseSelect = {
+          id: messagesTable.id,
+          room_id: messagesTable.room_id,
+          sender_id: messagesTable.sender_id,
+          content: messagesTable.content,
+          file_url: messagesTable.file_url,
+          is_deleted: messagesTable.is_deleted,
+          created_at: messagesTable.created_at,
+          edited_at: messagesTable.edited_at,
+        } as const;
 
-      const [roomRes, messageRes, bannedRes] = await Promise.all([
-        roomQuery,
-        messageQuery,
-        bannedWordsMessageQuery ?? Promise.resolve({ data: [], error: null } as never),
-      ]);
+        let msgQuery = db.select(msgBaseSelect).from(messagesTable).$dynamic();
+        const msgConditions: ReturnType<typeof and>[] = [];
+        if (roomId) msgConditions.push(eq(messagesTable.room_id, roomId));
+        // D1은 ilike 미지원 — like로 대체 (대소문자 무관 SQLite LIKE)
+        if (keyword) msgConditions.push(sql`lower(${messagesTable.content}) like lower(${'%' + keyword + '%'})`);
+        if (msgConditions.length > 0) msgQuery = msgQuery.where(and(...msgConditions));
+        msgQuery = msgQuery.orderBy(desc(messagesTable.created_at)).limit(chatLimit);
 
-      if (roomRes.error) {
-        return NextResponse.json({ error: '채팅방 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
+        // 2. bannedWords 조회 (OR 검색)
+        let bannedMsgRows: { room_id: string | null }[] = [];
+        if (bannedWords.length > 0) {
+          // SQLite LIKE OR 조건을 sql 태그로 조합
+          const likeConditions = bannedWords.map(
+            (word) => sql`lower(${messagesTable.content}) like lower(${'%' + word.replace(/[%_]/g, '\\$&') + '%'})`
+          );
+          const orExpr = likeConditions.length === 1
+            ? likeConditions[0]
+            : sql`(${likeConditions.reduce((acc, cur) => sql`${acc} OR ${cur}`)})`;
+          bannedMsgRows = await db
+            .select({ room_id: messagesTable.room_id })
+            .from(messagesTable)
+            .where(orExpr)
+            .orderBy(desc(messagesTable.created_at))
+            .limit(5000);
+        }
+
+        // 3. 채팅방 조회
+        const roomRawRows = await db.select({
+          id: chatRoomsTable.id,
+          name: chatRoomsTable.name,
+          type: chatRoomsTable.type,
+          members: chatRoomsTable.members,
+          created_at: chatRoomsTable.created_at,
+          last_message_at: chatRoomsTable.last_message_at,
+        }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(roomLimit);
+
+        const [msgRows] = await Promise.all([msgQuery]);
+
+        // chat_rooms.members TEXT → JSON 파싱
+        rawRooms = roomRawRows.map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.members === 'string') {
+            try { r.members = JSON.parse(r.members); } catch { r.members = []; }
+          }
+          return r as ChatRoomRow;
+        });
+        rawMessages = msgRows as unknown as ChatMessageRow[];
+        bannedRoomIds = new Set<string>(
+          bannedMsgRows.map((row) => String(row.room_id || '').trim()).filter(Boolean)
+        );
+      } else {
+        // 기존 supabase 경로
+        let messageQuery = supabase
+          .from('messages')
+          .select(CHAT_MESSAGE_ADMIN_SELECT)
+          .order('created_at', { ascending: false })
+          .limit(chatLimit);
+        if (roomId) messageQuery = messageQuery.eq('room_id', roomId);
+        if (keyword) messageQuery = messageQuery.ilike('content', `%${keyword}%`);
+
+        const bannedWordsMessageQuery = bannedWords.length > 0
+          ? supabase
+              .from('messages')
+              .select('id, room_id, content')
+              .or(bannedWords.map((word) => `content.ilike.%${word.replace(/[,)]/g, '')}%`).join(','))
+              .order('created_at', { ascending: false })
+              .limit(5000)
+          : null;
+
+        const roomQuery = supabase
+          .from('chat_rooms')
+          .select(CHAT_ROOM_ADMIN_SELECT)
+          .order('created_at', { ascending: false })
+          .limit(roomLimit);
+
+        const [roomRes, messageRes, bannedRes] = await Promise.all([
+          roomQuery,
+          messageQuery,
+          bannedWordsMessageQuery ?? Promise.resolve({ data: [], error: null } as never),
+        ]);
+
+        if (roomRes.error) {
+          return NextResponse.json({ error: '채팅방 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
+        }
+        if (messageRes.error) {
+          return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
+        }
+        if (bannedRes && (bannedRes as { error?: { message?: string } }).error) {
+          return NextResponse.json({ error: '필터 단어 검색 중 오류가 발생했습니다.' }, { status: 500 });
+        }
+
+        rawRooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+        rawMessages = toLooseRecordArray<ChatMessageRow>(messageRes.data);
+        bannedRoomIds = new Set<string>(
+          bannedWords.length > 0
+            ? toLooseRecordArray<ChatMessageRow>((bannedRes as { data: ChatMessageRow[] }).data || [])
+                .map((row) => String(row.room_id || '').trim())
+                .filter(Boolean)
+            : [],
+        );
       }
-      if (messageRes.error) {
-        return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-      if (bannedRes && (bannedRes as { error?: { message?: string } }).error) {
-        return NextResponse.json({ error: '필터 단어 검색 중 오류가 발생했습니다.' }, { status: 500 });
-      }
 
-      const bannedRoomIds = new Set<string>(
-        bannedWords.length > 0
-          ? toLooseRecordArray<ChatMessageRow>((bannedRes as { data: ChatMessageRow[] }).data || [])
-              .map((row) => String(row.room_id || '').trim())
-              .filter(Boolean)
-          : [],
-      );
-
-      let rooms = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+      let rooms = rawRooms;
       if (wantOnlyBannedRooms) {
         rooms = rooms.filter((room) => bannedRoomIds.has(String(room.id || '')));
       }
@@ -928,7 +1251,7 @@ export async function GET(request: NextRequest) {
           return rightTime - leftTime;
         });
 
-      const filteredMessages = toLooseRecordArray<ChatMessageRow>(messageRes.data)
+      const filteredMessages = rawMessages
         .filter((message) => !keyword || matchSearch(message, keyword))
         .map((message) => normalizeMessage(message, roomMap, staffMap));
 
@@ -940,28 +1263,168 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'operations') {
-      const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions, recentPushFailures, subscriptionRows] = await Promise.all([
-        supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(400),
-        supabase.from('staff_members').select('id'),
-        listRecentBackups(10),
-        collectChatPushQueueHealth(supabase),
-        safeRows(() => supabase.from('backup_restore_runs').select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary').order('started_at', { ascending: false }).limit(10), 'backup_restore_runs'),
-        safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
-        safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),
-        safeHeadCount(() => supabase.from('todo_reminder_logs').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), 'todo_reminder_logs'),
-        safeHeadCount(() => supabase.from('wiki_documents').select('id', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
-        safeHeadCount(() => supabase.from('wiki_document_versions').select('id', { count: 'exact', head: true }), 'wiki_document_versions'),
-        safeRows(() => supabase.from('wiki_document_versions').select('id,document_id,title,version_no,created_at,change_summary').order('created_at', { ascending: false }).limit(5), 'wiki_document_versions'),
-        loadRecentPushFailures(supabase),
-        loadPushSubscriptionDiagnostics(supabase),
-      ]);
+      type OperationsData = {
+        auditRows: AuditLogRow[];
+        validStaffIds: Set<string>;
+        backupRows: BackupSummaryRow[];
+        queueSummary: Awaited<ReturnType<typeof collectChatPushQueueHealth>>;
+        restoreRuns: LooseRecord[];
+        dueTodoCount: number;
+        repeatingTodoCount: number;
+        reminderLogCount24h: number;
+        wikiDocumentCount: number;
+        wikiVersionCount: number;
+        recentWikiVersions: LooseRecord[];
+        recentPushFailures: PushFailureRow[];
+        subscriptionRows: PushSubscriptionRow[];
+      };
 
-      if (auditRes.error) { console.error('system-master audit query failed:', auditRes.error); return NextResponse.json({ error: '감사 로그 조회에 실패했습니다.' }, { status: 500 }); }
-      if (staffIdRes.error) { console.error('system-master staff query failed:', staffIdRes.error); return NextResponse.json({ error: '직원 데이터 조회에 실패했습니다.' }, { status: 500 }); }
+      let opData: OperationsData;
 
-      const validStaffIds = new Set(
-        toLooseRecordArray(staffIdRes.data).map((row) => String(row.id || '')),
-      );
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available (operations)' }, { status: 500 });
+        const db = getD1Drizzle(d1);
+        const nowIso = new Date().toISOString();
+        const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+        const [
+          auditRawRows,
+          staffIdRows,
+          restoreRunRaws,
+          dueTodoRows,
+          repeatingTodoRows,
+          reminderLogRows,
+          wikiDocRows,
+          wikiVerRows,
+          recentWikiVerRows,
+        ] = await Promise.all([
+          db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.created_at)).limit(400),
+          db.select({ id: staffMembersTable.id }).from(staffMembersTable),
+          db.select({
+            id: backupRestoreRunsTable.id,
+            file_name: backupRestoreRunsTable.file_name,
+            status: backupRestoreRunsTable.status,
+            total_tables: backupRestoreRunsTable.total_tables,
+            total_rows: backupRestoreRunsTable.total_rows,
+            requested_by_name: backupRestoreRunsTable.requested_by_name,
+            started_at: backupRestoreRunsTable.started_at,
+            finished_at: backupRestoreRunsTable.finished_at,
+            result_summary: backupRestoreRunsTable.result_summary,
+          }).from(backupRestoreRunsTable).orderBy(desc(backupRestoreRunsTable.started_at)).limit(10),
+          // 미완료 + reminder_at 설정 + 기한 경과
+          db.select({ id: todosTable.id }).from(todosTable)
+            .where(and(
+              eq(todosTable.is_complete, 0),
+              isNotNull(todosTable.reminder_at),
+              lte(todosTable.reminder_at, nowIso),
+            )),
+          // 반복 할일 (repeat_type != 'none')
+          db.select({ id: todosTable.id }).from(todosTable)
+            .where(and(
+              eq(todosTable.is_complete, 0),
+              ne(todosTable.repeat_type, 'none'),
+            )),
+          // 24시간 이내 리마인더 로그
+          db.select({ id: todoReminderLogsTable.id }).from(todoReminderLogsTable)
+            .where(gte(todoReminderLogsTable.created_at, since24h)),
+          // 아카이브 안 된 위키 문서
+          db.select({ id: wikiDocumentsTable.id }).from(wikiDocumentsTable)
+            .where(eq(wikiDocumentsTable.is_archived, 0)),
+          // 위키 버전 전체 카운트
+          db.select({ id: wikiDocumentVersionsTable.id }).from(wikiDocumentVersionsTable),
+          // 최근 위키 버전 5건
+          db.select({
+            id: wikiDocumentVersionsTable.id,
+            document_id: wikiDocumentVersionsTable.document_id,
+            title: wikiDocumentVersionsTable.title,
+            version_no: wikiDocumentVersionsTable.version_no,
+            created_at: wikiDocumentVersionsTable.created_at,
+            change_summary: wikiDocumentVersionsTable.change_summary,
+          }).from(wikiDocumentVersionsTable).orderBy(desc(wikiDocumentVersionsTable.created_at)).limit(5),
+        ]);
+
+        // audit_logs.details JSON 파싱
+        const parsedAuditRows = auditRawRows.map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.details === 'string') {
+            try { r.details = JSON.parse(r.details) as LooseRecord; } catch { r.details = {}; }
+          }
+          return r as AuditLogRow;
+        });
+
+        const [backupRows, queueSummary, recentPushFailures, subscriptionRows] = await Promise.all([
+          listRecentBackups(10),
+          collectChatPushQueueHealth(supabase),
+          loadRecentPushFailures(supabase),
+          loadPushSubscriptionDiagnostics(supabase),
+        ]);
+
+        opData = {
+          auditRows: parsedAuditRows,
+          validStaffIds: new Set(staffIdRows.map((row) => String(row.id || ''))),
+          backupRows,
+          queueSummary,
+          restoreRuns: restoreRunRaws as unknown as LooseRecord[],
+          dueTodoCount: dueTodoRows.length,
+          repeatingTodoCount: repeatingTodoRows.length,
+          reminderLogCount24h: reminderLogRows.length,
+          wikiDocumentCount: wikiDocRows.length,
+          wikiVersionCount: wikiVerRows.length,
+          recentWikiVersions: recentWikiVerRows as unknown as LooseRecord[],
+          recentPushFailures,
+          subscriptionRows,
+        };
+      } else {
+        const [auditRes, staffIdRes, backupRows, queueSummary, restoreRuns, dueTodoCount, repeatingTodoCount, reminderLogCount24h, wikiDocumentCount, wikiVersionCount, recentWikiVersions, recentPushFailures, subscriptionRows] = await Promise.all([
+          supabase.from('audit_logs').select(AUDIT_LOG_SELECT).order('created_at', { ascending: false }).limit(400),
+          supabase.from('staff_members').select('id'),
+          listRecentBackups(10),
+          collectChatPushQueueHealth(supabase),
+          safeRows(() => supabase.from('backup_restore_runs').select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary').order('started_at', { ascending: false }).limit(10), 'backup_restore_runs'),
+          safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).not('reminder_at', 'is', null).lte('reminder_at', new Date().toISOString()), 'todos'),
+          safeHeadCount(() => supabase.from('todos').select('id', { count: 'exact', head: true }).eq('is_complete', false).neq('repeat_type', 'none'), 'todos'),
+          safeHeadCount(() => supabase.from('todo_reminder_logs').select('id', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), 'todo_reminder_logs'),
+          safeHeadCount(() => supabase.from('wiki_documents').select('id', { count: 'exact', head: true }).eq('is_archived', false), 'wiki_documents'),
+          safeHeadCount(() => supabase.from('wiki_document_versions').select('id', { count: 'exact', head: true }), 'wiki_document_versions'),
+          safeRows(() => supabase.from('wiki_document_versions').select('id,document_id,title,version_no,created_at,change_summary').order('created_at', { ascending: false }).limit(5), 'wiki_document_versions'),
+          loadRecentPushFailures(supabase),
+          loadPushSubscriptionDiagnostics(supabase),
+        ]);
+        if (auditRes.error) { console.error('system-master audit query failed:', auditRes.error); return NextResponse.json({ error: '감사 로그 조회에 실패했습니다.' }, { status: 500 }); }
+        if (staffIdRes.error) { console.error('system-master staff query failed:', staffIdRes.error); return NextResponse.json({ error: '직원 데이터 조회에 실패했습니다.' }, { status: 500 }); }
+        opData = {
+          auditRows: toLooseRecordArray<AuditLogRow>(auditRes.data),
+          validStaffIds: new Set(toLooseRecordArray(staffIdRes.data).map((row) => String(row.id || ''))),
+          backupRows,
+          queueSummary,
+          restoreRuns: restoreRuns as LooseRecord[],
+          dueTodoCount,
+          repeatingTodoCount,
+          reminderLogCount24h,
+          wikiDocumentCount,
+          wikiVersionCount,
+          recentWikiVersions: recentWikiVersions as LooseRecord[],
+          recentPushFailures,
+          subscriptionRows,
+        };
+      }
+
+      const {
+        auditRows: opAuditRows,
+        validStaffIds,
+        backupRows,
+        queueSummary,
+        restoreRuns,
+        dueTodoCount,
+        repeatingTodoCount,
+        reminderLogCount24h,
+        wikiDocumentCount,
+        wikiVersionCount,
+        recentWikiVersions,
+        recentPushFailures,
+        subscriptionRows,
+      } = opData;
       const duplicateEndpointInfo = groupDuplicateEndpoints(subscriptionRows);
       const orphanSubscriptions = subscriptionRows.filter((row) => {
         const staffId = String(row.staff_id || '').trim();
@@ -1075,7 +1538,7 @@ export async function GET(request: NextRequest) {
         latestBackup,
         restoreRuns,
         cronJobs: OPERATION_CRONS,
-        usageSummary: buildUsageSummary(toLooseRecordArray<AuditLogRow>(auditRes.data)),
+        usageSummary: buildUsageSummary(opAuditRows),
         todoAutomation: {
           dueReminders: dueTodoCount,
           repeatingOpenTodos: repeatingTodoCount,
@@ -1091,18 +1554,39 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'permission-diffs') {
-      const { data: auditRows, error: auditError } = await supabase
-        .from('audit_logs')
-        .select(AUDIT_LOG_SELECT)
-        .eq('target_type', 'staff_permission')
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      let auditPermRows: AuditLogRow[];
 
-      if (auditError) {
-        return NextResponse.json({ error: auditError.message }, { status: 500 });
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available' }, { status: 500 });
+        const db = getD1Drizzle(d1);
+        const rows = await db
+          .select()
+          .from(auditLogsTable)
+          .where(eq(auditLogsTable.target_type, 'staff_permission'))
+          .orderBy(desc(auditLogsTable.created_at))
+          .limit(limit);
+        auditPermRows = rows.map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.details === 'string') {
+            try { r.details = JSON.parse(r.details) as LooseRecord; } catch { r.details = {}; }
+          }
+          return r as AuditLogRow;
+        });
+      } else {
+        const { data: auditRows, error: auditError } = await supabase
+          .from('audit_logs')
+          .select(AUDIT_LOG_SELECT)
+          .eq('target_type', 'staff_permission')
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        if (auditError) {
+          return NextResponse.json({ error: auditError.message }, { status: 500 });
+        }
+        auditPermRows = toLooseRecordArray<AuditLogRow>(auditRows);
       }
 
-      const logs = toLooseRecordArray<AuditLogRow>(auditRows)
+      const logs = auditPermRows
         .map((log) => normalizeAuditLog(log, staffMap))
         .map((log) => ({
           ...log,
@@ -1114,24 +1598,73 @@ export async function GET(request: NextRequest) {
     }
 
     if (scope === 'integrity') {
-      const [payrollRes, subscriptionRes, roomRes, approvalRes] = await Promise.all([
-        supabase.from('payroll_records').select('id, staff_id, year_month, status'),
-        supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
-        supabase.from('chat_rooms').select('id, name, members'),
-        supabase.from('approvals').select('id, title, status, current_approver_id'),
-      ]);
+      let integrityPayrollRows: PayrollRow[];
+      let integritySubRows: PushSubscriptionRow[];
+      let integrityRoomRows: ChatRoomRow[];
+      let integrityApprovalRows: ApprovalRow[];
 
-      if (payrollRes.error) return NextResponse.json({ error: payrollRes.error.message }, { status: 500 });
-      if (subscriptionRes.error) return NextResponse.json({ error: subscriptionRes.error.message }, { status: 500 });
-      if (roomRes.error) return NextResponse.json({ error: roomRes.error.message }, { status: 500 });
-      if (approvalRes.error) return NextResponse.json({ error: approvalRes.error.message }, { status: 500 });
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) return NextResponse.json({ error: '[system-master] D1 binding not available' }, { status: 500 });
+        const db = getD1Drizzle(d1);
+        const [pRows, sRows, rRows, aRows] = await Promise.all([
+          db.select({
+            id: payrollRecordsTable.id,
+            staff_id: payrollRecordsTable.staff_id,
+            year_month: payrollRecordsTable.year_month,
+            status: payrollRecordsTable.status,
+          }).from(payrollRecordsTable),
+          db.select({
+            id: pushSubscriptionsTable.id,
+            staff_id: pushSubscriptionsTable.staff_id,
+            endpoint: pushSubscriptionsTable.endpoint,
+          }).from(pushSubscriptionsTable),
+          db.select({
+            id: chatRoomsTable.id,
+            name: chatRoomsTable.name,
+            members: chatRoomsTable.members,
+          }).from(chatRoomsTable),
+          db.select({
+            id: approvalsTable.id,
+            title: approvalsTable.title,
+            status: approvalsTable.status,
+            current_approver_id: approvalsTable.current_approver_id,
+          }).from(approvalsTable),
+        ]);
+        // chat_rooms.members TEXT → JSON
+        integrityRoomRows = rRows.map((row) => {
+          const r = { ...row } as Record<string, unknown>;
+          if (typeof r.members === 'string') {
+            try { r.members = JSON.parse(r.members); } catch { r.members = []; }
+          }
+          return r as ChatRoomRow;
+        });
+        integrityPayrollRows = pRows as unknown as PayrollRow[];
+        integritySubRows = sRows as unknown as PushSubscriptionRow[];
+        integrityApprovalRows = aRows as unknown as ApprovalRow[];
+      } else {
+        const [payrollRes, subscriptionRes, roomRes, approvalRes] = await Promise.all([
+          supabase.from('payroll_records').select('id, staff_id, year_month, status'),
+          supabase.from('push_subscriptions').select('id, staff_id, endpoint'),
+          supabase.from('chat_rooms').select('id, name, members'),
+          supabase.from('approvals').select('id, title, status, current_approver_id'),
+        ]);
+        if (payrollRes.error) return NextResponse.json({ error: payrollRes.error.message }, { status: 500 });
+        if (subscriptionRes.error) return NextResponse.json({ error: subscriptionRes.error.message }, { status: 500 });
+        if (roomRes.error) return NextResponse.json({ error: roomRes.error.message }, { status: 500 });
+        if (approvalRes.error) return NextResponse.json({ error: approvalRes.error.message }, { status: 500 });
+        integrityPayrollRows = toLooseRecordArray<PayrollRow>(payrollRes.data);
+        integritySubRows = toLooseRecordArray<PushSubscriptionRow>(subscriptionRes.data);
+        integrityRoomRows = toLooseRecordArray<ChatRoomRow>(roomRes.data);
+        integrityApprovalRows = toLooseRecordArray<ApprovalRow>(approvalRes.data);
+      }
 
       const issues = buildIntegrityChecks({
         staffRows: safeStaffRows,
-        payrollRows: toLooseRecordArray<PayrollRow>(payrollRes.data),
-        subscriptionRows: toLooseRecordArray<PushSubscriptionRow>(subscriptionRes.data),
-        roomRows: toLooseRecordArray<ChatRoomRow>(roomRes.data),
-        approvalRows: toLooseRecordArray<ApprovalRow>(approvalRes.data),
+        payrollRows: integrityPayrollRows,
+        subscriptionRows: integritySubRows,
+        roomRows: integrityRoomRows,
+        approvalRows: integrityApprovalRows,
       });
 
       return NextResponse.json({

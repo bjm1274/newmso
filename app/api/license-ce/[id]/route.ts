@@ -9,6 +9,16 @@ import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { computeEffectiveExpiry, getRenewalRule, addMonths } from '@/lib/license-renewal-policy';
 import { mirrorNotificationsToD1 } from '@/lib/notification-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  license_continuing_education as licenseCETable,
+  staff_licenses as staffLicensesTable,
+  notifications as notificationsTable,
+  eq,
+  and,
+} from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -55,16 +65,59 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       );
     }
 
-    const sb = adminClient();
     const reviewerId = String((session.user as { id?: string })?.id ?? '');
 
-    // 현재 CE 레코드 + 연결된 면허 정보 조회
-    const { data: ceRow, error: ceErr } = await sb
-      .from('license_continuing_education')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (ceErr || !ceRow) {
+    const backend = await resolveDataBackend();
+
+    // CE 레코드 조회
+    type CERawRow = {
+      id: string;
+      staff_id: string;
+      license_id: string | null;
+      license_type_hint: string | null;
+      ocr_text: string | null;
+      ocr_education_date: string | null;
+      ocr_extracted_meta: string | null;
+      status: string;
+      memo: string | null;
+    };
+
+    let ceRow: CERawRow | null = null;
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (PATCH:ceRow)');
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: licenseCETable.id,
+          staff_id: licenseCETable.staff_id,
+          license_id: licenseCETable.license_id,
+          license_type_hint: licenseCETable.license_type_hint,
+          ocr_text: licenseCETable.ocr_text,
+          ocr_education_date: licenseCETable.ocr_education_date,
+          ocr_extracted_meta: licenseCETable.ocr_extracted_meta,
+          status: licenseCETable.status,
+          memo: licenseCETable.memo,
+        })
+        .from(licenseCETable)
+        .where(eq(licenseCETable.id, id))
+        .limit(1);
+      ceRow = (rows[0] as CERawRow) ?? null;
+    } else {
+      const sb = adminClient();
+      const { data, error: ceErr } = await sb
+        .from('license_continuing_education')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (ceErr || !data) {
+        return NextResponse.json({ error: '제출 기록을 찾지 못했습니다.' }, { status: 404 });
+      }
+      ceRow = data as CERawRow;
+    }
+
+    if (!ceRow) {
       return NextResponse.json({ error: '제출 기록을 찾지 못했습니다.' }, { status: 404 });
     }
     if (ceRow.status !== 'pending') {
@@ -74,22 +127,43 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       );
     }
 
+    const now = new Date().toISOString();
+
     if (parsed.data.action === 'reject') {
-      const { error } = await sb
-        .from('license_continuing_education')
-        .update({
-          status: 'rejected',
-          reject_reason: parsed.data.reject_reason ?? null,
-          reviewed_by: reviewerId || null,
-          reviewed_at: new Date().toISOString(),
-          memo: parsed.data.memo ?? ceRow.memo,
-          ocr_text: parsed.data.ocr_text ?? ceRow.ocr_text,
-          ocr_education_date: parsed.data.ocr_education_date ?? ceRow.ocr_education_date,
-          ocr_extracted_meta: parsed.data.ocr_extracted_meta ?? ceRow.ocr_extracted_meta,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-      if (error) throw error;
+      const ocrExtractedMeta = parsed.data.ocr_extracted_meta ?? ceRow.ocr_extracted_meta;
+      const rejectPayload = {
+        status: 'rejected',
+        reject_reason: parsed.data.reject_reason ?? null,
+        reviewed_by: reviewerId || null,
+        reviewed_at: now,
+        memo: parsed.data.memo ?? ceRow.memo,
+        ocr_text: parsed.data.ocr_text ?? ceRow.ocr_text,
+        ocr_education_date: parsed.data.ocr_education_date ?? ceRow.ocr_education_date,
+        ocr_extracted_meta: ocrExtractedMeta,
+        updated_at: now,
+      };
+
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (PATCH:reject)');
+        const db = getD1Drizzle(d1);
+        const d1RejectPayload = {
+          ...rejectPayload,
+          // D1에서 ocr_extracted_meta는 TEXT — 객체면 직렬화
+          ocr_extracted_meta:
+            ocrExtractedMeta !== null && ocrExtractedMeta !== undefined && typeof ocrExtractedMeta !== 'string'
+              ? JSON.stringify(ocrExtractedMeta)
+              : (ocrExtractedMeta as string | null),
+        };
+        await db.update(licenseCETable).set(d1RejectPayload).where(eq(licenseCETable.id, id));
+      } else {
+        const sb = adminClient();
+        const { error } = await sb
+          .from('license_continuing_education')
+          .update(rejectPayload)
+          .eq('id', id);
+        if (error) throw error;
+      }
       return NextResponse.json({ ok: true, action: 'reject' });
     }
 
@@ -103,28 +177,66 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
 
     // 연결 면허 조회 (license_id가 없으면 staff의 대표 면허 또는 hint로 추정)
-    let licenseRow:
-      | { id: string; license_type: string | null; renewed_date: string | null; expiry_date: string | null; issued_date: string | null }
-      | null = null;
-    if (ceRow.license_id) {
-      const { data } = await sb
-        .from('staff_licenses')
-        .select('id, license_type, renewed_date, expiry_date, issued_date')
-        .eq('id', ceRow.license_id)
-        .single();
-      licenseRow = data ?? null;
-    }
+    type LicenseRefRow = { id: string; license_type: string | null; renewed_date: string | null; expiry_date: string | null; issued_date: string | null };
+    let licenseRow: LicenseRefRow | null = null;
 
-    // 연결 면허가 없으면 staff_id+license_type_hint로 매칭 시도
-    if (!licenseRow && ceRow.staff_id && ceRow.license_type_hint) {
-      const { data } = await sb
-        .from('staff_licenses')
-        .select('id, license_type, renewed_date, expiry_date, issued_date')
-        .eq('staff_id', ceRow.staff_id)
-        .eq('license_type', ceRow.license_type_hint)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-      licenseRow = (data && data[0]) ?? null;
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (PATCH:license)');
+      const db = getD1Drizzle(d1);
+      if (ceRow.license_id) {
+        const rows = await db
+          .select({
+            id: staffLicensesTable.id,
+            license_type: staffLicensesTable.license_type,
+            renewed_date: staffLicensesTable.renewed_date,
+            expiry_date: staffLicensesTable.expiry_date,
+            issued_date: staffLicensesTable.issued_date,
+          })
+          .from(staffLicensesTable)
+          .where(eq(staffLicensesTable.id, ceRow.license_id))
+          .limit(1);
+        licenseRow = (rows[0] as LicenseRefRow) ?? null;
+      }
+      if (!licenseRow && ceRow.staff_id && ceRow.license_type_hint) {
+        const rows = await db
+          .select({
+            id: staffLicensesTable.id,
+            license_type: staffLicensesTable.license_type,
+            renewed_date: staffLicensesTable.renewed_date,
+            expiry_date: staffLicensesTable.expiry_date,
+            issued_date: staffLicensesTable.issued_date,
+          })
+          .from(staffLicensesTable)
+          .where(
+            and(
+              eq(staffLicensesTable.staff_id, ceRow.staff_id),
+              eq(staffLicensesTable.license_type, ceRow.license_type_hint),
+            )
+          )
+          .limit(1);
+        licenseRow = (rows[0] as LicenseRefRow) ?? null;
+      }
+    } else {
+      const sb = adminClient();
+      if (ceRow.license_id) {
+        const { data } = await sb
+          .from('staff_licenses')
+          .select('id, license_type, renewed_date, expiry_date, issued_date')
+          .eq('id', ceRow.license_id)
+          .single();
+        licenseRow = data ?? null;
+      }
+      if (!licenseRow && ceRow.staff_id && ceRow.license_type_hint) {
+        const { data } = await sb
+          .from('staff_licenses')
+          .select('id, license_type, renewed_date, expiry_date, issued_date')
+          .eq('staff_id', ceRow.staff_id)
+          .eq('license_type', ceRow.license_type_hint)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        licenseRow = (data && data[0]) ?? null;
+      }
     }
 
     // 신규 만료일 계산
@@ -144,36 +256,61 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     // 면허 row가 있으면 expiry_date / renewed_date 갱신
     if (licenseRow) {
-      const { error } = await sb
-        .from('staff_licenses')
-        .update({
-          renewed_date: educationDate,
-          expiry_date: newExpiry,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', licenseRow.id);
-      if (error) throw error;
+      if (backend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (PATCH:updateLicense)');
+        const db = getD1Drizzle(d1);
+        await db
+          .update(staffLicensesTable)
+          .set({ renewed_date: educationDate, expiry_date: newExpiry, updated_at: now })
+          .where(eq(staffLicensesTable.id, licenseRow.id));
+      } else {
+        const sb = adminClient();
+        const { error } = await sb
+          .from('staff_licenses')
+          .update({ renewed_date: educationDate, expiry_date: newExpiry, updated_at: now })
+          .eq('id', licenseRow.id);
+        if (error) throw error;
+      }
     }
 
     // CE 레코드 승인 상태로 갱신
-    const { error: updErr } = await sb
-      .from('license_continuing_education')
-      .update({
-        status: 'approved',
-        education_date: educationDate,
-        applied_expiry_date: newExpiry,
-        applied_renewed_date: educationDate,
-        reviewed_by: reviewerId || null,
-        reviewed_at: new Date().toISOString(),
-        ocr_text: parsed.data.ocr_text ?? ceRow.ocr_text,
-        ocr_education_date: parsed.data.ocr_education_date ?? ceRow.ocr_education_date,
-        ocr_extracted_meta: parsed.data.ocr_extracted_meta ?? ceRow.ocr_extracted_meta,
-        memo: parsed.data.memo ?? ceRow.memo,
-        license_id: licenseRow?.id ?? ceRow.license_id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-    if (updErr) throw updErr;
+    const approveOcrMeta = parsed.data.ocr_extracted_meta ?? ceRow.ocr_extracted_meta;
+    const approvePayload = {
+      status: 'approved',
+      education_date: educationDate,
+      applied_expiry_date: newExpiry,
+      applied_renewed_date: educationDate,
+      reviewed_by: reviewerId || null,
+      reviewed_at: now,
+      ocr_text: parsed.data.ocr_text ?? ceRow.ocr_text,
+      ocr_education_date: parsed.data.ocr_education_date ?? ceRow.ocr_education_date,
+      ocr_extracted_meta: approveOcrMeta,
+      memo: parsed.data.memo ?? ceRow.memo,
+      license_id: licenseRow?.id ?? ceRow.license_id,
+      updated_at: now,
+    };
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (PATCH:approve)');
+      const db = getD1Drizzle(d1);
+      const d1ApprovePayload = {
+        ...approvePayload,
+        ocr_extracted_meta:
+          approveOcrMeta !== null && approveOcrMeta !== undefined && typeof approveOcrMeta !== 'string'
+            ? JSON.stringify(approveOcrMeta)
+            : (approveOcrMeta as string | null),
+      };
+      await db.update(licenseCETable).set(d1ApprovePayload).where(eq(licenseCETable.id, id));
+    } else {
+      const sb = adminClient();
+      const { error: updErr } = await sb
+        .from('license_continuing_education')
+        .update(approvePayload)
+        .eq('id', id);
+      if (updErr) throw updErr;
+    }
 
     // 승인 완료 알림 (직원에게)
     if (ceRow.staff_id) {
@@ -191,9 +328,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           },
           read_at: null,
         };
-        await sb.from('notifications').insert(notifRow);
-        // Phase 2.10 — D1 notifications 미러
-        await mirrorNotificationsToD1([notifRow]);
+        if (backend === 'd1') {
+          const d1 = await getD1Binding();
+          if (d1) {
+            const db = getD1Drizzle(d1);
+            await db.insert(notificationsTable).values({
+              id: crypto.randomUUID(),
+              user_id: notifRow.user_id,
+              type: notifRow.type,
+              title: notifRow.title,
+              body: notifRow.body,
+              metadata: JSON.stringify(notifRow.metadata),
+              read_at: null,
+              created_at: now,
+            });
+          }
+        } else {
+          const sb = adminClient();
+          await sb.from('notifications').insert(notifRow);
+          // Phase 2.10 — D1 notifications 미러
+          await mirrorNotificationsToD1([notifRow]);
+        }
       } catch {
         // 알림 실패는 메인 트랜잭션에 영향 없음
       }
@@ -229,6 +384,31 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
     const { id } = await ctx.params;
     if (!id) return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 });
 
+    const me = String((session.user as { id?: string })?.id ?? '');
+    const hr = isHrUser(session);
+
+    const backend = await resolveDataBackend();
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce/[id]] D1 binding not available (DELETE)');
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({ staff_id: licenseCETable.staff_id, status: licenseCETable.status })
+        .from(licenseCETable)
+        .where(eq(licenseCETable.id, id))
+        .limit(1);
+      const ceRow = rows[0] ?? null;
+      if (!ceRow) return NextResponse.json({ error: '없음' }, { status: 404 });
+
+      const owner = ceRow.staff_id === me;
+      if (!hr && (!owner || ceRow.status !== 'pending')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      await db.delete(licenseCETable).where(eq(licenseCETable.id, id));
+      return NextResponse.json({ ok: true });
+    }
+
     const sb = adminClient();
     const { data: ceRow } = await sb
       .from('license_continuing_education')
@@ -237,8 +417,6 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
       .single();
     if (!ceRow) return NextResponse.json({ error: '없음' }, { status: 404 });
 
-    const me = String((session.user as { id?: string })?.id ?? '');
-    const hr = isHrUser(session);
     const owner = ceRow.staff_id === me;
     if (!hr && (!owner || ceRow.status !== 'pending')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

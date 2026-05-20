@@ -8,13 +8,13 @@ import {
   LEAVE_NOTICE_TIMEZONE,
 } from '@/lib/leave-notice';
 import {
+  mirrorRowsToD1,
   messages as messagesTable,
   getD1Binding,
   getD1Drizzle,
   updateChatRoomLastMessage,
   resolveDataBackend,
 } from '@/lib/db';
-import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type LeaveApprovalRow = {
   id: string;
@@ -190,38 +190,27 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       content,
       created_at: nowIso,
     };
+    const { error: messageError } = await supabase.from('messages').insert(messageRow);
 
-    // Phase 8-G — D1 직접 INSERT. id가 결정적이므로 onConflictDoNothing으로
-    // 중복은 duplicateMessage 로 처리.
-    let duplicateMessage = false;
-    let messageInsertFailed = false;
-    try {
-      const backend = await resolveDataBackend();
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'leave-notice-cron:messages', backend });
-        throw new Error('[leave-notice-cron] D1 binding not available');
-      }
-      const db = getD1Drizzle(d1);
-      const result = await db
-        .insert(messagesTable)
-        .values(messageRow)
-        .onConflictDoNothing()
-        .returning({ id: messagesTable.id });
-      // onConflictDoNothing 결과가 비어있다면 중복으로 간주
-      if (result.length === 0) {
-        duplicateMessage = true;
-      }
-    } catch (err) {
-      messageInsertFailed = true;
+    const duplicateMessage =
+      Boolean(messageError) &&
+      (String((messageError as { code?: string } | null)?.code || '') === '23505' ||
+        /duplicate key|unique constraint/i.test(
+          String((messageError as { message?: string } | null)?.message || '')
+        ));
+
+    if (messageError && !duplicateMessage) {
       failed += 1;
-      errors.push(`${approval.id}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    if (messageInsertFailed) {
+      errors.push(`${approval.id}: ${String(messageError.message || messageError)}`);
       continue;
     }
 
+    // D1 미러 — id가 결정적(deterministic)이라 중복 INSERT는 onConflictDoNothing.
+    // chat_rooms.last_message_at / preview도 함께 업데이트 (Postgres 트리거 대체).
+    await mirrorRowsToD1(messagesTable, messageRow, {
+      label: 'messages',
+      onConflict: 'do_nothing',
+    });
     if (!duplicateMessage) {
       // 중복이 아닐 때만 last_message 갱신 (이미 더 최신 메시지가 있을 수 있음)
       try {

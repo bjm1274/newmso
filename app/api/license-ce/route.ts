@@ -8,6 +8,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  license_continuing_education as licenseCETable,
+  eq,
+  and,
+  desc,
+} from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -48,6 +57,31 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const backend = await resolveDataBackend();
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce] D1 binding not available (GET)');
+      const db = getD1Drizzle(d1);
+
+      const conditions = [];
+      if (staffId) {
+        conditions.push(eq(licenseCETable.staff_id, staffId));
+      } else if (!hr) {
+        conditions.push(eq(licenseCETable.staff_id, me));
+      }
+      if (status) {
+        conditions.push(eq(licenseCETable.status, status));
+      }
+
+      const rows = await db
+        .select()
+        .from(licenseCETable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(licenseCETable.submitted_at));
+
+      return NextResponse.json({ ok: true, items: rows ?? [] });
+    }
+
     const sb = adminClient();
     let query = sb
       .from('license_continuing_education')
@@ -84,20 +118,45 @@ export async function POST(req: Request) {
       );
     }
 
+    const now = new Date().toISOString();
+    const newRow = {
+      staff_id: me,
+      submitted_by: me,
+      license_id: parsed.data.license_id ?? null,
+      license_type_hint: parsed.data.license_type_hint ?? null,
+      license_name_hint: parsed.data.license_name_hint ?? null,
+      file_url: parsed.data.file_url,
+      file_name: parsed.data.file_name ?? null,
+      memo: parsed.data.memo ?? null,
+      status: 'pending',
+    };
+
+    const backend = await resolveDataBackend();
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[license-ce] D1 binding not available (POST)');
+      const db = getD1Drizzle(d1);
+      const newId = crypto.randomUUID();
+      await db.insert(licenseCETable).values({
+        id: newId,
+        ...newRow,
+        submitted_at: now,
+        created_at: now,
+        updated_at: now,
+      });
+      // D1에서 삽입된 행을 반환
+      const rows = await db
+        .select()
+        .from(licenseCETable)
+        .where(eq(licenseCETable.id, newId))
+        .limit(1);
+      return NextResponse.json({ ok: true, item: rows[0] ?? null });
+    }
+
     const sb = adminClient();
     const { data, error } = await sb
       .from('license_continuing_education')
-      .insert({
-        staff_id: me,
-        submitted_by: me,
-        license_id: parsed.data.license_id ?? null,
-        license_type_hint: parsed.data.license_type_hint ?? null,
-        license_name_hint: parsed.data.license_name_hint ?? null,
-        file_url: parsed.data.file_url,
-        file_name: parsed.data.file_name ?? null,
-        memo: parsed.data.memo ?? null,
-        status: 'pending',
-      })
+      .insert(newRow)
       .select('*')
       .single();
     if (error) throw error;

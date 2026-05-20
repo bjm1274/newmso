@@ -14,6 +14,15 @@ import {
   loadExistingDedupeKeys,
   insertNotificationsChunked,
 } from './types';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  approvals as approvalsTable,
+  eq,
+  and,
+  isNotNull,
+} from '@/lib/db';
 
 type ApprovalRow = {
   id: string;
@@ -25,15 +34,41 @@ type ApprovalRow = {
 };
 
 export async function checkApprovalQueue(supabase: SupabaseClient): Promise<CheckJobResult> {
-  const { data, error } = await supabase
-    .from('approvals')
-    .select('id, current_approver_id, title, sender_name, doc_type, type')
-    .eq('status', '대기')
-    .not('current_approver_id', 'is', null)
-    .limit(500);
-  if (error) return { detected: 0, created: 0, errors: [error.message] };
+  let rows: ApprovalRow[];
 
-  const rows = (data ?? []) as ApprovalRow[];
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) return { detected: 0, created: 0, errors: ['[check-approval] D1 binding not available'] };
+    const db = getD1Drizzle(d1);
+    const d1Rows = await db
+      .select({
+        id: approvalsTable.id,
+        current_approver_id: approvalsTable.current_approver_id,
+        title: approvalsTable.title,
+        sender_name: approvalsTable.sender_name,
+        doc_type: approvalsTable.doc_type,
+        type: approvalsTable.type,
+      })
+      .from(approvalsTable)
+      .where(
+        and(
+          eq(approvalsTable.status, '대기'),
+          isNotNull(approvalsTable.current_approver_id),
+        )
+      )
+      .limit(500);
+    rows = d1Rows as ApprovalRow[];
+  } else {
+    const { data, error } = await supabase
+      .from('approvals')
+      .select('id, current_approver_id, title, sender_name, doc_type, type')
+      .eq('status', '대기')
+      .not('current_approver_id', 'is', null)
+      .limit(500);
+    if (error) return { detected: 0, created: 0, errors: [error.message] };
+    rows = (data ?? []) as ApprovalRow[];
+  }
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(

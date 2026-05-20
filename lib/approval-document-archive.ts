@@ -4,6 +4,15 @@ import {
   getReportApprovalSummary,
   normalizeApprovalAttachments,
 } from './approval-report-utils';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+  document_repository as documentRepositoryTable,
+  eq,
+  and,
+  desc,
+} from '@/lib/db';
 
 type ApprovalArchiveSource = Record<string, unknown>;
 
@@ -327,14 +336,64 @@ export async function syncApprovalToDocumentRepository(
     title,
     category: resolveApprovalCategory(item),
     content: buildApprovalArchiveContent(item),
-    file_url: null,
+    file_url: null as string | null,
     version: 1,
     company_name: String(item.sender_company || '').trim() || '전체',
-    created_by: item.sender_id || null,
+    created_by: (item.sender_id as string | null) || null,
   };
 
   const docNumber = resolveApprovalDocNumber(item);
   const companyName = nextRow.company_name;
+
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[approval-document-archive] D1 binding not available (syncApprovalToDocumentRepository)');
+    const db = getD1Drizzle(d1);
+
+    const baseQuery = db
+      .select()
+      .from(documentRepositoryTable)
+      .orderBy(desc(documentRepositoryTable.updated_at))
+      .limit(300);
+
+    const existingDocs = companyName && companyName !== '전체'
+      ? await baseQuery.where(eq(documentRepositoryTable.company_name, companyName))
+      : await baseQuery;
+
+    const matchedDoc = (existingDocs || []).find((doc) => {
+      const archivedDocNumber = extractApprovalDocNumberFromDocument(doc as Record<string, unknown>);
+      if (docNumber && archivedDocNumber) {
+        return archivedDocNumber === docNumber;
+      }
+      return hasMatchingFallbackDocument(doc as Record<string, unknown>, item);
+    }) as Record<string, unknown> | undefined;
+
+    const now = new Date().toISOString();
+    if (matchedDoc?.id) {
+      const currentVersion = Number(matchedDoc.version) || 1;
+      await db
+        .update(documentRepositoryTable)
+        .set({
+          ...nextRow,
+          updated_at: now,
+          version: currentVersion,
+          file_url: (matchedDoc.file_url as string | null) || null,
+        })
+        .where(eq(documentRepositoryTable.id, String(matchedDoc.id)));
+      return matchedDoc.id;
+    }
+
+    const newId = crypto.randomUUID();
+    await db.insert(documentRepositoryTable).values({
+      id: newId,
+      ...nextRow,
+      created_at: now,
+      updated_at: now,
+    });
+    return newId;
+  }
+
   let query = client.from('document_repository').select('*').order('updated_at', { ascending: false }).limit(300);
   if (companyName && companyName !== '전체') {
     query = query.eq('company_name', companyName);

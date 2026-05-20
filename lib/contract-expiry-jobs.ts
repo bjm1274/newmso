@@ -7,6 +7,10 @@ import {
   getD1Drizzle,
   resolveDataBackend,
   notifications as notificationsTable,
+  staff_members as staffMembersTable,
+  eq,
+  and,
+  inArray,
 } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
@@ -259,12 +263,62 @@ export async function processContractExpiry(
     return { scanned: 0, sent: 0, skipped: 0, errors: ['invalid_today_key'] };
   }
 
-  const { data: staffRows, error: staffError } = await supabase
-    .from('staff_members')
-    .select('id, name, company, department, position, joined_at, join_date, status, role, permissions');
-  if (staffError) throw staffError;
+  let rows: StaffRow[];
 
-  const rows = ((staffRows ?? []) as unknown) as StaffRow[];
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'processContractExpiry:staffQuery', backend });
+      throw new Error('[contract-expiry-jobs] D1 binding not available (processContractExpiry:staffQuery)');
+    }
+    const db = getD1Drizzle(d1);
+    const staffRows = await db
+      .select({
+        id: staffMembersTable.id,
+        name: staffMembersTable.name,
+        company: staffMembersTable.company,
+        department: staffMembersTable.department,
+        position: staffMembersTable.position,
+        joined_at: staffMembersTable.joined_at,
+        join_date: staffMembersTable.join_date,
+        status: staffMembersTable.status,
+        role: staffMembersTable.role,
+        permissions: staffMembersTable.permissions,
+      })
+      .from(staffMembersTable);
+    // permissions는 D1에서 TEXT(JSON) → 파싱
+    rows = staffRows.map((r) => {
+      let permissions: Record<string, unknown> | null = null;
+      if (typeof r.permissions === 'string' && r.permissions.length > 0) {
+        try {
+          const parsed = JSON.parse(r.permissions) as unknown;
+          if (isPlainRecord(parsed)) permissions = parsed;
+        } catch { /* 파싱 실패 → null */ }
+      } else if (isPlainRecord(r.permissions)) {
+        permissions = r.permissions as Record<string, unknown>;
+      }
+      return {
+        id: r.id,
+        name: r.name ?? null,
+        company: r.company ?? null,
+        department: r.department ?? null,
+        position: r.position ?? null,
+        joined_at: r.joined_at ?? null,
+        join_date: r.join_date ?? null,
+        status: r.status ?? null,
+        role: r.role ?? null,
+        permissions,
+      };
+    });
+  } else {
+    const { data: staffRows, error: staffError } = await supabase
+      .from('staff_members')
+      .select('id, name, company, department, position, joined_at, join_date, status, role, permissions');
+    if (staffError) throw staffError;
+    rows = ((staffRows ?? []) as unknown) as StaffRow[];
+  }
+
   if (rows.length === 0) {
     return { scanned: 0, sent: 0, skipped: 0, errors: [] };
   }
@@ -296,18 +350,50 @@ export async function processContractExpiry(
   const dedupKeys = new Set(
     candidates.map((c) => `${c.staffId}|${c.kind}|${c.expiryDate}`),
   );
-  const { data: existingRows, error: existingError } = await supabase
-    .from('notifications')
-    .select('user_id, metadata')
-    .eq('type', 'contract_expiry')
-    .in('user_id', adminIds);
-  if (existingError) throw existingError;
+
+  type ExistingNotifRow = { user_id: string | null; metadata: Record<string, unknown> | null };
+  let existingNotifRows: ExistingNotifRow[];
+
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'processContractExpiry:notifQuery', backend });
+      throw new Error('[contract-expiry-jobs] D1 binding not available (processContractExpiry:notifQuery)');
+    }
+    const db = getD1Drizzle(d1);
+    const notifRows = await db
+      .select({ user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
+      .from(notificationsTable)
+      .where(
+        and(
+          eq(notificationsTable.type, 'contract_expiry'),
+          inArray(notificationsTable.user_id, adminIds),
+        ),
+      );
+    existingNotifRows = notifRows.map((r) => {
+      let metadata: Record<string, unknown> | null = null;
+      if (typeof r.metadata === 'string' && r.metadata.length > 0) {
+        try {
+          const parsed = JSON.parse(r.metadata) as unknown;
+          if (isPlainRecord(parsed)) metadata = parsed;
+        } catch { /* 파싱 실패 → null */ }
+      } else if (isPlainRecord(r.metadata)) {
+        metadata = r.metadata as Record<string, unknown>;
+      }
+      return { user_id: r.user_id ?? null, metadata };
+    });
+  } else {
+    const { data: existingRows, error: existingError } = await supabase
+      .from('notifications')
+      .select('user_id, metadata')
+      .eq('type', 'contract_expiry')
+      .in('user_id', adminIds);
+    if (existingError) throw existingError;
+    existingNotifRows = (existingRows ?? []) as ExistingNotifRow[];
+  }
 
   const sentSet = new Set<string>();
-  for (const row of (existingRows ?? []) as Array<{
-    user_id: string | null;
-    metadata: Record<string, unknown> | null;
-  }>) {
+  for (const row of existingNotifRows) {
     if (!row.user_id) continue;
     const metadata = isPlainRecord(row.metadata) ? row.metadata : {};
     const key =

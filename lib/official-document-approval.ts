@@ -3,7 +3,11 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import {
   getD1Binding,
   getD1Drizzle,
+  resolveDataBackend,
   official_doc_log as officialDocLogTable,
+  like,
+  count,
+  sql,
 } from '@/lib/db';
 
 export type OfficialDocRequest = {
@@ -71,14 +75,28 @@ async function issueOfficialDocNumber(supabase: SupabaseClient, sentDate: string
   const month = String(baseDate.getMonth() + 1).padStart(2, '0');
   const prefix = `공문-${year}${month}`;
 
-  const { count, error } = await supabase
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[official-document-approval] D1 binding not available (issueOfficialDocNumber)');
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({ cnt: count() })
+      .from(officialDocLogTable)
+      .where(like(officialDocLogTable.doc_number, `${prefix}%`));
+    const existingCount = Number(rows[0]?.cnt ?? 0);
+    const sequence = String(existingCount + 1).padStart(3, '0');
+    return `${prefix}-${sequence}`;
+  }
+
+  const { count: existingCount, error } = await supabase
     .from('official_doc_log')
     .select('*', { count: 'exact', head: true })
     .like('doc_number', `${prefix}%`);
 
   if (error) throw error;
 
-  const sequence = String((count ?? 0) + 1).padStart(3, '0');
+  const sequence = String((existingCount ?? 0) + 1).padStart(3, '0');
   return `${prefix}-${sequence}`;
 }
 

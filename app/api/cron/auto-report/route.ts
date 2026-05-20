@@ -7,9 +7,11 @@ import {
 } from '@/lib/auto-report-generator';
 import {
   generated_reports as generatedReportsTable,
+  report_schedules as reportSchedulesTable,
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
+  eq,
 } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
@@ -34,10 +36,35 @@ export async function GET(request: Request) {
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     // 활성 스케줄 조회
-    const { data: schedules } = await supabase
-      .from('report_schedules')
-      .select('id, report_type, company_id, recipients, enabled')
-      .eq('enabled', true);
+    const backend = await resolveDataBackend();
+    type ScheduleRow = { id: string; report_type: string; company_id: string | null; recipients: string[] | string | null; enabled: number | boolean };
+    let schedules: ScheduleRow[] | null = null;
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        logD1BindingMissing({ label: 'auto-report:report_schedules', backend });
+        throw new Error('[auto-report] D1 binding not available (report_schedules)');
+      }
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: reportSchedulesTable.id,
+          report_type: reportSchedulesTable.report_type,
+          company_id: reportSchedulesTable.company_id,
+          recipients: reportSchedulesTable.recipients,
+          enabled: reportSchedulesTable.enabled,
+        })
+        .from(reportSchedulesTable)
+        .where(eq(reportSchedulesTable.enabled, 1));
+      schedules = rows as ScheduleRow[];
+    } else {
+      const { data } = await supabase
+        .from('report_schedules')
+        .select('id, report_type, company_id, recipients, enabled')
+        .eq('enabled', true);
+      schedules = data as ScheduleRow[] | null;
+    }
 
     if (!schedules || schedules.length === 0) {
       return NextResponse.json({ ok: true, message: '활성 스케줄 없음', generated: 0 });
@@ -49,7 +76,12 @@ export async function GET(request: Request) {
       try {
         const reportType = String(schedule.report_type);
         const companyId = schedule.company_id || null;
-        const recipients = Array.isArray(schedule.recipients) ? schedule.recipients : [];
+        // D1에서 recipients는 TEXT(JSON) → 파싱
+        let recipientsRaw = schedule.recipients;
+        if (typeof recipientsRaw === 'string') {
+          try { recipientsRaw = JSON.parse(recipientsRaw) as string[]; } catch { recipientsRaw = []; }
+        }
+        const recipients = Array.isArray(recipientsRaw) ? recipientsRaw : [];
 
         let summary: Record<string, unknown> = {};
 
@@ -70,7 +102,6 @@ export async function GET(request: Request) {
           summary,
         };
         {
-          const backend = await resolveDataBackend();
           const d1 = await getD1Binding();
           if (!d1) {
             logD1BindingMissing({ label: 'auto-report:generated_reports', backend });
@@ -89,10 +120,21 @@ export async function GET(request: Request) {
         }
 
         // 스케줄 last_generated_at 업데이트
-        await supabase
-          .from('report_schedules')
-          .update({ last_generated_at: now.toISOString() })
-          .eq('id', schedule.id);
+        if (backend === 'd1') {
+          const d1 = await getD1Binding();
+          if (d1) {
+            const db = getD1Drizzle(d1);
+            await db
+              .update(reportSchedulesTable)
+              .set({ last_generated_at: now.toISOString() })
+              .where(eq(reportSchedulesTable.id, schedule.id));
+          }
+        } else {
+          await supabase
+            .from('report_schedules')
+            .update({ last_generated_at: now.toISOString() })
+            .eq('id', schedule.id);
+        }
 
         // 수신자 알림
         if (recipients.length > 0) {

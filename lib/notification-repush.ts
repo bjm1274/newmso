@@ -4,13 +4,18 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
+  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
+  notifications as notificationsTable,
   push_subscriptions as pushSubscriptionsTable,
+  eq,
+  and,
   inArray,
+  isNull,
+  lte,
+  gte,
 } from '@/lib/db';
-import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type NotificationRow = {
   id: string;
@@ -138,9 +143,24 @@ async function patchNotificationMetadata(
   metadataPatch: Record<string, unknown>,
 ) {
   const metadata = toMetadata(row.metadata);
+  const merged = { ...metadata, ...metadataPatch };
+
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[notification-repush] D1 binding not available (patchNotificationMetadata)');
+    const db = getD1Drizzle(d1);
+    await db
+      .update(notificationsTable)
+      .set({ metadata: JSON.stringify(merged) })
+      .where(eq(notificationsTable.id, String(row.id)));
+    return;
+  }
+
+  // 기존 Supabase 경로
   const { error } = await supabase
     .from('notifications')
-    .update({ metadata: { ...metadata, ...metadataPatch } })
+    .update({ metadata: merged })
     .eq('id', row.id);
 
   if (error) {
@@ -174,54 +194,131 @@ export async function processUnreadNotificationRepushServer(
   const maxAgeCutoffIso = new Date(now.getTime() - REPUSH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const scopedUserIds = normalizeScopedUserIds(userIds);
 
-  let notificationQuery = supabase
-    .from('notifications')
-    .select('id,user_id,type,title,body,metadata,created_at')
-    .is('read_at', null)
-    .lte('created_at', minAgeCutoffIso)
-    .gte('created_at', maxAgeCutoffIso)
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  let notifications: NotificationRow[];
+  let subscriptionsByUser: Map<string, PushSubscriptionRow[]>;
 
-  if (scopedUserIds.length > 0) {
-    notificationQuery = notificationQuery.in('user_id', scopedUserIds);
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[notification-repush] D1 binding not available (processUnreadNotificationRepushServer)');
+    const db = getD1Drizzle(d1);
+
+    // notifications 조회
+    const baseConditions = [
+      isNull(notificationsTable.read_at),
+      lte(notificationsTable.created_at, minAgeCutoffIso),
+      gte(notificationsTable.created_at, maxAgeCutoffIso),
+    ];
+    const conditions = scopedUserIds.length > 0
+      ? [...baseConditions, inArray(notificationsTable.user_id, scopedUserIds)]
+      : baseConditions;
+
+    const { asc } = await import('drizzle-orm');
+    const rawRows = await db
+      .select({
+        id: notificationsTable.id,
+        user_id: notificationsTable.user_id,
+        type: notificationsTable.type,
+        title: notificationsTable.title,
+        body: notificationsTable.body,
+        metadata: notificationsTable.metadata,
+        created_at: notificationsTable.created_at,
+      })
+      .from(notificationsTable)
+      .where(and(...(conditions as Parameters<typeof and>)))
+      .orderBy(asc(notificationsTable.created_at))
+      .limit(limit);
+
+    // D1 metadata는 TEXT → JSON.parse
+    notifications = rawRows.map((row) => {
+      let parsedMetadata: Record<string, unknown> | null = null;
+      if (typeof row.metadata === 'string' && row.metadata.length > 0) {
+        try {
+          const parsed = JSON.parse(row.metadata) as unknown;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            parsedMetadata = parsed as Record<string, unknown>;
+          }
+        } catch { parsedMetadata = null; }
+      } else if (row.metadata && typeof row.metadata === 'object') {
+        parsedMetadata = row.metadata as Record<string, unknown>;
+      }
+      return {
+        id: String(row.id ?? ''),
+        user_id: String(row.user_id ?? ''),
+        type: row.type ?? null,
+        title: row.title ?? null,
+        body: row.body ?? null,
+        metadata: parsedMetadata,
+        created_at: row.created_at ?? null,
+      } satisfies NotificationRow;
+    });
+
+    if (notifications.length === 0) {
+      return { ok: true, scanned: 0, eligible: 0, sent: 0, failed: 0, skipped: 0, pushDisabled: false, errors: [] };
+    }
+
+    const targetUserIds = Array.from(new Set(notifications.map((row) => String(row.user_id || '')).filter(Boolean)));
+    const subRows = await db
+      .select({
+        id: pushSubscriptionsTable.id,
+        staff_id: pushSubscriptionsTable.staff_id,
+        endpoint: pushSubscriptionsTable.endpoint,
+        p256dh: pushSubscriptionsTable.p256dh,
+        auth: pushSubscriptionsTable.auth,
+        fcm_token: pushSubscriptionsTable.fcm_token,
+        created_at: pushSubscriptionsTable.created_at,
+      })
+      .from(pushSubscriptionsTable)
+      .where(inArray(pushSubscriptionsTable.staff_id, targetUserIds));
+
+    subscriptionsByUser = new Map<string, PushSubscriptionRow[]>();
+    (subRows as PushSubscriptionRow[]).forEach((row) => {
+      const uid = String(row.staff_id || '').trim();
+      if (!uid) return;
+      subscriptionsByUser.set(uid, [...(subscriptionsByUser.get(uid) || []), row]);
+    });
+  } else {
+    // 기존 Supabase 경로
+    let notificationQuery = supabase
+      .from('notifications')
+      .select('id,user_id,type,title,body,metadata,created_at')
+      .is('read_at', null)
+      .lte('created_at', minAgeCutoffIso)
+      .gte('created_at', maxAgeCutoffIso)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+
+    if (scopedUserIds.length > 0) {
+      notificationQuery = notificationQuery.in('user_id', scopedUserIds);
+    }
+
+    const { data, error } = await notificationQuery;
+    if (error) {
+      throw error;
+    }
+
+    notifications = (data || []) as NotificationRow[];
+    if (notifications.length === 0) {
+      return { ok: true, scanned: 0, eligible: 0, sent: 0, failed: 0, skipped: 0, pushDisabled: false, errors: [] };
+    }
+
+    const targetUserIds = Array.from(new Set(notifications.map((row) => String(row.user_id || '')).filter(Boolean)));
+    const { data: subscriptionRows, error: subscriptionError } = await supabase
+      .from('push_subscriptions')
+      .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
+      .in('staff_id', targetUserIds);
+
+    if (subscriptionError) {
+      throw subscriptionError;
+    }
+
+    subscriptionsByUser = new Map<string, PushSubscriptionRow[]>();
+    ((subscriptionRows || []) as PushSubscriptionRow[]).forEach((row) => {
+      const uid = String(row.staff_id || '').trim();
+      if (!uid) return;
+      subscriptionsByUser.set(uid, [...(subscriptionsByUser.get(uid) || []), row]);
+    });
   }
-
-  const { data, error } = await notificationQuery;
-  if (error) {
-    throw error;
-  }
-
-  const notifications = (data || []) as NotificationRow[];
-  if (notifications.length === 0) {
-    return {
-      ok: true,
-      scanned: 0,
-      eligible: 0,
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      pushDisabled: false,
-      errors: [],
-    };
-  }
-
-  const targetUserIds = Array.from(new Set(notifications.map((row) => String(row.user_id || '')).filter(Boolean)));
-  const { data: subscriptionRows, error: subscriptionError } = await supabase
-    .from('push_subscriptions')
-    .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
-    .in('staff_id', targetUserIds);
-
-  if (subscriptionError) {
-    throw subscriptionError;
-  }
-
-  const subscriptionsByUser = new Map<string, PushSubscriptionRow[]>();
-  ((subscriptionRows || []) as PushSubscriptionRow[]).forEach((row) => {
-    const userId = String(row.staff_id || '').trim();
-    if (!userId) return;
-    subscriptionsByUser.set(userId, [...(subscriptionsByUser.get(userId) || []), row]);
-  });
 
   let pushDisabled = false;
   try {
@@ -306,10 +403,24 @@ export async function processUnreadNotificationRepushServer(
         rowSent += fcmResult.success.length > 0 ? 1 : 0;
         rowFailed += fcmResult.success.length === 0 ? 1 : 0;
         if (fcmResult.expired.length > 0) {
-          await supabase
-            .from('push_subscriptions')
-            .update({ fcm_token: null })
-            .in('fcm_token', fcmResult.expired);
+          const repushBackend = await resolveDataBackend();
+          if (repushBackend === 'd1') {
+            const d1b = await getD1Binding();
+            if (d1b) {
+              const dbRepush = getD1Drizzle(d1b);
+              for (const expiredToken of fcmResult.expired) {
+                await dbRepush
+                  .update(pushSubscriptionsTable)
+                  .set({ fcm_token: null })
+                  .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
+              }
+            }
+          } else {
+            await supabase
+              .from('push_subscriptions')
+              .update({ fcm_token: null })
+              .in('fcm_token', fcmResult.expired);
+          }
         }
       } catch (fcmError) {
         rowFailed += 1;
@@ -345,22 +456,17 @@ export async function processUnreadNotificationRepushServer(
     }
 
     if (expiredSubscriptionIds.length > 0) {
-      // Phase 8-G — D1 직접 delete. inArray(D1)는 bind 한도(약 100) 이내 청크 분할.
-      try {
-        const backend = await resolveDataBackend();
-        const d1 = await getD1Binding();
-        if (!d1) {
-          logD1BindingMissing({ label: 'notification-repush:push_subscriptions', backend });
-          throw new Error('[notification-repush] D1 binding not available');
+      const repushBackend = await resolveDataBackend();
+      if (repushBackend === 'd1') {
+        const d1b = await getD1Binding();
+        if (d1b) {
+          const dbRepush = getD1Drizzle(d1b);
+          await dbRepush
+            .delete(pushSubscriptionsTable)
+            .where(inArray(pushSubscriptionsTable.id, expiredSubscriptionIds));
         }
-        const db = getD1Drizzle(d1);
-        const CHUNK = 100;
-        for (let idx = 0; idx < expiredSubscriptionIds.length; idx += CHUNK) {
-          const slice = expiredSubscriptionIds.slice(idx, idx + CHUNK);
-          await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, slice));
-        }
-      } catch (err) {
-        errors.push(`${row.id}: ${err instanceof Error ? err.message : String(err)}`);
+      } else {
+        await supabase.from('push_subscriptions').delete().in('id', expiredSubscriptionIds);
       }
     }
 

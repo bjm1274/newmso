@@ -10,6 +10,18 @@ import {
   calculateLeaveDays,
 } from '@/lib/annual-leave-ledger';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  staff_members as staffMembersTable,
+  companies as companiesTable,
+  leave_requests as leaveRequestsTable,
+  leave_balances as leaveBalancesTable,
+  eq,
+  and,
+  inArray,
+} from '@/lib/db';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -162,6 +174,179 @@ export async function POST(request: Request) {
     const supabase = getAdminClient();
     const staffIds = updates.map((u) => u.staffId);
     const targetYear = new Date().getFullYear();
+
+    const backend = await resolveDataBackend();
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) throw new Error('[manual-grant] D1 binding not available');
+      const db = getD1Drizzle(d1);
+
+      // 1. 대상 직원 일괄 조회
+      const staffDataRows = await db
+        .select({
+          id: staffMembersTable.id,
+          employee_no: staffMembersTable.employee_no,
+          name: staffMembersTable.name,
+          company: staffMembersTable.company,
+          join_date: staffMembersTable.join_date,
+          joined_at: staffMembersTable.joined_at,
+          hire_date: staffMembersTable.hire_date,
+          company_id: staffMembersTable.company_id,
+        })
+        .from(staffMembersTable)
+        .where(inArray(staffMembersTable.id, staffIds));
+
+      const staffRows = staffDataRows as StaffRow[];
+      const staffMap = new Map(staffRows.map((s) => [s.id, s]));
+      const missingIds = staffIds.filter((id) => !staffMap.has(id));
+      if (missingIds.length > 0) {
+        return NextResponse.json(
+          { error: `존재하지 않는 직원 ID가 포함되어 있습니다: ${missingIds.join(', ')}` },
+          { status: 400 },
+        );
+      }
+
+      // 2. 회사 정책 일괄 조회
+      const companyIds = Array.from(
+        new Set(staffRows.map((s) => s.company_id).filter((v): v is string => !!v)),
+      );
+      const companyMap = new Map<string, CompanyRow>();
+      if (companyIds.length > 0) {
+        const companyDataRows = await db
+          .select({
+            id: companiesTable.id,
+            leave_policy: companiesTable.leave_policy,
+            fiscal_year_start_month: companiesTable.fiscal_year_start_month,
+          })
+          .from(companiesTable)
+          .where(inArray(companiesTable.id, companyIds));
+        companyDataRows.forEach((c) =>
+          companyMap.set(c.id, {
+            id: c.id,
+            leave_policy: c.leave_policy ?? null,
+            fiscal_year_start_month: c.fiscal_year_start_month ?? null,
+          }),
+        );
+      }
+
+      // 3. 휴가신청 내역 일괄 조회
+      const leaveDataRows = await db
+        .select({
+          staff_id: leaveRequestsTable.staff_id,
+          leave_type: leaveRequestsTable.leave_type,
+          start_date: leaveRequestsTable.start_date,
+          end_date: leaveRequestsTable.end_date,
+          status: leaveRequestsTable.status,
+        })
+        .from(leaveRequestsTable)
+        .where(inArray(leaveRequestsTable.staff_id, staffIds));
+
+      const leaveByStaff = new Map<string, LeaveRequestRow[]>();
+      leaveDataRows.forEach((row) => {
+        const staffId = row.staff_id ?? '';
+        if (!staffId) return;
+        const leaveRow: LeaveRequestRow = {
+          staff_id: staffId,
+          leave_type: row.leave_type ?? null,
+          start_date: row.start_date ?? null,
+          end_date: row.end_date ?? null,
+          status: row.status ?? null,
+        };
+        const list = leaveByStaff.get(staffId);
+        if (list) list.push(leaveRow);
+        else leaveByStaff.set(staffId, [leaveRow]);
+      });
+
+      // 4. leave_balances 기존 행 조회 (staff_id+year — id PK 필요)
+      const existingBalanceRows = await db
+        .select({
+          id: leaveBalancesTable.id,
+          staff_id: leaveBalancesTable.staff_id,
+          year: leaveBalancesTable.year,
+        })
+        .from(leaveBalancesTable)
+        .where(
+          and(
+            inArray(leaveBalancesTable.staff_id, staffIds),
+            eq(leaveBalancesTable.year, targetYear),
+          ),
+        );
+      const existingBalanceMap = new Map(
+        existingBalanceRows.map((r) => [r.staff_id, r]),
+      );
+
+      // 5. staff_members / leave_balances 갱신
+      for (const update of updates) {
+        const staff = staffMap.get(update.staffId)!;
+        const usedDays = computeUsedDays(leaveByStaff.get(update.staffId) || []);
+        const totalDays = update.total;
+
+        const company = staff.company_id ? companyMap.get(staff.company_id) : undefined;
+        let expiryDate: Date;
+        if (company?.leave_policy === '회계연도') {
+          expiryDate = fiscalYearExpiryDate(targetYear, company.fiscal_year_start_month ?? 1);
+        } else {
+          const hireDate = staff.hire_date ?? staff.join_date ?? staff.joined_at ?? null;
+          expiryDate = hireDate
+            ? calculateAnnualLeaveExpiryDate(hireDate, new Date())
+            : new Date(targetYear, 11, 31);
+        }
+        const expiryDateStr = formatKoreanDateKey(expiryDate);
+        const remainingDays = Math.max(0, totalDays - usedDays - update.expired - update.compensated);
+
+        // staff_members UPDATE
+        await db
+          .update(staffMembersTable)
+          .set({
+            annual_leave_total: totalDays,
+            annual_leave_used: usedDays,
+          })
+          .where(eq(staffMembersTable.id, update.staffId));
+
+        // leave_balances upsert (SELECT 후 UPDATE or INSERT)
+        const existingBalance = existingBalanceMap.get(update.staffId);
+        if (existingBalance?.id) {
+          await db
+            .update(leaveBalancesTable)
+            .set({
+              total_days: totalDays,
+              used_days: usedDays,
+              remaining_days: remainingDays,
+              expiry_date: expiryDateStr,
+              expired_days: update.expired,
+              compensated_days: update.compensated,
+              updated_at: new Date().toISOString(),
+            })
+            .where(eq(leaveBalancesTable.id, existingBalance.id));
+        } else {
+          await db.insert(leaveBalancesTable).values({
+            id: crypto.randomUUID(),
+            staff_id: update.staffId,
+            year: targetYear,
+            total_days: totalDays,
+            used_days: usedDays,
+            remaining_days: remainingDays,
+            expiry_date: expiryDateStr,
+            expired_days: update.expired,
+            compensated_days: update.compensated,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        updatedCount: updates.length,
+        message:
+          updates.length === 1
+            ? '연차 수동 부여 내역이 저장되었습니다.'
+            : `${updates.length}명의 연차 수동 부여 내역이 저장되었습니다.`,
+      });
+    }
+
+    // ── Supabase 경로 (dual-write 모드 유지) ─────────────────────────────────
 
     // 1. 대상 직원 일괄 조회 (존재 검증 + 정책 계산용)
     //    NOT NULL·기본값 없는 컬럼(employee_no/name/company)을 함께 읽어 upsert INSERT 경로 충족

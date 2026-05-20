@@ -177,37 +177,66 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const dedupeKey = `manual:${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+    const newRow = {
+      company_id: companyId,
+      provider: 'manual',
+      dedupe_key: dedupeKey,
+      provider_event_type: 'MANUAL_ENTRY',
+      order_id: String(body.order_id || '').trim() || null,
+      order_name: String(body.order_name || '').trim() || null,
+      payment_key: null as string | null,
+      transaction_key: null as string | null,
+      method: 'manual',
+      deposit_status: 'deposited',
+      match_status: 'unmatched',
+      amount,
+      currency: 'KRW',
+      depositor_name: depositorName,
+      customer_name: depositorName,
+      patient_name: String(body.patient_name || '').trim() || null,
+      patient_id: String(body.patient_id || '').trim() || null,
+      transaction_label: String(body.transaction_label || '').trim() || null,
+      bank_code: 'TOSS',
+      bank_name: '토스뱅크',
+      account_number: '1002-4939-3286',
+      due_date: null as string | null,
+      deposited_at: String(body.deposited_at || '').trim() || now,
+      matched_target_type: null as string | null,
+      matched_target_id: null as string | null,
+      matched_note: String(body.matched_note || '').trim() || null,
+    };
+    const rawPayloadObj = { source: 'manual', entered_by: access.user.id, ...body };
+
+    const postBackend = await resolveDataBackend();
+    if (postBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        logD1BindingMissing({ label: 'virtual_account_deposits:post', backend: postBackend });
+        return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
+      const newId = crypto.randomUUID();
+      await db.insert(virtualAccountDepositsTable).values({
+        id: newId,
+        ...newRow,
+        raw_payload: JSON.stringify(rawPayloadObj),
+        created_at: now,
+        updated_at: now,
+      });
+      const rows = await db
+        .select()
+        .from(virtualAccountDepositsTable)
+        .where(eq(virtualAccountDepositsTable.id, newId))
+        .limit(1);
+      return NextResponse.json({ deposit: rows[0] ? deserializeDepositRow(rows[0] as Record<string, unknown>) : null });
+    }
+
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('virtual_account_deposits')
       .insert({
-        company_id: companyId,
-        provider: 'manual',
-        dedupe_key: dedupeKey,
-        provider_event_type: 'MANUAL_ENTRY',
-        order_id: String(body.order_id || '').trim() || null,
-        order_name: String(body.order_name || '').trim() || null,
-        payment_key: null,
-        transaction_key: null,
-        method: 'manual',
-        deposit_status: 'deposited',
-        match_status: 'unmatched',
-        amount,
-        currency: 'KRW',
-        depositor_name: depositorName,
-        customer_name: depositorName,
-        patient_name: String(body.patient_name || '').trim() || null,
-        patient_id: String(body.patient_id || '').trim() || null,
-        transaction_label: String(body.transaction_label || '').trim() || null,
-        bank_code: 'TOSS',
-        bank_name: '토스뱅크',
-        account_number: '1002-4939-3286',
-        due_date: null,
-        deposited_at: String(body.deposited_at || '').trim() || now,
-        matched_target_type: null,
-        matched_target_id: null,
-        matched_note: String(body.matched_note || '').trim() || null,
-        raw_payload: { source: 'manual', entered_by: access.user.id, ...body },
+        ...newRow,
+        raw_payload: rawPayloadObj,
         created_at: now,
         updated_at: now,
       })
@@ -233,9 +262,32 @@ export async function DELETE(request: NextRequest) {
     const id = url.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 });
 
-    const supabase = getAdminClient();
     const { companyId, isSystemMaster } = access.scope;
 
+    const deleteBackend = await resolveDataBackend();
+    if (deleteBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        logD1BindingMissing({ label: 'virtual_account_deposits:delete', backend: deleteBackend });
+        return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
+      const whereExpr =
+        companyId && !isSystemMaster
+          ? and(
+              eq(virtualAccountDepositsTable.id, id),
+              eq(virtualAccountDepositsTable.provider, 'manual'),
+              eq(virtualAccountDepositsTable.company_id, companyId),
+            )
+          : and(
+              eq(virtualAccountDepositsTable.id, id),
+              eq(virtualAccountDepositsTable.provider, 'manual'),
+            );
+      await db.delete(virtualAccountDepositsTable).where(whereExpr);
+      return NextResponse.json({ ok: true });
+    }
+
+    const supabase = getAdminClient();
     // 수동 등록된 건만 삭제 가능
     let q = supabase.from('virtual_account_deposits')
       .delete()
@@ -299,6 +351,31 @@ export async function PATCH(request: NextRequest) {
 
     if (!existingRow) {
       return NextResponse.json({ error: '수정할 입금 내역을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    const patchBackend = await resolveDataBackend();
+    if (patchBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        logD1BindingMissing({ label: 'virtual_account_deposits:patch:update', backend: patchBackend });
+        return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
+      // raw_payload가 객체면 JSON.stringify
+      const d1Updates = { ...updates } as Record<string, unknown>;
+      if (d1Updates.raw_payload !== undefined && d1Updates.raw_payload !== null && typeof d1Updates.raw_payload !== 'string') {
+        d1Updates.raw_payload = JSON.stringify(d1Updates.raw_payload);
+      }
+      await db
+        .update(virtualAccountDepositsTable)
+        .set({ ...d1Updates, updated_at: new Date().toISOString() } as Parameters<ReturnType<typeof db.update>['set']>[0])
+        .where(eq(virtualAccountDepositsTable.id, id));
+      const updatedRows = await db
+        .select()
+        .from(virtualAccountDepositsTable)
+        .where(eq(virtualAccountDepositsTable.id, id))
+        .limit(1);
+      return NextResponse.json({ deposit: updatedRows[0] ? deserializeDepositRow(updatedRows[0] as Record<string, unknown>) : null });
     }
 
     const { data, error } = await supabase

@@ -11,7 +11,13 @@ import {
   resolveDataBackend,
   push_subscriptions as pushSubscriptionsTable,
   staff_members as staffMembersTable,
+  notifications as notificationsTable,
+  chat_push_jobs as chatPushJobsTable,
   inArray,
+  isNull,
+  isNotNull,
+  lt,
+  and,
 } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
@@ -75,12 +81,54 @@ async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClien
     chatPushJobsError?: string;
   };
 
-  // 읽음 처리되고 90일 경과한 알림은 삭제 (egress·storage 절감)
   const NOTIFICATION_RETENTION_DAYS = 90;
   const notifCutoff = new Date(
     Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
+  const PUSH_JOB_RETENTION_DAYS = 30;
+  const pushCutoff = new Date(
+    Date.now() - PUSH_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    // D1 경로: drizzle로 직접 삭제 (count 반환 없음 — 0으로 표기)
+    const db = await requireD1ForCleanup('cleanupRetentionLogs');
+
+    try {
+      // 읽음 처리되고 90일 경과한 알림 삭제 (read_at IS NOT NULL AND read_at < notifCutoff)
+      await db
+        .delete(notificationsTable)
+        .where(
+          and(
+            isNotNull(notificationsTable.read_at),
+            lt(notificationsTable.read_at, notifCutoff),
+          ),
+        );
+    } catch (err) {
+      result.notificationsError = err instanceof Error ? err.message : String(err);
+    }
+
+    try {
+      // 발송 처리된 chat_push_jobs 30일 경과 정리 (processed_at IS NOT NULL AND processed_at < pushCutoff)
+      await db
+        .delete(chatPushJobsTable)
+        .where(
+          and(
+            isNotNull(chatPushJobsTable.processed_at),
+            lt(chatPushJobsTable.processed_at, pushCutoff),
+          ),
+        );
+    } catch (err) {
+      result.chatPushJobsError = err instanceof Error ? err.message : String(err);
+    }
+
+    return result;
+  }
+
+  // 기존 Supabase 경로
+  // 읽음 처리되고 90일 경과한 알림은 삭제 (egress·storage 절감)
   const notifRes = await supabase
     .from('notifications')
     .delete({ count: 'estimated' })
@@ -94,11 +142,6 @@ async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClien
   }
 
   // 발송 처리(또는 폐기)된 chat_push_jobs 30일 경과 정리
-  const PUSH_JOB_RETENTION_DAYS = 30;
-  const pushCutoff = new Date(
-    Date.now() - PUSH_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString();
-
   const pushRes = await supabase
     .from('chat_push_jobs')
     .delete({ count: 'estimated' })

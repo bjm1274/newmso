@@ -27,6 +27,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { runInappNotificationJobs } from '@/lib/inapp-notification-jobs';
+import { resolveDataBackend } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,15 +48,27 @@ export async function GET(request: Request) {
   }
 
   try {
+    const backend = await resolveDataBackend();
+
+    // d1 모드에서는 supabase 환경변수 없이도 동작 (하위 check-*.ts 가 각자 D1 분기 처리)
+    // supabase/dual-write 모드에서는 환경변수 필수
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
+
+    if (backend !== 'd1' && (!supabaseUrl || !serviceKey)) {
       return NextResponse.json(
         { ok: false, error: 'Supabase service role configuration is missing.' },
         { status: 500 },
       );
     }
-    const supabase = createClient(supabaseUrl, serviceKey);
+
+    // D1 모드에서도 supabase 파라미터는 필요하지만, 하위 모듈이 resolveDataBackend()로
+    // D1을 선택하므로 실제 Supabase 호출은 발생하지 않는다.
+    // 환경변수 미설정 시 빈 stub 클라이언트 대신 dummy URL로 생성 (호출되지 않음)
+    const supabase = createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      serviceKey || 'placeholder',
+    );
 
     const result = await runInappNotificationJobs(supabase);
     return NextResponse.json({ ok: true, ...result });

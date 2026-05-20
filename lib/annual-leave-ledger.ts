@@ -2,23 +2,33 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  leave_requests as leaveRequestsTable,
+  staff_members as staffMembersTable,
+  eq,
+  and,
+  desc,
+} from '@/lib/db';
 
-const APPROVED_STATUS_LABELS = new Set(['\uc2b9\uc778', 'approved']);
+const APPROVED_STATUS_LABELS = new Set(['승인', 'approved']);
 
 export function isAnnualLeaveType(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
   if (!normalized) return false;
 
-  // '\uc5f0\ucc28(\uc774\ub825)': \ub9cc\ub8cc\ub41c \uc774\uc804 \uc0ac\uc774\ud074\uc758 \uc0ac\uc6a9 \uc774\ub825 \u2014 \uadfc\ud0dc \ud654\uba74\uc5d4 \ud45c\uc2dc\ud558\ub418
-  // \ud604\uc7ac \uc794\uc5ec \uacc4\uc0b0(annual_leave_used)\uc5d0\ub294 \ud569\uc0b0\ud558\uc9c0 \uc54a\ub294\ub2e4.
-  if (normalized.includes('\uc774\ub825')) return false;
+  // '연차(이력)': 만료된 이전 사이클의 사용 이력 — 근태 화면엔 표시하되
+  // 현재 잔여 계산(annual_leave_used)에는 합산하지 않는다.
+  if (normalized.includes('이력')) return false;
 
   return (
     normalized === 'annual_leave' ||
     normalized === 'annual' ||
-    normalized === '\uc5f0\ucc28' ||
-    normalized === '\uc5f0\ucc28/\ud734\uac00' ||
-    normalized.includes('\uc5f0\ucc28')
+    normalized === '연차' ||
+    normalized === '연차/휴가' ||
+    normalized.includes('연차')
   );
 }
 
@@ -27,10 +37,10 @@ export function isHalfLeaveType(value: unknown): boolean {
 }
 
 /**
- * \ud734\uac00 \uc720\ud615\ubcc4 1\ud68c\ub2f9 \uc18c\ubaa8 \uc77c\uc218 \ub2e8\uc704 \ubc18\ud658
- * - \ubc18\ucc28(\uc624\uc804/\uc624\ud6c4 \ud3ec\ud568): 0.5
- * - \uadf8 \uc678 \uc5f0\ucc28/\uacf5\uac00 \ub4f1 \ud480\ub370\uc774: 1.0
- * \uc8fc\uc758: \ubc18\ubc18\ucc28(0.25)\ub294 \uc774 \uc2dc\uc2a4\ud15c\uc5d0\uc11c \uc9c0\uc6d0\ud558\uc9c0 \uc54a\uc74c
+ * 휴가 유형별 1회당 소모 일수 단위 반환
+ * - 반차(오전/오후 포함): 0.5
+ * - 그 외 연차/공가 등 풀데이: 1.0
+ * 주의: 반반차(0.25)는 이 시스템에서 지원하지 않음
  */
 export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
   const normalized = String(value ?? '').trim().toLowerCase();
@@ -39,11 +49,11 @@ export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
   const isHalf =
     normalized === 'half_leave' ||
     normalized === 'half-day' ||
-    normalized === '\ubc18\ucc28' ||
-    normalized === '\uc624\uc804\ubc18\ucc28' ||
-    normalized === '\uc624\ud6c4\ubc18\ucc28' ||
-    normalized.startsWith('\ubc18\ucc28') ||
-    normalized.endsWith('\ubc18\ucc28');
+    normalized === '반차' ||
+    normalized === '오전반차' ||
+    normalized === '오후반차' ||
+    normalized.startsWith('반차') ||
+    normalized.endsWith('반차');
 
   return isHalf ? 0.5 : 1.0;
 }
@@ -165,6 +175,20 @@ function buildLeaveRequestPayload(params: EnsureApprovedAnnualLeaveRequestParams
   };
 }
 
+// D1 leave_requests 스키마에 존재하는 컬럼만 사용하는 insert 타입
+type D1LeaveRequestInsert = {
+  id: string;
+  staff_id: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  status: string;
+  approved_at: string;
+  company_id: string | null;
+  created_at: string;
+};
+
 export async function ensureApprovedAnnualLeaveRequest(params: {
   staffId: string;
   leaveType: string;
@@ -181,6 +205,70 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
 }, client: SupabaseClient = supabase) {
   const { staffId, leaveType, startDate, endDate } = params;
   const payload = buildLeaveRequestPayload(params);
+
+  const backend = await resolveDataBackend();
+
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (ensureApprovedAnnualLeaveRequest)');
+    const db = getD1Drizzle(d1);
+
+    // 기존 레코드 조회 (staff_id + leave_type + start_date + end_date, 최신 순)
+    const existingRows = await db
+      .select({ id: leaveRequestsTable.id, status: leaveRequestsTable.status })
+      .from(leaveRequestsTable)
+      .where(
+        and(
+          eq(leaveRequestsTable.staff_id, staffId),
+          eq(leaveRequestsTable.leave_type, leaveType),
+          eq(leaveRequestsTable.start_date, startDate),
+          eq(leaveRequestsTable.end_date, endDate),
+        ),
+      )
+      .orderBy(desc(leaveRequestsTable.created_at))
+      .limit(1);
+
+    const existingRow = existingRows[0] ?? null;
+    const matchedRow =
+      existingRow &&
+      (isApprovedLeaveStatus(existingRow.status) || String(existingRow.status ?? '').trim() === '')
+        ? existingRow
+        : null;
+
+    if (matchedRow?.id) {
+      if (!isApprovedLeaveStatus(matchedRow.status)) {
+        await db
+          .update(leaveRequestsTable)
+          .set({
+            status: '승인',
+            approved_at: payload.approved_at,
+            // D1 스키마에 company_id 있음
+            ...(params.companyId ? { company_id: params.companyId } : {}),
+          })
+          .where(eq(leaveRequestsTable.id, matchedRow.id));
+      }
+      return matchedRow.id;
+    }
+
+    // INSERT — D1 스키마에 없는 컬럼(approval_id, company_name, delegate_* 등) 제외
+    const newId = crypto.randomUUID();
+    const insertValues: D1LeaveRequestInsert = {
+      id: newId,
+      staff_id: payload.staff_id,
+      leave_type: payload.leave_type,
+      start_date: payload.start_date,
+      end_date: payload.end_date,
+      reason: payload.reason,
+      status: payload.status,
+      approved_at: payload.approved_at,
+      company_id: params.companyId ?? null,
+      created_at: new Date().toISOString(),
+    };
+    await db.insert(leaveRequestsTable).values(insertValues);
+    return newId;
+  }
+
+  // ── Supabase 경로 (dual-write 모드 유지) ─────────────────────────────────
   const optionalColumnNames = payload.optionalEntries.map(([columnName]) => columnName);
 
   const { data: existing, error: existingError } = await client
@@ -251,6 +339,40 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
 }
 
 export async function syncAnnualLeaveUsedForStaff(staffId: string, client: SupabaseClient = supabase) {
+  const backend = await resolveDataBackend();
+
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (syncAnnualLeaveUsedForStaff)');
+    const db = getD1Drizzle(d1);
+
+    const rows = await db
+      .select({
+        leave_type: leaveRequestsTable.leave_type,
+        start_date: leaveRequestsTable.start_date,
+        end_date: leaveRequestsTable.end_date,
+        status: leaveRequestsTable.status,
+      })
+      .from(leaveRequestsTable)
+      .where(eq(leaveRequestsTable.staff_id, staffId));
+
+    const approvedAnnualLeaveDays = rows.reduce((sum, row) => {
+      if (!isApprovedLeaveStatus(row?.status)) return sum;
+      const unit = getLeaveUnit(row?.leave_type);
+      if (unit === 0.5) return sum + 0.5;
+      if (!isAnnualLeaveType(row?.leave_type)) return sum;
+      return sum + calculateLeaveDays(row?.start_date, row?.end_date);
+    }, 0);
+
+    await db
+      .update(staffMembersTable)
+      .set({ annual_leave_used: approvedAnnualLeaveDays })
+      .where(eq(staffMembersTable.id, staffId));
+
+    return approvedAnnualLeaveDays;
+  }
+
+  // ── Supabase 경로 (dual-write 모드 유지) ─────────────────────────────────
   const { data, error } = await client
     .from('leave_requests')
     .select('leave_type, start_date, end_date, status')
