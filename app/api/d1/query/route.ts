@@ -36,6 +36,7 @@ import {
   assertFilterTreeValid,
   type FilterNode,
 } from '@/lib/d1-compat/filter';
+import { JSON_COLUMNS } from '@/lib/db/json-columns';
 
 export const dynamic = 'force-dynamic';
 
@@ -188,6 +189,42 @@ function buildOrFilterParts(orFilters: FilterNode[] | undefined): SQL[] {
   });
 }
 
+// ─────────────────────────────────────────────────────────────
+// JSON 역직렬화 헬퍼 (수정 1)
+// D1(SQLite)은 jsonb/배열 컬럼을 TEXT로 반환하므로, 클라이언트에
+// 돌려주기 직전 JSON_COLUMNS 맵에 등록된 컬럼을 JSON.parse 한다.
+// parse 실패 시 원본 문자열 유지 (graceful — JM3).
+// ─────────────────────────────────────────────────────────────
+function deserializeRow(
+  table: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const jsonCols = JSON_COLUMNS[table];
+  if (!jsonCols || jsonCols.length === 0) return row;
+  const result: Record<string, unknown> = { ...row };
+  for (const col of jsonCols) {
+    const val = result[col];
+    if (typeof val === 'string') {
+      try {
+        result[col] = JSON.parse(val);
+      } catch {
+        // parse 실패 → 원본 문자열 유지
+      }
+    }
+    // null / 이미 객체/배열 → 그대로
+  }
+  return result;
+}
+
+function deserializeRows(
+  table: string,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const jsonCols = JSON_COLUMNS[table];
+  if (!jsonCols || jsonCols.length === 0) return rows;
+  return rows.map((row) => deserializeRow(table, row));
+}
+
 function buildSelectSql(payload: Payload): SQL {
   const tableSql = sql.identifier(payload.table);
   const colsSql = payload.columns && payload.columns.length > 0
@@ -278,17 +315,19 @@ export async function POST(request: Request) {
     const result = await db.run(buildSelectSql(payload));
     const rawRows = ((result as { results?: unknown[] }).results ?? []) as Array<Record<string, unknown>>;
     const filtered = await filterByPolicy(db, claims, payload.table, rawRows);
+    // jsonb/배열 컬럼을 TEXT → 객체/배열로 역직렬화 (수정 1)
+    const deserialized = deserializeRows(payload.table, filtered);
 
     if (payload.single) {
-      if (filtered.length === 0) {
+      if (deserialized.length === 0) {
         return NextResponse.json({ ok: false, error: 'Not found' }, { status: 404 });
       }
-      return NextResponse.json({ ok: true, data: filtered[0] });
+      return NextResponse.json({ ok: true, data: deserialized[0] });
     }
     if (payload.maybeSingle) {
-      return NextResponse.json({ ok: true, data: filtered[0] ?? null });
+      return NextResponse.json({ ok: true, data: deserialized[0] ?? null });
     }
-    return NextResponse.json({ ok: true, data: filtered });
+    return NextResponse.json({ ok: true, data: deserialized });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

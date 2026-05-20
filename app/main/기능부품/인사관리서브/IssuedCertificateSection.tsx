@@ -98,7 +98,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName }
       try {
         const certQuery = supabase
           .from('certificate_issuances')
-          .select('*, staff_members!certificate_issuances_staff_id_fkey(name, company)')
+          .select('*')
           .order('issued_at', { ascending: false })
           .limit(200);
 
@@ -118,7 +118,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName }
           console.error('발급 증명서 조회 실패:', certRes.error);
         }
 
-        const certs = (certRes.data || []) as IssuedRow[];
+        const rawCerts = (certRes.data || []) as (IssuedCertificate & { staff_id?: string | null })[];
         const staffList = (staffRes.data || []) as StaffRow[];
         const sealRows = sealRes.data || [];
 
@@ -126,6 +126,18 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName }
         for (const s of staffList) {
           if (s.id) newStaffMap[s.id] = s;
         }
+
+        // staff_members embed 대신 JS에서 staff_id → staffMap 으로 병합
+        const certs: IssuedRow[] = rawCerts.map((cert) => {
+          const staffId = String(cert.staff_id || '');
+          const matched = newStaffMap[staffId];
+          return {
+            ...cert,
+            staff_members: matched
+              ? { name: matched.name ?? null, company: matched.company ?? null }
+              : null,
+          };
+        });
 
         const newSealMap: Record<string, string> = {};
         for (const row of sealRows) {

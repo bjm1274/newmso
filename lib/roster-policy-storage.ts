@@ -118,7 +118,41 @@ export async function upsertRosterPolicyStorageRecord(record: RosterPolicyStorag
     updated_at: updatedAt,
   };
 
-  // D1 직접 upsert — (policy_type, policy_id) unique index 충돌 시 update.
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  if (typeof window !== 'undefined') {
+    try {
+      const { error } = await supabase
+        .from('roster_policy_settings')
+        .upsert(
+          {
+            policy_type: payload.policy_type,
+            policy_id: payload.policy_id,
+            company_id: payload.company_id,
+            company_name: payload.company_name,
+            name: payload.name,
+            payload: payload.payload,
+            created_by: payload.created_by,
+            updated_by: payload.updated_by,
+            updated_at: payload.updated_at,
+          },
+          { onConflict: 'policy_type,policy_id' },
+        );
+      if (error) {
+        if (isMissingRosterPolicyStorageError(error)) {
+          return { storageAvailable: false as const };
+        }
+        throw error;
+      }
+      return { storageAvailable: true as const };
+    } catch (err) {
+      if (isMissingRosterPolicyStorageError(err)) {
+        return { storageAvailable: false as const };
+      }
+      throw err;
+    }
+  }
+
+  // 서버: D1 직접 upsert — (policy_type, policy_id) unique index 충돌 시 update.
   // payload는 jsonb → JSON.stringify, id는 INTEGER PK rowid 자동 할당.
   const d1 = await getD1Binding();
   if (!d1) {

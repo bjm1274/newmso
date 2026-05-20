@@ -170,6 +170,24 @@ async function runPayrollRecordUpsert(
   optionalColumns: readonly string[],
   cacheKey?: string,
 ): Promise<SupabaseMutationResult> {
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  if (typeof window !== 'undefined') {
+    const { supabase: sb } = await import('@/lib/supabase');
+    const records = Array.isArray(payload) ? payload : [payload];
+    if (records.length === 0) return { data: [], error: null };
+    try {
+      const { data, error } = await sb
+        .from('payroll_records')
+        .upsert(records as Record<string, unknown>[], {
+          onConflict: conflictTarget,
+          ignoreDuplicates: false,
+        });
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: err };
+    }
+  }
+
   return withMissingColumnsFallback(
     async (omittedColumns) => {
       if (

@@ -54,12 +54,35 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     const end = `${month}-${new Date(y, m, 0).getDate()}`;
     const { data, error } = await supabase
       .from('corporate_card_transactions')
-      .select('*, corporate_cards!card_id(card_nickname, last_four, company_name)')
+      .select('*')
       .gte('transaction_date', start)
       .lte('transaction_date', end)
       .order('transaction_date', { ascending: false });
-    let rows: Record<string, unknown>[] = error ? [] : (data || []).map((row: any) => ({
+
+    const rawRows = error ? [] : (data || []) as Array<Record<string, unknown>>;
+
+    // card_id 목록 수집 → corporate_cards 한 번에 조회
+    const cardIds = Array.from(
+      new Set(rawRows.map((r) => String(r.card_id || '')).filter(Boolean)),
+    );
+    let cardLookup: Map<string, { card_nickname: string | null; last_four: string | null; company_name: string | null }> = new Map();
+    if (cardIds.length > 0) {
+      const { data: cardData } = await supabase
+        .from('corporate_cards')
+        .select('id, card_nickname, last_four, company_name')
+        .in('id', cardIds);
+      for (const c of cardData || []) {
+        cardLookup.set(String(c.id), {
+          card_nickname: c.card_nickname ?? null,
+          last_four: c.last_four ?? null,
+          company_name: c.company_name ?? null,
+        });
+      }
+    }
+
+    let rows: Record<string, unknown>[] = rawRows.map((row) => ({
       ...row,
+      corporate_cards: cardLookup.get(String(row.card_id || '')) ?? null,
       staff_members: staffById.get(String(row.staff_id || row.holder_id || '')),
     }));
     if (selectedCo !== '전체') rows = rows.filter((r: Record<string, unknown>) => (r.company_name || (r.corporate_cards as Record<string, unknown>)?.company_name) === selectedCo);

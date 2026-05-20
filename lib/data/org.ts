@@ -114,6 +114,22 @@ async function requireOrgD1() {
  */
 export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error: Error | null }> {
   try {
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      const { error } = await sb.from('org_teams').insert({
+        id: crypto.randomUUID(),
+        company_name: input.company_name,
+        division: input.division,
+        team_name: input.team_name,
+        sort_order: input.sort_order,
+        created_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      invalidateOrgTeams(input.company_name);
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
     const db = await requireOrgD1();
     await db.insert(orgTeamsTable).values({
       id: crypto.randomUUID(),
@@ -136,6 +152,15 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
  */
 export async function deleteOrgTeam(id: string, company?: string): Promise<{ error: Error | null }> {
   try {
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      const { error } = await sb.from('org_teams').delete().eq('id', id);
+      if (error) throw error;
+      invalidateOrgTeams(company);
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
     const db = await requireOrgD1();
     await db.delete(orgTeamsTable).where(eq(orgTeamsTable.id, id));
     invalidateOrgTeams(company);

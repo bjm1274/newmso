@@ -22,7 +22,12 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { BACKFILL_TABLES } from './tables.mjs';
+import { TABLE_DEFS as FULL_TABLE_DEFS } from './tables-full.mjs';
 import { rowToValueTuple, buildInsertChunk } from './normalize.mjs';
+
+// tables.mjs(24개)와 tables-full.mjs(125개)를 합쳐 사용.
+// 동일 키는 tables-full.mjs가 우선(더 최신 정의).
+const ALL_TABLES = { ...BACKFILL_TABLES, ...FULL_TABLE_DEFS };
 
 const DEFAULT_PAGE_SIZE = 1000;
 const DEFAULT_CHUNK = 200;
@@ -68,10 +73,12 @@ function parseArgs(argv) {
 async function* paginate(supabase, def, pageSize = DEFAULT_PAGE_SIZE) {
   let offset = 0;
   while (true) {
+    // 정렬 키는 반드시 유일 키(PK) — 비유일 컬럼 정렬은 페이지 경계에서
+    // 행 누락/중복을 일으킨다.
     const { data, error } = await supabase
       .from(def.name)
       .select(def.select)
-      .order(def.orderBy, { ascending: true })
+      .order(def.pk ?? 'id', { ascending: true })
       .range(offset, offset + pageSize - 1);
     if (error) throw error;
     if (!data || data.length === 0) return;
@@ -96,9 +103,9 @@ async function main() {
     console.error('error: --table is required');
     process.exit(1);
   }
-  const def = BACKFILL_TABLES[args.table];
+  const def = ALL_TABLES[args.table];
   if (!def) {
-    console.error(`error: unknown table '${args.table}'. supported: ${Object.keys(BACKFILL_TABLES).join(', ')}`);
+    console.error(`error: unknown table '${args.table}'. supported: ${Object.keys(ALL_TABLES).join(', ')}`);
     process.exit(1);
   }
 

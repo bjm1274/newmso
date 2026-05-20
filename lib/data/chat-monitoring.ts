@@ -77,6 +77,19 @@ export async function deleteChatMessage(
   roomId?: string,
 ): Promise<{ error: Error | null }> {
   try {
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      const { error } = await sb.from('messages').delete().eq('id', id);
+      if (error) throw error;
+      if (roomId) {
+        invalidateCache(`chat:messages:by-room:${roomId}`);
+      } else {
+        invalidateCache(/^chat:messages:by-room:/);
+      }
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
     const d1 = await getD1Binding();
     if (!d1) {
       throw new Error('[chat-monitoring] D1 binding not available');

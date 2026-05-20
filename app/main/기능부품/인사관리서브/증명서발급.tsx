@@ -95,18 +95,41 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     if (!showHistory) return;
 
     const loadHistory = async () => {
-      const { data } = await supabase
+      const { data: certData } = await supabase
         .from('certificate_issuances')
-        .select('*, staff_members!certificate_issuances_staff_id_fkey(name, company)')
+        .select('*')
         .order('issued_at', { ascending: false })
         .limit(50);
 
-      const list = (data || []).filter((row: any) => {
+      const rawRows = (certData || []) as Array<Record<string, unknown>>;
+
+      // staff_id 목록 수집 → staff_members 한 번에 조회
+      const staffIds = Array.from(
+        new Set(rawRows.map((r) => String(r.staff_id || '')).filter(Boolean)),
+      );
+      let staffLookup: Map<string, { name: string | null; company: string | null }> = new Map();
+      if (staffIds.length > 0) {
+        const { data: staffData } = await supabase
+          .from('staff_members')
+          .select('id, name, company')
+          .in('id', staffIds);
+        for (const s of staffData || []) {
+          staffLookup.set(String(s.id), { name: s.name ?? null, company: s.company ?? null });
+        }
+      }
+
+      // JS에서 staff_members 병합
+      const merged = rawRows.map((row) => ({
+        ...row,
+        staff_members: staffLookup.get(String(row.staff_id || '')) ?? null,
+      }));
+
+      const filtered = merged.filter((row) => {
         if (selectedCo === '전체') return true;
         return row.staff_members?.company === selectedCo;
       });
 
-      setHistoryList(list);
+      setHistoryList(filtered);
     };
 
     loadHistory().catch((error) => {

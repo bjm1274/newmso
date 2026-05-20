@@ -142,7 +142,22 @@ export async function saveLeavePolicySettings(selectedCompany: string, settings:
     updated_at: new Date().toISOString(),
   };
 
-  // D1 직접 upsert — system_settings.key PK 충돌 시 value/updated_at 갱신
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  if (typeof window !== 'undefined') {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert(
+        { key: payload.key, value: payload.value, updated_at: payload.updated_at },
+        { onConflict: 'key' },
+      );
+    if (error) {
+      throw new Error(`[leave-policy-settings] saveLeavePolicySettings (client): ${error.message}`);
+    }
+    writeLocalFallbackStore(nextStore);
+    return nextStore;
+  }
+
+  // 서버: D1 직접 upsert — system_settings.key PK 충돌 시 value/updated_at 갱신
   const d1 = await getD1Binding();
   if (!d1) {
     throw new Error('[leave-policy-settings] D1 binding not available');

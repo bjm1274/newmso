@@ -27,6 +27,7 @@ import {
   POLICY_REGISTRY,
 } from '@/lib/db';
 import type { ErpClaims } from '@/lib/db/auth/claims';
+import { JSON_COLUMNS } from '@/lib/db/json-columns';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,6 +137,60 @@ function whereToRowProxy(where: { field: string; op: string; value: unknown }[])
   return proxy;
 }
 
+// ─────────────────────────────────────────────────────────────
+// JSON 직렬화/역직렬화 헬퍼 (수정 2)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * INSERT values / UPDATE set 에서 객체·배열 값을 JSON.stringify 로 변환.
+ * D1(SQLite)은 객체/배열을 bound value로 처리하지 못하므로 TEXT로 직렬화.
+ * null / 원시값(string, number, boolean)은 그대로 통과.
+ */
+function serializeRecord(row: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (v !== null && typeof v === 'object') {
+      result[k] = JSON.stringify(v);
+    } else {
+      result[k] = v;
+    }
+  }
+  return result;
+}
+
+/**
+ * RETURNING 결과 행의 JSON 컬럼을 TEXT → 객체/배열로 역직렬화.
+ * parse 실패 시 원본 문자열 유지 (graceful — JM3).
+ */
+function deserializeRow(
+  table: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const jsonCols = JSON_COLUMNS[table];
+  if (!jsonCols || jsonCols.length === 0) return row;
+  const result: Record<string, unknown> = { ...row };
+  for (const col of jsonCols) {
+    const val = result[col];
+    if (typeof val === 'string') {
+      try {
+        result[col] = JSON.parse(val);
+      } catch {
+        // parse 실패 → 원본 문자열 유지
+      }
+    }
+  }
+  return result;
+}
+
+function deserializeRows(
+  table: string,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const jsonCols = JSON_COLUMNS[table];
+  if (!jsonCols || jsonCols.length === 0) return rows;
+  return rows.map((row) => deserializeRow(table, row));
+}
+
 function buildReturningSql(returning: string[] | undefined): SQL {
   if (!returning || returning.length === 0) return sql.raw('');
   if (returning.includes('*')) return sql` RETURNING *`;
@@ -175,16 +230,18 @@ export async function POST(request: Request) {
       for (const row of payload.values) {
         await assertAccess({ db, claims, table: payload.table, op: 'insert', row });
       }
+      // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
+      const serializedValues = payload.values.map(serializeRecord);
       const tableSql = sql.identifier(payload.table);
       const allCols = Array.from(
-        payload.values.reduce<Set<string>>((acc, row) => {
+        serializedValues.reduce<Set<string>>((acc, row) => {
           Object.keys(row).forEach((k) => acc.add(k));
           return acc;
         }, new Set()),
       );
       const colsSql = sql.join(allCols.map((c) => sql.identifier(c)), sql`, `);
       const valuesSql = sql.join(
-        payload.values.map((row) =>
+        serializedValues.map((row) =>
           sql`(${sql.join(allCols.map((c) => sql`${row[c] ?? null}`), sql`, `)})`,
         ),
         sql`, `,
@@ -221,20 +278,23 @@ export async function POST(request: Request) {
 
       const result = await db.run(stmt);
       const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-      return NextResponse.json({ ok: true, data: rows });
+      // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
+      return NextResponse.json({ ok: true, data: deserializeRows(payload.table, rows) });
     }
 
     if (payload.op === 'update') {
       // where 조건의 eq 필드로 row proxy 만들고 정책 검사
       const row = { ...whereToRowProxy(payload.where), ...payload.set };
       await assertAccess({ db, claims, table: payload.table, op: 'update', row });
+      // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
+      const serializedSet = serializeRecord(payload.set);
       const tableSql = sql.identifier(payload.table);
-      const setKeys = Object.keys(payload.set).filter((k) => COLUMN_RE.test(k));
+      const setKeys = Object.keys(serializedSet).filter((k) => COLUMN_RE.test(k));
       if (setKeys.length === 0) {
         return NextResponse.json({ ok: false, error: 'Empty set' }, { status: 400 });
       }
       const setSql = sql.join(
-        setKeys.map((k) => sql`${sql.identifier(k)} = ${payload.set[k] ?? null}`),
+        setKeys.map((k) => sql`${sql.identifier(k)} = ${serializedSet[k] ?? null}`),
         sql`, `,
       );
       const whereParts = buildWhereSql(payload.where);
@@ -243,7 +303,8 @@ export async function POST(request: Request) {
       if (payload.returning && payload.returning.length > 0) {
         const result = await db.run(stmt);
         const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-        return NextResponse.json({ ok: true, data: rows });
+        // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
+        return NextResponse.json({ ok: true, data: deserializeRows(payload.table, rows) });
       }
       await db.run(stmt);
       return NextResponse.json({ ok: true });

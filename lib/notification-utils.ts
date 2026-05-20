@@ -163,6 +163,44 @@ export async function sendAdminNotifications(
 ): Promise<number> {
   if (alerts.length === 0) return 0;
 
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  if (typeof window !== 'undefined') {
+    const { supabase } = await import('./supabase');
+    const { data: adminUsers, error: adminError } = await supabase
+      .from('staff_members')
+      .select('id')
+      .in('department', ['행정팀', '총무팀', '원무팀', '행정부']);
+
+    if (adminError) {
+      console.warn('[notifications] sendAdminNotifications admin lookup (client):', adminError.message);
+      return 0;
+    }
+    if (!adminUsers?.length) return 0;
+
+    const rows = adminUsers.flatMap((admin: { id: string }) =>
+      alerts.map((alert) => ({
+        id: crypto.randomUUID(),
+        user_id: admin.id,
+        type: alert.type,
+        title: alert.title,
+        body: alert.body,
+        metadata: alert.dedupeKey
+          ? { ...(alert.metadata ?? {}), dedupe_key: alert.dedupeKey }
+          : (alert.metadata ?? null),
+        read_at: null,
+        created_at: new Date().toISOString(),
+      })),
+    );
+
+    if (rows.length > 0) {
+      const { error } = await supabase.from('notifications').insert(rows);
+      if (error) {
+        console.warn('[notifications] sendAdminNotifications insert (client):', error.message);
+      }
+    }
+    return rows.length;
+  }
+
   const db = await requireD1ForNotifications('sendAdminNotifications:lookup');
 
   const adminUsers = await db
@@ -408,7 +446,21 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
     created_at: new Date().toISOString(),
   };
 
-  // D1 직접 upsert (id PK 충돌 시 무시 — race condition 가드)
+  // 클라이언트(브라우저)는 D1 binding에 접근 불가 → compat supabase 경유
+  // (ENABLE_D1_CLIENT=true면 /api/d1/mutate, 아니면 realSupabase). 알림 실패가
+  // 본 기능을 막지 않도록 graceful 처리.
+  if (typeof window !== 'undefined') {
+    const { supabase } = await import('./supabase');
+    const { error } = await supabase
+      .from('notifications')
+      .upsert(row, { onConflict: 'id', ignoreDuplicates: true });
+    if (error && !/UNIQUE|duplicate/i.test(error.message ?? '')) {
+      console.warn('[notifications] upsertNotificationWithDedupe (client):', error.message);
+    }
+    return { id };
+  }
+
+  // 서버: D1 binding 직접 upsert (id PK 충돌 시 무시 — race condition 가드)
   const db = await requireD1ForNotifications('upsertNotificationWithDedupe');
   const value = normalizeForD1(row as NotificationRow);
 

@@ -116,6 +116,17 @@ export async function updateOfficialDoc(
       invalidateOfficialDocs();
       return { error: null };
     }
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      // is_received는 supabase에서 boolean, D1에서 0|1 — 클라이언트는 boolean 그대로 전달
+      const clientPayload: Record<string, unknown> = { ...payload };
+      const { error } = await sb.from('official_doc_log').update(clientPayload).eq('id', id);
+      if (error) throw error;
+      invalidateOfficialDocs();
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
     const db = await requireOfficialDocsD1();
     await db.update(officialDocLogTable).set(set).where(eq(officialDocLogTable.id, id));
     invalidateOfficialDocs();
@@ -128,6 +139,15 @@ export async function updateOfficialDoc(
 
 export async function deleteOfficialDoc(id: number): Promise<{ error: Error | null }> {
   try {
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      const { error } = await sb.from('official_doc_log').delete().eq('id', id);
+      if (error) throw error;
+      invalidateOfficialDocs();
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
     const db = await requireOfficialDocsD1();
     await db.delete(officialDocLogTable).where(eq(officialDocLogTable.id, id));
     invalidateOfficialDocs();

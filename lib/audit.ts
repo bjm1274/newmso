@@ -152,7 +152,25 @@ export async function logAudit(
 ) {
   const createdAt = new Date().toISOString();
   try {
-    // D1 직접 INSERT — details(jsonb) → text(JSON.stringify) 변환
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase } = await import('./supabase');
+      const { error } = await supabase.from('audit_logs').insert({
+        id: crypto.randomUUID(),
+        user_id: userId || null,
+        user_name: userName || null,
+        action,
+        target_type: targetType,
+        target_id: targetId,
+        details,
+        created_at: createdAt,
+      });
+      if (error) {
+        console.warn('[audit_logs] logAudit (client):', error.message);
+      }
+      return;
+    }
+    // 서버: D1 binding 직접 INSERT — details(jsonb) → text(JSON.stringify) 변환
     const db = await requireD1ForAuditLogs('logAudit');
     await db.insert(auditLogsTable).values({
       id: crypto.randomUUID(),

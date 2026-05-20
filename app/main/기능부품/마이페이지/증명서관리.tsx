@@ -128,7 +128,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             .order('created_at', { ascending: false }),
           supabase
             .from('certificate_issuances')
-            .select('*, staff_members!certificate_issuances_staff_id_fkey(name)')
+            .select('*')
             .eq('staff_id', effectiveUserId)
             .gte('issued_at', certificateCutoffIso)
             .order('issued_at', { ascending: false })

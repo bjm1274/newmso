@@ -96,8 +96,45 @@ Postgres → SQLite 자료형 매핑:
 - `null` → SQL `NULL`
 - D1에 존재하지 않는 컬럼(예: payroll_records.company_id) → 자동 제외
 
+## 전체 125개 테이블 백필 (run.mjs)
+
+`run.mjs`로 125개 활성 테이블 전체를 FK 순서대로 한 번에 백필할 수 있다.
+테이블 정의는 `tables-full.mjs`에 있다.
+
+```bash
+# 1. DRY RUN — SQL 파일만 생성 (기본값, 안전)
+node scripts/backfill-d1/run.mjs --dry-run
+
+# 2. 특정 테이블만 dry-run
+node scripts/backfill-d1/run.mjs --dry-run --only=companies,staff_members
+
+# 3. D1 로컬에 적용 (검증용)
+node scripts/backfill-d1/run.mjs --local
+
+# 4. D1 production에 적용 (컷오버 직전 감독 하에 실행)
+node scripts/backfill-d1/run.mjs --remote
+
+# 5. 중단 후 재개 (완료된 테이블 건너뜀)
+node scripts/backfill-d1/run.mjs --local --resume
+
+# 6. 출력 디렉터리 지정
+node scripts/backfill-d1/run.mjs --dry-run --output=./tmp/my-backfill
+```
+
+진행 상태는 `scripts/backfill-d1/.backfill-progress.json`에 저장된다.
+
+### 파일 구조
+
+| 파일 | 역할 |
+|---|---|
+| `tables.mjs` | 기존 24개 테이블 정의 (하위 호환) |
+| `tables-full.mjs` | 125개 전체 테이블 정의 + FK 순서 |
+| `dump.mjs` | 단일 테이블 SQL 생성 (125개 지원) |
+| `normalize.mjs` | Supabase→SQLite 변환 함수 |
+| `run.mjs` | 전체 오케스트레이터 |
+| `run-helpers.mjs` | run.mjs 헬퍼 유틸리티 |
+
 ## 향후 작업
 
-- `run.mjs` orchestrator (모든 테이블 순차 backfill + 진행률 출력)
 - 검증 스크립트 (Supabase row count vs D1 row count 비교)
 - `wrangler d1 export` 방식과의 비교 (D1 단방향 export는 schema만 가능)

@@ -106,4 +106,5 @@ supabase/.temp/
 __pycache__/
 *.pyc
 scripts/**/산출물/
+scripts/backfill-d1/.backfill-progress.json
 .open-next-yesterday-46bdac3f/

@@ -488,10 +488,28 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'tasks',
   'report_schedules',
 
-  // ── Phase 9 준비 (2026-05-20) — 클라이언트가 supabase.from()으로 호출하나
-  //    아직 D1 스키마에 CREATE TABLE이 없는 테이블. 여기 등록하면 whitelist는
-  //    통과하지만, 실제 컷오버 전 D1 스키마 마이그레이션 추가가 선행되어야
-  //    쿼리가 동작함(미선행 시 'no such table'). 레지스트리 등록만 선행 정비.
+  // ── 2026-05-20 컷오버 회귀 수정 — 누락 발견분 (7개)
+  //    클라이언트 코드가 supabase.from()으로 호출하나 POLICY_REGISTRY·
+  //    ADDITIONAL_PUBLIC_TABLES 어디에도 없어 403이 발생하던 테이블.
+  'annual_leave_promotion_logs', // 연차 이월/프로모션 로그
+  'attendance_corrections',      // 출퇴근 정정 요청
+  'audit_logs',                  // 관리자 감사 로그
+  'backup_restore_runs',         // 백업·복원 실행 기록
+  'certificate_issuances',       // 증명서 발급 이력
+  'org_teams',                   // 조직 팀 정보
+  'staff_transfer_history',      // 직원 이동·부서이동 이력
+
+  // ── 2026-05-20 재점검 — 전수 audit(.from 호출 vs 등록)로 발견한 누락 실테이블
+  'access_logs',             // 접근 감사 로그
+  'inventory_price_history', // 재고 가격 이력
+  'official_doc_log',        // 공문서 발송 로그
+  'system_settings',         // 시스템 설정(전자결재 양식 등) — key-value
+
+  // ── 2026-05-20 확인 — 아래 16개는 클라이언트 코드가 supabase.from()으로
+  //    호출하지만 Supabase에 테이블이 실제로 존재하지 않음(probe 결과 PGRST205
+  //    + information_schema 부재). 즉 현재도 동작하지 않는 미완성/사장된 기능
+  //    참조이며 D1 이관 대상이 아님. whitelist 등록 자체는 무해하고, 향후 해당
+  //    기능을 살릴 때 테이블 생성과 함께 정책을 재정비해야 함.
   'org_chart_nodes',
   'as_repair_records',
   'return_records',

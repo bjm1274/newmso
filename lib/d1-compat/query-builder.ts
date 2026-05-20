@@ -152,6 +152,15 @@ export class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     return this as QueryBuilder<T>;
   }
 
+  /** supabase의 .returns<T>() — 런타임 no-op, 반환 타입만 재지정. */
+  returns<U = T>(): QueryBuilder<U> {
+    return this as unknown as QueryBuilder<U>;
+  }
+  /** supabase의 .overrideTypes<T>() — 런타임 no-op. */
+  overrideTypes<U = T>(): QueryBuilder<U> {
+    return this as unknown as QueryBuilder<U>;
+  }
+
   then<TResult1 = QueryResult<T>, TResult2 = never>(
     onfulfilled?: ((value: QueryResult<T>) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
