@@ -4,6 +4,16 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
+import {
+  approvals as approvalsTable,
+  staff_members as staffMembersTable,
+  roster_approval_requests as rosterApprovalRequestsTable,
+  push_subscriptions as pushSubscriptionsTable,
+  inArray,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from '@/lib/db';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
 const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
@@ -235,17 +245,46 @@ async function dispatchImmediateApprovalPush(
     return { pushTargetCount: 0, pushSentCount: 0 };
   }
 
-  const { data: subscriptionRows, error: subscriptionError } = await supabase
-    .from('push_subscriptions')
-    .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
-    .in('staff_id', targetUserIds);
+  let subscriptions: PushSubscriptionRow[] = [];
+  const pushBackend = await resolveDataBackend();
+  if (pushBackend === 'd1') {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: pushSubscriptionsTable.id,
+          staff_id: pushSubscriptionsTable.staff_id,
+          endpoint: pushSubscriptionsTable.endpoint,
+          p256dh: pushSubscriptionsTable.p256dh,
+          auth: pushSubscriptionsTable.auth,
+          fcm_token: pushSubscriptionsTable.fcm_token,
+          created_at: pushSubscriptionsTable.created_at,
+        })
+        .from(pushSubscriptionsTable)
+        .where(inArray(pushSubscriptionsTable.staff_id, targetUserIds));
+      subscriptions = rows.map((r) => ({
+        id: String(r.id ?? ''),
+        staff_id: r.staff_id ?? null,
+        endpoint: r.endpoint ?? null,
+        p256dh: r.p256dh ?? null,
+        auth: r.auth ?? null,
+        fcm_token: r.fcm_token ?? null,
+        created_at: r.created_at ?? null,
+      }));
+    }
+  } else {
+    const { data: subscriptionRows, error: subscriptionError } = await supabase
+      .from('push_subscriptions')
+      .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
+      .in('staff_id', targetUserIds);
 
-  if (subscriptionError) {
-    console.error('roster approval push subscription lookup failed:', subscriptionError);
-    return { pushTargetCount: targetUserIds.length, pushSentCount: 0 };
+    if (subscriptionError) {
+      console.error('roster approval push subscription lookup failed:', subscriptionError);
+      return { pushTargetCount: targetUserIds.length, pushSentCount: 0 };
+    }
+    subscriptions = (subscriptionRows || []) as PushSubscriptionRow[];
   }
-
-  const subscriptions = (subscriptionRows || []) as PushSubscriptionRow[];
   const sampleNotification = notificationRows[0];
   const payload = buildImmediatePushPayload(sampleNotification);
   let pushSentCount = 0;
@@ -336,6 +375,39 @@ async function insertLegacyApprovalRequest(params: {
 }) {
   const { supabase, companyName, teamName, yearMonth, assignments, requestedBy, requestedByName, approverIds } = params;
 
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[roster/approval-request] D1 binding not available (insertLegacyApprovalRequest)');
+    const db = getD1Drizzle(d1);
+    const newId = crypto.randomUUID();
+    const metaDataObj = {
+      type: 'approval',
+      approval_view: 'roster_schedule',
+      approval_source: 'approvals',
+      roster_request_type: 'monthly_schedule',
+      company_name: companyName || null,
+      team_name: teamName,
+      year_month: yearMonth,
+      assignments,
+      approver_line: approverIds,
+    };
+    await db.insert(approvalsTable).values({
+      id: newId,
+      sender_id: requestedBy,
+      sender_name: requestedByName,
+      sender_company: companyName || null,
+      current_approver_id: approverIds[0] || null,
+      type: ROSTER_APPROVAL_TYPE,
+      title: `${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD`,
+      content: `${requestedByName}\uB2D8\uC758 ${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD\uC785\uB2C8\uB2E4.`,
+      status: LEGACY_APPROVAL_PENDING_STATUS,
+      meta_data: JSON.stringify(metaDataObj),
+      created_at: new Date().toISOString(),
+    });
+    return newId;
+  }
+
   const { data, error } = await supabase
     .from('approvals')
     .insert({
@@ -408,23 +480,60 @@ export async function POST(request: Request) {
     const requestedByName = String(session.user.name || '').trim() || '\uC774\uB984 \uC5C6\uC74C';
     const now = new Date().toISOString();
 
-    const approverFilter = [
-      `position.eq.${ROSTER_APPROVER_POSITIONS[0]}`,
-      `position.eq.${ROSTER_APPROVER_POSITIONS[1]}`,
-      'role.eq.admin',
-      'role.eq.master',
-    ].join(',');
+    const rosterBackend = await resolveDataBackend();
 
-    const { data: staffRows, error: staffError } = await supabase
-      .from('staff_members')
-      .select('id, name, position, company, role')
-      .or(approverFilter);
+    // staff_members \uC870\uD68C \u2014 D1 \uBD84\uAE30
+    let staffRows: ApproverRow[] = [];
+    if (rosterBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        return NextResponse.json({ error: 'D1 binding not available' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
+      const { or: drizzleOr, inArray: drizzleInArray, eq: drizzleEq } = await import('drizzle-orm');
+      const rows = await db
+        .select({
+          id: staffMembersTable.id,
+          name: staffMembersTable.name,
+          position: staffMembersTable.position,
+          company: staffMembersTable.company,
+          role: staffMembersTable.role,
+        })
+        .from(staffMembersTable)
+        .where(
+          drizzleOr(
+            drizzleInArray(staffMembersTable.position, ROSTER_APPROVER_POSITIONS),
+            drizzleEq(staffMembersTable.role, 'admin'),
+            drizzleEq(staffMembersTable.role, 'master'),
+          )
+        );
+      staffRows = rows.map((r) => ({
+        id: r.id ?? null,
+        name: r.name ?? null,
+        position: r.position ?? null,
+        company: r.company ?? null,
+        role: r.role ?? null,
+      }));
+    } else {
+      const approverFilter = [
+        `position.eq.${ROSTER_APPROVER_POSITIONS[0]}`,
+        `position.eq.${ROSTER_APPROVER_POSITIONS[1]}`,
+        'role.eq.admin',
+        'role.eq.master',
+      ].join(',');
 
-    if (staffError) {
-      return NextResponse.json({ error: staffError.message }, { status: 500 });
+      const { data: supaStaffRows, error: staffError } = await supabase
+        .from('staff_members')
+        .select('id, name, position, company, role')
+        .or(approverFilter);
+
+      if (staffError) {
+        return NextResponse.json({ error: staffError.message }, { status: 500 });
+      }
+      staffRows = (supaStaffRows || []) as ApproverRow[];
     }
 
-    const approvers = resolveApprovers((staffRows || []) as ApproverRow[], requestedBy, companyName);
+    const approvers = resolveApprovers(staffRows, requestedBy, companyName);
     const approverIds = approvers
       .map((approver) => String(approver.id || '').trim())
       .filter(Boolean);
@@ -439,48 +548,95 @@ export async function POST(request: Request) {
     let requestId = '';
     let storage: 'roster_approval_requests' | 'approvals' = 'roster_approval_requests';
 
-    const { data: insertedRequest, error: insertError } = await supabase
-      .from('roster_approval_requests')
-      .insert({
-        company_name: companyName || null,
-        team_name: teamName,
-        year_month: yearMonth,
-        assignments,
-        requested_by: requestedBy,
-        requested_by_name: requestedByName,
-        status: 'pending',
-        created_at: now,
-        updated_at: now,
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      if (!isMissingRelationError(insertError, ['roster_approval_requests'])) {
-        return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (rosterBackend === 'd1') {
+      // D1 \uBAA8\uB4DC: roster_approval_requests \uC9C1\uC811 INSERT
+      const d1 = await getD1Binding();
+      if (!d1) {
+        return NextResponse.json({ error: 'D1 binding not available (roster_approval_requests)' }, { status: 500 });
       }
-
-      storage = 'approvals';
+      const db = getD1Drizzle(d1);
       try {
-        requestId = await insertLegacyApprovalRequest({
-          supabase,
-          companyName,
-          teamName,
-          yearMonth,
-          assignments,
-          requestedBy,
-          requestedByName,
-          approverIds,
+        const newRosterId = crypto.randomUUID();
+        await db.insert(rosterApprovalRequestsTable).values({
+          id: newRosterId,
+          company_name: companyName || null,
+          team_name: teamName,
+          year_month: yearMonth,
+          assignments: JSON.stringify(assignments),
+          requested_by: requestedBy,
+          requested_by_name: requestedByName,
+          status: 'pending',
+          created_at: now,
+          updated_at: now,
         });
-      } catch (legacyInsertError) {
-        const message =
-          legacyInsertError instanceof Error
-            ? legacyInsertError.message
-            : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
-        return NextResponse.json({ error: message }, { status: 500 });
+        requestId = newRosterId;
+      } catch (d1InsertError) {
+        // roster_approval_requests\uAC00 D1\uC5D0 \uC5C6\uC73C\uBA74 approvals\uB85C \uD3F4\uBC31
+        storage = 'approvals';
+        try {
+          requestId = await insertLegacyApprovalRequest({
+            supabase,
+            companyName,
+            teamName,
+            yearMonth,
+            assignments,
+            requestedBy,
+            requestedByName,
+            approverIds,
+          });
+        } catch (legacyInsertError) {
+          const message =
+            legacyInsertError instanceof Error
+              ? legacyInsertError.message
+              : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
+          console.error('D1 roster approval insert fallback failed:', d1InsertError, legacyInsertError);
+          return NextResponse.json({ error: message }, { status: 500 });
+        }
       }
     } else {
-      requestId = String(insertedRequest?.id || '').trim();
+      const { data: insertedRequest, error: insertError } = await supabase
+        .from('roster_approval_requests')
+        .insert({
+          company_name: companyName || null,
+          team_name: teamName,
+          year_month: yearMonth,
+          assignments,
+          requested_by: requestedBy,
+          requested_by_name: requestedByName,
+          status: 'pending',
+          created_at: now,
+          updated_at: now,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        if (!isMissingRelationError(insertError, ['roster_approval_requests'])) {
+          return NextResponse.json({ error: insertError.message }, { status: 500 });
+        }
+
+        storage = 'approvals';
+        try {
+          requestId = await insertLegacyApprovalRequest({
+            supabase,
+            companyName,
+            teamName,
+            yearMonth,
+            assignments,
+            requestedBy,
+            requestedByName,
+            approverIds,
+          });
+        } catch (legacyInsertError) {
+          const message =
+            legacyInsertError instanceof Error
+              ? legacyInsertError.message
+              : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
+          return NextResponse.json({ error: message }, { status: 500 });
+        }
+      } else {
+        requestId = String(insertedRequest?.id || '').trim();
+      }
     }
 
     const notificationRows = buildApprovalNotificationRows({

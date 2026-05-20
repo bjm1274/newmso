@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import {
+  approvals as approvalsTable,
+  eq,
+  getD1Binding,
+  getD1Drizzle,
+  resolveDataBackend,
+} from '@/lib/db';
 
 function createAdminSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,15 +69,68 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminSupabase();
-    const { data: approval, error } = await supabase
-      .from('approvals')
-      .select('id, status, meta_data, current_approver_id, approver_line, doc_number, sender_id, sender_company, title')
-      .eq('id', approvalId)
-      .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    // D1/dual-write 분기: approvals 조회
+    type ApprovalFetchRow = {
+      id: string;
+      status: string | null;
+      meta_data: unknown;
+      current_approver_id: string | null;
+      approver_line: unknown;
+      doc_number: string | null;
+      sender_id: string | null;
+      sender_company: string | null;
+      title: string;
+    };
+
+    const backend = await resolveDataBackend();
+    let approval: ApprovalFetchRow | null = null;
+
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        return NextResponse.json({ ok: false, error: 'D1 binding not available' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({
+          id: approvalsTable.id,
+          status: approvalsTable.status,
+          meta_data: approvalsTable.meta_data,
+          current_approver_id: approvalsTable.current_approver_id,
+          approver_line: approvalsTable.approver_line,
+          doc_number: approvalsTable.doc_number,
+          sender_id: approvalsTable.sender_id,
+          sender_company: approvalsTable.sender_company,
+          title: approvalsTable.title,
+        })
+        .from(approvalsTable)
+        .where(eq(approvalsTable.id, approvalId));
+      const row = rows[0] ?? null;
+      if (row) {
+        // D1 JSON 컬럼 파싱
+        let parsedMetaData: unknown = null;
+        if (typeof row.meta_data === 'string' && row.meta_data.length > 0) {
+          try { parsedMetaData = JSON.parse(row.meta_data); } catch { parsedMetaData = null; }
+        }
+        let parsedApproverLine: unknown = null;
+        if (typeof row.approver_line === 'string' && row.approver_line.length > 0) {
+          try { parsedApproverLine = JSON.parse(row.approver_line); } catch { parsedApproverLine = null; }
+        }
+        approval = { ...row, meta_data: parsedMetaData, approver_line: parsedApproverLine };
+      }
+    } else {
+      const { data: supaApproval, error } = await supabase
+        .from('approvals')
+        .select('id, status, meta_data, current_approver_id, approver_line, doc_number, sender_id, sender_company, title')
+        .eq('id', approvalId)
+        .maybeSingle();
+      if (error) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+      approval = supaApproval as ApprovalFetchRow | null;
     }
+
     if (!approval) {
       return NextResponse.json({ ok: false, error: 'Approval not found' }, { status: 404 });
     }

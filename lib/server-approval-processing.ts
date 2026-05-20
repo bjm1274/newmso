@@ -19,6 +19,9 @@ import {
   attendance_corrections as attendanceCorrectionsTable,
   staff_transfer_history as staffTransferHistoryTable,
   certificate_issuances as certificateIssuancesTable,
+  approvals as approvalsTable,
+  staff_members as staffMembersTable,
+  eq,
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
@@ -143,19 +146,51 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
     inventory_workflow: workflow,
   };
 
-  const { error: metaError } = await supabase
-    .from('approvals')
-    .update({ meta_data: nextMetaData })
-    .eq('id', String(item.id));
-
-  if (metaError) throw metaError;
+  const supplyBackend = await resolveDataBackend();
+  if (supplyBackend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[server-approval-processing] D1 binding not available (supply:approvals.update)');
+    const db = getD1Drizzle(d1);
+    await db
+      .update(approvalsTable)
+      .set({ meta_data: JSON.stringify(nextMetaData) })
+      .where(eq(approvalsTable.id, String(item.id)));
+  } else {
+    const { error: metaError } = await supabase
+      .from('approvals')
+      .update({ meta_data: nextMetaData })
+      .eq('id', String(item.id));
+    if (metaError) throw metaError;
+  }
 
   try {
-    const { data: inventoryManagers } = await supabase
-      .from('staff_members')
-      .select('id, name')
-      .eq('company', INVENTORY_SUPPORT_COMPANY)
-      .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
+    let inventoryManagerRows: Array<{ id: string; name: string }> = [];
+    if (supplyBackend === 'd1') {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
+        const rows = await db
+          .select({ id: staffMembersTable.id, name: staffMembersTable.name })
+          .from(staffMembersTable)
+          .where(
+            drizzleAnd(
+              drizzleEq(staffMembersTable.company, INVENTORY_SUPPORT_COMPANY),
+              drizzleEq(staffMembersTable.department, INVENTORY_SUPPORT_DEPARTMENT),
+            )
+          );
+        inventoryManagerRows = rows.map((r) => ({ id: String(r.id ?? ''), name: String(r.name ?? '') }));
+      }
+    } else {
+      const { data: inventoryManagers } = await supabase
+        .from('staff_members')
+        .select('id, name')
+        .eq('company', INVENTORY_SUPPORT_COMPANY)
+        .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
+      inventoryManagerRows = (inventoryManagers || []) as Array<{ id: string; name: string }>;
+    }
+    // 이하 코드를 위해 inventoryManagers 변수명으로 통합
+    const inventoryManagers = inventoryManagerRows;
 
     const managerNotifications = (inventoryManagers || [])
       .map((staff: { id: string; name: string }) => ({
@@ -232,10 +267,23 @@ export async function processFinalApprovalEffects(
     },
   };
 
-  await supabase
-    .from('approvals')
-    .update({ meta_data: baseMetaData })
-    .eq('id', String(item.id));
+  const processingBackend = await resolveDataBackend();
+  if (processingBackend === 'd1') {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      await db
+        .update(approvalsTable)
+        .set({ meta_data: JSON.stringify(baseMetaData) })
+        .where(eq(approvalsTable.id, String(item.id)));
+    }
+    // d1 binding 없으면 silently skip — 마커 실패가 처리를 막지 않도록
+  } else {
+    await supabase
+      .from('approvals')
+      .update({ meta_data: baseMetaData })
+      .eq('id', String(item.id));
+  }
 
   const steps: string[] = [];
   const warnings: string[] = [];
@@ -268,11 +316,28 @@ export async function processFinalApprovalEffects(
     };
 
     try {
-      const { data: currentStaff } = await supabase
-        .from('staff_members')
-        .select('department, position')
-        .eq('id', orderTargetId)
-        .maybeSingle();
+      let currentStaffDept: string | null | undefined;
+      let currentStaffPosition: string | null | undefined;
+
+      if (processingBackend === 'd1') {
+        const d1 = await getD1Binding();
+        if (!d1) throw new Error('[server-approval-processing] D1 binding not available (personnel_order:staff_members.select)');
+        const db = getD1Drizzle(d1);
+        const rows = await db
+          .select({ department: staffMembersTable.department, position: staffMembersTable.position })
+          .from(staffMembersTable)
+          .where(eq(staffMembersTable.id, orderTargetId));
+        currentStaffDept = rows[0]?.department ?? null;
+        currentStaffPosition = rows[0]?.position ?? null;
+      } else {
+        const { data: currentStaff } = await supabase
+          .from('staff_members')
+          .select('department, position')
+          .eq('id', orderTargetId)
+          .maybeSingle();
+        currentStaffDept = currentStaff?.department;
+        currentStaffPosition = currentStaff?.position;
+      }
 
       const staffUpdate: Record<string, unknown> = {};
       if (newPosition) staffUpdate.position = newPosition;
@@ -281,16 +346,26 @@ export async function processFinalApprovalEffects(
       }
 
       if (Object.keys(staffUpdate).length > 0) {
-        const { error: updateError } = await supabase
-          .from('staff_members')
-          .update(staffUpdate)
-          .eq('id', orderTargetId);
-        if (updateError) throw updateError;
+        if (processingBackend === 'd1') {
+          const d1 = await getD1Binding();
+          if (!d1) throw new Error('[server-approval-processing] D1 binding not available (personnel_order:staff_members.update)');
+          const db = getD1Drizzle(d1);
+          await db
+            .update(staffMembersTable)
+            .set(staffUpdate as Parameters<ReturnType<typeof db.update>['set']>[0])
+            .where(eq(staffMembersTable.id, orderTargetId));
+        } else {
+          const { error: updateError } = await supabase
+            .from('staff_members')
+            .update(staffUpdate)
+            .eq('id', orderTargetId);
+          if (updateError) throw updateError;
+        }
 
         const transferRow = {
           staff_id: orderTargetId,
           transfer_type: orderCategory,
-          before_value: orderCategory === '부서이동(전보)' ? currentStaff?.department : currentStaff?.position,
+          before_value: orderCategory === '부서이동(전보)' ? currentStaffDept : currentStaffPosition,
           after_value: orderCategory === '부서이동(전보)' ? targetDept : newPosition,
           effective_date: getKoreanTodayString(),
           approval_id: item.id,
@@ -513,10 +588,22 @@ export async function processFinalApprovalEffects(
     },
   };
 
-  await supabase
-    .from('approvals')
-    .update({ meta_data: nextMetaData })
-    .eq('id', String(item.id));
+  if (processingBackend === 'd1') {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      await db
+        .update(approvalsTable)
+        .set({ meta_data: JSON.stringify(nextMetaData) })
+        .where(eq(approvalsTable.id, String(item.id)));
+    }
+    // d1 binding 없으면 silently skip — 완료 마커 실패가 결과를 바꾸지 않도록
+  } else {
+    await supabase
+      .from('approvals')
+      .update({ meta_data: nextMetaData })
+      .eq('id', String(item.id));
+  }
 
   return {
     alreadyProcessed: false,
