@@ -240,6 +240,26 @@ function MyPageMain({
     void fetchMonthlyAttendanceSummary();
   }, [fetchMonthlyAttendanceSummary]);
 
+  // JM2/JM3: 인사관리·근태이상 워크센터에서 본인 근태가 보정되면 즉시 재집계.
+  //   - 정상 처리 같은 액션이 발생하면 attendance 테이블이 update 되고
+  //     'erp-attendance-updated' 이벤트가 broadcast 된다.
+  //   - 본인(user.id)에 해당할 때만 refetch (다른 사용자 이벤트는 무시 — 불필요한 호출 방지)
+  //   - 안전: 이벤트 detail이 비어 있으면 그냥 refetch (deferred broadcast 호환)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const userId = user?.id ? String(user.id) : '';
+    const handleAttendanceUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ staffId?: unknown }>).detail;
+      const targetId = detail?.staffId ? String(detail.staffId) : '';
+      if (targetId && userId && targetId !== userId) return;
+      void fetchMonthlyAttendanceSummary();
+    };
+    window.addEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
+    return () => {
+      window.removeEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
+    };
+  }, [fetchMonthlyAttendanceSummary, user?.id]);
+
   const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;

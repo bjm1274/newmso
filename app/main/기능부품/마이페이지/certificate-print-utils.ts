@@ -127,6 +127,8 @@ export type IssuedCertificateContext = {
   duty?: string | null;
   rank?: string | null;
   profilePhotoUrl?: string | null;
+  // 본문 표에 추가로 노출할 행 (예: 급여 증명서의 기준 급여)
+  extraInfoRows?: Array<{ label: string; value: string }> | null;
 };
 
 function getClosingText(certType: string) {
@@ -181,6 +183,13 @@ export function buildIssuedCertificatePrintHtml(
   const primaryColor = escapeHtml(context.primaryColor || '#197c86');
   const borderColor = escapeHtml(context.borderColor || '#d7dee5');
   const closingText = escapeHtml(getClosingText(certType));
+  const extraInfoRowsHtml = (context.extraInfoRows || [])
+    .filter((row) => row && row.label)
+    .map(
+      (row) =>
+        `<div class="info-row"><span class="label">${escapeHtml(row.label)}</span><span>:</span><span class="value">${escapeHtml(row.value)}</span></div>`,
+    )
+    .join('');
 
   const autoPrintScript = options?.autoPrint
     ? `<script>
@@ -283,6 +292,7 @@ window.onload = () => window.print();
         <div class="info-row"><span class="label">담당업무</span><span>:</span><span class="value">${duty}</span></div>
         <div class="info-row"><span class="label">발급일자</span><span>:</span><span class="value">${issuedAt}</span></div>
         ${serial ? `<div class="info-row"><span class="label">발급번호</span><span>:</span><span class="value">${serial}</span></div>` : ''}
+        ${extraInfoRowsHtml}
       </section>
 
       <section class="sign-block" aria-label="발급 책임자">

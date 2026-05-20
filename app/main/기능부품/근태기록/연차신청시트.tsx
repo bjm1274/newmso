@@ -104,11 +104,33 @@ export default function 연차신청시트({
     setError('');
     setSubmitting(true);
     try {
+      const resolvedEndDate = isHalf ? startDate : endDate;
+
+      // 버그 A 수정: 동일 직원 + 날짜 범위 중복 신청 차단
+      // 대기 또는 승인 상태인 기존 건과 날짜가 겹치면 신청 거부
+      const { data: overlapping, error: overlapCheckError } = await supabase
+        .from('leave_requests')
+        .select('id, start_date, end_date, status')
+        .eq('staff_id', staffId)
+        .in('status', ['대기', '승인'])
+        .lte('start_date', resolvedEndDate)
+        .gte('end_date', startDate);
+
+      if (overlapCheckError) throw overlapCheckError;
+
+      if (overlapping && overlapping.length > 0) {
+        const dup = overlapping[0];
+        setError(
+          `이미 같은 기간에 ${dup.status === '승인' ? '승인된' : '신청 중인'} 휴가(${dup.start_date}~${dup.end_date})가 있습니다.`,
+        );
+        return;
+      }
+
       const payload = {
         staff_id: staffId,
         leave_type: leaveType,
         start_date: startDate,
-        end_date: isHalf ? startDate : endDate,
+        end_date: resolvedEndDate,
         reason: reason.trim(),
         status: '대기',
       };

@@ -34,6 +34,11 @@ const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_ROWS_PER_INSERT = 100;
 
+// RETURNING 컬럼 — 일반 컬럼명 또는 '*'(전체 컬럼). supabase .select('*') 호환.
+const ReturningColSchema = z.string().refine((c) => c === '*' || COLUMN_RE.test(c), {
+  message: 'invalid returning column',
+});
+
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
   op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike']),
@@ -45,7 +50,11 @@ const InsertSchema = z.object({
   table: z.string(),
   values: z.array(z.record(z.string().regex(COLUMN_RE), z.unknown())).min(1).max(MAX_ROWS_PER_INSERT),
   onConflict: z.enum(['ignore', 'replace']).optional(),
-  returning: z.array(z.string().regex(COLUMN_RE)).optional(),
+  conflict: z.object({
+    columns: z.array(z.string().regex(COLUMN_RE)).min(1).max(8),
+    action: z.enum(['update', 'ignore']),
+  }).optional(),
+  returning: z.array(ReturningColSchema).optional(),
 });
 
 const UpdateSchema = z.object({
@@ -53,6 +62,7 @@ const UpdateSchema = z.object({
   table: z.string(),
   set: z.record(z.string().regex(COLUMN_RE), z.unknown()),
   where: z.array(WhereSchema).min(1).max(20),
+  returning: z.array(ReturningColSchema).optional(),
 });
 
 const DeleteSchema = z.object({
@@ -126,6 +136,12 @@ function whereToRowProxy(where: { field: string; op: string; value: unknown }[])
   return proxy;
 }
 
+function buildReturningSql(returning: string[] | undefined): SQL {
+  if (!returning || returning.length === 0) return sql.raw('');
+  if (returning.includes('*')) return sql` RETURNING *`;
+  return sql` RETURNING ${sql.join(returning.map((c) => sql.identifier(c)), sql`, `)}`;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -160,11 +176,6 @@ export async function POST(request: Request) {
         await assertAccess({ db, claims, table: payload.table, op: 'insert', row });
       }
       const tableSql = sql.identifier(payload.table);
-      const verb = payload.onConflict === 'replace'
-        ? sql.raw('INSERT OR REPLACE')
-        : payload.onConflict === 'ignore'
-          ? sql.raw('INSERT OR IGNORE')
-          : sql.raw('INSERT');
       const allCols = Array.from(
         payload.values.reduce<Set<string>>((acc, row) => {
           Object.keys(row).forEach((k) => acc.add(k));
@@ -178,11 +189,36 @@ export async function POST(request: Request) {
         ),
         sql`, `,
       );
-      const returningSql =
-        payload.returning && payload.returning.length > 0
-          ? sql` RETURNING ${sql.join(payload.returning.map((c) => sql.identifier(c)), sql`, `)}`
-          : sql.raw('');
-      const stmt = sql`${verb} INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${returningSql}`;
+      const returningSql = buildReturningSql(payload.returning);
+
+      let stmt: SQL;
+      if (payload.conflict) {
+        // 복합 ON CONFLICT(...) DO UPDATE/NOTHING
+        const conflictColsSql = sql.join(
+          payload.conflict.columns.map((c) => sql.identifier(c)),
+          sql`, `,
+        );
+        const conflictSet = new Set(payload.conflict.columns);
+        const updateCols = allCols.filter((c) => !conflictSet.has(c));
+        const shouldUpdate =
+          payload.conflict.action === 'update' && updateCols.length > 0;
+        const onConflictClause = shouldUpdate
+          ? sql` ON CONFLICT(${conflictColsSql}) DO UPDATE SET ${sql.join(
+              updateCols.map((c) => sql`${sql.identifier(c)} = excluded.${sql.identifier(c)}`),
+              sql`, `,
+            )}`
+          : sql` ON CONFLICT(${conflictColsSql}) DO NOTHING`;
+        stmt = sql`INSERT INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${onConflictClause}${returningSql}`;
+      } else {
+        // 기존 INSERT / INSERT OR REPLACE / INSERT OR IGNORE
+        const verb = payload.onConflict === 'replace'
+          ? sql.raw('INSERT OR REPLACE')
+          : payload.onConflict === 'ignore'
+            ? sql.raw('INSERT OR IGNORE')
+            : sql.raw('INSERT');
+        stmt = sql`${verb} INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${returningSql}`;
+      }
+
       const result = await db.run(stmt);
       const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
       return NextResponse.json({ ok: true, data: rows });
@@ -202,7 +238,13 @@ export async function POST(request: Request) {
         sql`, `,
       );
       const whereParts = buildWhereSql(payload.where);
-      const stmt = sql`UPDATE ${tableSql} SET ${setSql} WHERE ${sql.join(whereParts, sql` AND `)}`;
+      const returningSql = buildReturningSql(payload.returning);
+      const stmt = sql`UPDATE ${tableSql} SET ${setSql} WHERE ${sql.join(whereParts, sql` AND `)}${returningSql}`;
+      if (payload.returning && payload.returning.length > 0) {
+        const result = await db.run(stmt);
+        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+        return NextResponse.json({ ok: true, data: rows });
+      }
       await db.run(stmt);
       return NextResponse.json({ ok: true });
     }

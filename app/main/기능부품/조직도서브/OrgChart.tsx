@@ -5,6 +5,7 @@ import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
+import { AddCompanyCard, AddCompanyHintModal } from './AddCompanyCard';
 
 type OrgChartProps = {
   user?: StaffMember | null;
@@ -744,6 +745,7 @@ export default function OrgChart({
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showWorkingOnly, setShowWorkingOnly] = useState(false);
+  const [showAddCompanyHint, setShowAddCompanyHint] = useState(false);
   const [allStaffs, setAllStaffs] = useState<StaffMember[]>(() =>
     dedupeStaffs([...(orgChartDirectoryCache ?? []), ...staffs]),
   );
@@ -1203,14 +1205,20 @@ export default function OrgChart({
               )}
             </section>
           ) : trees.length > 0 ? (
-            trees.map((tree) => (
-              <CompanyPyramid
-                key={tree.company}
-                tree={tree}
-                onSelect={setSelectedStaff}
-                attendanceByStaffId={attendanceByStaffId}
-              />
-            ))
+            <>
+              {trees.map((tree) => (
+                <CompanyPyramid
+                  key={tree.company}
+                  tree={tree}
+                  onSelect={setSelectedStaff}
+                  attendanceByStaffId={attendanceByStaffId}
+                />
+              ))}
+              {/* §4-3: 다중 회사 지원 — 마지막 카드 뒤 dashed 추가 버튼 (전체 탭에서만 노출) */}
+              {activeCompany === COMPANY_ALL && !showWorkingOnly ? (
+                <AddCompanyCard onClick={() => setShowAddCompanyHint(true)} />
+              ) : null}
+            </>
           ) : (
             <section className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--card)] px-5 py-16 text-center shadow-sm">
               <h3 className="font-bold text-[var(--foreground)]">
@@ -1219,6 +1227,11 @@ export default function OrgChart({
               <p className="mt-1 text-sm font-medium text-[var(--toss-gray-3)]">
                 {showWorkingOnly ? '필터를 해제하면 전체 조직도를 다시 볼 수 있습니다.' : '회사나 검색 조건을 다시 확인해 주세요.'}
               </p>
+              {!showWorkingOnly ? (
+                <div className="mt-6">
+                  <AddCompanyCard onClick={() => setShowAddCompanyHint(true)} />
+                </div>
+              ) : null}
             </section>
           )}
         </div>
@@ -1273,6 +1286,11 @@ export default function OrgChart({
           </div>
         </div>
       )}
+
+      <AddCompanyHintModal
+        open={showAddCompanyHint}
+        onClose={() => setShowAddCompanyHint(false)}
+      />
     </div>
   );
 }

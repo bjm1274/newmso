@@ -4,7 +4,22 @@ import { createPortal } from 'react-dom';
 import type { Dispatch, MutableRefObject, SetStateAction, WheelEvent } from 'react';
 import { SUPPLY_REQUEST_CATEGORY_OPTIONS } from '@/app/main/inventory-utils';
 import { EditableGrid, type EditableGridField } from '@/app/components/EditableGrid';
-import type { InventoryCatalogItem, SupplyRow } from './비품구매양식';
+import {
+  getStockTone,
+  sanitizeQuantity,
+  type InventoryCatalogItem,
+  type SupplyRow,
+} from './supplies-helpers';
+
+const STOCK_CHIP_CLASS: Record<ReturnType<typeof getStockTone>, string> = {
+  empty: 'bg-[var(--muted)] text-[var(--toss-gray-3)]',
+  danger: 'bg-red-500/10 text-red-600',
+  warn: 'bg-amber-500/15 text-amber-700',
+  normal: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
+};
+
+// 표시용 단위(EA/BOX 외 추가 단위는 화면 select에서만 노출, 저장은 normalize되어 EA/BOX로 환원).
+const DISPLAY_UNITS = ['EA', 'BOX', '박', '병', 'kg', 'L'] as const;
 
 type SuppliesGridProps = {
   items: SupplyRow[];
@@ -189,30 +204,44 @@ export default function SuppliesPurchaseGrid({
       id: 'currentStock',
       label: '현재 재고',
       width: '15%',
-      render: (item, index) => (
-        <div
-          data-testid={`supplies-item-current-stock-${index}`}
-          className={`inline-flex min-h-[40px] min-w-[88px] items-center justify-center rounded-[var(--radius-md)] px-2.5 text-[11px] font-black ${
-            item.currentStock === null
-              ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-              : item.currentStock <= 5
-                ? 'bg-red-500/10 text-red-600'
-                : 'bg-blue-500/10 text-blue-600'
-          }`}
-        >
-          {item.currentStock === null ? '-' : `${item.currentStock} ${item.unit}`}
-        </div>
-      ),
+      render: (item, index) => {
+        const tone = getStockTone(item.currentStock);
+        return (
+          <div
+            data-testid={`supplies-item-current-stock-${index}`}
+            aria-label={
+              item.currentStock === null
+                ? '현재 재고 미파악'
+                : `현재 재고 ${item.currentStock}${item.unit}`
+            }
+            className={`inline-flex min-h-[36px] min-w-[88px] items-center justify-center rounded-full px-2.5 text-[11px] font-black ${STOCK_CHIP_CLASS[tone]}`}
+          >
+            {item.currentStock === null ? '—' : `${item.currentStock} ${item.unit}`}
+          </div>
+        );
+      },
     },
     {
       id: 'qty',
       label: '신청 수량',
-      width: '15%',
+      width: '20%',
       render: (item, index) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <label htmlFor={`supplies-item-qty-${index}`} className="sr-only">
             신청 수량
           </label>
+          <button
+            type="button"
+            aria-label="수량 감소"
+            data-testid={`supplies-item-qty-dec-${index}`}
+            onClick={() =>
+              updateItemField(index, 'qty', sanitizeQuantity(item.qty - 1))
+            }
+            disabled={item.qty <= 1}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[14px] font-black text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            −
+          </button>
           <input
             id={`supplies-item-qty-${index}`}
             data-testid={`supplies-item-qty-${index}`}
@@ -221,14 +250,35 @@ export default function SuppliesPurchaseGrid({
             min="1"
             value={item.qty}
             onChange={(event) => updateItemField(index, 'qty', event.target.value)}
-            className="h-10 w-full min-w-[64px] rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2.5 text-center text-sm font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+            className="h-8 w-12 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 text-center text-[12px] font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
           />
-          <span
-            data-testid={`supplies-item-unit-${index}`}
-            className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-black text-[var(--accent)]"
+          <button
+            type="button"
+            aria-label="수량 증가"
+            data-testid={`supplies-item-qty-inc-${index}`}
+            onClick={() =>
+              updateItemField(index, 'qty', sanitizeQuantity(item.qty + 1))
+            }
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[14px] font-black text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
           >
-            {item.unit}
-          </span>
+            +
+          </button>
+          <label htmlFor={`supplies-item-unit-${index}`} className="sr-only">
+            단위 선택
+          </label>
+          <select
+            id={`supplies-item-unit-${index}`}
+            data-testid={`supplies-item-unit-${index}`}
+            value={item.unit}
+            onChange={(event) => updateItemField(index, 'unit', event.target.value)}
+            className="h-8 shrink-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1.5 text-[10px] font-black text-[var(--accent)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
+          >
+            {DISPLAY_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
         </div>
       ),
     },
@@ -276,6 +326,7 @@ export default function SuppliesPurchaseGrid({
         </button>
       </div>
       <EditableGrid<SupplyRow>
+        className="[&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-[var(--accent-light)]/30 [&_tbody_tr:focus-within]:bg-[var(--accent-light)]/50"
         rows={items}
         fields={fields}
         rowKey={(_item, index) => `desktop-reordered-${index}`}

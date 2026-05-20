@@ -1,0 +1,323 @@
+'use client';
+
+/**
+ * 급여 워크센터 — Supabase fetch
+ *
+ * - 입력: yearMonth, selectedCo
+ * - 출력: PayrollWorkcenterData (정규화된 records + staffs)
+ *
+ * JM2: Promise.allSettled 병렬, AbortController로 race 차단
+ * JM3: 모든 fetch는 try/catch, 실패 시 빈 결과 + errors[]
+ * JM4: any 금지, 정규화 함수로 row 타입 명시
+ * JM5: 금액은 Math.floor로 정수 보장
+ */
+
+import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
+import type { StaffMember } from '@/types';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  getPayrollPolicy,
+  calculateTenureYears,
+  type PayrollPolicy,
+} from './payroll-policy';
+
+// ─── 정규화된 payroll record ─────────────────────────
+export interface PayrollRecordNormalized {
+  staff_id: string;
+  year_month: string;
+  status: string;
+  record_type: string | null;
+  base_salary: number;
+  meal_allowance: number;
+  night_duty_allowance: number;
+  vehicle_allowance: number;
+  childcare_allowance: number;
+  research_allowance: number;
+  other_taxfree: number;
+  extra_allowance: number;
+  overtime_pay: number;
+  bonus: number;
+  total_taxable: number;
+  total_taxfree: number;
+  total_deduction: number;
+  national_pension: number;
+  health_insurance: number;
+  long_term_care: number;
+  employment_insurance: number;
+  income_tax: number;
+  local_tax: number;
+  net_pay: number;
+}
+
+const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
+  'record_type',
+  'base_salary',
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  'extra_allowance',
+  'overtime_pay',
+  'bonus',
+  'total_taxable',
+  'total_taxfree',
+  'total_deduction',
+  'national_pension',
+  'health_insurance',
+  'long_term_care',
+  'employment_insurance',
+  'income_tax',
+  'local_tax',
+  'net_pay',
+] as const;
+
+function num(v: unknown): number {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? Math.floor(n) : 0;
+}
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : v == null ? '' : String(v);
+}
+
+function normalizeRecord(row: Record<string, unknown>): PayrollRecordNormalized {
+  return {
+    staff_id: str(row.staff_id),
+    year_month: str(row.year_month),
+    status: str(row.status),
+    record_type: row.record_type == null ? null : str(row.record_type),
+    base_salary: num(row.base_salary),
+    meal_allowance: num(row.meal_allowance),
+    night_duty_allowance: num(row.night_duty_allowance),
+    vehicle_allowance: num(row.vehicle_allowance),
+    childcare_allowance: num(row.childcare_allowance),
+    research_allowance: num(row.research_allowance),
+    other_taxfree: num(row.other_taxfree),
+    extra_allowance: num(row.extra_allowance),
+    overtime_pay: num(row.overtime_pay),
+    bonus: num(row.bonus),
+    total_taxable: num(row.total_taxable),
+    total_taxfree: num(row.total_taxfree),
+    total_deduction: num(row.total_deduction),
+    national_pension: num(row.national_pension),
+    health_insurance: num(row.health_insurance),
+    long_term_care: num(row.long_term_care),
+    employment_insurance: num(row.employment_insurance),
+    income_tax: num(row.income_tax),
+    local_tax: num(row.local_tax),
+    net_pay: num(row.net_pay),
+  };
+}
+
+// ─── 통합 출력 ───────────────────────────────────────
+export interface PayrollWorkcenterData {
+  policy: PayrollPolicy;
+  staffs: StaffMember[];
+  records: PayrollRecordNormalized[];
+  recordsPrev: PayrollRecordNormalized[];
+  yearMonth: string;
+  yearMonthPrev: string;
+  selectedCo: string;
+  errors: { source: string; message: string }[];
+}
+
+function shiftYearMonth(ym: string, deltaMonths: number): string {
+  const [y, m] = ym.split('-').map((v) => parseInt(v, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return ym;
+  const d = new Date(y, m - 1 + deltaMonths, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export interface FetchPayrollOptions {
+  yearMonth: string;
+  selectedCo: string;
+  signal?: AbortSignal;
+}
+
+export async function fetchPayrollWorkcenterData({
+  yearMonth,
+  selectedCo,
+  signal,
+}: FetchPayrollOptions): Promise<PayrollWorkcenterData> {
+  const policy = getPayrollPolicy();
+  const errors: { source: string; message: string }[] = [];
+  const yearMonthPrev = shiftYearMonth(yearMonth, -1);
+
+  let staffs: StaffMember[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select(
+        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions',
+      );
+    if (error) throw new Error(error.message);
+    const rows = Array.isArray(data) ? data : [];
+    staffs = rows
+      .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
+      .map((raw) => {
+        const row = raw as unknown as Record<string, unknown>;
+        return {
+          id: str(row.id),
+          name: str(row.name),
+          company: str(row.company),
+          department: row.department == null ? null : str(row.department),
+          position: row.position == null ? null : str(row.position),
+          status: row.status == null ? null : str(row.status),
+          hire_date: row.hire_date == null ? null : str(row.hire_date),
+          resign_date: row.resign_date == null ? null : str(row.resign_date),
+          birth_date: row.birth_date == null ? null : str(row.birth_date),
+          salary: row.salary == null ? null : Number(row.salary),
+          employee_no: row.employee_no == null ? null : str(row.employee_no),
+          permissions: (row.permissions ?? null) as StaffMember['permissions'],
+        };
+      })
+      .filter((s) => {
+        if (!isActiveStaff(s)) return false;
+        if (selectedCo && selectedCo !== '전체' && s.company !== selectedCo) return false;
+        return true;
+      });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '직원 마스터 조회 실패';
+    console.warn('[payroll] staff_members:', msg);
+    errors.push({ source: '직원 마스터', message: msg });
+  }
+  if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+
+  const [curRes, prevRes] = await Promise.allSettled([
+    withMissingColumnsFallback(
+      (omitted) =>
+        supabase
+          .from('payroll_records')
+          .select(
+            [
+              'staff_id',
+              'year_month',
+              'status',
+              ...PAYROLL_RECORD_OPTIONAL_COLUMNS.filter((c) => !omitted.has(c)),
+            ].join(', '),
+          )
+          .eq('year_month', yearMonth),
+      [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+    ),
+    withMissingColumnsFallback(
+      (omitted) =>
+        supabase
+          .from('payroll_records')
+          .select(
+            [
+              'staff_id',
+              'year_month',
+              'status',
+              ...PAYROLL_RECORD_OPTIONAL_COLUMNS.filter((c) => !omitted.has(c)),
+            ].join(', '),
+          )
+          .eq('year_month', yearMonthPrev),
+      [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+    ),
+  ]);
+
+  if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+
+  const records = extractRecords(curRes, errors, `payroll_records ${yearMonth}`);
+  const recordsPrev = extractRecords(prevRes, errors, `payroll_records ${yearMonthPrev}`);
+
+  return {
+    policy,
+    staffs,
+    records,
+    recordsPrev,
+    yearMonth,
+    yearMonthPrev,
+    selectedCo,
+    errors,
+  };
+}
+
+function extractRecords(
+  res: PromiseSettledResult<{ data: unknown; error: unknown } | null>,
+  errors: { source: string; message: string }[],
+  source: string,
+): PayrollRecordNormalized[] {
+  if (res.status === 'rejected') {
+    const msg = res.reason instanceof Error ? res.reason.message : '조회 실패';
+    console.warn(`[payroll] ${source}:`, msg);
+    errors.push({ source, message: msg });
+    return [];
+  }
+  const payload = res.value;
+  if (!payload) return [];
+  if (payload.error) {
+    const msg = payload.error instanceof Error ? payload.error.message : String(payload.error);
+    console.warn(`[payroll] ${source}:`, msg);
+    errors.push({ source, message: msg });
+    return [];
+  }
+  const list = Array.isArray(payload.data) ? payload.data : [];
+  const normalized = list
+    .filter((row): row is Record<string, unknown> => row != null && typeof row === 'object')
+    .map(normalizeRecord);
+  return filterNonInterimPayrollRecords(normalized);
+}
+
+// ─── 퇴직자 fetch ────────────────────────────────────
+export interface RetirementComputed {
+  staff_id: string;
+  name: string;
+  resignDate: string | null;
+  tenureLabel: string;
+  estimatedPay: number;
+}
+
+export async function fetchRecentRetirees(
+  selectedCo: string,
+  signal?: AbortSignal,
+): Promise<RetirementComputed[]> {
+  try {
+    const { data, error } = await supabase
+      .from('staff_members')
+      .select('id, name, company, department, hire_date, resign_date, salary, status')
+      .not('resign_date', 'is', null);
+    if (error) throw new Error(error.message);
+    if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+    const rows = Array.isArray(data) ? data : [];
+    return rows
+      .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
+      .map((raw) => raw as unknown as Record<string, unknown>)
+      .filter((row) => {
+        if (selectedCo && selectedCo !== '전체') {
+          return row.company === selectedCo;
+        }
+        return true;
+      })
+      .map((row) => {
+        const hire = row.hire_date == null ? null : str(row.hire_date);
+        const resign = row.resign_date == null ? null : str(row.resign_date);
+        const sal = Number(row.salary ?? 0);
+        const tenure = calculateTenureYears(hire, resign ? new Date(resign) : undefined);
+        const tenureLabel =
+          tenure === null
+            ? '-'
+            : tenure < 1
+              ? `${Math.floor(tenure * 12)}개월`
+              : `${tenure.toFixed(1)}년`;
+        const estimatedPay = tenure !== null && sal > 0 ? Math.floor(sal * tenure) : 0;
+        return {
+          staff_id: str(row.id),
+          name: str(row.name),
+          resignDate: resign,
+          tenureLabel,
+          estimatedPay,
+        };
+      })
+      .sort((a, b) => (b.resignDate ?? '').localeCompare(a.resignDate ?? ''))
+      .slice(0, 20);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '퇴직자 조회 실패';
+    console.warn('[payroll] retirees:', msg);
+    return [];
+  }
+}

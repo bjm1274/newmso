@@ -487,6 +487,27 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'virtual_account_deposits',
   'tasks',
   'report_schedules',
+
+  // ── Phase 9 준비 (2026-05-20) — 클라이언트가 supabase.from()으로 호출하나
+  //    아직 D1 스키마에 CREATE TABLE이 없는 테이블. 여기 등록하면 whitelist는
+  //    통과하지만, 실제 컷오버 전 D1 스키마 마이그레이션 추가가 선행되어야
+  //    쿼리가 동작함(미선행 시 'no such table'). 레지스트리 등록만 선행 정비.
+  'org_chart_nodes',
+  'as_repair_records',
+  'return_records',
+  'education_completions',
+  'nurse_schedules',
+  'profiles',
+  'email_queue',
+  'congratulations_condolences',
+  'work_type_change_history',
+  'patient_prescriptions',
+  'early_leave_records',
+  'inventory_items',
+  'attendance_records',
+  'document_submissions',
+  'generated_contracts',
+  'work_schedules',
 ];
 
 for (const tableName of ADDITIONAL_PUBLIC_TABLES) {

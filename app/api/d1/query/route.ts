@@ -9,7 +9,10 @@
 //
 // 요청 형식:
 //   POST /api/d1/query
-//   body: { table, columns?, where?, order?, limit?, range?, single?, count? }
+//   body: { table, columns?, where?, order?, limit?, range?, single?, count?,
+//           orFilters? }
+//
+//   orFilters?: FilterNode[]  — 각 원소가 OR 그룹. WHERE에 AND로 추가.
 //
 // 응답:
 //   { ok: true, data: T[] | T | null, count?: number }
@@ -28,6 +31,11 @@ import {
   POLICY_REGISTRY,
 } from '@/lib/db';
 import type { ErpClaims } from '@/lib/db/auth/claims';
+import {
+  FilterNodeSchema,
+  assertFilterTreeValid,
+  type FilterNode,
+} from '@/lib/d1-compat/filter';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +63,7 @@ const PayloadSchema = z.object({
   table: z.string(),
   columns: z.array(z.string().regex(COLUMN_RE)).optional(),
   where: z.array(WhereSchema).max(20).optional(),
+  orFilters: z.array(FilterNodeSchema).max(10).optional(),
   order: z.array(OrderSchema).max(5).optional(),
   limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
   range: z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }).optional(),
@@ -124,12 +133,70 @@ function buildWhereSql(where: Payload['where']): SQL[] {
   return out;
 }
 
+/**
+ * FilterNode 트리를 재귀적으로 SQL로 변환.
+ * 모든 값은 drizzle sql 템플릿 파라미터 바인딩으로 처리.
+ */
+function buildFilterNodeSql(node: FilterNode): SQL {
+  if (node.kind === 'cond') {
+    const col = sql.identifier(node.field);
+    const { op, value } = node;
+    if (op === 'eq') return sql`(${col} = ${value})`;
+    if (op === 'neq') return sql`(${col} != ${value})`;
+    if (op === 'lt') return sql`(${col} < ${value})`;
+    if (op === 'gt') return sql`(${col} > ${value})`;
+    if (op === 'lte') return sql`(${col} <= ${value})`;
+    if (op === 'gte') return sql`(${col} >= ${value})`;
+    if (op === 'is') {
+      if (value === null) return sql`(${col} IS NULL)`;
+      return sql`(${col} IS ${value})`;
+    }
+    if (op === 'isNot') {
+      if (value === null) return sql`(${col} IS NOT NULL)`;
+      return sql`(${col} IS NOT ${value})`;
+    }
+    if (op === 'like') return sql`(${col} LIKE ${value})`;
+    if (op === 'ilike') return sql`(${col} LIKE ${value})`; // SQLite LIKE는 기본 CI
+    if (op === 'in') {
+      const arr = Array.isArray(value) ? value : [];
+      if (arr.length === 0) return sql`(1 = 0)`;
+      return sql`(${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)}))`;
+    }
+    // 미지원 op — 방어적으로 false 반환
+    return sql`(1 = 0)`;
+  }
+
+  if (node.kind === 'and') {
+    const parts = node.children.map(buildFilterNodeSql);
+    return sql`(${sql.join(parts, sql` AND `)})`;
+  }
+
+  // kind === 'or'
+  const parts = node.children.map(buildFilterNodeSql);
+  return sql`(${sql.join(parts, sql` OR `)})`;
+}
+
+/**
+ * orFilters 배열을 검증하고 WHERE 절에 추가할 SQL 조각 목록 반환.
+ * 각 원소를 assertFilterTreeValid로 검증 후 buildFilterNodeSql로 변환.
+ */
+function buildOrFilterParts(orFilters: FilterNode[] | undefined): SQL[] {
+  if (!orFilters || orFilters.length === 0) return [];
+  return orFilters.map((node) => {
+    assertFilterTreeValid(node); // 깊이/노드 수 초과 시 throw → 500 처리
+    return buildFilterNodeSql(node);
+  });
+}
+
 function buildSelectSql(payload: Payload): SQL {
   const tableSql = sql.identifier(payload.table);
   const colsSql = payload.columns && payload.columns.length > 0
     ? sql.join(payload.columns.map((c) => sql.identifier(c)), sql`, `)
     : sql.raw('*');
-  const whereParts = buildWhereSql(payload.where);
+  const whereParts = [
+    ...buildWhereSql(payload.where),
+    ...buildOrFilterParts(payload.orFilters),
+  ];
   const whereSql =
     whereParts.length > 0
       ? sql` WHERE ${sql.join(whereParts, sql` AND `)}`
@@ -154,7 +221,10 @@ function buildSelectSql(payload: Payload): SQL {
 
 function buildCountSql(payload: Payload): SQL {
   const tableSql = sql.identifier(payload.table);
-  const whereParts = buildWhereSql(payload.where);
+  const whereParts = [
+    ...buildWhereSql(payload.where),
+    ...buildOrFilterParts(payload.orFilters),
+  ];
   const whereSql =
     whereParts.length > 0
       ? sql` WHERE ${sql.join(whereParts, sql` AND `)}`
@@ -197,6 +267,8 @@ export async function POST(request: Request) {
     const claims = buildClaimsFromSession(session?.user);
 
     if (payload.count) {
+      // 주의: COUNT(*)는 filterByPolicy를 거치지 않음 — PUBLIC 외 정책 테이블은
+      // 사용자가 볼 수 없는 row까지 카운트될 수 있음(컷오버 전 정책 인식 카운트 보강 필요).
       const countResult = await db.run(buildCountSql(payload));
       const rows = ((countResult as { results?: unknown[] }).results ?? []) as Array<{ count: number }>;
       const count = rows[0]?.count ?? 0;

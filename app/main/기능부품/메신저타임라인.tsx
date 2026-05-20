@@ -15,7 +15,7 @@ import {
   type AttachmentPreviewKind,
 } from './메신저첨부';
 import { MessengerAvatar } from './메신저공통';
-import { extractWardMessageMeta, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
+import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
 import type { ThreadSummary } from './메신저파생훅';
 import { MenuIcon } from './조직도서브/조직도측면창';
 
@@ -110,6 +110,7 @@ type MessengerTimelineProps = {
   onScrollToMessage: (messageId: string) => void;
   onMessageListScroll: () => void;
   onVote: (pollId: string, optionIndex: number) => void;
+  onDrawPrize?: (pollId: string) => void | Promise<void>;
   onOpenAttachmentPreviewForMessage: (message: ChatMessage) => void;
   onStartReplyToMessage: (message: ChatMessage) => void;
   onOpenThread: (message: ChatMessage) => void;
@@ -164,6 +165,7 @@ function MessengerTimelineComponent({
   onScrollToMessage,
   onMessageListScroll,
   onVote,
+  onDrawPrize,
   onOpenAttachmentPreviewForMessage,
   onStartReplyToMessage,
   onOpenThread,
@@ -492,12 +494,14 @@ function MessengerTimelineComponent({
                 const pollItem = item as PollItem;
                 const votes = pollVotes[pollItem.id] || {};
                 const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
+                const { displayQuestion, prize, prizeWinners } = extractPollMetaFromQuestion(pollItem.question);
+                const isCreator = String(pollItem.creator_id) === String(effectiveChatUserId);
                 return (
                   <div data-testid={`chat-poll-${pollItem.id}`} key={`poll-${pollItem.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-500/10 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
                     <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                       <span className="text-sm">🗳️</span> 투표
                     </p>
-                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{pollItem.question}</p>
+                    <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{displayQuestion}</p>
                     <div className="space-y-1.5">
                       {(pollItem.options || []).map((opt: string, idx: number) => (
                         <button type="button"
@@ -514,6 +518,31 @@ function MessengerTimelineComponent({
                         </button>
                       ))}
                     </div>
+                    {prize && (
+                      <div className="mt-3 pt-3 border-t border-blue-200/50 dark:border-blue-700/30 space-y-1.5">
+                        {prizeWinners && prizeWinners.length > 0 ? (
+                          <div className="text-[11px] font-semibold text-[var(--foreground)] space-y-0.5">
+                            <p className="text-blue-600 dark:text-blue-400">🎁 상품: {prize.name}</p>
+                            <p>🎉 당첨: {prizeWinners.map((w) => w.name).join(', ')}</p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                              🎁 상품: {prize.name} · 당첨 {prize.winnerCount}명
+                            </span>
+                            {isCreator && onDrawPrize && (
+                              <button
+                                type="button"
+                                onClick={() => void onDrawPrize(pollItem.id)}
+                                className="ml-2 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[10px] font-bold hover:opacity-90 transition-opacity"
+                              >
+                                🎁 추첨하기
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -696,7 +725,7 @@ function MessengerTimelineComponent({
                     renderDateDivider(dateLabel, dateKey)
                   )}
                   {isSystemInvite ? (
-                    <div className="flex justify-center my-1">
+                    <div className="flex justify-center my-1" role="status" aria-live="polite">
                       <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
                         초대 {systemText}
                       </span>
@@ -746,18 +775,19 @@ function MessengerTimelineComponent({
                                 : !msg.content
                                   ? 'p-0 bg-transparent shadow-none border-none'
                                   : 'border px-3 py-2'
-                            } rounded-2xl text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-full ${
+                            } rounded-[var(--radius-lg)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-full ${
                               isDeletedMessage
                                 ? isMine
-                                  ? 'rounded-tr-sm'
-                                  : 'rounded-tl-sm'
+                                  ? 'rounded-br-[4px]'
+                                  : 'rounded-bl-[4px]'
                                 : !msg.content
                                   ? ''
                                   : isMine
-                                    ? 'bg-[var(--accent)] text-white border-transparent rounded-tr-sm'
-                                    : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-sm hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
+                                    ? 'bg-[var(--accent)] text-white border-transparent rounded-br-[4px]'
+                                    : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-bl-[4px] hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
                             }`}
-                            role="button"
+                            role="article"
+                            aria-roledescription="채팅 메시지"
                             tabIndex={isDeletedMessage ? -1 : 0}
                             onKeyDown={(event) => {
                               if (isDeletedMessage) return;
@@ -858,20 +888,20 @@ function MessengerTimelineComponent({
                                       event.stopPropagation();
                                       onLoadReadStatus(msg);
                                     }}
-                                    className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
+                                    className="text-[10px] font-bold tabular-nums text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
                                   >
                                     {displayedReadStatusSummary}
                                   </button>
                                 ) : (
                                   <span
                                     data-testid={`chat-message-read-status-${msg.id}`}
-                                    className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}
+                                    className={`text-[10px] font-bold tabular-nums ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}
                                   >
                                     {displayedReadStatusSummary}
                                   </span>
                                 )
                               )}
-                              <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
+                              <span className="text-[10px] font-bold tabular-nums text-[var(--toss-gray-3)]">
                                 {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>

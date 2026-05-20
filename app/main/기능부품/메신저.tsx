@@ -232,6 +232,8 @@ export default function ChatView({
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** typing=true broadcast throttle: 마지막 emit 시각(ms). 짧은 시간 안에 매 키마다 supabase realtime broadcast 보내는 것을 차단 */
+  const lastTypingEmitAtRef = useRef(0);
   const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
   const incomingRealtimeMessageIdsRef = useRef<Map<string, number>>(new Map());
@@ -1137,12 +1139,19 @@ export default function ChatView({
     }
 
     if (value.trim()) {
-      emitTypingState(true);
+      // 매 키마다 supabase broadcast를 보내면 입력이 버벅이므로 3초 간격으로 throttle
+      const now = Date.now();
+      if (now - lastTypingEmitAtRef.current > 3000) {
+        lastTypingEmitAtRef.current = now;
+        emitTypingState(true);
+      }
       typingClearRef.current = setTimeout(() => {
+        lastTypingEmitAtRef.current = 0;
         emitTypingState(false);
         typingClearRef.current = null;
       }, 1800);
     } else {
+      lastTypingEmitAtRef.current = 0;
       emitTypingState(false);
     }
   }, [emitTypingState]);
@@ -1302,6 +1311,13 @@ export default function ChatView({
     handleRemovePollOption,
     handleAddPollOption,
     handleVote,
+    handleDrawPollPrize,
+    prizeEnabled,
+    prizeWinnerCount,
+    prizeName,
+    setPrizeEnabled,
+    setPrizeWinnerCount,
+    setPrizeName,
     slashCommand,
     showSlashModal,
     slashForm,
@@ -2745,6 +2761,41 @@ export default function ChatView({
     auditUserName: user?.name,
   });
 
+  // 타임라인/컴포저 props 안정화 콜백 (입력 시 매 키마다 발생하는
+  // 부모 re-render 영향으로 memo()가 무효화되는 것을 막기 위함)
+  const closeMessageActions = useCallback(() => {
+    setActiveActionMsg(null);
+  }, []);
+  const handleTimelineToggleReaction = useCallback(
+    (message: ChatMessage, emoji: string) => {
+      void toggleReaction(String(message.id), emoji);
+    },
+    [toggleReaction],
+  );
+  const handleTimelineTogglePin = useCallback(
+    (message: ChatMessage) => {
+      void togglePin(String(message.id));
+    },
+    [togglePin],
+  );
+  const handleTimelineToggleBookmark = useCallback(
+    (message: ChatMessage) => {
+      void toggleBookmark(String(message.id));
+    },
+    [toggleBookmark],
+  );
+  const handleCloseReply = useCallback(() => {
+    setReplyTo(null);
+  }, []);
+  const handleScrollToLatest = useCallback(() => {
+    scrollToBottom('smooth');
+  }, [scrollToBottom]);
+  const selectedRoomIdForRetry = selectedRoomId;
+  const handleRetryAllFailedAttachmentsForRoom = useCallback(
+    () => retryAllFailedAttachmentUploads(selectedRoomIdForRetry),
+    [retryAllFailedAttachmentUploads, selectedRoomIdForRetry],
+  );
+
   const {
     activeMessageHighlightQuery,
     combinedTimeline,
@@ -2993,22 +3044,17 @@ export default function ChatView({
           onScrollToMessage={scrollToMessage}
           onMessageListScroll={updateScrollPositionState}
             onVote={handleVote}
+            onDrawPrize={handleDrawPollPrize}
             onOpenAttachmentPreviewForMessage={openAttachmentPreviewForMessage}
             onStartReplyToMessage={startReplyToMessage}
             onOpenThread={openTrackedThreadPanel}
             onOpenBoardPost={onOpenBoardPost}
             onOpenMessageActions={openMessageActions}
-            onCloseMessageActions={() => setActiveActionMsg(null)}
-            onToggleReaction={(message, emoji) => {
-              void toggleReaction(String(message.id), emoji);
-            }}
+            onCloseMessageActions={closeMessageActions}
+            onToggleReaction={handleTimelineToggleReaction}
             onAddTask={addTaskFromMessage}
-            onTogglePin={(message) => {
-              void togglePin(String(message.id));
-            }}
-            onToggleBookmark={(message) => {
-              void toggleBookmark(String(message.id));
-            }}
+            onTogglePin={handleTimelineTogglePin}
+            onToggleBookmark={handleTimelineToggleBookmark}
             onForwardMessage={startForwardMessage}
             onDeleteMessage={deleteMessageFromActions}
             onStartEdit={startEditMessage}
@@ -3081,14 +3127,14 @@ export default function ChatView({
               showScrollToLatest={showScrollToLatest}
               showMentionList={showMentionList}
               mentionCandidates={mentionCandidates}
-              onCloseReply={() => setReplyTo(null)}
+              onCloseReply={handleCloseReply}
               onCancelAlbumUpload={cancelAlbumUpload}
               onRemoveAlbumFile={removeAlbumFile}
               onSendAlbum={sendAlbum}
               onCancelPendingAttachmentUpload={cancelPendingAttachmentUpload}
               onConfirmPendingAttachmentUpload={confirmPendingAttachmentUpload}
               onRetryFailedAttachmentUpload={retryFailedAttachmentUpload}
-              onRetryAllFailedAttachmentUploads={() => retryAllFailedAttachmentUploads(selectedRoomId)}
+              onRetryAllFailedAttachmentUploads={handleRetryAllFailedAttachmentsForRoom}
               onDismissFailedAttachmentUpload={dismissFailedAttachmentUpload}
               onClearAllFailedAttachmentUploads={clearAllFailedAttachmentUploads}
               onAttachmentSelect={handleAttachmentSelect}
@@ -3097,7 +3143,7 @@ export default function ChatView({
               onComposerChange={handleComposerChange}
               onComposerPaste={handleComposerPaste}
               onSendMessage={handleSendMessage}
-              onScrollToLatest={() => scrollToBottom('smooth')}
+              onScrollToLatest={handleScrollToLatest}
               onSelectMention={handleSelectMention}
             />
           </>
@@ -3185,11 +3231,17 @@ export default function ChatView({
         question={pollQuestion}
         options={pollOptions}
         deadlineAt={pollDeadlineAt}
+        prizeEnabled={prizeEnabled}
+        prizeWinnerCount={prizeWinnerCount}
+        prizeName={prizeName}
         onQuestionChange={setPollQuestion}
         onDeadlineAtChange={setPollDeadlineAt}
         onOptionChange={handlePollOptionChange}
         onRemoveOption={handleRemovePollOption}
         onAddOption={handleAddPollOption}
+        onPrizeEnabledChange={setPrizeEnabled}
+        onPrizeWinnerCountChange={setPrizeWinnerCount}
+        onPrizeNameChange={setPrizeName}
         onClose={closePollModal}
         onSubmit={handleCreatePoll}
       />

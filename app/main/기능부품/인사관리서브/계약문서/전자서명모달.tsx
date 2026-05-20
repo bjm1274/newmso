@@ -10,6 +10,7 @@ import {
     stripContractClosingLines,
     type ContractClosingData,
 } from '@/lib/contract-template-closing';
+import { buildContractBodyPrintHTML } from '@/lib/contract-body-print-html';
 import ContractClosingBlock from './계약서마무리블록';
 import {
     getShiftBandGroupRows,
@@ -258,15 +259,30 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (!printWindow) return;
 
             const styles = `
+                    /* A4 고정: 용지 밖으로 내용이 짤리지 않도록 페이지 크기·여백을 명시 */
+                    @page { size: A4 portrait; margin: 12mm; }
+                    *, *::before, *::after { box-sizing: border-box; }
+                    html, body { margin: 0; padding: 0; }
+                    body {
+                        font-family: 'Noto Sans KR', sans-serif;
+                        line-height: 1.6;
+                        color: #1f2937;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    img { max-width: 100%; height: auto; }
+                    pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+                    /* 모든 콘텐츠를 인쇄 영역 폭 안으로 제한 → 우측 짤림 방지 */
+                    .contract-wrapper { padding: 0; }
+                    .contract-wrapper, .contract-wrapper * { max-width: 100%; }
                     @media print {
                         body { margin: 0; padding: 0; }
-                        .contract-page, [style*="page-break-before: always"] { 
-                            page-break-before: always; 
+                        .contract-page, [style*="page-break-before: always"] {
+                            page-break-before: always;
                         }
+                        /* 첫 콘텐츠 앞 빈 페이지 방지 */
+                        .contract-wrapper > :first-child { page-break-before: avoid; }
                     }
-                    body { font-family: 'Noto Sans KR', sans-serif; line-height: 1.6; }
-                    img { max-width: 100%; height: auto; }
-                    .contract-wrapper { padding: 20px; }
                 `;
 
             printWindow.document.write(`<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
@@ -360,10 +376,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 signatureDataUrl: signatureData,
             });
 
+            const bodyHTML = buildContractBodyPrintHTML(bodyText);
+
             const fullContractHTML = `
                 <div class="contract-wrapper">
                     <div class="contract-page">
-                        <pre style="white-space:pre-wrap;font-family:'Noto Sans KR', sans-serif;font-size:13px;line-height:1.75;margin:0;color:#1f2937;">${bodyText}</pre>
+                        ${bodyHTML}
                         ${closingHTML}
                     </div>
                     ${agreementsSection}

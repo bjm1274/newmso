@@ -100,6 +100,21 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    if (fcmToken) {
+      // 같은 물리 기기의 FCM 토큰을 다른 staff가 보유 중이면 그 행을 제거한다.
+      // 로그아웃 시 토큰 정리가 누락돼도, 다음 사용자가 같은 브라우저에서 로그인해
+      // 토큰을 재등록하는 시점에 교차 계정 잔재가 사라진다(메시지 알림 오발송 차단).
+      // fcm_token UNIQUE 제약과 충돌하지 않도록 반드시 upsert 이전에 실행한다.
+      await db
+        .delete(push_subscriptions)
+        .where(
+          and(
+            eq(push_subscriptions.fcm_token, fcmToken),
+            ne(push_subscriptions.staff_id, staffId),
+          ),
+        );
+    }
+
     if (fcmToken && !endpoint) {
       // fcm-only 갱신 시 같은 staff의 fcm_token IS NULL 행 정리
       await db

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { StaffMember } from '@/types';
 import AttendanceForms from './근태신청양식';
 import SuppliesForm from './비품구매양식';
@@ -14,8 +14,8 @@ import ReportApprovalForm from './ReportApprovalForm';
 import type { ApprovalCcUser, ApproverTemplate } from '../전자결재-types';
 import { normalizeComposeFormType } from '../전자결재-utils';
 import { LucideIcon } from '../조직도서브/조직도측면창';
-import ApprovalFormTypePicker from './ApprovalFormTypePicker';
 import ApprovalApproverLinePanel from './ApprovalApproverLinePanel';
+import ApprovalLineTimeline from './ApprovalLineTimeline';
 
 type ApprovalComposerViewProps = {
   user: StaffMember | null;
@@ -25,6 +25,7 @@ type ApprovalComposerViewProps = {
   loadDraftFromStorage: () => void;
   clearDraftFromStorage: () => void;
   approverCandidates: StaffMember[];
+  referenceCandidates: StaffMember[];
   approvalDirectoryStaffs: StaffMember[];
   approverLine: StaffMember[];
   setApproverLine: Dispatch<SetStateAction<StaffMember[]>>;
@@ -64,15 +65,24 @@ type ApprovalComposerViewProps = {
   isSubmitting?: boolean;
 };
 
-type StepId = 1 | 2 | 3 | 4;
-type StepKey = 'form' | 'content' | 'approver' | 'submit';
-
-const STEP_LABELS: Record<StepId, { key: StepKey; label: string; tagline: string }> = {
-  1: { key: 'form', label: '양식 선택', tagline: '결재 양식을 고르세요' },
-  2: { key: 'content', label: '내용 작성', tagline: '문서 내용을 입력하세요' },
-  3: { key: 'approver', label: '결재선', tagline: '결재자와 참조자를 지정하세요' },
-  4: { key: 'submit', label: '상신', tagline: '내용 확인 후 상신하세요' },
+type FormOption = {
+  tab: string;
+  normalized: string;
+  label: string;
+  isCustom: boolean;
+  group: 'leave' | 'work' | 'misc';
+  requiresPermission: boolean;
 };
+
+const LEAVE_KEYWORDS = ['연차/휴가', '연차계획서', '연장근무', '출결정정', '연차촉진'];
+const WORK_KEYWORDS = ['물품', '수리', '보고', '업무', '공문'];
+const PERMISSION_KEYWORDS = ['공문발송'];
+
+function classifyGroup(label: string, normalized: string): 'leave' | 'work' | 'misc' {
+  if (LEAVE_KEYWORDS.some((kw) => label.includes(kw) || normalized.includes(kw))) return 'leave';
+  if (WORK_KEYWORDS.some((kw) => label.includes(kw) || normalized.includes(kw))) return 'work';
+  return 'misc';
+}
 
 export default function ApprovalComposerView({
   user,
@@ -82,6 +92,7 @@ export default function ApprovalComposerView({
   loadDraftFromStorage,
   clearDraftFromStorage,
   approverCandidates,
+  referenceCandidates,
   approvalDirectoryStaffs,
   approverLine,
   setApproverLine,
@@ -116,40 +127,53 @@ export default function ApprovalComposerView({
   handleSubmit,
   isSubmitting = false,
 }: ApprovalComposerViewProps) {
-  const [currentStep, setCurrentStep] = useState<StepId>(1);
+  const allOptions: FormOption[] = useMemo(() => {
+    return composeFormTabs.map((tab) => {
+      const normalized = normalizeComposeFormType(tab);
+      const label = builtinFormTypes.includes(tab)
+        ? tab
+        : customFormTypes.find((customForm) => customForm.slug === tab)?.name ?? tab;
+      const isCustom = customFormTypes.some((customForm) => customForm.slug === tab);
+      return {
+        tab,
+        normalized,
+        label,
+        isCustom,
+        group: classifyGroup(label, normalized),
+        requiresPermission: PERMISSION_KEYWORDS.some((kw) => label.includes(kw) || normalized.includes(kw)),
+      };
+    });
+  }, [composeFormTabs, builtinFormTypes, customFormTypes]);
 
-  const activeFormLabel = builtinFormTypes.includes(formType)
-    ? formType
-    : customFormTypes.find((customForm) => customForm.slug === formType)?.name ?? formType;
+  const groupedOptions = useMemo(() => {
+    const used = new Set<string>();
+    const make = (key: 'leave' | 'work' | 'misc') =>
+      allOptions.filter((option) => {
+        if (used.has(option.normalized)) return false;
+        if (option.group !== key) return false;
+        used.add(option.normalized);
+        return true;
+      });
+    return [
+      { key: 'leave' as const, title: '근태·휴가', items: make('leave') },
+      { key: 'work' as const, title: '업무·지원', items: make('work') },
+      { key: 'misc' as const, title: '양식·기타', items: make('misc') },
+    ].filter((group) => group.items.length > 0);
+  }, [allOptions]);
+
+  const currentOption = useMemo(
+    () => allOptions.find((option) => option.tab === formType || option.normalized === formType),
+    [allOptions, formType],
+  );
+  const activeFormLabel = currentOption?.label || formType;
+  const currentSelectValue = currentOption?.tab ?? '';
+
   // '증명서발급' 양식은 자체 양식 컴포넌트가 본문을 대체하므로 일반 문서 본문/이전 기안 노출 제외
   const selectedDraft = formType !== '증명서발급' ? lastDraftByType[formType] : null;
   const showDocumentBody = formType !== '증명서발급';
   const isOfficialDispatch = formType === '공문발송';
   const isEditingApproval = Boolean(editingApproval?.id);
-
   const contentReady = !showDocumentBody || isOfficialDispatch || Boolean(formTitle.trim());
-
-  const canGoToStep = (target: StepId): boolean => {
-    if (target === 1) return true;
-    if (target === 2) return Boolean(formType);
-    if (target === 3) return Boolean(formType) && contentReady;
-    return Boolean(formType) && contentReady && hasApproverSelection;
-  };
-
-  const goNext = () => {
-    if (currentStep < 4 && canGoToStep((currentStep + 1) as StepId)) {
-      setCurrentStep((prev) => (Math.min(prev + 1, 4) as StepId));
-    }
-  };
-  const goPrev = () => {
-    if (currentStep > 1) setCurrentStep((prev) => (Math.max(prev - 1, 1) as StepId));
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [currentStep]);
 
   const selectFormType = (tab: string) => {
     const nextFormType = normalizeComposeFormType(tab);
@@ -161,36 +185,22 @@ export default function ApprovalComposerView({
     void handleSubmit();
   };
 
-  const stepIds: StepId[] = [1, 2, 3, 4];
-
-  const summaryItems = useMemo(() => {
-    const items: { label: string; value: string }[] = [
-      { label: '양식', value: activeFormLabel || '미선택' },
-    ];
-    if (showDocumentBody && !isOfficialDispatch) {
-      items.push({ label: '제목', value: formTitle.trim() || '(제목 없음)' });
-    }
-    items.push({
-      label: '결재선',
-      value:
-        approverLine.length > 0
-          ? approverLine.map((approver, index) => `${index + 1}. ${approver.name} ${approver.position || ''}`.trim()).join(' › ')
-          : '미지정',
-    });
-    items.push({
-      label: '참조',
-      value: ccLine.length > 0 ? ccLine.map((cc) => cc.name).join(', ') : '없음',
-    });
-    return items;
-  }, [activeFormLabel, approverLine, ccLine, formTitle, isOfficialDispatch, showDocumentBody]);
-
-  const nextDisabled = !canGoToStep((currentStep + 1) as StepId);
   const submitDisabled = !hasApproverSelection || !contentReady || isSubmitting;
 
-  const nextLabel = currentStep === 3 ? '확인 및 상신' : '다음 단계';
+  // 결재 흐름 미리보기용 가상 item (작성 중 모드)
+  const composePreviewItem = useMemo<Record<string, unknown>>(
+    () => ({
+      sender_id: user?.id || '',
+      sender_name: user?.name || '기안자(나)',
+      status: '대기',
+      created_at: new Date().toISOString(),
+      meta_data: { approver_line: approverLine.map((approver) => String(approver.id)) },
+    }),
+    [user, approverLine],
+  );
 
   return (
-    <div className="-mx-4 md:mx-auto md:max-w-[62.4rem] space-y-3 pb-6">
+    <div className="mx-auto w-full max-w-[62.4rem] space-y-3 pb-6">
       {isEditingApproval && (
         <div className="app-card flex items-start gap-3 border-[var(--accent)]/25 bg-[var(--accent-selected-subtle)] p-3">
           <span className="erp-icon-box h-8 w-8 shrink-0 bg-[var(--card)] text-[var(--accent)]">
@@ -200,7 +210,7 @@ export default function ApprovalComposerView({
         </div>
       )}
 
-      {draftBanner && currentStep === 1 && (
+      {draftBanner && (
         <div className="app-card flex flex-col gap-2 p-3 animate-premium-fade sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="erp-icon-box h-8 w-8">
@@ -211,11 +221,7 @@ export default function ApprovalComposerView({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={loadDraftFromStorage}
-              className="btn-premium-primary min-h-[34px] flex-1 sm:flex-none"
-            >
+            <button type="button" onClick={loadDraftFromStorage} className="btn-premium-primary min-h-[34px] flex-1 sm:flex-none">
               불러오기
             </button>
             <button
@@ -232,294 +238,213 @@ export default function ApprovalComposerView({
         </div>
       )}
 
-      <nav className="app-card p-2.5 sm:p-3" aria-label="결재 작성 단계">
-        <ol className="grid grid-cols-4 gap-1 sm:gap-2">
-          {stepIds.map((id) => {
-            const meta = STEP_LABELS[id];
-            const isActive = currentStep === id;
-            const isCompleted = currentStep > id;
-            const reachable = canGoToStep(id);
-            return (
-              <li key={id} className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (reachable) setCurrentStep(id);
-                  }}
-                  disabled={!reachable}
-                  aria-current={isActive ? 'step' : undefined}
-                  className={`flex w-full min-w-0 items-center gap-1.5 rounded-[var(--radius-md)] px-1.5 py-1.5 text-left transition-colors sm:gap-2 sm:px-2 ${
-                    isActive
-                      ? 'bg-[var(--accent-selected-subtle)]'
-                      : reachable
-                        ? 'hover:bg-[var(--surface-subtle)]'
-                        : 'opacity-60'
-                  } disabled:cursor-not-allowed`}
-                >
-                  <span
-                    aria-hidden
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black transition-all sm:h-7 sm:w-7 sm:text-[11px] ${
-                      isActive
-                        ? 'bg-[var(--accent)] text-white shadow-[var(--shadow-xs)]'
-                        : isCompleted
-                          ? 'bg-[var(--accent)]/75 text-white'
-                          : 'border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted-foreground)]'
-                    }`}
-                  >
-                    {isCompleted ? <LucideIcon name="Check" size={12} strokeWidth={2.6} /> : id}
-                  </span>
-                  <span
-                    className={`min-w-0 truncate text-[11px] font-black sm:text-[12px] ${
-                      isActive
-                        ? 'text-[var(--accent)]'
-                        : isCompleted
-                          ? 'text-[var(--foreground)]'
-                          : 'text-[var(--muted-foreground)]'
-                    }`}
-                  >
-                    {meta.label}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
-      <section className="app-card overflow-hidden">
-        <div className="space-y-4 p-3 sm:p-4">
-          {currentStep === 1 && (
-            <div className="space-y-3 animate-premium-fade">
-              <ApprovalFormTypePicker
-                composeFormTabs={composeFormTabs}
-                builtinFormTypes={builtinFormTypes}
-                customFormTypes={customFormTypes}
-                formType={formType}
-                selectFormType={selectFormType}
-                lastDraftByType={lastDraftByType}
-              />
-
-              {selectedDraft && (
-                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="erp-icon-box h-7 w-7">
-                      <LucideIcon name="History" size={13} strokeWidth={2.2} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-[var(--muted-foreground)]">최근 상신 문서</p>
-                      <p className="truncate text-[12px] font-bold text-[var(--foreground)]">
-                        {(selectedDraft.title as string) || '(제목 없음)'} ·{' '}
-                        {new Date(selectedDraft.created_at as string).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={loadLastDraft} className="btn-premium-secondary min-h-[36px] w-full">
-                    이전 기안 불러오기
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-4 animate-premium-fade">
-              <div className="min-h-[220px]">
-                {['연차/휴가', '연장근무'].includes(formType) ? (
-                  <AttendanceForms
-                    user={user}
-                    staffs={staffs}
-                    formType={formType}
-                    setExtraData={setExtraData}
-                    setFormTitle={setFormTitle}
-                    initialExtraData={extraData}
-                  />
-                ) : formType === '물품신청' ? (
-                  <SuppliesForm
-                    key={suppliesLoadKey}
-                    setExtraData={setExtraData}
-                    initialItems={Array.isArray(extraData.items) ? (extraData.items as unknown[]) : undefined}
-                    user={user}
-                  />
-                ) : formType === '수리요청서' ? (
-                  <RepairRequestForm setExtraData={setExtraData} />
-                ) : formType === '보고서작성' ? (
-                  <ReportApprovalForm
-                    extraData={extraData}
-                    setExtraData={setExtraData}
-                    formTitle={formTitle}
-                    setFormTitle={setFormTitle}
-                  />
-                ) : formType === '증명서발급' ? (
-                  <FormRequest user={user} staffs={staffs} approverLine={approverLine} ccLine={ccLine} />
-                ) : formType === '출결정정' ? (
-                  <AttendanceCorrectionForm
-                    user={user}
-                    staffs={staffs}
-                    initialSelectedDates={attendanceCorrectionSeedDates}
-                    onConsumeInitialSelectedDates={() => setAttendanceCorrectionSeedDates([])}
-                    setExtraData={setExtraData}
-                    setFormTitle={setFormTitle}
-                  />
-                ) : formType === '연차계획서' ? (
-                  <AnnualLeavePlanForm
-                    user={user}
-                    staffs={staffs}
-                    setExtraData={setExtraData}
-                    setFormTitle={setFormTitle}
-                  />
-                ) : formType === '공문발송' ? (
-                  <OfficialDocumentDispatchForm
-                    user={user}
-                    extraData={extraData}
-                    setExtraData={setExtraData}
-                    setFormTitle={setFormTitle}
-                    setFormContent={setFormContent}
-                  />
-                ) : (
-                  <AdminForms
-                    staffs={staffs as { id: string; name: string; position: string }[]}
-                    formType={formType}
-                    setExtraData={setExtraData}
-                  />
-                )}
-              </div>
-
-              {showDocumentBody && (
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-[13px] font-bold text-[var(--foreground)]">문서 기본 정보</h3>
-                    {isOfficialDispatch && <span className="erp-status erp-status-blue">자동 반영</span>}
-                  </div>
-
-                  {!isOfficialDispatch ? (
-                    <div className="space-y-3">
-                      <label className="block space-y-1.5">
-                        <span className="text-[11px] font-bold text-[var(--muted-foreground)]">기안 제목</span>
-                        <input
-                          data-testid="approval-title-input"
-                          value={formTitle}
-                          onChange={(event) => setFormTitle(event.target.value)}
-                          className="h-12 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[15px] font-bold text-[var(--foreground)] outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-                          placeholder="기안 제목을 입력하세요"
-                        />
-                      </label>
-                      <label className="block space-y-1.5">
-                        <span className="text-[11px] font-bold text-[var(--muted-foreground)]">상세 내용</span>
-                        <textarea
-                          data-testid="approval-content-input"
-                          value={formContent}
-                          onChange={(event) => setFormContent(event.target.value)}
-                          className="h-44 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-[13px] font-semibold leading-relaxed text-[var(--foreground)] outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 md:h-52"
-                          placeholder="상세 사유 및 내용을 입력하세요."
-                        />
-                      </label>
-                    </div>
-                  ) : (
-                    <div className="rounded-[var(--radius-md)] border border-[var(--accent)]/20 bg-[var(--accent-selected-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--accent)]">
-                      공문 양식 자동 반영
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="space-y-3 animate-premium-fade">
-              <ApprovalApproverLinePanel
-                approverCandidates={approverCandidates}
-                approvalDirectoryStaffs={approvalDirectoryStaffs}
-                approverLine={approverLine}
-                setApproverLine={setApproverLine}
-                ccLine={ccLine}
-                setCcLine={setCcLine}
-                hasApproverSelection={hasApproverSelection}
-                approverTemplates={approverTemplates}
-                setApproverTemplates={setApproverTemplates}
-                persistApproverTemplates={persistApproverTemplates}
-                showApproverTemplateMenu={showApproverTemplateMenu}
-                setShowApproverTemplateMenu={setShowApproverTemplateMenu}
-                setTemplateNameInput={setTemplateNameInput}
-                setShowTemplateModal={setShowTemplateModal}
-              />
-            </div>
-          )}
-
-          {currentStep === 4 && (
-            <div className="space-y-3 animate-premium-fade">
-              <ol className="space-y-2">
-                {summaryItems.map((item) => (
-                  <li
-                    key={item.label}
-                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
-                  >
-                    <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-foreground)]">
-                      {item.label}
-                    </p>
-                    <p className="mt-1 text-[13px] font-black text-[var(--foreground)] whitespace-pre-wrap break-words">
-                      {item.value}
-                    </p>
-                  </li>
+      {/* 헤더: 양식 드롭다운 + 상신 액션 (H1·서브 라인 제거 — 사용자 결정 27번) */}
+      <header className="app-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2">
+            <span className="text-[11px] font-black text-[var(--muted-foreground)]">양식</span>
+            <div className="relative">
+              <select
+                value={currentSelectValue}
+                onChange={(event) => {
+                  if (event.target.value) selectFormType(event.target.value);
+                }}
+                data-testid="approval-form-type-select"
+                aria-label="결재 양식 선택"
+                className="h-9 min-w-[180px] appearance-none rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-3 pr-9 text-[13px] font-black text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+              >
+                <option value="" disabled>
+                  양식을 선택하세요
+                </option>
+                {groupedOptions.map((group) => (
+                  <optgroup key={group.key} label={group.title}>
+                    {group.items.map((option) => (
+                      <option key={option.tab} value={option.tab}>
+                        {option.label}
+                        {option.requiresPermission ? ' · 권한 필요' : ''}
+                        {option.isCustom ? ' (커스텀)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
-                {showDocumentBody && !isOfficialDispatch && formContent.trim() && (
-                  <li className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-foreground)]">
-                      상세 내용
-                    </p>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[13px] font-semibold leading-relaxed text-[var(--foreground)]">
-                      {formContent}
-                    </p>
-                  </li>
-                )}
-              </ol>
-
-              {!hasApproverSelection && (
-                <p className="rounded-[var(--radius-md)] bg-[var(--danger-light)] px-3 py-2 text-center text-[12px] font-bold text-[var(--danger)]">
-                  결재자를 먼저 지정하세요.
-                </p>
-              )}
+              </select>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+                <LucideIcon name="ChevronDown" size={14} strokeWidth={2.2} />
+              </span>
             </div>
+          </label>
+          {currentOption?.requiresPermission && (
+            <span className="rounded-[var(--radius-sm,4px)] bg-[var(--warning-light)] px-2 py-0.5 text-[10px] font-black text-[var(--warning)]">
+              권한 필요
+            </span>
+          )}
+          {selectedDraft && (
+            <span className="text-[11px] font-semibold text-[var(--muted-foreground)]">
+              최근 상신: {(selectedDraft.title as string) || '(제목 없음)'}
+              <button
+                type="button"
+                onClick={loadLastDraft}
+                className="ml-1.5 rounded-[var(--radius-sm,4px)] border border-[var(--border)] bg-[var(--card)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--foreground)] hover:border-[var(--accent)]/40"
+              >
+                불러오기
+              </button>
+            </span>
           )}
         </div>
-
-        <footer
-          className="flex items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-3"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
-        >
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={goPrev}
-            disabled={currentStep === 1}
-            className="btn-premium-secondary min-h-[44px] flex-1 max-w-[160px] disabled:cursor-not-allowed disabled:opacity-45"
+            data-testid="approval-submit-button"
+            onClick={submitApproval}
+            disabled={submitDisabled}
+            className="btn-premium-primary min-h-[38px] px-4 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <LucideIcon name="ChevronLeft" size={15} strokeWidth={2.2} />
-            이전
+            <LucideIcon name="Send" size={14} strokeWidth={2.2} />
+            {isEditingApproval ? '수정본 재상신' : '결재 상신'}
           </button>
+        </div>
+      </header>
 
-          {currentStep < 4 ? (
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={nextDisabled}
-              className="btn-premium-primary min-h-[44px] flex-1 max-w-[220px] disabled:cursor-not-allowed disabled:opacity-45"
-              data-testid={currentStep === 3 ? 'approval-step-confirm' : `approval-step-next-${currentStep}`}
-            >
-              {nextLabel}
-              <LucideIcon name="ChevronDown" size={15} strokeWidth={2.2} className="-rotate-90" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-testid="approval-submit-button"
-              onClick={submitApproval}
-              disabled={submitDisabled}
-              className="btn-premium-primary min-h-[44px] flex-1 max-w-[220px] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <LucideIcon name="Send" size={15} strokeWidth={2.2} />
-              {isEditingApproval ? '수정본 재상신' : '결재 상신'}
-            </button>
+      {/* 결재 흐름 카드 — 상신 버튼 바로 아래 (사용자 결정 29번) */}
+      <section className="app-card px-3 py-2.5">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <h2 className="text-[12px] font-black text-[var(--foreground)]">결재 흐름</h2>
+          <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+            상신 시 첫 결재자에게 알림 발송
+          </span>
+        </div>
+        <ApprovalLineTimeline
+          item={composePreviewItem}
+          staffs={approvalDirectoryStaffs}
+          resolveApprovalLineIds={() => approverLine.map((approver) => String(approver.id))}
+          resolveCurrentApproverId={() => (approverLine[0]?.id ? String(approverLine[0].id) : null)}
+          composeMode
+        />
+        <ApprovalApproverLinePanel
+          approverCandidates={approverCandidates}
+          referenceCandidates={referenceCandidates}
+          approvalDirectoryStaffs={approvalDirectoryStaffs}
+          approverLine={approverLine}
+          setApproverLine={setApproverLine}
+          ccLine={ccLine}
+          setCcLine={setCcLine}
+          hasApproverSelection={hasApproverSelection}
+          approverTemplates={approverTemplates}
+          setApproverTemplates={setApproverTemplates}
+          persistApproverTemplates={persistApproverTemplates}
+          showApproverTemplateMenu={showApproverTemplateMenu}
+          setShowApproverTemplateMenu={setShowApproverTemplateMenu}
+          setTemplateNameInput={setTemplateNameInput}
+          setShowTemplateModal={setShowTemplateModal}
+        />
+      </section>
+
+      {/* 본문 — 단일 컬럼 (사용자 결정 28번) */}
+      <section className="app-card overflow-hidden">
+        <div className="space-y-4 p-3 sm:p-4">
+          <header className="flex items-center justify-between gap-2">
+            <h2 className="text-[13px] font-black text-[var(--foreground)]">본문 · {activeFormLabel}</h2>
+            {isOfficialDispatch && <span className="erp-status erp-status-blue">자동 반영</span>}
+          </header>
+
+          <div className="min-h-[220px]">
+            {['연차/휴가', '연장근무'].includes(formType) ? (
+              <AttendanceForms
+                user={user}
+                staffs={staffs}
+                formType={formType}
+                setExtraData={setExtraData}
+                setFormTitle={setFormTitle}
+                initialExtraData={extraData}
+              />
+            ) : formType === '물품신청' ? (
+              <SuppliesForm
+                key={suppliesLoadKey}
+                setExtraData={setExtraData}
+                initialItems={Array.isArray(extraData.items) ? (extraData.items as unknown[]) : undefined}
+                user={user}
+              />
+            ) : formType === '수리요청서' ? (
+              <RepairRequestForm setExtraData={setExtraData} />
+            ) : formType === '보고서작성' ? (
+              <ReportApprovalForm
+                extraData={extraData}
+                setExtraData={setExtraData}
+                formTitle={formTitle}
+                setFormTitle={setFormTitle}
+              />
+            ) : formType === '증명서발급' ? (
+              <FormRequest user={user} staffs={staffs} approverLine={approverLine} ccLine={ccLine} />
+            ) : formType === '출결정정' ? (
+              <AttendanceCorrectionForm
+                user={user}
+                staffs={staffs}
+                initialSelectedDates={attendanceCorrectionSeedDates}
+                onConsumeInitialSelectedDates={() => setAttendanceCorrectionSeedDates([])}
+                setExtraData={setExtraData}
+                setFormTitle={setFormTitle}
+              />
+            ) : formType === '연차계획서' ? (
+              <AnnualLeavePlanForm
+                user={user}
+                staffs={staffs}
+                setExtraData={setExtraData}
+                setFormTitle={setFormTitle}
+              />
+            ) : formType === '공문발송' ? (
+              <OfficialDocumentDispatchForm
+                user={user}
+                extraData={extraData}
+                setExtraData={setExtraData}
+                setFormTitle={setFormTitle}
+                setFormContent={setFormContent}
+              />
+            ) : (
+              <AdminForms
+                staffs={staffs as { id: string; name: string; position: string }[]}
+                formType={formType}
+                setExtraData={setExtraData}
+              />
+            )}
+          </div>
+
+          {showDocumentBody && !isOfficialDispatch && (
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+              <h3 className="mb-3 text-[12px] font-black text-[var(--foreground)]">문서 기본 정보</h3>
+              <div className="space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold text-[var(--muted-foreground)]">기안 제목</span>
+                  <input
+                    data-testid="approval-title-input"
+                    value={formTitle}
+                    onChange={(event) => setFormTitle(event.target.value)}
+                    className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[14px] font-bold text-[var(--foreground)] outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                    placeholder="기안 제목을 입력하세요"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold text-[var(--muted-foreground)]">상세 내용</span>
+                  <textarea
+                    data-testid="approval-content-input"
+                    value={formContent}
+                    onChange={(event) => setFormContent(event.target.value)}
+                    className="h-40 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 text-[13px] font-semibold leading-relaxed text-[var(--foreground)] outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 md:h-48"
+                    placeholder="상세 사유 및 내용을 입력하세요."
+                  />
+                </label>
+              </div>
+            </div>
           )}
-        </footer>
+
+          {!hasApproverSelection && (
+            <p
+              data-testid="approval-approver-required-banner"
+              className="rounded-[var(--radius-md)] bg-[var(--danger-light)] px-3 py-2 text-[12px] font-bold text-[var(--danger)]"
+            >
+              결재자를 먼저 지정하세요.
+            </p>
+          )}
+        </div>
       </section>
     </div>
   );

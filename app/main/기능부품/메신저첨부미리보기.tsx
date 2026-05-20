@@ -447,59 +447,68 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
           </>
         ) : null}
 
-        <div className="max-w-[92vw] max-h-full w-full flex items-center justify-center p-2" onClick={(e) => e.stopPropagation()}>
-          {isImage ? (
-            imageLoadFailed ? (
-              <div className="flex min-h-[220px] w-full max-w-md items-center justify-center rounded-xl border border-white/15 bg-white/10 px-6 text-center text-sm font-semibold text-white">
-                이미지를 불러올 수 없습니다
-              </div>
-            ) : (
-              <div
-                className={`flex items-center justify-center overflow-hidden rounded-xl ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
-                style={{ touchAction: zoom > 1 ? 'none' : 'manipulation', maxWidth: '92vw', maxHeight: 'calc(100vh - 160px)' }}
-                onWheel={handleImageWheel}
-                onPointerDown={handleImagePointerDown}
-                onPointerMove={handleImagePointerMove}
-                onPointerUp={handleImagePointerUp}
-                onPointerCancel={handleImagePointerUp}
-                onDoubleClick={handleImageDoubleClick}
-              >
-                <img
-                  src={activeViewUrl}
-                  alt={activeItem.name || '미리보기'}
-                  data-testid="chat-attachment-preview-image"
-                  className="rounded-xl object-contain shadow-sm select-none"
-                  style={{
-                    maxWidth: '92vw',
-                    maxHeight: 'calc(100vh - 160px)',
-                    transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom}) rotate(${rotation}deg)`,
-                    transformOrigin: 'center center',
-                    transition: isDragging ? 'none' : 'transform 160ms ease',
-                  }}
-                  draggable={false}
-                  onError={() => setImageLoadFailed(true)}
-                />
-              </div>
-            )
-          ) : activeItem.kind === 'video' ? (
-            <video src={activeViewUrl} controls autoPlay playsInline className="max-w-[92vw] max-h-[calc(100vh-160px)] rounded-xl bg-black shadow-sm" />
-          ) : /\.pdf(\?|#|$)/i.test(activeItem.url) ? (
-            <iframe src={activeViewUrl} title={activeItem.name} className="w-[92vw] h-[calc(100vh-160px)] rounded-xl bg-[var(--card)] shadow-sm" />
-          ) : (
-            <div className="w-full max-w-md rounded-[var(--radius-xl)] bg-[var(--card)] p-6 shadow-sm text-left">
-              <p className="text-sm font-bold text-[var(--foreground)] break-all">{activeItem.name}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <a href={activeViewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white">새 창 열기</a>
-                <a
-                  href={buildDownloadUrl(activeItem.url, activeItem.name ?? '')}
-                  onClick={(event) => void handleStorageDownloadLinkClick(event, activeItem.url, activeItem.name ?? 'download')}
-                  download={activeItem.name ?? 'download'}
-                  className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
-                >다운로드</a>
-              </div>
+        {isImage ? (
+          imageLoadFailed ? (
+            <div
+              className="flex min-h-[220px] w-full max-w-md items-center justify-center rounded-xl border border-white/15 bg-white/10 px-6 text-center text-sm font-semibold text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              이미지를 불러올 수 없습니다
             </div>
-          )}
-        </div>
+          ) : (
+            // 줌 영역을 본문 전체로 채워, 확대 시 사진이 작은 박스에 갇히지 않고
+            // 화면 전체로 확대되도록 한다(overflow-hidden 은 상·하단 바를 침범하지 않게 유지).
+            <div
+              className={`flex h-full w-full items-center justify-center overflow-hidden p-2 ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in'}`}
+              style={{ touchAction: zoom > 1 ? 'none' : 'manipulation' }}
+              onWheel={handleImageWheel}
+              onPointerDown={handleImagePointerDown}
+              onPointerMove={handleImagePointerMove}
+              onPointerUp={handleImagePointerUp}
+              onPointerCancel={handleImagePointerUp}
+              onDoubleClick={handleImageDoubleClick}
+              onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}
+            >
+              <img
+                src={activeViewUrl}
+                alt={activeItem.name || '미리보기'}
+                data-testid="chat-attachment-preview-image"
+                className="rounded-xl object-contain shadow-sm select-none"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom}) rotate(${rotation}deg)`,
+                  transformOrigin: 'center center',
+                  transition: isDragging ? 'none' : 'transform 160ms ease',
+                }}
+                draggable={false}
+                onClick={(e) => e.stopPropagation()}
+                onError={() => setImageLoadFailed(true)}
+              />
+            </div>
+          )
+        ) : (
+          <div className="flex max-h-full max-w-[92vw] items-center justify-center p-2" onClick={(e) => e.stopPropagation()}>
+            {activeItem.kind === 'video' ? (
+              <video src={activeViewUrl} controls autoPlay playsInline className="max-w-[92vw] max-h-[calc(100vh-160px)] rounded-xl bg-black shadow-sm" />
+            ) : /\.pdf(\?|#|$)/i.test(activeItem.url) ? (
+              <iframe src={activeViewUrl} title={activeItem.name} className="w-[92vw] h-[calc(100vh-160px)] rounded-xl bg-[var(--card)] shadow-sm" />
+            ) : (
+              <div className="w-full max-w-md rounded-[var(--radius-xl)] bg-[var(--card)] p-6 shadow-sm text-left">
+                <p className="text-sm font-bold text-[var(--foreground)] break-all">{activeItem.name}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <a href={activeViewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-lg bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white">새 창 열기</a>
+                  <a
+                    href={buildDownloadUrl(activeItem.url, activeItem.name ?? '')}
+                    onClick={(event) => void handleStorageDownloadLinkClick(event, activeItem.url, activeItem.name ?? 'download')}
+                    download={activeItem.name ?? 'download'}
+                    className="inline-flex items-center rounded-lg bg-[var(--tab-bg)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
+                  >다운로드</a>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 하단 썸네일 스트립 */}

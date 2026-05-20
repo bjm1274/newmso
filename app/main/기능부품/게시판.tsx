@@ -19,6 +19,7 @@ import {
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
+import PostTableView from './게시판서브/PostTableView';
 import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 import { BOARD_MENU_ITEMS } from './게시판메뉴';
@@ -64,6 +65,11 @@ import { isAnonymousReadStatusPost, BODY_PARTS, VALID_BODY_IDS } from './게시�
 import ReadStatusModal from './게시판/ReadStatusModal';
 import CommentComposerSticky from '@/app/components/CommentComposerSticky';
 import { useIsMobile } from '@/app/components/useIsMobile';
+import {
+  drawBoardPollPrize,
+  type BoardPoll,
+  type BoardPollPrizeWinner,
+} from './게시판서브/board-poll-prize';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -129,6 +135,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [pollAnonymous, setPollAnonymous] = useState(false);
   const [pollMultiple, setPollMultiple] = useState(false);
+  // 상품 추첨
+  const [pollPrizeEnabled, setPollPrizeEnabled] = useState(false);
+  const [pollPrizeWinnerCount, setPollPrizeWinnerCount] = useState(1);
+  const [pollPrizeName, setPollPrizeName] = useState('');
+  // 추첨 진행 중 로딩 상태 (postId 저장)
+  const [drawingPostId, setDrawingPostId] = useState<string | null>(null);
   const [schedulePeriod, setSchedulePeriod] = useState('');
   const [scheduleHour, setScheduleHour] = useState('');
   const [scheduleMinute, setScheduleMinute] = useState('');
@@ -1131,6 +1143,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setPollOptions(['', '']);
     setPollAnonymous(false);
     setPollMultiple(false);
+    setPollPrizeEnabled(false);
+    setPollPrizeWinnerCount(1);
+    setPollPrizeName('');
     setEditingPostId(null);
   };
 
@@ -1212,12 +1227,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           setLoading(false);
           return;
         }
-        postData.poll = {
+        const pollData: BoardPoll = {
           question: pollQuestion.trim() || normalizedTitle,
           options: validOptions,
           anonymous: pollAnonymous,
           multiple: pollMultiple,
         };
+        if (pollPrizeEnabled && pollPrizeName.trim() && pollPrizeWinnerCount >= 1) {
+          pollData.prize = { winnerCount: pollPrizeWinnerCount, name: pollPrizeName.trim() };
+        }
+        postData.poll = pollData;
       } else if (editingPostId) {
         postData.poll = null;
       }
@@ -1431,18 +1450,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-4 space-y-4 md:space-y-4 pb-24 md:pb-8">
-          {canCreatePost && (
-            <div className="shrink-0 flex justify-start md:justify-end">
-              <button type="button"
-                data-testid="board-toggle-new-post"
-                onClick={() => setShowNewPost(!showNewPost)}
-                className="px-4 md:px-4 py-2.5 md:py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-              >
-                {showNewPost ? '취소' : '+ 새 게시물'}
-              </button>
-            </div>
-          )}
-
           {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) */}
           {showNewPost && activeBoard !== '업무가이드' && (
             <div data-testid="board-new-post-form" className="bg-[var(--card)] p-4 md:p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -1824,6 +1831,45 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <input type="checkbox" checked={pollMultiple} onChange={(e) => setPollMultiple(e.target.checked)} className="w-4 h-4 rounded accent-[var(--accent)]" />
                             복수 선택 허용
                           </label>
+                        </div>
+                        {/* 상품 추첨 섹션 */}
+                        <div className="pt-1 border-t border-[var(--border)]">
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
+                            <input
+                              type="checkbox"
+                              id="board-poll-prize-enabled"
+                              checked={pollPrizeEnabled}
+                              onChange={(e) => setPollPrizeEnabled(e.target.checked)}
+                              className="w-4 h-4 rounded accent-[var(--accent)]"
+                            />
+                            상품 추첨 진행
+                          </label>
+                          {pollPrizeEnabled && (
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <div>
+                                <label htmlFor="board-poll-prize-count" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">당첨 인원</label>
+                                <input
+                                  id="board-poll-prize-count"
+                                  type="number"
+                                  min={1}
+                                  value={pollPrizeWinnerCount}
+                                  onChange={(e) => setPollPrizeWinnerCount(Math.max(1, Number(e.target.value) || 1))}
+                                  className="w-full p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="board-poll-prize-name" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상품명</label>
+                                <input
+                                  id="board-poll-prize-name"
+                                  type="text"
+                                  value={pollPrizeName}
+                                  onChange={(e) => setPollPrizeName(e.target.value)}
+                                  placeholder="예: 아메리카노 쿠폰"
+                                  className="w-full p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2256,7 +2302,42 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           )}
 
           {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
-          {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
+          {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && !isMobile && (
+            <PostTableView
+              boardLabel={activeBoard}
+              posts={visiblePosts}
+              loading={loading}
+              noticeVisibilityTick={noticeVisibilityTick}
+              myLikedPostIds={myLikedPostIds}
+              postReadMap={postReadMap}
+              effectiveBoardUserId={effectiveBoardUserId}
+              canCreatePost={canCreatePost}
+              showNewPost={showNewPost}
+              onToggleNewPost={() => setShowNewPost((v) => !v)}
+              onSelectPost={(postId) => setSelectedPostId(postId)}
+              onToggleLike={(post) => { void handleLike(post); }}
+              emptyDescription={
+                activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
+                  ? '작성된 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
+                  : '새 게시물이 등록되면 이 목록에 표시됩니다.'
+              }
+            />
+          )}
+
+          {/* 모바일: 기존 카드 리스트 유지 (모바일 영역 변경 금지) */}
+          {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && isMobile && canCreatePost && (
+            <div className="shrink-0 flex justify-start">
+              <button
+                type="button"
+                data-testid="board-toggle-new-post"
+                onClick={() => setShowNewPost(!showNewPost)}
+                className="px-4 py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+              >
+                {showNewPost ? '취소' : '+ 새 게시물'}
+              </button>
+            </div>
+          )}
+          {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && isMobile && (
             <div data-testid="board-post-list" className="space-y-2">
               {loading ? (
                 <div className="space-y-2">
@@ -2553,11 +2634,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
                 {/* 투표 표시 */}
                 {((selectedPost as Record<string, unknown>).poll ? (() => {
-                  const poll = (selectedPost as Record<string, unknown>).poll as { question?: string; options?: string[]; anonymous?: boolean; multiple?: boolean };
+                  const poll = (selectedPost as Record<string, unknown>).poll as BoardPoll;
                   const votes = ((selectedPost as Record<string, unknown>).poll_votes || {}) as Record<string, string[]>;
                   const myId = effectiveBoardUserId;
-                  const hasVoted = Object.values(votes).some((arr) => Array.isArray(arr) && arr.includes(String(myId)));
                   const totalVotes = Object.values(votes).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+                  const isAuthor = String((selectedPost as Record<string, unknown>).author_id ?? '') === myId && myId !== '';
+                  const hasPrize = Boolean(poll.prize);
+                  const prizeWinners: BoardPollPrizeWinner[] = Array.isArray(poll.prizeWinners) ? poll.prizeWinners : [];
+                  const alreadyDrawn = prizeWinners.length > 0;
+                  const isDrawing = drawingPostId === selectedPost.id;
 
                   const handlePostPollVote = async (optIdx: number) => {
                     if (!myId) return;
@@ -2582,6 +2667,45 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: currentVotes } : prev);
                   };
 
+                  const handleDrawPrize = async () => {
+                    if (!isAuthor || !myId) return;
+                    setDrawingPostId(selectedPost.id);
+                    try {
+                      const result = await drawBoardPollPrize({
+                        postId: selectedPost.id,
+                        poll,
+                        pollVotes: votes,
+                        actorId: myId,
+                        actorName: user?.name ?? '관리자',
+                      });
+                      if (!result.ok) {
+                        toast(result.message, 'warning');
+                        return;
+                      }
+                      // 낙관적 갱신: poll.prizeWinners 반영
+                      const updatedPoll: BoardPoll = { ...poll, prizeWinners: result.winners };
+                      const updatedPollVotes = votes;
+                      setPosts((prev) => prev.map((p) =>
+                        p.id === selectedPost.id ? { ...p, poll: updatedPoll } : p,
+                      ));
+                      setSelectedPostDetail((prev: BoardPost | null) =>
+                        prev?.id === selectedPost.id ? { ...prev, poll: updatedPoll, poll_votes: updatedPollVotes } : prev,
+                      );
+                      // 댓글 목록 새로고침 (추첨 결과 댓글 표시)
+                      const { data: newComments } = await supabase
+                        .from('board_post_comments')
+                        .select(BOARD_COMMENT_SELECT)
+                        .eq('post_id', selectedPost.id)
+                        .order('created_at', { ascending: true });
+                      if (newComments) {
+                        setComments((prev) => ({ ...prev, [selectedPost.id]: newComments as BoardCommentRow[] }));
+                      }
+                      toast(`🎉 추첨 완료! 당첨자: ${result.winners.map((w) => w.name).join(', ')}`);
+                    } finally {
+                      setDrawingPostId(null);
+                    }
+                  };
+
                   return (
                     <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/20 p-4 space-y-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{poll.question || selectedPost.title}</p>
@@ -2592,7 +2716,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
                           const myVote = Array.isArray(votes[String(i)]) && votes[String(i)].includes(String(myId));
                           return (
-                            <button key={i} type="button" onClick={() => handlePostPollVote(i)} className={`w-full text-left rounded-lg border p-3 transition relative overflow-hidden ${myVote ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/30'}`}>
+                            <button key={i} type="button" onClick={() => void handlePostPollVote(i)} className={`w-full text-left rounded-lg border p-3 transition relative overflow-hidden ${myVote ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/30'}`}>
                               <div className="absolute inset-y-0 left-0 bg-[var(--accent)]/10 transition-all" style={{ width: `${pct}%` }} />
                               <div className="relative flex justify-between items-center">
                                 <span className="text-sm font-bold">{myVote ? '✓ ' : ''}{opt}</span>
@@ -2603,6 +2727,32 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         })}
                       </div>
                       <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold">총 {totalVotes}표 · {poll.multiple ? '복수 선택' : '단일 선택'}</p>
+                      {/* 상품 추첨 영역 */}
+                      {hasPrize && (
+                        <div className="border-t border-[var(--accent)]/10 pt-3 space-y-2">
+                          {alreadyDrawn ? (
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-0.5">
+                              <p className="text-xs font-bold text-amber-700">🎁 상품: {poll.prize!.name}</p>
+                              <p className="text-xs font-bold text-amber-800">🏆 당첨: {prizeWinners.map((w) => w.name).join(', ')}</p>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">🎁 상품: {poll.prize!.name} (당첨 {poll.prize!.winnerCount}명)</p>
+                              {isAuthor && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDrawPrize()}
+                                  disabled={isDrawing}
+                                  aria-label="투표 참여자 중 상품 당첨자 추첨"
+                                  className="px-4 py-2 rounded-[var(--radius-md)] bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                  {isDrawing ? '추첨 중...' : '🎁 추첨하기'}
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })() : null) as React.ReactNode}

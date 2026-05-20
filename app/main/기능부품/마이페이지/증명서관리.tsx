@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
 import {
   buildApprovalCertificatePrintHtml,
@@ -52,6 +53,10 @@ type CertificateContextStaff = {
   grade?: string | null;
   level?: string | null;
   profile_photo_url?: string | null;
+  profile_photo_path?: string | null;
+  profile_photo_updated_at?: string | null;
+  avatar_url?: string | null;
+  photo_url?: string | null;
   permissions?: Record<string, unknown> | null;
 };
 
@@ -106,6 +111,12 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       }
 
       try {
+        // 내정보에는 발급 후 한 달 이내의 증명서만 노출한다(오래된 발급분 자동 정리).
+        // certificate_issuances 원본은 그대로 보존되어 인사관리 '발급 이력 조회'에는 남는다.
+        const certificateCutoff = new Date();
+        certificateCutoff.setMonth(certificateCutoff.getMonth() - 1);
+        const certificateCutoffIso = certificateCutoff.toISOString();
+
         const [approvalRes, certRes, staffRes] = await Promise.all([
           supabase
             .from('approvals')
@@ -119,11 +130,12 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             .from('certificate_issuances')
             .select('*, staff_members!certificate_issuances_staff_id_fkey(name)')
             .eq('staff_id', effectiveUserId)
+            .gte('issued_at', certificateCutoffIso)
             .order('issued_at', { ascending: false })
             .limit(20),
           supabase
             .from('staff_members')
-            .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, permissions')
+            .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions')
             .eq('id', effectiveUserId)
             .maybeSingle(),
         ]);
@@ -146,9 +158,10 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
               .from('contract_templates')
               .select('seal_url')
               .eq('company_name', companyName)
-              .maybeSingle();
-            if (!cancelled && !sealRes.error && sealRes.data?.seal_url) {
-              setSealUrl(String(sealRes.data.seal_url));
+              .limit(1);
+            const sealRow = sealRes.data?.[0];
+            if (!cancelled && !sealRes.error && sealRow?.seal_url) {
+              setSealUrl(String(sealRow.seal_url));
             }
           } catch (sealError) {
             console.error('증명서 직인 조회 실패:', sealError);
@@ -200,7 +213,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       employeeNo,
       duty: dutyLabel,
       rank: rankLabel,
-      profilePhotoUrl: staffDetail?.profile_photo_url || null,
+      profilePhotoUrl: getProfilePhotoUrl(staffDetail) || null,
     };
   }, [resolvedUser, sealUrl, staffDetail]);
 

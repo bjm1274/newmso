@@ -23,7 +23,7 @@ const MAX_RECENT = 5;
 const LS_FAVORITES = 'erp_favorites';
 const LS_RECENT = 'erp_recent_features';
 
-const FEATURE_GROUP_ORDER = ['운영 보조', '의료/현장'] as const;
+const FEATURE_GROUP_ORDER = ['운영 보조', '의료 · 현장'] as const;
 
 const FEATURE_PRESENTATION: Record<string, { group: (typeof FEATURE_GROUP_ORDER)[number] }> = {
   'org-chart': { group: '운영 보조' },
@@ -33,10 +33,10 @@ const FEATURE_PRESENTATION: Record<string, { group: (typeof FEATURE_GROUP_ORDER)
   'closing-report': { group: '운영 보조' },
   'staff-evaluation': { group: '운영 보조' },
   'realtime-deposit': { group: '운영 보조' },
-  'discharge-review': { group: '의료/현장' },
-  'surgery-consultation': { group: '의료/현장' },
-  'op-check': { group: '의료/현장' },
-  'esl-manager': { group: '의료/현장' },
+  'discharge-review': { group: '의료 · 현장' },
+  'surgery-consultation': { group: '의료 · 현장' },
+  'op-check': { group: '의료 · 현장' },
+  'esl-manager': { group: '의료 · 현장' },
 };
 
 type ExtraFeaturesProps = {
@@ -371,18 +371,21 @@ export default function ExtraFeatures({
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`${item.label} — 외부 시스템 ${item.vendor} 새 창에서 열기`}
                 className="group flex min-h-[112px] flex-col items-start justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
               >
                 <div className="flex w-full items-start justify-between gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--accent)] transition-colors group-hover:bg-[var(--toss-blue-light)]">
                     <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
                   </div>
-                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
-                    새 창
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
+                    외부 시스템
+                    <LucideIcon name="ArrowUpRight" size={10} strokeWidth={2.4} />
                   </span>
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 min-w-0">
                   <h3 className="text-[13px] font-black text-[var(--foreground)]">{item.label}</h3>
+                  <p className="mt-0.5 truncate text-[10px] font-bold text-[var(--toss-gray-3)]">{item.vendor}</p>
                 </div>
               </a>
               ))}

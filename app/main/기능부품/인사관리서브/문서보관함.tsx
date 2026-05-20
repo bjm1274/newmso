@@ -5,6 +5,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { extractApprovalDocNumberFromDocument, mapApprovalToDocumentRepositoryEntry } from '@/lib/approval-document-archive';
 import ArchivedDocumentView from './ArchivedDocumentView';
+import IssuedCertificateSection from './IssuedCertificateSection';
+import LaborContractViewer from './LaborContractViewer';
+import { openDocumentPrintView } from './document-print-utils';
+
+type DocumentCenterView = '기안 문서' | '발급 증명서';
 
 const CATEGORIES = [
   { id: '규정', label: '규정' },
@@ -32,75 +37,10 @@ function hasApprovalArchiveSignature(doc: Record<string, unknown> | null | undef
   return false;
 }
 
-function escapeHtml(value: unknown) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function formatDocumentDate(value: unknown) {
-  const date = value ? new Date(String(value)) : new Date();
-  if (Number.isNaN(date.getTime())) return new Date().toLocaleDateString('ko-KR');
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
-function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: string) {
-  const title = String(doc.title || '문서');
-  const category = String(doc.category || '문서');
-  const companyName = String(doc.company_name || selectedCo || '전체');
-  const content = String(doc.content || '');
-  const updatedAt = formatDocumentDate(doc.updated_at || doc.created_at);
-  const popup = window.open('', '_blank');
-  if (!popup) {
-    toast('팝업 차단을 해제한 뒤 다시 열어 주세요.', 'warning');
-    return;
-  }
-
-  popup.document.write(`<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(title)}</title>
-  <style>
-    @page { size: A4; margin: 18mm; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #f1f4f8; color: #111827; font-family: "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif; }
-    .toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; background: #111827; }
-    button { border: 0; border-radius: 8px; background: #2563eb; color: #fff; font-weight: 700; padding: 8px 14px; cursor: pointer; }
-    .sheet { width: 210mm; min-height: 297mm; margin: 18px auto; background: #fff; padding: 22mm 20mm; box-shadow: 0 24px 70px rgba(15,23,42,.18); }
-    .meta { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 24px; font-size: 12px; color: #4b5563; }
-    h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0; color: #111827; }
-    .badge { display: inline-flex; border-radius: 999px; background: #eff6ff; color: #1d4ed8; padding: 4px 10px; font-size: 11px; font-weight: 800; }
-    .content { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.78; font-size: 13px; }
-    .footer { margin-top: 36px; border-top: 1px solid #d1d5db; padding-top: 16px; text-align: right; font-size: 12px; color: #6b7280; }
-    @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; box-shadow: none; width: auto; min-height: auto; padding: 0; } }
-  </style>
-</head>
-<body>
-  <div class="toolbar"><button onclick="window.print()">인쇄 / PDF 저장</button></div>
-  <main class="sheet">
-    <div class="meta">
-      <div>
-        <span class="badge">${escapeHtml(category)}</span>
-        <h1>${escapeHtml(title)}</h1>
-        <div>${escapeHtml(companyName)}</div>
-      </div>
-      <div>${escapeHtml(updatedAt)}</div>
-    </div>
-    <section class="content">${escapeHtml(content)}</section>
-    <div class="footer">${escapeHtml(companyName)}</div>
-  </main>
-</body>
-</html>`);
-  popup.document.close();
-}
-
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(문서보관함)은 그대로 유지됩니다.
+type UserRecord = Record<string, unknown> | null | undefined;
+
 export default function DocumentRepository({
   user,
   selectedCo,
@@ -108,14 +48,15 @@ export default function DocumentRepository({
   canManageDocuments = false,
   title = '문서 보관함',
 }: {
-  user: any;
+  user: UserRecord;
   selectedCo: string;
   linkedTarget?: { id?: string; name?: string };
   canManageDocuments?: boolean;
   title?: string;
 }) {
   const { dialog, openConfirm } = useActionDialog();
-  const [docs, setDocs] = useState<any[]>([]);
+  const [activeView, setActiveView] = useState<DocumentCenterView>('기안 문서');
+  const [docs, setDocs] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState({ title: '', category: '규정', content: '' });
@@ -229,12 +170,12 @@ export default function DocumentRepository({
     } catch (e) { toast('저장 중 오류가 발생했습니다.', 'error'); } finally { setSaving(false); }
   };
 
-  const handleEdit = (d: any) => {
+  const handleEdit = (d: Record<string, unknown>) => {
     setSelected(d);
-    setForm({ title: d.title, category: d.category || '규정', content: d.content || '' });
+    setForm({ title: String(d.title || ''), category: String(d.category || '규정'), content: String(d.content || '') });
   };
 
-  const handleDelete = async (doc: any) => {
+  const handleDelete = async (doc: Record<string, unknown>) => {
     if (!doc?.id) return;
     if (!canManageDocuments) {
       toast('문서 삭제는 관리자 전용입니다.', 'warning');
@@ -284,24 +225,50 @@ export default function DocumentRepository({
     toast('열 수 있는 문서 내용이나 파일이 없습니다.', 'warning');
   };
 
+  const VIEW_TABS: { id: DocumentCenterView; label: string }[] = [
+    { id: '기안 문서', label: '기안 문서' },
+    { id: '발급 증명서', label: '발급 증명서' },
+  ];
+
   return (
     <div className="flex flex-col h-full app-page p-4 md:p-5">
       {dialog}
       <div className="flex justify-between items-center mb-4 gap-3 flex-wrap">
-        <h2 className="text-xl font-bold text-[var(--foreground)]">{title}</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-4)]"
-          >
-            <option value="전체">전체 폴더</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-[var(--foreground)]">{title}</h2>
+          {/* 기안 문서 / 발급 증명서 탭 */}
+          <div className="flex gap-1 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-1">
+            {VIEW_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveView(tab.id)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-md)] transition-colors ${
+                  activeView === tab.id
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                }`}
+              >
+                {tab.label}
+              </button>
             ))}
-          </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {activeView === '기안 문서' && (
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-4)]"
+            >
+              <option value="전체">전체 폴더</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="text"
             value={staffFilterName || ''}
@@ -309,18 +276,30 @@ export default function DocumentRepository({
             placeholder="직원 이름으로 검색"
             className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] min-w-[140px]"
           />
-          <button
-            onClick={handleNew}
-            disabled={!canManageDocuments}
-            className={`px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] ${
-              canManageDocuments ? 'hover:bg-[var(--accent)]' : 'hidden'
-            }`}
-          >
-            + 새 문서
-          </button>
+          {activeView === '기안 문서' && (
+            <button
+              onClick={handleNew}
+              disabled={!canManageDocuments}
+              className={`px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] ${
+                canManageDocuments ? 'hover:bg-[var(--accent)]' : 'hidden'
+              }`}
+            >
+              + 새 문서
+            </button>
+          )}
         </div>
       </div>
 
+      {/* ── 발급 증명서 탭 ── */}
+      {activeView === '발급 증명서' && (
+        <IssuedCertificateSection
+          selectedCo={selectedCo}
+          staffFilterName={staffFilterName}
+        />
+      )}
+
+      {/* ── 기안 문서 탭 ── */}
+      {activeView === '기안 문서' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden">
           <div className="p-4 border-b border-[var(--border)] flex items-center justify-between gap-2">
@@ -354,7 +333,7 @@ export default function DocumentRepository({
                     ) : (
                       folderDocs.map((d) => (
                         <div
-                          key={d.id}
+                          key={String(d.id ?? '')}
                           className={`flex items-center border-b border-[var(--muted)] hover:bg-[var(--muted)] ${selected?.id === d.id ? 'bg-[var(--toss-blue-light)]' : ''
                             }`}
                         >
@@ -363,11 +342,11 @@ export default function DocumentRepository({
                             className="flex-1 text-left pl-6 pr-4 py-3"
                           >
                             <p className="font-semibold text-[var(--foreground)] truncate text-sm">
-                              {d.title}
+                              {String(d.title ?? '')}
                             </p>
                             <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
-                              v{d.version} ·{' '}
-                              {new Date(d.updated_at).toLocaleDateString('ko-KR')}
+                              v{String(d.version ?? '')} ·{' '}
+                              {new Date(String(d.updated_at ?? '')).toLocaleDateString('ko-KR')}
                             </p>
                           </button>
                         </div>
@@ -425,49 +404,7 @@ export default function DocumentRepository({
             <ArchivedDocumentView doc={selected} companyName={selectedCo} />
           ) : selected?.category === '근로계약서' ? (
             /* 계약서 전용 뷰어 (A4 스타일) */
-            <div className="bg-[var(--tab-bg)] p-4 md:p-5 rounded-[var(--radius-md)] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
-              <div className="w-full max-w-[650px] bg-[var(--card)] shadow-sm p-5 md:p-14 font-serif text-[12px] leading-relaxed relative border border-[var(--border)]">
-                {/* Watermark */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-                  <span className="text-[80px] font-black rotate-[-45deg]">ORIGINAL</span>
-                </div>
-
-                <div className="relative z-10">
-                  <h1 className="text-xl font-black text-center mb-10 tracking-widest underline underline-offset-8">근 로 계 약 서</h1>
-
-                  <div className="whitespace-pre-wrap text-[var(--foreground)] leading-[1.8]">
-                    {(() => {
-                      let text = form.content;
-                      // ASCII 표 제거
-                      text = text.replace(/┌[─┬┐\s\S]*?┘/g, '');
-                      return text;
-                    })()}
-                  </div>
-
-                  <div className="mt-14 pt-8 border-t border-dotted border-[var(--border)] text-center">
-                    <p className="font-bold text-[14px]">{new Date(selected.updated_at as string).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-
-                    <div className="mt-10 flex justify-between items-start text-left">
-                      <div className="w-1/2 space-y-2">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">[사용자]</p>
-                        <p className="font-bold">{(selected.company_name as string) || selectedCo}</p>
-                        <div className="relative inline-block">
-                          <p className="font-bold">대표이사 (인)</p>
-                          <div className="absolute -top-3 -right-6 w-10 h-10 border-2 border-red-500/30 rounded-full flex items-center justify-center rotate-12">
-                            <span className="text-[10px] text-red-500/40 font-bold">인</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="w-1/2 text-right space-y-2">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">[근로자]</p>
-                        <p className="font-bold">{(selected.title as string).split(' ')[0]}</p>
-                        <p className="font-bold">(서명)</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <LaborContractViewer doc={selected} content={form.content} selectedCo={selectedCo} />
           ) : (
             /* 일반 문서 편집 폼 */
             <fieldset className="space-y-4" disabled={isReadOnlySelected || !canManageDocuments}>
@@ -518,6 +455,7 @@ export default function DocumentRepository({
           </div>
         </div>
       </div>
+      )} {/* end 기안 문서 탭 */}
     </div>
   );
 }

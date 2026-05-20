@@ -311,6 +311,24 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
   }, [effectiveUserId, currentMonth, currentDateKey]);
 
+  // JM2/JM3: 워크센터 "정상 처리" 등 외부 이벤트로 본인 근태가 보정되면 즉시 재로드.
+  //   - 다른 직원 이벤트는 무시
+  //   - effectiveUserId 가 없으면 listener 등록 안 함
+  useEffect(() => {
+    if (typeof window === 'undefined' || !effectiveUserId) return;
+    const handleAttendanceUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ staffId?: unknown }>).detail;
+      const targetId = detail?.staffId ? String(detail.staffId) : '';
+      if (targetId && targetId !== effectiveUserId) return;
+      void initCommuteData();
+    };
+    window.addEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
+    return () => {
+      window.removeEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveUserId]);
+
   useEffect(() => {
     if (!effectiveUserId) return;
     void fetchTodayLog(currentDateKey);

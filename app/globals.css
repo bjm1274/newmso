@@ -899,7 +899,12 @@ select:not(.no-style) {
     /* Table density default */
     --row-h: 40px;
 
-    /* PC 2차 사이드바 — 192 → 220px 확장 (§2-2) */
+    /* PC 2차 사이드바 — 기본 147px (지시서 결정 #31). 채팅만 220px 분기 (아래) */
+    --submenu-width: 147px;
+  }
+
+  /* 결정 #31: 채팅 메뉴일 때만 사이드바2 폭 220px */
+  [data-main-menu="채팅"] {
     --submenu-width: 220px;
   }
 

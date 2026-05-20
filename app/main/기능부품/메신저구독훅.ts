@@ -250,13 +250,17 @@ export function useChatRealtimeSubscriptions({
     if (!userId) return;
     setGlobalRealtimeState('connected');
     globalRealtimeHealthyRef.current = true;
+    // Phase 5-D — 폴링 비용 절감(2026-05-20).
+    // global messages: 3000→8000ms. selectedRoomId 안에서는 chat-realtime-${roomId}
+    // 채널(2500ms)이 messages를 더 짧게 감지하므로 global은 백그라운드 보조 역할만
+    // 수행해도 충분. chat-rooms-list(5000ms)도 last_message_at 변경을 감지해 보완.
     const unsubscribe = subscribeRealtime(
       'chat-global-messages',
       [{ table: 'messages' }],
       () => {
         void fetchDataLatestRef.current({ force: true });
       },
-      { pollIntervalMs: 3000 },
+      { pollIntervalMs: 8000 },
     );
     return () => {
       globalRealtimeHealthyRef.current = false;
@@ -336,7 +340,10 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
         }
       },
-      { pollIntervalMs: 1500 },
+      // Phase 5-D — 폴링 비용 절감(2026-05-20).
+      // 방 내부: 1500→2500ms. 활성 채팅 중 다른 사람 메시지 도착 체감 차이 미미.
+      // 자체 메시지는 낙관적 업데이트로 즉시 표시되므로 폴링 간격과 무관.
+      { pollIntervalMs: 2500 },
     );
 
     return () => {

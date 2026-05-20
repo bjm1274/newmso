@@ -1,0 +1,190 @@
+'use client';
+
+/**
+ * 인사관리 워크센터 라우터
+ *
+ * 사이드바2 메뉴 id를 받아 해당 워크센터 컴포넌트를 렌더링한다.
+ * - 영문 id (`member`, `attend`, `leave`, `abnormal`, `welfare`, `docs`): 신규 워크센터
+ * - 한글 별칭 (`구성원`, `근태`, `연차·휴가`, `근태이상`, `복지`, `계약·문서`): 호환 유지
+ *
+ * 급여(payroll) 워크센터는 별도 에이전트가 처리하므로 본 라우터에서 제외.
+ *
+ * JM: 단일 책임 — id → 컴포넌트 매핑
+ * JM4: any 금지, WorkcenterId union 사용
+ */
+
+import { useMemo } from 'react';
+import type { StaffMember } from '@/types';
+import MemberWorkcenter from './MemberWorkcenter';
+import AttendWorkcenter from './AttendWorkcenter';
+import LeaveWorkcenter from './LeaveWorkcenter';
+import AbnormalWorkcenter from './AbnormalWorkcenter';
+import PayrollWorkcenter from './payroll/PayrollWorkcenter';
+import WelfareWorkcenter from './WelfareWorkcenter';
+import DocsWorkcenter from './DocsWorkcenter';
+import type { WorkcenterId } from './workcenter-common';
+
+// 워크센터 id (급여 포함)
+const WORKCENTER_IDS: readonly WorkcenterId[] = [
+  'member',
+  'attend',
+  'leave',
+  'abnormal',
+  'payroll',
+  'welfare',
+  'docs',
+] as const;
+
+// 한글 사이드바 id ↔ 워크센터 id 매핑
+//
+// 기존 인사관리.tsx의 한글 id(`구성원`, `근태`, `급여`, `경조사`, `자격·안전센터`,
+// `계약`, `문서센터`, `인사변동`, `입퇴사·교육센터`)는 기존 Legacy 흐름과 충돌하므로
+// 워크센터 라우팅 대상에서 제외한다. (HRMainView가 한글 id를 받으면 기존 사이드바·본문
+// 흐름이 그대로 동작해야 함)
+//
+// 사이드바2가 신규 통합 라벨을 정식 채택하면 여기에 추가한다. 본 매핑은 영문 id만
+// 라우팅하며, 사이드바2 정책 확정 후 한글 별칭을 합쳐도 안전한 형태로 설계.
+const KOREAN_ALIASES: Record<string, WorkcenterId> = {
+  // 신규 사이드바2가 채택할 가능성이 있는 통합 라벨 (Legacy 메뉴와 겹치지 않는 것만)
+  '근태이상 감지': 'abnormal',
+  '연차·휴가': 'leave',
+  '계약·문서': 'docs',
+};
+
+/**
+ * 주어진 id가 워크센터 라우팅 대상인지 판단.
+ * - 영문 워크센터 id 일치
+ * - 한글 별칭에 매핑됨
+ */
+export function resolveWorkcenterId(id?: string | null): WorkcenterId | null {
+  if (!id) return null;
+  if ((WORKCENTER_IDS as readonly string[]).includes(id)) {
+    return id as WorkcenterId;
+  }
+  if (KOREAN_ALIASES[id]) {
+    return KOREAN_ALIASES[id];
+  }
+  return null;
+}
+
+interface HrWorkcenterRouterProps {
+  workcenterId: WorkcenterId;
+  staffs?: StaffMember[];
+  selectedCo?: string;
+  user?: Record<string, unknown> | null;
+  onRefresh?: () => void;
+  canRegisterNewStaff?: boolean;
+  onOpenNewStaff?: () => void;
+  onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
+  linkedTarget?: { id?: string; name?: string };
+  canManageDocuments?: boolean;
+}
+
+/**
+ * 워크센터 라우터.
+ * 신규 사이드바2가 영문 id를 전달할 때, HRMainView가 이 컴포넌트로
+ * 위임하여 통합 워크센터 화면을 렌더링한다.
+ */
+export default function HrWorkcenterRouter({
+  workcenterId,
+  staffs = [],
+  selectedCo,
+  user = null,
+  onRefresh,
+  canRegisterNewStaff = false,
+  onOpenNewStaff,
+  onOpenDocumentRepoForStaff,
+  linkedTarget,
+  canManageDocuments = false,
+}: HrWorkcenterRouterProps) {
+  const view = useMemo(() => {
+    switch (workcenterId) {
+      case 'member':
+        return (
+          <MemberWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+            onRefresh={onRefresh}
+            canRegisterNewStaff={canRegisterNewStaff}
+            onOpenNewStaff={onOpenNewStaff}
+            onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
+          />
+        );
+      case 'attend':
+        return (
+          <AttendWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+            onRefresh={onRefresh}
+          />
+        );
+      case 'leave':
+        return (
+          <LeaveWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+            onRefresh={onRefresh}
+          />
+        );
+      case 'abnormal':
+        return (
+          <AbnormalWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+          />
+        );
+      case 'payroll':
+        return <PayrollWorkcenter />;
+      case 'welfare':
+        return (
+          <WelfareWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+          />
+        );
+      case 'docs':
+        return (
+          <DocsWorkcenter
+            staffs={staffs}
+            selectedCo={selectedCo}
+            user={user}
+            onRefresh={onRefresh}
+            linkedTarget={linkedTarget}
+            canManageDocuments={canManageDocuments}
+          />
+        );
+      default:
+        return null;
+    }
+  }, [
+    workcenterId,
+    staffs,
+    selectedCo,
+    user,
+    onRefresh,
+    canRegisterNewStaff,
+    onOpenNewStaff,
+    onOpenDocumentRepoForStaff,
+    linkedTarget,
+    canManageDocuments,
+  ]);
+
+  return view;
+}
+
+// 외부에서 워크센터 컴포넌트를 직접 사용할 때 편의 export
+export {
+  MemberWorkcenter,
+  AttendWorkcenter,
+  LeaveWorkcenter,
+  AbnormalWorkcenter,
+  PayrollWorkcenter,
+  WelfareWorkcenter,
+  DocsWorkcenter,
+};
+export type { WorkcenterId };

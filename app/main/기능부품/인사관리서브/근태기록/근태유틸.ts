@@ -85,8 +85,98 @@ export function resolveAttendanceStatus(attendance: any, isWeekend = false) {
   return isWeekend ? 'holiday' : '';
 }
 
+/**
+ * 버그 B 수정: leave_requests 승인 데이터를 반영하여 근태 상태를 최종 결정한다.
+ *
+ * 우선순위:
+ * 1. attendances 기록이 있으면 해당 상태를 우선한다 (실제 출퇴근이 진실에 가깝다).
+ * 2. 기록이 없거나 빈 문자열일 때 leave_requests에 승인된 연차/휴가가 있으면 해당
+ *    상태(annual_leave / half_leave / sick_leave)로 대체한다.
+ * 3. 그래도 없으면 기존 resolveAttendanceStatus 결과를 그대로 반환한다.
+ *
+ * @param attendance - attendances 테이블 행 (undefined 허용)
+ * @param leaveStatus - 해당 직원·날짜에 대해 사전 집계한 leave 상태 문자열 (없으면 null)
+ * @param isWeekend - 주말 여부
+ */
+export function resolveAttendanceStatusWithLeave(
+  attendance: any,
+  leaveStatus: string | null | undefined,
+  isWeekend = false,
+): string {
+  const attStatus = resolveAttendanceStatus(attendance, isWeekend);
+
+  // 실제 출퇴근 기록이 있으면 그것이 우선
+  if (attStatus === 'present' || attStatus === 'late' || attStatus === 'early_leave') {
+    return attStatus;
+  }
+
+  // 기록 없음 또는 빈 상태일 때만 leave 상태로 보완
+  if (!attStatus && leaveStatus) {
+    return leaveStatus;
+  }
+
+  // absent 상태인데 승인된 연차가 있으면 연차로 대체
+  if (attStatus === 'absent' && leaveStatus) {
+    return leaveStatus;
+  }
+
+  return attStatus;
+}
+
+/**
+ * leave_requests 배열에서 특정 직원·날짜에 해당하는 승인된 휴가 상태를 반환한다.
+ * - '연차' → 'annual_leave'
+ * - '반차' → 'half_leave'
+ * - '병가' → 'sick_leave'
+ * - 그 외 승인 휴가 → 'annual_leave' (일반 휴가로 처리)
+ *
+ * @param staffId - 직원 ID
+ * @param dateStr - 'YYYY-MM-DD' 형식 날짜
+ * @param approvedLeaves - leave_requests 배열 (status='승인')
+ */
+export function resolveLeaveStatusForDate(
+  staffId: string,
+  dateStr: string,
+  approvedLeaves: Array<{
+    staff_id: string;
+    start_date: string;
+    end_date: string;
+    leave_type: string;
+    status: string;
+  }>,
+): string | null {
+  const match = approvedLeaves.find((row) => {
+    if (row.staff_id !== staffId) return false;
+    const approved = String(row.status || '').trim();
+    if (approved !== '승인' && approved !== 'approved') return false;
+    const start = String(row.start_date || '').slice(0, 10);
+    const end = String(row.end_date || row.start_date || '').slice(0, 10);
+    return dateStr >= start && dateStr <= end;
+  });
+
+  if (!match) return null;
+
+  const leaveType = String(match.leave_type || '').trim();
+  if (leaveType === '반차' || leaveType.startsWith('반차') || leaveType === 'half_leave') {
+    return 'half_leave';
+  }
+  if (leaveType === '병가' || leaveType === 'sick_leave') {
+    return 'sick_leave';
+  }
+  return 'annual_leave';
+}
+
 export function isWorkedAttendanceStatus(status: string) {
   return status === 'present' || status === 'late' || status === 'early_leave';
+}
+
+/**
+ * 상태 일괄 수정 대상 판별 — 정상 출근(present)·휴일·승인 휴가가 아닌,
+ * 관리자가 점검·보정해야 할 상태(결근·지각·조퇴·기록 없음)인지 여부.
+ */
+export function isProblemAttendanceStatus(status: string | null | undefined): boolean {
+  const normalized = String(status || '').trim();
+  return !['present', 'holiday', 'annual_leave', 'half_leave', 'sick_leave'].includes(normalized);
 }
 
 export const ATTENDANCE_STATUS_META = {

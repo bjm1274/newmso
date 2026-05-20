@@ -14,10 +14,17 @@
  * - JM6: 체크박스는 label과 연결, 키보드 접근 가능
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import SmartDatePicker from '../../공통/SmartDatePicker';
+import {
+  getAttendanceStatusMeta,
+  isProblemAttendanceStatus,
+  isWeekendDate,
+  resolveAttendanceStatusWithLeave,
+  resolveLeaveStatusForDate,
+} from './근태유틸';
 
 type StaffLite = {
   id: string;
@@ -64,6 +71,22 @@ const STATUS_LABEL_MAP: Record<BulkStatus, string> = {
   holiday: '휴일',
 };
 
+type BulkEditAttendanceRow = {
+  staff_id: string;
+  work_date: string;
+  status?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+};
+
+type BulkEditLeaveRow = {
+  staff_id: string;
+  start_date: string;
+  end_date: string;
+  leave_type: string;
+  status: string;
+};
+
 export type AttendanceBulkEditModalProps = {
   open: boolean;
   onClose: () => void;
@@ -73,6 +96,12 @@ export type AttendanceBulkEditModalProps = {
   onApplied?: () => void;
   /** 모달 오픈 시 미리 체크해 둘 직원 id (선택사항) */
   initialSelectedIds?: string[];
+  /** 달력에서 선택한 날짜 — 모달 기준일 및 문제 직원 판별 기준일 */
+  initialDate?: string;
+  /** 기준월 근태 기록 — 기준일의 직원별 상태 판별용 */
+  attendances?: BulkEditAttendanceRow[];
+  /** 승인된 휴가 — 기준일의 연차/반차/병가 판별용 */
+  approvedLeaves?: BulkEditLeaveRow[];
 };
 
 function toIsoDate(d: Date): string {
@@ -119,17 +148,30 @@ export default function AttendanceBulkEditModal({
   staffs,
   onApplied,
   initialSelectedIds,
+  initialDate,
+  attendances = [],
+  approvedLeaves = [],
 }: AttendanceBulkEditModalProps) {
   const [rangeType, setRangeType] = useState<BulkRangeType>('day');
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState(initialDate || today);
+  const [endDate, setEndDate] = useState(initialDate || today);
   const [status, setStatus] = useState<BulkStatus>('absent');
   const [saving, setSaving] = useState(false);
   const [keyword, setKeyword] = useState('');
+  // 기본 ON: 정상 출퇴근이 아닌(결근·지각·조퇴·기록없음) 직원만 노출
+  const [problemOnly, setProblemOnly] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(initialSelectedIds ?? []),
   );
+
+  // 달력에서 다른 날짜를 고른 뒤 다시 열면 기준일을 그 날짜로 맞춘다.
+  useEffect(() => {
+    if (open && initialDate) {
+      setStartDate(initialDate);
+      setEndDate(initialDate);
+    }
+  }, [open, initialDate]);
 
   const nameCollator = useMemo(
     () => new Intl.Collator('ko-KR', { numeric: true, sensitivity: 'base' }),
@@ -149,18 +191,37 @@ export default function AttendanceBulkEditModal({
     return next;
   }, [staffs, nameCollator]);
 
-  const visibleStaffs = useMemo(() => {
-    const k = keyword.trim().toLowerCase();
-    if (!k) return sortedStaffs;
-    return sortedStaffs.filter((s) => {
-      return (
-        (s.name || '').toLowerCase().includes(k) ||
-        (s.department || '').toLowerCase().includes(k) ||
-        (s.position || '').toLowerCase().includes(k) ||
-        (s.company || '').toLowerCase().includes(k)
+  // 기준일(startDate)의 직원별 근태 상태 — 문제 직원 필터 및 배지 표시용
+  const staffStatusForDate = useMemo(() => {
+    const map = new Map<string, string>();
+    const weekend = isWeekendDate(startDate);
+    for (const s of staffs) {
+      const att = attendances.find(
+        (a) => a.staff_id === s.id && String(a.work_date).slice(0, 10) === startDate,
       );
-    });
-  }, [sortedStaffs, keyword]);
+      const leaveStatus = resolveLeaveStatusForDate(s.id, startDate, approvedLeaves);
+      map.set(s.id, resolveAttendanceStatusWithLeave(att, leaveStatus, weekend));
+    }
+    return map;
+  }, [staffs, attendances, approvedLeaves, startDate]);
+
+  const visibleStaffs = useMemo(() => {
+    let list = sortedStaffs;
+    if (problemOnly) {
+      list = list.filter((s) => isProblemAttendanceStatus(staffStatusForDate.get(s.id)));
+    }
+    const k = keyword.trim().toLowerCase();
+    if (k) {
+      list = list.filter(
+        (s) =>
+          (s.name || '').toLowerCase().includes(k) ||
+          (s.department || '').toLowerCase().includes(k) ||
+          (s.position || '').toLowerCase().includes(k) ||
+          (s.company || '').toLowerCase().includes(k),
+      );
+    }
+    return list;
+  }, [sortedStaffs, keyword, problemOnly, staffStatusForDate]);
 
   const allVisibleChecked =
     visibleStaffs.length > 0 && visibleStaffs.every((s) => selectedIds.has(s.id));
@@ -328,6 +389,18 @@ export default function AttendanceBulkEditModal({
               )}
             </div>
 
+            <label className="flex items-center gap-2 cursor-pointer select-none rounded-xl border border-[var(--border)] dark:border-zinc-700 bg-[var(--tab-bg)]/40 dark:bg-zinc-800/20 px-3 py-2">
+              <input
+                type="checkbox"
+                checked={problemOnly}
+                onChange={(e) => setProblemOnly(e.target.checked)}
+                className="w-4 h-4 accent-blue-600"
+              />
+              <span className="text-[11px] font-bold text-foreground">
+                {startDate} 기준 · 정상 출퇴근이 아닌 직원만 보기
+              </span>
+            </label>
+
             <input
               type="search"
               placeholder="이름·부서·직급·회사로 검색"
@@ -355,13 +428,18 @@ export default function AttendanceBulkEditModal({
               </label>
               {visibleStaffs.length === 0 ? (
                 <p className="px-3 py-6 text-center text-xs text-[var(--toss-gray-4)]">
-                  표시할 직원이 없습니다.
+                  {problemOnly
+                    ? `${startDate}에 정상 출퇴근이 아닌 직원이 없습니다.`
+                    : '표시할 직원이 없습니다.'}
                 </p>
               ) : (
                 <ul className="divide-y divide-[var(--border-subtle)] dark:divide-zinc-800">
                   {visibleStaffs.map((s) => {
                     const checked = selectedIds.has(s.id);
                     const inputId = `bulk-staff-${s.id}`;
+                    const dayStatusMeta = getAttendanceStatusMeta(
+                      staffStatusForDate.get(s.id) ?? '',
+                    );
                     return (
                       <li key={s.id}>
                         <label
@@ -383,6 +461,11 @@ export default function AttendanceBulkEditModal({
                               {s.department || '-'} · {s.position || '-'} · {s.company || '-'}
                             </span>
                           </div>
+                          <span
+                            className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${dayStatusMeta.bg} ${dayStatusMeta.color}`}
+                          >
+                            {dayStatusMeta.label}
+                          </span>
                         </label>
                       </li>
                     );

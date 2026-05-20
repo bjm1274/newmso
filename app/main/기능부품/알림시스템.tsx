@@ -1516,6 +1516,9 @@ export default function NotificationSystem({
     // 일부 인앱 알림(결재 차례/재고 부족/단어 필터 등)은 사라짐 — 옵션 A
     // trade-off. 운영 영향 큰 알림은 후속 phase에서 서버 cron 추가 검토.
     let lastNotificationsSeenAt = mountedAt;
+    // Phase 5-D — 폴링 비용 절감(2026-05-20).
+    // 알림: 3000→8000ms. 푸시(FCM)와 인앱 알림이 병행 동작하므로 8초 폴링으로 충분.
+    // 인앱 뱃지 갱신은 최대 8초 지연 가능하나 푸시는 즉시 도착.
     const unsubscribeNotifications = subscribeRealtime(
       `noti-db-${uid}`,
       [{ table: 'notifications' }],
@@ -1526,7 +1529,7 @@ export default function NotificationSystem({
         void fetchUnreadNotificationsSince(since);
         void syncBadge();
       },
-      { pollIntervalMs: 3000 },
+      { pollIntervalMs: 8000 },
     );
     // initial: fetch once + prime metadata
     void fetchUnreadNotificationsSince(mountedAt);

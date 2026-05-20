@@ -15,7 +15,6 @@ import {
 } from '@/lib/payroll-working-hours';
 import {
   calculateEmployeeInsuranceDeductions,
-  getIndustrialAccidentInsuranceInfo,
 } from '@/lib/payroll-insurance-rates';
 
 function toNumber(value: unknown) {
@@ -309,7 +308,6 @@ export default function SalaryDetail({
   }, [data, deductionDetail, record]);
 
   const companyName = staff?.company || design.companyLabel || 'SY INC.';
-  const industrialAccidentInfo = getIndustrialAccidentInsuranceInfo(companyName);
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor || '#163b70';
   const borderColor = design.borderColor || '#d8e1ee';
@@ -524,15 +522,12 @@ export default function SalaryDetail({
 
       <div className="flex flex-1 flex-col px-7 py-5 print:px-4 print:py-3">
         <div className="salary-print-avoid mb-4 grid grid-cols-3 overflow-hidden border border-slate-200 print:mb-2">
-          <InfoItem
-            label="산재보험(회사부담)"
-            value={`${(industrialAccidentInfo.employerRate * 100).toFixed(2)}% · ${industrialAccidentInfo.industryLabel}`}
-          />
           <InfoItem label="성명" value={staff?.name} />
           <InfoItem label="사번" value={staff?.employee_no || staff?.id} />
           <InfoItem label="입사일" value={formatDateLabel(staff?.join_date || staff?.joined_at)} />
           <InfoItem label="부서" value={staff?.department} />
           <InfoItem label="직위" value={staff?.position} />
+          <InfoItem label="지급월" value={monthLabel} />
           <InfoItem label="주당 근로시간" value={`${weeklyHours.toLocaleString('ko-KR')}시간`} />
           <InfoItem label="월 소정근로시간" value={`${monthlyWorkingHours.toLocaleString('ko-KR')}시간`} />
           <InfoItem label="시급 환산" value={`${hourlyRate.toLocaleString('ko-KR')}원`} highlight />

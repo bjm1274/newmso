@@ -12,7 +12,15 @@ export type AdminOperationsTabId = '알림자동화' | '수술검사템플릿' |
 
 export type AdminAuditTabId = '감사로그' | '접근감사로그' | '급여이상치';
 
+// 결정 #45: 관리자 26장 → 6 워크센터 (exec / company / roles / ops / forms / audit)
+// 기존 한글 id는 호환을 위해 union에 유지 (라우팅 alias 처리)
 export type AdminOuterTabId =
+  | 'exec'
+  | 'company'
+  | 'roles'
+  | 'ops'
+  | 'forms'
+  | 'audit'
   | '경영분석'
   | '운영설정'
   | '감사센터'
@@ -66,19 +74,29 @@ export const ADMIN_AUDIT_TABS: { id: AdminAuditTabId; label: string; icon: strin
 ];
 
 export const ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
-  { id: '경영분석', label: '경영 분석', group: '경영 분석', icon: 'analytics' },
-  { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: 'server' },
-  { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: 'admin' },
-  { id: '운영설정', label: '운영 설정', group: '시스템 설정', icon: 'settings' },
-  { id: '문서양식', label: '결재 양식 관리', group: '시스템 설정', icon: 'document' },
-  { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: 'save' },
-  { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: 'refresh' },
-  { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: 'search' },
-  { id: '시스템마스터센터', label: '시스템마스터센터', group: '시스템 마스터', icon: 'admin' },
-  { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: 'bell', hidden: true },
-  { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: 'scan', hidden: true },
-  { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: 'document', hidden: true },
-  { id: '급여이상치', label: '급여 이상치 감지', group: '감사 센터', icon: 'alert', hidden: true },
+  // 결정 #45: 26장 → 6 워크센터. 사이드바는 6개 영문 id만 노출.
+  { id: 'exec', label: '경영 대시보드', group: '관리자', icon: 'analytics' },
+  { id: 'company', label: '회사 관리', group: '관리자', icon: 'server' },
+  { id: 'roles', label: '권한 관리', group: '관리자', icon: 'admin' },
+  { id: 'ops', label: '운영 설정', group: '관리자', icon: 'settings' },
+  { id: 'forms', label: '결재 양식', group: '관리자', icon: 'document' },
+  { id: 'audit', label: '감사·백업', group: '관리자', icon: 'search' },
+  // 시스템마스터센터: 6 워크센터에 포함되지 않는 9999 시스템마스터 전용 화면.
+  // page.tsx·관리자전용.tsx에서 isSystemMaster로 게이팅되어 일반 관리자에게는 노출되지 않는다.
+  { id: '시스템마스터센터', label: '시스템마스터센터', group: '관리자', icon: 'admin' },
+  // 기존 한글 id는 알림·즐겨찾기 navigation 호환을 위해 hidden 유지
+  { id: '경영분석', label: '경영 분석', group: '관리자', icon: 'analytics', hidden: true },
+  { id: '회사관리', label: '회사 · 조직', group: '관리자', icon: 'server', hidden: true },
+  { id: '직원권한', label: '직원 권한', group: '관리자', icon: 'admin', hidden: true },
+  { id: '운영설정', label: '운영 설정', group: '관리자', icon: 'settings', hidden: true },
+  { id: '문서양식', label: '결재 양식 관리', group: '관리자', icon: 'document', hidden: true },
+  { id: '데이터백업', label: '백업 / 복원', group: '관리자', icon: 'save', hidden: true },
+  { id: '데이터초기화', label: '데이터 초기화', group: '관리자', icon: 'refresh', hidden: true },
+  { id: '감사센터', label: '감사 센터', group: '관리자', icon: 'search', hidden: true },
+  { id: '알림자동화', label: '알림 자동화', group: '관리자', icon: 'bell', hidden: true },
+  { id: '수술검사템플릿', label: '수술 · 검사 템플릿', group: '관리자', icon: 'scan', hidden: true },
+  { id: '팝업관리', label: '팝업 관리', group: '관리자', icon: 'document', hidden: true },
+  { id: '급여이상치', label: '급여 이상치 감지', group: '관리자', icon: 'alert', hidden: true },
 ];
 
 export const ADMIN_OUTER_TABS: AdminOuterTabId[] = ADMIN_SIDEBAR_ITEMS.filter((item) => !item.hidden).map(

@@ -35,10 +35,31 @@ type LeaveHistoryRow = {
   created_at?: string | null;
 };
 
-function formatDate(value: unknown) {
+// JM4: `start_date`/`end_date`가 'YYYY-MM-DD' 또는 ISO timestamp 둘 다 올 수 있음.
+// `new Date('YYYY-MM-DD')`는 UTC 자정으로 해석되므로 KST 외 timezone에서 하루가 밀릴 수 있다.
+// 날짜 부분만 직접 파싱해 KST/UTC 무관하게 동일한 결과를 보장.
+function extractDateOnly(value: unknown): { y: number; m: number; d: number } | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (!y || !m || !d) return null;
+  return { y, m, d };
+}
+
+function formatDateOnly(value: unknown) {
+  const parts = extractDateOnly(value);
+  if (!parts) return '-';
+  return `${parts.y}년 ${parts.m}월 ${parts.d}일`;
+}
+
+function formatDateTimeKst(value: unknown) {
   if (!value) return '-';
   const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
+  if (Number.isNaN(parsed.getTime())) return formatDateOnly(value);
   return parsed.toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'short',
@@ -47,11 +68,15 @@ function formatDate(value: unknown) {
 }
 
 function formatRange(row: LeaveHistoryRow) {
-  const startDate = String(row.start_date || '');
-  const endDate = String(row.end_date || row.start_date || '');
-  if (!startDate) return '-';
-  if (!endDate || startDate === endDate) return formatDate(startDate);
-  return `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
+  const startParts = extractDateOnly(row.start_date);
+  const endParts = extractDateOnly(row.end_date) || startParts;
+  if (!startParts) return '-';
+  const startLabel = `${startParts.y}년 ${startParts.m}월 ${startParts.d}일`;
+  if (!endParts || (endParts.y === startParts.y && endParts.m === startParts.m && endParts.d === startParts.d)) {
+    return startLabel;
+  }
+  const endLabel = `${endParts.y}년 ${endParts.m}월 ${endParts.d}일`;
+  return `${startLabel} ~ ${endLabel}`;
 }
 
 function getLeaveDays(row: LeaveHistoryRow) {
@@ -65,6 +90,15 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
   const [staff, setStaff] = useState<StaffLeaveBalance | null>(null);
   const [rows, setRows] = useState<LeaveHistoryRow[]>([]);
 
+  // JM2: 부모(MyPageMain)가 자체 setState로 리렌더될 때마다 user prop reference가
+  // 동일하더라도 useEffect deps가 `[user]` 객체 전체이면 미세한 reference 변경이
+  // 누적되어 fetch가 반복 실행되며 화면이 깜빡인다. 실제로 fetch에 필요한 staff
+  // 식별 정보(id/employee_no/auth_user_id/name)만 추출해 primitive 비교로 좁힌다.
+  const userIdKey = typeof user?.id === 'string' ? user.id : '';
+  const userEmployeeNo = typeof user?.employee_no === 'string' ? user.employee_no : '';
+  const userAuthUserId = typeof user?.auth_user_id === 'string' ? user.auth_user_id : '';
+  const userName = typeof user?.name === 'string' ? user.name : '';
+
   useEffect(() => {
     let cancelled = false;
 
@@ -73,7 +107,14 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
       setError('');
 
       try {
-        const resolvedUser = await resolveStaffLike(user || {});
+        // JM2: deps 좁힘으로 인해 user 전체가 아닌 식별 필드만 재구성해서 전달.
+        const lookupInput: Record<string, unknown> = {
+          id: userIdKey,
+          employee_no: userEmployeeNo,
+          auth_user_id: userAuthUserId,
+          name: userName,
+        };
+        const resolvedUser = await resolveStaffLike(lookupInput);
         const staffId = getStaffLikeId(resolvedUser);
 
         if (!staffId) {
@@ -113,6 +154,7 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
           setRows(approvedRows);
         }
       } catch (loadError) {
+        // JM3: 사용자 표시용 메시지 + 디버깅용 콘솔 분리
         console.error('내 연차휴가 사용내역 조회 실패:', loadError);
         if (!cancelled) {
           setStaff(null);
@@ -128,14 +170,19 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userIdKey, userEmployeeNo, userAuthUserId, userName]);
 
-  const currentYear = new Date().getFullYear();
+  // JM2: `new Date().getFullYear()`를 매 렌더마다 호출하면 number 값은 같지만
+  // useMemo deps에 매 렌더 새 number(같은 값)는 영향 없음. useMemo 1회 계산으로 충분.
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
   const yearRows = useMemo(
     () =>
       rows.filter((row) => {
-        const startYear = new Date(String(row.start_date || '')).getFullYear();
-        const endYear = new Date(String(row.end_date || row.start_date || '')).getFullYear();
+        const startParts = extractDateOnly(row.start_date);
+        const endParts = extractDateOnly(row.end_date) || startParts;
+        if (!startParts) return false;
+        const startYear = startParts.y;
+        const endYear = endParts ? endParts.y : startYear;
         return startYear === currentYear || endYear === currentYear;
       }),
     [currentYear, rows]
@@ -213,24 +260,36 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
               <span>승인일</span>
             </div>
             <div className="divide-y divide-[var(--border)]">
-              {rows.map((row) => (
-                <article
-                  key={row.id}
-                  className="grid gap-2 px-4 py-3 text-[12px] md:grid-cols-[1.4fr_0.7fr_0.6fr_1fr] md:items-center md:gap-3"
-                >
-                  <div>
-                    <p className="font-bold text-[var(--foreground)]">{formatRange(row)}</p>
-                    {row.reason ? (
-                      <p className="mt-1 line-clamp-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{row.reason}</p>
-                    ) : null}
-                  </div>
-                  <span className="font-semibold text-[var(--toss-gray-4)]">{row.leave_type || '연차'}</span>
-                  <span className="font-black text-[var(--accent)]">{getLeaveDays(row).toFixed(1)}일</span>
-                  <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">
-                    {formatDate(row.approved_at || row.created_at)}
-                  </span>
-                </article>
-              ))}
+              {rows.map((row) => {
+                const rangeLabel = formatRange(row);
+                const approvedLabel = row.approved_at ? formatDateTimeKst(row.approved_at) : '-';
+                return (
+                  <article
+                    key={row.id}
+                    className="grid gap-2 px-4 py-3 text-[12px] md:grid-cols-[1.4fr_0.7fr_0.6fr_1fr] md:items-center md:gap-3"
+                  >
+                    <div>
+                      <p
+                        className="font-bold text-[var(--foreground)]"
+                        aria-label={`사용일자 ${rangeLabel}`}
+                      >
+                        {rangeLabel}
+                      </p>
+                      {row.reason ? (
+                        <p className="mt-1 line-clamp-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{row.reason}</p>
+                      ) : null}
+                    </div>
+                    <span className="font-semibold text-[var(--toss-gray-4)]">{row.leave_type || '연차'}</span>
+                    <span className="font-black text-[var(--accent)]">{getLeaveDays(row).toFixed(1)}일</span>
+                    <span
+                      className="text-[11px] font-medium text-[var(--toss-gray-3)]"
+                      aria-label={approvedLabel === '-' ? '승인일 미기록' : `승인일 ${approvedLabel}`}
+                    >
+                      {approvedLabel}
+                    </span>
+                  </article>
+                );
+              })}
             </div>
           </div>
         )}

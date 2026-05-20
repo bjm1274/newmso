@@ -6,6 +6,15 @@ import { toast } from '@/lib/toast';
 import { getRecommendedOrderQuantity, getItemQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
+import {
+  type WeekBasis,
+  type DeptWeekSettings,
+  loadDeptWeekSettings,
+  upsertItemSetting,
+  getItemSetting,
+  calcMinStock,
+} from './dept-week-settings';
+import { DeptInventoryRow, type DeptInventoryMode } from './DeptInventoryRow';
 
 // ---- 타입 정의 ----
 interface InventoryItem {
@@ -55,6 +64,8 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   const [loading, setLoading] = useState(true);
   const [orderingItemId, setOrderingItemId] = useState<string | null>(null);
   const [viewDept, setViewDept] = useState<string>('');
+  const [inventoryMode, setInventoryMode] = useState<DeptInventoryMode>('view');
+  const [deptWeekSettings, setDeptWeekSettings] = useState<DeptWeekSettings>({});
   const { data: appData } = useAppData();
 
   const inventory = (inventoryProp?.length ? inventoryProp : inventoryFetched) || [];
@@ -62,6 +73,15 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   const myDept = (user?.department || '').trim();
   const myCompany = (user?.company || '').trim();
   const effectiveDept = viewDept || myDept;
+
+  // 부서가 바뀌면 해당 부서의 주(week) 설정을 LocalStorage에서 로드
+  useEffect(() => {
+    if (!effectiveDept) {
+      setDeptWeekSettings({});
+      return;
+    }
+    setDeptWeekSettings(loadDeptWeekSettings(effectiveDept));
+  }, [effectiveDept]);
 
   useEffect(() => {
     (async () => {
@@ -111,6 +131,44 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     return coMatch && deptMatch;
   });
 
+  // 부서·품목 단위 주(week) 설정 변경 핸들러
+  const handleChangeWeeks = useCallback((itemId: string, weeks: WeekBasis) => {
+    if (!effectiveDept) return;
+    const updated = upsertItemSetting(effectiveDept, itemId, { weeks });
+    setDeptWeekSettings(updated);
+  }, [effectiveDept]);
+
+  const handleChangeWeekly = useCallback((itemId: string, weekly: number) => {
+    if (!effectiveDept) return;
+    const updated = upsertItemSetting(effectiveDept, itemId, { weekly });
+    setDeptWeekSettings(updated);
+  }, [effectiveDept]);
+
+  // KPI 계산: 주(week) 기반 최소재고 적용
+  const inventoryStats = useMemo(() => {
+    let needOrder = 0;
+    let normal = 0;
+    let msoPending = 0;
+    for (const item of deptItems) {
+      const qty = getItemQuantity(item as Parameters<typeof getItemQuantity>[0]);
+      const setting = getItemSetting(deptWeekSettings, String(item.id));
+      const min = calcMinStock(setting);
+      if (qty < min) {
+        needOrder += 1;
+        // weekly가 설정돼 있고 부족 상태이면 'MSO 요청 대기' 후보로 카운트
+        if (setting.weekly > 0) msoPending += 1;
+      } else {
+        normal += 1;
+      }
+    }
+    return {
+      total: deptItems.length,
+      needOrder,
+      normal,
+      msoPending,
+    };
+  }, [deptItems, deptWeekSettings]);
+
   // 우리 부서 장비: 미반납 대여 중 직원의 부서가 우리 부서인 것
   const deptAssets = assetLoans.filter((r) => (r.staff?.department || '').trim() === effectiveDept);
   const deptTransfers = transferHistory.filter((transfer) => {
@@ -132,7 +190,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     ...assetLoans.map((r) => (r.staff?.department || '').trim()).filter(Boolean)
   ])).sort();
 
-  const handleQuickReorder = useCallback(async (item: InventoryItem) => {
+  const handleQuickReorderByItem = useCallback(async (item: InventoryItem) => {
     const orderQty = getRecommendedOrderQuantity(item);
     const confirmed = await openConfirm({
       title: '부서 재고 발주 신청',
@@ -159,69 +217,12 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     }
   }, [openConfirm, user, effectiveDept, myDept]);
 
-  // ---- 컬럼 정의 ----
-  const deptItemColumns = useMemo((): Column<InventoryItem>[] => [
-    {
-      key: 'name',
-      label: '품목명',
-      primary: true,
-      render: (item) => item.name ?? item.item_name ?? '-',
-    },
-    {
-      key: 'category',
-      label: '분류',
-      render: (item) => item.category ?? '-',
-    },
-    {
-      key: 'stock',
-      label: '잔여 수량',
-      align: 'right',
-      render: (item) => String(item.stock ?? item.quantity ?? 0),
-    },
-    {
-      key: 'min_stock',
-      label: '최소재고',
-      align: 'right',
-      showOnMobile: false,
-      render: (item) => String(item.min_stock ?? item.min_quantity ?? '-'),
-    },
-    {
-      key: 'status',
-      label: '상태',
-      align: 'center',
-      render: (item) => {
-        const qty = item.stock ?? item.quantity ?? 0;
-        const minQty = item.min_stock ?? item.min_quantity ?? 0;
-        return qty <= minQty ? (
-          <span className="text-red-600 text-[11px] font-semibold">발주 필요</span>
-        ) : (
-          <span className="text-emerald-600 text-[11px] font-semibold">정상</span>
-        );
-      },
-    },
-    {
-      key: 'action',
-      label: '빠른 작업',
-      align: 'center',
-      showOnMobile: false,
-      render: (item) => {
-        const qty = item.stock ?? item.quantity ?? 0;
-        const minQty = item.min_stock ?? item.min_quantity ?? 0;
-        return qty <= minQty ? (
-          <button
-            type="button"
-            onClick={() => void handleQuickReorder(item)}
-            disabled={orderingItemId === String(item.id)}
-            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {orderingItemId === String(item.id) ? '신청 중...' : `자동 발주 ${getRecommendedOrderQuantity(item)}개`}
-          </button>
-        ) : (
-          <span className="text-[11px] text-[var(--toss-gray-3)]">-</span>
-        );
-      },
-    },
-  ], [orderingItemId, handleQuickReorder]);
+  // 행에서 호출하는 발주 핸들러 (itemId만 받음)
+  const handleQuickReorderById = useCallback((itemId: string) => {
+    const target = deptItems.find((it) => String(it.id) === itemId);
+    if (!target) return;
+    void handleQuickReorderByItem(target);
+  }, [deptItems, handleQuickReorderByItem]);
 
   const assetColumns = useMemo((): Column<AssetLoan>[] => [
     { key: 'asset_type', label: '장비 종류', primary: true },
@@ -239,19 +240,77 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     <div className="space-y-4">
       {dialog}
       {/* §4-4, §13.8, §13.15 부서별 재고: PageHeader 제목 + 컨텍스트 배너 삭제. 부서 셀렉터는 우상단 액션으로. */}
-      {departments.length > 0 && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
-          <select
-            value={viewDept}
-            onChange={e => setViewDept(e.target.value)}
-            className="border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm font-bold bg-[var(--card)]"
+      {/* 우상단: 부서 셀렉터 + 재고/기준 segmented (결정 8번: 컨텍스트 배너 X) */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div
+          role="tablist"
+          aria-label="재고 보기 모드"
+          className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-0.5"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={inventoryMode === 'view'}
+            onClick={() => setInventoryMode('view')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition ${
+              inventoryMode === 'view'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+            }`}
           >
-            <option value="">내 부서 ({myDept || '미지정'})</option>
-            {departments.map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+            재고 보기
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={inventoryMode === 'setting'}
+            onClick={() => setInventoryMode('setting')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition ${
+              inventoryMode === 'setting'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+            }`}
+          >
+            기준 설정 (주)
+          </button>
+        </div>
+        {departments.length > 0 && (
+          <>
+            <label htmlFor="dept-view-select" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
+            <select
+              id="dept-view-select"
+              value={viewDept}
+              onChange={e => setViewDept(e.target.value)}
+              className="border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-1.5 text-sm font-bold bg-[var(--card)]"
+            >
+              <option value="">내 부서 ({myDept || '미지정'})</option>
+              {departments.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </>
+        )}
+      </div>
+
+      {/* KPI 4종 */}
+      {effectiveDept && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">전체 품목</div>
+            <div className="mt-1 text-xl font-extrabold text-[var(--foreground)] tabular-nums">{inventoryStats.total}<span className="ml-1 text-xs font-semibold text-[var(--toss-gray-3)]">종</span></div>
+          </div>
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">발주 필요</div>
+            <div className="mt-1 text-xl font-extrabold tabular-nums text-[var(--danger)]">{inventoryStats.needOrder}<span className="ml-1 text-xs font-semibold text-[var(--toss-gray-3)]">종</span></div>
+          </div>
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">정상</div>
+            <div className="mt-1 text-xl font-extrabold tabular-nums text-emerald-600">{inventoryStats.normal}<span className="ml-1 text-xs font-semibold text-[var(--toss-gray-3)]">종</span></div>
+          </div>
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="text-[11px] font-semibold text-[var(--toss-gray-3)]">MSO 요청 대기</div>
+            <div className="mt-1 text-xl font-extrabold text-[var(--accent)] tabular-nums">{inventoryStats.msoPending}<span className="ml-1 text-xs font-semibold text-[var(--toss-gray-3)]">건</span></div>
+          </div>
         </div>
       )}
 
@@ -261,20 +320,72 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         </div>
       )}
 
-      {/* 우리 부서 물품 */}
+      {/* 우리 부서 물품 — 주(week) 기반 최소재고 적용 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
-          📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
-        </h3>
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+            📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
+          </h3>
+          {inventoryMode === 'setting' && (
+            <span className="text-[11px] text-[var(--toss-gray-3)]">
+              최소재고 = 주간 소비량 × 보유 기준(주) · 부서별 자동 저장
+            </span>
+          )}
+        </div>
         {loading ? (
           <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
+        ) : deptItems.length === 0 ? (
+          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에 배정된 물품이 없습니다.</p>
         ) : (
-          <ResponsiveTable<InventoryItem>
-            columns={deptItemColumns}
-            rows={deptItems}
-            keyField="id"
-            emptyMessage="해당 부서에 배정된 물품이 없습니다."
-          />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-wide text-[var(--toss-gray-3)]">
+                  <th className="px-3 py-2 text-left font-semibold">품목명</th>
+                  <th className="px-3 py-2 text-left font-semibold">분류</th>
+                  <th className="px-3 py-2 text-right font-semibold">잔여</th>
+                  {inventoryMode === 'setting' ? (
+                    <>
+                      <th className="px-3 py-2 text-right font-semibold">주간 소비</th>
+                      <th className="px-3 py-2 text-left font-semibold">보유 기준 (주)</th>
+                      <th className="px-3 py-2 text-right font-semibold">최소재고</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-3 py-2 text-right font-semibold">주간 소비</th>
+                      <th className="px-3 py-2 text-right font-semibold">최소재고</th>
+                      <th className="px-3 py-2 text-center font-semibold">상태</th>
+                      <th className="px-3 py-2 text-center font-semibold">빠른 작업</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {deptItems.map((item) => {
+                  const id = String(item.id);
+                  const setting = getItemSetting(deptWeekSettings, id);
+                  return (
+                    <DeptInventoryRow
+                      key={id}
+                      item={{
+                        id,
+                        name: item.name ?? item.item_name ?? '-',
+                        category: item.category ?? '-',
+                        quantity: getItemQuantity(item as Parameters<typeof getItemQuantity>[0]),
+                      }}
+                      mode={inventoryMode}
+                      setting={setting}
+                      ordering={orderingItemId === id}
+                      recommendedQty={getRecommendedOrderQuantity(item as Parameters<typeof getRecommendedOrderQuantity>[0])}
+                      onChangeWeeks={handleChangeWeeks}
+                      onChangeWeekly={handleChangeWeekly}
+                      onQuickReorder={handleQuickReorderById}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

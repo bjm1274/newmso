@@ -13,11 +13,17 @@ type PollComposerModalProps = {
   question: string;
   options: string[];
   deadlineAt: string;
+  prizeEnabled: boolean;
+  prizeWinnerCount: number;
+  prizeName: string;
   onQuestionChange: (value: string) => void;
   onDeadlineAtChange: (value: string) => void;
   onOptionChange: (index: number, value: string) => void;
   onRemoveOption: (index: number) => void;
   onAddOption: () => void;
+  onPrizeEnabledChange: (value: boolean) => void;
+  onPrizeWinnerCountChange: (value: number) => void;
+  onPrizeNameChange: (value: string) => void;
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
 };
@@ -37,11 +43,17 @@ export function PollComposerModal({
   question,
   options,
   deadlineAt,
+  prizeEnabled,
+  prizeWinnerCount,
+  prizeName,
   onQuestionChange,
   onDeadlineAtChange,
   onOptionChange,
   onRemoveOption,
   onAddOption,
+  onPrizeEnabledChange,
+  onPrizeWinnerCountChange,
+  onPrizeNameChange,
   onClose,
   onSubmit,
 }: PollComposerModalProps) {
@@ -106,6 +118,49 @@ export function PollComposerModal({
                 + 항목 추가
               </button>
             </div>
+          </div>
+
+          <div className="pt-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="poll-prize-enabled"
+                checked={prizeEnabled}
+                onChange={(event) => onPrizeEnabledChange(event.target.checked)}
+                className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+              />
+              <label htmlFor="poll-prize-enabled" className="text-xs font-semibold text-[var(--foreground)] cursor-pointer select-none">
+                상품 추첨 진행
+              </label>
+            </div>
+            {prizeEnabled && (
+              <div className="mt-3 space-y-2 pl-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="poll-prize-winner-count" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">당첨 인원</label>
+                    <input
+                      id="poll-prize-winner-count"
+                      type="number"
+                      min={1}
+                      value={prizeWinnerCount}
+                      onChange={(event) => onPrizeWinnerCountChange(Math.max(1, Number(event.target.value) || 1))}
+                      className="w-full p-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="poll-prize-name" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상품명</label>
+                    <input
+                      id="poll-prize-name"
+                      type="text"
+                      value={prizeName}
+                      onChange={(event) => onPrizeNameChange(event.target.value)}
+                      placeholder="예: 아메리카노 쿠폰"
+                      className="w-full p-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2 pt-2">

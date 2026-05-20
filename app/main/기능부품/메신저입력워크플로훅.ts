@@ -4,7 +4,9 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { buildPollQuestionContent } from './메신저유틸';
+import { buildPollQuestionContent, extractPollMetaFromQuestion } from './메신저유틸';
+import type { PollPrizeWinner } from './메신저유틸';
+import { insertChatMessageWithFallback } from './메신저메시지서비스';
 
 const DEFAULT_POLL_OPTIONS = ['찬성', '반대'];
 
@@ -46,6 +48,12 @@ type UseChatWorkflowDraftsResult = {
   pollOptions: string[];
   pollDeadlineAt: string;
   setPollDeadlineAt: Dispatch<SetStateAction<string>>;
+  prizeEnabled: boolean;
+  prizeWinnerCount: number;
+  prizeName: string;
+  setPrizeEnabled: Dispatch<SetStateAction<boolean>>;
+  setPrizeWinnerCount: Dispatch<SetStateAction<number>>;
+  setPrizeName: Dispatch<SetStateAction<string>>;
   openPollModal: () => void;
   closePollModal: () => void;
   handleCreatePoll: () => Promise<void>;
@@ -53,6 +61,7 @@ type UseChatWorkflowDraftsResult = {
   handleRemovePollOption: (index: number) => void;
   handleAddPollOption: () => void;
   handleVote: (pollId: string, optionIndex: number) => Promise<void>;
+  handleDrawPollPrize: (pollId: string) => Promise<void>;
   slashCommand: SlashCommandType;
   showSlashModal: boolean;
   slashForm: SlashCommandForm;
@@ -78,6 +87,9 @@ export function useChatWorkflowDrafts({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(DEFAULT_POLL_OPTIONS);
   const [pollDeadlineAt, setPollDeadlineAt] = useState('');
+  const [prizeEnabled, setPrizeEnabled] = useState(false);
+  const [prizeWinnerCount, setPrizeWinnerCount] = useState(1);
+  const [prizeName, setPrizeName] = useState('');
   const [slashCommand, setSlashCommand] = useState<SlashCommandType>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
   const [slashForm, setSlashForm] = useState<SlashCommandForm>({
@@ -95,6 +107,9 @@ export function useChatWorkflowDrafts({
   const closePollModal = useCallback(() => {
     setShowPollModal(false);
     setPollDeadlineAt('');
+    setPrizeEnabled(false);
+    setPrizeWinnerCount(1);
+    setPrizeName('');
   }, []);
 
   const handleCreatePoll = useCallback(async () => {
@@ -110,10 +125,18 @@ export function useChatWorkflowDrafts({
     }
 
     try {
+      const prizeMeta =
+        prizeEnabled && prizeName.trim() && prizeWinnerCount >= 1
+          ? { winnerCount: prizeWinnerCount, name: prizeName.trim() }
+          : undefined;
+
       const pollPayload = {
         room_id: selectedRoomId,
         creator_id: effectiveChatUserId || user?.id,
-        question: buildPollQuestionContent(pollQuestion, { deadlineAt: pollDeadlineAt }),
+        question: buildPollQuestionContent(pollQuestion, {
+          deadlineAt: pollDeadlineAt,
+          prize: prizeMeta,
+        }),
         options,
       };
 
@@ -129,10 +152,18 @@ export function useChatWorkflowDrafts({
 
       setPolls((prev) => [...prev, poll as PollItem]);
     } catch {
+      const prizeMeta =
+        prizeEnabled && prizeName.trim() && prizeWinnerCount >= 1
+          ? { winnerCount: prizeWinnerCount, name: prizeName.trim() }
+          : undefined;
+
       const optimisticPoll: PollItem = {
         id: Date.now().toString(),
         room_id: selectedRoomId,
-        question: buildPollQuestionContent(pollQuestion, { deadlineAt: pollDeadlineAt }),
+        question: buildPollQuestionContent(pollQuestion, {
+          deadlineAt: pollDeadlineAt,
+          prize: prizeMeta,
+        }),
         options,
       };
       setPolls((prev) => [...prev, optimisticPoll]);
@@ -140,9 +171,12 @@ export function useChatWorkflowDrafts({
       setPollQuestion('');
       setPollOptions(DEFAULT_POLL_OPTIONS);
       setPollDeadlineAt('');
+      setPrizeEnabled(false);
+      setPrizeWinnerCount(1);
+      setPrizeName('');
       setShowPollModal(false);
     }
-  }, [effectiveChatUserId, pollDeadlineAt, pollOptions, pollQuestion, selectedRoomId, user?.id]);
+  }, [effectiveChatUserId, pollDeadlineAt, pollOptions, pollQuestion, prizeEnabled, prizeName, prizeWinnerCount, selectedRoomId, user?.id]);
 
   const handlePollOptionChange = useCallback((index: number, value: string) => {
     setPollOptions((prev) => prev.map((option, optionIndex) => (optionIndex === index ? value : option)));
@@ -194,6 +228,109 @@ export function useChatWorkflowDrafts({
       // ignore poll vote failures here; room refresh will reconcile later
     }
   }, [effectiveChatUserId, fetchData, user?.id]);
+
+  const handleDrawPollPrize = useCallback(async (pollId: string) => {
+    const poll = polls.find((p) => p.id === pollId);
+    if (!poll) return;
+
+    const myId = effectiveChatUserId || user?.id;
+    if (String(poll.creator_id) !== String(myId)) {
+      toast('투표 생성자만 추첨할 수 있습니다.', 'warning');
+      return;
+    }
+
+    const { prize, prizeWinners } = extractPollMetaFromQuestion(poll.question);
+    if (!prize) return;
+    if (prizeWinners && prizeWinners.length > 0) {
+      toast('이미 추첨이 완료된 투표입니다.', 'warning');
+      return;
+    }
+
+    try {
+      const { data: voteRows, error: voteError } = await supabase
+        .from('poll_votes')
+        .select('user_id')
+        .eq('poll_id', pollId);
+
+      if (voteError) throw voteError;
+
+      const participantIds = [...new Set((voteRows ?? []).map((row: { user_id: unknown }) => String(row.user_id)))];
+      if (participantIds.length === 0) {
+        toast('투표 참여자가 없어 추첨할 수 없습니다.', 'warning');
+        return;
+      }
+
+      // Fisher-Yates 셔플
+      const shuffled = [...participantIds];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      const selectedIds = shuffled.slice(0, Math.min(prize.winnerCount, shuffled.length));
+
+      const { data: staffRows, error: staffError } = await supabase
+        .from('staff_members')
+        .select('id, name')
+        .in('id', selectedIds);
+
+      if (staffError) throw staffError;
+
+      const winners: PollPrizeWinner[] = selectedIds.map((id) => {
+        const found = (staffRows ?? []).find((s: { id: unknown; name: unknown }) => String(s.id) === id);
+        return { id, name: String(found?.name || '알 수 없음') };
+      });
+
+      const { deadlineAt } = extractPollMetaFromQuestion(poll.question);
+      const newQuestion = buildPollQuestionContent(
+        extractPollMetaFromQuestion(poll.question).displayQuestion,
+        { deadlineAt, prize, prizeWinners: winners },
+      );
+
+      const { error: updateError } = await supabase
+        .from('polls')
+        .update({ question: newQuestion })
+        .eq('id', pollId);
+
+      if (updateError) throw updateError;
+
+      // 낙관적 갱신
+      setPolls((prev) =>
+        prev.map((p) => (p.id === pollId ? { ...p, question: newQuestion } : p)),
+      );
+
+      // 추첨 결과를 해당 채팅방에 일반 메시지로 게시 (JM3: 추첨 성공과 격리)
+      const roomId = String(poll.room_id || selectedRoomId || '');
+      if (roomId) {
+        const senderId = String(effectiveChatUserId || user?.id || '');
+        const { displayQuestion } = extractPollMetaFromQuestion(poll.question);
+        const winnerNames = winners.map((w) => w.name).join(', ');
+        const resultContent = `🎉 추첨 결과\n[${displayQuestion}]\n🎁 상품: ${prize.name}\n🏆 당첨: ${winnerNames}`;
+
+        try {
+          await insertChatMessageWithFallback({
+            room_id: roomId,
+            sender_id: senderId || null,
+            content: resultContent,
+            file_url: null,
+            file_name: null,
+            file_size_bytes: null,
+            file_kind: null,
+            reply_to_id: null,
+            album_id: null,
+            album_index: null,
+            album_total: null,
+          });
+        } catch {
+          toast('추첨 결과 메시지 게시에 실패했습니다.', 'warning');
+        }
+      }
+
+      void fetchData();
+      toast(`🎉 추첨 완료! 당첨자: ${winners.map((w) => w.name).join(', ')}`);
+    } catch {
+      toast('추첨 중 오류가 발생했습니다.', 'error');
+    }
+  }, [effectiveChatUserId, fetchData, polls, selectedRoomId, setPolls, user?.id]);
 
   const closeSlashModal = useCallback(() => {
     setShowSlashModal(false);
@@ -344,6 +481,12 @@ export function useChatWorkflowDrafts({
     pollOptions,
     pollDeadlineAt,
     setPollDeadlineAt,
+    prizeEnabled,
+    prizeWinnerCount,
+    prizeName,
+    setPrizeEnabled,
+    setPrizeWinnerCount,
+    setPrizeName,
     openPollModal,
     closePollModal,
     handleCreatePoll,
@@ -351,6 +494,7 @@ export function useChatWorkflowDrafts({
     handleRemovePollOption,
     handleAddPollOption,
     handleVote,
+    handleDrawPollPrize,
     slashCommand,
     showSlashModal,
     slashForm,

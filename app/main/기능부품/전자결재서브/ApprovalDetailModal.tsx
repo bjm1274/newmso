@@ -3,6 +3,8 @@
 import type { StaffMember } from '@/types';
 import { isApprovalLocked } from '@/lib/approval-workflow';
 import { alphaColor } from '../전자결재-utils';
+import ApprovalLineTimeline from './ApprovalLineTimeline';
+import { resolveRejectReason } from './ApprovalRiskReviewDialog';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -46,11 +48,15 @@ type ApprovalDetailModalProps = {
 
 export default function ApprovalDetailModal({
   item,
+  approvalDirectoryStaffs,
+  approvalLookupStaffs,
   onClose,
   buildApprovalPrintHtml,
   openApprovalPrintView,
   resolveApprovalTemplateMeta,
   resolveApprovalTemplateDesign,
+  resolveApprovalLineIds,
+  resolveCurrentApproverId,
   resolveApprovalDelegateSnapshot,
   resolveApprovalDelaySnapshot,
   resolveApprovalLockSnapshot,
@@ -60,6 +66,7 @@ export default function ApprovalDetailModal({
   handleRejectAction,
   handleRecallAction,
 }: ApprovalDetailModalProps) {
+  const timelineStaffs = approvalLookupStaffs ?? approvalDirectoryStaffs;
   if (!item) return null;
 
   const detailType = item.type as string | null | undefined;
@@ -106,6 +113,22 @@ export default function ApprovalDetailModal({
           <button type="button" onClick={onClose} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-5">
+          <div className="mx-auto mb-3 w-full max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-[12px] font-black text-[var(--foreground)]">결재선</h3>
+              {String(detailStatus || '').includes('반려') && resolveRejectReason(item) && (
+                <span className="rounded-[var(--radius-sm,4px)] bg-[var(--danger-light)] px-2 py-0.5 text-[10px] font-semibold text-[var(--danger)]">
+                  반려 사유: {resolveRejectReason(item)}
+                </span>
+              )}
+            </div>
+            <ApprovalLineTimeline
+              item={item}
+              staffs={timelineStaffs}
+              resolveApprovalLineIds={resolveApprovalLineIds}
+              resolveCurrentApproverId={resolveCurrentApproverId}
+            />
+          </div>
           <div className="mx-auto mb-4 w-full max-w-[860px] overflow-hidden rounded-[var(--radius-lg)] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.65)]">
             <iframe
               data-testid="approval-detail-preview"

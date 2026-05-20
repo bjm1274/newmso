@@ -506,6 +506,20 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       });
   }, [staffs]);
 
+  // 참조자 후보: 전 회사·전 부서의 활성 직원 전체 (MSO 특성상 타 회사 직원도 참조자 지정 가능).
+  // 결재선과 달리 직책 보유자로 제한하지 않는다.
+  const allCompaniesReferenceCandidates = useMemo(() => {
+    return mergeApprovalStaffDirectory(Array.isArray(staffs) ? staffs : [], supportApproverStaffs)
+      .filter(isActiveStaff)
+      .sort((a, b) => {
+        const companyDiff = String(a.company || '').localeCompare(String(b.company || ''), 'ko-KR');
+        if (companyDiff !== 0) return companyDiff;
+        const deptDiff = String(a.department || '').localeCompare(String(b.department || ''), 'ko-KR');
+        if (deptDiff !== 0) return deptDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ko-KR');
+      });
+  }, [staffs, supportApproverStaffs]);
+
   const {
     normalizeApprovalLineIds,
     resolveApprovalLineIds,
@@ -1219,6 +1233,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
             loadDraftFromStorage={loadDraftFromStorage}
             clearDraftFromStorage={clearDraftFromStorage}
             approverCandidates={allCompaniesApproverCandidates}
+            referenceCandidates={allCompaniesReferenceCandidates}
             approvalDirectoryStaffs={approvalDirectoryStaffs}
             approverLine={approverLine}
             setApproverLine={setApproverLine}
@@ -1255,6 +1270,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         ) : (
           <ApprovalInboxView
             viewMode={viewMode}
+            currentUserId={user?.id ? String(user.id) : null}
             listForView={listForView}
             approvalDocumentFilter={approvalDocumentFilter}
             setApprovalDocumentFilter={setApprovalDocumentFilter}

@@ -478,41 +478,74 @@ export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: St
   return room.name || '채팅방';
 }
 
+export type PollPrize = {
+  winnerCount: number;
+  name: string;
+};
+
+export type PollPrizeWinner = {
+  id: string;
+  name: string;
+};
+
+export type PollMeta = {
+  deadlineAt?: string | null;
+  prize?: PollPrize | null;
+  prizeWinners?: PollPrizeWinner[] | null;
+};
+
 export function buildPollQuestionContent(
   question: string,
-  meta?: { deadlineAt?: string | null },
+  meta?: PollMeta | null,
 ): string {
   const normalizedQuestion = String(question || '').trim();
+  const hasMeta =
+    (meta?.deadlineAt && String(meta.deadlineAt).trim()) ||
+    meta?.prize ||
+    meta?.prizeWinners;
+
+  if (!hasMeta) return normalizedQuestion;
+
+  const metaObj: PollMeta = {};
   const deadlineAt = String(meta?.deadlineAt || '').trim();
-  if (!deadlineAt) return normalizedQuestion;
-  return `${normalizedQuestion}${normalizedQuestion ? '\n' : ''}${POLL_META_PREFIX}${JSON.stringify({ deadlineAt })}${POLL_META_SUFFIX}`;
+  if (deadlineAt) metaObj.deadlineAt = deadlineAt;
+  if (meta?.prize) metaObj.prize = meta.prize;
+  if (meta?.prizeWinners) metaObj.prizeWinners = meta.prizeWinners;
+
+  return `${normalizedQuestion}${normalizedQuestion ? '\n' : ''}${POLL_META_PREFIX}${JSON.stringify(metaObj)}${POLL_META_SUFFIX}`;
 }
 
 export function extractPollMetaFromQuestion(value: unknown): {
   displayQuestion: string;
   deadlineAt: string;
+  prize: PollPrize | null;
+  prizeWinners: PollPrizeWinner[] | null;
 } {
   const raw = String(value || '');
   const start = raw.indexOf(POLL_META_PREFIX);
   const end = raw.indexOf(POLL_META_SUFFIX);
 
   if (start === -1 || end === -1 || end <= start) {
-    return { displayQuestion: raw.trim(), deadlineAt: '' };
+    return { displayQuestion: raw.trim(), deadlineAt: '', prize: null, prizeWinners: null };
   }
 
   const displayQuestion = raw.slice(0, start).trim();
   const metaText = raw.slice(start + POLL_META_PREFIX.length, end).trim();
 
   try {
-    const parsed = JSON.parse(metaText) as { deadlineAt?: string | null };
+    const parsed = JSON.parse(metaText) as PollMeta;
     return {
       displayQuestion,
       deadlineAt: String(parsed?.deadlineAt || '').trim(),
+      prize: parsed?.prize ?? null,
+      prizeWinners: parsed?.prizeWinners ?? null,
     };
   } catch {
     return {
       displayQuestion: raw.trim(),
       deadlineAt: '',
+      prize: null,
+      prizeWinners: null,
     };
   }
 }

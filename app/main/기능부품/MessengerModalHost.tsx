@@ -25,11 +25,17 @@ export function MessengerModalHost({ controller }: MessengerModalHostProps) {
         question={c.pollQuestion}
         options={c.pollOptions}
         deadlineAt={c.pollDeadlineAt}
+        prizeEnabled={c.prizeEnabled ?? false}
+        prizeWinnerCount={c.prizeWinnerCount ?? 1}
+        prizeName={c.prizeName ?? ''}
         onQuestionChange={c.setPollQuestion}
         onDeadlineAtChange={c.setPollDeadlineAt}
         onOptionChange={c.handlePollOptionChange}
         onRemoveOption={c.handleRemovePollOption}
         onAddOption={c.handleAddPollOption}
+        onPrizeEnabledChange={c.setPrizeEnabled ?? (() => {})}
+        onPrizeWinnerCountChange={c.setPrizeWinnerCount ?? (() => {})}
+        onPrizeNameChange={c.setPrizeName ?? (() => {})}
         onClose={c.closePollModal}
         onSubmit={c.handleCreatePoll}
       />

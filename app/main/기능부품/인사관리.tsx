@@ -8,6 +8,7 @@ import 구성원관리 from './인사관리서브/구성원현황';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { ChevronDown } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import HrWorkcenterRouter, { resolveWorkcenterId } from './인사관리워크센터';
 
 // ── 서브뷰 lazy 로드 (인사관리 번들 최소화, 구성원 뷰만 정적) ──
 const HrSubViewLoading = () => (
@@ -69,7 +70,7 @@ type HrTabDef = {
   label: string;
   perm: string;
   icon: string;
-  group: '인력관리' | '근태/급여' | '복무/복지' | '문서/기타';
+  group: '인력관리' | '근태 · 급여' | '복무 · 복지' | '문서 · 기타';
 };
 
 type AttendanceAnalysisTabDef = {
@@ -81,8 +82,8 @@ type AttendanceAnalysisTabDef = {
 
 const HR_WORKSPACES: { id: HrWorkspaceId; label: string; icon: string; groups: HrTabDef['group'][] }[] = [
   { id: '인력관리', label: '인력관리', icon: 'users', groups: ['인력관리'] },
-  { id: '근태 · 급여', label: '근태 · 급여', icon: 'calculator', groups: ['근태/급여'] },
-  { id: '복지 · 문서', label: '복지 · 문서', icon: 'folder', groups: ['복무/복지', '문서/기타'] },
+  { id: '근태 · 급여', label: '근태 · 급여', icon: 'calculator', groups: ['근태 · 급여'] },
+  { id: '복지 · 문서', label: '복지 · 문서', icon: 'folder', groups: ['복무 · 복지', '문서 · 기타'] },
 ];
 
 const HR_WORKSPACE_META: Record<HrWorkspaceId, { risk: string }> = {
@@ -93,21 +94,21 @@ const HR_WORKSPACE_META: Record<HrWorkspaceId, { risk: string }> = {
 
 const HR_GROUP_LABELS: Record<HrTabDef['group'], string> = {
   인력관리: '인력관리',
-  '근태/급여': '· 근태/급여',
-  '복무/복지': '· 복무/복지',
-  '문서/기타': '· 문서/기타',
+  '근태 · 급여': '근태 · 급여',
+  '복무 · 복지': '복무 · 복지',
+  '문서 · 기타': '문서 · 기타',
 };
 
 const HR_TABS: HrTabDef[] = [
   { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: 'users', group: '인력관리' },
   { id: '인사변동', label: '인사변동', perm: 'hr_인사발령', icon: 'briefcase', group: '인력관리' },
   { id: '입퇴사·교육센터', label: '입퇴사·교육센터', perm: 'hr_교육', icon: 'compass', group: '인력관리' },
-  { id: '근태', label: '근태', perm: 'hr_근태', icon: 'history', group: '근태/급여' },
-  { id: '급여', label: '급여', perm: 'hr_급여', icon: 'calculator', group: '근태/급여' },
-  { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: 'bell', group: '복무/복지' },
-  { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: 'admin', group: '복무/복지' },
-  { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: 'document', group: '문서/기타' },
-  { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: 'folder', group: '문서/기타' },
+  { id: '근태', label: '근태', perm: 'hr_근태', icon: 'history', group: '근태 · 급여' },
+  { id: '급여', label: '급여', perm: 'hr_급여', icon: 'calculator', group: '근태 · 급여' },
+  { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: 'bell', group: '복무 · 복지' },
+  { id: '자격·안전센터', label: '자격·안전센터', perm: 'hr_건강검진', icon: 'admin', group: '복무 · 복지' },
+  { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: 'document', group: '문서 · 기타' },
+  { id: '문서센터', label: '문서센터', perm: 'hr_문서보관함', icon: 'folder', group: '문서 · 기타' },
 ];
 
 const ATTENDANCE_ANALYSIS_TABS: AttendanceAnalysisTabDef[] = [
@@ -269,7 +270,7 @@ function getWorkspaceForHrMenu(menuId: HrMenuId): HrWorkspaceId {
   const tab = HR_TABS.find((item) => item.id === menuId);
   if (!tab) return '인력관리';
   if (tab.group === '인력관리') return '인력관리';
-  if (tab.group === '근태/급여') return '근태 · 급여';
+  if (tab.group === '근태 · 급여') return '근태 · 급여';
   return '복지 · 문서';
 }
 
@@ -714,6 +715,30 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           메인 메뉴 권한과 세부 인사관리 권한을 확인해 주세요.
         </p>
       </div>
+    );
+  }
+
+  // ── 워크센터 라우팅 (사이드바2가 영문 워크센터 id를 전달한 경우) ──
+  // initialMenu가 'member' / 'attend' / 'leave' / 'abnormal' / 'welfare' / 'docs'
+  // 또는 매핑되는 한글 별칭(워크센터 통합 라벨)인 경우 새 워크센터 라우터로 위임.
+  // 한글 사이드바(구성원·근태·급여 등)는 resolveWorkcenterId가 null을 반환하지 않도록
+  // 신중하게 alias를 골랐으니, 기존 흐름(아래 사이드바 + 본문) 보존을 위해
+  // 영문 워크센터 id 또는 신규 통합 라벨이 들어온 경우에만 분기한다.
+  const workcenterId = resolveWorkcenterId(initialMenu);
+  if (workcenterId) {
+    return (
+      <HrWorkcenterRouter
+        workcenterId={workcenterId}
+        staffs={인사직원목록 as unknown as never}
+        selectedCo={선택사업체}
+        user={user}
+        onRefresh={onRefresh}
+        canRegisterNewStaff={canRegisterNewStaff}
+        onOpenNewStaff={() => 창상태설정(true)}
+        onOpenDocumentRepoForStaff={(staff) => 인사서류보기(staff)}
+        linkedTarget={문서연결대상}
+        canManageDocuments={isAdminUser(user)}
+      />
     );
   }
 

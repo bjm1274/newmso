@@ -218,9 +218,10 @@ export const FEATURE_CARDS: FeatureCard[] = [
   { id: 'ESL관리', label: 'ESL 관리', icon: 'Tag', subView: 'ESL관리', testId: 'esl-manager', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
 ];
 
+// 결정 #14: 외부 시스템 미러링 카드 — 벤더명 + 외부 시스템 표시. 실제 API 연동은 후속 차수.
 export const EXTERNAL_LINKS = [
-  { id: 'km-park', label: '주차관제', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: 'CircleParking' },
-  { id: 'webfax', label: '웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: 'Printer' },
+  { id: 'km-park', label: '주차관제', vendor: 'ParkSys Pro', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: 'CircleParking' },
+  { id: 'webfax', label: '웹팩스', vendor: 'WebFax Cloud', url: 'https://webfax.uplus.co.kr/m', icon: 'Printer' },
 ];
 
 export function FeatureShell({

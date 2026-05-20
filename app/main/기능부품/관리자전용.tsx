@@ -18,6 +18,7 @@ import {
 import dynamic from 'next/dynamic';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 import { MenuIcon } from './조직도서브/조직도측면창';
+import { isAdminWorkcenterId, getAdminWorkcenter } from './관리자워크센터';
 
 // ── 서브뷰 lazy 로드 (관리자 메뉴 번들 최소화) ──
 const AdminSubViewLoading = () => (
@@ -208,6 +209,23 @@ export default function AdminView(props: Record<string, unknown>) {
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
           메인 메뉴 권한과 관리자 세부 권한을 확인해 주세요.
         </p>
+      </div>
+    );
+  }
+
+  // 사이드바2 옵트인: 영문 id(`exec`, `company`, `roles`, `ops`, `forms`, `audit`)가
+  // 전달되면 새 통합 워크센터로 라우팅. 기존 한글 id는 아래 기존 흐름 그대로 동작.
+  // 권한 검증(hasAdminMenuAccess)은 이미 통과한 뒤이므로 안전.
+  if (isAdminWorkcenterId(initialTab)) {
+    const Workcenter = getAdminWorkcenter(initialTab);
+    return (
+      <div
+        className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
+        data-testid="admin-view"
+      >
+        <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 pb-20 md:p-4">
+          <Workcenter />
+        </main>
       </div>
     );
   }

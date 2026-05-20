@@ -888,11 +888,23 @@ function MainPageContent() {
   );
   const currentSubMenuGroups = useMemo(
     () =>
-      mainMenu === '관리자' || mainMenu === '재고관리'
+      mainMenu === '관리자' || mainMenu === '재고관리' || mainMenu === '게시판'
         ? Array.from(new Set(selectableSubMenus.map((subMenu) => subMenu.group))).filter(Boolean)
         : [],
     [mainMenu, selectableSubMenus]
   );
+  // 결정 #24: 게시판 사이드바 row 우측 카운트 chip — board_id별 게시물 수 집계
+  const boardCounts = useMemo<Record<string, number>>(() => {
+    if (mainMenu !== '게시판') return {};
+    const counts: Record<string, number> = {};
+    for (const post of data.posts as Array<{ board_id?: string | null }>) {
+      const key = post.board_id;
+      if (typeof key === 'string' && key) {
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [mainMenu, data.posts]);
   const displayedSubView = getDisplayedSubView(mainMenu, subView);
   const subgroupLabels: Record<string, string> = {
     운영: '운영',
@@ -903,15 +915,16 @@ function MainPageContent() {
     '문서 · 자산': '문서 · 자산',
     '기준 정보': '기준 정보',
     '경영 분석': '경영 분석',
-    '조직 / 권한': '/ 권한',
+    '조직 · 권한': '조직 · 권한',
     '시스템 설정': '설정',
     '데이터 관리': '관리',
     '감사 센터': '센터',
     '시스템 마스터': '시스템 마스터',
     인력관리: '인력관리',
-    '근태/급여': '근태 · 급여',
-    '복무/복지': '복무 · 복지',
-    '문서/기타': '문서 · 기타',
+    '근태 · 급여': '근태 · 급여',
+    '복무 · 복지': '복무 · 복지',
+    '문서 · 기타': '문서 · 기타',
+    게시판: '게시판',
   };
 
   // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
@@ -1136,6 +1149,7 @@ function MainPageContent() {
     <div
       className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--page-bg)] pt-[env(safe-area-inset-top)] md:flex-row md:pt-0"
       data-testid="main-shell"
+      data-main-menu={mainMenu}
     >
       <style>{`
         @media (min-width: 768px) {
@@ -1231,7 +1245,7 @@ function MainPageContent() {
             className={`${subNavCollapsed ? 'hidden md:flex' : 'flex'} no-scrollbar scroll-smooth snap-x snap-mandatory flex-row gap-0.5 overflow-x-auto px-2 py-1.5 md:flex-col md:snap-none md:overflow-x-visible md:px-2 md:py-3`}
           >
           {(() => {
-            if (mainMenu === '관리자' || mainMenu === '재고관리') {
+            if (mainMenu === '관리자' || mainMenu === '재고관리' || mainMenu === '게시판') {
               const groups = currentSubMenuGroups;
 
               return groups.map(groupName => (
@@ -1242,7 +1256,9 @@ function MainPageContent() {
                   <div className="app-subnav-group-label hidden px-2 pb-1 select-none md:block">
                     {subgroupLabels[groupName!] || groupName}
                   </div>
-                  {selectableSubMenus.filter(s => s.group === groupName).map(sub => (
+                  {selectableSubMenus.filter(s => s.group === groupName).map(sub => {
+                    const boardCount = mainMenu === '게시판' ? boardCounts[sub.id] : undefined;
+                    return (
                     <button type="button"
                       key={sub.id}
                       onClick={() => handleSubViewChange(sub.id)}
@@ -1254,8 +1270,17 @@ function MainPageContent() {
                         <MenuIcon name={sub.icon} className="h-[14px] w-[14px]" />
                       </span>
                       <span className="truncate">{sub.label}</span>
+                      {typeof boardCount === 'number' && boardCount > 0 ? (
+                        <span
+                          className="ml-auto hidden shrink-0 rounded-full bg-[var(--muted)] px-1.5 text-[10px] font-bold tabular-nums text-[var(--toss-gray-4)] md:inline-flex md:items-center md:min-w-[20px] md:justify-center md:h-[18px]"
+                          aria-label={`${sub.label} ${boardCount}건`}
+                        >
+                          {boardCount > 99 ? '99+' : boardCount}
+                        </span>
+                      ) : null}
                     </button>
-                  ))}
+                  );
+                  })}
                 </div>
               ));
             }

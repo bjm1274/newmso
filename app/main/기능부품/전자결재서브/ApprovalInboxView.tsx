@@ -4,12 +4,11 @@ import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { StaffMember } from '@/types';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { ALL_DOCUMENT_FILTER } from './approval-constants';
-import {
-  ApprovalProgressSummary,
-  ApprovalRiskReviewDialog,
-  buildApprovalWorkflowSummary,
-} from './ApprovalRiskReviewDialog';
-import { ResponsiveTable, type Column, type ResponsiveTableSelection } from '@/app/components/ResponsiveTable';
+import { ApprovalRiskReviewDialog } from './ApprovalRiskReviewDialog';
+import { ResponsiveTable, type ResponsiveTableSelection } from '@/app/components/ResponsiveTable';
+import WorkflowBoard from './WorkflowBoard';
+import ApprovalWorkflowKpi from './ApprovalWorkflowKpi';
+import { buildApprovalInboxColumns } from './ApprovalInboxColumns';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -17,6 +16,8 @@ type TemplateDesign = Record<string, any>;
 
 type ApprovalInboxViewProps = {
   viewMode: string;
+  /** 현재 사용자 id — 워크플로 보드의 "내 차례·검토 중" 분류에 사용 */
+  currentUserId?: string | null;
   listForView: ApprovalRecord[];
   approvalDocumentFilter: string;
   setApprovalDocumentFilter: Dispatch<SetStateAction<string>>;
@@ -74,6 +75,7 @@ type ApprovalInboxViewProps = {
 
 export default function ApprovalInboxView({
   viewMode,
+  currentUserId,
   listForView,
   approvalDocumentFilter,
   setApprovalDocumentFilter,
@@ -134,25 +136,6 @@ export default function ApprovalInboxView({
     { pending: 0, approved: 0, rejected: 0 },
   );
 
-  const formatDraftDate = (value: unknown) => {
-    const raw = String(value || '');
-    if (!raw) return '-';
-    const datePart = raw.slice(0, 10);
-    const [, month, day] = datePart.split('-');
-    return month && day ? `${month}.${day}` : datePart;
-  };
-
-  const statusTone = (statusValue: unknown) => {
-    const status = String(statusValue || '대기').trim();
-    if (status.includes('승인')) {
-      return { label: '승인', className: 'erp-status erp-status-green' };
-    }
-    if (status.includes('반려')) {
-      return { label: '반려', className: 'erp-status erp-status-red' };
-    }
-    return { label: '대기', className: 'erp-status erp-status-yellow' };
-  };
-
   const [searchExpanded, setSearchExpanded] = useState(false);
 
   // ResponsiveTable: 결재함일 때만 selection 활성화
@@ -173,141 +156,35 @@ export default function ApprovalInboxView({
     };
   }, [viewMode, bulkTargetList, selectedApprovalIds, allBulkSelected, toggleSelectOne, toggleSelectAll, listForView]);
 
-  // 컬럼 정의 — viewMode 무관 (selection은 별도 prop)
-  const columns: Column<ApprovalRecord>[] = useMemo(() => [
-    {
-      key: 'title',
-      label: '문서 제목',
-      primary: true,
-      render: (item) => (
-        <div className="min-w-[220px]" data-testid={`approval-card-${String(item.id || '')}`}>
-          <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
-          <ApprovalProgressSummary
-            item={item}
-            staffs={lookupStaffsForDisplay}
-            resolveApprovalLineIds={resolveApprovalLineIds}
-            resolveCurrentApproverId={resolveCurrentApproverId}
-            resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
-            compact
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'sender_name',
-      label: '기안자',
-      render: (item) => String(item.sender_name || '사용자'),
-    },
-    {
-      key: 'type',
-      label: '문서 유형',
-      render: (item) => {
-        const templateMeta = resolveApprovalTemplateMeta(item);
-        return <span className="erp-status erp-status-blue">{templateMeta.name || String(item.type || '결재')}</span>;
-      },
-    },
-    {
-      key: 'created_at',
-      label: '기안일',
-      render: (item) => formatDraftDate(item.created_at),
-    },
-    {
-      key: 'status',
-      label: '상태',
-      render: (item) => {
-        const status = statusTone(item.status);
-        const workflowSummary = buildApprovalWorkflowSummary({
-          item,
-          staffs: lookupStaffsForDisplay,
-          resolveApprovalLineIds,
-          resolveCurrentApproverId,
-        });
-        return (
-          <div className="flex flex-col items-start gap-1">
-            <span className={status.className}>{status.label}</span>
-            {String(item.status || '').includes('대기') && (
-              <span className="text-[10px] font-bold text-[var(--muted-foreground)]">
-                {workflowSummary.currentApproverName}
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: '__actions',
-      label: '관리',
-      align: 'right',
-      render: (item) => {
-        const itemId = String(item.id || '');
-        return (
-          <div
-            className="flex items-center justify-end gap-2"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {canUserRecallItem(item) && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleRecallAction(item);
-                }}
-                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
-              >
-                회수 후 수정
-              </button>
-            )}
-            {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
-              <>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleApproveAction(item);
-                  }}
-                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm transition-all hover:bg-[var(--success-light)]"
-                >
-                  승인
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleRejectAction(item);
-                  }}
-                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm transition-all hover:bg-[var(--danger-light)]"
-                >
-                  반려
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setSelectedApprovalId(itemId);
-              }}
-              className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--foreground)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
-            >
-              상세
-            </button>
-          </div>
-        );
-      },
-    },
-  ], [
-    lookupStaffsForDisplay,
-    resolveApprovalLineIds,
-    resolveCurrentApproverId,
-    resolveApprovalDelaySnapshot,
-    resolveApprovalTemplateMeta,
-    canUserRecallItem,
-    canUserApproveItem,
-    handleRecallAction,
-    handleApproveAction,
-    handleRejectAction,
-    setSelectedApprovalId,
-  ]);
+  const columns = useMemo(
+    () =>
+      buildApprovalInboxColumns({
+        lookupStaffs: lookupStaffsForDisplay,
+        resolveApprovalLineIds,
+        resolveCurrentApproverId,
+        resolveApprovalDelaySnapshot,
+        resolveApprovalTemplateMeta,
+        canUserRecallItem,
+        canUserApproveItem,
+        handleRecallAction,
+        handleApproveAction,
+        handleRejectAction,
+        onOpenDetail: (id) => setSelectedApprovalId(id),
+      }),
+    [
+      lookupStaffsForDisplay,
+      resolveApprovalLineIds,
+      resolveCurrentApproverId,
+      resolveApprovalDelaySnapshot,
+      resolveApprovalTemplateMeta,
+      canUserRecallItem,
+      canUserApproveItem,
+      handleRecallAction,
+      handleApproveAction,
+      handleRejectAction,
+      setSelectedApprovalId,
+    ],
+  );
 
   const closeBulkReview = () => {
     setBulkReviewAction(null);
@@ -427,17 +304,25 @@ export default function ApprovalInboxView({
           )}
 
           {searchExpanded ? (
-            <input
-              data-testid="approval-keyword-filter"
-              autoFocus
-              value={approvalKeyword}
-              onChange={(event) => setApprovalKeyword(event.target.value)}
-              onBlur={() => {
-                if (!approvalKeyword) setSearchExpanded(false);
-              }}
-              placeholder="제목, 내용, 기안자 검색"
-              className="h-8 w-48 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
-            />
+            <div className="relative">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+              >
+                <LucideIcon name="Search" size={13} />
+              </span>
+              <input
+                data-testid="approval-keyword-filter"
+                autoFocus
+                value={approvalKeyword}
+                onChange={(event) => setApprovalKeyword(event.target.value)}
+                onBlur={() => {
+                  if (!approvalKeyword) setSearchExpanded(false);
+                }}
+                placeholder="제목·기안자·문서번호"
+                className="h-8 w-56 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] pl-7 pr-2 text-[11px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
+              />
+            </div>
           ) : (
             <button
               type="button"
@@ -502,7 +387,35 @@ export default function ApprovalInboxView({
         </div>
       )}
 
-      {listForView.length === 0 ? null : (
+      {viewMode === '결재함' && (
+        <ApprovalWorkflowKpi
+          documents={listForView}
+          myStaffId={currentUserId ?? null}
+          resolveCurrentApproverId={resolveCurrentApproverId}
+        />
+      )}
+
+      {viewMode === '결재함' ? (
+        listForView.length === 0 ? (
+          <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center text-[12px] font-semibold text-[var(--muted-foreground)]">
+            표시할 결재 문서가 없습니다.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[1080px]">
+              <WorkflowBoard
+                documents={listForView}
+                myStaffId={currentUserId ?? null}
+                staffs={lookupStaffsForDisplay}
+                resolveApprovalLineIds={resolveApprovalLineIds}
+                resolveCurrentApproverId={resolveCurrentApproverId}
+                resolveApprovalTemplateMeta={resolveApprovalTemplateMeta}
+                onSelectDocument={(id) => setSelectedApprovalId(id)}
+              />
+            </div>
+          </div>
+        )
+      ) : listForView.length === 0 ? null : (
         <section className="erp-table-card">
           <div className="overflow-x-auto">
             <div className="min-w-[860px]">

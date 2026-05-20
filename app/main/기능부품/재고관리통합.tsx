@@ -45,6 +45,14 @@ const SupplierDocumentWorkspace = dynamic(() => import('./재고관리서브/Sup
 const AssetLoanSettingsAdminView = dynamic(() => import('./관리자전용서브/비품대여물품설정'), { ssr: false, loading: InvSubViewLoading });
 
 import InventoryStatusView from './재고관리서브/재고현황뷰';
+import { getStockWorkcenter } from './재고관리워크센터';
+
+// ── 워크센터 영문 id (사이드바2 옵트인) ──
+// 한글 id(현황·등록·발주·자산·월마감)는 기존 동작을 유지하기 위해 매핑 보류.
+const STOCK_WORKCENTER_ENGLISH_IDS = ['status', 'io', 'item', 'analyze'] as const;
+type StockWorkcenterEnglishId = (typeof STOCK_WORKCENTER_ENGLISH_IDS)[number];
+const isStockWorkcenterEnglishId = (id: unknown): id is StockWorkcenterEnglishId =>
+  typeof id === 'string' && (STOCK_WORKCENTER_ENGLISH_IDS as readonly string[]).includes(id);
 
 // ── 뷰 해석 (레거시 뷰 → 현재 뷰 매핑) ──
 function resolveInventoryView(view?: string | null): {
@@ -283,6 +291,15 @@ export default function IntegratedInventoryManagement({
       },
     },
   ], []);
+
+  // ── 워크센터 라우팅 (사이드바2가 영문 워크센터 id를 전달한 경우) ──
+  // initialView가 'status' / 'io' / 'item' / 'analyze'이면 새 워크센터로 위임.
+  // 한글 id(현황·등록·발주·자산·월마감)는 기존 동작 보존(옵트인).
+  // 주의: 모든 hook이 호출된 뒤에 early return해야 React Hook 규칙(#310) 위반 방지.
+  if (isStockWorkcenterEnglishId(initialView)) {
+    const StockWorkcenter = getStockWorkcenter(initialView);
+    return <StockWorkcenter />;
+  }
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">

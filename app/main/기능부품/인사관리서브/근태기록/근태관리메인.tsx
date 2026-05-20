@@ -118,6 +118,53 @@ function resolveAttendanceStatus(attendance: any, isWeekend = false) {
   return isWeekend ? 'holiday' : '';
 }
 
+type ApprovedLeaveRow = {
+  staff_id: string;
+  start_date: string;
+  end_date: string;
+  leave_type: string;
+  status: string;
+};
+
+/** 버그 B 수정: 특정 직원·날짜에 승인된 연차/휴가가 있으면 대응 status 문자열을 반환 */
+function resolveLeaveStatusForDate(
+  staffId: string,
+  dateStr: string,
+  approvedLeaves: ApprovedLeaveRow[],
+): string | null {
+  const match = approvedLeaves.find((row) => {
+    if (row.staff_id !== staffId) return false;
+    const start = String(row.start_date || '').slice(0, 10);
+    const end = String(row.end_date || row.start_date || '').slice(0, 10);
+    return dateStr >= start && dateStr <= end;
+  });
+  if (!match) return null;
+  const lt = String(match.leave_type || '').trim();
+  if (lt === '반차' || lt.startsWith('반차') || lt === 'half_leave') return 'half_leave';
+  if (lt === '병가' || lt === 'sick_leave') return 'sick_leave';
+  return 'annual_leave';
+}
+
+/**
+ * 버그 B 수정: 근태 기록과 승인 연차를 합산하여 최종 상태를 결정한다.
+ * - 실제 출퇴근 기록이 있으면 우선
+ * - 없거나 absent인데 승인 연차가 있으면 연차 상태로 대체
+ */
+function resolveAttendanceStatusWithLeave(
+  attendance: any,
+  leaveStatus: string | null | undefined,
+  isWeekend = false,
+): string {
+  const attStatus = resolveAttendanceStatus(attendance, isWeekend);
+  if (attStatus === 'present' || attStatus === 'late' || attStatus === 'early_leave') {
+    return attStatus;
+  }
+  if ((!attStatus || attStatus === 'absent') && leaveStatus) {
+    return leaveStatus;
+  }
+  return attStatus;
+}
+
 function isWorkedAttendanceStatus(status: string) {
   return status === 'present' || status === 'late' || status === 'early_leave';
 }
@@ -339,6 +386,14 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  // 버그 B 수정: 승인된 연차/휴가 데이터 — 근태 상태 표시 시 결근 오판 방지
+  const [approvedLeaves, setApprovedLeaves] = useState<Array<{
+    staff_id: string;
+    start_date: string;
+    end_date: string;
+    leave_type: string;
+    status: string;
+  }>>([]);
   const [loading, setLoading] = useState(false);
   const [workShifts, setWorkShifts] = useState<any[]>([]);
   const [shiftAssignments, setShiftAssignments] = useState<Record<string, string>>({}); // key: `${staff_id}_${work_date}` -> shift_id or ''
@@ -390,12 +445,19 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       totalRecords: number;
     }>();
 
+    // 버그 B 수정: attendanceData 기록이 있는 직원만이 아니라, 연차 승인 직원도 집계한다.
+    // 먼저 attendanceData 기반으로 집계 후, 기록이 없지만 연차가 있는 직원을 보완한다.
     attendanceData.forEach((attendance) => {
       const workDate = String(attendance?.work_date || '').trim();
       if (!workDate || !workDate.startsWith(`${selectedMonth}-`)) return;
 
       const dayOfWeek = new Date(workDate).getDay();
-      const status = resolveAttendanceStatus(attendance, dayOfWeek === 0 || dayOfWeek === 6);
+      const leaveStatus = resolveLeaveStatusForDate(
+        String(attendance?.staff_id || '').trim(),
+        workDate,
+        approvedLeaves,
+      );
+      const status = resolveAttendanceStatusWithLeave(attendance, leaveStatus, dayOfWeek === 0 || dayOfWeek === 6);
       if (!summary.has(workDate)) {
         summary.set(workDate, {
           worked: 0,
@@ -449,8 +511,47 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       }
     });
 
+    // 출퇴근 기록은 없지만 연차가 승인된 직원을 날짜별로 보완한다 (버그 B 핵심 수정)
+    approvedLeaves.forEach((leave) => {
+      const start = String(leave.start_date || '').slice(0, 10);
+      const end = String(leave.end_date || leave.start_date || '').slice(0, 10);
+      const [sy, sm, sd] = start.split('-').map(Number);
+      const [ey, em, ed] = end.split('-').map(Number);
+      const startMs = new Date(sy, (sm || 1) - 1, sd || 1).getTime();
+      const endMs = new Date(ey, (em || 1) - 1, ed || 1).getTime();
+      const [my, mm] = selectedMonth.split('-').map(Number);
+      const monthStartMs = new Date(my, (mm || 1) - 1, 1).getTime();
+      const monthEndMs = new Date(my, mm || 1, 0).getTime();
+
+      const effectiveStart = Math.max(startMs, monthStartMs);
+      const effectiveEnd = Math.min(endMs, monthEndMs);
+
+      for (let ms = effectiveStart; ms <= effectiveEnd; ms += 86400000) {
+        const d = new Date(ms);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        // 이미 attendanceData에서 집계된 직원·날짜는 건너뜀
+        const hasAttRecord = attendanceData.some(
+          (a) => String(a.staff_id || '') === leave.staff_id && String(a.work_date || '').slice(0, 10) === dateStr,
+        );
+        if (hasAttRecord) continue;
+
+        const lt = String(leave.leave_type || '').trim();
+        let leaveStatusKey: string;
+        if (lt === '반차' || lt.startsWith('반차')) leaveStatusKey = 'halfLeave';
+        else if (lt === '병가') leaveStatusKey = 'sickLeave';
+        else leaveStatusKey = 'annualLeave';
+
+        if (!summary.has(dateStr)) {
+          summary.set(dateStr, { worked: 0, late: 0, earlyLeave: 0, absent: 0, annualLeave: 0, sickLeave: 0, halfLeave: 0, totalRecords: 0 });
+        }
+        const current = summary.get(dateStr)!;
+        current.totalRecords += 1;
+        (current as Record<string, number>)[leaveStatusKey] = ((current as Record<string, number>)[leaveStatusKey] || 0) + 1;
+      }
+    });
+
     return summary;
-  }, [attendanceData, selectedMonth]);
+  }, [attendanceData, approvedLeaves, selectedMonth]);
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -458,28 +559,54 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       const staffIds = filtered.map((s: StaffMember) => s.id);
       if (staffIds.length === 0) {
         setAttendanceData([]);
+        setApprovedLeaves([]);
         return;
       }
-      const weekDates = buildWeekDates(selectedDate);
-      const [startDate, endDate] =
-        viewMode === 'calendar' && calendarDetailView === 'day'
-          ? [selectedDate, selectedDate]
-          : viewMode === 'calendar' && calendarDetailView === 'week'
-            ? [weekDates[0], weekDates[weekDates.length - 1]]
-            : [`${selectedMonth}-01`, `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`];
+      // 달력 월간 격자는 항상 표시되므로 한 달 전체 데이터가 필요하다.
+      // (과거: 일별 상세일 때 선택한 하루만 조회 → 날짜 클릭 시 격자의
+      //  다른 날이 모두 '기록 없음'으로 비던 버그)
+      const monthStart = `${selectedMonth}-01`;
+      const monthEnd = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
+      let startDate = monthStart;
+      let endDate = monthEnd;
+      if (viewMode === 'calendar') {
+        // 주별 상세가 월 경계를 넘을 수 있어 해당 주 범위까지 포함한다.
+        const weekDates = buildWeekDates(selectedDate);
+        if (weekDates[0] < startDate) startDate = weekDates[0];
+        if (weekDates[weekDates.length - 1] > endDate) endDate = weekDates[weekDates.length - 1];
+      }
 
-      const { data, error } = await supabase
-        .from('attendances')
-        .select('*')
-        .in('staff_id', staffIds)
-        .gte('work_date', startDate)
-        .lte('work_date', endDate);
+      // 버그 B 수정: 근태와 연차 데이터를 병렬 조회 (JM2: 단일 왕복)
+      const [attendanceResult, leaveResult] = await Promise.all([
+        supabase
+          .from('attendances')
+          .select('*')
+          .in('staff_id', staffIds)
+          .gte('work_date', startDate)
+          .lte('work_date', endDate),
+        supabase
+          .from('leave_requests')
+          .select('staff_id, start_date, end_date, leave_type, status')
+          .in('staff_id', staffIds)
+          .eq('status', '승인')
+          .lte('start_date', endDate)
+          .gte('end_date', startDate),
+      ]);
 
-      if (error) throw error;
-      setAttendanceData(data || []);
+      if (attendanceResult.error) throw attendanceResult.error;
+      setAttendanceData(attendanceResult.data || []);
+
+      // leave_requests 오류는 근태 표시를 막지 않도록 분리 처리 (JM3)
+      if (leaveResult.error) {
+        console.error('[fetchAttendance] 연차 조회 실패:', leaveResult.error);
+        setApprovedLeaves([]);
+      } else {
+        setApprovedLeaves((leaveResult.data || []) as typeof approvedLeaves);
+      }
     } catch (err) {
       console.error('근태 조회 실패:', err);
       setAttendanceData([]);
+      setApprovedLeaves([]);
     } finally {
       setLoading(false);
     }
@@ -487,7 +614,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
 
   useEffect(() => {
     fetchAttendance();
-  }, [selectedMonth, selectedDate, selectedCo, viewMode, calendarDetailView, filtered]);
+  }, [selectedMonth, selectedDate, selectedCo, viewMode, filtered]);
 
   // 근무표 편성: work_shifts 로드
   useEffect(() => {
@@ -1054,9 +1181,15 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   }, [calendarDetailView, daysArray, selectedMonth, weekDates]);
 
   const stats = useMemo(() => {
-    const resolvedStatuses = attendanceData.map((attendance: any) =>
-      resolveAttendanceStatus(attendance, false),
-    );
+    // 버그 B 수정: 연차 반영하여 absent 카운트에서 연차 제외
+    const resolvedStatuses = attendanceData.map((attendance: any) => {
+      const leaveStatus = resolveLeaveStatusForDate(
+        String(attendance?.staff_id || '').trim(),
+        String(attendance?.work_date || '').slice(0, 10),
+        approvedLeaves,
+      );
+      return resolveAttendanceStatusWithLeave(attendance, leaveStatus, false);
+    });
     const total = resolvedStatuses.filter(Boolean).length;
     const present = resolvedStatuses.filter((status) => status === 'present').length;
     const late = resolvedStatuses.filter((status) => status === 'late').length;
@@ -1068,7 +1201,14 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     filtered.forEach((s: StaffMember) => {
       const myStatuses = attendanceData
         .filter((a: any) => a.staff_id === s.id)
-        .map((attendance: any) => resolveAttendanceStatus(attendance, false));
+        .map((attendance: any) => {
+          const leaveStatus = resolveLeaveStatusForDate(
+            s.id,
+            String(attendance?.work_date || '').slice(0, 10),
+            approvedLeaves,
+          );
+          return resolveAttendanceStatusWithLeave(attendance, leaveStatus, false);
+        });
       const lates = myStatuses.filter((status) => status === 'late').length;
       const absents = myStatuses.filter((status) => status === 'absent').length;
       if (lates >= 3 || absents >= 2) {
@@ -1077,7 +1217,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     });
 
     return { total, present, late, earlyLeave, absent, rate, atRiskStaff };
-  }, [attendanceData, filtered]);
+  }, [attendanceData, approvedLeaves, filtered]);
 
   const dayPanelColumns = useMemo((): Column<StaffMember>[] => [
     {
@@ -1098,7 +1238,9 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       label: '상태',
       render: (s) => {
         const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
-        const status = resolveAttendanceStatus(att, isWeekendDate(selectedDate));
+        // 버그 B 수정: 승인 연차 반영
+        const leaveStatus = resolveLeaveStatusForDate(s.id, selectedDate, approvedLeaves);
+        const status = resolveAttendanceStatusWithLeave(att, leaveStatus, isWeekendDate(selectedDate));
         const meta = getAttendanceStatusMeta(status || 'missing');
         return (
           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
@@ -1130,7 +1272,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         );
       },
     },
-  ], [attendanceMap, selectedDate]);
+  ], [attendanceMap, selectedDate, approvedLeaves]);
 
   // 일별 출퇴근 현황 정렬 상태: 기본 부서→직급→이름, 토글로 이름·상태·출근시각 정렬 가능
   type DayPanelSortKey = 'default' | 'name' | 'status' | 'checkIn';
@@ -1182,8 +1324,11 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       } else if (dayPanelSort.key === 'status') {
         const attA = attendanceMap.get(buildAttendanceKey(a.id, selectedDate));
         const attB = attendanceMap.get(buildAttendanceKey(b.id, selectedDate));
-        const sA = resolveAttendanceStatus(attA, isWeekendDate(selectedDate)) || 'missing';
-        const sB = resolveAttendanceStatus(attB, isWeekendDate(selectedDate)) || 'missing';
+        // 버그 B 수정: 정렬에도 승인 연차 반영
+        const leaveA = resolveLeaveStatusForDate(a.id, selectedDate, approvedLeaves);
+        const leaveB = resolveLeaveStatusForDate(b.id, selectedDate, approvedLeaves);
+        const sA = resolveAttendanceStatusWithLeave(attA, leaveA, isWeekendDate(selectedDate)) || 'missing';
+        const sB = resolveAttendanceStatusWithLeave(attB, leaveB, isWeekendDate(selectedDate)) || 'missing';
         compared = (STATUS_ORDER[sA] ?? 99) - (STATUS_ORDER[sB] ?? 99);
       } else if (dayPanelSort.key === 'checkIn') {
         const attA = attendanceMap.get(buildAttendanceKey(a.id, selectedDate));
@@ -1196,7 +1341,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       return dayPanelSort.dir === 'asc' ? compared : -compared;
     });
     return next;
-  }, [filtered, dayPanelSort, attendanceMap, selectedDate, nameCollator, STATUS_ORDER]);
+  }, [filtered, dayPanelSort, attendanceMap, selectedDate, nameCollator, STATUS_ORDER, approvedLeaves]);
 
   const toggleDayPanelSort = (key: Exclude<DayPanelSortKey, 'default'>) => {
     setDayPanelSort((cur) =>
@@ -1290,7 +1435,9 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                   </td>
                   {calendarDetailColumns.map((column) => {
                     const att = attendanceMap.get(buildAttendanceKey(s.id, column.dateStr));
-                    const status = resolveAttendanceStatus(att, column.isWeekend);
+                    // 버그 B 수정: 승인 연차 반영
+                    const leaveStatus = resolveLeaveStatusForDate(s.id, column.dateStr, approvedLeaves);
+                    const status = resolveAttendanceStatusWithLeave(att, leaveStatus, column.isWeekend);
                     const meta = getAttendanceStatusMeta(status || 'missing');
                     if (isWorkedAttendanceStatus(status)) workDays += 1;
                     return (
@@ -1786,6 +1933,9 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             department: s.department,
             company: s.company,
           }))}
+          initialDate={selectedDate}
+          attendances={attendanceData}
+          approvedLeaves={approvedLeaves}
           onApplied={() => {
             fetchAttendance();
           }}
