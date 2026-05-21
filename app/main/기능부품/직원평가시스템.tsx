@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 
 interface Evaluation {
     id: string;
@@ -65,21 +66,14 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             fetchEvaluations(selectedStaff.id as string);
 
             // 실시간 구독
-            const channel = supabase
-                .channel(`staff-eval-${selectedStaff.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'staff_evaluations',
-                    filter: `staff_id=eq.${selectedStaff.id}`
-                }, () => {
-                    fetchEvaluations(selectedStaff.id as string);
-                })
-                .subscribe();
+            const unsubscribe = subscribeRealtime(
+                `staff-eval-${selectedStaff.id}`,
+                [{ table: 'staff_evaluations', event: '*' }],
+                () => { fetchEvaluations(selectedStaff.id as string); },
+                { pollIntervalMs: 10000 },
+            );
 
-            return () => {
-                supabase.removeChannel(channel);
-            };
+            return unsubscribe;
         } else {
             setEvaluations([]);
         }

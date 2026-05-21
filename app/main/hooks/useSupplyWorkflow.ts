@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember, InventoryItem } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import {
   buildSupplyRequestWorkflowItems,
@@ -372,13 +373,13 @@ export function useSupplyWorkflow({
   // ── 실시간 구독 ──
   useEffect(() => {
     if (!isInventoryOpsUser || activeView !== '현황') return;
-    const channel = supabase
-      .channel(`inventory-supply-approvals-${user?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
-        void fetchPendingSupplyApprovals();
-      })
-      .subscribe();
-    return () => { channel.unsubscribe(); supabase.removeChannel(channel); };
+    const unsubscribe = subscribeRealtime(
+      `inventory-supply-approvals-${user?.id || 'guest'}`,
+      [{ table: 'approvals', event: '*' }],
+      () => { void fetchPendingSupplyApprovals(); },
+      { pollIntervalMs: 5000 },
+    );
+    return unsubscribe;
   }, [activeView, fetchPendingSupplyApprovals, isInventoryOpsUser, user?.id]);
 
   // ── 요약 ──

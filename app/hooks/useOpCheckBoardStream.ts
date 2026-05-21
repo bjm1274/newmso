@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   isMissingColumnError,
   withMissingColumnsFallback,
@@ -165,31 +166,19 @@ export function useOpCheckBoardStream(filters: OpCheckBoardFilters): OpCheckBoar
   useEffect(() => {
     aliveRef.current = true;
     refresh();
-    const channel = supabase
-      .channel(`op_check_board_stream_${date || 'all'}_${companyId || 'all'}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'board_posts' },
-        () => {
-          refresh();
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'op_patient_checks' },
-        () => {
-          refresh();
-        },
-      )
-      .subscribe();
+    const unsubscribe = subscribeRealtime(
+      `op_check_board_stream_${date || 'all'}_${companyId || 'all'}`,
+      [
+        { table: 'board_posts', event: '*' },
+        { table: 'op_patient_checks', event: '*' },
+      ],
+      () => { refresh(); },
+      { pollIntervalMs: 5000 },
+    );
 
     return () => {
       aliveRef.current = false;
-      try {
-        channel.unsubscribe();
-      } catch {
-        // 채널이 이미 종료된 경우 무시
-      }
+      unsubscribe();
     };
   }, [companyId, date, refresh]);
 

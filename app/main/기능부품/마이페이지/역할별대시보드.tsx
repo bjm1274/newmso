@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { useLocalDateKey } from '@/lib/use-local-date-key';
@@ -292,12 +293,12 @@ export default function RoleDashboard({
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel(`mypage-pending-approvals-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
-        void fetchPending();
-      })
-      .subscribe();
+    const unsubscribe = subscribeRealtime(
+      `mypage-pending-approvals-${user.id}`,
+      [{ table: 'approvals', event: '*' }],
+      () => { void fetchPending(); },
+      { pollIntervalMs: 5000 },
+    );
 
     const handleFocus = () => {
       void fetchPending();
@@ -311,7 +312,7 @@ export default function RoleDashboard({
       if (typeof window !== 'undefined') {
         window.removeEventListener('focus', handleFocus);
       }
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [fetchPending, user?.id]);
 

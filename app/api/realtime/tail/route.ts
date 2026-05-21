@@ -54,6 +54,10 @@ const ALLOWED_TABLES = new Set<string>([
   'payroll_records',
   'audit_logs',
   'work_shifts',
+  'shift_assignments',
+  'staff_shift_assignments',
+  'backup_restore_runs',
+  'staff_evaluations',
 ]);
 
 

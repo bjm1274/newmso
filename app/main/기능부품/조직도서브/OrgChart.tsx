@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import type { StaffMember } from '@/types';
 import { AddCompanyCard, AddCompanyHintModal } from './AddCompanyCard';
 
@@ -876,11 +877,15 @@ export default function OrgChart({
       }, 250);
     };
 
-    const channel = supabase
-      .channel(`org-chart-working-status-${user?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendances' }, scheduleRefresh)
-      .subscribe();
+    const unsubscribe = subscribeRealtime(
+      `org-chart-working-status-${user?.id || 'guest'}`,
+      [
+        { table: 'attendance', event: '*' },
+        { table: 'attendances', event: '*' },
+      ],
+      scheduleRefresh,
+      { pollIntervalMs: 10000 },
+    );
 
     const handleVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -906,7 +911,7 @@ export default function OrgChart({
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisible);
       }
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [user?.id]);
 

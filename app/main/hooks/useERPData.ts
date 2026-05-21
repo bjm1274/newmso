@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import { hasUserPayloadChanged } from '@/lib/access-control';
 import {
@@ -105,18 +106,16 @@ export function useERPData(
       }, REFETCH_DEBOUNCE_MS);
     };
 
-    const channel = supabase
-      .channel('erp-data-staff_members-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'staff_members' },
-        scheduleRefetch,
-      )
-      .subscribe();
+    const unsubscribe = subscribeRealtime(
+      'erp-data-staff_members-realtime',
+      [{ table: 'staff_members', event: '*' }],
+      scheduleRefetch,
+      { pollIntervalMs: 10000 },
+    );
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [fetchERPData, getUser]);
 

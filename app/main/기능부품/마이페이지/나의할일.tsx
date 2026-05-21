@@ -3,6 +3,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -355,16 +356,13 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
   useEffect(() => {
     if (!effectiveUserId) return;
-    const channel = supabase
-      .channel(`todos-realtime-${effectiveUserId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${effectiveUserId}` }, () => {
-        void fetchTasks(effectiveUserId);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const unsubscribe = subscribeRealtime(
+      `todos-realtime-${effectiveUserId}`,
+      [{ table: 'todos', event: '*' }],
+      () => { void fetchTasks(effectiveUserId); },
+      { pollIntervalMs: 5000 },
+    );
+    return unsubscribe;
   }, [effectiveUserId, selectedDate, viewRange]);
 
   const handleAddTask = async () => {

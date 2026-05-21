@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isActiveStaff } from '@/lib/active-staff';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
@@ -390,15 +391,19 @@ function WorkStatus({ user }: { user?: any }) {
     };
 
     isRealtimeActiveRef.current = true;
-    const channel = supabase
-      .channel(`work-status-live-${user?.id || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendances' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_assignments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_shift_assignments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_members' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_shifts' }, scheduleRefresh)
-      .subscribe();
+    const unsubscribe = subscribeRealtime(
+      `work-status-live-${user?.id || 'guest'}`,
+      [
+        { table: 'attendance', event: '*' },
+        { table: 'attendances', event: '*' },
+        { table: 'shift_assignments', event: '*' },
+        { table: 'staff_shift_assignments', event: '*' },
+        { table: 'staff_members', event: '*' },
+        { table: 'work_shifts', event: '*' },
+      ],
+      scheduleRefresh,
+      { pollIntervalMs: 10000 },
+    );
 
     // JM2: realtime 활성 시 focus/visibilitychange는 noop (realtime이 이미 커버)
     //       hidden 상태에서도 fetch skip
@@ -424,7 +429,7 @@ function WorkStatus({ user }: { user?: any }) {
       }
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisible);
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [user?.id]);
 

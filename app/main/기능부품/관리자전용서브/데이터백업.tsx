@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { BACKUP_GROUPS, BACKUP_RESTORE_ORDER, resolveBackupTables } from '@/lib/backup-config';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getStaffLikeId, normalizeStaffLike } from '@/lib/staff-identity';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -216,16 +217,13 @@ function DataBackupDesktop({ user }: Props) {
   }, [loadRestoreRuns]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('backup-restore-runs-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'backup_restore_runs' }, () => {
-        void loadRestoreRuns();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const unsubscribe = subscribeRealtime(
+      'backup-restore-runs-realtime',
+      [{ table: 'backup_restore_runs', event: '*' }],
+      () => { void loadRestoreRuns(); },
+      { pollIntervalMs: 5000 },
+    );
+    return unsubscribe;
   }, [loadRestoreRuns]);
 
   useEffect(() => {

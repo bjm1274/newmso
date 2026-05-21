@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   buildApprovalNotificationHref,
   buildBoardNotificationHref,
@@ -106,6 +107,10 @@ export default function GlobalNotificationBell({
   useEffect(() => {
     if (!user?.id) return;
 
+    // prevIds를 closure에 담아 변경 감지 시 diff 수행
+    let prevIds: Set<string> = new Set();
+    let unsubscribe: (() => void) | null = null;
+
     const fetchList = async () => {
       const { data } = await supabase
         .from('notifications')
@@ -120,86 +125,66 @@ export default function GlobalNotificationBell({
       setUnreadCount(nextList.filter((item) => !item.is_read).length);
     };
 
-    /** stale 여부 확인 후 필요한 경우만 전체 fetch (JM2) */
-    const fetchIfStale = () => {
-      if (Date.now() - lastFetchedAtRef.current >= STALE_MS) {
-        void fetchList();
+    const handleChange = async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select(NOTIFICATION_SELECT)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      lastFetchedAtRef.current = Date.now();
+      const nextList = Array.isArray(data) ? (data as NotificationItem[]) : [];
+      setList(nextList);
+      setUnreadCount(nextList.filter((item) => !item.is_read).length);
+
+      // 이전에 없던 항목 → toast
+      const newItems = nextList.filter((item) => !prevIds.has(item.id));
+      prevIds = new Set(nextList.map((item) => item.id));
+
+      if (newItems.length > 0) {
+        const newest = newItems[0];
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification(newest.title || '새 알림', {
+              body: newest.body || '확인할 새 알림이 있습니다.',
+              icon: '/sy-logo.png',
+            });
+          } catch {
+            // ignore browser notification failures
+          }
+        }
+        setToastNotification(newest);
+        toastTimerRef.current = window.setTimeout(() => setToastNotification(null), 5000);
       }
     };
 
-    // mount 시 1회 전체 fetch
-    void fetchList();
+    const setup = async () => {
+      // mount 시 1회 전체 fetch
+      await fetchList();
 
-    const channel = supabase
-      .channel(`notifications-${String(user.id)}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` },
-        (payload) => {
-          const item = normalizePayload(payload.new);
-          if (!item) {
-            // payload 파싱 실패 → 안전망: stale이면 전체 fetch (JM3)
-            fetchIfStale();
-            return;
-          }
+      // 초기 ID 목록 수집 (false positive toast 방지)
+      const { data: initData } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      prevIds = new Set(Array.isArray(initData) ? initData.map((r: { id: string }) => r.id) : []);
 
-          // payload 1건 머지 — 전체 재페치 없음 (JM2)
-          setList((prev) => [item, ...prev].slice(0, LIST_MAX));
-          setUnreadCount((prev) => prev + (item.is_read ? 0 : 1));
+      unsubscribe = subscribeRealtime(
+        `notifications-${String(user.id)}`,
+        [{ table: 'notifications', event: '*' }],
+        () => { void handleChange(); },
+        { pollIntervalMs: 5000 },
+      );
+    };
 
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            try {
-              new Notification(item.title || '새 알림', {
-                body: item.body || '확인할 새 알림이 있습니다.',
-                icon: '/sy-logo.png',
-              });
-            } catch {
-              // ignore browser notification failures
-            }
-          }
-
-          setToastNotification(item);
-          toastTimerRef.current = window.setTimeout(() => setToastNotification(null), 5000);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` },
-        (payload) => {
-          const updated = normalizePayload(payload.new);
-          if (!updated) {
-            fetchIfStale();
-            return;
-          }
-
-          // 해당 항목만 교체 후 unreadCount 재산출 — 전체 재페치 없음 (JM2)
-          setList((prev) => {
-            const next = prev.map((n) => (n.id === updated.id ? updated : n));
-            setUnreadCount(next.filter((n) => !n.is_read).length);
-            return next;
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` },
-        (payload) => {
-          const oldId = typeof (payload.old as Record<string, unknown>).id === 'string'
-            ? (payload.old as Record<string, unknown>).id as string
-            : null;
-          if (!oldId) {
-            fetchIfStale();
-            return;
-          }
-          setList((prev) => prev.filter((n) => n.id !== oldId));
-          setUnreadCount((prev) => Math.max(0, prev - 1));
-        }
-      )
-      .subscribe();
+    void setup();
 
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      supabase.removeChannel(channel);
+      if (unsubscribe) unsubscribe();
     };
   }, [user?.id]);
 

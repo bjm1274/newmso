@@ -9,6 +9,7 @@ import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, ty
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   buildStorageInlineUrl,
@@ -626,30 +627,29 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [loadBoardReadState]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('board-post-reads-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_post_reads' }, () => {
-        void loadBoardReadState();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const unsubscribe = subscribeRealtime(
+      'board-post-reads-realtime',
+      [{ table: 'board_post_reads', event: '*' }],
+      () => { void loadBoardReadState(); },
+      { pollIntervalMs: 10000 },
+    );
+    return unsubscribe;
   }, [loadBoardReadState]);
 
   // 수술/검사 템플릿 필터링 로직 (유지)
 
   useEffect(() => {
-    const channel = supabase
-      .channel('board-posts-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
+    const unsubscribe = subscribeRealtime(
+      'board-posts-realtime',
+      [{ table: 'board_posts', event: '*' }],
+      () => {
         // 좋아요 처리 중이면 realtime fetch 건너뜀 (로컬 state 덮어쓰기 방지)
         if (likingRef.current) return;
         fetchPosts();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      },
+      { pollIntervalMs: 10000 },
+    );
+    return unsubscribe;
   }, [activeBoard, user?.id]);
 
   // 근무현황 Effect 제거됨

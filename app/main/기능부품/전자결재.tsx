@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { isActiveStaff } from '@/lib/active-staff';
 import { supabase } from '@/lib/supabase';
+import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/supabase-compat';
 import { APPROVAL_OPTIONAL_COLUMNS, buildApprovalSelect } from '@/lib/approval-query-columns';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
@@ -779,18 +780,20 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel('approvals-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
+    const unsubscribe = subscribeRealtime(
+      'approvals-realtime',
+      [{ table: 'approvals', event: '*' }],
+      () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           fetchApprovalsRef.current();
         }, 300);
-      })
-      .subscribe();
+      },
+      { pollIntervalMs: 5000 },
+    );
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 
