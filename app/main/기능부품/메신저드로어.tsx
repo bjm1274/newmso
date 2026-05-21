@@ -261,7 +261,7 @@ function MessengerDrawerImpl({
       <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" onClick={onClose} aria-hidden="true" />
       <div
         data-testid="chat-room-drawer"
-        className="absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-sm animate-in slide-in-from-right duration-300 md:w-80 dark:bg-zinc-900"
+        className="absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-sm animate-in slide-in-from-right duration-300 md:w-[260px] dark:bg-zinc-900"
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] p-4">
           <span className="text-sm font-bold">채팅방 정보</span>
@@ -275,15 +275,54 @@ function MessengerDrawerImpl({
         </div>
 
         <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
-          <div className="flex items-center justify-between rounded-2xl bg-[var(--tab-bg)] p-3 dark:bg-zinc-800/50">
-            <span className="text-sm font-semibold">알림 설정</span>
-            <button
-              type="button"
-              onClick={() => void onToggleRoomNotify()}
-              className={`relative h-6 w-12 rounded-full transition-colors ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}
-            >
-              <div className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--card)] transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
-            </button>
+          <div className="space-y-2 rounded-2xl bg-[var(--tab-bg)] p-3 dark:bg-zinc-800/50">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">알림 설정</span>
+              <button
+                type="button"
+                onClick={() => void onToggleRoomNotify()}
+                className={`relative h-6 w-12 rounded-full transition-colors ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                aria-label={roomNotifyOn ? '알림 끄기' : '알림 켜기'}
+              >
+                <div className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--card)] transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
+              </button>
+            </div>
+            {roomNotifyOn && (
+              <div className="border-t border-[var(--border)] pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">알림 모드</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    roomNotificationMode === 'all'
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                      : roomNotificationMode === 'mention_only'
+                        ? 'bg-amber-500/10 text-amber-700'
+                        : roomNotificationMode === 'keyword'
+                          ? 'bg-emerald-500/10 text-emerald-700'
+                          : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                  }`}>
+                    {roomNotificationMode === 'all'
+                      ? '모든 메시지'
+                      : roomNotificationMode === 'mention_only'
+                        ? '멘션만'
+                        : roomNotificationMode === 'keyword'
+                          ? '키워드'
+                          : '조용히'}
+                  </span>
+                </div>
+                {roomNotificationMode === 'keyword' && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="text-[10px] text-[var(--toss-gray-4)]">키워드</span>
+                    {roomNotificationKeyword ? (
+                      <span className="rounded-[var(--radius-md)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--accent)]">
+                        {roomNotificationKeyword.split(',').filter(Boolean).length}개 설정됨
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[var(--toss-gray-3)]">없음</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button
@@ -299,17 +338,61 @@ function MessengerDrawerImpl({
             <span className="text-[10px] font-bold text-blue-400 transition-transform group-hover:translate-x-1">열기</span>
           </button>
 
-          <div className="space-y-3">
-            <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
-            <div data-testid="chat-drawer-notice" className="rounded-2xl border border-orange-100 bg-orange-500/10 p-4 dark:border-orange-900/30 dark:bg-orange-950/20">
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-orange-900/70 dark:text-orange-200/50">
-                {getMessageDisplayText(
-                  currentNoticeMessage?.content,
-                  currentNoticeMessage?.file_name,
-                  currentNoticeMessage?.file_url,
-                  '등록된 공지가 없습니다.',
-                )}
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 px-1">
+              <span className="text-[11px]" aria-hidden="true">📌</span>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
+            </div>
+            <div
+              data-testid="chat-drawer-notice"
+              className={`rounded-[var(--radius-lg)] border p-3.5 ${
+                hasNoticeMessage
+                  ? 'border-[var(--accent)]/20 bg-[var(--accent-light,_#eff6ff)] dark:border-[var(--accent)]/30 dark:bg-[var(--accent)]/10'
+                  : 'border-[var(--border)] bg-[var(--tab-bg)] dark:bg-zinc-800/30'
+              }`}
+            >
+              {hasNoticeMessage ? (
+                <div className="space-y-2">
+                  <p className="line-clamp-3 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--foreground)]">
+                    {getMessageDisplayText(
+                      currentNoticeMessage?.content,
+                      currentNoticeMessage?.file_name,
+                      currentNoticeMessage?.file_url,
+                      '',
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onJumpToNoticeMessage}
+                      className="rounded-[var(--radius-md)] bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/15"
+                    >
+                      메시지로 이동
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="chat-notice-read-status"
+                      onClick={onOpenNoticeReadStatus}
+                      className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]"
+                    >
+                      읽음 {noticeReadCount}/{noticeRecipientCount}
+                    </button>
+                    {noticeUnreadCount > 0 ? (
+                      <button
+                        type="button"
+                        data-testid="chat-notice-send-reminder"
+                        onClick={() => void onSendNoticeReminder()}
+                        disabled={noticeReminderBusy}
+                        className="rounded-[var(--radius-md)] bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-500/15 disabled:opacity-50"
+                      >
+                        {noticeReminderBusy ? '발송 중…' : `미확인 ${noticeUnreadCount}명 리마인드`}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">등록된 공지가 없습니다.</p>
+              )}
             </div>
           </div>
 
@@ -660,7 +743,7 @@ function MessengerDrawerImpl({
                 </button>
               ) : null}
             </div>
-            <div className="space-y-3">
+            <div className="grid grid-cols-5 gap-2">
               {roomMembers.map((member) => {
                 const memberId = String(member.id);
                 const resolvedMember =
@@ -669,33 +752,35 @@ function MessengerDrawerImpl({
                     : resolveRoomMemberProfile(selectedRoom, memberId) || member;
 
                 return (
-                  <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="group flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div
+                    data-testid={`chat-room-member-${memberId}`}
+                    key={memberId}
+                    className="group relative flex flex-col items-center gap-1"
+                  >
+                    <div className="relative">
                       <MessengerAvatar
                         name={resolvedMember?.name}
                         photoUrl={getProfilePhotoUrl(resolvedMember)}
-                        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30"
+                        className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-600 dark:bg-emerald-900/30"
                         decorative
                       />
-                      <div>
-                        <p className="text-xs font-bold text-foreground">{resolvedMember?.name || '이름 없음'}</p>
-                        <p className="text-[10px] font-medium text-[var(--toss-gray-4)]">
-                          {[resolvedMember?.department, resolvedMember?.position].filter(Boolean).join(' · ')}
-                        </p>
-                      </div>
+                      {isOwner && memberId !== ownerId ? (
+                        <button
+                          type="button"
+                          data-testid={`chat-remove-member-${memberId}`}
+                          onClick={() => {
+                            void onRemoveRoomMember(memberId);
+                          }}
+                          aria-label={`${resolvedMember?.name || '멤버'} 내보내기`}
+                          className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                        >
+                          ×
+                        </button>
+                      ) : null}
                     </div>
-                    {isOwner && memberId !== ownerId ? (
-                      <button
-                        type="button"
-                        data-testid={`chat-remove-member-${memberId}`}
-                        onClick={() => {
-                          void onRemoveRoomMember(memberId);
-                        }}
-                        className="touch-manipulation min-h-[44px] rounded-md px-2 py-2 text-[10px] font-bold text-red-500 opacity-0 transition-all hover:bg-red-500/10 active:bg-red-500/10 group-hover:opacity-100 [@media(hover:none)]:opacity-100 dark:hover:bg-red-900/20"
-                      >
-                        내보내기
-                      </button>
-                    ) : null}
+                    <p className="w-full truncate text-center text-[9px] font-bold text-[var(--foreground)]">
+                      {resolvedMember?.name || '이름 없음'}
+                    </p>
                   </div>
                 );
               })}

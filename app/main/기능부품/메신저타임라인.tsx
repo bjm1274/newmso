@@ -245,7 +245,7 @@ function MessengerTimelineComponent({
   }, [messageListRef, selectedRoomId, shouldKeepBottomAligned]);
 
   const renderDateDivider = (dateLabel: string, dateKey: string) => (
-    <div data-testid="chat-date-divider" className="my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2">
+    <div data-testid="chat-date-divider" className="sticky top-0 z-10 my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2 bg-[var(--card)] py-0.5">
       <div className="flex-1 h-px bg-[var(--border)]" />
       <button
         type="button"
@@ -589,7 +589,7 @@ function MessengerTimelineComponent({
                         <MessengerAvatar
                           name={senderName}
                           photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
-                          className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-4)]"
+                          className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-4)]"
                           decorative
                         />
                       )}
@@ -742,12 +742,12 @@ function MessengerTimelineComponent({
                               <MessengerAvatar
                                 name={senderName}
                                 photoUrl={senderPhotoUrl}
-                                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-3)] ring-1 ring-black/5 dark:bg-zinc-800"
+                                className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-black/5"
                                 decorative
                               />
                             </div>
                           ) : (
-                            <div aria-hidden="true" className="w-10 shrink-0" />
+                            <div aria-hidden="true" className="w-7 shrink-0" />
                           )
                         ) : null}
                         <div
@@ -784,7 +784,7 @@ function MessengerTimelineComponent({
                                   ? ''
                                   : isMine
                                     ? 'bg-[var(--accent)] text-white border-transparent rounded-br-[4px]'
-                                    : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-bl-[4px] hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
+                                    : 'bg-[var(--card)] border-[var(--border)] rounded-bl-[4px] hover:border-[var(--accent)]/40 text-[var(--foreground)]'
                             }`}
                             role="article"
                             aria-roledescription="채팅 메시지"

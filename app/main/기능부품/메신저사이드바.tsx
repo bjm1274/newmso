@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Pin, PinOff, EyeOff, Eye } from 'lucide-react';
+import { Bell, Pin, PinOff, EyeOff, Eye, Search } from 'lucide-react';
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText } from './메신저유틸';
-import { MenuIcon } from './조직도서브/조직도측면창';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -80,6 +79,41 @@ type MessengerSidebarProps = {
   onOpenDirectChat: (staff: StaffMember) => void | Promise<void>;
 };
 
+// room id/name 해시로 팔레트 인덱스 파생 — tone 데이터가 없을 때 사용
+const TONE_PALETTES = [
+  { bg: 'bg-blue-500', text: 'text-white' },
+  { bg: 'bg-amber-500', text: 'text-white' },
+  { bg: 'bg-green-500', text: 'text-white' },
+  { bg: 'bg-cyan-500', text: 'text-white' },
+  { bg: 'bg-violet-500', text: 'text-white' },
+  { bg: 'bg-pink-500', text: 'text-white' },
+  { bg: 'bg-gray-500', text: 'text-white' },
+] as const;
+
+function hashRoomTone(seed: string): (typeof TONE_PALETTES)[number] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) & 0xffff;
+  }
+  return TONE_PALETTES[h % TONE_PALETTES.length];
+}
+
+// 마지막 메시지 시각 포맷 — 오늘이면 HH:mm, 아니면 MM/DD
+function formatRoomTime(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function MessengerSidebar({
   selectedRoomId,
   viewMode,
@@ -91,6 +125,7 @@ export function MessengerSidebar({
   groupedStaffs,
   expandedDepts,
   onViewModeChange,
+  onOpenGroupModal,
   onOpenGlobalSearch,
   onToggleHiddenRooms,
   onRoomClick,
@@ -105,309 +140,133 @@ export function MessengerSidebar({
 }: MessengerSidebarProps) {
   const [actionRoomId, setActionRoomId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-  void onMovePinnedRoom;
+  // 현재 사용하지 않는 props: suppress unused-var lint
+  void [onMovePinnedRoom, attentionThreadItems, mentionInboxItems, threadInboxItems,
+        onOpenAttentionThreadItem, onOpenMentionItem, onOpenThreadItem];
+
+  const pinnedItems = sidebarRoomItems.filter((item) => item.isPinned);
+  const unpinnedItems = sidebarRoomItems.filter((item) => !item.isPinned);
 
   return (
     <aside
-      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}
+      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-[var(--submenu-width,220px)] border-r border-[var(--border)] bg-[var(--card)] flex-col shrink-0 z-50 transition-all`}
     >
-      <div className="p-3 md:p-3 space-y-3 flex flex-col min-h-0">
-        <div className="flex items-center gap-1">
-          <div className="flex flex-1 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
-            <button type="button"
-              data-testid="chat-tab-chat"
-              onClick={() => onViewModeChange('chat')}
-              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                viewMode === 'chat'
-                  ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
-                  : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
-              }`}
-            >
-              채팅
-            </button>
-            <button type="button"
-              data-testid="chat-tab-org"
-              onClick={() => onViewModeChange('org')}
-              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                viewMode === 'org'
-                  ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
-                  : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
-              }`}
-            >
-              조직도
-            </button>
-          </div>
-          <button type="button"
-            data-testid="chat-open-global-search"
-            onClick={onOpenGlobalSearch}
-            title="대화내용·파일·사진 통합 검색"
-            className="shrink-0 flex items-center justify-center w-9 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--accent)] hover:bg-[var(--toss-blue-light)] transition-all"
+      {/* 상단 헤더: 세그먼트 토글 + 검색 */}
+      <div className="px-3 pt-3 pb-2 space-y-2 shrink-0">
+        {/* 채팅/조직도 세그먼트 토글 — 높이 24px 고정 */}
+        <div className="flex h-6 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5 gap-0.5">
+          <button
+            type="button"
+            data-testid="chat-tab-chat"
+            onClick={() => onViewModeChange('chat')}
+            className={`flex-1 text-[10px] font-bold rounded-[var(--radius-sm)] transition-all ${
+              viewMode === 'chat'
+                ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)]'
+            }`}
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="8" cy="8" r="5.5" />
-              <line x1="12.5" y1="12.5" x2="18" y2="18" />
-              <path d="M15 3v4" />
-              <path d="M13 5h4" />
-            </svg>
+            채팅
           </button>
+          <button
+            type="button"
+            data-testid="chat-tab-org"
+            onClick={() => onViewModeChange('org')}
+            className={`flex-1 text-[10px] font-bold rounded-[var(--radius-sm)] transition-all ${
+              viewMode === 'org'
+                ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)]'
+            }`}
+          >
+            조직도
+          </button>
+        </div>
+
+        {/* 검색 input — 돋보기 아이콘 내부 좌측, 클릭·포커스 시 전역 검색 모달 오픈 */}
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">
+            <Search size={12} />
+          </span>
+          <input
+            type="text"
+            data-testid="chat-open-global-search"
+            readOnly
+            placeholder="대화 검색"
+            onClick={onOpenGlobalSearch}
+            onFocus={onOpenGlobalSearch}
+            className="w-full h-7 pl-7 pr-2 text-[11px] bg-[var(--tab-bg)] border border-transparent rounded-[var(--radius-md)] text-[var(--toss-gray-4)] placeholder:text-[var(--toss-gray-3)] cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-colors"
+          />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4 space-y-0.5 custom-scrollbar">
+      {/* 방 목록 / 조직도 */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 custom-scrollbar">
         {viewMode === 'chat' ? (
-          <>
-            <div className="flex items-center justify-between px-1 pb-2">
-              <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
-                {showHiddenRooms ? '숨김 대화 포함' : '숨김 대화 제외'}
-              </span>
+          <div className="space-y-0.5">
+            {/* 숨김 토글 링크 */}
+            <div className="flex items-center justify-end px-1 py-1">
               <button
                 type="button"
                 data-testid="chat-toggle-hidden-rooms"
                 onClick={onToggleHiddenRooms}
-                className="text-[10px] font-semibold text-blue-500 hover:text-blue-600"
+                className="text-[10px] font-semibold text-[var(--accent)] hover:underline"
               >
                 {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
               </button>
             </div>
-            {sidebarRoomItems.map(
-              ({
-                room,
-                roomId,
-                unread,
-                isSelected,
-                isNoticeChannel,
-                isGroupRoom,
-                participantCount,
-                label,
-                preview,
-                peerName,
-                peerPhotoUrl,
-                isPeerOnline,
-                isPinned,
-                isHidden,
-              }) => {
-                const groupBadgeText = isGroupRoom ? getGroupChatRoomBadgeText(label) : '';
-                // 모바일 스와이프 액션: 공지 채널은 핀/숨김 의미가 없어 제외
-                const enableSwipe = isMobile && !isNoticeChannel;
-                const swipeLeftActions: SwipeAction[] = enableSwipe
-                  ? [{
-                      id: 'pin',
-                      label: isPinned ? '고정 해제' : '고정',
-                      icon: isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />,
-                      tone: 'normal',
-                      onTrigger: () => onToggleRoomPinned(room.id, !isPinned),
-                    }]
-                  : [];
-                const swipeRightActions: SwipeAction[] = enableSwipe
-                  ? [{
-                      id: 'hide',
-                      label: isHidden ? '표시' : '숨김',
-                      icon: isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />,
-                      tone: 'normal',
-                      onTrigger: () => onToggleRoomHidden(room.id, !isHidden),
-                    }]
-                  : [];
-                const handlePrimaryClick = () => {
-                  setActionRoomId((current) => current && current !== roomId ? null : current);
-                  onRoomClick(room.id);
-                };
 
-                const cardBody = (
-                  <div
-                    onDoubleClick={(event) => {
-                      event.preventDefault();
-                      setActionRoomId((current) => current === roomId ? null : roomId);
-                    }}
-                    className={`group min-h-[72px] p-3 rounded-[var(--radius-lg)] cursor-pointer transition-all flex flex-col items-stretch justify-start gap-2 border relative overflow-hidden ${
-                      isSelected
-                        ? 'bg-zinc-800 border-zinc-700 shadow-sm'
-                        : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
-                    }`}
-                  >
-                    {isSelected ? (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/100"></div>
-                    ) : null}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      data-testid={`chat-room-${roomId}`}
-                      onClick={handlePrimaryClick}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          handlePrimaryClick();
-                        }
-                      }}
-                      className={`flex w-full min-w-0 flex-1 items-start ${isGroupRoom ? 'gap-2.5' : 'gap-3'} text-left touch-manipulation cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-[var(--radius-md)]`}
-                    >
-                      {isNoticeChannel ? (
-                        <div
-                          data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]"
-                        >
-                          <MenuIcon name="bell" className="h-4 w-4" />
-                        </div>
-                      ) : isGroupRoom ? (
-                        <div
-                          data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black leading-none tracking-tight text-amber-700 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
-                        >
-                          {groupBadgeText}
-                        </div>
-                      ) : peerName ? (
-                        <div
-                          data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-10 w-10 shrink-0 items-center justify-center"
-                        >
-                          <MessengerAvatar
-                            name={peerName || label}
-                            photoUrl={peerPhotoUrl}
-                            className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                            decorative
-                          />
-                          {isPeerOnline ? (
-                            <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div
-                          data-testid={`chat-room-icon-${roomId}`}
-                          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                        >
-                          <MenuIcon name="chat" className="h-4 w-4" />
-                        </div>
-                      )}
-                      <div
-                        data-testid={`chat-room-summary-${roomId}`}
-                        className="flex min-w-0 flex-1 flex-col gap-1.5"
-                      >
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-                          {unread > 0 ? (
-                            <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-blue-600 px-1.5 text-[10px] font-bold text-white shadow-soft">
-                              {unread > 99 ? '99+' : unread}
-                            </span>
-                          ) : null}
-                          <p
-                            title={isGroupRoom ? label : undefined}
-                            className={`min-w-0 flex-1 truncate text-[13px] font-extrabold leading-5 ${
-                              isSelected
-                                ? 'text-white'
-                                : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'
-                            }`}
-                          >
-                            {label || '단체 채팅방'}
-                          </p>
-                          {isGroupRoom && participantCount > 0 ? (
-                            <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                              isSelected
-                                ? 'bg-white/10 text-white/80'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200'
-                            }`}>
-                              {participantCount}명
-                            </span>
-                          ) : null}
-                          {isPinned ? <span className="rounded-[var(--radius-sm)] bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500">고정</span> : null}
-                          {isHidden ? <span className="rounded-[var(--radius-sm)] bg-[var(--muted)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--toss-gray-3)]">숨김</span> : null}
-                        </div>
-                        <div
-                          data-testid={`chat-room-preview-${roomId}`}
-                          className="text-[11px] text-[var(--toss-gray-3)] font-medium truncate"
-                        >
-                          {preview}
-                        </div>
-                        {unread > 0 ? (
-                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                            <span className="text-[var(--accent)]">새 메시지 {unread > 99 ? '99+' : unread}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  {actionRoomId === roomId && !isNoticeChannel ? (
-                  <div
-                    data-testid={`chat-room-actions-${roomId}`}
-                    className="flex w-full shrink-0 items-center justify-end gap-1 pl-12"
-                    onClick={(event) => event.stopPropagation()}
-                    onDoubleClick={(event) => event.stopPropagation()}
-                  >
-                    {!isNoticeChannel ? (
-                      <>
-                        <button
-                          type="button"
-                          data-testid={`chat-room-pin-${roomId}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleRoomPinned(room.id, !isPinned);
-                            setActionRoomId(null);
-                          }}
-                          className={`flex min-h-[30px] min-w-[46px] items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-bold ${
-                            isSelected
-                              ? 'text-white/80 hover:bg-[var(--card)]/10'
-                              : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
-                          }`}
-                          title={isPinned ? '고정 해제' : '상단 고정'}
-                        >
-                          {isPinned ? '해제' : '고정'}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid={`chat-room-hide-${roomId}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleRoomHidden(room.id, !isHidden);
-                            setActionRoomId(null);
-                          }}
-                          className={`flex min-h-[30px] min-w-[46px] items-center justify-center rounded-md px-2.5 py-1 text-[10px] font-bold ${
-                            isSelected
-                              ? 'text-white/80 hover:bg-[var(--card)]/10'
-                              : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
-                          }`}
-                          title={isHidden ? '숨김 해제' : '대화 숨김'}
-                        >
-                          {isHidden ? '표시' : '숨김'}
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                  ) : null}
-                  </div>
-                );
-
-                if (enableSwipe) {
-                  return (
-                    <SwipeableCard
-                      key={roomId}
-                      leftActions={swipeLeftActions}
-                      rightActions={swipeRightActions}
-                      className="bg-transparent"
-                    >
-                      {cardBody}
-                    </SwipeableCard>
-                  );
-                }
-
-                return <div key={roomId}>{cardBody}</div>;
-              }
+            {/* 고정 그룹 */}
+            {pinnedItems.length > 0 && (
+              <div className="mb-1">
+                <p className="px-1 py-0.5 text-[11px] font-[800] text-[var(--muted)]">고정</p>
+                <div className="space-y-0.5">
+                  {pinnedItems.map((item) => (
+                    <RoomRow
+                      key={item.roomId}
+                      item={item}
+                      actionRoomId={actionRoomId}
+                      isMobile={isMobile}
+                      onRoomClick={onRoomClick}
+                      onToggleRoomPinned={onToggleRoomPinned}
+                      onToggleRoomHidden={onToggleRoomHidden}
+                      setActionRoomId={setActionRoomId}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
-          </>
+
+            {/* 대화 그룹 */}
+            {unpinnedItems.length > 0 && (
+              <div>
+                <p className="px-1 py-0.5 text-[11px] font-[800] text-[var(--muted)]">대화</p>
+                <div className="space-y-0.5">
+                  {unpinnedItems.map((item) => (
+                    <RoomRow
+                      key={item.roomId}
+                      item={item}
+                      actionRoomId={actionRoomId}
+                      isMobile={isMobile}
+                      onRoomClick={onRoomClick}
+                      onToggleRoomPinned={onToggleRoomPinned}
+                      onToggleRoomHidden={onToggleRoomHidden}
+                      setActionRoomId={setActionRoomId}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
-          <div data-testid="chat-org-list" className="space-y-3">
+          /* 조직도 뷰 */
+          <div data-testid="chat-org-list" className="space-y-3 pt-1">
             {Object.entries(groupedStaffs).map(([company, depts]) => (
               <div key={company} className="space-y-1">
                 <div className="flex items-center gap-2 px-1 py-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500/100 shrink-0" />
-                  <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] uppercase tracking-wider truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+                  <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-wider truncate">
                     {company}
                   </h3>
-                  <div className="flex-1 h-[1px] bg-[var(--tab-bg)] dark:bg-zinc-800/50" />
+                  <div className="flex-1 h-[1px] bg-[var(--tab-bg)]" />
                 </div>
                 <div className="space-y-0.5 pl-1">
                   {Object.entries(depts as Record<string, StaffMember[]>).map(([dept, members]) => {
@@ -418,7 +277,7 @@ export function MessengerSidebar({
                         <button
                           type="button"
                           onClick={() => onToggleDept(key)}
-                          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/60 transition-colors text-left"
+                          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--tab-bg)] transition-colors text-left"
                         >
                           <span
                             className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${
@@ -427,45 +286,46 @@ export function MessengerSidebar({
                           >
                             ▼
                           </span>
-                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] flex-1 truncate">
+                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] flex-1 truncate">
                             {dept}
                           </span>
                           <span className="text-[9px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                             {members.length}명
                           </span>
                         </button>
-                        {!collapsed ? (
+                        {!collapsed && (
                           <div className="space-y-0.5 pl-2 pt-0.5 pb-1">
                             {members.map((staff: StaffMember) => (
                               <div
                                 key={staff.id}
-                                className="flex items-center gap-2.5 px-2 py-2 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border-subtle)] dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 transition-all group cursor-default"
+                                className="flex items-center gap-2 px-2 py-2 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] hover:border-[var(--accent)]/40 transition-all"
                               >
                                 <MessengerAvatar
                                   name={staff.name}
                                   photoUrl={getProfilePhotoUrl(staff)}
-                                  className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)] dark:bg-zinc-800"
+                                  className="h-7 w-7 shrink-0 overflow-hidden rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)]"
                                   decorative
                                 />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1">
-                                    <p className="text-[11px] font-bold text-foreground truncate">{staff.name}</p>
+                                    <p className="text-[11px] font-bold text-[var(--foreground)] truncate">{staff.name}</p>
                                     <span className="text-[9px] font-medium text-[var(--toss-gray-3)] shrink-0">
                                       {staff.position}
                                     </span>
                                   </div>
                                 </div>
-                                <button type="button"
+                                <button
+                                  type="button"
                                   data-testid={`chat-direct-${staff.id}`}
                                   onClick={() => void onOpenDirectChat(staff)}
-                                  className="px-2 py-0.5 bg-blue-500/10 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
+                                  className="px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded-[var(--radius-sm)] text-[9px] font-bold border border-[var(--accent)]/20 shrink-0"
                                 >
                                   대화
                                 </button>
                               </div>
                             ))}
                           </div>
-                        ) : null}
+                        )}
                       </div>
                     );
                   })}
@@ -475,6 +335,282 @@ export function MessengerSidebar({
           </div>
         )}
       </div>
+
+      {/* 하단: 새 대화 시작 */}
+      {viewMode === 'chat' && (
+        <NewConversationButton onOpenGroupModal={onOpenGroupModal} />
+      )}
     </aside>
+  );
+}
+
+// ─── 방 row 서브컴포넌트 ─────────────────────────────────────────────────
+
+type RoomRowProps = {
+  item: MessengerSidebarRoomItem;
+  actionRoomId: string | null;
+  isMobile: boolean;
+  onRoomClick: (roomId: string) => void;
+  onToggleRoomPinned: (roomId: string, shouldPin: boolean) => void;
+  onToggleRoomHidden: (roomId: string, hidden: boolean) => void;
+  setActionRoomId: React.Dispatch<React.SetStateAction<string | null>>;
+};
+
+function RoomRow({
+  item,
+  actionRoomId,
+  isMobile,
+  onRoomClick,
+  onToggleRoomPinned,
+  onToggleRoomHidden,
+  setActionRoomId,
+}: RoomRowProps) {
+  const {
+    room,
+    roomId,
+    unread,
+    isSelected,
+    isNoticeChannel,
+    isGroupRoom,
+    participantCount,
+    label,
+    preview,
+    peerName,
+    peerPhotoUrl,
+    isPeerOnline,
+    isPinned,
+    isHidden,
+  } = item;
+
+  const tone = hashRoomTone(room.id || room.name || '');
+  const rawTime = typeof room.last_message_at === 'string' ? room.last_message_at : null;
+  const timeStr = formatRoomTime(rawTime);
+  const groupBadgeText = isGroupRoom ? getGroupChatRoomBadgeText(label) : '';
+
+  const enableSwipe = isMobile && !isNoticeChannel;
+  const swipeLeftActions: SwipeAction[] = enableSwipe
+    ? [
+        {
+          id: 'pin',
+          label: isPinned ? '고정 해제' : '고정',
+          icon: isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />,
+          tone: 'normal',
+          onTrigger: () => onToggleRoomPinned(room.id, !isPinned),
+        },
+      ]
+    : [];
+  const swipeRightActions: SwipeAction[] = enableSwipe
+    ? [
+        {
+          id: 'hide',
+          label: isHidden ? '표시' : '숨김',
+          icon: isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />,
+          tone: 'normal',
+          onTrigger: () => onToggleRoomHidden(room.id, !isHidden),
+        },
+      ]
+    : [];
+
+  const handlePrimaryClick = () => {
+    setActionRoomId((current) => (current && current !== roomId ? null : current));
+    onRoomClick(room.id);
+  };
+
+  const cardBody = (
+    <div
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        setActionRoomId((current) => (current === roomId ? null : roomId));
+      }}
+      className={`group rounded-[var(--radius-md)] cursor-pointer transition-all border relative overflow-hidden ${
+        isSelected
+          ? 'bg-zinc-800 border-zinc-700 shadow-sm'
+          : 'bg-transparent border-transparent hover:bg-[var(--tab-bg)] hover:border-[var(--border)]'
+      }`}
+    >
+      {isSelected && (
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
+      )}
+
+      {/* 메인 행 — 그리드 30/1fr/auto */}
+      <div
+        role="button"
+        tabIndex={0}
+        data-testid={`chat-room-${roomId}`}
+        onClick={handlePrimaryClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handlePrimaryClick();
+          }
+        }}
+        className="grid grid-cols-[30px_1fr_auto] items-center gap-2 px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-[var(--radius-md)]"
+      >
+        {/* 좌: 30×30 아바타 */}
+        <div
+          data-testid={`chat-room-icon-${roomId}`}
+          className="relative w-[30px] h-[30px] shrink-0 flex items-center justify-center rounded-[var(--radius-md)] overflow-hidden"
+        >
+          {isNoticeChannel ? (
+            <div className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]`}>
+              <Bell size={13} />
+            </div>
+          ) : isGroupRoom ? (
+            <div
+              className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] text-[9px] font-black leading-none ${tone.bg} ${tone.text}`}
+            >
+              {groupBadgeText}
+            </div>
+          ) : peerName ? (
+            <>
+              <MessengerAvatar
+                name={peerName || label}
+                photoUrl={peerPhotoUrl}
+                className="w-full h-full flex items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-4)]"
+                decorative
+              />
+              {/* 출근 dot: 출근중=green, 출근전=amber */}
+              <span
+                className={`absolute right-0 bottom-0 w-2 h-2 rounded-full border-2 border-[var(--card)] ${
+                  isPeerOnline ? 'bg-[var(--success,#10B981)]' : 'bg-[#FBBF24]'
+                }`}
+              />
+            </>
+          ) : (
+            <div
+              className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] text-[9px] font-black ${tone.bg} ${tone.text}`}
+            >
+              {label.charAt(0)}
+            </div>
+          )}
+        </div>
+
+        {/* 중: 이름 row1 + 미리보기 row2 */}
+        <div
+          data-testid={`chat-room-summary-${roomId}`}
+          className="min-w-0 flex flex-col gap-0.5"
+        >
+          {/* row1: 이름 + 인원 + 시각 */}
+          <div className="flex items-center gap-1 min-w-0">
+            <p
+              title={isGroupRoom ? label : undefined}
+              className={`truncate text-[12px] font-[800] leading-tight flex-1 min-w-0 ${
+                isSelected ? 'text-white' : 'text-[var(--foreground)]'
+              }`}
+            >
+              {label || '단체 채팅방'}
+            </p>
+            {isGroupRoom && participantCount > 0 && (
+              <span className={`shrink-0 text-[10px] ${isSelected ? 'text-white/60' : 'text-[var(--toss-gray-3)]'}`}>
+                {participantCount}
+              </span>
+            )}
+          </div>
+
+          {/* row2: 미리보기 */}
+          <p
+            data-testid={`chat-room-preview-${roomId}`}
+            className={`text-[11px] truncate leading-tight ${
+              isSelected ? 'text-white/60' : 'text-[var(--toss-gray-3)]'
+            }`}
+          >
+            {preview}
+          </p>
+        </div>
+
+        {/* 우: 시각 + 배지 */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {timeStr && (
+            <span className={`text-[10px] tabular-nums leading-tight ${isSelected ? 'text-white/50' : 'text-[var(--toss-gray-3)]'}`}>
+              {timeStr}
+            </span>
+          )}
+          {unread > 0 && (
+            <span className="inline-flex w-[18px] h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-bold text-white leading-none">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 더블클릭 액션 패널 */}
+      {actionRoomId === roomId && !isNoticeChannel && (
+        <div
+          data-testid={`chat-room-actions-${roomId}`}
+          className="flex items-center justify-end gap-1 px-2 pb-1.5"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            data-testid={`chat-room-pin-${roomId}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleRoomPinned(room.id, !isPinned);
+              setActionRoomId(null);
+            }}
+            className={`flex min-h-[28px] min-w-[40px] items-center justify-center rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-bold ${
+              isSelected
+                ? 'text-white/80 hover:bg-white/10'
+                : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)]'
+            }`}
+            title={isPinned ? '고정 해제' : '상단 고정'}
+          >
+            {isPinned ? '해제' : '고정'}
+          </button>
+          <button
+            type="button"
+            data-testid={`chat-room-hide-${roomId}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleRoomHidden(room.id, !isHidden);
+              setActionRoomId(null);
+            }}
+            className={`flex min-h-[28px] min-w-[40px] items-center justify-center rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-bold ${
+              isSelected
+                ? 'text-white/80 hover:bg-white/10'
+                : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)]'
+            }`}
+            title={isHidden ? '숨김 해제' : '대화 숨김'}
+          >
+            {isHidden ? '표시' : '숨김'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (enableSwipe) {
+    return (
+      <SwipeableCard
+        key={roomId}
+        leftActions={swipeLeftActions}
+        rightActions={swipeRightActions}
+        className="bg-transparent"
+      >
+        {cardBody}
+      </SwipeableCard>
+    );
+  }
+
+  return <div key={roomId}>{cardBody}</div>;
+}
+
+// ─── 새 대화 시작 버튼 ──────────────────────────────────────────────────
+
+function NewConversationButton({ onOpenGroupModal }: { onOpenGroupModal?: () => void }) {
+  return (
+    <div className="px-3 pb-3 pt-1 shrink-0">
+      <button
+        type="button"
+        data-testid="chat-new-conversation"
+        onClick={onOpenGroupModal}
+        disabled={!onOpenGroupModal}
+        className="w-full h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] border border-dashed border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <span className="text-base leading-none">+</span>
+        새 대화 시작
+      </button>
+    </div>
   );
 }

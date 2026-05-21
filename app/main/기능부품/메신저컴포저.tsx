@@ -7,6 +7,8 @@ import { buildMessengerImageAlt } from './메신저공통';
 import { isMobileChatViewport, NOTICE_ROOM_ID } from './메신저유틸';
 import type { AttachmentRetryQueueEntry } from './메신저첨부재시도큐';
 
+const QUICK_EMOJIS = ['👍', '😊', '😂', '❤️', '🔥', '✅', '👏', '🎉', '🙏', '😅', '💪', '😄'] as const;
+
 type MessengerComposerProps = {
   replyTo: ChatMessage | null;
   pendingAlbumFiles: File[];
@@ -39,6 +41,8 @@ type MessengerComposerProps = {
   onComposerPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void | Promise<void>;
   onSendMessage: () => void | Promise<unknown>;
   onSelectMention: (name: string) => void;
+  onOpenPollModal?: () => void;
+  selectedRoomName?: string;
 };
 
 function MessengerComposerImpl({
@@ -71,11 +75,14 @@ function MessengerComposerImpl({
   onComposerPaste,
   onSendMessage,
   onSelectMention,
+  onOpenPollModal,
+  selectedRoomName,
 }: MessengerComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const albumFileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -94,6 +101,37 @@ function MessengerComposerImpl({
       vv.removeEventListener('scroll', handleResize);
     };
   }, []);
+
+  const handleInsertEmoji = (emoji: string) => {
+    setShowEmojiPicker(false);
+    const ta = composerRef.current;
+    if (!ta) {
+      onComposerChange(inputMsg + emoji, (inputMsg + emoji).length);
+      return;
+    }
+    const start = ta.selectionStart ?? inputMsg.length;
+    const end = ta.selectionEnd ?? inputMsg.length;
+    const next = inputMsg.slice(0, start) + emoji + inputMsg.slice(end);
+    onComposerChange(next, start + emoji.length);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + emoji.length, start + emoji.length);
+    });
+  };
+
+  const handleInsertMention = () => {
+    const ta = composerRef.current;
+    const start = ta ? (ta.selectionStart ?? inputMsg.length) : inputMsg.length;
+    const end = ta ? (ta.selectionEnd ?? inputMsg.length) : inputMsg.length;
+    const next = inputMsg.slice(0, start) + '@' + inputMsg.slice(end);
+    onComposerChange(next, start + 1);
+    requestAnimationFrame(() => {
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(start + 1, start + 1);
+      }
+    });
+  };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -305,7 +343,7 @@ function MessengerComposerImpl({
         </div>
       )}
 
-      <div className={`flex items-end gap-1.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/50 px-1.5 py-1 transition-all md:gap-2.5 md:px-2.5 md:py-2 ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+      <div className={`flex items-end gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/50 px-1.5 py-1 transition-all md:gap-1.5 md:px-2 md:py-1.5 ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
         ? 'opacity-60 pointer-events-none'
         : ''
         }`}>
@@ -327,22 +365,112 @@ function MessengerComposerImpl({
           accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,.avif"
           multiple
         />
-        <button type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={fileUploading}
-          aria-label="사진 또는 파일 첨부"
-          title="사진/파일 첨부"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50 md:h-11 md:w-11"
-        >
-          {fileUploading ? <span className="animate-pulse text-xs">...</span> : <span className="text-[11px] font-bold md:text-xs">첨부</span>}
-        </button>
+
+        {/* 좌측 액션바: +(첨부) / 이모지 / 투표 / @멘션 */}
+        <div className="flex shrink-0 items-center gap-0.5 pb-0.5">
+          {/* 첨부 */}
+          <button
+            type="button"
+            data-testid="chat-attach-button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={fileUploading}
+            aria-label="파일 첨부"
+            title="파일 첨부"
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] disabled:opacity-40"
+          >
+            {fileUploading ? (
+              <span className="animate-pulse text-[10px]">…</span>
+            ) : (
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 4v12M4 10h12" />
+              </svg>
+            )}
+          </button>
+          {/* 이모지 팝오버 */}
+          <div className="relative">
+            <button
+              type="button"
+              data-testid="chat-emoji-button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              aria-label="이모지 삽입"
+              aria-expanded={showEmojiPicker}
+              title="이모지"
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="10" cy="10" r="7.5" />
+                <path d="M7 11.5s.8 1.5 3 1.5 3-1.5 3-1.5" />
+                <circle cx="7.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
+                <circle cx="12.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+            {showEmojiPicker && (
+              <div
+                role="dialog"
+                aria-label="이모지 선택"
+                className="absolute bottom-full left-0 z-30 mb-1 grid grid-cols-6 gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-md"
+              >
+                {QUICK_EMOJIS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => handleInsertEmoji(emoji)}
+                    aria-label={`이모지 ${emoji} 삽입`}
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-base hover:bg-[var(--muted)] transition-colors"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* 투표 */}
+          {onOpenPollModal ? (
+            <button
+              type="button"
+              data-testid="chat-poll-button"
+              onClick={onOpenPollModal}
+              aria-label="투표 만들기"
+              title="투표 만들기"
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="13" width="3" height="4" rx="0.5" />
+                <rect x="8.5" y="9" width="3" height="8" rx="0.5" />
+                <rect x="14" y="5" width="3" height="12" rx="0.5" />
+              </svg>
+            </button>
+          ) : null}
+          {/* @멘션 */}
+          <button
+            type="button"
+            data-testid="chat-mention-button"
+            onClick={handleInsertMention}
+            aria-label="멘션 삽입 (@)"
+            title="멘션 (@)"
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="10" cy="10" r="3.5" />
+              <path d="M13.5 10c0 2.5.8 3.5 2 3.5 0-1 .5-7.5-5.5-7.5S4 8 4 10s1.5 6 7 5" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 가운데: 자라나는 textarea */}
         <div className="relative flex-1">
           <textarea
             ref={composerRef}
             data-testid="chat-message-input"
             rows={1}
-            className="block min-h-[30px] w-full min-w-0 resize-none bg-transparent px-1 py-1 text-[16px] font-semibold leading-5 outline-none md:min-h-[44px] md:px-1.5 md:py-2.5 md:text-sm md:leading-5"
-            placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? '부서장 이상만 공지 작성 가능' : '메시지를 입력하세요... (@이름 멘션 가능)'}
+            className="block min-h-[30px] w-full min-w-0 resize-none bg-transparent px-1 py-1 text-[16px] font-semibold leading-5 outline-none md:min-h-[36px] md:px-1.5 md:py-2 md:text-sm md:leading-5"
+            placeholder={
+              selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+                ? '부서장 이상만 공지 작성 가능'
+                : selectedRoomName
+                  ? `#${selectedRoomName}에 메시지 보내기 (@이름 멘션 가능)`
+                  : '메시지를 입력하세요... (@이름 멘션 가능)'
+            }
             value={inputMsg}
             onChange={(event) => {
               const value = event.target.value;
@@ -371,12 +499,18 @@ function MessengerComposerImpl({
             </div>
           )}
         </div>
-        <button type="button"
+
+        {/* 우측: 36×36 accent 원형 send 버튼 */}
+        <button
+          type="button"
           data-testid="chat-send-button"
           onClick={() => void onSendMessage()}
-          className="flex h-8 min-w-[44px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[11px] font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 md:h-11 md:min-w-[60px] md:px-3 md:text-xs"
+          aria-label="메시지 전송"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 mb-0.5"
         >
-          전송
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 10l12-6-4 6 4 6-12-6z" />
+          </svg>
         </button>
       </div>
     </div>
