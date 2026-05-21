@@ -50,9 +50,9 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '공지사항', label: '공지사항', group: '게시판', icon: 'bell' },
     { id: '자유게시판', label: '자유게시판', group: '게시판', icon: 'document' },
     { id: '경조사', label: '경조사 소식', group: '게시판', icon: 'tag' },
-    { id: '수술일정', label: '수술일정', group: '게시판', icon: 'calendar' },
-    { id: 'MRI일정', label: 'MRI일정', group: '게시판', icon: 'scan' },
-    { id: '업무가이드', label: '업무 공유', group: '게시판', icon: 'folder' },
+    { id: '수술일정', label: '수술 일정', group: '게시판', icon: 'calendar' },
+    { id: 'MRI일정', label: 'MRI 일정', group: '게시판', icon: 'scan' },
+    { id: '업무가이드', label: '업무 가이드', group: '참고', icon: 'folder' },
   ],
   전자결재: [
     { id: '기안함', label: '기안함', icon: 'document' },

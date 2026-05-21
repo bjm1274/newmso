@@ -315,7 +315,7 @@ export default function PostTableView({
               <th scope="col" style={{ width: 140 }}>작성자</th>
               <th scope="col" style={{ width: 100 }}>등록일</th>
               <th scope="col" style={{ width: 60, textAlign: 'right' }} aria-sort={sortKey === 'views' ? 'descending' : 'none'}>조회</th>
-              <th scope="col" style={{ width: 70, textAlign: 'right' }} aria-sort={sortKey === 'likes' ? 'descending' : 'none'}>좋아요</th>
+              <th scope="col" style={{ width: 60, textAlign: 'right' }} aria-sort={sortKey === 'likes' ? 'descending' : 'none'}>좋아요</th>
               <th scope="col" style={{ width: 40 }}><span className="sr-only">메뉴</span></th>
             </tr>
           </thead>
