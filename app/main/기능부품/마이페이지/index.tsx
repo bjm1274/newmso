@@ -1055,7 +1055,7 @@ function MyPageMain({
                         {profileSummary.position || '직책 정보 없음'} · {profileSummary.department || '소속 정보 없음'}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="erp-status erp-status-green">재직중</span>
+                        <span className={isRetired ? 'erp-status erp-status-red' : 'erp-status erp-status-green'}>{isRetired ? '퇴직' : '재직중'}</span>
                         <span className="erp-status erp-status-blue">정규직</span>
                         <span className="erp-chip">{tenureLabel}</span>
                       </div>

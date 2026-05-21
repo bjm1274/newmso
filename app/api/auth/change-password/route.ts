@@ -13,8 +13,8 @@ import { isUuidLike } from '@/lib/staff-identity';
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!session?.user?.id && !session?.user?.name) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ ok: false, error: '본인 확인을 위해 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const body = await request.json().catch(() => null);
@@ -40,10 +40,12 @@ export async function POST(request: Request) {
       candidates.set(staff.id, staff);
     };
 
-    const sessionUserId = String(session.user.id ?? '').trim();
+    const sessionUserId = String(session.user.id).trim();
     const sessionEmployeeNo = String(session.user.employee_no ?? '').trim();
     const sessionUserName = String(session.user.name ?? '').trim();
 
+    // id가 보장된 상태이므로 UUID로 직접 조회를 우선한다.
+    // id 조회에 성공하면 employee_no/name 폴백을 건너뛰어 동명이인 오염을 차단한다.
     if (isUuidLike(sessionUserId)) {
       const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow>((selectClause) =>
         supabase
@@ -56,7 +58,8 @@ export async function POST(request: Request) {
       addCandidate(data);
     }
 
-    if (sessionEmployeeNo) {
+    // UUID 조회 실패 시에만 employee_no 폴백 사용 (동명이인 위험 없음)
+    if (candidates.size === 0 && sessionEmployeeNo) {
       const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>((selectClause) =>
         supabase
           .from('staff_members')
@@ -68,7 +71,8 @@ export async function POST(request: Request) {
       (data || []).forEach(addCandidate);
     }
 
-    if (sessionUserName) {
+    // employee_no 폴백도 실패 시에만 name 폴백 사용. 단, 동명이인이 있으면 거부한다.
+    if (candidates.size === 0 && sessionUserName) {
       const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>((selectClause) =>
         supabase
           .from('staff_members')
@@ -77,7 +81,14 @@ export async function POST(request: Request) {
           .limit(5)
       );
       if (error) throw error;
-      (data || []).forEach(addCandidate);
+      const nameMatches = data || [];
+      if (nameMatches.length > 1) {
+        return NextResponse.json(
+          { ok: false, error: '본인 확인을 위해 다시 로그인해 주세요.' },
+          { status: 403 }
+        );
+      }
+      nameMatches.forEach(addCandidate);
     }
 
     const verifiedStaffs: StaffCredentialRow[] = [];

@@ -349,8 +349,6 @@ export function isAdminSession(user?: SessionUser | null) {
 export function isSystemMasterSession(user?: SessionUser | null) {
   return Boolean(
     user?.permissions?.system_master === true ||
-    (user as Record<string, unknown> | undefined)?.is_system_master === true ||
-    user?.employee_no === '0' ||
-    user?.name === '시스템관리자'
+    (user as Record<string, unknown> | undefined)?.is_system_master === true
   );
 }

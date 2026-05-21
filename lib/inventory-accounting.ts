@@ -10,6 +10,7 @@ import {
   getD1Drizzle,
   inventory_cost_entries as inventoryCostEntriesTable,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type ActorLike = {
   id?: string | null;
@@ -204,6 +205,50 @@ export async function createInventoryCostEntriesForReceipt(
       return { inserted: 0, totalAmount: 0 };
     }
     throw result.error;
+  }
+
+  // dual-write: inventory_cost_entries 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const d1Rows = rows.map((row) => ({
+          id: crypto.randomUUID(),
+          purchase_order_id: (row.purchase_order_id as string | null) ?? null,
+          approval_id: (row.approval_id as string | null) ?? null,
+          inventory_item_id: (row.inventory_item_id as string | null) ?? null,
+          order_item_index: typeof row.order_item_index === 'number' ? row.order_item_index : 0,
+          item_name: String(row.item_name ?? ''),
+          company_id: (row.company_id as string | null) ?? null,
+          company_name: (row.company_name as string | null) ?? null,
+          department: (row.department as string | null) ?? null,
+          supplier_id: (row.supplier_id as string | null) ?? null,
+          supplier_name: (row.supplier_name as string | null) ?? null,
+          qty_ordered: typeof row.qty_ordered === 'number' ? row.qty_ordered : null,
+          qty_received: typeof row.qty_received === 'number' ? row.qty_received : null,
+          qty_rejected: typeof row.qty_rejected === 'number' ? row.qty_rejected : null,
+          qty_pending: typeof row.qty_pending === 'number' ? row.qty_pending : null,
+          unit_price: typeof row.unit_price === 'number' ? row.unit_price : null,
+          supply_amount: typeof row.supply_amount === 'number' ? row.supply_amount : null,
+          vat_amount: typeof row.vat_amount === 'number' ? row.vat_amount : null,
+          total_amount: typeof row.total_amount === 'number' ? row.total_amount : null,
+          cost_center: (row.cost_center as string | null) ?? null,
+          budget_item: (row.budget_item as string | null) ?? null,
+          account_code: (row.account_code as string | null) ?? null,
+          posted_status: (row.posted_status as string | null) ?? 'posted',
+          occurred_at: (row.occurred_at as string | null) ?? null,
+          posted_at: (row.posted_at as string | null) ?? null,
+          posted_by_id: (row.posted_by_id as string | null) ?? null,
+          posted_by_name: (row.posted_by_name as string | null) ?? null,
+          idempotency_key: (row.idempotency_key as string | null) ?? null,
+          notes: (row.notes as string | null) ?? null,
+        }));
+        await db.insert(inventoryCostEntriesTable).values(d1Rows);
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:inventory_cost_entries.receipt', backend });
+    }
   }
 
   return {

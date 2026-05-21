@@ -2385,3 +2385,18 @@ export const work_shifts = sqliteTable("work_shifts", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+// ---------------------------------------------------------------------------
+// rate_limit_attempts — 분산 Workers 환경에서 레이트리밋 상태를 D1에 영속
+// key: 식별자 (loginId, ip:userId 등), count: 윈도우 내 실패 횟수,
+// window_start: 윈도우 시작 epoch ms(TEXT), updated_at: 마지막 시도 시각
+// ---------------------------------------------------------------------------
+export const rate_limit_attempts = sqliteTable("rate_limit_attempts", {
+	key: text().primaryKey().notNull(),
+	count: integer().notNull().default(0),
+	window_start: text().notNull(),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_rate_limit_attempts_window_start").on(table.window_start),
+]);
+

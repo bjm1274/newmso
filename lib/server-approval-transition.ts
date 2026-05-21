@@ -17,6 +17,7 @@ import {
   getD1Drizzle,
   resolveDataBackend,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -234,6 +235,18 @@ function applyDelegationMeta(
   );
 }
 
+function serializeApprovalUpdateForD1(updateData: Record<string, unknown>): Record<string, unknown> {
+  const d1UpdateData: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(updateData)) {
+    if ((key === 'meta_data' || key === 'approver_line' || key === 'approval_line') && value !== null && value !== undefined && typeof value !== 'string') {
+      d1UpdateData[key] = JSON.stringify(value);
+    } else {
+      d1UpdateData[key] = value;
+    }
+  }
+  return d1UpdateData;
+}
+
 async function updateApprovalRecord(
   supabase: SupabaseClient,
   approvalId: string,
@@ -245,14 +258,7 @@ async function updateApprovalRecord(
     if (!d1) throw new Error('[server-approval-transition] D1 binding not available (updateApprovalRecord)');
     const db = getD1Drizzle(d1);
     // JSON 컬럼(meta_data, approver_line, approval_line)은 TEXT로 직렬화
-    const d1UpdateData: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(updateData)) {
-      if ((key === 'meta_data' || key === 'approver_line' || key === 'approval_line') && value !== null && value !== undefined && typeof value !== 'string') {
-        d1UpdateData[key] = JSON.stringify(value);
-      } else {
-        d1UpdateData[key] = value;
-      }
-    }
+    const d1UpdateData = serializeApprovalUpdateForD1(updateData);
     const rows = await db
       .update(approvalsTable)
       .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
@@ -280,6 +286,23 @@ async function updateApprovalRecord(
 
   if (error) {
     throw error;
+  }
+
+  // dual-write: Supabase 성공 후 D1 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const d1UpdateData = serializeApprovalUpdateForD1(updateData);
+        await db
+          .update(approvalsTable)
+          .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
+          .where(eq(approvalsTable.id, approvalId));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.update', backend });
+    }
   }
 
   return (data || null) as ApprovalRow | null;
@@ -371,13 +394,30 @@ async function markApprovalNotificationsAsRead(
     return;
   }
 
+  const readAt = new Date().toISOString();
   const { error: updateError } = await supabase
     .from('notifications')
-    .update({ read_at: new Date().toISOString() })
+    .update({ read_at: readAt })
     .in('id', matchedIds);
 
   if (updateError) {
     throw updateError;
+  }
+
+  // dual-write: Supabase 성공 후 D1 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(notificationsTable)
+          .set({ read_at: readAt })
+          .where(inArray(notificationsTable.id, matchedIds));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:notifications.read_at', backend });
+    }
   }
 }
 

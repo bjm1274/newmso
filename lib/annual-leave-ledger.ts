@@ -12,6 +12,7 @@ import {
   and,
   desc,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 const APPROVED_STATUS_LABELS = new Set(['승인', 'approved']);
 
@@ -305,6 +306,22 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
       );
 
       if (approveError) throw approveError;
+
+      // dual-write: leave_requests.status 미러 (best-effort)
+      if (backend === 'dual-write') {
+        try {
+          const d1 = await getD1Binding();
+          if (d1) {
+            const db = getD1Drizzle(d1);
+            await db
+              .update(leaveRequestsTable)
+              .set({ status: '승인', approved_at: payload.approved_at })
+              .where(eq(leaveRequestsTable.id, matched.id));
+          }
+        } catch (mirrorErr) {
+          logD1MirrorFailure(mirrorErr, { label: 'mirror:leave_requests.approve', backend });
+        }
+      }
     }
 
     return matched.id;
@@ -335,6 +352,32 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
   const inserted = insertResult.data;
   const insertError = insertResult.error;
   if (insertError) throw insertError;
+
+  // dual-write: leave_requests 신규 insert 미러 (best-effort)
+  if (backend === 'dual-write' && inserted?.id) {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const d1InsertValues: D1LeaveRequestInsert = {
+          id: inserted.id,
+          staff_id: payload.staff_id,
+          leave_type: payload.leave_type,
+          start_date: payload.start_date,
+          end_date: payload.end_date,
+          reason: payload.reason,
+          status: payload.status,
+          approved_at: payload.approved_at,
+          company_id: params.companyId ?? null,
+          created_at: new Date().toISOString(),
+        };
+        await db.insert(leaveRequestsTable).values(d1InsertValues).onConflictDoNothing();
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:leave_requests.insert', backend });
+    }
+  }
+
   return inserted?.id ?? null;
 }
 
@@ -406,5 +449,22 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string, client: Supab
     .eq('id', staffId);
 
   if (updateError) throw updateError;
+
+  // dual-write: staff_members.annual_leave_used 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(staffMembersTable)
+          .set({ annual_leave_used: approvedAnnualLeaveDays })
+          .where(eq(staffMembersTable.id, staffId));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:staff_members.annual_leave_used', backend });
+    }
+  }
+
   return approvedAnnualLeaveDays;
 }

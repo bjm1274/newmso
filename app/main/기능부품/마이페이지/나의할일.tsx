@@ -86,8 +86,8 @@ function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
     const saturday = new Date(sunday);
     saturday.setDate(sunday.getDate() + 6);
     return {
-      start: sunday.toISOString().slice(0, 10),
-      end: saturday.toISOString().slice(0, 10),
+      start: sunday.toLocaleDateString('en-CA'),
+      end: saturday.toLocaleDateString('en-CA'),
     };
   }
 

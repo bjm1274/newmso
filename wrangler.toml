@@ -30,6 +30,8 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "mso-system.firebasestorage.app"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "873459384687"
 NEXT_PUBLIC_FIREBASE_APP_ID = "1:873459384687:web:4fd03a6b1090683a58689a"
 NEXT_PUBLIC_FCM_VAPID_KEY = "BCk7ISKIUPeXrOw0GwuRH4a8zBHKdKospS3rCQc5CWxiI8ukae0gJ5wE7Svn1RDOWsFTadEUdxlFu1R_HVJ5izQ"
+# Web Push (VAPID) 구독용 공개키 — FCM VAPID와 별개 시스템
+NEXT_PUBLIC_VAPID_PUBLIC_KEY = "BMf4VkZmz6KBu1gqZSPypXMmYurULhlG31-m0F-GO-dH9fkBHkFeyyFLOqcd86M0sRQGxG_eBc7aXsF3yynxMww"
 
 # Cron Triggers
 # Daily full backup stays paused to avoid unnecessary Supabase egress.

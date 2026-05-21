@@ -55,10 +55,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const body = await req.json();
-        const { image, mimeType } = body;
+        const rawBody: unknown = await req.json().catch(() => null);
+        if (!rawBody || typeof rawBody !== 'object') {
+            return NextResponse.json({ error: '잘못된 요청 형식입니다.' }, { status: 400 });
+        }
+        const { image, mimeType } = rawBody as Record<string, unknown>;
 
-        if (!image || !mimeType) {
+        if (!image || typeof image !== 'string' || !mimeType || typeof mimeType !== 'string') {
             return NextResponse.json({ error: '이미지 데이터가 없습니다.' }, { status: 400 });
         }
 

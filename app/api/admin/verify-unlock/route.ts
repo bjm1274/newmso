@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   const userId = String(session.user?.id || session.user?.user_id || 'unknown');
   const rateLimitKey = getRateLimitKey(req, userId);
-  const rateCheck = checkRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_MS);
+  const rateCheck = await checkRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_MS);
 
   if (!rateCheck.allowed) {
     return NextResponse.json(
@@ -39,9 +39,9 @@ export async function POST(req: Request) {
 
   const ok = await bcrypt.compare(password, resetHash);
   if (ok) {
-    resetAttempts(rateLimitKey);
+    await resetAttempts(rateLimitKey);
   } else {
-    recordFailedAttempt(rateLimitKey, LOCKOUT_MS);
+    await recordFailedAttempt(rateLimitKey, LOCKOUT_MS);
   }
 
   return NextResponse.json({ ok });

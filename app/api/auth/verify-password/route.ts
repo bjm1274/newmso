@@ -31,8 +31,8 @@ function isIdentityMismatch(requestValue: string, sessionValue: string) {
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!session?.user?.id && !session?.user?.name) {
-      return NextResponse.json({ verified: false, error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ verified: false, error: '본인 확인을 위해 다시 로그인해 주세요.' }, { status: 401 });
     }
 
     const body = await request.json().catch(() => null);
@@ -103,29 +103,38 @@ export async function POST(request: Request) {
       (data || []).forEach(addCandidate);
     };
 
-    const fetchByName = async (name: string) => {
-      const trimmed = String(name || '').trim();
-      if (!trimmed) return;
-      const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
-        (selectClause) =>
-          supabase
-            .from('staff_members')
-            .select(selectClause)
-            .eq('name', trimmed)
-            .limit(5)
-      );
-      if (error) throw error;
-      (data || []).forEach(addCandidate);
-    };
-
+    // id 조회 우선. 성공하면 employee_no/name 폴백을 건너뛰어 동명이인 오염을 차단한다.
     await fetchById(sessionUserId);
 
-    for (const employeeNo of Array.from(new Set([sessionEmployeeNo].filter(Boolean)))) {
-      await fetchByEmployeeNo(employeeNo);
+    if (candidates.size === 0) {
+      for (const employeeNo of Array.from(new Set([sessionEmployeeNo].filter(Boolean)))) {
+        await fetchByEmployeeNo(employeeNo);
+      }
     }
 
-    for (const candidateName of Array.from(new Set([sessionUserName].filter(Boolean)))) {
-      await fetchByName(candidateName);
+    // employee_no 폴백도 실패 시에만 name 폴백 사용. 동명이인이 있으면 거부한다.
+    if (candidates.size === 0) {
+      for (const candidateName of Array.from(new Set([sessionUserName].filter(Boolean)))) {
+        const trimmed = String(candidateName || '').trim();
+        if (!trimmed) continue;
+        const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
+          (selectClause) =>
+            supabase
+              .from('staff_members')
+              .select(selectClause)
+              .eq('name', trimmed)
+              .limit(5)
+        );
+        if (error) throw error;
+        const nameMatches = data || [];
+        if (nameMatches.length > 1) {
+          return NextResponse.json(
+            { verified: false, error: '본인 확인을 위해 다시 로그인해 주세요.' },
+            { status: 403 }
+          );
+        }
+        nameMatches.forEach(addCandidate);
+      }
     }
 
     const candidateRows = Array.from(candidates.values());

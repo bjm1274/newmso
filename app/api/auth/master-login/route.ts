@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
   // 아이디 단위로 차단 (IP 기반 X → 다른 사람에게 영향 없음)
   const MAX_FAILED_ATTEMPTS = 10; // 동일 아이디로 10회 연속 실패 시 차단
   const WINDOW_MS = 15 * 60 * 1000; // 15분
-  const rateCheck = checkRateLimit(loginId, MAX_FAILED_ATTEMPTS, WINDOW_MS);
+  const rateCheck = await checkRateLimit(loginId, MAX_FAILED_ATTEMPTS, WINDOW_MS);
   if (!rateCheck.allowed) {
     return failureResponse('비밀번호를 너무 많이 틀렸습니다. 15분 후 다시 시도해주세요.', 429);
   }
@@ -346,7 +346,7 @@ export async function POST(request: NextRequest) {
       // 과거에는 첫 로그인 시 입력값을 비밀번호로 저장하고 로그인시켰으나,
       // 이는 제3자가 비밀번호 미설정 계정을 선점·탈취할 수 있는 취약점이었다.
       // 신규 직원의 초기 비밀번호는 관리자가 직접 설정해야 한다.
-      recordFailedAttempt(loginId, WINDOW_MS);
+      await recordFailedAttempt(loginId, WINDOW_MS);
       return failureResponse(
         '비밀번호가 설정되지 않은 계정입니다. 관리자에게 초기 비밀번호 설정을 요청해 주세요.'
       );
@@ -406,7 +406,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        recordFailedAttempt(loginId, WINDOW_MS);
+        await recordFailedAttempt(loginId, WINDOW_MS);
         return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
       }
 
@@ -415,7 +415,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    resetAttempts(loginId); // 로그인 성공 시 실패 카운트 초기화
+    await resetAttempts(loginId); // 로그인 성공 시 실패 카운트 초기화
     return successResponse(userRow, notice);
   } catch (error) {
     console.error('[master-login] 처리 중 예외 발생:', error);

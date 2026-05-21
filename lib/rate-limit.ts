@@ -1,64 +1,43 @@
 /**
- * 공유 Rate Limiting 모듈
+ * D1 기반 Rate Limiting 모듈
  *
- * 인메모리 Map 기반으로 동작하며, 만료된 엔트리를 주기적으로 정리하고
- * 최대 엔트리 수를 제한하여 메모리 누수를 방지합니다.
+ * Cloudflare Workers는 요청마다 isolate가 분산되므로 인메모리 Map으로는
+ * 레이트리밋이 사실상 무효다. D1 테이블(rate_limit_attempts)에 상태를 영속해
+ * Workers 전체에서 실질적인 차단이 동작하도록 한다.
  *
- * 한계: Worker/서버리스 환경에서는 인스턴스 간 메모리가 공유되지 않아
- * 실질적 보호 효과가 제한적입니다. 강화가 필요하면 Supabase 테이블 또는
- * 외부 Redis 계층을 고려하세요.
+ * Graceful Degradation:
+ *   D1 binding을 가져올 수 없는 환경(로컬 dev 등)에서는 레이트리밋을 건너뛰되
+ *   로그를 남기고 로그인 자체는 막지 않는다.
+ *
+ * 윈도우 리셋:
+ *   다음 접근 시 window_start + windowMs < now 이면 카운트를 초기화한다.
+ *   별도 정리 잡 없이 자연 리셋되는 슬라이딩-타임스탬프 방식.
  */
 
-interface RateLimitEntry {
+import type { D1Database } from '@cloudflare/workers-types';
+import { getD1Binding } from '@/lib/db';
+
+// ---------------------------------------------------------------------------
+// 내부 헬퍼
+// ---------------------------------------------------------------------------
+
+interface RateLimitRow {
+  key: string;
   count: number;
-  resetAt: number; // epoch ms — 이 시각 이후에는 엔트리 만료
+  window_start: string; // epoch ms (TEXT)
+  updated_at: string | null;
 }
 
-const store = new Map<string, RateLimitEntry>();
-
-/** 저장소에 보관할 최대 키 수. 초과 시 만료된 엔트리를 우선 정리합니다. */
-const MAX_ENTRIES = 10_000;
-
-/** 자동 정리 주기 (ms). 60초마다 만료 엔트리를 삭제합니다. */
-const CLEANUP_INTERVAL_MS = 60_000;
-
-let cleanupTimer: ReturnType<typeof setInterval> | null = null;
-
-function ensureCleanupTimer() {
-  if (cleanupTimer) return;
-  cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of store) {
-      if (now > entry.resetAt) store.delete(key);
-    }
-    // 타이머가 프로세스 종료를 막지 않도록 unref
-    if (store.size === 0 && cleanupTimer) {
-      clearInterval(cleanupTimer);
-      cleanupTimer = null;
-    }
-  }, CLEANUP_INTERVAL_MS);
-  // Node.js 환경에서 타이머가 프로세스를 잡아두지 않도록 설정
-  if (typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
-    (cleanupTimer as NodeJS.Timeout).unref();
-  }
-}
-
-/** 만료 엔트리를 정리하고, 여전히 MAX_ENTRIES 초과 시 가장 오래된 엔트리부터 제거 */
-function evictIfNeeded() {
-  if (store.size <= MAX_ENTRIES) return;
-  const now = Date.now();
-  // 1차: 만료된 엔트리 삭제
-  for (const [key, entry] of store) {
-    if (now > entry.resetAt) store.delete(key);
-  }
-  // 2차: 여전히 초과 시 가장 오래된(resetAt이 작은) 엔트리부터 삭제
-  if (store.size > MAX_ENTRIES) {
-    const sorted = [...store.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
-    const toRemove = store.size - MAX_ENTRIES;
-    for (let i = 0; i < toRemove; i++) {
-      store.delete(sorted[i][0]);
-    }
-  }
+/**
+ * D1에서 레이트리밋 레코드를 조회한다.
+ * 테이블이 없거나 오류 시 null을 반환한다.
+ */
+async function fetchRow(d1: D1Database, key: string): Promise<RateLimitRow | null> {
+  const result = await d1
+    .prepare('SELECT key, count, window_start, updated_at FROM rate_limit_attempts WHERE key = ?')
+    .bind(key)
+    .first<RateLimitRow>();
+  return result ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,55 +45,133 @@ function evictIfNeeded() {
 // ---------------------------------------------------------------------------
 
 /**
- * 주어진 키의 요청이 허용되는지 확인합니다.
+ * 주어진 키의 요청이 허용되는지 확인한다.
  *
- * @param key          식별 키 (예: loginId, ip:userId 등)
- * @param maxAttempts  윈도우 내 최대 허용 시도 횟수
- * @param windowMs     윈도우 크기 (ms)
+ * @param key         식별 키 (예: loginId, ip:userId 등)
+ * @param maxAttempts 윈도우 내 최대 허용 시도 횟수
+ * @param windowMs    윈도우 크기 (ms)
  * @returns allowed — true이면 요청 허용, retryAfterSec — 차단 시 남은 초
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   maxAttempts: number,
   windowMs: number,
-): { allowed: boolean; retryAfterSec?: number } {
-  const now = Date.now();
-  const entry = store.get(key);
-
-  if (!entry || now > entry.resetAt) return { allowed: true };
-
-  if (entry.count >= maxAttempts) {
-    const retryAfterSec = Math.ceil((entry.resetAt - now) / 1000);
-    return { allowed: false, retryAfterSec };
+): Promise<{ allowed: boolean; retryAfterSec?: number }> {
+  let d1: D1Database | undefined;
+  try {
+    d1 = await getD1Binding();
+  } catch (err) {
+    console.warn('[rate-limit] D1 binding 획득 실패, 레이트리밋 건너뜀:', err);
+    return { allowed: true };
   }
 
-  return { allowed: true };
+  if (!d1) {
+    // 로컬 dev 환경 — 레이트리밋 비활성
+    return { allowed: true };
+  }
+
+  try {
+    const now = Date.now();
+    const row = await fetchRow(d1, key);
+
+    if (!row) return { allowed: true };
+
+    const windowStart = parseInt(row.window_start, 10);
+    if (isNaN(windowStart) || now >= windowStart + windowMs) {
+      // 윈도우 만료 — 카운트 리셋된 것으로 간주
+      return { allowed: true };
+    }
+
+    if (row.count >= maxAttempts) {
+      const retryAfterSec = Math.ceil((windowStart + windowMs - now) / 1000);
+      return { allowed: false, retryAfterSec };
+    }
+
+    return { allowed: true };
+  } catch (err) {
+    console.error('[rate-limit] checkRateLimit D1 오류, 레이트리밋 건너뜀:', err);
+    return { allowed: true };
+  }
 }
 
 /**
- * 실패한 시도를 기록합니다.
+ * 실패한 시도를 기록한다.
  *
- * @param key       식별 키
- * @param windowMs  윈도우 크기 (ms). 첫 실패 시점부터 windowMs 후에 리셋됩니다.
+ * @param key      식별 키
+ * @param windowMs 윈도우 크기 (ms). 첫 실패 시점부터 windowMs 후에 리셋된다.
  */
-export function recordFailedAttempt(key: string, windowMs: number): void {
-  ensureCleanupTimer();
-
-  const now = Date.now();
-  const entry = store.get(key);
-
-  if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + windowMs });
-  } else {
-    entry.count++;
+export async function recordFailedAttempt(key: string, windowMs: number): Promise<void> {
+  let d1: D1Database | undefined;
+  try {
+    d1 = await getD1Binding();
+  } catch (err) {
+    console.warn('[rate-limit] D1 binding 획득 실패, 실패 기록 건너뜀:', err);
+    return;
   }
 
-  evictIfNeeded();
+  if (!d1) return;
+
+  try {
+    const now = Date.now();
+    const row = await fetchRow(d1, key);
+
+    const nowStr = String(now);
+    const nowTs = new Date(now).toISOString();
+
+    if (!row) {
+      // 첫 실패 — 새 레코드 삽입
+      await d1
+        .prepare(
+          'INSERT INTO rate_limit_attempts (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)',
+        )
+        .bind(key, nowStr, nowTs)
+        .run();
+      return;
+    }
+
+    const windowStart = parseInt(row.window_start, 10);
+    if (isNaN(windowStart) || now >= windowStart + windowMs) {
+      // 윈도우 만료 — 리셋 후 카운트 1
+      await d1
+        .prepare(
+          'UPDATE rate_limit_attempts SET count = 1, window_start = ?, updated_at = ? WHERE key = ?',
+        )
+        .bind(nowStr, nowTs, key)
+        .run();
+    } else {
+      // 같은 윈도우 — 카운트 증가
+      await d1
+        .prepare(
+          'UPDATE rate_limit_attempts SET count = count + 1, updated_at = ? WHERE key = ?',
+        )
+        .bind(nowTs, key)
+        .run();
+    }
+  } catch (err) {
+    console.error('[rate-limit] recordFailedAttempt D1 오류:', err);
+  }
 }
 
 /**
- * 성공 시 해당 키의 시도 기록을 초기화합니다.
+ * 성공 시 해당 키의 시도 기록을 초기화한다.
  */
-export function resetAttempts(key: string): void {
-  store.delete(key);
+export async function resetAttempts(key: string): Promise<void> {
+  let d1: D1Database | undefined;
+  try {
+    d1 = await getD1Binding();
+  } catch (err) {
+    console.warn('[rate-limit] D1 binding 획득 실패, 리셋 건너뜀:', err);
+    return;
+  }
+
+  if (!d1) return;
+
+  try {
+    await d1
+      .prepare('DELETE FROM rate_limit_attempts WHERE key = ?')
+      .bind(key)
+      .run();
+  } catch (err) {
+    console.error('[rate-limit] resetAttempts D1 오류:', err);
+  }
 }

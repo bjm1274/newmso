@@ -26,7 +26,7 @@ import {
   getD1Drizzle,
   resolveDataBackend,
 } from '@/lib/db';
-import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+import { logD1BindingMissing, logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 //
@@ -161,6 +161,22 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
       .update({ meta_data: nextMetaData })
       .eq('id', String(item.id));
     if (metaError) throw metaError;
+
+    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
+    if (supplyBackend === 'dual-write') {
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          await db
+            .update(approvalsTable)
+            .set({ meta_data: JSON.stringify(nextMetaData) })
+            .where(eq(approvalsTable.id, String(item.id)));
+        }
+      } catch (mirrorErr) {
+        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.supply_workflow', backend: supplyBackend });
+      }
+    }
   }
 
   try {
@@ -283,6 +299,22 @@ export async function processFinalApprovalEffects(
       .from('approvals')
       .update({ meta_data: baseMetaData })
       .eq('id', String(item.id));
+
+    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
+    if (processingBackend === 'dual-write') {
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          await db
+            .update(approvalsTable)
+            .set({ meta_data: JSON.stringify(baseMetaData) })
+            .where(eq(approvalsTable.id, String(item.id)));
+        }
+      } catch (mirrorErr) {
+        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.processing_start', backend: processingBackend });
+      }
+    }
   }
 
   const steps: string[] = [];
@@ -603,6 +635,22 @@ export async function processFinalApprovalEffects(
       .from('approvals')
       .update({ meta_data: nextMetaData })
       .eq('id', String(item.id));
+
+    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
+    if (processingBackend === 'dual-write') {
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          await db
+            .update(approvalsTable)
+            .set({ meta_data: JSON.stringify(nextMetaData) })
+            .where(eq(approvalsTable.id, String(item.id)));
+        }
+      } catch (mirrorErr) {
+        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.processing_complete', backend: processingBackend });
+      }
+    }
   }
 
   return {

@@ -16,6 +16,7 @@ import {
   lte,
   gte,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type NotificationRow = {
   id: string;
@@ -165,6 +166,22 @@ async function patchNotificationMetadata(
 
   if (error) {
     throw error;
+  }
+
+  // dual-write: notifications.metadata 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(notificationsTable)
+          .set({ metadata: JSON.stringify(merged) })
+          .where(eq(notificationsTable.id, String(row.id)));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:notifications.repush_metadata', backend });
+    }
   }
 }
 
@@ -420,6 +437,23 @@ export async function processUnreadNotificationRepushServer(
               .from('push_subscriptions')
               .update({ fcm_token: null })
               .in('fcm_token', fcmResult.expired);
+            // dual-write: FCM 토큰 무효화 미러 (best-effort)
+            if (repushBackend === 'dual-write') {
+              try {
+                const d1b = await getD1Binding();
+                if (d1b) {
+                  const dbRepush = getD1Drizzle(d1b);
+                  for (const expiredToken of fcmResult.expired) {
+                    await dbRepush
+                      .update(pushSubscriptionsTable)
+                      .set({ fcm_token: null })
+                      .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
+                  }
+                }
+              } catch (mirrorErr) {
+                logD1MirrorFailure(mirrorErr, { label: 'mirror:push_subscriptions.fcm_token_null', backend: repushBackend });
+              }
+            }
           }
         }
       } catch (fcmError) {
@@ -456,8 +490,8 @@ export async function processUnreadNotificationRepushServer(
     }
 
     if (expiredSubscriptionIds.length > 0) {
-      const repushBackend = await resolveDataBackend();
-      if (repushBackend === 'd1') {
+      const repushBackend2 = await resolveDataBackend();
+      if (repushBackend2 === 'd1') {
         const d1b = await getD1Binding();
         if (d1b) {
           const dbRepush = getD1Drizzle(d1b);
@@ -467,6 +501,20 @@ export async function processUnreadNotificationRepushServer(
         }
       } else {
         await supabase.from('push_subscriptions').delete().in('id', expiredSubscriptionIds);
+        // dual-write: 만료 구독 삭제 미러 (best-effort)
+        if (repushBackend2 === 'dual-write') {
+          try {
+            const d1b = await getD1Binding();
+            if (d1b) {
+              const dbRepush = getD1Drizzle(d1b);
+              await dbRepush
+                .delete(pushSubscriptionsTable)
+                .where(inArray(pushSubscriptionsTable.id, expiredSubscriptionIds));
+            }
+          } catch (mirrorErr) {
+            logD1MirrorFailure(mirrorErr, { label: 'mirror:push_subscriptions.delete_expired', backend: repushBackend2 });
+          }
+        }
       }
     }
 

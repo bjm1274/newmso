@@ -7,6 +7,7 @@ import {
   eq,
   and,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 export type RoomReadCursorWriteResult = {
   ok: boolean;
@@ -91,7 +92,7 @@ export async function upsertRoomReadCursors(
     }
   }
 
-  // 기존 Supabase 경로 — dual-write 모드에서 그대로 사용
+  // 기존 Supabase 경로 — dual-write 모드에서도 Supabase 쓰기 후 D1 미러
   try {
     const { error } = await client.from('room_read_cursors').upsert(
       roomIds.map((roomId) => ({
@@ -110,6 +111,38 @@ export async function upsertRoomReadCursors(
         readAt,
         error,
       };
+    }
+
+    // dual-write: room_read_cursors 미러 (best-effort)
+    if (backend === 'dual-write') {
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          for (const roomId of roomIds) {
+            const existing = await db
+              .select({ id: roomReadCursorsTable.id })
+              .from(roomReadCursorsTable)
+              .where(and(eq(roomReadCursorsTable.user_id, userId), eq(roomReadCursorsTable.room_id, roomId)))
+              .limit(1);
+            if (existing.length > 0) {
+              await db
+                .update(roomReadCursorsTable)
+                .set({ last_read_at: readAt })
+                .where(and(eq(roomReadCursorsTable.user_id, userId), eq(roomReadCursorsTable.room_id, roomId)));
+            } else {
+              await db.insert(roomReadCursorsTable).values({
+                id: crypto.randomUUID(),
+                user_id: userId,
+                room_id: roomId,
+                last_read_at: readAt,
+              });
+            }
+          }
+        }
+      } catch (mirrorErr) {
+        logD1MirrorFailure(mirrorErr, { label: 'mirror:room_read_cursors.upsert', backend });
+      }
     }
 
     return {

@@ -7,8 +7,34 @@ import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-acces
 import {
   analyzeDischargeReviewRules,
   formatDischargeRuleAnalysisForPrompt,
+  type DischargeRuleItemInput,
 } from '@/lib/discharge-review-rules';
 import type { DischargeCustomRule } from '@/lib/discharge-custom-rules';
+
+interface DischargeReviewRequestBody {
+  patientName?: string;
+  birthDate?: string;
+  gender?: string;
+  department?: string;
+  admissionDate?: string;
+  dischargeDate?: string;
+  diagnosis?: string;
+  insuranceType?: string;
+  surgeryName?: string;
+  surgeryDate?: string;
+  roomGrade?: string;
+  doctorName?: string;
+  comorbidities?: string;
+  admissionRoute?: string;
+  dischargeType?: string;
+  drgCode?: string;
+  diseaseCodes?: string;
+  checkedItems?: DischargeRuleItemInput[];
+  allItems?: DischargeRuleItemInput[];
+  chartData?: string;
+  templateData?: string;
+  customRules?: DischargeCustomRule[];
+}
 
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
 
@@ -71,14 +97,17 @@ async function callGemini(prompt: string): Promise<string> {
 export async function POST(req: Request) {
   try {
     const auth = await readAuthorizedExtraFeatureUser(req, '퇴원심사');
-    if (!auth.user || auth.status || auth.error) {
+    if (!auth.user || auth.status !== null || auth.error) {
       return NextResponse.json(
         { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
         { status: auth.status ?? 500 }
       );
     }
 
-    const body = await req.json();
+    const body: unknown = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: '잘못된 요청 형식입니다.' }, { status: 400 });
+    }
     const {
       patientName,
       birthDate,
@@ -102,8 +131,11 @@ export async function POST(req: Request) {
       chartData,
       templateData,
       customRules,
-    } = body;
+    } = body as DischargeReviewRequestBody;
 
+    if (!admissionDate || !dischargeDate) {
+      return NextResponse.json({ error: '입원일과 퇴원일은 필수입니다.' }, { status: 400 });
+    }
     const admDate = new Date(admissionDate);
     const disDate = new Date(dischargeDate);
     const stayDays = Math.ceil((disDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));

@@ -12,6 +12,7 @@ import {
   inventory_price_history as inventoryPriceHistoryTable,
   eq,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type LooseRecord = Record<string, unknown>;
 
@@ -94,6 +95,22 @@ export async function updateInventoryTrackingFields(
   if (result.error) {
     throw result.error;
   }
+
+  // dual-write: inventory tracking fields 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(inventoryTable)
+          .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+          .where(eq(inventoryTable.id, inventoryItemId));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:inventory.tracking_fields', backend });
+    }
+  }
 }
 
 export async function recordInventoryPriceHistory(
@@ -173,6 +190,31 @@ export async function recordInventoryPriceHistory(
       return;
     }
     throw result.error;
+  }
+
+  // dual-write: inventory_price_history 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db.insert(inventoryPriceHistoryTable).values({
+          id: crypto.randomUUID(),
+          inventory_item_id: String(payload.inventory_item_id ?? ''),
+          supplier_id: (payload.supplier_id as string | null) ?? null,
+          supplier_name: (payload.supplier_name as string | null) ?? null,
+          unit_price: typeof payload.unit_price === 'number' ? payload.unit_price : null,
+          quantity: typeof payload.quantity === 'number' ? payload.quantity : 0,
+          total_amount: typeof payload.total_amount === 'number' ? payload.total_amount : null,
+          source_type: (payload.source_type as string | null) ?? 'manual',
+          recorded_by: (payload.recorded_by as string | null) ?? null,
+          purchase_order_id: (payload.purchase_order_id as string | null) ?? null,
+          notes: (payload.notes as string | null) ?? null,
+        });
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:inventory_price_history.insert', backend });
+    }
   }
 }
 

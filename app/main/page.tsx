@@ -771,7 +771,7 @@ function MainPageContent() {
   useEffect(() => {
     if (!user) return;
     fetchERPData(user);
-  }, [user]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isMsoUser) return;

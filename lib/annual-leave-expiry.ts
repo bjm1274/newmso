@@ -21,6 +21,7 @@ import {
   lte,
   gt,
 } from './db';
+import { logD1MirrorFailure } from './db/mirror-metrics';
 
 export type ExpiryResult = {
   staffId: string;
@@ -102,28 +103,73 @@ export async function processStaffLeaveExpiry(
 
   // ── Supabase 경로 (dual-write 모드 유지) ─────────────────────────────────
 
+  const expiryNowIso = now.toISOString();
+
   // leave_balances 업데이트 (소멸 처리)
   await supabase
     .from('leave_balances')
     .update({
       expired_days: remainingDays,
-      expired_at: now.toISOString(),
+      expired_at: expiryNowIso,
     })
     .eq('staff_id', staffId)
     .eq('expiry_date', expiryDateStr);
 
+  // dual-write: leave_balances 미러
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(leaveBalancesTable)
+          .set({ expired_days: remainingDays, expired_at: expiryNowIso })
+          .where(
+            and(
+              eq(leaveBalancesTable.staff_id, staffId),
+              eq(leaveBalancesTable.expiry_date, expiryDateStr),
+            ),
+          );
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:leave_balances.expiry', backend });
+    }
+  }
+
   // 소멸 확정 로그 기록 (step=3)
+  const promotionMeta = {
+    action: 'expired',
+    expiry_date: expiryDateStr,
+    processed_at: expiryNowIso,
+  };
   await supabase.from('annual_leave_promotion_logs').insert({
     staff_id: staffId,
     target_year: expiryDate.getFullYear(),
     step: 3, // 소멸 확정
     remain_days: remainingDays,
-    meta: {
-      action: 'expired',
-      expiry_date: expiryDateStr,
-      processed_at: now.toISOString(),
-    },
+    meta: promotionMeta,
   });
+
+  // dual-write: annual_leave_promotion_logs 미러
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db.insert(annualLeavePromotionLogsTable).values({
+          id: crypto.randomUUID(),
+          staff_id: staffId,
+          target_year: expiryDate.getFullYear(),
+          step: 3,
+          remain_days: remainingDays,
+          meta: JSON.stringify(promotionMeta),
+          created_at: expiryNowIso,
+        });
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:annual_leave_promotion_logs.expiry', backend });
+    }
+  }
 
   // 소멸 알림 발송
   const expiryNotificationRow: NotificationRow = {
@@ -226,6 +272,22 @@ export async function recordUnusedLeaveCompensation(
     .from('staff_members')
     .update({ annual_leave_pay: compensationAmount })
     .eq('id', staffId);
+
+  // dual-write: staff_members.annual_leave_pay 미러
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        await db
+          .update(staffMembersTable)
+          .set({ annual_leave_pay: compensationAmount })
+          .where(eq(staffMembersTable.id, staffId));
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:staff_members.annual_leave_pay', backend });
+    }
+  }
 }
 
 /**

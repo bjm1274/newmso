@@ -20,7 +20,7 @@ function createAdminSupabase() {
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!session?.user?.id && !session?.user?.name) {
+    if (!session?.user?.id) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 

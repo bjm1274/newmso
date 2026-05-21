@@ -19,6 +19,7 @@ import {
   eq,
   and,
 } from '@/lib/db';
+import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 // ─── 입력 검증 스키마 ─────────────────────────────────────────────────────────
 
@@ -331,24 +332,19 @@ export async function recalculateLeaveBalance(
   const remainingDays = Math.max(0, totalDays - usedDays - expiredDays - compensatedDays);
 
   // 8. UPSERT
+  const leaveBalancePayload = {
+    staff_id: staffId,
+    year: targetYear,
+    total_days: totalDays,
+    used_days: usedDays,
+    remaining_days: remainingDays,
+    expiry_date: expiryDateStr,
+    expired_days: expiredDays,
+    compensated_days: compensatedDays,
+  };
   const { error: upsertError } = await client
     .from('leave_balances')
-    .upsert(
-      {
-        staff_id: staffId,
-        year: targetYear,
-        total_days: totalDays,
-        used_days: usedDays,
-        remaining_days: remainingDays,
-        expiry_date: expiryDateStr,
-        expired_days: expiredDays,
-        compensated_days: compensatedDays,
-      },
-      {
-        onConflict: 'staff_id,year',
-        ignoreDuplicates: false,
-      },
-    );
+    .upsert(leaveBalancePayload, { onConflict: 'staff_id,year', ignoreDuplicates: false });
 
   if (upsertError) {
     console.error('[recalculateLeaveBalance] leave_balances UPSERT 실패:', upsertError);
@@ -356,5 +352,51 @@ export async function recalculateLeaveBalance(
     throw new Error(
       `leave_balances 갱신 실패. staff_members.annual_leave_used(${usedDays})와 불일치 상태일 수 있습니다. 관리자에게 문의하세요.`,
     );
+  }
+
+  // dual-write: leave_balances 미러 (best-effort)
+  if (backend === 'dual-write') {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        // 기존 행 유무 확인 후 UPDATE 또는 INSERT
+        const existing = await db
+          .select({ id: leaveBalancesTable.id })
+          .from(leaveBalancesTable)
+          .where(and(eq(leaveBalancesTable.staff_id, staffId), eq(leaveBalancesTable.year, targetYear)))
+          .limit(1);
+        if (existing[0]?.id) {
+          await db
+            .update(leaveBalancesTable)
+            .set({
+              total_days: totalDays,
+              used_days: usedDays,
+              remaining_days: remainingDays,
+              expiry_date: expiryDateStr,
+              expired_days: expiredDays,
+              compensated_days: compensatedDays,
+              updated_at: new Date().toISOString(),
+            })
+            .where(eq(leaveBalancesTable.id, existing[0].id));
+        } else {
+          await db.insert(leaveBalancesTable).values({
+            id: crypto.randomUUID(),
+            staff_id: staffId,
+            year: targetYear,
+            total_days: totalDays,
+            used_days: usedDays,
+            remaining_days: remainingDays,
+            expiry_date: expiryDateStr,
+            expired_days: expiredDays,
+            compensated_days: compensatedDays,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (mirrorErr) {
+      logD1MirrorFailure(mirrorErr, { label: 'mirror:leave_balances.recalculate', backend });
+    }
   }
 }
