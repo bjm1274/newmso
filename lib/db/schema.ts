@@ -187,6 +187,8 @@ export const attendances = sqliteTable("attendances", {
 	status: text().default("present"),
 	work_hours_minutes: integer(),
 	notes: text(),
+	current_status: text(),
+	current_status_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 },
 (table) => [
