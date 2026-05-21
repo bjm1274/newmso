@@ -131,6 +131,8 @@ export default function LoginPage() {
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 data-testid="login-id-input"
+                name="erp-login-id"
+                autoComplete="off"
                 className="w-full px-3.5 py-2.5 bg-[var(--tab-bg)] rounded-[8px] text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20 border border-transparent focus:border-[var(--accent)] transition-all text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)]"
                 placeholder="사번 또는 이름"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
@@ -143,6 +145,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="login-password-input"
+                name="erp-login-password"
+                autoComplete="new-password"
                 className="w-full px-3.5 py-2.5 bg-[var(--tab-bg)] rounded-[8px] text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20 border border-transparent focus:border-[var(--accent)] transition-all text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)]"
                 placeholder="비밀번호"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
