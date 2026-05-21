@@ -5,9 +5,13 @@ import { readSessionFromRequest, resolveLatestSessionUser } from '@/lib/server-s
 import {
   pickStoredPassword,
   selectStaffPasswordRowsWithFallback,
+  selectStaffCredentialByIdD1,
+  selectStaffCredentialsByEmployeeNoD1,
+  selectStaffCredentialsByNameD1,
   type StaffCredentialRow,
   verifyStoredPassword,
 } from '@/lib/staff-password';
+import { resolveDataBackend } from '@/lib/db';
 
 function createAdminSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -67,73 +71,100 @@ export async function POST(request: Request) {
       return NextResponse.json({ verified: true });
     }
 
-    const supabase = createAdminSupabase();
+    const backend = await resolveDataBackend();
     const candidates = new Map<string, StaffCredentialRow>();
     const addCandidate = (staff: StaffCredentialRow | null | undefined) => {
       if (!staff?.id || candidates.has(staff.id)) return;
       candidates.set(staff.id, staff);
     };
 
-    const fetchById = async (staffId: string) => {
-      if (!isUuidLike(staffId)) return;
-      const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow>(
-        (selectClause) =>
-          supabase
-            .from('staff_members')
-            .select(selectClause)
-            .eq('id', staffId)
-            .maybeSingle()
-      );
-      if (error) throw error;
-      addCandidate(data);
-    };
-
-    const fetchByEmployeeNo = async (employeeNo: string) => {
-      const trimmed = String(employeeNo || '').trim();
-      if (!trimmed) return;
-      const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
-        (selectClause) =>
-          supabase
-            .from('staff_members')
-            .select(selectClause)
-            .eq('employee_no', trimmed)
-            .limit(3)
-      );
-      if (error) throw error;
-      (data || []).forEach(addCandidate);
-    };
-
-    // id 조회 우선. 성공하면 employee_no/name 폴백을 건너뛰어 동명이인 오염을 차단한다.
-    await fetchById(sessionUserId);
-
-    if (candidates.size === 0) {
-      for (const employeeNo of Array.from(new Set([sessionEmployeeNo].filter(Boolean)))) {
-        await fetchByEmployeeNo(employeeNo);
+    if (backend === 'd1') {
+      // d1 모드: Drizzle 헬퍼 사용 — Supabase withMissingColumnsFallback 불필요
+      if (isUuidLike(sessionUserId)) {
+        const row = await selectStaffCredentialByIdD1(sessionUserId);
+        addCandidate(row);
       }
-    }
 
-    // employee_no 폴백도 실패 시에만 name 폴백 사용. 동명이인이 있으면 거부한다.
-    if (candidates.size === 0) {
-      for (const candidateName of Array.from(new Set([sessionUserName].filter(Boolean)))) {
-        const trimmed = String(candidateName || '').trim();
-        if (!trimmed) continue;
-        const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
-          (selectClause) =>
-            supabase
-              .from('staff_members')
-              .select(selectClause)
-              .eq('name', trimmed)
-              .limit(5)
-        );
-        if (error) throw error;
-        const nameMatches = data || [];
-        if (nameMatches.length > 1) {
+      if (candidates.size === 0 && sessionEmployeeNo) {
+        const rows = await selectStaffCredentialsByEmployeeNoD1(sessionEmployeeNo);
+        rows.forEach(addCandidate);
+      }
+
+      if (candidates.size === 0 && sessionUserName) {
+        const rows = await selectStaffCredentialsByNameD1(sessionUserName);
+        if (rows.length > 1) {
           return NextResponse.json(
             { verified: false, error: '본인 확인을 위해 다시 로그인해 주세요.' },
             { status: 403 }
           );
         }
-        nameMatches.forEach(addCandidate);
+        rows.forEach(addCandidate);
+      }
+    } else {
+      // Supabase 경로 (dual-write / supabase 모드)
+      const supabase = createAdminSupabase();
+
+      const fetchById = async (staffId: string) => {
+        if (!isUuidLike(staffId)) return;
+        const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow>(
+          (selectClause) =>
+            supabase
+              .from('staff_members')
+              .select(selectClause)
+              .eq('id', staffId)
+              .maybeSingle()
+        );
+        if (error) throw error;
+        addCandidate(data);
+      };
+
+      const fetchByEmployeeNo = async (employeeNo: string) => {
+        const trimmed = String(employeeNo || '').trim();
+        if (!trimmed) return;
+        const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
+          (selectClause) =>
+            supabase
+              .from('staff_members')
+              .select(selectClause)
+              .eq('employee_no', trimmed)
+              .limit(3)
+        );
+        if (error) throw error;
+        (data || []).forEach(addCandidate);
+      };
+
+      // id 조회 우선. 성공하면 employee_no/name 폴백을 건너뛰어 동명이인 오염을 차단한다.
+      await fetchById(sessionUserId);
+
+      if (candidates.size === 0) {
+        for (const employeeNo of Array.from(new Set([sessionEmployeeNo].filter(Boolean)))) {
+          await fetchByEmployeeNo(employeeNo);
+        }
+      }
+
+      // employee_no 폴백도 실패 시에만 name 폴백 사용. 동명이인이 있으면 거부한다.
+      if (candidates.size === 0) {
+        for (const candidateName of Array.from(new Set([sessionUserName].filter(Boolean)))) {
+          const trimmed = String(candidateName || '').trim();
+          if (!trimmed) continue;
+          const { data, error } = await selectStaffPasswordRowsWithFallback<StaffCredentialRow[]>(
+            (selectClause) =>
+              supabase
+                .from('staff_members')
+                .select(selectClause)
+                .eq('name', trimmed)
+                .limit(5)
+          );
+          if (error) throw error;
+          const nameMatches = data || [];
+          if (nameMatches.length > 1) {
+            return NextResponse.json(
+              { verified: false, error: '본인 확인을 위해 다시 로그인해 주세요.' },
+              { status: 403 }
+            );
+          }
+          nameMatches.forEach(addCandidate);
+        }
       }
     }
 

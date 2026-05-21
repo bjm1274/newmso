@@ -8,6 +8,7 @@ import {
   pickStoredPassword,
   updateStaffPasswordWithFallback,
   verifyStoredPassword,
+  type StaffCredentialRow,
 } from '@/lib/staff-password';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
@@ -17,6 +18,13 @@ import {
   normalizeSessionUser,
   SESSION_COOKIE_NAME,
 } from '@/lib/server-session';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  staff_members as staffMembersTable,
+  eq,
+} from '@/lib/db';
 
 function getAdminClient() {
   const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
@@ -111,6 +119,100 @@ async function runStaffLoginSelect<T>(
     STAFF_LOGIN_OPTIONAL_COLUMNS
   );
 }
+
+// ----------------------------------------------------------------
+// D1 전용 staff_members 로그인 행 조회 헬퍼
+// ----------------------------------------------------------------
+
+type StaffLoginRow = StaffCredentialRow & {
+  role?: string | null;
+  department?: string | null;
+  company?: string | null;
+  company_id?: string | null;
+  position?: string | null;
+  status?: string | null;
+  permissions?: unknown;
+  photo_url?: string | null;
+  avatar_url?: string | null;
+  profile_photo_path?: string | null;
+  profile_photo_updated_at?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  auth_user_id?: string | null;
+  is_system_master?: number | boolean | null;
+  password_reset_required?: number | boolean | null;
+};
+
+function parseLoginRowPermissions(raw: unknown): Record<string, unknown> {
+  if (typeof raw === 'string' && raw.length > 0) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // 파싱 실패 — 빈 객체 반환
+    }
+  }
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return {};
+}
+
+function normalizeD1LoginRow(row: Record<string, unknown>): StaffLoginRow {
+  return {
+    ...row,
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    employee_no: String(row.employee_no ?? ''),
+    permissions: parseLoginRowPermissions(row.permissions),
+    is_system_master: row.is_system_master === 1 || row.is_system_master === true,
+    password_reset_required: row.password_reset_required === 1 || row.password_reset_required === true,
+    password: typeof row.password === 'string' ? row.password : null,
+    passwd: typeof row.passwd === 'string' ? row.passwd : null,
+  };
+}
+
+async function fetchStaffLoginRowByEmployeeNoD1(loginId: string): Promise<StaffLoginRow | null> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[master-login] D1 binding not available (fetchStaffLoginRowByEmployeeNoD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select()
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.employee_no, loginId))
+    .limit(1);
+  const row = rows[0] ?? null;
+  return row ? normalizeD1LoginRow(row as Record<string, unknown>) : null;
+}
+
+async function fetchStaffLoginRowsByNameD1(name: string): Promise<StaffLoginRow[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[master-login] D1 binding not available (fetchStaffLoginRowsByNameD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select()
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.name, name))
+    .limit(10);
+  return rows.map((r) => normalizeD1LoginRow(r as Record<string, unknown>));
+}
+
+async function fetchStaffLoginRowByNameSingleD1(name: string): Promise<StaffLoginRow | null> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[master-login] D1 binding not available (fetchStaffLoginRowByNameSingleD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select()
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.name, name))
+    .limit(1);
+  const row = rows[0] ?? null;
+  return row ? normalizeD1LoginRow(row as Record<string, unknown>) : null;
+}
+
+// ----------------------------------------------------------------
 
 function isSupabaseQuotaRestriction(error: any) {
   const message = String(error?.message ?? '').toLowerCase();
@@ -207,48 +309,74 @@ export async function POST(request: NextRequest) {
       return privilegedResponse;
     }
 
+    const backend = await resolveDataBackend();
     const supabase = getAdminClient();
     let userRow: any = null;
 
-    const { data: byEmployeeNo, error: byEmployeeNoError } = await runStaffLoginSelect((selectClause) =>
-      supabase
-        .from('staff_members')
-        .select(selectClause)
-        .eq('employee_no', loginId)
-        .maybeSingle()
-    );
-
-    if (byEmployeeNoError) {
-      console.error('[master-login] staff_members employee_no 조회 실패:', JSON.stringify(byEmployeeNoError));
-      return authDataUnavailableResponse(byEmployeeNoError);
-    }
-
-    if (byEmployeeNo) {
-      userRow = byEmployeeNo;
+    if (backend === 'd1') {
+      // d1 모드: Drizzle로 직접 조회
+      try {
+        const byEmployeeNo = await fetchStaffLoginRowByEmployeeNoD1(loginId);
+        if (byEmployeeNo) {
+          userRow = byEmployeeNo;
+        } else {
+          const byNameRows = await fetchStaffLoginRowsByNameD1(loginId);
+          const activeNameMatches = byNameRows.filter(isActiveStaffForLogin);
+          if (activeNameMatches.length > 1) {
+            return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
+          }
+          if (activeNameMatches.length === 1) {
+            userRow = activeNameMatches[0];
+          } else if (byNameRows.length === 1) {
+            userRow = byNameRows[0];
+          }
+        }
+      } catch (d1Err) {
+        console.error('[master-login] D1 staff_members 조회 실패:', d1Err instanceof Error ? d1Err.message : String(d1Err));
+        return authDataUnavailableResponse(d1Err);
+      }
     } else {
-      const { data: byName, error: byNameError } = await runStaffLoginSelect<any[]>((selectClause) =>
+      // Supabase 경로 (dual-write / supabase 모드)
+      const { data: byEmployeeNo, error: byEmployeeNoError } = await runStaffLoginSelect((selectClause) =>
         supabase
           .from('staff_members')
           .select(selectClause)
-          .eq('name', loginId)
-          .limit(10)
+          .eq('employee_no', loginId)
+          .maybeSingle()
       );
 
-      if (byNameError) {
-        console.error('[master-login] staff_members name 조회 실패:', JSON.stringify(byNameError));
-        return authDataUnavailableResponse(byNameError);
+      if (byEmployeeNoError) {
+        console.error('[master-login] staff_members employee_no 조회 실패:', JSON.stringify(byEmployeeNoError));
+        return authDataUnavailableResponse(byEmployeeNoError);
       }
 
-      const activeNameMatches = (byNameError ? [] : (byName ?? [])).filter(isActiveStaffForLogin);
+      if (byEmployeeNo) {
+        userRow = byEmployeeNo;
+      } else {
+        const { data: byName, error: byNameError } = await runStaffLoginSelect<any[]>((selectClause) =>
+          supabase
+            .from('staff_members')
+            .select(selectClause)
+            .eq('name', loginId)
+            .limit(10)
+        );
 
-      if (activeNameMatches.length > 1) {
-        return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
-      }
+        if (byNameError) {
+          console.error('[master-login] staff_members name 조회 실패:', JSON.stringify(byNameError));
+          return authDataUnavailableResponse(byNameError);
+        }
 
-      if (activeNameMatches.length === 1) {
-        userRow = activeNameMatches[0];
-      } else if (byName?.length === 1) {
-        userRow = byName[0];
+        const activeNameMatches = (byNameError ? [] : (byName ?? [])).filter(isActiveStaffForLogin);
+
+        if (activeNameMatches.length > 1) {
+          return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
+        }
+
+        if (activeNameMatches.length === 1) {
+          userRow = activeNameMatches[0];
+        } else if (byName?.length === 1) {
+          userRow = byName[0];
+        }
       }
     }
 
@@ -260,25 +388,33 @@ export async function POST(request: NextRequest) {
         let msoRow: any = null;
 
         if (adminName) {
-          const { data } = await runStaffLoginSelect((selectClause) =>
-            supabase
-              .from('staff_members')
-              .select(selectClause)
-              .eq('name', adminName)
-              .maybeSingle()
-          );
-          msoRow = data ?? null;
+          if (backend === 'd1') {
+            msoRow = await fetchStaffLoginRowByNameSingleD1(adminName).catch(() => null);
+          } else {
+            const { data } = await runStaffLoginSelect((selectClause) =>
+              supabase
+                .from('staff_members')
+                .select(selectClause)
+                .eq('name', adminName)
+                .maybeSingle()
+            );
+            msoRow = data ?? null;
+          }
         }
 
         if (!msoRow && /^\d+$/.test(loginId)) {
-          const { data } = await runStaffLoginSelect((selectClause) =>
-            supabase
-              .from('staff_members')
-              .select(selectClause)
-              .eq('employee_no', loginId)
-              .maybeSingle()
-          );
-          msoRow = data ?? null;
+          if (backend === 'd1') {
+            msoRow = await fetchStaffLoginRowByEmployeeNoD1(loginId).catch(() => null);
+          } else {
+            const { data } = await runStaffLoginSelect((selectClause) =>
+              supabase
+                .from('staff_members')
+                .select(selectClause)
+                .eq('employee_no', loginId)
+                .maybeSingle()
+            );
+            msoRow = data ?? null;
+          }
         }
 
         const user = msoRow
@@ -359,6 +495,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 관리자가 초기화한 계정 — 입력 비밀번호를 새 비밀번호로 설정
+      // updateStaffPasswordWithFallback은 내부에서 resolveDataBackend() 분기 처리
       const { error: setPasswordError } = await updateStaffPasswordWithFallback(supabase, userRow.id, password);
       if (setPasswordError) {
         const message = setPasswordError instanceof Error
@@ -367,16 +504,32 @@ export async function POST(request: NextRequest) {
         return failureResponse(message);
       }
 
-      // 플래그 해제 — 컬럼이 없으면 graceful skip
-      const flagClearResult = await supabase
-        .from('staff_members')
-        .update({ password_reset_required: false })
-        .eq('id', userRow.id);
+      // 플래그 해제 — d1 모드는 Drizzle, 그 외 Supabase (컬럼 없으면 graceful skip)
+      if (backend === 'd1') {
+        try {
+          const d1 = await getD1Binding();
+          if (d1) {
+            const db = getD1Drizzle(d1);
+            await db
+              .update(staffMembersTable)
+              .set({ password_reset_required: 0 })
+              .where(eq(staffMembersTable.id, userRow.id));
+          }
+        } catch (flagErr) {
+          console.error('[master-login] D1 password_reset_required 플래그 해제 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
+          // 플래그 해제 실패는 로그인 성공을 막지 않음
+        }
+      } else {
+        const flagClearResult = await supabase
+          .from('staff_members')
+          .update({ password_reset_required: false })
+          .eq('id', userRow.id);
 
-      if (flagClearResult.error) {
-        if (!isMissingColumnError(flagClearResult.error, 'password_reset_required')) {
-          console.error('[master-login] password_reset_required 플래그 해제 실패:', flagClearResult.error);
-          // 플래그 해제 실패는 로그인 성공 자체를 막지 않음
+        if (flagClearResult.error) {
+          if (!isMissingColumnError(flagClearResult.error, 'password_reset_required')) {
+            console.error('[master-login] password_reset_required 플래그 해제 실패:', flagClearResult.error);
+            // 플래그 해제 실패는 로그인 성공 자체를 막지 않음
+          }
         }
       }
 

@@ -1,5 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  staff_members as staffMembersTable,
+  eq,
+} from '@/lib/db';
 
 export type StaffCredentialRow = {
   id: string;
@@ -36,13 +43,112 @@ export async function verifyStoredPassword(storedPassword: string, inputPassword
   };
 }
 
+// ----------------------------------------------------------------
+// D1 전용 헬퍼 — staff_members 비밀번호 컬럼 직접 조회/갱신
+// ----------------------------------------------------------------
+
+/** D1에서 staff_members 비밀번호 행 1건 조회 (by id) */
+export async function selectStaffCredentialByIdD1(staffId: string): Promise<StaffCredentialRow | null> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[staff-password] D1 binding not available (selectStaffCredentialByIdD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({
+      id: staffMembersTable.id,
+      name: staffMembersTable.name,
+      employee_no: staffMembersTable.employee_no,
+      password: staffMembersTable.password,
+      passwd: staffMembersTable.passwd,
+    })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.id, staffId))
+    .limit(1);
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    name: row.name ?? null,
+    employee_no: row.employee_no ?? null,
+    password: row.password ?? null,
+    passwd: row.passwd ?? null,
+  };
+}
+
+/** D1에서 staff_members 비밀번호 행 목록 조회 (by employee_no) */
+export async function selectStaffCredentialsByEmployeeNoD1(employeeNo: string): Promise<StaffCredentialRow[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[staff-password] D1 binding not available (selectStaffCredentialsByEmployeeNoD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({
+      id: staffMembersTable.id,
+      name: staffMembersTable.name,
+      employee_no: staffMembersTable.employee_no,
+      password: staffMembersTable.password,
+      passwd: staffMembersTable.passwd,
+    })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.employee_no, employeeNo))
+    .limit(3);
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: row.name ?? null,
+    employee_no: row.employee_no ?? null,
+    password: row.password ?? null,
+    passwd: row.passwd ?? null,
+  }));
+}
+
+/** D1에서 staff_members 비밀번호 행 목록 조회 (by name) */
+export async function selectStaffCredentialsByNameD1(name: string): Promise<StaffCredentialRow[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[staff-password] D1 binding not available (selectStaffCredentialsByNameD1)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({
+      id: staffMembersTable.id,
+      name: staffMembersTable.name,
+      employee_no: staffMembersTable.employee_no,
+      password: staffMembersTable.password,
+      passwd: staffMembersTable.passwd,
+    })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.name, name))
+    .limit(5);
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: row.name ?? null,
+    employee_no: row.employee_no ?? null,
+    password: row.password ?? null,
+    passwd: row.passwd ?? null,
+  }));
+}
+
+// ----------------------------------------------------------------
+// Supabase 경로 — dual-write/supabase 모드용 (절대 삭제 금지)
+// ----------------------------------------------------------------
+
 export async function updateStaffPasswordWithFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   staffId: string,
   rawPassword: string
 ) {
   const passwordHash = await bcrypt.hash(rawPassword, 10);
 
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[staff-password] D1 binding not available (updateStaffPasswordWithFallback)');
+    const db = getD1Drizzle(d1);
+    await db
+      .update(staffMembersTable)
+      .set({ password: passwordHash })
+      .where(eq(staffMembersTable.id, staffId));
+    return { error: null, updatedColumn: 'password' as const, passwordHash };
+  }
+
+  // Supabase 경로 (dual-write / supabase 모드)
   const passwordUpdate = await supabase
     .from('staff_members')
     .update({ password: passwordHash })
@@ -68,7 +174,24 @@ export async function updateStaffPasswordWithFallback(
   return { error: null, updatedColumn: 'passwd' as const, passwordHash };
 }
 
-export async function clearStaffPasswordWithFallback(supabase: any, staffId: string) {
+export async function clearStaffPasswordWithFallback(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  staffId: string
+) {
+  const backend = await resolveDataBackend();
+  if (backend === 'd1') {
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[staff-password] D1 binding not available (clearStaffPasswordWithFallback)');
+    const db = getD1Drizzle(d1);
+    await db
+      .update(staffMembersTable)
+      .set({ password: null, passwd: null })
+      .where(eq(staffMembersTable.id, staffId));
+    return { error: null, clearedColumns: ['password', 'passwd'] as string[] };
+  }
+
+  // Supabase 경로 (dual-write / supabase 모드)
   let clearedPassword = false;
   let clearedPasswd = false;
 
@@ -103,16 +226,21 @@ export async function clearStaffPasswordWithFallback(supabase: any, staffId: str
   };
 }
 
+/**
+ * Supabase 경로 전용 — `withMissingColumnsFallback` 패턴으로 컬럼 누락을 허용하며 조회.
+ * d1 모드에서는 D1 전용 헬퍼(selectStaffCredentialByIdD1 등)를 직접 사용할 것.
+ */
 export async function selectStaffPasswordRowsWithFallback<T = StaffCredentialRow[]>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runSelect: (selectClause: string) => PromiseLike<{ data: any; error: any }>
-): Promise<{ data: T | null; error: any }> {
+): Promise<{ data: T | null; error: unknown }> {
   const selectClauses = [
     STAFF_PASSWORD_SELECT,
     `${STAFF_PASSWORD_BASE_SELECT}, password`,
     `${STAFF_PASSWORD_BASE_SELECT}, passwd`,
   ];
 
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   for (const selectClause of selectClauses) {
     const result = await runSelect(selectClause);
