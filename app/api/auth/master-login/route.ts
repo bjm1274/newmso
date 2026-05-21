@@ -342,13 +342,14 @@ export async function POST(request: NextRequest) {
     let notice: string | undefined;
 
     if (isFirstLogin) {
-      const { error: updateError } = await updateStaffPasswordWithFallback(supabase, userRow.id, password);
-
-      if (updateError) {
-        return failureResponse('비밀번호 설정 중 오류가 발생했습니다.', 500);
-      }
-
-      notice = '비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.';
+      // 보안: 비밀번호 미설정 계정의 자동 로그인·자동 설정을 차단한다.
+      // 과거에는 첫 로그인 시 입력값을 비밀번호로 저장하고 로그인시켰으나,
+      // 이는 제3자가 비밀번호 미설정 계정을 선점·탈취할 수 있는 취약점이었다.
+      // 신규 직원의 초기 비밀번호는 관리자가 직접 설정해야 한다.
+      recordFailedAttempt(loginId, WINDOW_MS);
+      return failureResponse(
+        '비밀번호가 설정되지 않은 계정입니다. 관리자에게 초기 비밀번호 설정을 요청해 주세요.'
+      );
     } else {
       const verified = await verifyStoredPassword(storedPassword, password);
       if (!verified.ok) {
