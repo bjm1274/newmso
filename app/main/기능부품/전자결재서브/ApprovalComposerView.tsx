@@ -63,6 +63,7 @@ type ApprovalComposerViewProps = {
     unregisteredItemNames?: string[];
   }) => void | Promise<void>;
   isSubmitting?: boolean;
+  onSaveDraft?: () => void;
 };
 
 type FormOption = {
@@ -126,6 +127,7 @@ export default function ApprovalComposerView({
   hasApproverSelection,
   handleSubmit,
   isSubmitting = false,
+  onSaveDraft,
 }: ApprovalComposerViewProps) {
   const allOptions: FormOption[] = useMemo(() => {
     return composeFormTabs.map((tab) => {
@@ -295,6 +297,7 @@ export default function ApprovalComposerView({
           <button
             type="button"
             data-testid="approval-draft-save-button"
+            onClick={onSaveDraft}
             disabled={isSubmitting}
             className="btn-premium-secondary min-h-[38px] px-4 disabled:cursor-not-allowed disabled:opacity-45"
           >

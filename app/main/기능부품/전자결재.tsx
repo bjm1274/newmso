@@ -709,6 +709,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     loadLastDraft,
     loadDraftFromStorage,
     clearDraftFromStorage,
+    saveDraftNow,
   } = useApprovalComposeDraft({
     user,
     viewMode,
@@ -1266,6 +1267,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
             setAttendanceCorrectionSeedDates={setAttendanceCorrectionSeedDates}
             hasApproverSelection={hasApproverSelection}
             handleSubmit={handleSubmit}
+            onSaveDraft={saveDraftNow}
           />
         ) : (
           <ApprovalInboxView

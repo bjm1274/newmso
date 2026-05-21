@@ -487,39 +487,43 @@ export function useApprovalComposeDraft({
     } catch { /* ignore */ }
   }, [setDraftBanner, viewMode]);
 
+  const saveDraftNow = useCallback(() => {
+    if (!formTitle && !formContent && Object.keys(extraData).length === 0) return;
+    try {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      window.localStorage.setItem(
+        APPROVAL_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          formTitle,
+          formContent,
+          extraData,
+          formType,
+          approverLine: approverLine.map((approver) => ({
+            id: approver.id,
+            name: approver.name,
+            position: approver.position ?? null,
+          })),
+          ccLine,
+          savedAt: hhmm,
+        })
+      );
+      setAutoSaveMsg(`임시저장됨 ${hhmm}`);
+      if (autoSaveMsgTimer.current) clearTimeout(autoSaveMsgTimer.current);
+      autoSaveMsgTimer.current = setTimeout(() => setAutoSaveMsg(null), 3000);
+    } catch { /* ignore */ }
+  }, [approverLine, autoSaveMsgTimer, ccLine, extraData, formContent, formTitle, formType, setAutoSaveMsg]);
+
   useEffect(() => {
     if (viewMode !== '작성하기') return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
-      if (!formTitle && !formContent && Object.keys(extraData).length === 0) return;
-      try {
-        const now = new Date();
-        const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        window.localStorage.setItem(
-          APPROVAL_DRAFT_STORAGE_KEY,
-          JSON.stringify({
-            formTitle,
-            formContent,
-            extraData,
-            formType,
-            approverLine: approverLine.map((approver) => ({
-              id: approver.id,
-              name: approver.name,
-              position: approver.position ?? null,
-            })),
-            ccLine,
-            savedAt: hhmm,
-          })
-        );
-        setAutoSaveMsg(`임시저장됨 ${hhmm}`);
-        if (autoSaveMsgTimer.current) clearTimeout(autoSaveMsgTimer.current);
-        autoSaveMsgTimer.current = setTimeout(() => setAutoSaveMsg(null), 3000);
-      } catch { /* ignore */ }
+      saveDraftNow();
     }, 3000);
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [approverLine, autoSaveMsgTimer, autoSaveTimer, ccLine, extraData, formContent, formTitle, formType, setAutoSaveMsg, viewMode]);
+  }, [autoSaveTimer, saveDraftNow, viewMode]);
 
   const loadDraftFromStorage = useCallback(() => {
     try {
@@ -566,5 +570,6 @@ export function useApprovalComposeDraft({
     loadLastDraft,
     loadDraftFromStorage,
     clearDraftFromStorage,
+    saveDraftNow,
   };
 }

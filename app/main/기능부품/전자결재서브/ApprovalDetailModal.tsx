@@ -287,25 +287,6 @@ export default function ApprovalDetailModal({
                     반려
                   </button>
                 </div>
-                {/* 보조 액션: 의견 작성 / 다음 결재선 (핸들러 미제공 → disabled) */}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled
-                    title="의견 작성 기능은 준비 중입니다"
-                    className="flex-1 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] opacity-50 cursor-not-allowed"
-                  >
-                    의견 작성
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    title="다음 결재선 이동은 준비 중입니다"
-                    className="flex-1 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] opacity-50 cursor-not-allowed"
-                  >
-                    다음 결재선 →
-                  </button>
-                </div>
               </div>
             ) : canUserRecallItem(item) ? (
               <div className="px-4 py-3 md:px-4 md:py-3">
