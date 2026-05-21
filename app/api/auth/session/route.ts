@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     authenticated: true,
     user: freshSessionUser,
     expiresAt: session.exp,
+    issuedAt: new Date(session.iat * 1000).toISOString(),
     supabaseAccessToken,
   });
 

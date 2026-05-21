@@ -25,6 +25,7 @@ import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
+import { performClientLogout } from '@/lib/client-logout';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import {
@@ -699,21 +700,7 @@ function MyPageMain({
     });
     if (!shouldLogout) return;
 
-    try {
-      await fetch('/api/auth/session', { method: 'DELETE' });
-    } catch {
-      // ignore
-    }
-
-    try {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-      localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-      persistSupabaseAccessToken(null);
-      void supabase.realtime.setAuth(null);
-    } catch {
-      // ignore
-    }
-
+    await performClientLogout();
     window.location.replace('/');
   };
 

@@ -15,6 +15,7 @@ import {
 } from '@/lib/staff-query-columns';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
+import { unsubscribePushOnLogout } from '@/lib/client-logout';
 import {
   canAccessAdminSection,
   canAccessApprovalSection,
@@ -325,6 +326,9 @@ function MainPageContent() {
   );
 
   const clearClientSession = useCallback(async () => {
+    // 푸시 구독 해제 (실패해도 세션 정리는 계속)
+    await unsubscribePushOnLogout();
+
     try {
       await fetch('/api/auth/session', { method: 'DELETE' });
     } catch {

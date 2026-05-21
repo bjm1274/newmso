@@ -82,7 +82,8 @@ export default function LoginPage() {
       }
 
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
-      localStorage.setItem(STORAGE_KEYS.LOGIN_AT, new Date().toISOString());
+      // 서버 발급 시각 우선 사용, 없으면 클라이언트 시각 폴백
+      localStorage.setItem(STORAGE_KEYS.LOGIN_AT, payload.issuedAt ?? new Date().toISOString());
       persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
       void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
       setLoading(false);

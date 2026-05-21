@@ -31,11 +31,13 @@ function getAdminClient() {
 
 async function successResponse(user: any, notice?: string) {
   const safeUser = normalizeSessionUser(user);
+  const issuedAt = new Date().toISOString();
   const token = await createSessionToken(safeUser);
   const supabaseAccessToken = await createSupabaseAccessToken(safeUser);
   const response = NextResponse.json({
     success: true,
     user: safeUser,
+    issuedAt,
     supabaseAccessToken,
     ...(notice ? { notice } : {}),
   });

@@ -191,5 +191,11 @@ export async function sendWebPushNotification(
     body: buf(body),
   });
 
+  if (!response.ok) {
+    const err = new Error(`Web Push failed: HTTP ${response.status}`) as Error & { statusCode: number };
+    err.statusCode = response.status;
+    throw err;
+  }
+
   return response;
 }

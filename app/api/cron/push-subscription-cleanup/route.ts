@@ -168,11 +168,18 @@ async function cleanupPushSubscriptions() {
         endpoint: pushSubscriptionsTable.endpoint,
       })
       .from(pushSubscriptionsTable),
-    db.select({ id: staffMembersTable.id }).from(staffMembersTable),
+    db
+      .select({ id: staffMembersTable.id, status: staffMembersTable.status })
+      .from(staffMembersTable),
   ]);
 
+  // 재직 중인 staff_id 집합 — '퇴사' / '퇴직' 상태는 제외한다.
+  // 퇴사자 행이 DB에 남아 있더라도 구독은 정리 대상으로 처리한다.
+  const RESIGNED_STATUSES = new Set(['퇴사', '퇴직']);
   const validStaffIds = new Set(
-    staffRows.map((row) => String(row.id || '')),
+    staffRows
+      .filter((row) => !RESIGNED_STATUSES.has(String(row.status ?? '').trim()))
+      .map((row) => String(row.id || '')),
   );
 
   const rows = subscriptionRows as PushSubscriptionRow[];

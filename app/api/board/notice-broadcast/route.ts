@@ -15,6 +15,7 @@ import {
   messages as messagesTable,
   eq,
 } from '@/lib/db';
+import { isActiveStaff } from '@/lib/active-staff';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
@@ -213,9 +214,11 @@ export async function POST(request: NextRequest) {
     let notificationCount = 0;
     try {
       const staffList = await db
-        .select({ id: staffMembersTable.id })
+        .select({ id: staffMembersTable.id, status: staffMembersTable.status })
         .from(staffMembersTable);
+      // 퇴사자('퇴사'/'퇴직' status) 제외 — 퇴사자에게 알림이 가지 않도록 필터링
       const staffIds = (staffList ?? [])
+        .filter((row) => isActiveStaff({ status: row.status }))
         .map((row) => String(row.id || '').trim())
         .filter(Boolean);
       if (staffIds.length > 0) {

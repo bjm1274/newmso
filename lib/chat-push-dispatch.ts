@@ -1147,6 +1147,8 @@ export async function dispatchChatPushForMessage(params: {
         data: fcmPayloadData,
       });
       sent += fcmResult.success.length;
+      // error 토큰(5xx·네트워크 실패)은 유효할 수 있으므로 무효화하지 않는다.
+      // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
       if (fcmResult.expired.length > 0) {
         const fcmBackend = await resolveDataBackend();
         if (fcmBackend === 'd1') {

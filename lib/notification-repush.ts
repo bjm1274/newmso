@@ -372,14 +372,6 @@ export async function processUnreadNotificationRepushServer(
     }
 
     const userSubscriptions = subscriptionsByUser.get(String(row.user_id || '').trim()) || [];
-    const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
-    userSubscriptions.forEach((subscription) => {
-      if (!subscription.endpoint) return;
-      if (!subscription.p256dh || !subscription.auth || !/^https?:\/\//i.test(String(subscription.endpoint))) return;
-      if (!uniqueSubscriptions.has(subscription.endpoint)) {
-        uniqueSubscriptions.set(subscription.endpoint, subscription);
-      }
-    });
 
     // 같은 사용자의 잔재 fcm_token이 여러 개 남아있을 수 있으므로
     // 가장 최신(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
@@ -396,6 +388,19 @@ export async function processUnreadNotificationRepushServer(
       }
     }
     const uniqueFcmTokens = latestFcmToken ? [latestFcmToken] : [];
+    const hasFcmToken = uniqueFcmTokens.length > 0;
+
+    // FCM 토큰이 있는 사용자는 Web Push 제외 — FCM·Web Push 이중 발송 방지
+    const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
+    if (!hasFcmToken) {
+      userSubscriptions.forEach((subscription) => {
+        if (!subscription.endpoint) return;
+        if (!subscription.p256dh || !subscription.auth || !/^https?:\/\//i.test(String(subscription.endpoint))) return;
+        if (!uniqueSubscriptions.has(subscription.endpoint)) {
+          uniqueSubscriptions.set(subscription.endpoint, subscription);
+        }
+      });
+    }
 
     if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
       skipped += 1;
@@ -418,7 +423,9 @@ export async function processUnreadNotificationRepushServer(
           data: payloadData,
         });
         rowSent += fcmResult.success.length > 0 ? 1 : 0;
-        rowFailed += fcmResult.success.length === 0 ? 1 : 0;
+        // error 토큰(5xx·네트워크 실패)은 일시 오류이므로 failed 카운트만 올리고 토큰은 유지.
+        // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
+        rowFailed += fcmResult.success.length === 0 && fcmResult.expired.length === 0 && fcmResult.error.length > 0 ? 1 : 0;
         if (fcmResult.expired.length > 0) {
           const repushBackend = await resolveDataBackend();
           if (repushBackend === 'd1') {

@@ -119,10 +119,15 @@ function buildSafeWebpushLink() {
   }
 }
 
+export type FcmSendResult =
+  | { ok: true }
+  | { ok: false; reason: 'expired' }
+  | { ok: false; reason: 'error' };
+
 export async function sendFcmNotification(
   fcmToken: string,
   payload: { title: string; body: string; data?: Record<string, string> },
-): Promise<boolean> {
+): Promise<FcmSendResult> {
   try {
     const sa = getServiceAccount();
     const accessToken = await getAccessToken();
@@ -184,44 +189,55 @@ export async function sendFcmNotification(
       const errorStatus = String(errorObj?.status || '');
       const errorCode = String(errorObj?.code || '');
       // FCM v1: status=NOT_FOUND(토큰 무효), INVALID_ARGUMENT(토큰 형식 오류), code=404/400
+      // HTTP 400/404 응답도 토큰 만료/무효로 판정
       if (
         errorStatus === 'NOT_FOUND' || errorStatus === 'INVALID_ARGUMENT' ||
-        errorCode === '404' || errorCode === '400'
+        errorCode === '404' || errorCode === '400' ||
+        res.status === 404 || res.status === 400
       ) {
-        return false; // 토큰 만료/무효
+        return { ok: false, reason: 'expired' };
       }
+      // 5xx·기타 → 일시 오류, 토큰 유지
       console.error('[FCM HTTP v1] send failed:', res.status, body);
-      return false;
+      return { ok: false, reason: 'error' };
     }
 
-    return true;
+    return { ok: true };
   } catch (err: unknown) {
+    // 네트워크 실패 등 → 일시 오류, 토큰 유지
     console.error('[FCM HTTP v1] send error:', (err as Error)?.message || err);
-    return false;
+    return { ok: false, reason: 'error' };
   }
 }
 
 export async function sendFcmBatch(
   tokens: string[],
   payload: { title: string; body: string; data?: Record<string, string> },
-): Promise<{ success: string[]; expired: string[] }> {
+): Promise<{ success: string[]; expired: string[]; error: string[] }> {
   const uniqueTokens = Array.from(new Set(tokens.filter(Boolean)));
   const results = await Promise.allSettled(
     uniqueTokens.map(async (token) => {
-      const ok = await sendFcmNotification(token, payload);
-      return { token, ok };
+      const result = await sendFcmNotification(token, payload);
+      return { token, result };
     }),
   );
 
   const success: string[] = [];
   const expired: string[] = [];
+  const error: string[] = [];
 
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      if (result.value.ok) success.push(result.value.token);
-      else expired.push(result.value.token);
+  for (const settled of results) {
+    if (settled.status === 'fulfilled') {
+      const { token, result } = settled.value;
+      if (result.ok) {
+        success.push(token);
+      } else if (result.reason === 'expired') {
+        expired.push(token);
+      } else {
+        error.push(token);
+      }
     }
   }
 
-  return { success, expired };
+  return { success, expired, error };
 }

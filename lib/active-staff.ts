@@ -10,10 +10,14 @@ type StaffLike = {
   company?: string | null;
 };
 
-/** 퇴사 처리되지 않은 재직 중인 스태프인지 확인 */
+/**
+ * 재직 중인 스태프인지 확인.
+ * status '퇴사' 또는 '퇴직' 모두 비활성으로 판정한다.
+ * (메신저유틸.ts의 RESIGNED_STATUSES 기준과 동일)
+ */
 export function isActiveStaff(staff: StaffLike): boolean {
-  const status = staff?.status ?? staff?.상태;
-  return String(status ?? '').trim() !== '퇴사';
+  const status = String(staff?.status ?? staff?.상태 ?? '').trim();
+  return status !== '퇴사' && status !== '퇴직';
 }
 
 /**

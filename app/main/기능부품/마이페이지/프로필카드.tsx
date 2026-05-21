@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
+import { performClientLogout } from '@/lib/client-logout';
 import { buildAuditDiff } from '@/lib/audit';
 import {
   getProfilePhotoUrl,
@@ -134,21 +135,7 @@ export default function MyProfileCard({
     });
     if (!shouldLogout) return;
 
-    try {
-      await fetch('/api/auth/session', { method: 'DELETE' });
-    } catch {
-      // ignore
-    }
-
-    try {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-      localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-      persistSupabaseAccessToken(null);
-      void supabase.realtime.setAuth(null);
-    } catch {
-      // ignore
-    }
-
+    await performClientLogout();
     window.location.replace('/');
   };
 

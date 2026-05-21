@@ -174,7 +174,7 @@ async function syncPushSubscriptionOnServer(
   }
 }
 
-async function deletePushSubscriptionOnServer(endpoint?: string | null) {
+export async function deletePushSubscriptionOnServer(endpoint?: string | null) {
   if (!endpoint) return;
 
   await fetch('/api/notifications/push-subscription', {
