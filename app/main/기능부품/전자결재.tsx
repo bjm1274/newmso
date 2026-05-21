@@ -1318,6 +1318,10 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
             handleApproveAction={handleApproveAction}
             handleRejectAction={handleRejectAction}
             handleRecallAction={handleRecallAction}
+            onCreateDraft={() => {
+              setViewMode('작성하기');
+              if (typeof onViewChange === 'function') onViewChange('작성하기');
+            }}
           />
         )}
       </main>

@@ -70,7 +70,7 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
   const [attachments, setAttachments] = useState<File[]>([]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
 
-  const requesterDepartment = useMemo(() => {
+  const initialDepartment = useMemo(() => {
     const currentDepartment = String(user?.department || user?.team || '').trim();
     if (currentDepartment) return currentDepartment;
     return (
@@ -80,7 +80,10 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
         .map((item) => item.dept)
         .find(Boolean) || ''
     );
-  }, [initialItems, user?.department, user?.team]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 초기값 고정 — 이후 변경은 setRequesterDepartment로
+
+  const [requesterDepartment, setRequesterDepartment] = useState<string>(initialDepartment);
 
   const requesterCompany = useMemo(() => String(user?.company || '').trim(), [user?.company]);
   const requesterInventoryLabel = useMemo(
@@ -462,6 +465,7 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
     visibleMonthlySuggestions,
     statsSummaryText,
     requesterDepartment,
+    setRequesterDepartment,
     requesterInventoryLabel,
     departmentStockByName,
     draftSavedAt,

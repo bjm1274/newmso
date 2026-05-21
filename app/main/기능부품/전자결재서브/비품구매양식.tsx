@@ -85,6 +85,7 @@ export default function SuppliesForm({ setExtraData, initialItems, user }: Suppl
       <SuppliesContextBar
         requesterDepartment={form.requesterDepartment}
         inventoryLabel={form.requesterInventoryLabel}
+        onDepartmentChange={form.setRequesterDepartment}
         draftSavedAt={form.draftSavedAt}
         outOfStockCount={form.outOfStockCount}
       />

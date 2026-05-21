@@ -80,6 +80,17 @@ export default function ApprovalDetailModal({
   const templateMeta = resolveApprovalTemplateMeta(item);
   const templateDesign = resolveApprovalTemplateDesign(item);
   const detailDocNumber = String(item?.doc_number || detailMetaData?.doc_number || '').trim();
+  const detailSenderName = String(item.sender_name || detailMetaData?.sender_name || '').trim();
+  const detailCreatedAt = String(item.created_at || '').trim();
+  const detailIsUrgent = Boolean(item.urgent || detailMetaData?.urgent || false);
+  const detailCreatedAtFormatted = detailCreatedAt
+    ? (() => {
+        const d = new Date(detailCreatedAt);
+        return Number.isNaN(d.getTime())
+          ? detailCreatedAt
+          : `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+      })()
+    : '';
   const detailPreviewHtml = buildApprovalPrintHtml(item);
   const operationalAlertVisible =
     detailLocked
@@ -98,21 +109,98 @@ export default function ApprovalDetailModal({
         className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#edf2f7] md:h-[94dvh] md:max-w-5xl md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_36px_120px_-48px_rgba(15,23,42,0.85)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 bg-white/90 px-4 py-3 md:px-6 md:py-4">
-          <div className="min-w-0 flex items-center gap-2">
-            <span
-              className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold"
-              style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
-            >
-              {templateMeta.name || detailType}
-            </span>
-            {detailTitle && (
-              <span className="text-[12px] font-bold text-[var(--foreground)] truncate">{detailTitle}</span>
-            )}
+        <div className="border-b border-slate-200/80 bg-white/90 px-4 pt-3 pb-3 md:px-6 md:pt-4 md:pb-4">
+          {/* 메타 row: 상태 chip + 유형 chip + 긴급 chip + 문서번호 + 닫기 */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* 상태 chip */}
+              {detailStatus && (
+                <span
+                  className="inline-flex px-2 py-0.5 rounded-[var(--radius-md)] text-[10px] font-bold"
+                  style={{
+                    backgroundColor:
+                      detailStatus.includes('승인') || detailStatus.includes('완료')
+                        ? 'var(--success-light)'
+                        : detailStatus.includes('반려')
+                        ? 'var(--danger-light)'
+                        : detailStatus === '대기'
+                        ? 'var(--warning-light)'
+                        : 'var(--muted)',
+                    color:
+                      detailStatus.includes('승인') || detailStatus.includes('완료')
+                        ? 'var(--success)'
+                        : detailStatus.includes('반려')
+                        ? 'var(--danger)'
+                        : detailStatus === '대기'
+                        ? 'var(--warning)'
+                        : 'var(--toss-gray-4)',
+                  }}
+                >
+                  {detailStatus}
+                </span>
+              )}
+              {/* 유형 chip */}
+              <span
+                className="inline-flex px-2 py-0.5 rounded-[var(--radius-md)] text-[10px] font-semibold"
+                style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
+              >
+                {templateMeta.name || detailType}
+              </span>
+              {/* 긴급 chip */}
+              {detailIsUrgent && (
+                <span className="inline-flex px-2 py-0.5 rounded-[var(--radius-md)] text-[10px] font-bold bg-[var(--danger-light)] text-[var(--danger)]">
+                  긴급
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 문서번호 */}
+              {detailDocNumber && (
+                <span className="text-[10px] font-mono text-[var(--toss-gray-3)] select-all">
+                  {detailDocNumber}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="모달 닫기"
+                className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
+          {/* 제목: 18px / 800 */}
+          {detailTitle && (
+            <h2 className="text-[18px] font-[800] text-[var(--foreground)] leading-snug">
+              {detailTitle}
+            </h2>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 md:py-5">
+          {/* 메타 grid 3-col: 기안자 / 기안일 / 문서번호 */}
+          {(detailSenderName || detailCreatedAtFormatted || detailDocNumber) && (
+            <div className="mx-auto mb-3 w-full max-w-[860px] grid grid-cols-3 gap-px rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden">
+              <div className="bg-[var(--muted)] px-3 py-2.5">
+                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-0.5">기안자</p>
+                <p className="text-[12px] font-bold text-[var(--foreground)] truncate">
+                  {detailSenderName || '—'}
+                </p>
+              </div>
+              <div className="bg-[var(--muted)] px-3 py-2.5">
+                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-0.5">기안일</p>
+                <p className="text-[12px] font-bold text-[var(--foreground)] truncate">
+                  {detailCreatedAtFormatted || '—'}
+                </p>
+              </div>
+              <div className="bg-[var(--muted)] px-3 py-2.5">
+                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-0.5">문서번호</p>
+                <p className="text-[12px] font-mono font-bold text-[var(--foreground)] truncate select-all">
+                  {detailDocNumber || '—'}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="mx-auto mb-3 w-full max-w-[860px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <h3 className="text-[12px] font-black text-[var(--foreground)]">결재선</h3>
@@ -179,25 +267,59 @@ export default function ApprovalDetailModal({
           )}
         </div>
         {detailStatus === '대기' && (
-          <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">
+          <div className="border-t border-[var(--border)] safe-area-pb">
             {canUserApproveItem(item) ? (
-              <div className="flex gap-3">
-                <button type="button" onClick={async () => { await handleApproveAction(item); onClose(); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold">승인</button>
-                <button type="button" onClick={async () => { await handleRejectAction(item); onClose(); }} className="flex-1 py-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-red-500/20 transition-all">반려</button>
+              <div className="px-4 py-3 md:px-4 md:py-3 space-y-2">
+                {/* 주 액션: 승인 / 반려 */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={async () => { await handleApproveAction(item); onClose(); }}
+                    className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold hover:opacity-90 transition-opacity"
+                  >
+                    승인
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => { await handleRejectAction(item); onClose(); }}
+                    className="flex-1 py-3 bg-[var(--danger-light)] border border-[var(--danger)]/20 text-[var(--danger)] rounded-[var(--radius-lg)] text-sm font-bold hover:bg-[var(--danger)]/20 transition-all"
+                  >
+                    반려
+                  </button>
+                </div>
+                {/* 보조 액션: 의견 작성 / 다음 결재선 (핸들러 미제공 → disabled) */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    title="의견 작성 기능은 준비 중입니다"
+                    className="flex-1 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] opacity-50 cursor-not-allowed"
+                  >
+                    의견 작성
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="다음 결재선 이동은 준비 중입니다"
+                    className="flex-1 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] opacity-50 cursor-not-allowed"
+                  >
+                    다음 결재선 →
+                  </button>
+                </div>
               </div>
             ) : canUserRecallItem(item) ? (
-              <div className="flex gap-3">
+              <div className="px-4 py-3 md:px-4 md:py-3">
                 <button
                   type="button"
                   data-testid="approval-detail-recall"
                   onClick={async () => { await handleRecallAction(item); }}
-                  className="flex-1 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-amber-100 transition-all"
+                  className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-amber-100 transition-all"
                 >
                   회수 후 수정
                 </button>
               </div>
             ) : (
-              <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">결재자 계정에서만 승인·반려할 수 있습니다.</p>
+              <p className="px-4 py-3 text-[11px] text-[var(--toss-gray-3)] text-center">결재자 계정에서만 승인·반려할 수 있습니다.</p>
             )}
           </div>
         )}

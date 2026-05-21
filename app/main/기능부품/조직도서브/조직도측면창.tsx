@@ -55,8 +55,8 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '업무가이드', label: '업무 가이드', group: '참고', icon: 'folder' },
   ],
   전자결재: [
-    { id: '기안함', label: '기안함', icon: 'document' },
     { id: '결재함', label: '결재함', icon: 'check' },
+    { id: '기안함', label: '기안함', icon: 'document' },
     { id: '참조 문서함', label: '참조 문서함', icon: 'paperclip' },
     { id: '작성하기', label: '작성하기', icon: 'edit' },
   ],

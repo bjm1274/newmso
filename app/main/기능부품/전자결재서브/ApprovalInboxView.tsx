@@ -71,6 +71,7 @@ type ApprovalInboxViewProps = {
   handleApproveAction: (item: ApprovalRecord) => void | Promise<void>;
   handleRejectAction: (item: ApprovalRecord) => void | Promise<void>;
   handleRecallAction: (item: ApprovalRecord) => void | Promise<void>;
+  onCreateDraft?: () => void;
 };
 
 export default function ApprovalInboxView({
@@ -115,6 +116,7 @@ export default function ApprovalInboxView({
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalDelaySnapshot,
+  onCreateDraft,
 }: ApprovalInboxViewProps) {
   // 표시용 lookup은 풀(staffs 풀 + 외부 결재자) — 결재선 선택과 분리해 UUID 노출 차단.
   const lookupStaffsForDisplay = approvalLookupStaffs ?? approvalDirectoryStaffs;
@@ -137,6 +139,30 @@ export default function ApprovalInboxView({
   );
 
   const [searchExpanded, setSearchExpanded] = useState(false);
+
+  // 결재함 헤더용 서브 수치 — KPI 와 동일 로직, 별도 fetch 없음
+  const inboxHeaderStats = useMemo(() => {
+    if (viewMode !== '결재함') return { myTurn: 0, approvedThisMonth: 0 };
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    let myTurn = 0;
+    let approvedThisMonth = 0;
+    for (const item of listForView) {
+      const status = String(item.status || '').trim();
+      const createdAt = new Date(String(item.created_at || ''));
+      const inThisMonth = !Number.isNaN(createdAt.getTime()) && createdAt >= monthStart;
+      if (status.includes('대기') && currentUserId) {
+        const currentApproverId = resolveCurrentApproverId(item);
+        if (currentApproverId && String(currentApproverId) === String(currentUserId)) {
+          myTurn += 1;
+        }
+      }
+      if (inThisMonth && (status.includes('승인') || status.includes('완료'))) {
+        approvedThisMonth += 1;
+      }
+    }
+    return { myTurn, approvedThisMonth };
+  }, [viewMode, listForView, currentUserId, resolveCurrentApproverId]);
 
   // ResponsiveTable: 결재함일 때만 selection 활성화
   const selection: ResponsiveTableSelection | undefined = useMemo(() => {
@@ -303,35 +329,38 @@ export default function ApprovalInboxView({
             </>
           )}
 
-          {searchExpanded ? (
-            <div className="relative">
-              <span
-                aria-hidden
-                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+          {/* 결재함은 헤더의 상시 검색 input 사용 — 필터 바 토글 검색은 다른 뷰에서만 노출 */}
+          {viewMode !== '결재함' && (
+            searchExpanded ? (
+              <div className="relative">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+                >
+                  <LucideIcon name="Search" size={13} />
+                </span>
+                <input
+                  data-testid="approval-keyword-filter"
+                  autoFocus
+                  value={approvalKeyword}
+                  onChange={(event) => setApprovalKeyword(event.target.value)}
+                  onBlur={() => {
+                    if (!approvalKeyword) setSearchExpanded(false);
+                  }}
+                  placeholder="제목·기안자·문서번호"
+                  className="h-8 w-56 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] pl-7 pr-2 text-[11px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                aria-label="검색"
+                onClick={() => setSearchExpanded(true)}
+                className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
               >
-                <LucideIcon name="Search" size={13} />
-              </span>
-              <input
-                data-testid="approval-keyword-filter"
-                autoFocus
-                value={approvalKeyword}
-                onChange={(event) => setApprovalKeyword(event.target.value)}
-                onBlur={() => {
-                  if (!approvalKeyword) setSearchExpanded(false);
-                }}
-                placeholder="제목·기안자·문서번호"
-                className="h-8 w-56 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] pl-7 pr-2 text-[11px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50"
-              />
-            </div>
-          ) : (
-            <button
-              type="button"
-              aria-label="검색"
-              onClick={() => setSearchExpanded(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
-            >
-              <LucideIcon name="Search" size={14} />
-            </button>
+                <LucideIcon name="Search" size={14} />
+              </button>
+            )
           )}
 
           <div className="ml-auto flex items-center gap-1.5 text-[11px] font-semibold">
@@ -382,6 +411,61 @@ export default function ApprovalInboxView({
               className="h-9 rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger-light)] px-4 text-xs font-bold text-[var(--danger)] shadow-sm transition-all hover:bg-[var(--danger-light)]/80 disabled:cursor-not-allowed disabled:opacity-40"
             >
               일괄 반려
+            </button>
+          </div>
+        </div>
+      )}
+
+      {viewMode === '결재함' && (
+        <div className="flex flex-wrap items-start justify-between gap-3 px-1">
+          {/* 좌: 제목 + 서브라인 */}
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-[17px] font-extrabold leading-tight text-[var(--foreground)]">
+              결재함
+            </h2>
+            <p className="text-[12px] font-semibold text-[var(--toss-gray-4)]">
+              내 차례{' '}
+              <span className="font-extrabold text-[var(--warning)]">
+                {inboxHeaderStats.myTurn}건
+              </span>
+              {' · '}
+              이번 달 처리{' '}
+              <span className="font-extrabold text-[var(--success)]">
+                {inboxHeaderStats.approvedThisMonth}건
+              </span>
+            </p>
+          </div>
+
+          {/* 우: 검색 input + 새 기안 버튼 */}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* 검색: 기존 searchExpanded state·핸들러 그대로 재사용, 항상 보이는 형태 */}
+            <div className="relative">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+              >
+                <LucideIcon name="Search" size={13} />
+              </span>
+              <input
+                type="search"
+                aria-label="결재 문서 검색"
+                value={approvalKeyword}
+                onChange={(event) => setApprovalKeyword(event.target.value)}
+                placeholder="제목·기안자·문서번호"
+                className="h-9 w-52 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] pl-7 pr-3 text-[12px] font-semibold text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]"
+              />
+            </div>
+
+            {/* 새 기안 버튼 — onCreateDraft prop 연결 시 활성화 */}
+            <button
+              type="button"
+              onClick={onCreateDraft}
+              disabled={!onCreateDraft}
+              aria-label="새 기안 작성"
+              className="flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-[12px] font-bold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <LucideIcon name="FilePlus" size={14} />
+              새 기안
             </button>
           </div>
         </div>

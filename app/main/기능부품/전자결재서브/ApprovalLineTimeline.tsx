@@ -56,7 +56,7 @@ const STATE_STYLE: Record<
     nameColor: 'var(--foreground)',
   },
   pending: {
-    border: 'var(--toss-gray-2)',
+    border: 'var(--border)',
     pillBg: 'var(--muted)',
     pillColor: 'var(--muted-foreground)',
     nameColor: 'var(--muted-foreground)',
@@ -220,7 +220,7 @@ function StepCard({ step }: { step: Step }) {
     >
       <span
         aria-hidden
-        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black"
+        className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full text-[12px] font-black"
         style={{ background: style.pillBg, color: style.pillColor }}
       >
         {step.state === 'done' ? (
@@ -253,7 +253,7 @@ function ConnectorBar({ done }: { done: boolean }) {
     <span
       aria-hidden
       className="h-0 w-4 shrink-0 self-center border-t-2 border-dashed"
-      style={{ borderColor: done ? 'var(--success)' : 'var(--toss-gray-2)' }}
+      style={{ borderColor: done ? 'var(--success)' : 'var(--border)' }}
     />
   );
 }

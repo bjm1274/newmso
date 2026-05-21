@@ -294,6 +294,15 @@ export default function ApprovalComposerView({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
+            data-testid="approval-draft-save-button"
+            disabled={isSubmitting}
+            className="btn-premium-secondary min-h-[38px] px-4 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <LucideIcon name="Save" size={14} strokeWidth={2.2} />
+            임시저장
+          </button>
+          <button
+            type="button"
             data-testid="approval-submit-button"
             onClick={submitApproval}
             disabled={submitDisabled}
