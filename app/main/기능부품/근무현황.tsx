@@ -39,6 +39,7 @@ type AttendanceRow = {
   check_in_time?: string | null;
   check_out_time?: string | null;
   status?: string | null;
+  current_status?: string | null;
 };
 
 type AttendancesRow = {
@@ -47,6 +48,7 @@ type AttendancesRow = {
   check_in_time?: string | null;
   check_out_time?: string | null;
   status?: string | null;
+  current_status?: string | null;
 };
 
 type ShiftBand = 'D' | 'E' | 'N' | 'OTHER' | 'NONE';
@@ -197,6 +199,13 @@ function getBandBadgeClass(band: ShiftBand) {
   return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20';
 }
 
+function getBandStripeClass(band: ShiftBand) {
+  if (band === 'D') return 'bg-sky-500';
+  if (band === 'E') return 'bg-amber-500';
+  if (band === 'N') return 'bg-violet-500';
+  return 'bg-[var(--toss-gray-3)]';
+}
+
 function buildEmptyCounts(): DayShiftCounts {
   return { total: 0, D: 0, E: 0, N: 0, OTHER: 0 };
 }
@@ -221,6 +230,8 @@ function WorkStatus({ user }: { user?: any }) {
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
+  // §6 신규 state: 카드/표 전환
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRefreshAtRef = useRef<number>(0);
@@ -269,10 +280,19 @@ function WorkStatus({ user }: { user?: any }) {
             .from('attendance')
             .select('staff_id, date, check_in, check_out, status')
             .eq('date', todayKey),
-          supabase
-            .from('attendances')
-            .select('staff_id, work_date, check_in_time, check_out_time, status')
-            .eq('work_date', todayKey),
+          withMissingColumnFallback(
+            () =>
+              supabase
+                .from('attendances')
+                .select('staff_id, work_date, check_in_time, check_out_time, status, current_status')
+                .eq('work_date', todayKey),
+            () =>
+              supabase
+                .from('attendances')
+                .select('staff_id, work_date, check_in_time, check_out_time, status')
+                .eq('work_date', todayKey),
+            'current_status',
+          ),
         ]);
 
         if (cancelled) return;
@@ -332,6 +352,10 @@ function WorkStatus({ user }: { user?: any }) {
             check_in_time: row.check_in_time ?? existing?.check_in_time ?? null,
             check_out_time: row.check_out_time ?? existing?.check_out_time ?? null,
             status: row.status ?? existing?.status ?? null,
+            // current_status: attendances에만 존재하는 컬럼 — undefined면 existing 유지
+            current_status: row.current_status !== undefined
+              ? row.current_status
+              : existing?.current_status ?? null,
           });
         });
 
@@ -412,6 +436,14 @@ function WorkStatus({ user }: { user?: any }) {
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isDetailModalOpen]);
+
+  // §6-5 신규: 1분(60초) 자동 갱신 — realtime 보완용
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setRefreshNonce((current) => current + 1);
+    }, 60_000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const activeStaffsOnly = useMemo(
     () =>
@@ -688,11 +720,84 @@ function WorkStatus({ user }: { user?: any }) {
     };
   }, [assignmentCountsByDate, assignments, selectedDateKey, shiftLookup, showActiveOnly, staffMap, staffShiftMap, todayAttendance, todayKey]);
 
+  // §6-1: 6상태 stat bar용 집계
+  // - 근무중(순수): 출근 있고 퇴근 없고 current_status=null/없음
+  // - 휴게: current_status==='break'
+  // - 점심: current_status==='lunch'
+  // - 외근: current_status==='field'
+  // - 퇴근: check_in + check_out 모두 있음
+  // - 결근: 레코드 자체 없음 또는 check_in 없음
+  // current_status 컬럼이 없으면 자연히 null 처리 → 휴게/점심/외근 = 0 (graceful fallback)
+  const todayStatCounts = useMemo(() => {
+    const attendanceByStaff = new Map(todayAttendance.map((r) => [r.staff_id, r]));
+    let working = 0;
+    let onBreak = 0;
+    let onLunch = 0;
+    let fieldwork = 0;
+    let checkedOut = 0;
+    let absent = 0;
+    for (const staff of filteredStaffs) {
+      const rec = attendanceByStaff.get(staff.id);
+      if (!rec) {
+        absent += 1;
+      } else if ((rec.check_in || rec.check_in_time) && (rec.check_out || rec.check_out_time)) {
+        checkedOut += 1;
+      } else if (rec.check_in || rec.check_in_time) {
+        const cs = String(rec.current_status ?? '').trim();
+        if (cs === 'break') onBreak += 1;
+        else if (cs === 'lunch') onLunch += 1;
+        else if (cs === 'field') fieldwork += 1;
+        else working += 1;
+      } else {
+        absent += 1;
+      }
+    }
+    return { working, onBreak, onLunch, fieldwork, checkedOut, absent };
+  }, [filteredStaffs, todayAttendance]);
+
   return (
     <div className="space-y-5" data-testid="work-status-view">
+
+      {/* ── §6-1: 6상태 가로 stat bar ─────────────────────────────────── */}
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" data-testid="work-status-stat-bar">
+          {/* 근무중 (success) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--success-light,#bbf7d0)] bg-[var(--success-light,#f0fdf4)] px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--success,#16a34a)]">근무중</span>
+            <span className="text-xl font-black text-[var(--success,#16a34a)]">{todayStatCounts.working}</span>
+          </div>
+          {/* 휴게 (warning) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--warning-light,#fde68a)] bg-[var(--warning-light,#fffbeb)] px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--warning,#d97706)]">휴게</span>
+            <span className="text-xl font-black text-[var(--warning,#d97706)]">{todayStatCounts.onBreak}</span>
+          </div>
+          {/* 점심 (warning) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--warning-light,#fde68a)] bg-[var(--warning-light,#fffbeb)] px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--warning,#d97706)]">점심</span>
+            <span className="text-xl font-black text-[var(--warning,#d97706)]">{todayStatCounts.onLunch}</span>
+          </div>
+          {/* 외근 (accent) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--accent)]">외근</span>
+            <span className="text-xl font-black text-[var(--accent)]">{todayStatCounts.fieldwork}</span>
+          </div>
+          {/* 퇴근 (muted) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--toss-gray-4)]">퇴근</span>
+            <span className="text-xl font-black text-[var(--foreground)]">{todayStatCounts.checkedOut}</span>
+          </div>
+          {/* 결근 (danger) */}
+          <div className="flex flex-col items-center gap-1 rounded-[var(--radius-md)] border border-[var(--danger-light,#fecaca)] bg-[var(--danger-light,#fff1f2)] px-2 py-3">
+            <span className="text-[10px] font-bold text-[var(--danger,#dc2626)]">결근</span>
+            <span className="text-xl font-black text-[var(--danger,#dc2626)]">{todayStatCounts.absent}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── §6-4,5: 필터 + segmented + 새로고침 ──────────────────────────── */}
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-end">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={departmentFilter}
@@ -727,15 +832,58 @@ function WorkStatus({ user }: { user?: any }) {
               data-testid="work-status-active-only-toggle"
               className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold transition ${
                 showActiveOnly
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  ? 'border-[var(--success-light,#bbf7d0)] bg-[var(--success-light,#f0fdf4)] text-[var(--success,#16a34a)]'
                   : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:border-[var(--accent)] hover:text-[var(--accent)]'
               }`}
             >
-              오늘 근무중만
+              근무중만
             </button>
-            <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
-              실시간 반영
-            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* §6-4: 카드/표 segmented */}
+            <div
+              className="flex rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-0.5"
+              role="group"
+              aria-label="보기 전환"
+              data-testid="work-status-view-toggle"
+            >
+              <button
+                type="button"
+                onClick={() => setViewMode('card')}
+                aria-pressed={viewMode === 'card'}
+                className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold transition ${
+                  viewMode === 'card'
+                    ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
+                    : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                카드
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                aria-pressed={viewMode === 'table'}
+                className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold transition ${
+                  viewMode === 'table'
+                    ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
+                    : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
+                }`}
+              >
+                표
+              </button>
+            </div>
+
+            {/* §6-5: 수동 새로고침 */}
+            <button
+              type="button"
+              onClick={() => setRefreshNonce((current) => current + 1)}
+              data-testid="work-status-refresh"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              aria-label="데이터 새로고침"
+            >
+              새로고침
+            </button>
             <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
               선택일 {formatDisplayDate(selectedDate)}
             </span>
@@ -755,8 +903,8 @@ function WorkStatus({ user }: { user?: any }) {
             {departmentFilter === '전체' ? '전사 보기' : `${departmentFilter} 보기`}
           </span>
           {showActiveOnly ? (
-            <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-emerald-700">
-              오늘 근무중 {selectedDateRows.activeStaffCount}명
+            <span className="rounded-[var(--radius-md)] bg-[var(--success-light,#f0fdf4)] px-2.5 py-1 text-[var(--success,#16a34a)]">
+              근무중 {selectedDateRows.activeStaffCount}명
             </span>
           ) : null}
           {lastRefreshAt ? (
@@ -801,70 +949,156 @@ function WorkStatus({ user }: { user?: any }) {
           </div>
         ) : null}
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          {activeStaffs.length === 0 ? (
-            <div className="lg:col-span-3 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--page-bg)] px-4 py-5 text-center text-sm text-[var(--toss-gray-3)]">
-              오늘 출근해서 현재 근무중인 직원이 없습니다.
-            </div>
-          ) : (
-            activeStaffs.map((group) => (
-              <div
-                key={group.shiftId}
-                className="rounded-[var(--radius-xl)] border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(group.band)}`}>
-                      현재 근무중 · {getBandLabel(group.band)}
-                    </div>
-                    <h4 className="mt-2 text-base font-bold text-[var(--foreground)]">{group.shiftName}</h4>
-                    <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{group.timeRange}</p>
-                  </div>
-                  <span className="rounded-[var(--radius-md)] bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
-                    {group.items.length}명
-                  </span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {group.items.map(({ staff, attendance }) => {
-                    const extraChips = getExtraShiftChips(staff.id);
-                    return (
-                      <div
-                        key={staff.id}
-                        className="rounded-[var(--radius-lg)] border border-white/80 bg-[var(--card)]/90 px-3 py-2 shadow-sm"
-                      >
-                        <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
-                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                          {[staff.position, staff.department].filter(Boolean).join(' · ') || '근무중'} · 출근 {formatClockLabel(attendance.check_in || attendance.check_in_time) || '--:--'}
-                        </p>
-                        {extraChips.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
-                            {extraChips.map((chip) => (
-                              <span
-                                key={chip.shiftId}
-                                role="listitem"
-                                tabIndex={0}
-                                aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
-                                className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
-                                  chip.isPrimary
-                                    ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
-                                    : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                                }`}
-                              >
-                                {chip.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* ── §6-2,3,4: 근무중 직원 카드 / 표 뷰 ─────────────────────── */}
+        {viewMode === 'card' ? (
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {activeStaffs.length === 0 ? (
+              <div className="lg:col-span-3 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--page-bg)] px-4 py-5 text-center text-sm text-[var(--toss-gray-3)]">
+                오늘 출근해서 현재 근무중인 직원이 없습니다.
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              activeStaffs.map((group) => (
+                <div
+                  key={group.shiftId}
+                  className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--success-light,#bbf7d0)] bg-[var(--success-light,#f0fdf4)]/40 shadow-sm"
+                >
+                  {/* §6-2: 좌측 4px 컬러 stripe (success) */}
+                  <div className="flex h-full">
+                    <div className="w-1 shrink-0 rounded-l-[var(--radius-xl)] bg-[var(--success,#16a34a)]" aria-hidden="true" />
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(group.band)}`}>
+                            근무중 · {getBandLabel(group.band)}
+                          </div>
+                          <h4 className="mt-2 text-base font-bold text-[var(--foreground)]">{group.shiftName}</h4>
+                          <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{group.timeRange}</p>
+                        </div>
+                        <span className="rounded-[var(--radius-md)] bg-[var(--success,#16a34a)] px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
+                          {group.items.length}명
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {group.items.map(({ staff, attendance }) => {
+                          const extraChips = getExtraShiftChips(staff.id);
+                          const checkInLabel = formatClockLabel(attendance.check_in || attendance.check_in_time);
+                          const cs = String(attendance.current_status ?? '').trim();
+                          const stripeClass =
+                            cs === 'break' || cs === 'lunch'
+                              ? 'bg-[var(--warning,#d97706)]'
+                              : cs === 'field'
+                              ? 'bg-[var(--accent)]'
+                              : 'bg-[var(--success,#16a34a)]';
+                          const statusBadge =
+                            cs === 'break' ? '휴게중' :
+                            cs === 'lunch' ? '점심중' :
+                            cs === 'field' ? '외근중' : null;
+                          return (
+                            <div
+                              key={staff.id}
+                              className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm"
+                            >
+                              {/* §6-2: 내부 카드 좌측 stripe — current_status 반영 */}
+                              <div className="flex h-full">
+                                <div className={`w-1 shrink-0 ${stripeClass}`} aria-hidden="true" />
+                                <div className="flex-1 px-3 py-2">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
+                                    {statusBadge && (
+                                      <span className={`rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-black text-white ${cs === 'field' ? 'bg-[var(--accent)]' : 'bg-[var(--warning,#d97706)]'}`}>
+                                        {statusBadge}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* §6-3: "HH:MM 출근" last-action 강조 */}
+                                  <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                    {[staff.position, staff.department].filter(Boolean).join(' · ') || '근무중'}
+                                  </p>
+                                  {checkInLabel ? (
+                                    <p className="mt-0.5 text-[11px] font-bold text-[var(--success,#16a34a)]">
+                                      {checkInLabel} 출근
+                                    </p>
+                                  ) : null}
+                                  {extraChips.length > 0 && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
+                                      {extraChips.map((chip) => (
+                                        <span
+                                          key={chip.shiftId}
+                                          role="listitem"
+                                          tabIndex={0}
+                                          aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
+                                          className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                                            chip.isPrimary
+                                              ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+                                              : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                          }`}
+                                        >
+                                          {chip.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          /* §6-4: 표 뷰 */
+          <div className="mt-4 overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border)]">
+            <table className="erp-table w-full text-[12px]" data-testid="work-status-table-view">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-left">이름</th>
+                  <th className="px-3 py-2 text-left">부서</th>
+                  <th className="px-3 py-2 text-left">직위</th>
+                  <th className="px-3 py-2 text-left">근무형태</th>
+                  <th className="px-3 py-2 text-left">출근 시각</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeStaffs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-[var(--toss-gray-3)]">
+                      현재 근무중인 직원이 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  activeStaffs.flatMap((group) =>
+                    group.items.map(({ staff, attendance }) => {
+                      const checkInLabel = formatClockLabel(attendance.check_in || attendance.check_in_time);
+                      return (
+                        <tr key={staff.id}>
+                          <td className="px-3 py-2 font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</td>
+                          <td className="px-3 py-2 text-[var(--toss-gray-3)]">{staff.department || '-'}</td>
+                          <td className="px-3 py-2 text-[var(--toss-gray-3)]">{staff.position || '-'}</td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex rounded-[var(--radius-md)] border px-2 py-0.5 text-[10px] font-bold ${getBandBadgeClass(group.band)}`}>
+                              {group.shiftName}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-bold text-[var(--success,#16a34a)]">
+                            {checkInLabel ? `${checkInLabel} 출근` : '--:--'}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
+      {/* ── 월간 캘린더 ────────────────────────────────────────────────── */}
       <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -928,7 +1162,7 @@ function WorkStatus({ user }: { user?: any }) {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-[11px] font-black ${isToday ? 'text-emerald-600' : 'text-[var(--foreground)]'}`}>
+                    <span className={`text-[11px] font-black ${isToday ? 'text-[var(--success,#16a34a)]' : 'text-[var(--foreground)]'}`}>
                       {cell.getDate()}
                     </span>
                     <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
@@ -947,6 +1181,7 @@ function WorkStatus({ user }: { user?: any }) {
         </div>
       </section>
 
+      {/* ── 상세 모달 ──────────────────────────────────────────────────── */}
       {isDetailModalOpen ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-4" data-testid="work-status-detail-modal" onClick={() => setIsDetailModalOpen(false)}>
           <div
@@ -965,14 +1200,14 @@ function WorkStatus({ user }: { user?: any }) {
                   </span>
                 ) : null}
                 {showActiveOnly && selectedDateKey === todayKey ? (
-                  <span className="rounded-[var(--radius-md)] bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
-                    오늘 근무중만
+                  <span className="rounded-[var(--radius-md)] bg-[var(--success-light,#f0fdf4)] px-2.5 py-1 text-[var(--success,#16a34a)]">
+                    근무중만
                   </span>
                 ) : null}
                 <span className="rounded-[var(--radius-md)] bg-sky-500/15 px-2.5 py-1 text-sky-700 dark:text-sky-300">Day {selectedDateRows.counts.D}명</span>
                 <span className="rounded-[var(--radius-md)] bg-amber-500/15 px-2.5 py-1 text-amber-700 dark:text-amber-300">Evening {selectedDateRows.counts.E}명</span>
                 <span className="rounded-[var(--radius-md)] bg-violet-500/15 px-2.5 py-1 text-violet-700 dark:text-violet-300">Night {selectedDateRows.counts.N}명</span>
-                <span className="rounded-[var(--radius-md)] bg-emerald-500/15 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">기타 {selectedDateRows.counts.OTHER}명</span>
+                <span className="rounded-[var(--radius-md)] bg-[var(--success-light,#f0fdf4)] px-2.5 py-1 text-[var(--success,#16a34a)]">기타 {selectedDateRows.counts.OTHER}명</span>
                 <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[var(--toss-gray-3)]">총 {selectedDateRows.counts.total}명</span>
                 <button
                   type="button"
@@ -987,7 +1222,7 @@ function WorkStatus({ user }: { user?: any }) {
 
             <div className="max-h-[calc(90vh-92px)] overflow-y-auto p-5">
               {!selectedDateRows.hasExplicitAssignments ? (
-                <div className="mb-4 rounded-[var(--radius-lg)] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-700 dark:text-amber-300">
+                <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--warning-light,#fde68a)] bg-[var(--warning-light,#fffbeb)] px-4 py-3 text-[12px] font-medium text-[var(--warning,#d97706)]">
                   선택일에 등록된 근무 배정표가 없습니다.
                 </div>
               ) : null}
@@ -1003,66 +1238,98 @@ function WorkStatus({ user }: { user?: any }) {
                   </div>
                 ) : (
                   selectedDateRows.rows.map((row) => (
-                    <div key={row.shiftId} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(row.band)}`}>
-                            {getBandLabel(row.band)}
-                          </div>
-                          <h5 className="mt-2 text-base font-bold text-[var(--foreground)]">{row.shiftName}</h5>
-                          <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{row.timeRange}</p>
-                        </div>
-                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
-                          {row.staffs.length}명
-                        </span>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {row.staffs.map((staff) => {
-                          const isActiveNow = selectedDateKey === todayKey && row.activeStaffIds.has(staff.id);
-                          const extraChips = getExtraShiftChips(staff.id);
-                          return (
-                            <div
-                              key={staff.id}
-                              className={`rounded-[var(--radius-lg)] border px-3 py-2 shadow-sm ${
-                                isActiveNow
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <p className="text-[12px] font-bold">{staff.name || '이름 없음'}</p>
-                                {isActiveNow ? (
-                                  <span className="rounded-[var(--radius-md)] bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
-                                    근무중
-                                  </span>
-                                ) : null}
+                    <div
+                      key={row.shiftId}
+                      className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] shadow-sm"
+                    >
+                      {/* §6-2: 모달 카드에도 좌측 4px stripe */}
+                      <div className="flex h-full">
+                        <div
+                          className={`w-1 shrink-0 rounded-l-[var(--radius-xl)] ${getBandStripeClass(row.band)}`}
+                          aria-hidden="true"
+                        />
+                        <div className="flex-1 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(row.band)}`}>
+                                {getBandLabel(row.band)}
                               </div>
-                              <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                {[staff.department, staff.position].filter(Boolean).join(' · ') || '근무 정보'}
-                              </p>
-                              {extraChips.length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
-                                  {extraChips.map((chip) => (
-                                    <span
-                                      key={chip.shiftId}
-                                      role="listitem"
-                                      tabIndex={0}
-                                      aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
-                                      className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
-                                        chip.isPrimary
-                                          ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
-                                          : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                                      }`}
-                                    >
-                                      {chip.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                              <h5 className="mt-2 text-base font-bold text-[var(--foreground)]">{row.shiftName}</h5>
+                              <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{row.timeRange}</p>
                             </div>
-                          );
-                        })}
+                            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
+                              {row.staffs.length}명
+                            </span>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {row.staffs.map((staff) => {
+                              const isActiveNow = selectedDateKey === todayKey && row.activeStaffIds.has(staff.id);
+                              const extraChips = getExtraShiftChips(staff.id);
+                              const attendanceRec = todayAttendance.find((r) => r.staff_id === staff.id);
+                              const checkInLabel = isActiveNow && attendanceRec
+                                ? formatClockLabel(attendanceRec.check_in || attendanceRec.check_in_time)
+                                : null;
+                              return (
+                                <div
+                                  key={staff.id}
+                                  className={`overflow-hidden rounded-[var(--radius-lg)] border shadow-sm ${
+                                    isActiveNow
+                                      ? 'border-[var(--success-light,#bbf7d0)] bg-[var(--success-light,#f0fdf4)]'
+                                      : 'border-[var(--border)] bg-[var(--card)]'
+                                  }`}
+                                >
+                                  {/* §6-2: 근무중 직원 카드 좌측 stripe */}
+                                  <div className="flex h-full">
+                                    {isActiveNow && (
+                                      <div className="w-1 shrink-0 bg-[var(--success,#16a34a)]" aria-hidden="true" />
+                                    )}
+                                    <div className="flex-1 px-3 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <p className={`text-[12px] font-bold ${isActiveNow ? 'text-[var(--foreground)]' : 'text-[var(--foreground)]'}`}>
+                                          {staff.name || '이름 없음'}
+                                        </p>
+                                        {isActiveNow ? (
+                                          <span className="rounded-[var(--radius-md)] bg-[var(--success,#16a34a)] px-2 py-0.5 text-[10px] font-black text-white">
+                                            근무중
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                        {[staff.department, staff.position].filter(Boolean).join(' · ') || '근무 정보'}
+                                      </p>
+                                      {/* §6-3: last-action 시각 강조 */}
+                                      {checkInLabel ? (
+                                        <p className="mt-0.5 text-[11px] font-bold text-[var(--success,#16a34a)]">
+                                          {checkInLabel} 출근
+                                        </p>
+                                      ) : null}
+                                      {extraChips.length > 0 && (
+                                        <div className="mt-1.5 flex flex-wrap gap-1" role="list" aria-label="담당 근무유형">
+                                          {extraChips.map((chip) => (
+                                            <span
+                                              key={chip.shiftId}
+                                              role="listitem"
+                                              tabIndex={0}
+                                              aria-label={`${chip.isPrimary ? '주근무' : '부근무'}: ${chip.name}`}
+                                              className={`rounded-[var(--radius-md)] border px-1.5 py-0.5 text-[10px] font-bold outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                                                chip.isPrimary
+                                                  ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--accent)]'
+                                                  : 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                                              }`}
+                                            >
+                                              {chip.name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))

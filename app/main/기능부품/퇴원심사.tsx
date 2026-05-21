@@ -585,12 +585,17 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">
             {dialog}
             {/* §4-1, §13.15 추가기능 모듈: PageHeader 제목/서브 삭제, 우측 액션만 유지 */}
-            <div className="flex flex-col md:flex-row justify-end items-start md:items-center p-4 bg-[var(--card)] border-b border-[var(--border)] gap-4">
-                <div className="flex flex-wrap gap-2">
-                    {(['reviews', 'new', 'template'] as Tab[]).map(t => (
-                        <button key={t} data-testid={`discharge-tab-${t}`} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
-                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-[var(--foreground)] text-[var(--card)] shadow-sm' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'}`}>
-                            {t === 'reviews' ? '📋 심사 목록' : t === 'new' ? '➕ 새 심사' : '⚙️ 기본 항목 설정'}
+            <div className="flex justify-end items-center p-4 bg-[var(--card)] border-b border-[var(--border)]">
+                {/* Segmented control — 3분할 붙음 형태 */}
+                <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden bg-[var(--tab-bg)]">
+                    {(['reviews', 'new', 'template'] as Tab[]).map((t, i) => (
+                        <button
+                            key={t}
+                            data-testid={`discharge-tab-${t}`}
+                            onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
+                            className={`px-4 py-2 text-xs font-bold transition-all ${i > 0 ? 'border-l border-[var(--border)]' : ''} ${tab === t ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}
+                        >
+                            {t === 'reviews' ? '심사 목록' : t === 'new' ? '새 심사' : '기본 항목 설정'}
                         </button>
                     ))}
                 </div>
@@ -603,274 +608,10 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                     <div className="max-w-4xl mx-auto space-y-4">
                         <DischargeRuleBuilder rules={customRules} onChange={handleCustomRulesChange} />
 
-                        {/* 템플릿 목록 */}
-                        {false && selectedRuleAnalysis && (
-                            <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4" data-testid="discharge-rule-analysis">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                                        <span className="text-lg">📚</span>
-                                        규정 기반 점검
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">
-                                        PDF 기반
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
-                                        <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
-                                    </div>
-                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
-                                        <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
-                                    </div>
-                                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-                                        <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
-                                        <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
-                                    </div>
-                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
-                                        <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
-                                    </div>
-                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
-                                        <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 체크리스트</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {selectedRuleAnalysis!.checklist.map((item) => (
-                                            <div
-                                                key={item.key}
-                                                className={`rounded-xl border p-3 ${
-                                                    item.status === 'critical'
-                                                        ? 'border-red-500/20 bg-red-500/10'
-                                                        : item.status === 'warning'
-                                                            ? 'border-orange-500/20 bg-orange-500/10'
-                                                            : item.status === 'review'
-                                                                ? 'border-amber-200 bg-amber-50'
-                                                                : 'border-green-500/20 bg-green-500/10'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-xs font-bold text-[var(--foreground)]">{item.label}</p>
-                                                    <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{item.status}</span>
-                                                </div>
-                                                <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-5)] leading-relaxed">{item.detail}</p>
-                                                <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{item.basis}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
-                                    {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
-                                            현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {selectedRuleAnalysis!.issues.map((issue, idx) => (
-                                                <div
-                                                    key={issue.key}
-                                                    data-testid={`discharge-rule-issue-${idx}`}
-                                                    className={`rounded-xl border p-4 ${
-                                                        issue.severity === 'critical'
-                                                            ? 'border-red-500/20 bg-red-500/10'
-                                                            : issue.severity === 'warning'
-                                                                ? 'border-orange-500/20 bg-orange-500/10'
-                                                                : 'border-amber-200 bg-amber-50'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <p className="text-sm font-bold text-[var(--foreground)]">{issue.title}</p>
-                                                        <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{issue.severity}</span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs font-medium text-[var(--toss-gray-5)] leading-relaxed">{issue.detail}</p>
-                                                    <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{issue.basis}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {false && selectedRuleAnalysis && (
-                            <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4" data-testid="discharge-rule-analysis">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                                        <span className="text-lg">📚</span>
-                                        규정 기반 점검
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">
-                                        PDF 기반
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
-                                        <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
-                                    </div>
-                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
-                                        <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
-                                    </div>
-                                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-                                        <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
-                                        <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
-                                    </div>
-                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
-                                        <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
-                                    </div>
-                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
-                                        <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 체크리스트</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {selectedRuleAnalysis!.checklist.map((item) => (
-                                            <div
-                                                key={item.key}
-                                                className={`rounded-xl border p-3 ${
-                                                    item.status === 'critical'
-                                                        ? 'border-red-500/20 bg-red-500/10'
-                                                        : item.status === 'warning'
-                                                            ? 'border-orange-500/20 bg-orange-500/10'
-                                                            : item.status === 'review'
-                                                                ? 'border-amber-200 bg-amber-50'
-                                                                : 'border-green-500/20 bg-green-500/10'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-xs font-bold text-[var(--foreground)]">{item.label}</p>
-                                                    <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{item.status}</span>
-                                                </div>
-                                                <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-5)] leading-relaxed">{item.detail}</p>
-                                                <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{item.basis}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
-                                    {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
-                                            현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {selectedRuleAnalysis!.issues.map((issue, idx) => (
-                                                <div
-                                                    key={issue.key}
-                                                    data-testid={`discharge-rule-issue-${idx}`}
-                                                    className={`rounded-xl border p-4 ${
-                                                        issue.severity === 'critical'
-                                                            ? 'border-red-500/20 bg-red-500/10'
-                                                            : issue.severity === 'warning'
-                                                                ? 'border-orange-500/20 bg-orange-500/10'
-                                                                : 'border-amber-200 bg-amber-50'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <p className="text-sm font-bold text-[var(--foreground)]">{issue.title}</p>
-                                                        <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{issue.severity}</span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs font-medium text-[var(--toss-gray-5)] leading-relaxed">{issue.detail}</p>
-                                                    <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{issue.basis}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {false && selectedRuleAnalysis && (
-                            <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4" data-testid="discharge-rule-analysis">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">📚</span> 규정 기반 점검</h3>
-                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-500/10 px-2 py-1 rounded-lg">PDF 기반</span>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-red-600" data-testid="discharge-rule-critical-count">{selectedRuleAnalysis!.summary.critical}</p>
-                                        <p className="text-[10px] font-bold text-red-500 mt-1">Critical</p>
-                                    </div>
-                                    <div className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-orange-600">{selectedRuleAnalysis!.summary.warning}</p>
-                                        <p className="text-[10px] font-bold text-orange-500 mt-1">Warning</p>
-                                    </div>
-                                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-                                        <p className="text-lg font-bold text-amber-600">{selectedRuleAnalysis!.summary.review}</p>
-                                        <p className="text-[10px] font-bold text-amber-500 mt-1">Review</p>
-                                    </div>
-                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-blue-600">{selectedRuleAnalysis!.summary.missing}</p>
-                                        <p className="text-[10px] font-bold text-blue-500 mt-1">누락</p>
-                                    </div>
-                                    <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3 text-center">
-                                        <p className="text-lg font-bold text-purple-600">{selectedRuleAnalysis!.summary.overuse}</p>
-                                        <p className="text-[10px] font-bold text-purple-500 mt-1">과잉 후보</p>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 체크리스트</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                        {selectedRuleAnalysis!.checklist.map((item) => (
-                                            <div
-                                                key={item.key}
-                                                className={`rounded-xl border p-3 ${item.status === 'critical' ? 'border-red-500/20 bg-red-500/10' : item.status === 'warning' ? 'border-orange-500/20 bg-orange-500/10' : item.status === 'review' ? 'border-amber-200 bg-amber-50' : 'border-green-500/20 bg-green-500/10'}`}
-                                            >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-xs font-bold text-[var(--foreground)]">{item.label}</p>
-                                                    <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{item.status}</span>
-                                                </div>
-                                                <p className="mt-1 text-[11px] font-medium text-[var(--toss-gray-5)] leading-relaxed">{item.detail}</p>
-                                                <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{item.basis}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">규정 경고</p>
-                                    {selectedRuleAnalysis!.issues.length === 0 ? (
-                                        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-4 text-sm font-bold text-green-700">
-                                            현재 규칙 기준으로 뚜렷한 경고는 감지되지 않았습니다.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {selectedRuleAnalysis!.issues.map((issue, idx) => (
-                                                <div
-                                                    key={issue.key}
-                                                    data-testid={`discharge-rule-issue-${idx}`}
-                                                    className={`rounded-xl border p-4 ${issue.severity === 'critical' ? 'border-red-500/20 bg-red-500/10' : issue.severity === 'warning' ? 'border-orange-500/20 bg-orange-500/10' : 'border-amber-200 bg-amber-50'}`}
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <p className="text-sm font-bold text-[var(--foreground)]">{issue.title}</p>
-                                                        <span className="text-[10px] font-bold uppercase text-[var(--toss-gray-3)]">{issue.severity}</span>
-                                                    </div>
-                                                    <p className="mt-1 text-xs font-medium text-[var(--toss-gray-5)] leading-relaxed">{issue.detail}</p>
-                                                    <p className="mt-2 text-[10px] font-medium text-[var(--toss-gray-3)]">{issue.basis}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
+                        <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] p-4 shadow-xs space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-[var(--foreground)]">📋 항목 템플릿 목록 ({templates.length}개)</h3>
-                                <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--card)] bg-[var(--foreground)] rounded-xl hover:opacity-90 transition-all">➕ 새 템플릿 추가</button>
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">항목 템플릿 목록 <span className="text-[var(--toss-gray-3)] font-medium">({templates.length}개)</span></h3>
+                                <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-3 py-1.5 text-xs font-bold text-white bg-[var(--accent)] rounded-[var(--radius-md)] hover:opacity-90 transition-all">새 템플릿</button>
                             </div>
                             <p className="text-xs text-[var(--toss-gray-3)] font-medium">진단명/입원사유별로 기본 항목 템플릿을 만들어 두면, 심사 시 드롭다운으로 선택할 수 있습니다.</p>
 
@@ -878,23 +619,30 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="text-center py-10 space-y-3">
                                     <div className="text-4xl opacity-30">📋</div>
                                     <p className="text-sm text-[var(--toss-gray-3)] font-medium">아직 등록된 템플릿이 없습니다.</p>
-                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--accent)] bg-blue-500/10 rounded-xl hover:bg-blue-500/20">첫 번째 템플릿 만들기</button>
+                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20">첫 번째 템플릿 만들기</button>
                                 </div>
                             )}
 
-                            <div className="space-y-2">
-                                {templates.map(t => (
-                                    <div key={t.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${editTmplId === t.id ? 'border-[var(--accent)] bg-blue-500/10/30' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--border)]'}`}>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-bold text-[var(--foreground)]">{t.title}</h4>
-                                            <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5">{parseChartData(t.data).length}개 항목</p>
+                            {/* 카드 그리드 — 2~3열 */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {templates.map(t => {
+                                    const itemCount = parseChartData(t.data).length;
+                                    return (
+                                        <div
+                                            key={t.id}
+                                            className={`flex flex-col gap-2 p-4 rounded-[var(--radius-lg)] border transition-all ${editTmplId === t.id ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--accent)]/40 hover:shadow-xs'}`}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-[var(--foreground)] line-clamp-2 leading-snug">{t.title}</h4>
+                                                <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-1">{itemCount}개 항목</p>
+                                            </div>
+                                            <div className="flex gap-1 pt-1 border-t border-[var(--border)]">
+                                                <button onClick={() => startEditTemplate(t)} className="flex-1 py-1 text-[11px] font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-all">수정</button>
+                                                <button onClick={() => deleteTemplate(t.id)} className="flex-1 py-1 text-[11px] font-bold text-[var(--danger,#EF4444)] bg-[var(--danger,#EF4444)]/10 rounded-[var(--radius-md)] hover:bg-[var(--danger,#EF4444)]/20 transition-all">삭제</button>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1 shrink-0">
-                                            <button onClick={() => startEditTemplate(t)} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-500/10 rounded-lg hover:bg-blue-500/20">수정</button>
-                                            <button onClick={() => deleteTemplate(t.id)} className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-500/10 rounded-lg hover:bg-red-500/20">삭제</button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -1135,6 +883,37 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 {/* ===== 심사 목록 ===== */}
                 {tab === 'reviews' && !selectedReview && (
                     <div className="max-w-3xl mx-auto space-y-4">
+                        {/* KPI 카드 4개 — reviews state 파생, 새 state 없음 */}
+                        {!loading && reviews.length > 0 && (() => {
+                            const today = new Date().toISOString().split('T')[0];
+                            const inProgress = reviews.filter(r => r.status !== 'approved').length;
+                            const approved = reviews.filter(r => r.status === 'approved').length;
+                            const avgProgress = reviews.length > 0
+                                ? Math.round(reviews.reduce((sum, r) => sum + (r.items.length > 0 ? (r.items.filter(i => i.checked).length / r.items.length) * 100 : 0), 0) / reviews.length)
+                                : 0;
+                            const todayNew = reviews.filter(r => r.created_at && r.created_at.startsWith(today)).length;
+                            return (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3 text-center">
+                                        <p className="text-xl font-bold text-[var(--warning,#F59E0B)]">{inProgress}</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">진행 중</p>
+                                    </div>
+                                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3 text-center">
+                                        <p className="text-xl font-bold text-[var(--success,#10B981)]">{approved}</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">완료</p>
+                                    </div>
+                                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3 text-center">
+                                        <p className="text-xl font-bold text-[var(--accent)]">{avgProgress}%</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">평균 진행률</p>
+                                    </div>
+                                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3 text-center">
+                                        <p className="text-xl font-bold text-[var(--foreground)]">{todayNew}</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">오늘 신규</p>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         {loading ? (
                             <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-[var(--border-subtle)] border-t-[var(--accent)] rounded-full animate-spin" /></div>
                         ) : reviews.length === 0 ? (

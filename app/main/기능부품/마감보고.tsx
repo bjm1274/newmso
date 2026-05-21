@@ -404,34 +404,66 @@ export default function DailyClosurePage({
             <div className="rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] font-bold text-amber-800">
                 Chart 프로그램으로 이관 예정인 모듈입니다.
             </div>
-            <div className="flex justify-end items-center">
+
+            {/* 상단 컨트롤 바 */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* 좌측: 전체회사 열람 안내 */}
                 {canReadAcrossCompanies ? (
                     <p
                         data-testid="daily-closure-all-company-note"
-                        className="mr-auto text-[11px] font-semibold text-[var(--accent)]"
+                        className="text-[11px] font-semibold text-[var(--accent)]"
                     >
                         SY INC. 이사 권한으로 전체 회사 마감보고를 열람 중입니다.
                     </p>
-                ) : null}
+                ) : <span />}
+
+                {/* 우측: 2-segmented + 새 마감 작성 버튼 */}
                 {canReadClosures ? (
-                    <button
-                        data-testid="daily-closure-toggle-view"
-                        onClick={() => {
-                            if (view === 'list') {
+                    <div className="flex items-center gap-2">
+                        {/* 2-segmented 컨트롤 */}
+                        <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden bg-[var(--muted)]">
+                            <button
+                                type="button"
+                                data-testid="daily-closure-toggle-view"
+                                onClick={() => setView('list')}
+                                className={`px-3 py-1.5 text-xs font-bold transition-all ${
+                                    view === 'list'
+                                        ? 'bg-[var(--accent)] text-white'
+                                        : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                                }`}
+                            >
+                                마감 목록
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setView('form')}
+                                className={`px-3 py-1.5 text-xs font-bold transition-all ${
+                                    view === 'form'
+                                        ? 'bg-[var(--accent)] text-white'
+                                        : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                                }`}
+                            >
+                                새 마감 작성
+                            </button>
+                        </div>
+                        {/* 우측 primary 버튼 */}
+                        <button
+                            type="button"
+                            onClick={() => {
                                 setEditingCompanyId(null);
                                 setActiveClosure(null);
                                 resetFormFields();
-                            }
-                            setView(view === 'list' ? 'form' : 'list');
-                        }}
-                        className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--foreground)] text-[var(--card)] shadow-sm hover:opacity-90 transition-all"
-                    >
-                        {view === 'list' ? '➕ 새 마감 작성' : '📋 마감 목록 보기'}
-                    </button>
+                                setView('form');
+                            }}
+                            className="px-4 py-1.5 text-xs font-bold rounded-[var(--radius-md)] bg-[var(--accent)] text-white shadow-sm hover:opacity-90 transition-all"
+                        >
+                            새 마감 작성
+                        </button>
+                    </div>
                 ) : (
                     <div
                         data-testid="daily-closure-read-restricted-note"
-                        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]"
                     >
                         마감보고 권한 또는 관리자 권한이 필요합니다.
                     </div>
@@ -439,57 +471,71 @@ export default function DailyClosurePage({
             </div>
 
             {view === 'list' ? (
-                <div className="grid gap-4" data-testid="daily-closure-list">
+                <div data-testid="daily-closure-list">
                     {loading ? (
-                        <div className="text-center py-20 text-[var(--toss-gray-3)]">로딩 중...</div>
+                        <div className="text-center py-20 text-[var(--toss-gray-3)] text-sm">로딩 중...</div>
                     ) : closures.length === 0 ? (
-                        <div className="text-center py-20 border-2 border-dashed border-[var(--border)] rounded-2xl text-[var(--toss-gray-3)] font-medium">
+                        <div className="empty-state py-20">
                             등록된 마감 보고가 없습니다.
                         </div>
                     ) : (
-                        closures.map(c => (
-                            <div
-                                key={c.id}
-                                data-testid={`daily-closure-card-${c.id}`}
-                                className="p-5 bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-sm flex justify-between items-center gap-4"
-                            >
-                                <div>
+                        /* 5열 테이블: 날짜 / 총 수납액 / 상태 칩 / 작성자 / 액션 */
+                        <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden shadow-sm">
+                            {/* 헤더 */}
+                            <div className="grid grid-cols-[1fr_1fr_auto_1fr_auto] gap-x-4 px-4 py-2.5 bg-[var(--muted)] border-b border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">
+                                <span>날짜</span>
+                                <span>총 수납액</span>
+                                <span>상태</span>
+                                <span>작성자</span>
+                                {canEditClosures ? <span className="text-right">액션</span> : <span />}
+                            </div>
+                            {/* 행 */}
+                            {closures.map(c => (
+                                <div
+                                    key={c.id}
+                                    data-testid={`daily-closure-card-${c.id}`}
+                                    className="grid grid-cols-[1fr_1fr_auto_1fr_auto] gap-x-4 items-center px-4 py-3 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--muted)] transition-colors"
+                                >
+                                    {/* 날짜 */}
                                     <p className="text-sm font-bold text-[var(--foreground)]">{c.date}</p>
-                                    <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">총 수납액: {c.total_amount.toLocaleString()}원</p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-green-500/10 text-green-700">마감완료</span>
-                                    <p data-testid={`daily-closure-author-${c.id}`} className="text-[10px] text-[var(--toss-gray-3)] mt-2">
-                                        작성자: {getAuthorName(c)}
+                                    {/* 총 수납액 */}
+                                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                                        {c.total_amount.toLocaleString()}원
                                     </p>
+                                    {/* 상태 칩 */}
+                                    <span className="badge badge-green whitespace-nowrap">마감완료</span>
+                                    {/* 작성자 */}
+                                    <p
+                                        data-testid={`daily-closure-author-${c.id}`}
+                                        className="text-xs text-[var(--toss-gray-3)] truncate"
+                                    >
+                                        {getAuthorName(c)}
+                                    </p>
+                                    {/* 액션 */}
                                     {canEditClosures ? (
-                                        <div className="mt-2 flex items-center justify-end gap-3">
+                                        <div className="flex items-center justify-end gap-3">
                                             <button
                                                 type="button"
                                                 data-testid={`daily-closure-edit-${c.id}`}
-                                                onClick={() => {
-                                                    void openClosureForEdit(c);
-                                                }}
-                                                className="text-[11px] font-bold text-[var(--accent)] hover:underline"
+                                                onClick={() => { void openClosureForEdit(c); }}
+                                                className="text-xs font-bold text-[var(--accent)] hover:underline focus-visible:outline-[var(--accent)]"
                                             >
                                                 수정
                                             </button>
                                             <button
                                                 type="button"
                                                 data-testid={`daily-closure-delete-${c.id}`}
-                                                onClick={() => {
-                                                    void deleteClosure(c);
-                                                }}
-                                                className="text-[11px] font-bold text-red-500 hover:underline disabled:opacity-50"
+                                                onClick={() => { void deleteClosure(c); }}
                                                 disabled={loading}
+                                                className="text-xs font-bold text-[var(--danger,#ef4444)] hover:underline disabled:opacity-50 focus-visible:outline-[var(--danger,#ef4444)]"
                                             >
                                                 삭제
                                             </button>
                                         </div>
-                                    ) : null}
+                                    ) : <span />}
                                 </div>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     )}
                 </div>
             ) : (
@@ -497,9 +543,9 @@ export default function DailyClosurePage({
                     {activeClosure ? (
                         <div
                             data-testid="daily-closure-date-status"
-                            className={`rounded-2xl border p-4 text-sm font-semibold ${
+                            className={`rounded-[var(--radius-lg)] border p-4 text-sm font-semibold ${
                                 isOwnActiveClosure
-                                    ? 'border-blue-100 bg-blue-50 text-blue-700'
+                                    ? 'border-[var(--accent-light,#dbeafe)] bg-[var(--accent-light,#eff6ff)] text-[var(--accent)]'
                                     : 'border-amber-200 bg-amber-50 text-amber-700'
                             }`}
                         >
@@ -511,39 +557,57 @@ export default function DailyClosurePage({
                         </div>
                     ) : null}
 
-                    {/* 기본 정보 */}
-                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 기본 정보 — 3-col 필수 입력 */}
+                    <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase">마감 일자 *</label>
-                            <SmartDatePicker value={selectedDate} onChange={setSelectedDate} data-testid="daily-closure-date" className="w-full h-11 px-4 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium" />
+                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
+                                마감 일자 <span className="text-[var(--accent)]">*</span>
+                            </label>
+                            <SmartDatePicker
+                                value={selectedDate}
+                                onChange={setSelectedDate}
+                                data-testid="daily-closure-date"
+                                className="w-full h-10 px-3 bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                            />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase">기초 시재 (전일 이월) *</label>
+                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
+                                기초 시재 (전일 이월) <span className="text-[var(--accent)]">*</span>
+                            </label>
                             <input
                                 data-testid="daily-closure-petty-cash-start"
                                 type="number"
                                 value={pettyCashStart}
                                 onChange={e => setPettyCashStart(Number(e.target.value))}
-                                className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-100"
+                                className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase">기말 시재 (마감 시재) *</label>
+                            <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
+                                기말 시재 (마감 시재) <span className="text-[var(--accent)]">*</span>
+                            </label>
                             <input
                                 data-testid="daily-closure-petty-cash-end"
                                 type="number"
                                 value={pettyCashEnd}
                                 onChange={e => setPettyCashEnd(Number(e.target.value))}
-                                className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-100"
+                                className="w-full px-3 py-2.5 bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
                             />
                         </div>
                     </div>
 
                     {/* 수납 상세 */}
-                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-bold text-[var(--foreground)]">📊 수납 내역 상세</h3>
-                            <button data-testid="daily-closure-add-item" onClick={addItem} className="px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700">➕ 항목 추가</button>
+                    <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] p-4 shadow-sm space-y-3">
+                        <div className="section-header">
+                            <h3 className="section-title">수납 내역 상세</h3>
+                            <button
+                                type="button"
+                                data-testid="daily-closure-add-item"
+                                onClick={addItem}
+                                className="px-3 py-1.5 text-[11px] font-bold text-white bg-[var(--accent)] rounded-[var(--radius-md)] hover:opacity-90 transition-opacity focus-visible:outline-[var(--accent)]"
+                            >
+                                항목 추가
+                            </button>
                         </div>
                         <ClosureItemsGrid
                             items={items}
@@ -553,18 +617,32 @@ export default function DailyClosurePage({
                     </div>
 
                     {/* 수표 조회/기록 */}
-                    <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-bold text-[var(--foreground)]">🏴 수표 및 자기앞수표 기록</h3>
+                    <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] p-4 shadow-sm space-y-3">
+                        <div className="section-header">
+                            <h3 className="section-title">수표 및 자기앞수표 기록</h3>
                             <div className="flex gap-2">
-                                <a href="https://www.giro.or.kr/check/check_01.do" target="_blank" className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] bg-[var(--tab-bg)] rounded-lg hover:bg-[var(--tab-bg)]">기로 수표조회 가기 ↗</a>
-                                <button data-testid="daily-closure-add-check" onClick={addCheck} className="px-3 py-1.5 text-[11px] font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700">➕ 수표 추가</button>
+                                <a
+                                    href="https://www.giro.or.kr/check/check_01.do"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--card)] transition-colors"
+                                >
+                                    기로 수표조회 ↗
+                                </a>
+                                <button
+                                    type="button"
+                                    data-testid="daily-closure-add-check"
+                                    onClick={addCheck}
+                                    className="px-3 py-1.5 text-[11px] font-bold text-white bg-[var(--accent)] rounded-[var(--radius-md)] hover:opacity-90 transition-opacity focus-visible:outline-[var(--accent)]"
+                                >
+                                    수표 추가
+                                </button>
                             </div>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {checks.map((check, idx) => (
-                                <div key={idx} className="p-3 sm:p-4 bg-[var(--tab-bg)] rounded-xl relative group">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                <div key={idx} className="p-3 sm:p-4 bg-[var(--muted)] rounded-[var(--radius-md)] relative group border border-[var(--border)]">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-[var(--toss-gray-3)]">수표번호</label>
                                             <input
@@ -575,7 +653,7 @@ export default function DailyClosurePage({
                                                     newChecks[idx].check_number = e.target.value;
                                                     setChecks(newChecks);
                                                 }}
-                                                className="w-full bg-transparent outline-none text-sm font-mono font-bold"
+                                                className="w-full bg-transparent outline-none text-sm font-mono font-bold text-[var(--foreground)] focus:underline"
                                                 placeholder="00000000"
                                             />
                                         </div>
@@ -589,47 +667,56 @@ export default function DailyClosurePage({
                                                     newChecks[idx].amount = Number(e.target.value);
                                                     setChecks(newChecks);
                                                 }}
-                                                className="w-full bg-transparent outline-none text-sm font-bold text-purple-600"
+                                                className="w-full bg-transparent outline-none text-sm font-bold text-[var(--accent)] focus:underline"
                                             />
                                         </div>
                                     </div>
-                                    <button onClick={() => removeCheck(idx)} className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-red-400 opacity-60 transition-all hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100" aria-label="수표 삭제">✕</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeCheck(idx)}
+                                        className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-[var(--radius-md)] text-[var(--danger,#ef4444)] opacity-60 transition-all hover:bg-red-500/10 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
+                                        aria-label="수표 삭제"
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* 요약 및 저장 */}
-                    <div className="bg-[var(--foreground)] rounded-2xl p-5 text-[var(--card)] shadow-sm space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-white/10 pb-8">
+                    {/* 요약 다크 카드 */}
+                    <div className="bg-[var(--foreground)] rounded-[var(--radius-lg)] p-5 text-[var(--card)] shadow-sm space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-white/10 pb-5">
                             <div>
-                                <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2 uppercase tracking-wider">오늘 총 수납금액</p>
+                                <p className="text-[10px] font-bold text-white/50 mb-1.5 uppercase tracking-wider">오늘 총 수납금액</p>
                                 <p className="text-2xl sm:text-3xl font-black">{totalCalculated.toLocaleString()}원</p>
                             </div>
                             <div className="sm:text-right">
-                                <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2 uppercase tracking-wider">정산 오차 (현금)</p>
-                                <p className={`text-2xl sm:text-3xl font-black ${balance === 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <p className="text-[10px] font-bold text-white/50 mb-1.5 uppercase tracking-wider">정산 오차 (현금)</p>
+                                <p className={`text-2xl sm:text-3xl font-black ${balance === 0 ? 'text-[var(--success,#22c55e)]' : 'text-[var(--danger,#ef4444)]'}`}>
                                     {balance === 0 ? '정상' : `${balance > 0 ? '+' : ''}${balance.toLocaleString()}원`}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">마감 총평 및 특이사항</label>
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-white/50 uppercase tracking-wider">마감 총평 및 특이사항</label>
                             <textarea
                                 data-testid="daily-closure-memo"
                                 value={memo}
                                 onChange={e => setMemo(e.target.value)}
-                                className="w-full bg-[var(--card)]/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:ring-2 focus:ring-white/20 h-24 resize-none"
+                                className="w-full bg-white/5 border border-white/10 rounded-[var(--radius-md)] p-3 text-sm text-white outline-none focus:ring-2 focus:ring-white/20 h-24 resize-none placeholder:text-white/30"
                                 placeholder="당일 특이사항을 입력하세요..."
                             />
                         </div>
 
+                        {/* 풀폭 다크 저장 버튼 */}
                         <button
+                            type="button"
                             data-testid="daily-closure-save"
                             onClick={saveClosure}
                             disabled={loading || !canEditSelectedDateClosure}
-                            className="w-full py-4 bg-[var(--card)] text-[var(--foreground)] text-sm font-black rounded-2xl hover:bg-[var(--tab-bg)] transition-all active:scale-[0.98] disabled:opacity-50"
+                            className="w-full py-4 bg-[var(--accent)] text-white text-sm font-black rounded-[var(--radius-lg)] hover:opacity-90 transition-all active:scale-[0.99] disabled:opacity-40 focus-visible:outline-white"
                         >
                             {loading ? '저장 중...' : activeClosure ? '마감보고 수정 저장' : '오늘 업무 마감 및 보고 저장'}
                         </button>
@@ -638,11 +725,9 @@ export default function DailyClosurePage({
                             <button
                                 type="button"
                                 data-testid="daily-closure-delete-active"
-                                onClick={() => {
-                                    void deleteClosure(activeClosure);
-                                }}
+                                onClick={() => { void deleteClosure(activeClosure); }}
                                 disabled={loading}
-                                className="w-full py-3 border border-red-200 bg-red-50 text-sm font-bold text-red-600 rounded-2xl hover:bg-red-100 transition-all disabled:opacity-50"
+                                className="w-full py-3 border border-red-400/30 bg-red-500/10 text-sm font-bold text-[var(--danger,#ef4444)] rounded-[var(--radius-lg)] hover:bg-red-500/20 transition-all disabled:opacity-50 focus-visible:outline-[var(--danger,#ef4444)]"
                             >
                                 {loading ? '처리 중...' : '현재 마감보고 삭제'}
                             </button>

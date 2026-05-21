@@ -14,7 +14,10 @@ import {
   getItemSetting,
   calcMinStock,
 } from './dept-week-settings';
-import { DeptInventoryRow, type DeptInventoryMode } from './DeptInventoryRow';
+import { type DeptInventoryMode } from './DeptInventoryRow';
+import PurchaseOrderModal, { type OrderDraftItem, type SupplierGroup } from './PurchaseOrderModal';
+import DeptTransferHistory from './DeptTransferHistory';
+import DeptInventoryTable from './DeptInventoryTable';
 
 // ---- 타입 정의 ----
 interface InventoryItem {
@@ -28,6 +31,8 @@ interface InventoryItem {
   min_quantity?: number;
   department?: string;
   company?: string;
+  supplier_name?: string;
+  unit_price?: number;
   [key: string]: unknown;
 }
 
@@ -54,9 +59,24 @@ interface TransferRecord {
   status?: string;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
+// ---- MSO 본사 판별 헬퍼 ----
+function isMsoHq(company: string, department: string): boolean {
+  const co = company.toLowerCase();
+  const dept = department.toLowerCase();
+  return (
+    co.includes('본사') || co.includes('sy') || co.includes('mso') ||
+    dept.includes('본사') || dept.includes('mso')
+  );
+}
+
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(부서별물품장비현황)은 그대로 유지됩니다.
-export default function DepartmentAssetOverview({ user, inventory: inventoryProp }: { user: { department?: string; company?: string } | null; inventory?: InventoryItem[] }) {
+export default function DepartmentAssetOverview({ user, inventory: inventoryProp }: { user: { department?: string; company?: string; id?: string } | null; inventory?: InventoryItem[] }) {
   const { dialog, openConfirm } = useActionDialog();
   const [assetLoans, setAssetLoans] = useState<AssetLoan[]>([]);
   const [inventoryFetched, setInventoryFetched] = useState<InventoryItem[]>([]);
@@ -67,6 +87,12 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   const [inventoryMode, setInventoryMode] = useState<DeptInventoryMode>('view');
   const [deptWeekSettings, setDeptWeekSettings] = useState<DeptWeekSettings>({});
   const { data: appData } = useAppData();
+
+  // ---- 발주서 모달 state (MSO 본사 전용) ----
+  const [orderDraft, setOrderDraft] = useState<OrderDraftItem[]>([]);
+  const [supplierGroups, setSupplierGroups] = useState<SupplierGroup[]>([]);
+  const [supplierList, setSupplierList] = useState<Supplier[]>([]);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const inventory = (inventoryProp?.length ? inventoryProp : inventoryFetched) || [];
 
@@ -161,12 +187,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         normal += 1;
       }
     }
-    return {
-      total: deptItems.length,
-      needOrder,
-      normal,
-      msoPending,
-    };
+    return { total: deptItems.length, needOrder, normal, msoPending };
   }, [deptItems, deptWeekSettings]);
 
   // 우리 부서 장비: 미반납 대여 중 직원의 부서가 우리 부서인 것
@@ -176,12 +197,9 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     const toDept = String(transfer.to_department || '').trim();
     const fromCompany = String(transfer.from_company || '').trim();
     const toCompany = String(transfer.to_company || '').trim();
-    const companyMatches =
-      !myCompany || fromCompany === myCompany || toCompany === myCompany;
-
+    const companyMatches = !myCompany || fromCompany === myCompany || toCompany === myCompany;
     if (!companyMatches) return false;
     if (!effectiveDept) return true;
-
     return fromDept === effectiveDept || toDept === effectiveDept;
   }).slice(0, 12);
 
@@ -228,13 +246,92 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
     { key: 'asset_type', label: '장비 종류', primary: true },
     { key: 'asset_name', label: '장비명', render: (r) => r.asset_name ?? '-' },
     { key: 'staff', label: '사용자', render: (r) => r.staff?.name ?? '-' },
-    {
-      key: 'loaned_at',
-      label: '대여일',
-      showOnMobile: false,
-      render: (r) => r.loaned_at,
-    },
+    { key: 'loaned_at', label: '대여일', showOnMobile: false, render: (r) => r.loaned_at },
   ], []);
+
+  // ---- 부족 품목 목록 (발주 대상) ----
+  const shortfallItems = useMemo(() => deptItems.filter((item) => {
+    const qty = getItemQuantity(item as Parameters<typeof getItemQuantity>[0]);
+    const setting = getItemSetting(deptWeekSettings, String(item.id));
+    return qty < calcMinStock(setting);
+  }), [deptItems, deptWeekSettings]);
+
+  // ---- MSO 본사 여부 ----
+  const isHq = isMsoHq(myCompany, effectiveDept);
+
+  // DeptInventoryTable에 전달할 정규화된 품목 목록
+  const displayItems = useMemo(() => deptItems.map((item) => ({
+    id: String(item.id),
+    name: item.name ?? item.item_name ?? '-',
+    category: item.category ?? '-',
+    quantity: getItemQuantity(item as Parameters<typeof getItemQuantity>[0]),
+    setting: getItemSetting(deptWeekSettings, String(item.id)),
+    recommendedQty: getRecommendedOrderQuantity(item as Parameters<typeof getRecommendedOrderQuantity>[0]),
+  })), [deptItems, deptWeekSettings]);
+
+  // ---- 발주서 초안에 품목 추가 (MSO 본사 전용 행 액션) ----
+  const handleAddToOrderDraft = useCallback((item: InventoryItem) => {
+    const qty = getRecommendedOrderQuantity(item as Parameters<typeof getRecommendedOrderQuantity>[0]);
+    const supplierName = String(item.supplier_name || '').trim() || '미지정';
+    const unitPrice = Number(item.unit_price || 0);
+    setOrderDraft((prev) => {
+      const exists = prev.find((d) => d.itemId === String(item.id));
+      if (exists) return prev.map((d) => d.itemId === String(item.id) ? { ...d, qty: d.qty + qty } : d);
+      return [...prev, {
+        itemId: String(item.id),
+        name: item.name ?? item.item_name ?? '-',
+        qty,
+        unitPrice,
+        currentStock: getItemQuantity(item as Parameters<typeof getItemQuantity>[0]),
+        supplierName,
+        supplierId: null,
+      }];
+    });
+  }, []);
+
+  // ---- 부족 품목 전체 발주서 초안 생성 (일괄 버튼) ----
+  const handleBulkAddToOrderDraft = useCallback(async () => {
+    if (shortfallItems.length === 0) {
+      toast('발주가 필요한 품목이 없습니다.', 'warning');
+      return;
+    }
+    let loadedSuppliers = supplierList;
+    if (loadedSuppliers.length === 0) {
+      const { data } = await supabase.from('suppliers').select('id, name').order('name');
+      loadedSuppliers = (data as Supplier[]) || [];
+      setSupplierList(loadedSuppliers);
+    }
+    const supplierMap = new Map(loadedSuppliers.map((s) => [s.name.toLowerCase(), s]));
+
+    const draft: OrderDraftItem[] = shortfallItems.map((item) => {
+      const qty = getRecommendedOrderQuantity(item as Parameters<typeof getRecommendedOrderQuantity>[0]);
+      const rawSupplierName = String(item.supplier_name || '').trim();
+      const matched = rawSupplierName ? supplierMap.get(rawSupplierName.toLowerCase()) : undefined;
+      return {
+        itemId: String(item.id),
+        name: item.name ?? item.item_name ?? '-',
+        qty,
+        unitPrice: Number(item.unit_price || 0),
+        currentStock: getItemQuantity(item as Parameters<typeof getItemQuantity>[0]),
+        supplierName: (matched?.name ?? rawSupplierName) || '미지정',
+        supplierId: matched?.id ?? null,
+      };
+    });
+
+    // 거래처별 그룹핑
+    const groupMap = new Map<string, SupplierGroup>();
+    for (const d of draft) {
+      const key = d.supplierId ?? d.supplierName;
+      if (!groupMap.has(key)) {
+        groupMap.set(key, { supplierId: d.supplierId, supplierName: d.supplierName, memo: '', items: [], selected: true, sending: false });
+      }
+      groupMap.get(key)!.items.push(d);
+    }
+
+    setOrderDraft(draft);
+    setSupplierGroups(Array.from(groupMap.values()));
+    setShowOrderModal(true);
+  }, [shortfallItems, supplierList]);
 
   return (
     <div className="space-y-4">
@@ -290,6 +387,32 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
             </select>
           </>
         )}
+        {/* §5-2: MSO 본사 — 자동 발주 일괄 → 발주서 생성 버튼 */}
+        {isHq && inventoryMode === 'view' && shortfallItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { void handleBulkAddToOrderDraft(); }}
+            className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] shadow-sm hover:opacity-90 transition"
+          >
+            자동 발주 일괄 → 발주서 생성 ({shortfallItems.length})
+          </button>
+        )}
+        {/* §5-2: 일반 부서 — MSO 일괄 발주 요청 버튼 */}
+        {!isHq && inventoryMode === 'view' && shortfallItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              void (async () => {
+                for (const item of shortfallItems) {
+                  await handleQuickReorderByItem(item);
+                }
+              })();
+            }}
+            className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] shadow-sm hover:opacity-90 transition"
+          >
+            MSO 일괄 발주 요청 ({shortfallItems.length})
+          </button>
+        )}
       </div>
 
       {/* KPI 4종 */}
@@ -314,80 +437,30 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         </div>
       )}
 
+      {/* §5-1: amber 배너 제거 → 조용한 빈 상태 */}
       {!effectiveDept && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-lg)] text-sm text-amber-800 dark:text-amber-300">
-          부서가 지정되지 않은 경우 위에서 조회 부서를 선택하면 해당 부서의 물품·장비를 볼 수 있습니다.
-        </div>
+        <p className="text-sm text-[var(--toss-gray-3)] text-center py-6">
+          위에서 조회 부서를 선택하면 해당 부서의 물품·장비를 볼 수 있습니다.
+        </p>
       )}
 
       {/* 우리 부서 물품 — 주(week) 기반 최소재고 적용 */}
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-            📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
-          </h3>
-          {inventoryMode === 'setting' && (
-            <span className="text-[11px] text-[var(--toss-gray-3)]">
-              최소재고 = 주간 소비량 × 보유 기준(주) · 부서별 자동 저장
-            </span>
-          )}
-        </div>
-        {loading ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
-        ) : deptItems.length === 0 ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에 배정된 물품이 없습니다.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-wide text-[var(--toss-gray-3)]">
-                  <th className="px-3 py-2 text-left font-semibold">품목명</th>
-                  <th className="px-3 py-2 text-left font-semibold">분류</th>
-                  <th className="px-3 py-2 text-right font-semibold">잔여</th>
-                  {inventoryMode === 'setting' ? (
-                    <>
-                      <th className="px-3 py-2 text-right font-semibold">주간 소비</th>
-                      <th className="px-3 py-2 text-left font-semibold">보유 기준 (주)</th>
-                      <th className="px-3 py-2 text-right font-semibold">최소재고</th>
-                    </>
-                  ) : (
-                    <>
-                      <th className="px-3 py-2 text-right font-semibold">주간 소비</th>
-                      <th className="px-3 py-2 text-right font-semibold">최소재고</th>
-                      <th className="px-3 py-2 text-center font-semibold">상태</th>
-                      <th className="px-3 py-2 text-center font-semibold">빠른 작업</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {deptItems.map((item) => {
-                  const id = String(item.id);
-                  const setting = getItemSetting(deptWeekSettings, id);
-                  return (
-                    <DeptInventoryRow
-                      key={id}
-                      item={{
-                        id,
-                        name: item.name ?? item.item_name ?? '-',
-                        category: item.category ?? '-',
-                        quantity: getItemQuantity(item as Parameters<typeof getItemQuantity>[0]),
-                      }}
-                      mode={inventoryMode}
-                      setting={setting}
-                      ordering={orderingItemId === id}
-                      recommendedQty={getRecommendedOrderQuantity(item as Parameters<typeof getRecommendedOrderQuantity>[0])}
-                      onChangeWeeks={handleChangeWeeks}
-                      onChangeWeekly={handleChangeWeekly}
-                      onQuickReorder={handleQuickReorderById}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <DeptInventoryTable
+        loading={loading}
+        effectiveDept={effectiveDept}
+        inventoryMode={inventoryMode}
+        displayItems={displayItems}
+        orderingItemId={orderingItemId}
+        isHq={isHq}
+        orderDraft={orderDraft}
+        onChangeWeeks={handleChangeWeeks}
+        onChangeWeekly={handleChangeWeekly}
+        onQuickReorder={handleQuickReorderById}
+        onAddToOrderDraft={(itemId) => {
+          const target = deptItems.find((it) => String(it.id) === itemId);
+          if (target) handleAddToOrderDraft(target);
+        }}
+      />
 
       {/* 우리 부서 장비 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm">
@@ -406,46 +479,23 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         )}
       </div>
 
-      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
-          🔄 {effectiveDept ? `[${effectiveDept}] 최근 부서 이동 이력` : '최근 부서 이동 이력'}
-        </h3>
-        {loading ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
-        ) : deptTransfers.length === 0 ? (
-          <p className="text-[var(--toss-gray-3)] text-sm">표시할 이동 이력이 없습니다.</p>
-        ) : (
-          <div className="space-y-2">
-            {deptTransfers.map((transfer) => {
-              const fromLabel = [transfer.from_company, transfer.from_department].filter(Boolean).join(' · ') || '-';
-              const toLabel = [transfer.to_company, transfer.to_department].filter(Boolean).join(' · ') || '-';
-              return (
-                <div
-                  key={transfer.id}
-                  className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--page-bg)] px-4 py-3"
-                >
-                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-[var(--foreground)]">{transfer.item_name || '이동 품목'}</p>
-                      <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                        {fromLabel} → {toLabel}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--toss-gray-3)]">
-                      <span className="font-semibold text-[var(--foreground)]">{transfer.quantity || 0}개</span>
-                      <span>{transfer.transferred_by || '담당자 미기록'}</span>
-                      <span>{transfer.created_at ? new Date(transfer.created_at).toLocaleString('ko-KR') : '-'}</span>
-                      <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                        {transfer.status || '완료'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <DeptTransferHistory
+        transfers={deptTransfers}
+        loading={loading}
+        effectiveDept={effectiveDept}
+      />
+
+      {/* §5-3: 발주서 모달 (MSO 본사 전용) */}
+      {showOrderModal && (
+        <PurchaseOrderModal
+          supplierGroups={supplierGroups}
+          onGroupsChange={setSupplierGroups}
+          onDraftChange={setOrderDraft}
+          onClose={() => setShowOrderModal(false)}
+          userId={user?.id}
+          effectiveDept={effectiveDept || myDept}
+        />
+      )}
     </div>
   );
 }

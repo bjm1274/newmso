@@ -13,7 +13,7 @@ type ShiftLookupRecord,
 import { getStaffShifts, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
 import { getStaffLikeId,normalizeStaffLike,resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 import { useCallback,useEffect,useRef,useState } from 'react';
@@ -39,6 +39,25 @@ import { AttendanceCalendar,StatItem,TimeBox,WorkHoursChart } from './출퇴근�
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
+
+type WorkStatusCode = 'break' | 'lunch' | 'field' | null;
+type WorkStatusLabel = '근무중' | '휴게' | '점심' | '외근';
+
+const WORK_STATUS_LABEL_TO_CODE: Record<WorkStatusLabel, WorkStatusCode> = {
+  근무중: null,
+  휴게: 'break',
+  점심: 'lunch',
+  외근: 'field',
+};
+
+const WORK_STATUS_LABELS: WorkStatusLabel[] = ['근무중', '휴게', '점심', '외근'];
+
+function codeToLabel(code: string | null | undefined): WorkStatusLabel {
+  if (code === 'break') return '휴게';
+  if (code === 'lunch') return '점심';
+  if (code === 'field') return '외근';
+  return '근무중';
+}
 
 interface CommuteRecordProps {
   user?: Record<string, unknown>;
@@ -156,6 +175,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     checkOutTime: string;
     workedMinutes: number;
   } | null>(null);
+  const [currentWorkStatus, setCurrentWorkStatus] = useState<WorkStatusLabel>('근무중');
+  // statusChangeNotifiedRef: 컬럼 미존재 toast를 중복 방지용
+  const statusChangeNotifiedRef = useRef(false);
   const checkOutSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLocationRefreshAtRef = useRef<number>(0);
   const activeTodayLog =
@@ -333,6 +355,20 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (!effectiveUserId) return;
     void fetchTodayLog(currentDateKey);
   }, [effectiveUserId, currentDateKey]);
+
+  // activeTodayLog의 current_status로 로컬 상태 초기화
+  useEffect(() => {
+    if (!activeTodayLog || activeTodayLog.check_out) {
+      setCurrentWorkStatus('근무중');
+      return;
+    }
+    const raw = String((activeTodayLog as Record<string, unknown>)?.current_status ?? '');
+    setCurrentWorkStatus(codeToLabel(raw || null));
+  }, [
+    (activeTodayLog as Record<string, unknown> | null)?.id,
+    (activeTodayLog as Record<string, unknown> | null)?.current_status,
+    (activeTodayLog as Record<string, unknown> | null)?.check_out,
+  ]);
 
   const initCommuteData = async () => {
     setLoading(true);
@@ -694,6 +730,51 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     [effectiveUserId],
   );
 
+  const handleStatusChange = useCallback(
+    async (next: WorkStatusLabel) => {
+      const userId = effectiveUserId;
+      if (!userId || !activeTodayLog || activeTodayLog.check_out) return;
+      const workDate = String((activeTodayLog as Record<string, unknown>)?.date || '').slice(0, 10);
+      if (!workDate) return;
+
+      // 낙관적 업데이트
+      const previous = currentWorkStatus;
+      setCurrentWorkStatus(next);
+
+      const newCode = WORK_STATUS_LABEL_TO_CODE[next];
+      const now = new Date().toISOString();
+
+      try {
+        const { error } = await supabase
+          .from('attendances')
+          .update({
+            current_status: newCode,
+            current_status_at: now,
+          })
+          .eq('staff_id', userId)
+          .eq('work_date', workDate);
+
+        if (error) {
+          if (isMissingColumnError(error, 'current_status')) {
+            // 컬럼 미존재 — 1회만 안내 toast, 크래시 없이 낙관적 상태 유지
+            if (!statusChangeNotifiedRef.current) {
+              statusChangeNotifiedRef.current = true;
+              toast('상태 기능은 곧 활성화됩니다.', 'info');
+            }
+            return;
+          }
+          // 기타 에러 → 롤백
+          setCurrentWorkStatus(previous);
+          toast('상태 변경 중 오류가 발생했습니다.', 'error');
+        }
+      } catch {
+        setCurrentWorkStatus(previous);
+        toast('상태 변경 중 오류가 발생했습니다.', 'error');
+      }
+    },
+    [effectiveUserId, activeTodayLog, currentWorkStatus],
+  );
+
   const resolveLateThreshold = useCallback(
     async (workDate: string, fallbackDepartment?: string): Promise<ShiftBoundary> => {
       const userId = effectiveUserId;
@@ -946,28 +1027,66 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           </div>
         </div>
 
-        <div className="flex gap-3 z-10 shrink-0">
-          {!activeTodayLog && (
-            <button
-              data-testid="commute-check-in-button"
-              onClick={() => handleCommute('in')}
-              disabled={isProcessing}
-              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+        <div className="flex flex-col gap-3 z-10 shrink-0">
+          <div className="flex gap-3">
+            {!activeTodayLog && (
+              <button
+                data-testid="commute-check-in-button"
+                onClick={() => handleCommute('in')}
+                disabled={isProcessing}
+                className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기'}</span>
+                <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
+              </button>
+            )}
+            {((activeTodayLog && !activeTodayLog.check_out) || staleOpenLog) && (
+              <button
+                data-testid="commute-check-out-button"
+                onClick={() => handleCommute('out')}
+                disabled={isProcessing}
+                className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기'}</span>
+                <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
+              </button>
+            )}
+          </div>
+          {/* 근무 상태 토글 — 출근 중이고 아직 퇴근 안 한 경우만 표시 */}
+          {activeTodayLog && !activeTodayLog.check_out && (
+            <div
+              role="group"
+              aria-label="근무 상태 선택"
+              className="flex rounded-[var(--radius-md)] bg-white/10 p-0.5 gap-0.5"
             >
-              <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기'}</span>
-              <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
-            </button>
-          )}
-          {((activeTodayLog && !activeTodayLog.check_out) || staleOpenLog) && (
-            <button
-              data-testid="commute-check-out-button"
-              onClick={() => handleCommute('out')}
-              disabled={isProcessing}
-              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기'}</span>
-              <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
-            </button>
+              {WORK_STATUS_LABELS.map((label) => {
+                const isActive = currentWorkStatus === label;
+                const colorClass =
+                  label === '근무중'
+                    ? isActive
+                      ? 'bg-green-500 text-white'
+                      : 'text-white/60 hover:text-white/90'
+                    : label === '외근'
+                    ? isActive
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'text-white/60 hover:text-white/90'
+                    : isActive
+                    ? 'bg-amber-400 text-white'
+                    : 'text-white/60 hover:text-white/90';
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    data-testid={`work-status-toggle-${label}`}
+                    aria-pressed={isActive}
+                    onClick={() => { void handleStatusChange(label); }}
+                    className={`rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-bold transition-all ${colorClass}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

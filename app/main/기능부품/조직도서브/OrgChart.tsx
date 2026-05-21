@@ -77,14 +77,20 @@ const DEPARTMENT_ACCENTS = [
   'from-slate-500 to-slate-400',
 ];
 
-const DIVISION_STYLES = [
-  { headerClass: 'bg-blue-600 text-white', borderClass: 'border-blue-500/20', bgClass: 'bg-blue-500/10' },
-  { headerClass: 'bg-emerald-600 text-white', borderClass: 'border-emerald-200', bgClass: 'bg-emerald-50' },
-  { headerClass: 'bg-amber-500 text-white', borderClass: 'border-amber-200', bgClass: 'bg-amber-50' },
-  { headerClass: 'bg-violet-600 text-white', borderClass: 'border-violet-200', bgClass: 'bg-violet-50' },
-  { headerClass: 'bg-rose-500 text-white', borderClass: 'border-rose-200', bgClass: 'bg-rose-50' },
-  { headerClass: 'bg-[var(--muted)]0 text-white', borderClass: 'border-slate-200', bgClass: 'bg-[var(--muted)]' },
-];
+// 부서그룹 이름 기반 고정 색상 매핑 — 간호부=blue, 진료부=green, 총무부=orange, 기타=violet
+const DIVISION_STYLE_MAP = {
+  blue:   { headerClass: 'bg-blue-600 text-white',   borderClass: 'border-blue-200',   bgClass: 'bg-blue-50'   },
+  green:  { headerClass: 'bg-emerald-600 text-white', borderClass: 'border-emerald-200', bgClass: 'bg-emerald-50' },
+  orange: { headerClass: 'bg-orange-500 text-white',  borderClass: 'border-orange-200',  bgClass: 'bg-orange-50'  },
+  violet: { headerClass: 'bg-violet-600 text-white',  borderClass: 'border-violet-200',  bgClass: 'bg-violet-50'  },
+} as const;
+
+function getDivisionStyle(divisionName: string): typeof DIVISION_STYLE_MAP[keyof typeof DIVISION_STYLE_MAP] {
+  if (divisionName.includes('간호')) return DIVISION_STYLE_MAP.blue;
+  if (divisionName.includes('진료')) return DIVISION_STYLE_MAP.green;
+  if (divisionName.includes('총무')) return DIVISION_STYLE_MAP.orange;
+  return DIVISION_STYLE_MAP.violet;
+}
 
 const LEADER_KEYWORDS = [
   '대표이사', '이사장', '병원장', '대표원장', '부원장', '원장',
@@ -371,19 +377,18 @@ function buildDivisionsFromIndex(
   const assigned = new Set<string>();
   const result: DivisionGroup[] = [];
 
-  divisionOrder.forEach((divName, divIdx) => {
-    const style = DIVISION_STYLES[divIdx % DIVISION_STYLES.length];
+  divisionOrder.forEach((divName) => {
+    const style = getDivisionStyle(divName);
     const teamNames = divisionTeams.get(divName) ?? [];
     const divDepts = teamNames.map((t) => deptByName.get(t)).filter((d): d is DepartmentGroup => !!d);
     divDepts.forEach((d) => assigned.add(d.name));
     result.push({ name: divName, ...style, departments: divDepts });
   });
 
-  // org_teams에 없는 부서는 기타로
+  // org_teams에 없는 부서는 기타(violet)로
   const unassigned = departments.filter((d) => !assigned.has(d.name));
   if (unassigned.length > 0) {
-    const style = DIVISION_STYLES[result.length % DIVISION_STYLES.length];
-    result.push({ name: '기타', ...style, departments: unassigned });
+    result.push({ name: '기타', ...DIVISION_STYLE_MAP.violet, departments: unassigned });
   }
 
   return result;
@@ -426,7 +431,17 @@ function buildCompanyTree(
 
 // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────────
 
-function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember; size?: 'sm' | 'md' | 'lg'; isWorking?: boolean }) {
+function Avatar({
+  staff,
+  size = 'md',
+  isWorking = false,
+  presenceState,
+}: {
+  staff: StaffMember;
+  size?: 'sm' | 'md' | 'lg';
+  isWorking?: boolean;
+  presenceState?: PresenceState;
+}) {
   const sizeClass =
     size === 'lg' ? 'h-8 w-8 text-xs' : size === 'sm' ? 'h-6 w-6 text-[10px]' : 'h-7 w-7 text-[11px]';
   const palette = [
@@ -440,6 +455,18 @@ function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember;
   const name = normalizeText(staff.name) || '?';
   const color = palette[(name.charCodeAt(0) || 0) % palette.length];
   const photoUrl = getProfilePhotoUrl(staff);
+
+  // presenceState 우선, isWorking 폴백(하위호환)
+  const effectiveState: PresenceState | undefined =
+    presenceState ?? (isWorking ? 'working' : undefined);
+
+  const dotMeta =
+    effectiveState === 'working'
+      ? { cls: 'bg-emerald-500', label: '현재 근무중' }
+      : effectiveState === 'before_work'
+        ? { cls: 'bg-amber-400', label: '출근 전' }
+        : null;
+
   return (
     <div className="relative shrink-0">
       <div
@@ -456,10 +483,10 @@ function Avatar({ staff, size = 'md', isWorking = false }: { staff: StaffMember;
           name[0]
         )}
       </div>
-      {isWorking ? (
+      {dotMeta ? (
         <span
-          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 shadow-sm"
-          aria-label="현재 근무중"
+          className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm ${dotMeta.cls}`}
+          aria-label={dotMeta.label}
         />
       ) : null}
     </div>
@@ -495,7 +522,7 @@ function StaffChip({
       onClick={() => onSelect(staff)}
       className="flex w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
     >
-      <Avatar staff={staff} size="sm" isWorking={presence.state === 'working'} />
+      <Avatar staff={staff} size="md" presenceState={presence.state} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
         <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{normalizeText(staff.position) || '직급 미지정'}</p>
@@ -552,7 +579,7 @@ function LeaderCard({
       onClick={() => onSelect(leader)}
       className="flex items-center gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--card)] px-3 py-2 shadow-sm transition hover:border-[var(--accent)]/40 hover:shadow-md active:scale-[0.98]"
     >
-      <Avatar staff={leader} size="lg" isWorking={presence.state === 'working'} />
+      <Avatar staff={leader} size="lg" presenceState={presence.state} />
       <div className="min-w-0 text-left">
         <p className="text-sm font-black tracking-tight text-[var(--foreground)]">{normalizeText(leader.name)}</p>
         <p className="text-xs font-semibold text-[var(--toss-gray-3)]">{normalizeText(leader.position) || '대표'}</p>
@@ -588,7 +615,7 @@ function ManagerRow({
             onClick={() => onSelect(staff)}
             className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--page-bg)] px-2 py-1.5 transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
           >
-            <Avatar staff={staff} size="sm" isWorking={presence.state === 'working'} />
+            <Avatar staff={staff} size="sm" presenceState={presence.state} />
             <div className="text-left">
               <p className="text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
               <p className="text-[10px] text-[var(--toss-gray-3)]">
@@ -1140,7 +1167,7 @@ export default function OrgChart({
                           onClick={() => setSelectedStaff(staff)}
                           className="flex min-w-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-left transition hover:border-emerald-400 hover:bg-emerald-100"
                         >
-                          <Avatar staff={staff} size="sm" isWorking />
+                          <Avatar staff={staff} size="sm" presenceState="working" />
                           <span className="min-w-0">
                             <span className="block truncate text-[11px] font-bold text-emerald-900">
                               {normalizeText(staff.name)}
@@ -1184,7 +1211,7 @@ export default function OrgChart({
                       onClick={() => setSelectedStaff(staff)}
                       className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3.5 py-3 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 hover:shadow-sm"
                     >
-                      <Avatar staff={staff} isWorking={presence.state === 'working'} />
+                      <Avatar staff={staff} presenceState={presence.state} />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
                         <p className="truncate text-xs text-[var(--toss-gray-3)]">
@@ -1247,7 +1274,7 @@ export default function OrgChart({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-4">
-              <Avatar staff={selectedStaff} size="lg" isWorking={selectedStaffPresence?.state === 'working'} />
+              <Avatar staff={selectedStaff} size="lg" presenceState={selectedStaffPresence?.state} />
               <div className="min-w-0">
                 <p className="truncate text-xl font-black text-[var(--foreground)]">{normalizeText(selectedStaff.name)}</p>
                 <p className="truncate text-sm font-semibold text-[var(--toss-gray-3)]">{normalizeText(selectedStaff.position) || '직급 미지정'}</p>

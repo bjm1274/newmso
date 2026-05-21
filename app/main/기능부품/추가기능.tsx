@@ -23,22 +23,6 @@ const MAX_RECENT = 5;
 const LS_FAVORITES = 'erp_favorites';
 const LS_RECENT = 'erp_recent_features';
 
-const FEATURE_GROUP_ORDER = ['운영 보조', '의료 · 현장'] as const;
-
-const FEATURE_PRESENTATION: Record<string, { group: (typeof FEATURE_GROUP_ORDER)[number] }> = {
-  'org-chart': { group: '운영 보조' },
-  'department-inventory': { group: '운영 보조' },
-  'work-status': { group: '운영 보조' },
-  'handover-note': { group: '운영 보조' },
-  'closing-report': { group: '운영 보조' },
-  'staff-evaluation': { group: '운영 보조' },
-  'realtime-deposit': { group: '운영 보조' },
-  'discharge-review': { group: '의료 · 현장' },
-  'surgery-consultation': { group: '의료 · 현장' },
-  'op-check': { group: '의료 · 현장' },
-  'esl-manager': { group: '의료 · 현장' },
-};
-
 type ExtraFeaturesProps = {
   user?: any;
   staffs?: any[];
@@ -229,15 +213,6 @@ export default function ExtraFeatures({
     [recentFeatures, user]
   );
 
-  const groupedNormalCards = useMemo(
-    () =>
-      FEATURE_GROUP_ORDER.map((group) => ({
-        group,
-        cards: normalCards.filter((card) => FEATURE_PRESENTATION[card.testId]?.group === group),
-      })).filter((section) => section.cards.length > 0),
-    [normalCards]
-  );
-
   const compactToolbar = (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       <FontFamilyControl />
@@ -287,9 +262,6 @@ export default function ExtraFeatures({
           <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] transition-colors ${card.accentClass}`}>
             <LucideIcon name={card.icon} size={22} strokeWidth={1.9} />
           </div>
-          <span className="rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
-            {FEATURE_PRESENTATION[card.testId]?.group || '기능'}
-          </span>
         </div>
         <div className="mt-3 min-w-0">
           <h3 className="text-[13px] font-black text-[var(--foreground)]">{card.label}</h3>
@@ -351,20 +323,18 @@ export default function ExtraFeatures({
 
       <div className="w-full space-y-5">
           {/* §4-1, §13.17 단일 리스트 — 그룹 구분선/라벨 삭제. 순서: 즐겨찾기 → 최근 → 전체 → 외부연동. */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {favoriteCards.map(renderCard)}
             {recentCards
               .filter((card) => !favorites.includes(card.id))
               .map(renderCard)}
-            {groupedNormalCards.flatMap((section) =>
-              section.cards
-                .filter((card) => !recentFeatures.includes(card.id))
-                .map(renderCard)
-            )}
+            {normalCards
+              .filter((card) => !recentFeatures.includes(card.id))
+              .map(renderCard)}
           </div>
 
           <div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {EXTERNAL_LINKS.map((item) => (
               <a
                 key={item.id}

@@ -482,6 +482,27 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     }
   };
 
+  // 렌더 단계 파생 KPI (새 state/API 없이)
+  const kpi = (() => {
+    const todayKey = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
+    let todayTotal = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let cancelCount = 0;
+    rows.forEach((row) => {
+      const depositedDay = row.deposited_at ? row.deposited_at.slice(0, 10) : '';
+      if (row.deposit_status === 'deposited') {
+        completedCount += 1;
+        if (depositedDay === todayKey) todayTotal += toAmountNumber(row.amount);
+      } else if (row.deposit_status === 'issued') {
+        pendingCount += 1;
+      } else if (row.deposit_status === 'cancelled') {
+        cancelCount += 1;
+      }
+    });
+    return { todayTotal, completedCount, pendingCount, cancelCount };
+  })();
+
   return (
     <div data-testid="realtime-deposit-view" className="space-y-4">
       {dialog}
@@ -490,18 +511,28 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
         Chart 프로그램으로 이관 예정인 모듈입니다.
       </div>
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 text-xs font-black rounded-md border border-blue-500/20">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="px-2 py-0.5 bg-blue-500/10 text-blue-700 text-xs font-black rounded-[var(--radius-md)] border border-blue-500/20">
             🏦 토스뱅크 {TOSS_BANK_ACCOUNT}
           </span>
-          <button
-            type="button"
-            data-testid="realtime-deposit-refresh"
-            onClick={() => loadDeposits({ silent: true })}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/60"
-          >
-            {refreshing ? '동기화 중...' : '새로고침'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleImportSave}
+              disabled={importRows.length === 0}
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              내보내기
+            </button>
+            <button
+              type="button"
+              data-testid="realtime-deposit-refresh"
+              onClick={() => loadDeposits({ silent: true })}
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--muted)]"
+            >
+              {refreshing ? '동기화 중...' : '새로고침'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -684,28 +715,29 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
       )}
 
       {activeTab === 'list' && <>
+      {/* KPI 4종 */}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">전체 입금건</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{stats.totalCount}건</p>
+          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">오늘 총 입금</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{formatCurrency(kpi.todayTotal)}원</p>
         </div>
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">오늘 입금액</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{formatCurrency(stats.todayAmount)}원</p>
+          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">완료</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{kpi.completedCount}건</p>
         </div>
-        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">미매칭 건수</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{stats.unmatchedCount}건</p>
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm border-l-4 border-l-[var(--warning)]">
+          <p className="text-xs font-semibold" style={{ color: 'var(--warning)' }}>처리 대기</p>
+          <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--warning)' }}>{kpi.pendingCount}건</p>
         </div>
-        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-          <p className="text-xs font-semibold text-[var(--toss-gray-3)]">입금대기 계좌</p>
-          <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{stats.issuedCount}건</p>
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm border-l-4 border-l-[var(--danger)]">
+          <p className="text-xs font-semibold" style={{ color: 'var(--danger)' }}>환불·취소</p>
+          <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--danger)' }}>{kpi.cancelCount}건</p>
         </div>
       </div>
 
-
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
+      {/* 필터 */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm space-y-3">
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr]">
           <label className="space-y-1 text-sm">
             <span className="font-semibold text-[var(--foreground)]">검색</span>
             <input
@@ -715,6 +747,17 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
               placeholder="환자명, 거래건, 주문ID, 계좌번호"
               className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
             />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-semibold text-[var(--foreground)]">결제수단</span>
+            <select
+              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
+            >
+              <option value="all">전체</option>
+              <option value="virtual">가상계좌</option>
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+            </select>
           </label>
           <label className="space-y-1 text-sm">
             <span className="font-semibold text-[var(--foreground)]">입금 상태</span>
@@ -745,7 +788,29 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
             </select>
           </label>
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-[var(--toss-gray-3)]">
+        {/* segmented: 입금 상태 빠른 선택 */}
+        <div className="flex flex-wrap items-center gap-1">
+          {[
+            { value: 'all', label: '전체' },
+            { value: 'deposited', label: '완료' },
+            { value: 'issued', label: '대기' },
+            { value: 'cancelled', label: '환불·취소' },
+          ].map((seg) => (
+            <button
+              key={seg.value}
+              type="button"
+              onClick={() => setDepositStatus(seg.value)}
+              className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold transition ${
+                depositStatus === seg.value
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
+              }`}
+            >
+              {seg.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-between text-xs text-[var(--toss-gray-3)]">
           <span>마지막 동기화: {formatDateTime(lastSyncedAt)}</span>
           <span>{loading ? '불러오는 중...' : `${rows.length}건 표시`}</span>
         </div>
@@ -766,167 +831,119 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
           아직 수신된 가상계좌 입금 내역이 없습니다.
         </div>
       ) : (
-        <div className="space-y-3">
-          {rows.map((row) => {
-            const draft = drafts[row.id] || createDraft(row);
-            return (
-              <article
-                key={row.id}
-                data-testid={`realtime-deposit-row-${row.id}`}
-                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-bold text-[var(--foreground)]">
-                        {row.transaction_label || row.order_name || row.order_id || '미지정 거래건'}
-                      </h3>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getDepositStatusClass(row.deposit_status)}`}
-                      >
-                        {getDepositStatusLabel(row.deposit_status)}
-                      </span>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getMatchStatusClass(row.match_status)}`}
-                      >
-                        {getMatchStatusLabel(row.match_status)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--toss-gray-3)]">
-                      주문ID {row.order_id || '-'} · 결제키 {row.payment_key || '-'} · 거래키 {row.transaction_key || '-'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-[var(--foreground)]">{formatCurrency(row.amount)}원</p>
-                    <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                      입금시각 {formatDateTime(row.deposited_at || row.created_at)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">입금자</p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                      {row.depositor_name || row.customer_name || '-'}
-                    </p>
-                  </div>
-                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">계좌</p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                      {[row.bank_name || row.bank_code || '-', row.account_number || '-'].join(' / ')}
-                    </p>
-                  </div>
-                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">환자</p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                      {row.patient_name || '-'}
-                    </p>
-                  </div>
-                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">거래건</p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                      {row.transaction_label || '-'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">환자명</span>
-                    <input
-                      data-testid={`realtime-deposit-patient-name-${row.id}`}
-                      value={draft.patient_name}
-                      onChange={(event) => handleDraftChange(row.id, 'patient_name', event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
-                    />
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">환자 ID</span>
-                    <input
-                      value={draft.patient_id}
-                      onChange={(event) => handleDraftChange(row.id, 'patient_id', event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
-                    />
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">거래건</span>
-                    <input
-                      data-testid={`realtime-deposit-transaction-label-${row.id}`}
-                      value={draft.transaction_label}
-                      onChange={(event) => handleDraftChange(row.id, 'transaction_label', event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
-                    />
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">매칭 구분</span>
-                    <select
-                      value={draft.matched_target_type}
-                      onChange={(event) =>
-                        handleDraftChange(row.id, 'matched_target_type', event.target.value)
-                      }
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
+        /* 7열 sticky 테이블 */
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)]">
+                  {['시각', '환자', '항목', '결제수단', '금액', '상태', '액션'].map((h) => (
+                    <th
+                      key={h}
+                      className="sticky top-0 z-10 bg-[var(--muted)] px-3 py-2.5 text-left text-xs font-semibold text-[var(--toss-gray-4)] whitespace-nowrap"
                     >
-                      <option value="">선택 안 함</option>
-                      <option value="patient">환자</option>
-                      <option value="transaction">거래건</option>
-                      <option value="patient+transaction">환자+거래건</option>
-                      <option value="manual">수기확인</option>
-                    </select>
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">매칭 대상 ID</span>
-                    <input
-                      value={draft.matched_target_id}
-                      onChange={(event) => handleDraftChange(row.id, 'matched_target_id', event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
-                    />
-                  </label>
-                  <label className="space-y-1 text-sm">
-                    <span className="font-semibold text-[var(--foreground)]">매칭 상태</span>
-                    <select
-                      value={draft.match_status}
-                      onChange={(event) => handleDraftChange(row.id, 'match_status', event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const draft = drafts[row.id] || createDraft(row);
+                  return (
+                    <tr
+                      key={row.id}
+                      data-testid={`realtime-deposit-row-${row.id}`}
+                      className="group border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--muted)]/50 transition-colors"
                     >
-                      <option value="unmatched">미매칭</option>
-                      <option value="matched">매칭완료</option>
-                    </select>
-                  </label>
-                </div>
+                      {/* 시각 */}
+                      <td className="px-3 py-3 text-xs text-[var(--toss-gray-3)] whitespace-nowrap align-top">
+                        {formatDateTime(row.deposited_at || row.created_at)}
+                      </td>
 
-                <label className="mt-3 block space-y-1 text-sm">
-                  <span className="font-semibold text-[var(--foreground)]">메모</span>
-                  <textarea
-                    value={draft.matched_note}
-                    onChange={(event) => handleDraftChange(row.id, 'matched_note', event.target.value)}
-                    rows={3}
-                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 outline-none transition focus:border-[var(--accent)]"
-                    placeholder="환자 상태, 입금 확인 메모, 거래건 설명 등을 남겨주세요."
-                  />
-                </label>
+                      {/* 환자 */}
+                      <td className="px-3 py-3 align-top">
+                        <input
+                          data-testid={`realtime-deposit-patient-name-${row.id}`}
+                          value={draft.patient_name}
+                          onChange={(event) => handleDraftChange(row.id, 'patient_name', event.target.value)}
+                          placeholder={row.patient_name || row.depositor_name || row.customer_name || '-'}
+                          className="w-full min-w-[96px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-xs outline-none transition focus:border-[var(--accent)]"
+                        />
+                      </td>
 
-                <div className="mt-4 flex flex-col gap-2 text-xs text-[var(--toss-gray-3)] sm:flex-row sm:items-center sm:justify-between">
-                  <span>최종 갱신 {formatDateTime(row.updated_at || row.created_at)}</span>
-                  <button
-                    type="button"
-                    data-testid={`realtime-deposit-save-${row.id}`}
-                    onClick={() => handleSave(row)}
-                    disabled={savingId === row.id}
-                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {savingId === row.id ? '저장 중...' : '매칭 저장'}
-                  </button>
-                  {row.provider === 'manual' && (
-                    <button type="button" onClick={() => handleDeleteDeposit(row.id)}
-                      className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/20">
-                      🗑️ 삭제
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+                      {/* 항목 */}
+                      <td className="px-3 py-3 align-top">
+                        <input
+                          data-testid={`realtime-deposit-transaction-label-${row.id}`}
+                          value={draft.transaction_label}
+                          onChange={(event) => handleDraftChange(row.id, 'transaction_label', event.target.value)}
+                          placeholder={row.transaction_label || row.order_name || row.order_id || '-'}
+                          className="w-full min-w-[120px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-xs outline-none transition focus:border-[var(--accent)]"
+                        />
+                      </td>
+
+                      {/* 결제수단 칩 */}
+                      <td className="px-3 py-3 align-top whitespace-nowrap">
+                        <span className="inline-flex items-center rounded-[var(--radius-md)] bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                          {row.bank_name || row.bank_code || '가상계좌'}
+                        </span>
+                      </td>
+
+                      {/* 금액 */}
+                      <td className="px-3 py-3 text-right text-sm font-bold text-[var(--foreground)] whitespace-nowrap align-top">
+                        {formatCurrency(row.amount)}원
+                      </td>
+
+                      {/* 상태 칩 */}
+                      <td className="px-3 py-3 align-top whitespace-nowrap">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex items-center rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-semibold ${getDepositStatusClass(row.deposit_status)}`}>
+                            {getDepositStatusLabel(row.deposit_status)}
+                          </span>
+                          <span className={`inline-flex items-center rounded-[var(--radius-md)] px-2 py-0.5 text-[11px] font-semibold ${getMatchStatusClass(row.match_status)}`}>
+                            {getMatchStatusLabel(row.match_status)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 액션 */}
+                      <td className="px-3 py-3 align-top">
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            data-testid={`realtime-deposit-save-${row.id}`}
+                            onClick={() => handleSave(row)}
+                            disabled={savingId === row.id}
+                            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
+                          >
+                            {savingId === row.id ? '저장 중...' : '저장'}
+                          </button>
+                          {row.provider === 'manual' && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDeposit(row.id)}
+                              className="rounded-[var(--radius-md)] border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-2.5 py-1.5 text-xs font-semibold text-[var(--danger)] transition hover:bg-[var(--danger)]/20 whitespace-nowrap"
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </div>
+                        {/* 호버 전에도 메모 인풋 접근 가능하도록 항상 표시 */}
+                        <textarea
+                          value={draft.matched_note}
+                          onChange={(event) => handleDraftChange(row.id, 'matched_note', event.target.value)}
+                          rows={2}
+                          placeholder="메모"
+                          className="mt-1.5 w-full min-w-[120px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-xs outline-none transition focus:border-[var(--accent)]"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       </>}

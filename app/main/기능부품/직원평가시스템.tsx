@@ -149,7 +149,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
         <div className="flex flex-col lg:flex-row h-full gap-4 animate-in fade-in duration-500" data-testid="staff-evaluation-view">
             {dialog}
             {/* 1. 직원 목록 (좌측) */}
-            <aside className="w-full lg:w-80 flex flex-col bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
+            <aside className="w-full lg:w-[280px] flex flex-col bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-[var(--border)] bg-[var(--muted)]/30">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">평가 대상 직원</h3>
                 </div>
@@ -209,17 +209,24 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">기록 유형</label>
                                         <div className="flex gap-1.5 p-1 bg-[var(--muted)] rounded-[var(--radius-lg)]">
-                                            {['성과', '문제사항', '칭찬', '주의', '기타'].map((cat) => (
+                                            {([
+                                                { label: '성과',    activeBg: 'var(--accent)',        activeText: '#fff' },
+                                                { label: '문제사항', activeBg: 'var(--danger)',        activeText: '#fff' },
+                                                { label: '칭찬',    activeBg: 'var(--success)',       activeText: '#fff' },
+                                                { label: '주의',    activeBg: 'var(--warning)',       activeText: '#fff' },
+                                                { label: '기타',    activeBg: 'var(--toss-gray-4)',   activeText: '#fff' },
+                                            ] as const).map((cat) => (
                                                 <button
-                                                    key={cat}
+                                                    key={cat.label}
                                                     type="button"
-                                                    onClick={() => setCategory(cat)}
-                                                    className={`flex-1 py-2 text-[10px] font-bold rounded-[var(--radius-md)] transition-all ${category === cat
-                                                            ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
+                                                    onClick={() => setCategory(cat.label)}
+                                                    style={category === cat.label ? { background: cat.activeBg, color: cat.activeText } : {}}
+                                                    className={`flex-1 py-2 text-[10px] font-bold rounded-[var(--radius-md)] transition-all ${category === cat.label
+                                                            ? 'shadow-sm'
                                                             : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
                                                         }`}
                                                 >
-                                                    {cat}
+                                                    {cat.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -285,29 +292,66 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                     <div className="relative border-l-2 border-[var(--muted)] ml-2 pl-6 space-y-5">
                                         {evaluations.map((ev) => (
                                             <div key={ev.id} data-testid={`staff-evaluation-item-${ev.id}`} className="relative group">
-                                                {/* 타임라인 점 */}
-                                                <div className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-4 border-[var(--card)] shadow-sm ${ev.category === '문제사항' ? 'bg-red-500/100' :
-                                                        ev.category === '칭찬' ? 'bg-emerald-500' :
-                                                            ev.category === '주의' ? 'bg-orange-500/100' : 'bg-[var(--accent)]'
-                                                    }`} />
+                                                {/* 타임라인 점 — 디자인 토큰 사용 */}
+                                                <div
+                                                    className="absolute -left-[31px] top-0 w-4 h-4 rounded-full border-4 border-[var(--card)] shadow-sm"
+                                                    style={{
+                                                        background:
+                                                            ev.category === '문제사항' ? 'var(--danger)' :
+                                                            ev.category === '칭찬'    ? 'var(--success)' :
+                                                            ev.category === '주의'    ? 'var(--warning)' :
+                                                            ev.category === '기타'    ? 'var(--toss-gray-4)' :
+                                                                                        'var(--accent)'
+                                                    }}
+                                                />
 
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${ev.category === '문제사항' ? 'bg-red-500/10 text-red-600' :
-                                                                    ev.category === '칭찬' ? 'bg-emerald-50 text-emerald-600' :
-                                                                        ev.category === '주의' ? 'bg-orange-500/10 text-orange-600' :
-                                                                            'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                                                                }`}>
-                                                                {ev.category} {ev.score ? ` · ${ev.score}점` : ''}
+                                                            {/* 유형 칩 — 토큰 기반 */}
+                                                            <span
+                                                                className="px-2 py-0.5 rounded-md text-[9px] font-bold"
+                                                                style={{
+                                                                    background:
+                                                                        ev.category === '문제사항' ? 'var(--danger-light)'  :
+                                                                        ev.category === '칭찬'    ? 'var(--success-light)' :
+                                                                        ev.category === '주의'    ? 'var(--warning-light)' :
+                                                                        ev.category === '기타'    ? 'var(--muted)'         :
+                                                                                                    'var(--accent-light)',
+                                                                    color:
+                                                                        ev.category === '문제사항' ? 'var(--danger)'   :
+                                                                        ev.category === '칭찬'    ? 'var(--success)'  :
+                                                                        ev.category === '주의'    ? 'var(--warning)'  :
+                                                                        ev.category === '기타'    ? 'var(--toss-gray-4)' :
+                                                                                                    'var(--accent)',
+                                                                }}
+                                                            >
+                                                                {ev.category}
                                                             </span>
+                                                            {/* ★ 별점 — 성과(score 있을 때)만 표시 */}
+                                                            {ev.score !== null && ev.score !== undefined && (
+                                                                <span className="flex items-center gap-0.5" aria-label={`${ev.score}점`}>
+                                                                    {Array.from({ length: 5 }, (_, i) => (
+                                                                        <svg
+                                                                            key={i}
+                                                                            viewBox="0 0 16 16"
+                                                                            className="w-3 h-3"
+                                                                            fill={i < ev.score! ? 'var(--warning)' : 'var(--muted)'}
+                                                                            aria-hidden="true"
+                                                                        >
+                                                                            <path d="M8 1.2l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 9.4l-3.2 1.7.6-3.6L2.8 5l3.6-.5z" />
+                                                                        </svg>
+                                                                    ))}
+                                                                </span>
+                                                            )}
                                                             <span className="text-[10px] text-[var(--toss-gray-3)] font-medium">
                                                                 {new Date(ev.created_at).toLocaleString()}
                                                             </span>
                                                         </div>
                                                         <button
                                                             onClick={() => deleteEvaluation(ev.id)}
-                                                            className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all"
+                                                            className="opacity-0 group-hover:opacity-100 p-1 text-[var(--danger)] hover:opacity-80 transition-all"
+                                                            aria-label="평가 기록 삭제"
                                                         >
                                                             ✕
                                                         </button>

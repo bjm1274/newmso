@@ -1152,14 +1152,14 @@ export default function HandoverNotes({ user }: Props) {
     const isMutating = noteMutationId === note.id;
 
     return (
-      <div key={note.id} className={`rounded-[var(--radius-xl)] border px-4 py-3 shadow-sm ${note.is_completed ? 'border-[var(--border)] bg-[var(--page-bg)]' : note.priority === 'High' ? 'border-red-500/20 bg-red-500/10/60' : 'border-[var(--border)] bg-[var(--card)]'}`}>
+      <div key={note.id} className={`rounded-[var(--radius-xl)] border px-4 py-3 shadow-sm ${note.is_completed ? 'border-[var(--border)] bg-[var(--page-bg)]' : note.priority === 'High' ? 'border-[var(--danger)]/20 bg-[var(--danger-light)]' : 'border-[var(--border)] bg-[var(--card)]'}`}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[var(--accent)]">{note.shift}</span>
-              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.priority === 'High' ? 'bg-red-500/20 text-red-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)]'}`}>{note.priority === 'High' ? '중요' : '일반'}</span>
-              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.note_scope === 'patient' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{note.note_scope === 'patient' ? '환자별' : '공통'}</span>
-              {note.note_scope === 'patient' ? <span className="rounded-[var(--radius-md)] bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">{formatPatientBedLabel(note)}</span> : null}
+              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.priority === 'High' ? 'bg-[var(--danger-light)] text-[var(--danger)]' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)]'}`}>{note.priority === 'High' ? '중요' : '일반'}</span>
+              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 ${note.note_scope === 'patient' ? 'bg-[var(--success-light)] text-[var(--success)]' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{note.note_scope === 'patient' ? '환자별' : '공통'}</span>
+              {note.note_scope === 'patient' ? <span className="rounded-[var(--radius-md)] bg-[var(--success-light)] px-2.5 py-1 text-[var(--success)]">{formatPatientBedLabel(note)}</span> : null}
               <span className="text-[var(--toss-gray-3)]">{note.author_name || '이름 없음'} · {createdLabel(note.created_at)}</span>
             </div>
             {isEditing ? (
@@ -1303,7 +1303,7 @@ export default function HandoverNotes({ user }: Props) {
                   >
                     <div className="flex h-full flex-col justify-between">
                       <div className="flex items-start justify-between">
-                        <span className={`text-[11px] font-black ${isToday ? 'text-emerald-600' : 'text-[var(--foreground)]'}`}>
+                        <span className={`text-[11px] font-black ${isToday ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
                           {cell.getDate()}
                         </span>
                         {summary.total > 0 ? <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" /> : null}
@@ -1325,7 +1325,7 @@ export default function HandoverNotes({ user }: Props) {
             </div>
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-3">
               <div className="text-xs font-bold text-[var(--toss-gray-3)]">선택일 환자별 인계</div>
-              <div className="mt-2 text-xl font-black text-emerald-700">{patientGroups.length}명</div>
+              <div className="mt-2 text-xl font-black text-[var(--success)]">{patientGroups.length}명</div>
             </div>
             <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-3">
               <div className="text-xs font-bold text-[var(--toss-gray-3)]">검색 결과</div>
@@ -1356,7 +1356,7 @@ export default function HandoverNotes({ user }: Props) {
                   data-testid="handover-scope-patient"
                   onClick={() => setNoteScope('patient')}
                   className={`rounded-[var(--radius-md)] px-3 py-2 text-sm font-semibold ${
-                    noteScope === 'patient' ? 'bg-emerald-600 text-white' : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                    noteScope === 'patient' ? 'bg-[var(--success)] text-white' : 'bg-[var(--success-light)] text-[var(--success)]'
                   }`}
                 >
                   환자별 인계사항
@@ -1448,7 +1448,7 @@ export default function HandoverNotes({ user }: Props) {
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
                         {latestTemplateNote ? (
-                          <span className="rounded-[var(--radius-md)] bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
+                          <span className="rounded-[var(--radius-md)] bg-[var(--success-light)] px-2.5 py-1 text-[var(--success)]">
                             최신 v{latestTemplateNote.template_version || 1}
                           </span>
                         ) : null}
@@ -1482,7 +1482,7 @@ export default function HandoverNotes({ user }: Props) {
                                   <span className="rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[var(--accent)]">선택됨</span>
                                 ) : null}
                                 {isLatest ? (
-                                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">최신</span>
+                                  <span className="rounded-full bg-[var(--success-light)] px-2 py-0.5 text-[var(--success)]">최신</span>
                                 ) : null}
                               </span>
                             </div>
@@ -1500,9 +1500,9 @@ export default function HandoverNotes({ user }: Props) {
             </div>
 
             {noteScope === 'patient' ? (
-              <div className="space-y-3 rounded-[var(--radius-lg)] border border-emerald-100 bg-emerald-500/10 p-3">
+              <div className="space-y-3 rounded-[var(--radius-lg)] border border-[var(--success)]/20 bg-[var(--success-light)] p-3">
                 {bedOptions.length === 0 ? (
-                  <div className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-700">
+                  <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning-light)] px-3 py-3 text-sm font-medium text-[var(--warning)]">
                     먼저 병상 설정에서 환자를 지정해주세요.
                   </div>
                 ) : (
@@ -1511,7 +1511,7 @@ export default function HandoverNotes({ user }: Props) {
                       data-testid="handover-patient-select"
                       value={selectedBedKey}
                       onChange={(event) => setSelectedBedKey(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-emerald-200 bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-emerald-300 md:max-w-[320px]"
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--success)]/30 bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--success)] md:max-w-[320px]"
                     >
                       <option value="">환자 선택</option>
                       {bedOptions.map((option) => (
@@ -1527,7 +1527,7 @@ export default function HandoverNotes({ user }: Props) {
                           type="button"
                           onClick={() => setSelectedBedKey(option.selectionKey)}
                           className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-semibold transition ${
-                            selectedBedKey === option.selectionKey ? 'bg-emerald-600 text-white' : 'bg-[var(--card)] text-emerald-700'
+                            selectedBedKey === option.selectionKey ? 'bg-[var(--success)] text-white' : 'bg-[var(--card)] text-[var(--success)]'
                           }`}
                         >
                           {option.label}
@@ -1639,17 +1639,17 @@ export default function HandoverNotes({ user }: Props) {
                       type="button"
                       onClick={() => setSelectedPatientGroupKey(group.key)}
                       data-testid={`handover-patient-open-${group.testIdKey}`}
-                      className="rounded-[var(--radius-xl)] border border-emerald-100 bg-[var(--card)] p-4 text-left transition hover:border-emerald-300 hover:shadow-sm"
+                      className="rounded-[var(--radius-xl)] border border-[var(--success)]/20 bg-[var(--card)] p-4 text-left transition hover:border-[var(--success)]/50 hover:shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-bold text-emerald-900">{group.label}</div>
-                          <div className="mt-1 text-xs text-emerald-700">
+                          <div className="text-sm font-bold text-[var(--foreground)]">{group.label}</div>
+                          <div className="mt-1 text-xs text-[var(--success)]">
                             입원 {dateLabel(group.startDate)}
                             {group.endDate ? ` · 종료 ${dateLabel(group.endDate)}` : ' · 현재 입원 중'}
                           </div>
                         </div>
-                        <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                        <span className="rounded-[var(--radius-md)] bg-[var(--success-light)] px-2.5 py-1 text-xs font-semibold text-[var(--success)]">
                           인계 {group.notes.length}건
                         </span>
                       </div>
@@ -1717,19 +1717,19 @@ export default function HandoverNotes({ user }: Props) {
                 </div>
                 <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-3">
                   <div className="text-xs font-bold text-[var(--toss-gray-3)]">누적 인계사항</div>
-                  <div className="mt-2 text-lg font-black text-emerald-700">{selectedPatientGroup.notes.length}건</div>
+                  <div className="mt-2 text-lg font-black text-[var(--success)]">{selectedPatientGroup.notes.length}건</div>
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[var(--radius-xl)] border border-emerald-100 bg-emerald-500/10 p-4">
+              <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--success)]/20 bg-[var(--success-light)] p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-emerald-900">입원 구간 전체 인계 이력</h4>
-                  <span className="text-xs text-emerald-700">
+                  <h4 className="text-sm font-bold text-[var(--foreground)]">입원 구간 전체 인계 이력</h4>
+                  <span className="text-xs text-[var(--success)]">
                     {dateLabel(selectedPatientGroup.startDate)}부터 {selectedPatientGroup.endDate ? dateLabel(selectedPatientGroup.endDate) : '현재'}까지
                   </span>
                 </div>
                 {selectedPatientGroup.notes.length === 0 ? (
-                  <div className="rounded-[var(--radius-lg)] border border-dashed border-emerald-200 px-4 py-10 text-center text-sm text-emerald-700">
+                  <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--success)]/30 px-4 py-10 text-center text-sm text-[var(--success)]">
                     이 입원 구간에는 아직 등록된 환자별 인계사항이 없습니다.
                   </div>
                 ) : (
@@ -1751,9 +1751,9 @@ export default function HandoverNotes({ user }: Props) {
               </div>
               <div className="flex items-center gap-2">
                 {roomDirty ? <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)]">수정됨</span> : null}
-                {roomStatus === 'saving' ? <span className="rounded-[var(--radius-md)] bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">저장 중</span> : null}
-                {roomStatus === 'saved' ? <span className="rounded-[var(--radius-md)] bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">저장됨</span> : null}
-                {roomStatus === 'error' ? <span className="rounded-[var(--radius-md)] bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-red-600">저장 실패</span> : null}
+                {roomStatus === 'saving' ? <span className="rounded-[var(--radius-md)] bg-[var(--warning-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning)]">저장 중</span> : null}
+                {roomStatus === 'saved' ? <span className="rounded-[var(--radius-md)] bg-[var(--success-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success)]">저장됨</span> : null}
+                {roomStatus === 'error' ? <span className="rounded-[var(--radius-md)] bg-[var(--danger-light)] px-2.5 py-1 text-[11px] font-semibold text-[var(--danger)]">저장 실패</span> : null}
                 <button
                   type="button"
                   onClick={() => void handleSaveRoomConfigs()}
@@ -1835,7 +1835,7 @@ export default function HandoverNotes({ user }: Props) {
                          <button
                            type="button"
                            onClick={() => replaceRooms(roomConfigs.filter((item) => item.id !== room.id))}
-                            className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-500/20"
+                            className="rounded-[var(--radius-md)] bg-[var(--danger-light)] px-2 py-1.5 text-[11px] font-semibold text-[var(--danger)] transition hover:opacity-80"
                          >
                            호수 삭제
                          </button>
