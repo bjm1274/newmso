@@ -940,12 +940,20 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     (async () => {
       try {
-        // 원자적 조회수 증가 (RPC fallback)
-        const { error: rpcErr } = await supabase.rpc('increment_post_views', { p_post_id: selectedPostId });
-        if (rpcErr) {
-          const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
-          const nextViews = ((row?.views ?? 0) as number) + 1;
-          await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
+        // 원자적 조회수 증가 — D1 라우트 우선, 실패 시 Supabase fallback
+        const d1Res = await fetch('/api/d1/rpc/increment-post-views', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_post_id: selectedPostId }),
+        }).catch(() => null);
+        const d1Ok = d1Res?.ok && ((await d1Res.json().catch(() => ({ ok: false }))) as { ok: boolean }).ok;
+        if (!d1Ok) {
+          const { error: rpcErr } = await supabase.rpc('increment_post_views', { p_post_id: selectedPostId });
+          if (rpcErr) {
+            const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
+            const nextViews = ((row?.views ?? 0) as number) + 1;
+            await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
+          }
         }
         // UI 낙관적 업데이트
         const increment = (prev: BoardPost[]) =>

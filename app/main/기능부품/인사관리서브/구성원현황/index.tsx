@@ -1068,34 +1068,66 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
         const daysUntilExpiry = Math.max(0, Math.ceil((expiryMs - hireMs) / msPerDay));
         const leaveTotalDays = Math.min(15, Math.round((daysUntilExpiry / 365) * 15 * 10) / 10);
 
-        // ── RPC 호출 (트랜잭션 보장) ────────────────────────────────────────────
-        const { data: rpcResult, error: rpcErr } = await supabase.rpc(
-          'register_staff_full',
-          {
-            p_staff: staffPayload,
-            p_licenses: filledLicenses.map((l: LicenseRow) => ({
-              license_type: l.license_type ?? null,
-              license_name: l.license_name ?? null,
-              license_number: l.license_number ?? null,
-              issued_date: l.issued_date ?? null,
-              expiry_date: l.expiry_date ?? null,
-              issuing_body: l.issuing_body ?? null,
-              memo: l.memo ?? null,
-              is_primary: l.is_primary,
-            })),
-            p_job_cats: (신규직원.jobCategories ?? []).map((j: SelectedJobCategory) => ({
-              job_category_id: j.job_category_id,
-              is_primary: j.is_primary,
-            })),
-            p_shift_asgns: (신규직원.shiftAssignments ?? []).map((s: SelectedShiftAssignment) => ({
-              shift_id: s.shift_id,
-              is_primary: s.is_primary,
-              priority: s.priority,
-            })),
-            p_leave_year: leaveYear,
-            p_leave_total: leaveTotalDays,
-          },
-        );
+        // ── RPC 호출 (트랜잭션 보장) — D1 라우트 우선, 실패 시 Supabase fallback ──
+        const d1RpcBody = {
+          p_staff: staffPayload,
+          p_licenses: filledLicenses.map((l: LicenseRow) => ({
+            license_type: l.license_type ?? null,
+            license_name: l.license_name ?? null,
+            license_number: l.license_number ?? null,
+            issued_date: l.issued_date ?? null,
+            expiry_date: l.expiry_date ?? null,
+            issuing_body: l.issuing_body ?? null,
+            memo: l.memo ?? null,
+            is_primary: l.is_primary,
+          })),
+          p_job_cats: (신규직원.jobCategories ?? []).map((j: SelectedJobCategory) => ({
+            job_category_id: j.job_category_id,
+            is_primary: j.is_primary,
+          })),
+          p_shift_asgns: (신규직원.shiftAssignments ?? []).map((s: SelectedShiftAssignment) => ({
+            shift_id: s.shift_id,
+            is_primary: s.is_primary,
+            priority: s.priority,
+          })),
+          p_leave_year: leaveYear,
+          p_leave_total: leaveTotalDays,
+        };
+
+        let rpcResult: { staff_id: string } | null = null;
+        let rpcErr: unknown = null;
+
+        try {
+          const d1Res = await fetch('/api/d1/rpc/register-staff', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(d1RpcBody),
+          });
+          const d1Json = await d1Res.json() as { ok: boolean; data?: { staff_id: string }; error?: string };
+          if (d1Res.ok && d1Json.ok && d1Json.data?.staff_id) {
+            rpcResult = d1Json.data;
+          } else {
+            rpcErr = new Error(d1Json.error ?? 'D1 RPC 실패');
+            logger.warn('D1 register-staff 라우트 실패, Supabase fallback 시도:', rpcErr);
+            const { data: sbResult, error: sbErr } = await supabase.rpc('register_staff_full', d1RpcBody);
+            if (sbErr) {
+              rpcErr = sbErr;
+            } else {
+              rpcResult = sbResult as { staff_id: string } | null;
+              rpcErr = null;
+            }
+          }
+        } catch (fetchErr) {
+          rpcErr = fetchErr;
+          logger.warn('register-staff fetch 실패, Supabase fallback 시도:', fetchErr);
+          const { data: sbResult, error: sbErr } = await supabase.rpc('register_staff_full', d1RpcBody);
+          if (sbErr) {
+            rpcErr = sbErr;
+          } else {
+            rpcResult = sbResult as { staff_id: string } | null;
+            rpcErr = null;
+          }
+        }
 
         // RPC 실패 → 폴백: 기존 방식으로 staff_members만 INSERT
         let insertedStaffId: string | null = null;
