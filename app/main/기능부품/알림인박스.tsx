@@ -100,15 +100,18 @@ function matchesNotificationSearch(notification: Record<string, unknown>, rawQue
 }
 
 const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border: string }> = {
-  message: { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30', text: 'text-blue-600', border: 'border-blue-300' },
-  mention: { icon: '📣', bg: 'bg-indigo-500/10 dark:bg-indigo-950/30', text: 'text-indigo-600', border: 'border-indigo-300' },
-  approval: { icon: '📋', bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-600', border: 'border-violet-300' },
-  payroll: { icon: '💰', bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-600', border: 'border-emerald-300' },
-  inventory: { icon: '📦', bg: 'bg-orange-500/10 dark:bg-orange-950/30', text: 'text-orange-600', border: 'border-orange-300' },
-  attendance: { icon: '⏰', bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-600', border: 'border-teal-300' },
-  board: { icon: '📌', bg: 'bg-pink-500/10 dark:bg-pink-950/30', text: 'text-pink-600', border: 'border-pink-300' },
-  인사: { icon: '👥', bg: 'bg-cyan-50 dark:bg-cyan-950/30', text: 'text-cyan-700', border: 'border-cyan-300' },
-  education: { icon: '📚', bg: 'bg-purple-500/10 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
+  message:      { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30',    text: 'text-blue-600',   border: 'border-blue-300'   },
+  mention:      { icon: '📣', bg: 'bg-indigo-500/10 dark:bg-indigo-950/30', text: 'text-indigo-600', border: 'border-indigo-300' },
+  // 결재: 주황(warning 톤)
+  approval:     { icon: '📋', bg: 'bg-orange-500/10 dark:bg-orange-950/30', text: 'text-orange-600', border: 'border-orange-300' },
+  payroll:      { icon: '💰', bg: 'bg-emerald-50 dark:bg-emerald-950/30',   text: 'text-emerald-600', border: 'border-emerald-300' },
+  // 재고: 녹색(success 톤)
+  inventory:    { icon: '📦', bg: 'bg-green-500/10 dark:bg-green-950/30',   text: 'text-green-600',  border: 'border-green-300'  },
+  attendance:   { icon: '⏰', bg: 'bg-teal-50 dark:bg-teal-950/30',         text: 'text-teal-600',   border: 'border-teal-300'   },
+  board:        { icon: '📌', bg: 'bg-pink-500/10 dark:bg-pink-950/30',     text: 'text-pink-600',   border: 'border-pink-300'   },
+  // 인사: 보라(violet 톤)
+  인사:          { icon: '👥', bg: 'bg-violet-50 dark:bg-violet-950/30',     text: 'text-violet-600', border: 'border-violet-300' },
+  education:    { icon: '📚', bg: 'bg-purple-500/10 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
   notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' },
 };
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
@@ -942,6 +945,55 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
         <div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsTab userId={_u?.id as string | undefined} /></div>
       ) : (
         <>
+          {/* Stat 3종 카드 */}
+          <div className="shrink-0 grid grid-cols-3 gap-2 px-4 pt-3 pb-0 bg-[var(--card)]">
+            <button
+              type="button"
+              data-testid="notification-stat-unread"
+              onClick={() => { setStateFilter(stateFilter === 'unread' ? 'all' : 'unread'); setShowUnreadOnly(stateFilter !== 'unread'); }}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
+                stateFilter === 'unread'
+                  ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+              }`}
+            >
+              <span className={`text-base font-black tabular-nums ${stateFilter === 'unread' ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
+                {unreadCount}
+              </span>
+              <span className={`text-[10px] font-bold ${stateFilter === 'unread' ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>안읽음</span>
+            </button>
+            <button
+              type="button"
+              data-testid="notification-stat-action"
+              onClick={() => { const next = stateFilter === 'action' ? 'all' : 'action'; setStateFilter(next); setShowUnreadOnly(false); }}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
+                stateFilter === 'action'
+                  ? 'border-[var(--warning)] bg-[var(--warning-light)]'
+                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+              }`}
+            >
+              <span className={`text-base font-black tabular-nums ${stateFilter === 'action' ? 'text-[var(--warning)]' : 'text-[var(--foreground)]'}`}>
+                {actionRequiredCount}
+              </span>
+              <span className={`text-[10px] font-bold ${stateFilter === 'action' ? 'text-[var(--warning)]' : 'text-[var(--toss-gray-3)]'}`}>액션 필요</span>
+            </button>
+            <button
+              type="button"
+              data-testid="notification-stat-total"
+              onClick={() => { setStateFilter('all'); setShowUnreadOnly(false); }}
+              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
+                stateFilter === 'all'
+                  ? 'border-[var(--accent)] bg-[var(--accent-light)]'
+                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
+              }`}
+            >
+              <span className={`text-base font-black tabular-nums ${stateFilter === 'all' ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
+                {notifications.length}
+              </span>
+              <span className={`text-[10px] font-bold ${stateFilter === 'all' ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>전체</span>
+            </button>
+          </div>
+
           <div className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 space-y-3">
             <div className="flex flex-col gap-2 md:flex-row md:items-center">
               <input
@@ -1075,8 +1127,10 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
                           <div
                             key={n.id}
                             onClick={() => handleClick(n)}
-                            className={`relative flex items-start gap-3.5 px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--muted)] group
-                              ${isUnread ? `border-l-4 ${cfg.border} bg-opacity-30` : 'opacity-75'}
+                            className={`relative flex items-start gap-3.5 px-5 py-3.5 cursor-pointer transition-colors group
+                              ${isUnread
+                                ? 'bg-[var(--accent-light)] hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
+                                : 'opacity-75 hover:bg-[var(--muted)]'}
                               ${needsAction ? 'ring-1 ring-[var(--warning)]/20' : ''}
                               ${isSelected ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]' : ''}`}
                             data-testid={`notification-inbox-item-${n.id}`}
@@ -1098,47 +1152,77 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
                                 ✓
                               </button>
                             )}
+
+                            {/* 안읽음 dot */}
+                            {isUnread && (
+                              <span className="mt-2 w-2 h-2 shrink-0 bg-[var(--accent)] rounded-full" />
+                            )}
+
                             {/* 타입 아이콘 */}
-                            <div className={`w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
+                            <div className={`w-10 h-10 rounded-[var(--radius-md)] flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
                               {cfg.icon}
                             </div>
 
                             {/* 내용 */}
-                            <div className="flex-1 min-w-0 pr-8">
+                            <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2">
-                                <p className={`text-sm leading-snug flex-1 ${n.read_at ? 'font-medium text-[var(--toss-gray-3)]' : 'font-bold text-[var(--foreground)]'}`}>
+                                <p className={`text-sm leading-snug flex-1 truncate ${n.read_at ? 'font-medium text-[var(--toss-gray-3)]' : 'font-bold text-[var(--foreground)]'}`}>
                                   {n.title}
                                 </p>
                                 <span className="text-[10px] text-[var(--toss-gray-3)] whitespace-nowrap shrink-0">{timeAgo(n.created_at)}</span>
                               </div>
                               {n.body && (
-                                <p className="text-xs text-[var(--toss-gray-3)] mt-0.5 line-clamp-2 leading-relaxed">{n.body}</p>
+                                <p className="text-xs text-[var(--toss-gray-3)] mt-0.5 truncate leading-relaxed">{n.body}</p>
                               )}
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <span className={`rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-black ${
-                                  isUnread
-                                    ? 'bg-[var(--accent-light)] text-[var(--accent)]'
-                                    : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                                }`}>
-                                  {isUnread ? '안읽음' : '읽음'}
-                                </span>
-                                {needsAction ? (
-                                  <span className="rounded-[var(--radius-sm)] bg-[var(--warning-light)] px-2 py-1 text-[10px] font-black text-[var(--warning)]">
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                {isUnread && (
+                                  <span className="rounded-[var(--radius-sm)] bg-[var(--accent-light)] px-2 py-0.5 text-[10px] font-black text-[var(--accent)]">
+                                    안읽음
+                                  </span>
+                                )}
+                                {needsAction && (
+                                  <span className="rounded-[var(--radius-sm)] bg-[var(--warning-light)] px-2 py-0.5 text-[10px] font-black text-[var(--warning)]">
                                     액션 필요
                                   </span>
-                                ) : null}
+                                )}
                               </div>
                             </div>
 
-                            {/* 안읽음 점 */}
-                            {isUnread && (
-                              <span className="absolute right-5 top-1/2 -translate-y-1/2 w-2 h-2 bg-[var(--accent)] rounded-full" />
-                            )}
-
-                            {/* 삭제 버튼 (hover 시 표시) */}
-                            <button type="button" onClick={e => deleteNotif(n.id, e)}
-                              className="absolute right-5 top-3.5 w-6 h-6 flex items-center justify-center rounded-full text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 text-xs"
-                              aria-label="삭제">✕</button>
+                            {/* 인라인 액션: hover 시 노출 (바로가기 + 읽음 + 삭제) */}
+                            <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* 바로가기 */}
+                              <button
+                                type="button"
+                                data-testid={`notification-inbox-goto-${n.id}`}
+                                onClick={(e) => { e.stopPropagation(); handleClick(n); }}
+                                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors text-sm"
+                                aria-label="바로가기"
+                              >
+                                →
+                              </button>
+                              {/* 읽음 처리 (안읽음인 경우만) */}
+                              {isUnread && (
+                                <button
+                                  type="button"
+                                  data-testid={`notification-inbox-read-${n.id}`}
+                                  onClick={(e) => { e.stopPropagation(); void markAsRead(n.id); }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors text-sm"
+                                  aria-label="읽음 처리"
+                                >
+                                  ✓
+                                </button>
+                              )}
+                              {/* 삭제 */}
+                              <button
+                                type="button"
+                                data-testid={`notification-inbox-delete-${n.id}`}
+                                onClick={(e) => deleteNotif(n.id, e)}
+                                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-500/10 transition-colors text-xs"
+                                aria-label="삭제"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </div>
                         );
                       })}

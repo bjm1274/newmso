@@ -237,29 +237,37 @@ export default function MyDocuments(props: MyDocumentsProps) {
                 </div>
             </div>
 
-            <div className="rounded-[var(--radius-xl)] border border-violet-100 bg-violet-50/60 p-4">
+            <div
+                className="rounded-[var(--radius-xl)] border border-violet-200 p-4"
+                style={{ background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 40%, #ddd6fe 100%)' }}
+            >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="min-w-0">
-                        <p className="text-[11px] font-black tracking-wide text-violet-700">직원 문서 전자서명</p>
-                        <h3 className="mt-1 text-sm font-bold text-[var(--foreground)]">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <svg className="w-3.5 h-3.5 text-violet-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z" />
+                            </svg>
+                            <p className="text-[11px] font-black tracking-wide text-violet-700">직원 문서 전자서명</p>
+                        </div>
+                        <h3 className="text-sm font-bold text-violet-900">
                             {latestContract?.contract_type || '근로계약 전자서명 대기 없음'}
                         </h3>
-                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--toss-gray-3)]">
-                            <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-violet-700">
+                            <span className="rounded-full bg-white/70 px-2 py-1 font-semibold border border-violet-100">
                                 상태 {pendingContract ? '서명대기' : latestContract?.status || '미등록'}
                             </span>
                             {latestContract?.requested_at ? (
-                                <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
+                                <span className="rounded-full bg-white/70 px-2 py-1 font-semibold border border-violet-100">
                                     요청일 {formatDate(latestContract.requested_at)}
                                 </span>
                             ) : null}
                             {latestContract?.signed_at ? (
-                                <span className="rounded-full bg-[var(--card)] px-2 py-1 font-semibold">
+                                <span className="rounded-full bg-white/70 px-2 py-1 font-semibold border border-violet-100">
                                     서명일 {formatDate(latestContract.signed_at)}
                                 </span>
                             ) : null}
                         </div>
-                        <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
+                        <p className="mt-2 text-[11px] font-medium text-violet-600">
                             {pendingContract
                                 ? '전자서명이 필요한 근로계약서가 있습니다. 아래 버튼으로 다시 열 수 있습니다.'
                                 : latestContract?.status === '서명완료'
@@ -273,7 +281,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                 type="button"
                                 data-testid="contract-sign-open-button"
                                 onClick={() => props.onOpenContractSignature?.(pendingContract)}
-                                className="rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700"
+                                className="rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black text-white shadow-sm hover:bg-violet-700 transition-colors"
                             >
                                 전자서명 진행
                             </button>
@@ -283,7 +291,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                 type="button"
                                 data-testid="contract-document-view-button"
                                 onClick={() => openRepositoryDocument(latestContractDocument)}
-                                className="rounded-full border border-violet-200 bg-[var(--card)] px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-violet-50"
+                                className="rounded-full border border-violet-300 bg-white/80 px-4 py-2 text-[11px] font-black text-violet-700 hover:bg-white transition-colors"
                             >
                                 서명본 보기
                             </button>
@@ -305,35 +313,90 @@ export default function MyDocuments(props: MyDocumentsProps) {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {REQUIRED_DOCS.map((doc, index) => {
                     const existingDoc = documents.find(d => d.category === doc.id);
+                    // 서류 종류별 아이콘 색상 배정 (반복 없이 순환)
+                    const iconColors = [
+                        { bg: 'bg-blue-100', text: 'text-blue-600' },
+                        { bg: 'bg-emerald-100', text: 'text-emerald-600' },
+                        { bg: 'bg-orange-100', text: 'text-orange-600' },
+                        { bg: 'bg-purple-100', text: 'text-purple-600' },
+                        { bg: 'bg-rose-100', text: 'text-rose-600' },
+                        { bg: 'bg-sky-100', text: 'text-sky-600' },
+                        { bg: 'bg-amber-100', text: 'text-amber-600' },
+                        { bg: 'bg-teal-100', text: 'text-teal-600' },
+                    ] as const;
+                    const iconColor = iconColors[index % iconColors.length];
                     return (
-                        <div data-testid={`document-card-${index}`} key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-[var(--border-subtle)] bg-[var(--card)] hover:border-blue-400'}`}>
+                        <div data-testid={`document-card-${index}`} key={doc.id} className={`border p-3 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]'}`}>
                             <div>
+                                {/* 아이콘 박스 */}
+                                <div className={`inline-flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] mb-2 ${iconColor.bg}`}>
+                                    <svg className={`w-4 h-4 ${iconColor.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
                                 <div className="flex justify-between items-start">
                                     <h4 className="pr-4 text-[11px] font-black leading-tight text-[var(--foreground)]">{doc.label}</h4>
                                     {existingDoc && (
-                                        <span className="text-emerald-500 text-[10px] font-black">✓</span>
+                                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
                                     )}
                                 </div>
                                 <span data-testid={`document-status-${index}`} className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--muted)] text-[var(--toss-gray-5)]'}`}>
                                     {existingDoc ? '제출 완료' : '미제출'}
                                 </span>
+                                {/* 메타: 제출일 또는 제출 필요 */}
+                                <p className={`mt-1 text-[9px] font-semibold ${existingDoc ? 'text-emerald-500' : 'text-[var(--toss-gray-4)]'}`}>
+                                    {existingDoc
+                                        ? existingDoc.created_at
+                                            ? formatDate(existingDoc.created_at)
+                                            : '제출 완료'
+                                        : '제출 필요'}
+                                </p>
                             </div>
 
-                            <div className="mt-3 flex gap-1.5">
+                            <div className="mt-2.5 flex gap-1.5">
                                 {existingDoc ? (
                                     <>
-                                        <button data-testid={`document-view-${index}`} onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--muted)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
-                                        <button onClick={() => setScanningDoc(doc)} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[10px] text-[var(--toss-gray-5)] transition-colors hover:text-[var(--accent)]" title="재촬영">📷</button>
+                                        <button
+                                            type="button"
+                                            data-testid={`document-view-${index}`}
+                                            onClick={() => window.open(existingDoc.file_url, '_blank')}
+                                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[var(--muted)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            보기
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setScanningDoc(doc)}
+                                            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[var(--toss-gray-4)] transition-colors hover:text-[var(--accent)] hover:border-[var(--accent)]"
+                                            title="재촬영"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </button>
                                     </>
                                 ) : (
                                     <div className="flex w-full gap-1">
                                         <button
+                                            type="button"
                                             onClick={() => setScanningDoc(doc)}
-                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-500/10 py-2 text-[9px] font-black text-blue-700 transition-colors hover:bg-blue-500/20 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
+                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 py-2 text-[9px] font-black text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
                                         >
-                                            📷 촬영
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            촬영
                                         </button>
                                         <button
+                                            type="button"
                                             data-testid={`document-upload-file-${index}`}
                                             onClick={() => {
                                                 setUploadingDocId(doc.id);
@@ -341,7 +404,10 @@ export default function MyDocuments(props: MyDocumentsProps) {
                                             }}
                                             className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--muted)] py-2 text-[9px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
                                         >
-                                            📁 파일
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                            </svg>
+                                            파일
                                         </button>
                                     </div>
                                 )}
@@ -354,9 +420,14 @@ export default function MyDocuments(props: MyDocumentsProps) {
             {/* 면허·자격 보수교육 이수증 제출 섹션 */}
             <LicenseCESubmit user={user as { id?: string; name?: string } | null | undefined} />
 
-            <div className="bg-blue-500/10/50 p-4 rounded-[var(--radius-xl)] border border-blue-100">
-                <h4 className="text-[13px] font-black text-blue-800 mb-2">📢 제출 및 촬영 가이드</h4>
-                <ul className="text-[11px] text-blue-700 space-y-2 font-medium list-disc ml-5">
+            <div className="bg-blue-50 p-4 rounded-[var(--radius-xl)] border border-blue-100 dark:bg-blue-950/30 dark:border-blue-900/50">
+                <h4 className="text-[13px] font-black text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                    </svg>
+                    제출 및 촬영 가이드
+                </h4>
+                <ul className="text-[11px] text-blue-700 dark:text-blue-300 space-y-2 font-medium list-disc ml-5">
                     <li><strong className="font-black underline decoration-2">모바일 촬영 시</strong>: 글자가 선명하게 보이도록 밝은 곳에서 촬영해 주세요.</li>
                     <li><strong className="font-black underline decoration-2">다중 페이지</strong>: 여러 장의 서류는 촬영 후 &apos;다음 페이지 추가&apos;를 통해 하나의 PDF로 제출 가능합니다.</li>
                 </ul>
@@ -506,7 +577,7 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
         <div className="fixed inset-0 z-[500] bg-black md:bg-black/90 flex flex-col items-center justify-center animate-in fade-in">
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
                 <h3 className="text-white font-bold">{doc.label} 스캔</h3>
-                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/100/10 rounded-[var(--radius-md)] w-fit">
+                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/20 rounded-[var(--radius-md)] w-fit">
                     현재 {capturedBlobs.length}페이지 수집됨
                 </span>
             </div>

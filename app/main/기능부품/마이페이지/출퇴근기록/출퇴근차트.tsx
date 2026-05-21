@@ -24,7 +24,18 @@ export function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) 
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-lg)] text-center shadow-sm">
       <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
-      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{value}</p>
+      <p
+        className="text-2xl font-semibold"
+        style={{
+          color: isWarning
+            ? 'var(--warning)'
+            : isSuccess
+              ? 'var(--success)'
+              : 'var(--foreground)',
+        }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -148,50 +159,69 @@ export function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
           <span>평균 <strong className="text-[var(--accent)]">{avgHours.toFixed(1)}h</strong></span>
         </div>
       </div>
-      <div className="flex h-16 items-end gap-0.5 overflow-x-auto pb-1">
+      {/* 차트 영역: 막대 위에 시간 라벨 항상 노출 */}
+      <div className="flex items-end gap-0.5 overflow-x-auto pb-1" style={{ height: '88px' }}>
         {data.map(({ day, hours, status }) => {
           const heightPercent = maxHours > 0 ? (hours / maxHours) * 100 : 0;
-          const barColor =
+          // 색상 토큰화 4톤: 정상=success, 지각/조퇴=warning, 미기록=muted, 결근=danger
+          const barBg =
             hours === 0
               ? status === '결근'
-                ? 'bg-red-300'
-                : 'bg-[var(--border)]'
-              : status === '지각'
-                ? 'bg-orange-400'
-                : 'bg-[var(--accent)]';
+                ? 'var(--danger)'
+                : 'var(--border)'
+              : status === '지각' || status === '조퇴'
+                ? 'var(--warning)'
+                : 'var(--success)';
+          const labelText =
+            hours > 0
+              ? hours >= 1
+                ? `${hours.toFixed(0)}h`
+                : `${Math.round(hours * 60)}m`
+              : '';
           return (
             <div
               key={day}
-              className="flex flex-1 shrink-0 flex-col items-center gap-0.5"
-              style={{ minWidth: '10px', maxWidth: '24px' }}
+              className="flex flex-1 shrink-0 flex-col items-center"
+              style={{ minWidth: '10px', maxWidth: '24px', height: '88px', justifyContent: 'flex-end' }}
             >
-              <div className="relative flex w-full flex-1 items-end">
-                <div
-                  className={`w-full rounded-t-sm ${barColor} transition-all`}
-                  style={{ height: `${Math.max(hours > 0 ? 15 : 4, heightPercent)}%` }}
-                  title={`${day}일: ${hours > 0 ? hours.toFixed(1) + 'h' : status || '결근'}`}
-                />
-              </div>
-              <span className="text-[8px] text-[var(--toss-gray-3)]">{day}</span>
+              {/* 항상 보이는 시간 라벨 */}
+              <span
+                className="text-[7px] leading-none mb-0.5 text-[var(--toss-gray-3)] tabular-nums"
+                style={{ minHeight: '10px' }}
+              >
+                {labelText}
+              </span>
+              {/* 막대 */}
+              <div
+                className="w-full rounded-t-sm transition-all"
+                style={{
+                  height: `${Math.max(hours > 0 ? 15 : 4, heightPercent)}%`,
+                  background: barBg,
+                  maxHeight: '60px',
+                }}
+              />
+              {/* 날짜 라벨 */}
+              <span className="text-[8px] text-[var(--toss-gray-3)] mt-0.5">{day}</span>
             </div>
           );
         })}
       </div>
+      {/* 범례: 4톤 토큰 색상 동기화 */}
       <div className="mt-2 flex items-center gap-3 text-[10px] text-[var(--toss-gray-3)]">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-sm bg-[var(--accent)]" />
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: 'var(--success)' }} />
           정상
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-sm bg-orange-400" />
-          지각
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: 'var(--warning)' }} />
+          지각·조퇴
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-sm bg-[var(--border)]" />
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: 'var(--border)' }} />
           미기록
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-sm bg-red-300" />
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: 'var(--danger)' }} />
           결근
         </span>
       </div>

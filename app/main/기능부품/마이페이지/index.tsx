@@ -26,7 +26,6 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { LucideIcon } from '../조직도서브/조직도측면창';
-import ShortcutManager from './단축키관리';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import {
   MobileAttendanceEntry,
@@ -127,7 +126,7 @@ function MyPageMain({
   const isRetired = !isActiveStaff(user ?? {});
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<MobileAttendanceView | null>(null);
-  const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications' | 'shortcuts'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
@@ -869,12 +868,6 @@ function MyPageMain({
               label="알림"
               icon="Bell"
             />
-            <TabButton
-              isActive={activeTab === 'shortcuts'}
-              onClick={() => setActiveTab('shortcuts')}
-              label="단축키"
-              icon="Keyboard"
-            />
           </nav>
 
           <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
@@ -1175,11 +1168,6 @@ function MyPageMain({
                   {isEditingProfile ? '수정 취소' : '정보 수정'}
                 </button>
               </div>
-            </div>
-          )}
-          {activeTab === 'shortcuts' && (
-            <div data-testid="mypage-shortcuts-tab" className="animate-premium-fade pb-3 space-y-3">
-              <ShortcutManager user={user as Record<string, unknown> | null} />
             </div>
           )}
           {activeTab === 'commute' && (

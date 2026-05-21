@@ -925,18 +925,22 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--card)] opacity-5 rounded-[var(--radius-lg)] blur-3xl"></div>
 
-        <div className="space-y-2 z-10 min-w-0">
-          <h2 className="text-2xl sm:text-3xl font-semibold tabular-nums whitespace-nowrap leading-none">
+        <div className="space-y-1.5 z-10 min-w-0">
+          <p className="text-[12px] font-semibold text-white/55">
+            {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+          </p>
+          <h2 className="text-[44px] font-bold tabular-nums whitespace-nowrap leading-none">
             {currentTime.toLocaleTimeString('ko-KR')}
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${activeTodayLog ? (activeTodayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500/100') : 'bg-red-500/100'}`}></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${activeTodayLog ? (activeTodayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-400') : 'bg-red-400'}`}></span>
             <span className="text-sm font-bold mr-1">
               {activeTodayLog ? (activeTodayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
             {distance !== null && (
-              <span className={`px-2 py-0.5 rounded-full text-[11px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/100/20 text-green-400' : 'bg-red-500/100/20 text-red-400'}`}>
-                병원 거리: {distance}m {distance <= ALLOWED_RADIUS_METER ? '확인' : '제한'}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+                GPS 인증 · {distance}m {distance <= ALLOWED_RADIUS_METER ? '확인' : '제한'}
               </span>
             )}
           </div>
@@ -950,7 +954,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               disabled={isProcessing}
               className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기 ☀️'}</span>
+              <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
@@ -959,9 +963,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
               data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
               disabled={isProcessing}
-              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500/100 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기 🌙'}</span>
+              <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
@@ -1071,12 +1075,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                   <div
                     className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${
                       displayStatus === '결근'
-                        ? 'bg-red-500/15 text-red-600'
-                        : displayStatus === '지각'
-                        ? 'bg-red-500/20 text-red-600'
-                        : displayStatus === '조퇴'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                        ? 'bg-[var(--danger-light)] text-[var(--danger)]'
+                        : displayStatus === '지각' || displayStatus === '조퇴'
+                        ? 'bg-[var(--warning-light)] text-[var(--warning)]'
+                        : displayStatus === '정상' || displayStatus === 'present'
+                        ? 'bg-[var(--success-light)] text-[var(--success)]'
+                        : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
                     }`}
                   >
                     <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
