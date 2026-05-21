@@ -160,7 +160,18 @@ function CatalogPanel({
             <thead>
               <tr>
                 <th scope="col" className="text-left">SKU</th>
-                <th scope="col" className="text-left">품목명</th>
+                <th
+                  scope="col"
+                  className="text-left"
+                  style={{
+                    position: 'sticky',
+                    left: 0,
+                    background: 'var(--tab-bg)',
+                    zIndex: 1,
+                  }}
+                >
+                  품목명
+                </th>
                 <th scope="col" className="text-left">카테고리</th>
                 <th scope="col" className="text-left">단위</th>
                 <th scope="col" className="text-right">단가</th>
@@ -174,7 +185,17 @@ function CatalogPanel({
                   <td className="font-bold tabular-nums text-[var(--accent)] text-[11px]">
                     {r.sku}
                   </td>
-                  <td className="font-bold">{r.name}</td>
+                  <td
+                    className="font-bold"
+                    style={{
+                      position: 'sticky',
+                      left: 0,
+                      background: 'var(--card)',
+                      zIndex: 1,
+                    }}
+                  >
+                    {r.name}
+                  </td>
                   <td className="text-[var(--toss-gray-4)]">{r.cat}</td>
                   <td className="text-[var(--toss-gray-4)] tabular-nums">{r.unit}</td>
                   <td className="text-right font-extrabold tabular-nums">

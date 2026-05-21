@@ -14,8 +14,8 @@ import { asString, pickNumber, pickString, toMonthString, toTimeString, type Row
 const MOVE_KIND_TONE: Record<StockMoveRow['kind'], Tone> = {
   입고: 'success',
   출고: 'accent',
-  이관: 'muted',
-  반품: 'warn',
+  이관: 'warn',
+  반품: 'danger',
 };
 
 function normalizeMoveKind(v: unknown): StockMoveRow['kind'] {

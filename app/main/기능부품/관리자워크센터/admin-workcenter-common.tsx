@@ -13,8 +13,8 @@ import { chipClass, type AdminKpi, type ChipTone } from './admin-types';
 export function WorkcenterHeader({
   title,
   subtitle,
-  mergedCount,
-  mergedTitles,
+  mergedCount: _mergedCount,
+  mergedTitles: _mergedTitles,
   actions,
 }: {
   title: string;
@@ -23,36 +23,14 @@ export function WorkcenterHeader({
   mergedTitles: string[];
   actions?: React.ReactNode;
 }) {
-  const consolidationRate = mergedCount > 1 ? Math.round(((mergedCount - 1) / mergedCount) * 100) : 0;
   return (
-    <div className="mb-4 space-y-3">
+    <div className="mb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">{title}</h2>
           {subtitle && <p className="text-xs text-[var(--toss-gray-4)] mt-0.5">{subtitle}</p>}
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
-      </div>
-
-      <div className="app-card flex items-start gap-3 px-4 py-3 flex-wrap">
-        <div className="flex-1 min-w-[200px]">
-          <div className="text-[11px] font-bold text-[var(--toss-gray-4)] mb-1.5">
-            통합된 원본 화면 {mergedCount}장
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {mergedTitles.map((t, i) => (
-              <span
-                key={i}
-                className="text-[10.5px] font-semibold px-2 py-0.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)]"
-              >
-                #{i + 1} {t}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="text-[11px] text-[var(--toss-gray-4)] whitespace-nowrap">
-          통합률 <b className="text-[var(--accent)]">{consolidationRate}%</b>
-        </div>
       </div>
     </div>
   );

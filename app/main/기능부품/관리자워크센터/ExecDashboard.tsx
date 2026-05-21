@@ -146,32 +146,43 @@ const MAX_BAR = 400;
 const PnlChart = memo(function PnlChart() {
   return (
     <>
-      <div className="flex items-end gap-3 h-[170px] px-1 pb-1">
-        {CHART_DATA.map((b) => (
-          <div key={b.m} className="flex-1 flex flex-col items-center justify-end gap-1.5">
-            <div className="flex items-end gap-0.5 w-full justify-center">
+      {/* 스택(누적) 막대: 각 월 1개 컬럼에 매출·비용·이익 순서로 누적 */}
+      <div className="flex items-end gap-2 h-[170px] px-1 pb-1">
+        {CHART_DATA.map((b) => {
+          const total = b.rev + b.cost + b.prof;
+          const totalH = (total / MAX_BAR) * 130;
+          const revH = (b.rev / total) * totalH;
+          const costH = (b.cost / total) * totalH;
+          const profH = totalH - revH - costH;
+          return (
+            <div key={b.m} className="flex-1 flex flex-col items-center justify-end gap-1.5">
               <div
-                className="w-2.5 bg-[var(--accent)] rounded-t-sm"
-                style={{ height: `${(b.rev / MAX_BAR) * 130}px` }}
-                aria-label={`${b.m} 매출 ${b.rev}M`}
-              />
-              <div
-                className="w-2.5 bg-rose-400 rounded-t-sm"
-                style={{ height: `${(b.cost / MAX_BAR) * 130}px` }}
-                aria-label={`${b.m} 비용 ${b.cost}M`}
-              />
-              <div
-                className="w-2.5 bg-emerald-500 rounded-t-sm"
-                style={{ height: `${(b.prof / MAX_BAR) * 130}px` }}
-                aria-label={`${b.m} 이익 ${b.prof}M`}
-              />
+                className="w-full flex flex-col-reverse overflow-hidden rounded-t-sm"
+                style={{ height: `${totalH}px` }}
+                role="img"
+                aria-label={`${b.m} 매출 ${b.rev}M 비용 ${b.cost}M 이익 ${b.prof}M`}
+              >
+                {/* 아래부터: 매출 → 비용 → 이익 순으로 쌓임 */}
+                <div
+                  className="w-full bg-[var(--accent)] shrink-0"
+                  style={{ height: `${revH}px` }}
+                />
+                <div
+                  className="w-full bg-rose-400 shrink-0"
+                  style={{ height: `${costH}px` }}
+                />
+                <div
+                  className="w-full bg-emerald-500 shrink-0"
+                  style={{ height: `${profH}px` }}
+                />
+              </div>
+              <div className={`text-[10px] font-semibold ${b.partial ? 'text-amber-600' : 'text-[var(--toss-gray-4)]'}`}>
+                {b.m}
+                {b.partial && <span className="ml-0.5 text-[9px]">(1-11)</span>}
+              </div>
             </div>
-            <div className={`text-[10px] font-semibold ${b.partial ? 'text-amber-600' : 'text-[var(--toss-gray-4)]'}`}>
-              {b.m}
-              {b.partial && <span className="ml-0.5 text-[9px]">(1-11)</span>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex items-center gap-3 mt-2 text-[10.5px] font-semibold text-[var(--toss-gray-4)]">
         <span className="flex items-center gap-1">
