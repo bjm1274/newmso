@@ -9,7 +9,7 @@ import {
   updateStaffPasswordWithFallback,
   verifyStoredPassword,
 } from '@/lib/staff-password';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   clearSessionCookie,
   createSessionToken,
@@ -74,6 +74,7 @@ const STAFF_LOGIN_COLUMNS = [
   'is_system_master',
   'password',
   'passwd',
+  'password_reset_required',
 ] as const;
 const STAFF_LOGIN_OPTIONAL_COLUMNS = [
   'role',
@@ -93,6 +94,7 @@ const STAFF_LOGIN_OPTIONAL_COLUMNS = [
   'is_system_master',
   'password',
   'passwd',
+  'password_reset_required',
 ];
 
 function buildStaffLoginSelect(omittedColumns: ReadonlySet<string>) {
@@ -342,14 +344,42 @@ export async function POST(request: NextRequest) {
     let notice: string | undefined;
 
     if (isFirstLogin) {
-      // 보안: 비밀번호 미설정 계정의 자동 로그인·자동 설정을 차단한다.
-      // 과거에는 첫 로그인 시 입력값을 비밀번호로 저장하고 로그인시켰으나,
-      // 이는 제3자가 비밀번호 미설정 계정을 선점·탈취할 수 있는 취약점이었다.
-      // 신규 직원의 초기 비밀번호는 관리자가 직접 설정해야 한다.
-      await recordFailedAttempt(loginId, WINDOW_MS);
-      return failureResponse(
-        '비밀번호가 설정되지 않은 계정입니다. 관리자에게 초기 비밀번호 설정을 요청해 주세요.'
-      );
+      // 보안: 비밀번호 미설정 계정 중 관리자가 명시적으로 초기화한 경우만 first-login 허용.
+      // password_reset_required = true(1) 이면 입력값을 새 비밀번호로 설정하고 로그인 성공.
+      // 그 외(우연한 미설정 계정)는 제3자 선점 방지를 위해 계속 차단.
+      const isResetRequested = Boolean(userRow.password_reset_required);
+
+      if (!isResetRequested) {
+        await recordFailedAttempt(loginId, WINDOW_MS);
+        return failureResponse(
+          '비밀번호가 설정되지 않은 계정입니다. 관리자에게 초기 비밀번호 설정을 요청해 주세요.'
+        );
+      }
+
+      // 관리자가 초기화한 계정 — 입력 비밀번호를 새 비밀번호로 설정
+      const { error: setPasswordError } = await updateStaffPasswordWithFallback(supabase, userRow.id, password);
+      if (setPasswordError) {
+        const message = setPasswordError instanceof Error
+          ? setPasswordError.message
+          : String((setPasswordError as { message?: string }).message || '비밀번호 설정 중 오류가 발생했습니다.');
+        return failureResponse(message);
+      }
+
+      // 플래그 해제 — 컬럼이 없으면 graceful skip
+      const flagClearResult = await supabase
+        .from('staff_members')
+        .update({ password_reset_required: false })
+        .eq('id', userRow.id);
+
+      if (flagClearResult.error) {
+        if (!isMissingColumnError(flagClearResult.error, 'password_reset_required')) {
+          console.error('[master-login] password_reset_required 플래그 해제 실패:', flagClearResult.error);
+          // 플래그 해제 실패는 로그인 성공 자체를 막지 않음
+        }
+      }
+
+      await resetAttempts(loginId);
+      return successResponse(userRow, '비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.');
     } else {
       const verified = await verifyStoredPassword(storedPassword, password);
       if (!verified.ok) {

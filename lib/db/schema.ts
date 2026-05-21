@@ -2045,6 +2045,7 @@ export const staff_members = sqliteTable("staff_members", {
 	salary: real(),
 	extension: text(),
 	contract_type: text(),
+	password_reset_required: integer().default(0),
 },
 (table) => [
 	index("idx_staff_members_shift_id").on(table.shift_id),

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
-import { clearStaffPasswordWithFallback } from '@/lib/staff-password';
-import { updateStaffPasswordWithFallback } from '@/lib/staff-password';
+import { clearStaffPasswordWithFallback, updateStaffPasswordWithFallback } from '@/lib/staff-password';
+import { isMissingColumnError } from '@/lib/supabase-compat';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -82,6 +82,24 @@ export async function POST(request: Request) {
       if (error) {
         const message = error instanceof Error ? error.message : String(error?.message || 'Password clear failed');
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
+      }
+
+      // 비밀번호 초기화 플래그 설정 — 컬럼이 없으면 graceful skip (빌드/배포 시차 대응)
+      const flagUpdate = await supabase
+        .from('staff_members')
+        .update({ password_reset_required: true })
+        .eq('id', staffId);
+
+      if (flagUpdate.error) {
+        const flagErr: unknown = flagUpdate.error;
+        if (!isMissingColumnError(flagErr, 'password_reset_required')) {
+          const message = flagErr instanceof Error
+            ? flagErr.message
+            : String((flagErr as { message?: string })?.message || 'Flag update failed');
+          return NextResponse.json({ ok: false, error: message }, { status: 500 });
+        }
+        // 컬럼 없음 — 플래그 update 건너뜀, 비번 클리어 결과는 유지
+        console.warn('[staff-password] password_reset_required 컬럼 없음 — 플래그 update 건너뜀 (마이그레이션 필요)');
       }
 
       // 감사 로그 기록 — D1 직접 INSERT
