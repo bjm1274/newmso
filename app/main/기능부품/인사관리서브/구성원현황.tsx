@@ -16,7 +16,7 @@ import {
   resolveWeeklyWorkingHours,
   resolveWorkingDaysPerWeek,
 } from '@/lib/payroll-working-hours';
-import { buildProfilePhotoUrlFromPath, getProfilePhotoUrl } from '@/lib/profile-photo';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import {
   cleanOptionalText,
   getStaffContractEndDate,
@@ -685,20 +685,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     file: File,
     currentStaff?: Record<string, unknown> | null,
   ) => {
-    const filePath = `${staffId}/avatar`;
-    const uploadedAt = new Date().toISOString();
-    const { error: uploadError } = await supabase.storage
-      .from('profiles')
-      .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('staffId', String(staffId));
 
-    if (uploadError) {
-      throw uploadError;
+    const response = await fetch('/api/staff/profile-photo/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const json = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(json.error || '프로필 사진 업로드에 실패했습니다.');
     }
+    const result = (await response.json()) as { path: string; url: string; uploadedAt: string };
+    const { path: filePath, url: photoUrl, uploadedAt } = result;
 
-    const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
-    const photoUrl =
-      buildProfilePhotoUrlFromPath(filePath, uploadedAt) ||
-      `${data.publicUrl}?v=${encodeURIComponent(uploadedAt)}`;
     const currentPermissions =
       currentStaff?.permissions && typeof currentStaff.permissions === 'object' && !Array.isArray(currentStaff.permissions)
         ? (currentStaff.permissions as Record<string, unknown>)

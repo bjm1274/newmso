@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import { buildR2AccessUrl, isR2ChatStorageEnabled, uploadToR2 } from '@/lib/object-storage';
 
-const BUCKET = 'company-seals';
+const R2_BUCKET = 'pchos-files';
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_BYTES = 5 * 1024 * 1024;
 
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-  return createClient(supabaseUrl, serviceKey);
-}
-
-function getExtension(fileName: string, mimeType: string) {
+function getExtension(fileName: string, mimeType: string): string {
   const raw = fileName.split('.').pop()?.toLowerCase();
   if (raw && /^[a-z0-9]+$/.test(raw)) return raw;
   if (mimeType === 'image/png') return 'png';
@@ -23,17 +14,24 @@ function getExtension(fileName: string, mimeType: string) {
   return 'jpg';
 }
 
-function buildFilePath(company: string, fileName: string, mimeType: string) {
+function buildObjectKey(company: string, fileName: string, mimeType: string): string {
   const safeFolder = company.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
   const ext = getExtension(fileName, mimeType);
   return `seals/${safeFolder}_${Date.now()}_${crypto.randomUUID()}.${ext}`;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const session = await readSessionFromRequest(request);
     if (!session || !isAdminSession(session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isR2ChatStorageEnabled()) {
+      return NextResponse.json(
+        { error: 'Cloudflare R2 스토리지가 설정되지 않았습니다.' },
+        { status: 503 },
+      );
     }
 
     const contentLength = Number(request.headers.get('content-length') || '0');
@@ -61,36 +59,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '직인 이미지는 5MB 이하여야 합니다.' }, { status: 413 });
     }
 
-    const supabase = getAdminClient();
-    const filePath = buildFilePath(company, file.name, file.type);
+    const objectKey = buildObjectKey(company, file.name, file.type);
     const arrayBuffer = await file.arrayBuffer();
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(filePath, Buffer.from(arrayBuffer), {
-        contentType: file.type,
-        upsert: true,
-        cacheControl: '3600',
-      });
-
-    if (uploadError) {
-      return NextResponse.json(
-        { error: uploadError.message || '직인 업로드에 실패했습니다.' },
-        { status: 500 },
-      );
-    }
-
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+    const uploaded = await uploadToR2(R2_BUCKET, objectKey, Buffer.from(arrayBuffer), file.type);
 
     return NextResponse.json({
       success: true,
-      path: filePath,
-      url: urlData.publicUrl,
+      path: uploaded.path,
+      url: buildR2AccessUrl(R2_BUCKET, objectKey),
     });
-  } catch {
-    return NextResponse.json(
-      { error: '직인 업로드 중 오류가 발생했습니다.' },
-      { status: 500 },
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '직인 업로드 중 오류가 발생했습니다.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

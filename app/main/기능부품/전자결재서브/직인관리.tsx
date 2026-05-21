@@ -23,22 +23,13 @@ interface Seal {
 const SEAL_TYPES = ['법인인감', '대표인', '부서인'];
 
 const LOCAL_SEALS_KEY = STORAGE_KEYS.COMPANY_SEALS;
-const SEAL_BUCKET_CANDIDATES = ['seals', 'company-seals'];
 
-function isMissingTableError(error: any, tableName = 'company_seals') {
+function isMissingTableError(error: unknown, tableName = 'company_seals') {
   if (!error) return false;
-  const code = String(error?.code || '');
-  const message = String(error?.message || error?.details || '').toLowerCase();
+  const err = error as { code?: string; message?: string; details?: string };
+  const code = String(err?.code || '');
+  const message = String(err?.message || err?.details || '').toLowerCase();
   return code === 'PGRST205' || message.includes(tableName.toLowerCase());
-}
-
-function isMissingBucketError(error: any, bucketName: string) {
-  if (!error) return false;
-  const message = String(error?.message || error?.details || '').toLowerCase();
-  return (
-    message.includes('bucket') &&
-    (message.includes('not found') || message.includes(bucketName.toLowerCase()))
-  );
 }
 
 function readLocalSeals(): Seal[] {
@@ -60,21 +51,23 @@ function writeLocalSeals(next: Seal[]) {
   }
 }
 
-async function uploadSealImage(imageFile: File, fallbackPreview: string | null) {
-  const fileName = `seals/${Date.now()}_${imageFile.name}`;
+async function uploadSealImage(imageFile: File, company: string): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', imageFile);
+  formData.append('company', company);
 
-  for (const bucket of SEAL_BUCKET_CANDIDATES) {
-    const { error } = await supabase.storage.from(bucket).upload(fileName, imageFile, { upsert: true });
-    if (!error) {
-      const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-      return data?.publicUrl || fallbackPreview || '';
-    }
-    if (!isMissingBucketError(error, bucket)) {
-      throw error;
-    }
+  const response = await fetch('/api/admin/seal/upload', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const json = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(json.error || '직인 업로드에 실패했습니다.');
   }
 
-  return fallbackPreview || '';
+  const result = (await response.json()) as { url: string };
+  return result.url;
 }
 
 export default function SealManager({ user, selectedCo }: Props) {
@@ -131,7 +124,7 @@ export default function SealManager({ user, selectedCo }: Props) {
     try {
       let imageUrl = imagePreview || '';
       if (imageFile) {
-        imageUrl = await uploadSealImage(imageFile, imagePreview);
+        imageUrl = await uploadSealImage(imageFile, company.trim());
       }
       const nextSeal: Seal = {
         id: globalThis.crypto?.randomUUID?.() || `local-seal-${Date.now()}`,

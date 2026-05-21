@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import {
+  buildR2AccessUrl,
+  createChatAttachmentUploadPlan,
+  isR2ChatStorageEnabled,
+  uploadToR2,
+} from '@/lib/object-storage';
 
-
-
+const R2_BUCKET = 'pchos-files';
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'video/mp4']);
 
@@ -12,69 +16,51 @@ type SignedUploadPayload = {
   contentType?: string;
 };
 
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
-function getFileExtension(fileName: string, mimeType: string) {
+function getFileExtension(fileName: string, mimeType: string): string {
   const rawExtension = fileName.split('.').pop()?.toLowerCase();
   if (rawExtension && /^[a-z0-9]+$/.test(rawExtension)) {
     return rawExtension;
   }
-
   if (mimeType === 'video/mp4') return 'mp4';
   if (mimeType === 'image/png') return 'png';
   return 'jpg';
 }
 
-function buildFilePath(fileName: string, mimeType: string) {
-  return `popup_${Date.now()}_${crypto.randomUUID()}.${getFileExtension(fileName, mimeType)}`;
+function buildObjectKey(fileName: string, mimeType: string): string {
+  return `popups/popup_${Date.now()}_${crypto.randomUUID()}.${getFileExtension(fileName, mimeType)}`;
 }
 
-function getPublicUrl(supabase: ReturnType<typeof getAdminClient>, filePath: string) {
-  const { data } = supabase.storage.from('popups').getPublicUrl(filePath);
-  return data.publicUrl;
-}
-
-function isAllowedType(contentType: string) {
-  return ALLOWED_TYPES.has(contentType);
-}
-
-function isVideoType(contentType: string) {
+function isVideoType(contentType: string): boolean {
   return contentType === 'video/mp4';
 }
 
-function getMaxFileBytes(contentType: string) {
+function getMaxFileBytes(contentType: string): number | null {
   return isVideoType(contentType) ? MAX_VIDEO_BYTES : null;
 }
 
-function validateFileSize(contentType: string, fileSize: number) {
-  if (!isVideoType(contentType)) {
-    return;
-  }
-
-  if (fileSize > MAX_VIDEO_BYTES) {
+function validateFileSize(contentType: string, fileSize: number): void {
+  if (isVideoType(contentType) && fileSize > MAX_VIDEO_BYTES) {
     throw new Error('동영상 크기는 200MB 이하여야 합니다.');
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const session = await readSessionFromRequest(request);
     if (!session || !isAdminSession(session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getAdminClient();
+    if (!isR2ChatStorageEnabled()) {
+      return NextResponse.json(
+        { error: 'Cloudflare R2 스토리지가 설정되지 않았습니다.' },
+        { status: 503 },
+      );
+    }
+
     const requestContentType = request.headers.get('content-type') || '';
 
+    // JSON 요청: presigned PUT URL 발급 (클라이언트 직접 업로드용, 주로 동영상)
     if (requestContentType.includes('application/json')) {
       const payload = (await request.json().catch(() => null)) as SignedUploadPayload | null;
       const fileName = typeof payload?.fileName === 'string' ? payload.fileName.trim() : '';
@@ -83,35 +69,34 @@ export async function POST(request: Request) {
       if (!fileName || !contentType) {
         return NextResponse.json({ error: '파일 정보가 올바르지 않습니다.' }, { status: 400 });
       }
-
-      if (!isAllowedType(contentType)) {
+      if (!ALLOWED_TYPES.has(contentType)) {
         return NextResponse.json(
           { error: 'JPG, PNG, MP4 파일만 업로드할 수 있습니다.' },
           { status: 400 },
         );
       }
 
-      const filePath = buildFilePath(fileName, contentType);
-      const { data: signedUpload, error: signedUploadError } = await supabase.storage
-        .from('popups')
-        .createSignedUploadUrl(filePath, { upsert: true });
-
-      if (signedUploadError || !signedUpload) {
+      const objectKey = buildObjectKey(fileName, contentType);
+      const plan = await createChatAttachmentUploadPlan(objectKey, contentType);
+      if (!plan) {
         return NextResponse.json(
-          { error: signedUploadError?.message || '업로드 서명을 생성하지 못했습니다.' },
+          { error: 'R2 업로드 서명을 생성하지 못했습니다.' },
           { status: 500 },
         );
       }
 
       return NextResponse.json({
         success: true,
-        path: filePath,
-        token: signedUpload.token,
-        url: getPublicUrl(supabase, filePath),
+        provider: 'r2',
+        path: plan.path,
+        signedUrl: plan.signedUrl,
+        headers: plan.headers,
+        url: buildR2AccessUrl(R2_BUCKET, objectKey),
         maxFileBytes: getMaxFileBytes(contentType),
       });
     }
 
+    // multipart/form-data: 서버에서 직접 업로드 (이미지)
     const contentLength = Number(request.headers.get('content-length') || '0');
     if (contentLength > 52_428_800) {
       return NextResponse.json({ error: '파일 크기가 50MB를 초과합니다.' }, { status: 413 });
@@ -123,8 +108,7 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
-
-    if (!isAllowedType(file.type)) {
+    if (!ALLOWED_TYPES.has(file.type)) {
       return NextResponse.json(
         { error: 'JPG, PNG, MP4 파일만 업로드할 수 있습니다.' },
         { status: 400 },
@@ -133,29 +117,18 @@ export async function POST(request: Request) {
 
     validateFileSize(file.type, file.size);
 
-    const filePath = buildFilePath(file.name, file.type);
+    const objectKey = buildObjectKey(file.name, file.type);
     const arrayBuffer = await file.arrayBuffer();
-
-    const { error: uploadError } = await supabase.storage
-      .from('popups')
-      .upload(filePath, Buffer.from(arrayBuffer), {
-        contentType: file.type,
-        upsert: true,
-        cacheControl: '3600',
-      });
-
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
+    const uploaded = await uploadToR2(R2_BUCKET, objectKey, Buffer.from(arrayBuffer), file.type);
 
     return NextResponse.json({
       success: true,
-      path: filePath,
-      url: getPublicUrl(supabase, filePath),
+      provider: 'r2',
+      path: uploaded.path,
+      url: buildR2AccessUrl(R2_BUCKET, objectKey),
     });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : '팝업 업로드 중 오류가 발생했습니다.';
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '팝업 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

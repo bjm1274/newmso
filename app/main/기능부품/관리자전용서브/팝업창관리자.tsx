@@ -21,7 +21,9 @@ type PopupDraft = {
 
 type SignedUploadResponse = {
   path?: string;
-  token?: string;
+  /** R2 presigned PUT URL */
+  signedUrl?: string;
+  headers?: Record<string, string>;
   url?: string;
   error?: string;
 };
@@ -128,19 +130,23 @@ function PopupManagerDesktop() {
     });
 
     const signPayload = (await signResponse.json().catch(() => null)) as SignedUploadResponse | null;
-    if (!signResponse.ok || !signPayload?.path || !signPayload?.token || !signPayload?.url) {
+    if (!signResponse.ok || !signPayload?.signedUrl || !signPayload?.url) {
       throw new Error(signPayload?.error || '파일 업로드 준비에 실패했습니다.');
     }
 
-    const { error: uploadError } = await supabase.storage
-      .from('popups')
-      .uploadToSignedUrl(signPayload.path, signPayload.token, selectedFile, {
-        cacheControl: '3600',
-        contentType: selectedFile.type,
-      });
+    // R2 presigned URL에 직접 PUT 업로드
+    const r2Response = await fetch(signPayload.signedUrl, {
+      method: 'PUT',
+      headers: {
+        'content-type': selectedFile.type,
+        'cache-control': '3600',
+        ...(signPayload.headers ?? {}),
+      },
+      body: selectedFile,
+    });
 
-    if (uploadError) {
-      throw new Error(uploadError.message || '파일 업로드에 실패했습니다.');
+    if (!r2Response.ok) {
+      throw new Error(`파일 업로드에 실패했습니다. (status: ${r2Response.status})`);
     }
 
     return signPayload.url;

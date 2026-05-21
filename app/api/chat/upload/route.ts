@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   buildChatAttachmentObjectKey,
   createChatAttachmentUploadPlan,
-  isR2ChatStorageEnabled,
-  uploadChatAttachmentToR2,
+  uploadToR2,
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
@@ -13,7 +11,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
-const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
+
+const R2_BUCKET = 'pchos-files';
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -41,40 +40,18 @@ type UploadPlanRequest = {
   fileSize?: number;
 };
 
-type UploadPlanResponse =
-  | {
-      success: true;
-      provider: 'supabase';
-      bucket: string;
-      path: string;
-      token: string;
-      signedUrl: string;
-      fileName: string;
-      url: string;
-    }
-  | {
-      success: true;
-      provider: 'r2';
-      bucket: string;
-      path: string;
-      signedUrl: string;
-      fileName: string;
-      url: string;
-      headers: Record<string, string>;
-    };
+type UploadPlanResponse = {
+  success: true;
+  provider: 'r2';
+  bucket: string;
+  path: string;
+  signedUrl: string;
+  fileName: string;
+  url: string;
+  headers: Record<string, string>;
+};
 
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
-function guessFileExtension(fileName: string, mimeType: string) {
+function guessFileExtension(fileName: string, mimeType: string): string {
   const rawName = String(fileName || '').trim();
   const lastDotIndex = rawName.lastIndexOf('.');
   if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
@@ -88,7 +65,7 @@ function guessFileExtension(fileName: string, mimeType: string) {
   return 'bin';
 }
 
-function normalizeUploadMimeType(fileName: string, mimeType: string) {
+function normalizeUploadMimeType(fileName: string, mimeType: string): string {
   const rawMimeType = String(mimeType || '').trim().toLowerCase();
   if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
   if (rawMimeType === 'image/x-png') return 'image/png';
@@ -98,46 +75,32 @@ function normalizeUploadMimeType(fileName: string, mimeType: string) {
   return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
-function buildFallbackFileName(mimeType: string, ext: string) {
+function buildFallbackFileName(mimeType: string, ext: string): string {
   if (mimeType.startsWith('image/')) return `image.${ext}`;
   if (mimeType.startsWith('video/')) return `video.${ext}`;
   if (mimeType === 'application/pdf') return `document.${ext}`;
   return `attachment.${ext}`;
 }
 
-function normalizeUploadFileName(fileName: string, mimeType: string) {
+function normalizeUploadFileName(fileName: string, mimeType: string): string {
   const ext = guessFileExtension(fileName, mimeType);
   const rawName = String(fileName || '').trim() || buildFallbackFileName(mimeType, ext);
   const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
   const sanitized = withoutPath
-    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, ' ')
+    .replace(/[ -<>:"/\\|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
   return sanitized || buildFallbackFileName(mimeType, ext);
 }
 
-function buildSafeFilePath(fileName: string, mimeType: string) {
+function buildSafeFilePath(fileName: string, mimeType: string): string {
   return buildChatAttachmentObjectKey(normalizeUploadFileName(fileName, mimeType), mimeType);
-}
-
-function isMissingBucketError(error: unknown, bucketName: string) {
-  const message = String(
-    (error as { message?: string; details?: string })?.message ||
-      (error as { message?: string; details?: string })?.details ||
-      '',
-  ).toLowerCase();
-
-  return (
-    (message.includes('bucket') && message.includes('not found')) ||
-    message.includes(`bucket ${bucketName.toLowerCase()}`) ||
-    message.includes(`bucket_id = '${bucketName.toLowerCase()}'`)
-  );
 }
 
 const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
 
-function validateUploadTarget(fileName: string, mimeType: string, fileSize: number) {
+function validateUploadTarget(fileName: string, mimeType: string, fileSize: number): void {
   if (!fileName.trim()) {
     throw new Error('업로드할 파일 이름이 없습니다.');
   }
@@ -161,10 +124,7 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   }
 }
 
-async function createSignedUploadPlan(
-  supabase: any,
-  payload: UploadPlanRequest,
-) {
+async function createSignedUploadPlan(payload: UploadPlanRequest): Promise<NextResponse> {
   const rawFileName = String(payload.fileName || '').trim();
   const mimeType = normalizeUploadMimeType(rawFileName, payload.mimeType || DEFAULT_CONTENT_TYPE);
   const fileName = normalizeUploadFileName(rawFileName, mimeType);
@@ -173,70 +133,39 @@ async function createSignedUploadPlan(
   validateUploadTarget(fileName, mimeType, fileSize);
 
   const filePath = buildSafeFilePath(fileName, mimeType);
-  if (isR2ChatStorageEnabled()) {
-    const r2Plan = await createChatAttachmentUploadPlan(filePath, mimeType);
-    if (r2Plan) {
-      const response: UploadPlanResponse = {
-        success: true,
-        provider: 'r2',
-        bucket: r2Plan.bucket,
-        path: r2Plan.path,
-        signedUrl: r2Plan.signedUrl,
-        fileName,
-        url: r2Plan.url,
-        headers: r2Plan.headers,
-      };
-      return NextResponse.json(response);
-    }
+  const r2Plan = await createChatAttachmentUploadPlan(filePath, mimeType);
+  if (!r2Plan) {
+    return NextResponse.json(
+      { error: 'Cloudflare R2 스토리지가 설정되지 않았습니다.' },
+      { status: 503 },
+    );
   }
 
-  let lastError: unknown = null;
-
-  for (const bucket of CHAT_BUCKET_CANDIDATES) {
-    const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(filePath);
-
-    if (!error && data?.token) {
-      const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
-      const response: UploadPlanResponse = {
-        success: true,
-        provider: 'supabase',
-        bucket,
-        path: filePath,
-        token: data.token,
-        signedUrl: data.signedUrl,
-        fileName,
-        url: publicUrlData.publicUrl,
-      };
-      return NextResponse.json(response);
-    }
-
-    lastError = error;
-    if (!isMissingBucketError(error, bucket)) {
-      return NextResponse.json(
-        { error: error?.message || '파일 업로드 준비에 실패했습니다.' },
-        { status: 500 },
-      );
-    }
-  }
-
-  const message =
-    (lastError as { message?: string })?.message || '채팅 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
-  return NextResponse.json({ error: message }, { status: 500 });
+  const response: UploadPlanResponse = {
+    success: true,
+    provider: 'r2',
+    bucket: r2Plan.bucket,
+    path: r2Plan.path,
+    signedUrl: r2Plan.signedUrl,
+    fileName,
+    url: r2Plan.url,
+    headers: r2Plan.headers,
+  };
+  return NextResponse.json(response);
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await readSessionFromRequest(request);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = getAdminClient();
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('application/json')) {
       const payload = (await request.json().catch(() => ({}))) as UploadPlanRequest;
-      return await createSignedUploadPlan(supabase, payload);
+      return await createSignedUploadPlan(payload);
     }
 
     const contentLength = Number(request.headers.get('content-length') || '0');
@@ -258,55 +187,17 @@ export async function POST(request: NextRequest) {
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
     const arrayBuffer = await file.arrayBuffer();
-    if (isR2ChatStorageEnabled()) {
-      const uploaded = await uploadChatAttachmentToR2(
-        filePath,
-        Buffer.from(arrayBuffer),
-        mimeType,
-      );
-      return NextResponse.json({
-        success: true,
-        provider: uploaded.provider,
-        bucket: uploaded.bucket,
-        path: uploaded.path,
-        fileName: normalizedFileName,
-        url: uploaded.url,
-      });
-    }
 
-    let lastError: unknown = null;
-
-    for (const bucket of CHAT_BUCKET_CANDIDATES) {
-      const { error } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, Buffer.from(arrayBuffer), {
-          contentType: mimeType,
-          upsert: false,
-          cacheControl: '3600',
-        });
-
-      if (!error) {
-        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-        return NextResponse.json({
-          success: true,
-          provider: 'supabase',
-          bucket,
-          path: filePath,
-          fileName: normalizedFileName,
-          url: data.publicUrl,
-        });
-      }
-
-      lastError = error;
-      if (!isMissingBucketError(error, bucket)) {
-        return NextResponse.json({ error: error.message || '파일 업로드에 실패했습니다.' }, { status: 500 });
-      }
-    }
-
-    const message =
-      (lastError as { message?: string })?.message || '채팅 첨부 업로드용 Storage 버킷을 찾지 못했습니다.';
-    return NextResponse.json({ error: message }, { status: 500 });
-  } catch (error) {
+    const uploaded = await uploadToR2(R2_BUCKET, filePath, Buffer.from(arrayBuffer), mimeType);
+    return NextResponse.json({
+      success: true,
+      provider: uploaded.provider,
+      bucket: uploaded.bucket,
+      path: uploaded.path,
+      fileName: normalizedFileName,
+      url: uploaded.url,
+    });
+  } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : '채팅 첨부 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

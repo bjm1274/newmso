@@ -194,20 +194,26 @@ export default function MyDocuments(props: MyDocumentsProps) {
                 fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             }
 
-            const filePath = `hr_documents/${user!.id}/${fileName}`;
-            const { error: uploadError } = await supabase.storage
-                .from('board-attachments')
-                .upload(filePath, finalBlob, { contentType: 'application/pdf', upsert: true });
+            const uploadForm = new FormData();
+            uploadForm.append('file', new File([finalBlob], fileName, { type: 'application/pdf' }));
 
-            if (uploadError) throw uploadError;
-            const { data: urlData } = supabase.storage.from('board-attachments').getPublicUrl(filePath);
+            const uploadRes = await fetch('/api/approvals/upload', {
+                method: 'POST',
+                body: uploadForm,
+            });
+            if (!uploadRes.ok) {
+                const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
+                throw new Error(errJson.error || '파일 업로드에 실패했습니다.');
+            }
+            const uploadData = (await uploadRes.json()) as { url: string };
+            const fileUrl = uploadData.url;
 
             const { error: dbError } = await supabase.from('document_repository').insert({
                 created_by: user!.id,
                 category: docType,
                 title: `${user!.name} - ${docType}`,
                 company_name: user!.company || '전체',
-                file_url: urlData.publicUrl,
+                file_url: fileUrl,
                 version: 1,
                 content: null,
             });

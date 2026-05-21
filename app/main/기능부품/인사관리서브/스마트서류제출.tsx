@@ -107,21 +107,25 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                 fileName = sanitizeFileName(`${_user.name as string}_${docType}_${Date.now()}.pdf`);
             }
 
-            const filePath = `hr_documents/${_user.id as string}/${fileName}`;
+            const uploadForm = new FormData();
+            uploadForm.append('file', new File([finalBlob], fileName, { type: 'application/pdf' }));
 
-            const { error: uploadError } = await supabase.storage
-                .from('board-attachments')
-                .upload(filePath, finalBlob, { contentType: 'application/pdf', upsert: true });
-
-            if (uploadError) throw uploadError;
-            const { data: urlData } = supabase.storage.from('board-attachments').getPublicUrl(filePath);
+            const uploadRes = await fetch('/api/approvals/upload', {
+                method: 'POST',
+                body: uploadForm,
+            });
+            if (!uploadRes.ok) {
+                const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
+                throw new Error(errJson.error || '파일 업로드에 실패했습니다.');
+            }
+            const uploadResult = (await uploadRes.json()) as { url: string };
 
             await supabase.from('document_repository').insert([{
                 title: `${_user.name as string} - ${docType}`,
                 category: docType,
                 company_name: _user.company as string || '전체',
                 created_by: _user.id,
-                file_url: urlData.publicUrl
+                file_url: uploadResult.url
             }]);
 
             toast(`${docType} 업로드가 완료되었습니다.`, 'success');

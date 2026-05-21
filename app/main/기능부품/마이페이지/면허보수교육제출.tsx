@@ -113,17 +113,20 @@ export default function LicenseCESubmit({ user }: Props) {
 
     setBusy(true);
     try {
-      // 1. Storage 업로드
-      const ext = file.name.split('.').pop() || (isPdf ? 'pdf' : 'jpg');
-      const fileName = `${user.id}_ce_${Date.now()}.${ext}`;
-      const filePath = `license_ce/${user.id}/${fileName}`;
-      const { error: upErr } = await supabase.storage
-        .from('board-attachments')
-        .upload(filePath, file, { contentType: file.type, upsert: false });
-      if (upErr) throw new Error(`업로드 실패: ${upErr.message}`);
+      // 1. Storage 업로드 (R2 via approvals/upload)
+      const uploadForm = new FormData();
+      uploadForm.append('file', file);
 
-      const { data: urlData } = supabase.storage.from('board-attachments').getPublicUrl(filePath);
-      const fileUrl = urlData.publicUrl;
+      const uploadRes = await fetch('/api/approvals/upload', {
+        method: 'POST',
+        body: uploadForm,
+      });
+      if (!uploadRes.ok) {
+        const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
+        throw new Error(`업로드 실패: ${errJson.error || uploadRes.statusText}`);
+      }
+      const uploadData = (await uploadRes.json()) as { url: string };
+      const fileUrl = uploadData.url;
 
       // 2. CE 제출 API
       const res = await fetch('/api/license-ce', {

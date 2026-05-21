@@ -144,14 +144,25 @@ export default function EducationList({
       if (uploadFile) {
         const ext = uploadFile.name.split('.').pop() || 'png';
         const path = `certs/${selectedAction.staffId}_${Date.now()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from('board-attachments').upload(path, uploadFile, { upsert: true });
+        const uploadForm = new FormData();
+        uploadForm.append('file', uploadFile);
 
-        if (uploadError) {
-          console.warn('Storage error, but continuing', uploadError);
+        try {
+          const uploadRes = await fetch('/api/approvals/upload', {
+            method: 'POST',
+            body: uploadForm,
+          });
+          if (!uploadRes.ok) {
+            const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
+            console.warn('Storage error, but continuing', errJson.error);
+            toast('파일 업로드 중 오류가 발생했습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'success');
+          } else {
+            const uploadData = (await uploadRes.json()) as { url: string };
+            url = uploadData.url;
+          }
+        } catch (uploadErr) {
+          console.warn('Storage error, but continuing', uploadErr);
           toast('파일 업로드 중 권한 에러가 발생했을 수 있습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'success');
-        } else {
-          const { data: publicData } = supabase.storage.from('board-attachments').getPublicUrl(path);
-          url = publicData.publicUrl;
         }
       }
 

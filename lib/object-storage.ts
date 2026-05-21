@@ -339,6 +339,102 @@ export async function uploadChatAttachmentToR2(
   };
 }
 
+/**
+ * 범용 R2 업로드 — 버킷과 objectKey를 직접 지정.
+ * 직인·팝업·프로필·백업 등 chat 외 용도에 사용.
+ */
+export async function uploadToR2(
+  bucket: string,
+  objectKey: string,
+  body: Buffer,
+  mimeType: string,
+): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error('Cloudflare R2 configuration is missing.');
+  }
+
+  const signedUrl = await createR2PresignedUrl({
+    method: 'PUT',
+    bucket,
+    objectKey,
+    expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
+    headers: {
+      'content-type': mimeType,
+      'cache-control': DEFAULT_CACHE_CONTROL,
+    },
+  });
+  const response = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: {
+      'content-type': mimeType,
+      'cache-control': DEFAULT_CACHE_CONTROL,
+    },
+    body: body as BodyInit,
+  });
+  if (!response.ok) {
+    throw new Error(`Cloudflare R2 upload failed with status ${response.status}.`);
+  }
+
+  return {
+    provider: 'r2',
+    bucket,
+    path: objectKey,
+    url: buildR2AccessUrl(bucket, objectKey),
+  };
+}
+
+/**
+ * 범용 R2 객체 삭제 — AWS S3 API DELETE 사용.
+ */
+export async function deleteFromR2(bucket: string, objectKey: string): Promise<void> {
+  const config = getR2Config();
+  if (!config) {
+    throw new Error('Cloudflare R2 configuration is missing.');
+  }
+
+  const now = new Date();
+  const { amzDate, dateStamp } = formatAmzDate(now);
+  const host = `${config.accountId}.r2.cloudflarestorage.com`;
+  const credentialScope = `${dateStamp}/auto/s3/aws4_request`;
+  const canonicalUri = `/${awsEncode(bucket)}/${encodeObjectKey(objectKey)}`;
+  const signedHeaders = 'host';
+  const canonicalHeaders = `host:${host}\n`;
+  const canonicalQuery = buildCanonicalQueryString([
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${config.accessKeyId}/${credentialScope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', '60'],
+    ['X-Amz-SignedHeaders', signedHeaders],
+  ]);
+  const canonicalRequest = [
+    'DELETE',
+    canonicalUri,
+    canonicalQuery,
+    `${canonicalHeaders}\n`,
+    signedHeaders,
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join('\n');
+  const dateKey = await hmacSha256(`AWS4${config.secretAccessKey}`, dateStamp);
+  const regionKey = await hmacSha256(dateKey, 'auto');
+  const serviceKey = await hmacSha256(regionKey, 's3');
+  const signingKey = await hmacSha256(serviceKey, 'aws4_request');
+  const signature = bytesToHex(await hmacSha256(signingKey, stringToSign));
+
+  const deleteUrl = `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+  const response = await fetch(deleteUrl, { method: 'DELETE' });
+  // R2 returns 204 on success, 404 is acceptable (already gone)
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Cloudflare R2 delete failed with status ${response.status}.`);
+  }
+}
+
 export async function createR2DownloadUrl(
   bucket: string,
   objectKey: string,

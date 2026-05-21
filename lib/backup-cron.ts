@@ -2,12 +2,14 @@
  * MSO 정기 백업 실행 로직 (Cron용)
  * - 6h: 핵심 6개 테이블
  * - 24h: 전체 주요 테이블
- * Supabase Storage 버킷 'mso-backups'에 JSON 저장.
+ * Cloudflare R2 버킷 'pchos-files'의 backup/ prefix에 JSON 저장.
  */
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import 'server-only';
+import { createClient } from '@supabase/supabase-js';
 import { FULL_BACKUP_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
+import { uploadToR2, isR2ChatStorageEnabled } from '@/lib/object-storage';
 
-const BUCKET = 'mso-backups';
+const R2_BUCKET = 'pchos-files';
 
 export type BackupType = '6h' | '24h';
 
@@ -21,6 +23,15 @@ export interface BackupResult {
 }
 
 export async function runBackup(type: BackupType): Promise<BackupResult> {
+  if (!isR2ChatStorageEnabled()) {
+    return {
+      ok: false,
+      type,
+      error: 'Cloudflare R2 configuration is missing.',
+      hint: 'R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY 환경변수를 설정해 주세요.',
+    };
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) {
@@ -31,7 +42,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
     };
   }
 
-  const supabase: SupabaseClient = createClient(supabaseUrl, serviceKey);
+  const supabase = createClient(supabaseUrl, serviceKey);
   const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
   const data: Record<string, unknown[]> = {};
   const now = new Date();
@@ -64,32 +75,28 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   }
 
   const json = JSON.stringify(data, null, 2);
-  const path =
+  const objectKey =
     type === '24h'
-      ? `24h/mso-full-${dateOnly}-${iso}.json`
-      : `6h/mso-data-${iso}.json`;
+      ? `backup/24h/mso-full-${dateOnly}-${iso}.json`
+      : `backup/6h/mso-data-${iso}.json`;
 
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, new Blob([json], { type: 'application/json' }), {
-      contentType: 'application/json',
-      upsert: true,
-    });
-
-  if (uploadError) {
+  try {
+    await uploadToR2(R2_BUCKET, objectKey, Buffer.from(json, 'utf-8'), 'application/json');
+  } catch (uploadError: unknown) {
+    const message = uploadError instanceof Error ? uploadError.message : String(uploadError);
     console.error('[backup] upload failed', uploadError);
     return {
       ok: false,
       type,
-      error: uploadError.message,
-      hint: `Supabase Storage에 '${BUCKET}' 버킷을 생성해 주세요.`,
+      error: message,
+      hint: `R2 버킷 '${R2_BUCKET}'에 backup/ prefix로 쓸 수 있는지 확인하세요.`,
     };
   }
 
   return {
     ok: true,
     type,
-    path,
+    path: objectKey,
     tables: Object.keys(data).length,
   };
 }
