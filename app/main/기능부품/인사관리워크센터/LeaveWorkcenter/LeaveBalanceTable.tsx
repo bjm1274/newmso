@@ -53,7 +53,7 @@ const TableRow = memo(function TableRow({ row, active, onPick }: RowProps) {
         active ? 'bg-[var(--muted)]' : 'hover:bg-[var(--muted)]/60'
       }`}
     >
-      <td className="px-3 py-2">
+      <td className="sticky left-0 z-[1] bg-[var(--card)] px-3 py-2">
         <button
           type="button"
           onClick={() => onPick(row)}
@@ -112,9 +112,9 @@ function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick }: Prop
   return (
     <div className="overflow-x-auto">
       <table className="data-table w-full text-[12px]">
-        <thead className="bg-[var(--tab-bg)]">
+        <thead className="sticky top-0 z-[1] bg-[var(--tab-bg)]">
           <tr className="text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
-            <th className="px-3 py-2">이름</th>
+            <th className="sticky left-0 z-[2] bg-[var(--tab-bg)] px-3 py-2">이름</th>
             <th className="px-3 py-2">부서</th>
             <th className="px-3 py-2 text-center">부여</th>
             <th className="px-3 py-2 text-center">사용</th>

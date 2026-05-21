@@ -223,7 +223,7 @@ export default function RosterGrid({ staffs, selectedCo, onOpenLegacyPlanner }: 
     <section className="flex min-h-0 flex-col gap-3">
       <div className="app-card flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 md:px-4 md:py-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-[13px] font-bold text-[var(--foreground)]">월간 근무표 · {headerLabel}</h3>
+          <h3 className="text-[13px] font-bold text-[var(--foreground)]">근무표 · {headerLabel}</h3>
           <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
             {scopedStaffs.length}명
           </span>

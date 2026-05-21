@@ -19,6 +19,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
+import { WorkcenterBackButton } from '../workcenter-common';
 import {
   buildEducationCompletionMap,
   getApplicableEducationItems,
@@ -192,13 +193,7 @@ export default function EducationBoard({ staffs, selectedCo }: EducationBoardPro
       <section className="app-card flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2 md:px-4 md:py-2.5">
           <h3 className="text-[13px] font-bold text-[var(--foreground)]">교육·자격 상세 관리</h3>
-          <button
-            type="button"
-            onClick={() => setShowLegacy(false)}
-            className="rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] hover:bg-[var(--muted)]"
-          >
-            ← 요약으로 돌아가기
-          </button>
+          <WorkcenterBackButton onClick={() => setShowLegacy(false)} label="요약으로 돌아가기" />
         </header>
         <div className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
           <EducationMain staffs={staffs} selectedCo={selectedCo} />

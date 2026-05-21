@@ -132,8 +132,8 @@ function StaffTableBase({
           <table className="w-full text-[12px]">
             <thead className="sticky top-0 z-[1] bg-[var(--card)]">
               <tr className="border-b border-[var(--border)] text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-4)]">
-                <th scope="col" className="w-9 px-2 py-2 text-left"></th>
-                <th scope="col" className="px-2 py-2 text-left">이름</th>
+                <th scope="col" className="sticky left-0 z-[2] w-9 bg-[var(--card)] px-2 py-2 text-left"></th>
+                <th scope="col" className="sticky left-9 z-[2] bg-[var(--card)] px-2 py-2 text-left">이름</th>
                 <th scope="col" className="px-2 py-2 text-left">부서</th>
                 <th scope="col" className="px-2 py-2 text-left">직급</th>
                 <th scope="col" className="px-2 py-2 text-left">입사일</th>
@@ -211,7 +211,7 @@ const StaffRow = memo(function StaffRow({ staff, selected, onSelect }: StaffRowP
         selected ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--muted)]'
       }`}
     >
-      <td className="px-2 py-2">
+      <td className="sticky left-0 z-[1] bg-[var(--card)] px-2 py-2">
         <div
           className={`flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[11px] font-bold ${TONE_BG[tone]}`}
           aria-hidden="true"
@@ -219,7 +219,7 @@ const StaffRow = memo(function StaffRow({ staff, selected, onSelect }: StaffRowP
           {initial}
         </div>
       </td>
-      <td className="px-2 py-2">
+      <td className="sticky left-9 z-[1] bg-[var(--card)] px-2 py-2">
         <div className="font-bold text-[var(--foreground)]">{staff.name}</div>
         {staff.employee_no && (
           <div className="text-[10px] text-[var(--toss-gray-4)]">{staff.employee_no}</div>

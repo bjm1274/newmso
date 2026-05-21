@@ -25,6 +25,7 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
+  WorkcenterBackButton,
   WorkcenterDarkBanner,
   WorkcenterDarkBannerCta,
   WorkcenterEmbed,
@@ -157,13 +158,7 @@ export default function AttendWorkcenter({
             <h3 className="text-[13px] font-bold text-[var(--foreground)]">
               {legacyView === 'schedule' ? '근무표 편성 도구' : legacyView === 'calendar' ? '근태 달력 상세' : '근태 상세'}
             </h3>
-            <button
-              type="button"
-              onClick={() => setLegacyView(null)}
-              className="rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] hover:bg-[var(--muted)]"
-            >
-              ← 워크센터로 돌아가기
-            </button>
+            <WorkcenterBackButton onClick={() => setLegacyView(null)} />
           </header>
           <div className="min-h-0 flex-1 overflow-auto">
             <WorkcenterEmbed label="근태 상세">

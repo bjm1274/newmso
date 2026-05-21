@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
+import { WorkcenterBackButton } from '../workcenter-common';
 import { appointmentTone, type AppointmentRecord } from './data';
 
 const PersonnelAppointment = dynamic(() => import('../../인사관리서브/인사발령관리'), {
@@ -89,13 +90,7 @@ export default function AppointmentBoard({ staffs, selectedCo, user }: Appointme
       <section className="app-card flex min-h-0 flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2 md:px-4 md:py-2.5">
           <h3 className="text-[13px] font-bold text-[var(--foreground)]">인사발령 관리 (상세)</h3>
-          <button
-            type="button"
-            onClick={() => setShowLegacy(false)}
-            className="rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] hover:bg-[var(--muted)]"
-          >
-            ← 요약으로 돌아가기
-          </button>
+          <WorkcenterBackButton onClick={() => setShowLegacy(false)} label="요약으로 돌아가기" />
         </header>
         <div className="min-h-0 flex-1 overflow-auto p-3 md:p-4">
           <PersonnelAppointment staffs={staffs} selectedCo={selectedCo || '전체'} user={user as StaffMember | Record<string, unknown> | null | undefined} />
