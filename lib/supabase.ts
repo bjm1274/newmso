@@ -43,7 +43,7 @@ const realSupabase: SupabaseClient = createClient(url, key, {
 // 서버(Node.js)에서는 항상 realSupabase 사용 — self-call 무한 루프 방지.
 //
 // 운영 영향 발생 시 이 플래그를 false로 되돌리고 재배포로 즉시 롤백.
-const ENABLE_D1_CLIENT = false;
+const ENABLE_D1_CLIENT = true;
 const isClientD1 = typeof window !== 'undefined' && ENABLE_D1_CLIENT;
 
 function createHybridSupabase(): SupabaseClient {
