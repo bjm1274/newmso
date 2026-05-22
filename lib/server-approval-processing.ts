@@ -1,5 +1,4 @@
 import { sql } from 'drizzle-orm';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildSupplyRequestWorkflowItems,
   fetchSupportInventoryRows,
@@ -110,14 +109,14 @@ async function upsertAttendanceCorrectionRows(
     });
 }
 
-async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, item: ApprovalRow) {
+async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
   const metaData = item.meta_data as Record<string, unknown> | null | undefined;
   const requestedItems = Array.isArray(metaData?.items) ? metaData.items : [];
   if (!item?.id || requestedItems.length === 0) {
     return null;
   }
 
-  const { data: sourceInventoryRows, error: sourceInventoryError } = await fetchSupportInventoryRows(supabase);
+  const { data: sourceInventoryRows, error: sourceInventoryError } = await fetchSupportInventoryRows();
   if (sourceInventoryError) throw sourceInventoryError;
 
   const inventoryWorkflow = metaData?.inventory_workflow as Record<string, unknown> | null | undefined;
@@ -218,7 +217,6 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
 }
 
 export async function processFinalApprovalEffects(
-  supabase: SupabaseClient,
   item: ApprovalRow,
   actorId?: string | null,
 ) : Promise<ApprovalFinalizeResult> {
@@ -277,7 +275,7 @@ export async function processFinalApprovalEffects(
 
   if (item.type === '물품요청' && itemMetaData?.items) {
     try {
-      supplySummary = await prepareSupplyApprovalInventoryWorkflow(supabase, item);
+      supplySummary = await prepareSupplyApprovalInventoryWorkflow(item);
       steps.push('inventory_workflow');
     } catch (error) {
       warnings.push(`재고 워크플로우 준비 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
@@ -367,23 +365,20 @@ export async function processFinalApprovalEffects(
         const leaveType = leaveSummary?.leaveType || '연차';
         const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
-        await ensureApprovedAnnualLeaveRequest(
-          {
-            staffId: senderId,
-            leaveType,
-            startDate: startStr,
-            endDate: endStr,
-            reason: leaveSummary?.reason || String(item.title || ''),
-            approvalId: String(item.id || '').trim() || null,
-            companyId: String(item.company_id || '').trim() || null,
-            companyName: String(item.sender_company || '').trim() || null,
-            delegateId: leaveSummary?.delegateId || null,
-            delegateName: leaveSummary?.delegateName || null,
-            delegateDepartment: leaveSummary?.delegateDepartment || null,
-            delegatePosition: leaveSummary?.delegatePosition || null,
-          },
-          supabase,
-        );
+        await ensureApprovedAnnualLeaveRequest({
+          staffId: senderId,
+          leaveType,
+          startDate: startStr,
+          endDate: endStr,
+          reason: leaveSummary?.reason || String(item.title || ''),
+          approvalId: String(item.id || '').trim() || null,
+          companyId: String(item.company_id || '').trim() || null,
+          companyName: String(item.sender_company || '').trim() || null,
+          delegateId: leaveSummary?.delegateId || null,
+          delegateName: leaveSummary?.delegateName || null,
+          delegateDepartment: leaveSummary?.delegateDepartment || null,
+          delegatePosition: leaveSummary?.delegatePosition || null,
+        });
 
         // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
         const leaveDb = await requireD1ForApprovalProcessing('leave_attendance.upsert');
@@ -430,7 +425,7 @@ export async function processFinalApprovalEffects(
         }
 
         if (isAnnualLeaveType(leaveType)) {
-          await syncAnnualLeaveUsedForStaff(senderId, supabase);
+          await syncAnnualLeaveUsedForStaff(senderId);
         }
 
         steps.push('leave_attendance');

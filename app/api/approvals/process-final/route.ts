@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import {
@@ -8,17 +7,6 @@ import {
   getD1Binding,
   getD1Drizzle,
 } from '@/lib/db';
-
-function createAdminSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 function normalizeApprovalLineIds(line: unknown): string[] {
   if (!Array.isArray(line)) return [];
@@ -66,8 +54,6 @@ export async function POST(request: Request) {
     if (!approvalId) {
       return NextResponse.json({ ok: false, error: 'approvalId is required' }, { status: 400 });
     }
-
-    const supabase = createAdminSupabase();
 
     // approvals 조회 (D1)
     type ApprovalFetchRow = {
@@ -146,7 +132,6 @@ export async function POST(request: Request) {
     }
 
     const result = await processFinalApprovalEffects(
-      supabase,
       approval as Record<string, unknown>,
       String(session.user.id || '').trim() || null,
     );

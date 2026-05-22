@@ -1,10 +1,17 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { d1Client } from '@/lib/d1-supabase-compat';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   callAtomicStockUpdate,
   callAtomicStockTransfer,
 } from '@/lib/inventory-stock-client';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  inventory as inventoryTable,
+  and,
+  eq,
+} from '@/lib/db';
 import type { InventoryItem, StaffMember } from '@/types';
 
 type LooseRecord = Record<string, unknown>;
@@ -468,26 +475,54 @@ export function normalizeSupportInventoryRows(rows: InventoryLike[] = []) {
   });
 }
 
-export async function fetchSupportInventoryRows(client: SupabaseClient = supabase) {
-  const result = await withMissingColumnFallback<LooseRecord[]>(
-    () =>
-      client
-        .from('inventory')
-        .select('*')
-        .eq('company', INVENTORY_SUPPORT_COMPANY)
-        .eq('department', INVENTORY_SUPPORT_DEPARTMENT) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
-    () =>
-      client
-        .from('inventory')
-        .select('*')
-        .eq('company', INVENTORY_SUPPORT_COMPANY) as PromiseLike<SupabaseCompatResult<LooseRecord[]>>,
-    'department',
-  );
+/**
+ * SY INC. 경영지원팀 재고 행을 D1에서 조회한다.
+ *
+ * 컷오버(2026-05-21) 후 데이터 진실원은 Cloudflare D1 한 곳이다.
+ * - 서버/Workers: D1 binding이 있으면 drizzle로 직접 SELECT.
+ * - 브라우저: binding이 없으므로 d1Client(/api/d1/query) 경유로 D1을 읽는다.
+ * 어느 쪽이든 Supabase를 거치지 않는다.
+ */
+export async function fetchSupportInventoryRows(): Promise<{
+  data: InventoryLike[];
+  error: unknown;
+}> {
+  try {
+    const d1 = await getD1Binding();
+    if (d1) {
+      // 서버/Workers — D1 직접 조회
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select()
+        .from(inventoryTable)
+        .where(
+          and(
+            eq(inventoryTable.company, INVENTORY_SUPPORT_COMPANY),
+            eq(inventoryTable.department, INVENTORY_SUPPORT_DEPARTMENT),
+          ),
+        );
+      return {
+        data: normalizeSupportInventoryRows(toLooseRecordArray(rows) as InventoryLike[]),
+        error: null,
+      };
+    }
 
-  return {
-    data: normalizeSupportInventoryRows(toLooseRecordArray(result.data) as InventoryLike[]),
-    error: result.error,
-  };
+    // 브라우저 — d1Client가 /api/d1/query로 D1을 읽는다
+    const { data, error } = await d1Client
+      .from('inventory')
+      .select('*')
+      .eq('company', INVENTORY_SUPPORT_COMPANY)
+      .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
+    if (error) {
+      return { data: [], error };
+    }
+    return {
+      data: normalizeSupportInventoryRows(toLooseRecordArray(data) as InventoryLike[]),
+      error: null,
+    };
+  } catch (error) {
+    return { data: [], error };
+  }
 }
 
 export function findDestinationInventoryItem(

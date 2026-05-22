@@ -1,18 +1,11 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { isRelationMarkedMissing } from '@/lib/supabase-compat';
 import {
-  isRelationMarkedMissing,
-  rememberMissingRelation,
-  withMissingColumnsFallback,
-} from '@/lib/supabase-compat';
-import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   inventory as inventoryTable,
   inventory_price_history as inventoryPriceHistoryTable,
   eq,
 } from '@/lib/db';
-import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type LooseRecord = Record<string, unknown>;
 
@@ -55,7 +48,6 @@ export function buildInventoryTrackingPatch(input: InventoryTrackingPatch) {
 }
 
 export async function updateInventoryTrackingFields(
-  client: SupabaseClient,
   inventoryItemId: string,
   input: InventoryTrackingPatch,
 ) {
@@ -64,57 +56,17 @@ export async function updateInventoryTrackingFields(
     return;
   }
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[inventory-erp-helpers] D1 binding not available (updateInventoryTrackingFields)');
-    const db = getD1Drizzle(d1);
-    // inventory 테이블에 JSON 컬럼 없음 — 직렬화 불필요
-    await db
-      .update(inventoryTable)
-      .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
-      .where(eq(inventoryTable.id, inventoryItemId));
-    return;
-  }
-
-  const result = await withMissingColumnsFallback(
-    (omittedColumns) => {
-      const payload = { ...patch };
-      omittedColumns.forEach((columnName) => {
-        delete payload[columnName];
-      });
-      if (Object.keys(payload).length === 0) {
-        return Promise.resolve({ data: null, error: null });
-      }
-      return client.from('inventory').update(payload).eq('id', inventoryItemId);
-    },
-    ['serial_number', 'lot_number', 'expiry_date', 'location', 'supplier_name', 'unit_price'],
-    { cacheKey: 'inventory.tracking.update' },
-  );
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  // dual-write: inventory tracking fields 미러 (best-effort)
-  if (backend === 'dual-write') {
-    try {
-      const d1 = await getD1Binding();
-      if (d1) {
-        const db = getD1Drizzle(d1);
-        await db
-          .update(inventoryTable)
-          .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
-          .where(eq(inventoryTable.id, inventoryItemId));
-      }
-    } catch (mirrorErr) {
-      logD1MirrorFailure(mirrorErr, { label: 'mirror:inventory.tracking_fields', backend });
-    }
-  }
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[inventory-erp-helpers] D1 binding not available (updateInventoryTrackingFields)');
+  const db = getD1Drizzle(d1);
+  // inventory 테이블에 JSON 컬럼 없음 — 직렬화 불필요
+  await db
+    .update(inventoryTable)
+    .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+    .where(eq(inventoryTable.id, inventoryItemId));
 }
 
 export async function recordInventoryPriceHistory(
-  client: SupabaseClient,
   params: {
     inventoryItemId?: string | null;
     supplierId?: string | null;
@@ -151,70 +103,22 @@ export async function recordInventoryPriceHistory(
     notes: cleanText(params.notes),
   };
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[inventory-erp-helpers] D1 binding not available (recordInventoryPriceHistory)');
-    const db = getD1Drizzle(d1);
-    // inventory_price_history는 JSON 컬럼 없음 — 직렬화 불필요
-    await db.insert(inventoryPriceHistoryTable).values({
-      id: crypto.randomUUID(),
-      inventory_item_id: String(payload.inventory_item_id ?? ''),
-      supplier_id: (payload.supplier_id as string | null) ?? null,
-      supplier_name: (payload.supplier_name as string | null) ?? null,
-      unit_price: typeof payload.unit_price === 'number' ? payload.unit_price : null,
-      quantity: typeof payload.quantity === 'number' ? payload.quantity : 0,
-      total_amount: typeof payload.total_amount === 'number' ? payload.total_amount : null,
-      source_type: (payload.source_type as string | null) ?? 'manual',
-      recorded_by: (payload.recorded_by as string | null) ?? null,
-      purchase_order_id: (payload.purchase_order_id as string | null) ?? null,
-      notes: (payload.notes as string | null) ?? null,
-    });
-    return;
-  }
-
-  const result = await withMissingColumnsFallback(
-    (omittedColumns) => {
-      const nextPayload = { ...payload };
-      omittedColumns.forEach((columnName) => {
-        delete nextPayload[columnName];
-      });
-      return client.from('inventory_price_history').insert([nextPayload]);
-    },
-    ['supplier_id', 'supplier_name', 'total_amount', 'recorded_by', 'purchase_order_id', 'notes'],
-    { cacheKey: 'inventory_price_history.insert' },
-  );
-
-  if (result.error) {
-    if (rememberMissingRelation(result.error, 'inventory_price_history')) {
-      return;
-    }
-    throw result.error;
-  }
-
-  // dual-write: inventory_price_history 미러 (best-effort)
-  if (backend === 'dual-write') {
-    try {
-      const d1 = await getD1Binding();
-      if (d1) {
-        const db = getD1Drizzle(d1);
-        await db.insert(inventoryPriceHistoryTable).values({
-          id: crypto.randomUUID(),
-          inventory_item_id: String(payload.inventory_item_id ?? ''),
-          supplier_id: (payload.supplier_id as string | null) ?? null,
-          supplier_name: (payload.supplier_name as string | null) ?? null,
-          unit_price: typeof payload.unit_price === 'number' ? payload.unit_price : null,
-          quantity: typeof payload.quantity === 'number' ? payload.quantity : 0,
-          total_amount: typeof payload.total_amount === 'number' ? payload.total_amount : null,
-          source_type: (payload.source_type as string | null) ?? 'manual',
-          recorded_by: (payload.recorded_by as string | null) ?? null,
-          purchase_order_id: (payload.purchase_order_id as string | null) ?? null,
-          notes: (payload.notes as string | null) ?? null,
-        });
-      }
-    } catch (mirrorErr) {
-      logD1MirrorFailure(mirrorErr, { label: 'mirror:inventory_price_history.insert', backend });
-    }
-  }
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[inventory-erp-helpers] D1 binding not available (recordInventoryPriceHistory)');
+  const db = getD1Drizzle(d1);
+  // inventory_price_history는 JSON 컬럼 없음 — 직렬화 불필요
+  await db.insert(inventoryPriceHistoryTable).values({
+    id: crypto.randomUUID(),
+    inventory_item_id: String(payload.inventory_item_id ?? ''),
+    supplier_id: (payload.supplier_id as string | null) ?? null,
+    supplier_name: (payload.supplier_name as string | null) ?? null,
+    unit_price: typeof payload.unit_price === 'number' ? payload.unit_price : null,
+    quantity: typeof payload.quantity === 'number' ? payload.quantity : 0,
+    total_amount: typeof payload.total_amount === 'number' ? payload.total_amount : null,
+    source_type: (payload.source_type as string | null) ?? 'manual',
+    recorded_by: (payload.recorded_by as string | null) ?? null,
+    purchase_order_id: (payload.purchase_order_id as string | null) ?? null,
+    notes: (payload.notes as string | null) ?? null,
+  });
 }
 

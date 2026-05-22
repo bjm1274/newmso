@@ -527,7 +527,6 @@ async function transitionSingleApproval(params: {
     ...updateData,
   }) as ApprovalRow;
   const processingResult = await processFinalApprovalEffects(
-    supabase,
     finalizedApproval,
     actor.id
   );
