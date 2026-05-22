@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { deleteFromR2, isInternalStorageObjectUrl } from '@/lib/object-storage';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   popups as popupsTable,
@@ -21,17 +19,6 @@ type PopupRow = {
   title: string | null;
   media_url: string | null;
 };
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 /**
  * R2에 저장된 팝업 URL에서 object key를 추출한다.
@@ -85,55 +72,28 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: '삭제할 팝업 정보가 올바르지 않습니다.' }, { status: 400 });
     }
 
-    const backend = await resolveDataBackend();
-
-    let typedPopup: PopupRow;
-
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        return NextResponse.json({ error: '[popups/delete] D1 binding not available' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-
-      const rows = await db
-        .select({ id: popupsTable.id, title: popupsTable.title, media_url: popupsTable.media_url })
-        .from(popupsTable)
-        .where(eq(popupsTable.id, popupId))
-        .limit(1);
-
-      if (rows.length === 0) {
-        return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
-      }
-      typedPopup = { id: rows[0].id, title: rows[0].title ?? null, media_url: rows[0].media_url ?? null };
-
-      await db.delete(popupsTable).where(eq(popupsTable.id, popupId));
-    } else {
-      const supabase = getAdminClient();
-      const { data: popup, error: selectError } = await supabase
-        .from('popups')
-        .select('id, title, media_url')
-        .eq('id', popupId)
-        .maybeSingle();
-
-      if (selectError) {
-        return NextResponse.json({ error: selectError.message }, { status: 500 });
-      }
-      if (!popup) {
-        return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
-      }
-
-      typedPopup = popup as PopupRow;
-
-      const { error: deleteError } = await supabase
-        .from('popups')
-        .delete()
-        .eq('id', popupId);
-
-      if (deleteError) {
-        return NextResponse.json({ error: deleteError.message }, { status: 500 });
-      }
+    const d1 = await getD1Binding();
+    if (!d1) {
+      return NextResponse.json({ error: '[popups/delete] D1 binding not available' }, { status: 500 });
     }
+    const db = getD1Drizzle(d1);
+
+    const rows = await db
+      .select({ id: popupsTable.id, title: popupsTable.title, media_url: popupsTable.media_url })
+      .from(popupsTable)
+      .where(eq(popupsTable.id, popupId))
+      .limit(1);
+
+    if (rows.length === 0) {
+      return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
+    }
+    const typedPopup: PopupRow = {
+      id: rows[0].id,
+      title: rows[0].title ?? null,
+      media_url: rows[0].media_url ?? null,
+    };
+
+    await db.delete(popupsTable).where(eq(popupsTable.id, popupId));
 
     const objectKey = extractR2ObjectKey(typedPopup.media_url);
     if (!objectKey) {

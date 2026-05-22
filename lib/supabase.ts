@@ -1,70 +1,23 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { getStoredSupabaseAccessToken } from './supabase-bridge';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { d1Client } from './d1-supabase-compat';
 
-const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
-const PLACEHOLDER_KEY = 'placeholder-anon-key';
-
-function getSupabaseConfig(): { url: string; key: string } {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const url = typeof rawUrl === 'string' && rawUrl.trim() ? rawUrl : PLACEHOLDER_URL;
-  const key = typeof rawKey === 'string' && rawKey.trim() ? rawKey : PLACEHOLDER_KEY;
-  return { url, key };
-}
-
-const { url, key } = getSupabaseConfig();
-
-const shouldWarnMissingSupabaseConfig =
-  (url === PLACEHOLDER_URL || key === PLACEHOLDER_KEY) &&
-  typeof window !== 'undefined' &&
-  process.env.NODE_ENV !== 'test' &&
-  !(typeof navigator !== 'undefined' && navigator.webdriver);
-
-if (shouldWarnMissingSupabaseConfig) {
-  console.warn(
-    '[SY INC. ERP] Supabase URL 또는 Anon Key가 설정되지 않았습니다. .env.local에 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY를 추가하세요.'
-  );
-}
-
-const realSupabase: SupabaseClient = createClient(url, key, {
-  accessToken: async () => getStoredSupabaseAccessToken(),
-});
-
-// Phase 7 — Cloudflare D1 cutover.
-// ENABLE_D1_CLIENT=true 면 클라이언트(브라우저)의 `supabase.from()`·`supabase.rpc()`
-// 호출을 d1Client로 라우팅(/api/d1/query·/api/d1/mutate·/api/d1/rpc/*). 나머지
-// supabase 내장 API(.realtime, .auth, .storage, .channel 등)는 realSupabase로 흘러감.
+// Phase 9 — Supabase 런타임 의존 제거(Cloudflare D1 컷오버 완료).
 //
-// Phase 8-J — 이전 cutover 시도(전체 d1Client cast)는 login page의
-// `supabase.realtime.setAuth()` 호출이 undefined.setAuth → runtime error로
-// 로그인 자체가 불가능했음. Proxy hybrid로 .from()만 D1, 나머지는 realSupabase.
+// 과거: `supabase`는 Supabase 클라이언트를 감싼 Proxy 였다. 브라우저에서
+// `.from()`·`.rpc()`만 d1Client로 가로채고 나머지(.auth/.storage/.realtime/
+// .channel/.functions)는 실제 Supabase 클라이언트로 흘려보냈다.
 //
-// 서버(Node.js)에서는 항상 realSupabase 사용 — self-call 무한 루프 방지.
+// 현재: Realtime은 polling으로, Storage는 R2로, Auth는 자체 세션으로
+// 전환 완료되어 Supabase 내장 API 호출이 코드베이스에 남아 있지 않다.
+// 따라서 런타임 객체는 d1Client 그 자체다 — `.from()`·`.rpc()`는 D1
+// (/api/d1/query·/api/d1/mutate·/api/d1/rpc/*)로 라우팅되고, `.channel()`·
+// `.removeChannel()`는 legacy 호환용 no-op 이다. `createClient`·`realSupabase`·
+// Proxy 하이브리드는 모두 제거됐다(실제 Supabase 클라이언트 미생성).
 //
-// 운영 영향 발생 시 이 플래그를 false로 되돌리고 재배포로 즉시 롤백.
-const ENABLE_D1_CLIENT = true;
-const isClientD1 = typeof window !== 'undefined' && ENABLE_D1_CLIENT;
-
-function createHybridSupabase(): SupabaseClient {
-  // .from()·.rpc()만 d1Client로 가로채고, 나머지 prop은 realSupabase 그대로 사용.
-  return new Proxy(realSupabase, {
-    get(target, prop, receiver) {
-      if (prop === 'from') {
-        // 클라이언트가 supabase.from(table)을 호출하면 d1Client.from()이 처리
-        return d1Client.from.bind(d1Client);
-      }
-      if (prop === 'rpc') {
-        // .rpc()를 가로채지 않으면 realSupabase(폐기된 Supabase)로 새어나가
-        // D1에 반영되지 않는다. d1Client.rpc는 RPC_ROUTES에 매핑된 함수를
-        // /api/d1/rpc/* 라우트로 디스패치한다.
-        return d1Client.rpc.bind(d1Client);
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  }) as SupabaseClient;
-}
-
-export const supabase: SupabaseClient = isClientD1
-  ? createHybridSupabase()
-  : realSupabase;
+// 타입: 호출부 200여 개 파일이 `supabase`를 `SupabaseClient` 형태로
+// 사용하므로(느슨한 빌더 체이닝) 공개 타입은 `SupabaseClient`로 유지한다.
+// `@supabase/supabase-js` import는 타입 전용(`import type`)이며 런타임
+// 코드를 일절 포함하지 않는다 — 빌드 산출물에 Supabase 런타임은 없다.
+//
+// 서버(Node.js)·클라이언트(브라우저) 모두 동일하게 d1Client 를 사용한다.
+export const supabase = d1Client as unknown as SupabaseClient;

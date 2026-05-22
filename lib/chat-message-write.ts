@@ -11,6 +11,8 @@ const MESSAGE_INSERT_OPTIONAL_COLUMNS = [
   'album_total',
 ];
 
+// `supabase`(lib/supabase.ts) 프록시는 SupabaseClient 형태로 노출되며
+// 런타임에 D1으로 라우팅된다. from()만 사용하는 최소 구조적 타입.
 type ChatMessageWriteClient = Pick<SupabaseClient<any, any, any>, 'from'>;
 
 export async function insertChatMessageWithFallback<

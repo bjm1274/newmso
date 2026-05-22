@@ -20,7 +20,7 @@ export interface SupabaseError {
 }
 
 // SupabaseLike: from() 메서드만 노출하는 최소 클라이언트 인터페이스.
-// 클라이언트 `supabase`는 D1 호환 Proxy(d1Client)로 라우팅된다.
+// 클라이언트 `supabase`는 SupabaseClient 형태로 노출되며 D1으로 라우팅된다.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type SupabaseLike = Pick<import('@supabase/supabase-js').SupabaseClient<any, 'public', any>, 'from'>;
 

@@ -1,21 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { transitionApprovals } from '@/lib/server-approval-transition';
 
 
 export const dynamic = 'force-dynamic';
-
-function createAdminSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 export async function POST(request: Request) {
   try {
@@ -40,10 +28,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'approvalIds are required' }, { status: 400 });
     }
 
-    const supabase = createAdminSupabase();
     const reason = body?.reason ? String(body.reason) : null;
     const result = await transitionApprovals({
-      supabase,
       approvalIds,
       actor: {
         id: String(session.user.id || '').trim() || null,

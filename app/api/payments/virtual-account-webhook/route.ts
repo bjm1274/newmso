@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { readAuthorizedDepositUser } from '@/lib/server-deposit-access';
 import { normalizeVirtualAccountWebhook } from '@/lib/virtual-account-deposits';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   virtual_account_deposits as virtualAccountDepositsTable,
@@ -13,17 +11,6 @@ import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
 export const dynamic = 'force-dynamic';
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 async function authorizeWebhookRequest(request: NextRequest) {
   const expectedToken = process.env.VIRTUAL_ACCOUNT_WEBHOOK_TOKEN?.trim() || '';
@@ -108,111 +95,84 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const webhookBackend = await resolveDataBackend();
 
-    if (webhookBackend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'virtual_account_webhook:upsert', backend: webhookBackend });
-        return NextResponse.json({ error: '웹훅 처리 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-
-      // dedupe_key 기준으로 기존 행 조회 후 UPDATE 또는 INSERT (D1은 onConflictDoUpdate)
-      const existing = await db
-        .select({ id: virtualAccountDepositsTable.id })
-        .from(virtualAccountDepositsTable)
-        .where(eq(virtualAccountDepositsTable.dedupe_key, normalized.dedupe_key))
-        .limit(1);
-
-      const rawPayloadStr =
-        normalized.raw_payload !== undefined && normalized.raw_payload !== null
-          ? JSON.stringify(normalized.raw_payload)
-          : '{}';
-
-      // drizzle 스키마가 amount: real() → number | null 이므로 명시적 변환
-      const amountNum =
-        normalized.amount !== null && normalized.amount !== undefined
-          ? Number(normalized.amount)
-          : null;
-
-      // drizzle-safe 공통 필드 (spread 대신 명시적 매핑으로 타입 안정성 확보)
-      const d1Fields = {
-        company_id: normalized.company_id,
-        provider: normalized.provider,
-        dedupe_key: normalized.dedupe_key,
-        provider_event_type: normalized.provider_event_type,
-        provider_event_id: normalized.provider_event_id,
-        order_id: normalized.order_id,
-        order_name: normalized.order_name,
-        payment_key: normalized.payment_key,
-        transaction_key: normalized.transaction_key,
-        method: normalized.method,
-        deposit_status: normalized.deposit_status,
-        match_status: normalized.match_status,
-        amount: amountNum,
-        currency: normalized.currency,
-        depositor_name: normalized.depositor_name,
-        customer_name: normalized.customer_name,
-        patient_name: normalized.patient_name,
-        patient_id: normalized.patient_id,
-        transaction_label: normalized.transaction_label,
-        bank_code: normalized.bank_code,
-        bank_name: normalized.bank_name,
-        account_number: normalized.account_number,
-        due_date: normalized.due_date,
-        deposited_at: normalized.deposited_at,
-        matched_target_type: normalized.matched_target_type,
-        matched_target_id: normalized.matched_target_id,
-        matched_note: normalized.matched_note,
-        raw_payload: rawPayloadStr,
-      };
-
-      let depositId: string;
-      if (existing.length > 0 && existing[0].id) {
-        depositId = existing[0].id;
-        await db
-          .update(virtualAccountDepositsTable)
-          .set({ ...d1Fields, updated_at: now })
-          .where(eq(virtualAccountDepositsTable.id, depositId));
-      } else {
-        depositId = crypto.randomUUID();
-        await db.insert(virtualAccountDepositsTable).values({
-          id: depositId,
-          ...d1Fields,
-          created_at: now,
-          updated_at: now,
-        });
-      }
-
-      return NextResponse.json({
-        ok: true,
-        depositId,
-        dedupeKey: normalized.dedupe_key,
-        depositStatus: normalized.deposit_status,
-      });
-    }
-
-    const supabase = getAdminClient();
-    const { data, error } = await supabase
-      .from('virtual_account_deposits')
-      .upsert(
-        {
-          ...normalized,
-          updated_at: now,
-        },
-        { onConflict: 'dedupe_key' },
-      )
-      .select('*')
-      .single();
-
-    if (error) {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'virtual_account_webhook:upsert', backend: 'd1' });
       return NextResponse.json({ error: '웹훅 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+    const db = getD1Drizzle(d1);
+
+    // dedupe_key 기준으로 기존 행 조회 후 UPDATE 또는 INSERT (D1은 onConflictDoUpdate)
+    const existing = await db
+      .select({ id: virtualAccountDepositsTable.id })
+      .from(virtualAccountDepositsTable)
+      .where(eq(virtualAccountDepositsTable.dedupe_key, normalized.dedupe_key))
+      .limit(1);
+
+    const rawPayloadStr =
+      normalized.raw_payload !== undefined && normalized.raw_payload !== null
+        ? JSON.stringify(normalized.raw_payload)
+        : '{}';
+
+    // drizzle 스키마가 amount: real() → number | null 이므로 명시적 변환
+    const amountNum =
+      normalized.amount !== null && normalized.amount !== undefined
+        ? Number(normalized.amount)
+        : null;
+
+    // drizzle-safe 공통 필드 (spread 대신 명시적 매핑으로 타입 안정성 확보)
+    const d1Fields = {
+      company_id: normalized.company_id,
+      provider: normalized.provider,
+      dedupe_key: normalized.dedupe_key,
+      provider_event_type: normalized.provider_event_type,
+      provider_event_id: normalized.provider_event_id,
+      order_id: normalized.order_id,
+      order_name: normalized.order_name,
+      payment_key: normalized.payment_key,
+      transaction_key: normalized.transaction_key,
+      method: normalized.method,
+      deposit_status: normalized.deposit_status,
+      match_status: normalized.match_status,
+      amount: amountNum,
+      currency: normalized.currency,
+      depositor_name: normalized.depositor_name,
+      customer_name: normalized.customer_name,
+      patient_name: normalized.patient_name,
+      patient_id: normalized.patient_id,
+      transaction_label: normalized.transaction_label,
+      bank_code: normalized.bank_code,
+      bank_name: normalized.bank_name,
+      account_number: normalized.account_number,
+      due_date: normalized.due_date,
+      deposited_at: normalized.deposited_at,
+      matched_target_type: normalized.matched_target_type,
+      matched_target_id: normalized.matched_target_id,
+      matched_note: normalized.matched_note,
+      raw_payload: rawPayloadStr,
+    };
+
+    let depositId: string;
+    if (existing.length > 0 && existing[0].id) {
+      depositId = existing[0].id;
+      await db
+        .update(virtualAccountDepositsTable)
+        .set({ ...d1Fields, updated_at: now })
+        .where(eq(virtualAccountDepositsTable.id, depositId));
+    } else {
+      depositId = crypto.randomUUID();
+      await db.insert(virtualAccountDepositsTable).values({
+        id: depositId,
+        ...d1Fields,
+        created_at: now,
+        updated_at: now,
+      });
     }
 
     return NextResponse.json({
       ok: true,
-      depositId: data?.id ?? null,
+      depositId,
       dedupeKey: normalized.dedupe_key,
       depositStatus: normalized.deposit_status,
     });

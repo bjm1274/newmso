@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   appendApprovalHistory,
   getApprovalRevision,
@@ -311,14 +310,13 @@ async function markApprovalNotificationsAsRead(
 }
 
 async function transitionSingleApproval(params: {
-  supabase: SupabaseClient;
   item: ApprovalRow;
   actor: ActorContext;
   action: ApprovalAction;
   rejectReason?: string | null;
   approveComment?: string | null;
 }) {
-  const { supabase, item, actor, action, rejectReason, approveComment } = params;
+  const { item, actor, action, rejectReason, approveComment } = params;
   const approvalId = String(item.id || '').trim();
   const itemStatus = String(item.status || '').trim();
 
@@ -545,14 +543,13 @@ async function transitionSingleApproval(params: {
 }
 
 export async function transitionApprovals(params: {
-  supabase: SupabaseClient;
   approvalIds: string[];
   actor: ActorContext;
   action: ApprovalAction;
   rejectReason?: string | null;
   approveComment?: string | null;
 }) {
-  const { supabase, approvalIds, actor, action, rejectReason, approveComment } = params;
+  const { approvalIds, actor, action, rejectReason, approveComment } = params;
   const normalizedIds = Array.from(new Set(approvalIds.map((id) => String(id || '').trim()).filter(Boolean)));
 
   if (normalizedIds.length === 0) {
@@ -613,7 +610,6 @@ export async function transitionApprovals(params: {
     try {
       results.push(
         await transitionSingleApproval({
-          supabase,
           item,
           actor,
           action,
