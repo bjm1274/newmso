@@ -1,19 +1,16 @@
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeCENextDue, getRenewalRule } from '@/lib/license-renewal-policy';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import type { NotificationRow } from './notification-utils';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   notifications as notificationsTable,
   staff_licenses as staffLicensesTable,
   license_continuing_education as licenseCETable,
   eq,
   and,
   inArray,
-  isNull,
   isNotNull,
   lte,
   desc,
@@ -39,10 +36,9 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
 }
 
 async function requireD1ForLicenseJobs(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[license-expiry-jobs] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -141,20 +137,19 @@ function buildNotification(license: LicenseRow, daysLeft: number, milestone: Mil
   };
 }
 
-export async function processLicenseExpiry(supabase: SupabaseClient): Promise<LicenseExpiryJobResult> {
+export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
   const now = new Date();
   const horizonDays = MILESTONES[0];
   const horizonDate = new Date(now.getTime());
   horizonDate.setDate(horizonDate.getDate() + horizonDays);
   const horizonIso = formatKoreanDateKey(horizonDate);
 
-  const backend = await resolveDataBackend();
   let licenses: LicenseRow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) {
-      logD1BindingMissing({ label: 'processLicenseExpiry:staff_licenses', backend });
+      logD1BindingMissing({ label: 'processLicenseExpiry:staff_licenses', backend: 'd1' });
       throw new Error('[license-expiry-jobs] D1 binding not available (processLicenseExpiry)');
     }
     const db = getD1Drizzle(d1);
@@ -175,15 +170,6 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
         )
       );
     licenses = (rows ?? []) as LicenseRow[];
-  } else {
-    const { data: licenseRows, error: licenseError } = await supabase
-      .from('staff_licenses')
-      .select('id, staff_id, license_name, license_number, expiry_date, issuing_body')
-      .not('expiry_date', 'is', null)
-      .lte('expiry_date', horizonIso);
-
-    if (licenseError) throw licenseError;
-    licenses = (licenseRows ?? []) as LicenseRow[];
   }
 
   if (licenses.length === 0) {
@@ -209,7 +195,7 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
   const userIds = Array.from(new Set(candidates.map((c) => c.license.staff_id)));
   let existingRows: ExistingNotificationRow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processLicenseExpiry:notifications)');
     const db = getD1Drizzle(d1);
@@ -237,14 +223,6 @@ export async function processLicenseExpiry(supabase: SupabaseClient): Promise<Li
       }
       return { id: String(row.id || ''), user_id: String(row.user_id || ''), metadata };
     });
-  } else {
-    const { data: notifRows, error: existingError } = await supabase
-      .from('notifications')
-      .select('id, user_id, metadata')
-      .eq('type', 'license_expiry')
-      .in('user_id', userIds);
-    if (existingError) throw existingError;
-    existingRows = (notifRows ?? []) as ExistingNotificationRow[];
   }
 
   const sentKeys = new Set<string>();
@@ -333,14 +311,13 @@ function buildCENotification(
   };
 }
 
-export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExpiryJobResult> {
-  const backend = await resolveDataBackend();
+export async function processCEDue(): Promise<LicenseExpiryJobResult> {
   let licenses: LicenseFullRow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) {
-      logD1BindingMissing({ label: 'processCEDue:staff_licenses', backend });
+      logD1BindingMissing({ label: 'processCEDue:staff_licenses', backend: 'd1' });
       throw new Error('[license-expiry-jobs] D1 binding not available (processCEDue)');
     }
     const db = getD1Drizzle(d1);
@@ -359,13 +336,6 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
       .from(staffLicensesTable)
       .where(isNotNull(staffLicensesTable.license_type));
     licenses = (rows ?? []) as LicenseFullRow[];
-  } else {
-    const { data: rows, error } = await supabase
-      .from('staff_licenses')
-      .select('id, staff_id, license_type, license_name, license_number, expiry_date, issuing_body, renewed_date, issued_date')
-      .not('license_type', 'is', null);
-    if (error) throw error;
-    licenses = (rows ?? []) as LicenseFullRow[];
   }
 
   if (licenses.length === 0) {
@@ -375,7 +345,7 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
   const licenseIds = licenses.map((l) => l.id);
   let ceRawRows: CERow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processCEDue:ce)');
     const db = getD1Drizzle(d1);
@@ -396,15 +366,6 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
       )
       .orderBy(desc(licenseCETable.education_date));
     ceRawRows = (rows ?? []) as CERow[];
-  } else {
-    const { data: ceRows } = await supabase
-      .from('license_continuing_education')
-      .select('license_id, staff_id, education_date, status')
-      .in('license_id', licenseIds)
-      .eq('status', 'approved')
-      .not('education_date', 'is', null)
-      .order('education_date', { ascending: false });
-    ceRawRows = (ceRows ?? []) as CERow[];
   }
 
   const lastCEByLicense = new Map<string, string>();
@@ -440,7 +401,7 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
   type ExistingCENotifRow = { user_id: string; metadata: Record<string, unknown> | null };
   let existingCERows: ExistingCENotifRow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processCEDue:notifications)');
     const db = getD1Drizzle(d1);
@@ -467,14 +428,6 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
       }
       return { user_id: String(row.user_id || ''), metadata };
     });
-  } else {
-    const { data: existingRows, error: existingError } = await supabase
-      .from('notifications')
-      .select('id, user_id, metadata')
-      .eq('type', 'license_ce_due')
-      .in('user_id', userIds);
-    if (existingError) throw existingError;
-    existingCERows = (existingRows ?? []) as ExistingCENotifRow[];
   }
 
   const sentKeys = new Set<string>();
@@ -520,8 +473,8 @@ export async function processCEDue(supabase: SupabaseClient): Promise<LicenseExp
   };
 }
 
-export async function runLicenseExpiryJobs(supabase: SupabaseClient): Promise<LicenseExpiryJobsResult> {
-  const expiry = await processLicenseExpiry(supabase);
-  const ce = await processCEDue(supabase);
+export async function runLicenseExpiryJobs(): Promise<LicenseExpiryJobsResult> {
+  const expiry = await processLicenseExpiry();
+  const ce = await processCEDue();
   return { expiry, ce };
 }

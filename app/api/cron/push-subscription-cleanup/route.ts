@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { runLicenseExpiryJobs, type LicenseExpiryJobsResult } from '@/lib/license-expiry-jobs';
 import {
   runContractExpiryJobs,
@@ -8,13 +7,11 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   push_subscriptions as pushSubscriptionsTable,
   staff_members as staffMembersTable,
   notifications as notificationsTable,
   chat_push_jobs as chatPushJobsTable,
   inArray,
-  isNull,
   isNotNull,
   lt,
   and,
@@ -22,10 +19,9 @@ import {
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 async function requireD1ForCleanup(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[push-subscription-cleanup] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -40,17 +36,6 @@ type PushSubscriptionRow = {
   staff_id: string | null;
   endpoint: string | null;
 };
-
-function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 async function deleteSubscriptionsByIds(ids: string[]) {
   if (ids.length === 0) return;
@@ -73,7 +58,7 @@ function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
   })[0];
 }
 
-async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClient>) {
+async function cleanupRetentionLogs() {
   const result = { notificationsDeleted: 0, chatPushJobsDeleted: 0 } as {
     notificationsDeleted: number;
     chatPushJobsDeleted: number;
@@ -91,67 +76,35 @@ async function cleanupRetentionLogs(supabase: ReturnType<typeof createAdminClien
     Date.now() - PUSH_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    // D1 경로: drizzle로 직접 삭제 (count 반환 없음 — 0으로 표기)
-    const db = await requireD1ForCleanup('cleanupRetentionLogs');
+  // D1 경로: drizzle로 직접 삭제 (count 반환 없음 — 0으로 표기)
+  const db = await requireD1ForCleanup('cleanupRetentionLogs');
 
-    try {
-      // 읽음 처리되고 90일 경과한 알림 삭제 (read_at IS NOT NULL AND read_at < notifCutoff)
-      await db
-        .delete(notificationsTable)
-        .where(
-          and(
-            isNotNull(notificationsTable.read_at),
-            lt(notificationsTable.read_at, notifCutoff),
-          ),
-        );
-    } catch (err) {
-      result.notificationsError = err instanceof Error ? err.message : String(err);
-    }
-
-    try {
-      // 발송 처리된 chat_push_jobs 30일 경과 정리 (processed_at IS NOT NULL AND processed_at < pushCutoff)
-      await db
-        .delete(chatPushJobsTable)
-        .where(
-          and(
-            isNotNull(chatPushJobsTable.processed_at),
-            lt(chatPushJobsTable.processed_at, pushCutoff),
-          ),
-        );
-    } catch (err) {
-      result.chatPushJobsError = err instanceof Error ? err.message : String(err);
-    }
-
-    return result;
+  try {
+    // 읽음 처리되고 90일 경과한 알림 삭제 (read_at IS NOT NULL AND read_at < notifCutoff)
+    await db
+      .delete(notificationsTable)
+      .where(
+        and(
+          isNotNull(notificationsTable.read_at),
+          lt(notificationsTable.read_at, notifCutoff),
+        ),
+      );
+  } catch (err) {
+    result.notificationsError = err instanceof Error ? err.message : String(err);
   }
 
-  // 기존 Supabase 경로
-  // 읽음 처리되고 90일 경과한 알림은 삭제 (egress·storage 절감)
-  const notifRes = await supabase
-    .from('notifications')
-    .delete({ count: 'estimated' })
-    .not('read_at', 'is', null)
-    .lt('read_at', notifCutoff);
-
-  if (notifRes.error) {
-    result.notificationsError = notifRes.error.message;
-  } else {
-    result.notificationsDeleted = notifRes.count ?? 0;
-  }
-
-  // 발송 처리(또는 폐기)된 chat_push_jobs 30일 경과 정리
-  const pushRes = await supabase
-    .from('chat_push_jobs')
-    .delete({ count: 'estimated' })
-    .not('processed_at', 'is', null)
-    .lt('processed_at', pushCutoff);
-
-  if (pushRes.error) {
-    result.chatPushJobsError = pushRes.error.message;
-  } else {
-    result.chatPushJobsDeleted = pushRes.count ?? 0;
+  try {
+    // 발송 처리된 chat_push_jobs 30일 경과 정리 (processed_at IS NOT NULL AND processed_at < pushCutoff)
+    await db
+      .delete(chatPushJobsTable)
+      .where(
+        and(
+          isNotNull(chatPushJobsTable.processed_at),
+          lt(chatPushJobsTable.processed_at, pushCutoff),
+        ),
+      );
+  } catch (err) {
+    result.chatPushJobsError = err instanceof Error ? err.message : String(err);
   }
 
   return result;
@@ -281,8 +234,7 @@ export async function GET(req: Request) {
     let licenseJobs: LicenseExpiryJobsResult | null = null;
     let licenseError: string | null = null;
     try {
-      const supabase = createAdminClient();
-      licenseJobs = await runLicenseExpiryJobs(supabase);
+      licenseJobs = await runLicenseExpiryJobs();
     } catch (err) {
       licenseError = err instanceof Error ? err.message : 'license-expiry-jobs failed';
       console.error('[push-subscription-cleanup] license jobs failed:', err);
@@ -294,8 +246,7 @@ export async function GET(req: Request) {
     let contractJobs: ContractExpiryJobResult | null = null;
     let contractError: string | null = null;
     try {
-      const supabase = createAdminClient();
-      contractJobs = await runContractExpiryJobs(supabase);
+      contractJobs = await runContractExpiryJobs();
     } catch (err) {
       contractError = err instanceof Error ? err.message : 'contract-expiry-jobs failed';
       console.error('[push-subscription-cleanup] contract jobs failed:', err);
@@ -305,8 +256,7 @@ export async function GET(req: Request) {
     let retention: Awaited<ReturnType<typeof cleanupRetentionLogs>> | null = null;
     let retentionError: string | null = null;
     try {
-      const supabase = createAdminClient();
-      retention = await cleanupRetentionLogs(supabase);
+      retention = await cleanupRetentionLogs();
     } catch (err) {
       retentionError = err instanceof Error ? err.message : 'retention cleanup failed';
       console.error('[push-subscription-cleanup] retention cleanup failed:', err);

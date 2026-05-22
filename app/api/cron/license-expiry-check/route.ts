@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { runLicenseExpiryJobs } from '@/lib/license-expiry-jobs';
 
 export const runtime = 'nodejs';
@@ -14,12 +13,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
-
-    const { expiry, ce } = await runLicenseExpiryJobs(supabase);
+    const { expiry, ce } = await runLicenseExpiryJobs();
     return NextResponse.json({ ok: true, expiry, ce });
   } catch (err) {
     console.error('[license-expiry-check] failed:', err);

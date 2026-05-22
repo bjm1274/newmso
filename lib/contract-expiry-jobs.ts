@@ -1,11 +1,9 @@
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import type { NotificationRow } from './notification-utils';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   notifications as notificationsTable,
   staff_members as staffMembersTable,
   eq,
@@ -84,10 +82,9 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
 }
 
 async function requireD1ForContractJobs(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[contract-expiry-jobs] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -254,9 +251,7 @@ function buildNotification(
 }
 
 /** 메인 잡. */
-export async function processContractExpiry(
-  supabase: SupabaseClient,
-): Promise<ContractExpiryJobResult> {
+export async function processContractExpiry(): Promise<ContractExpiryJobResult> {
   const todayKey = formatKoreanDateKey(new Date());
   const today = parseDateKey(todayKey);
   if (!today) {
@@ -265,11 +260,10 @@ export async function processContractExpiry(
 
   let rows: StaffRow[];
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) {
-      logD1BindingMissing({ label: 'processContractExpiry:staffQuery', backend });
+      logD1BindingMissing({ label: 'processContractExpiry:staffQuery', backend: 'd1' });
       throw new Error('[contract-expiry-jobs] D1 binding not available (processContractExpiry:staffQuery)');
     }
     const db = getD1Drizzle(d1);
@@ -311,12 +305,6 @@ export async function processContractExpiry(
         permissions,
       };
     });
-  } else {
-    const { data: staffRows, error: staffError } = await supabase
-      .from('staff_members')
-      .select('id, name, company, department, position, joined_at, join_date, status, role, permissions');
-    if (staffError) throw staffError;
-    rows = ((staffRows ?? []) as unknown) as StaffRow[];
   }
 
   if (rows.length === 0) {
@@ -354,10 +342,10 @@ export async function processContractExpiry(
   type ExistingNotifRow = { user_id: string | null; metadata: Record<string, unknown> | null };
   let existingNotifRows: ExistingNotifRow[];
 
-  if (backend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) {
-      logD1BindingMissing({ label: 'processContractExpiry:notifQuery', backend });
+      logD1BindingMissing({ label: 'processContractExpiry:notifQuery', backend: 'd1' });
       throw new Error('[contract-expiry-jobs] D1 binding not available (processContractExpiry:notifQuery)');
     }
     const db = getD1Drizzle(d1);
@@ -382,14 +370,6 @@ export async function processContractExpiry(
       }
       return { user_id: r.user_id ?? null, metadata };
     });
-  } else {
-    const { data: existingRows, error: existingError } = await supabase
-      .from('notifications')
-      .select('user_id, metadata')
-      .eq('type', 'contract_expiry')
-      .in('user_id', adminIds);
-    if (existingError) throw existingError;
-    existingNotifRows = (existingRows ?? []) as ExistingNotifRow[];
   }
 
   const sentSet = new Set<string>();
@@ -448,8 +428,6 @@ export async function processContractExpiry(
   };
 }
 
-export async function runContractExpiryJobs(
-  supabase: SupabaseClient,
-): Promise<ContractExpiryJobResult> {
-  return processContractExpiry(supabase);
+export async function runContractExpiryJobs(): Promise<ContractExpiryJobResult> {
+  return processContractExpiry();
 }

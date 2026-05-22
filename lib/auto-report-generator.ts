@@ -2,18 +2,15 @@
  * 정기 보고서 자동 생성
  * 인사/급여/재고 보고서를 크론 스케줄로 자동 생성
  *
- * Phase 8-E — supabase.from() 의존 제거. staff_members / payroll_records
- * 조회와 notifications.insert를 D1 binding 직접 사용으로 전환. 외부 시그니처
- * (supabase 인자 포함) 는 호출처 호환을 위해 유지하나 내부에선 사용하지 않음.
+ * staff_members / payroll_records 조회와 notifications.insert를 D1 binding
+ * 직접 사용으로 처리한다.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getStaffEmploymentType } from './staff-meta';
 import { insertNotificationsOrThrow, type NotificationRow } from './notification-utils';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   staff_members as staffMembersTable,
   payroll_records as payrollRecordsTable,
   eq,
@@ -46,10 +43,9 @@ export type GeneratedReport = {
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 async function requireD1ForAutoReport(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[auto-report-generator] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -57,13 +53,8 @@ async function requireD1ForAutoReport(label: string) {
 
 /**
  * 인사현황 보고서 데이터 생성
- *
- * NOTE: supabase 파라미터는 호환을 위해 유지하나 내부 구현은 D1 binding을
- * 사용한다. 호출처(app/api/cron/auto-report/route.ts)가 인자를 그대로 넘기는
- * 형태를 유지하기 위함.
  */
 export async function generateMonthlyHRReport(
-  _supabase: SupabaseClient,
   companyId: string | null,
   period: string, // YYYY-MM
 ): Promise<{ summary: Record<string, unknown> }> {
@@ -121,7 +112,6 @@ export async function generateMonthlyHRReport(
  * 급여 요약 보고서 데이터 생성
  */
 export async function generateMonthlyPayrollReport(
-  _supabase: SupabaseClient,
   _companyId: string | null,
   period: string,
 ): Promise<{ summary: Record<string, unknown> }> {
@@ -167,7 +157,6 @@ export async function generateMonthlyPayrollReport(
  * 보고서 생성 후 알림 발송 — notifications 테이블 직접 INSERT
  */
 export async function notifyRecipients(
-  _supabase: SupabaseClient,
   recipients: string[],
   reportType: string,
   period: string,

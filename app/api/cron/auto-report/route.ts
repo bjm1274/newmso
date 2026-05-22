@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   generateMonthlyHRReport,
   generateMonthlyPayrollReport,
@@ -10,7 +9,6 @@ import {
   report_schedules as reportSchedulesTable,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   eq,
 } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
@@ -27,23 +25,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
-
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     // 활성 스케줄 조회
-    const backend = await resolveDataBackend();
     type ScheduleRow = { id: string; report_type: string; company_id: string | null; recipients: string[] | string | null; enabled: number | boolean };
     let schedules: ScheduleRow[] | null = null;
 
-    if (backend === 'd1') {
+    {
       const d1 = await getD1Binding();
       if (!d1) {
-        logD1BindingMissing({ label: 'auto-report:report_schedules', backend });
+        logD1BindingMissing({ label: 'auto-report:report_schedules', backend: 'd1' });
         throw new Error('[auto-report] D1 binding not available (report_schedules)');
       }
       const db = getD1Drizzle(d1);
@@ -58,12 +50,6 @@ export async function GET(request: Request) {
         .from(reportSchedulesTable)
         .where(eq(reportSchedulesTable.enabled, 1));
       schedules = rows as ScheduleRow[];
-    } else {
-      const { data } = await supabase
-        .from('report_schedules')
-        .select('id, report_type, company_id, recipients, enabled')
-        .eq('enabled', true);
-      schedules = data as ScheduleRow[] | null;
     }
 
     if (!schedules || schedules.length === 0) {
@@ -86,10 +72,10 @@ export async function GET(request: Request) {
         let summary: Record<string, unknown> = {};
 
         if (reportType === 'monthly_hr') {
-          const report = await generateMonthlyHRReport(supabase, companyId, period);
+          const report = await generateMonthlyHRReport(companyId, period);
           summary = report.summary;
         } else if (reportType === 'monthly_payroll') {
-          const report = await generateMonthlyPayrollReport(supabase, companyId, period);
+          const report = await generateMonthlyPayrollReport(companyId, period);
           summary = report.summary;
         }
 
@@ -104,7 +90,7 @@ export async function GET(request: Request) {
         {
           const d1 = await getD1Binding();
           if (!d1) {
-            logD1BindingMissing({ label: 'auto-report:generated_reports', backend });
+            logD1BindingMissing({ label: 'auto-report:generated_reports', backend: 'd1' });
             throw new Error('[auto-report] D1 binding not available');
           }
           const db = getD1Drizzle(d1);
@@ -120,7 +106,7 @@ export async function GET(request: Request) {
         }
 
         // 스케줄 last_generated_at 업데이트
-        if (backend === 'd1') {
+        {
           const d1 = await getD1Binding();
           if (d1) {
             const db = getD1Drizzle(d1);
@@ -129,16 +115,11 @@ export async function GET(request: Request) {
               .set({ last_generated_at: now.toISOString() })
               .where(eq(reportSchedulesTable.id, schedule.id));
           }
-        } else {
-          await supabase
-            .from('report_schedules')
-            .update({ last_generated_at: now.toISOString() })
-            .eq('id', schedule.id);
         }
 
         // 수신자 알림
         if (recipients.length > 0) {
-          await notifyRecipients(supabase, recipients as string[], reportType, period);
+          await notifyRecipients(recipients as string[], reportType, period);
         }
 
         results.push({ type: reportType, period, status: 'completed' });
