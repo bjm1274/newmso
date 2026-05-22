@@ -19,6 +19,23 @@ const POLL_META_PREFIX = '[[POLL_META]]';
 const POLL_META_SUFFIX = '[[/POLL_META]]';
 const RESIGNED_STATUSES = new Set(['\uD1F4\uC0AC', '\uD1F4\uC9C1']);
 
+/**
+ * \uC11C\uBC84(D1) \uD0C0\uC784\uC2A4\uD0EC\uD504\uB97C Date\uB85C \uD30C\uC2F1\uD55C\uB2E4.
+ * D1(SQLite)\uC758 CURRENT_TIMESTAMP\uB294 "YYYY-MM-DD HH:MM:SS" \uD615\uC2DD\uC758 UTC \uBB38\uC790\uC5F4\uC774\uC9C0\uB9CC
+ * \uD0C0\uC784\uC874 \uD45C\uAE30\uAC00 \uC5C6\uC5B4 `new Date()`\uAC00 \uC774\uB97C \uB85C\uCEEC \uC2DC\uAC01\uC73C\uB85C \uC798\uBABB \uD574\uC11D\uD55C\uB2E4(KST \uAE30\uC900 9\uC2DC\uAC04 \uC624\uCC28).
+ * \uD0C0\uC784\uC874 \uD45C\uAE30\uAC00 \uC5C6\uB294 \uC2DC\uAC01 \uBB38\uC790\uC5F4\uC740 UTC\uB85C \uAC04\uC8FC\uD574 'Z'\uB97C \uBD99\uC5EC \uD30C\uC2F1\uD55C\uB2E4.
+ * \uC774\uBBF8 'Z'\u00B7\uC624\uD504\uC14B\uC774 \uC788\uB294 ISO \uBB38\uC790\uC5F4(\uD074\uB77C\uC774\uC5B8\uD2B8 optimistic \uBA54\uC2DC\uC9C0 \uB4F1)\uC740 \uADF8\uB300\uB85C \uD30C\uC2F1.
+ */
+export function toChatDate(value?: string | number | null): Date {
+  if (value === null || value === undefined || value === '') return new Date(0);
+  if (typeof value === 'number') return new Date(value);
+  const raw = String(value).trim();
+  if (!raw) return new Date(0);
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}Z`);
+  return new Date(raw);
+}
+
 export type WardMessageMeta = {
   type?: string;
   patient_name?: string;
@@ -184,8 +201,11 @@ export function isActiveChatMember(staff: StaffMember | null | undefined): boole
 
 export function isMessageReadByCursor(messageCreatedAt: string | null | undefined, lastReadAt: string | null | undefined): boolean {
   if (!messageCreatedAt || !lastReadAt) return false;
-  const messageTime = new Date(messageCreatedAt).getTime();
-  const cursorTime = new Date(lastReadAt).getTime();
+  // toChatDate로 양변을 동일 규칙(UTC)으로 파싱한다. D1의 공백 형식과
+  // optimistic 메시지의 ISO-Z 형식이 섞이면 raw new Date()는 한쪽만 9시간
+  // 어긋나 비교가 깨지고 읽음 표시("1")가 사라지지 않는다.
+  const messageTime = toChatDate(messageCreatedAt).getTime();
+  const cursorTime = toChatDate(lastReadAt).getTime();
   if (!Number.isFinite(messageTime) || !Number.isFinite(cursorTime)) return false;
   return cursorTime >= messageTime;
 }
@@ -197,8 +217,8 @@ export function getLatestReadCursor(
   if (!nextValue) return currentValue || null;
   if (!currentValue) return nextValue;
 
-  const currentTime = new Date(currentValue).getTime();
-  const nextTime = new Date(nextValue).getTime();
+  const currentTime = toChatDate(currentValue).getTime();
+  const nextTime = toChatDate(nextValue).getTime();
   if (!Number.isFinite(currentTime)) return Number.isFinite(nextTime) ? nextValue : currentValue;
   if (!Number.isFinite(nextTime)) return currentValue;
   return nextTime >= currentTime ? nextValue : currentValue;

@@ -314,8 +314,11 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedMessageFetch();
         }
         if (tables.has('room_read_cursors')) {
-          // payload 기반 detailed 처리 불가 → fetchData로 일괄 갱신
-          triggerDebouncedMessageFetch();
+          // 읽음 커서 변경은 전체 fetchData(메시지·방목록 전부 재조회 — 버벅임 주범)
+          // 대신 현재 방의 읽음 표시(read receipt)만 가볍게 갱신한다.
+          triggerDebouncedMetadataRefresh(
+            () => refreshReadCursorsForRoomRef.current?.(selectedRoomId) ?? Promise.resolve(),
+          );
         }
         if (tables.has('message_reactions')) {
           triggerDebouncedMetadataRefresh(refreshVisibleMessageReactionsRef.current);

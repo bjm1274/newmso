@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
-import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
+import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
 import type { MessengerMentionInboxItem } from './메신저사이드바';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
 
@@ -35,12 +35,23 @@ export function useChatReadSync({
       roomIds: Array<string | null | undefined>,
       readAt?: string | null,
     ): Promise<boolean> => {
-      const result = await upsertRoomReadCursors(supabase, {
-        userId: effectiveChatUserId,
-        roomIds,
-        readAt,
-      });
-      return result.ok;
+      // 읽음 커서 쓰기는 서버 라우트에 위임한다. 클라이언트는 D1 binding에
+      // 직접 접근할 수 없어 upsertRoomReadCursors를 브라우저에서 호출하면
+      // 항상 실패한다(안 읽음 카운트가 사라지지 않던 원인).
+      const normalizedRoomIds = normalizeRoomReadCursorIds(roomIds);
+      if (!effectiveChatUserId || normalizedRoomIds.length === 0) return false;
+      try {
+        const res = await fetch('/api/chat/read-cursors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomIds: normalizedRoomIds, readAt: readAt ?? undefined }),
+          credentials: 'same-origin',
+        });
+        const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+        return Boolean(res.ok && json?.ok);
+      } catch {
+        return false;
+      }
     },
     [effectiveChatUserId],
   );

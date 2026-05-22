@@ -16,6 +16,20 @@ export type RoomReadCursorWriteResult = {
   error: unknown | null;
 };
 
+/**
+ * 읽음 커서 시각을 D1(SQLite) CURRENT_TIMESTAMP와 동일한 "YYYY-MM-DD HH:MM:SS"
+ * UTC 형식으로 정규화한다. messages.created_at(D1 기본값)과 형식을 맞춰야
+ * 안 읽음 집계의 문자열 비교(created_at > last_read_at)가 올바르게 동작한다.
+ * ISO("...Z") 입력은 UTC 기준으로 변환한다.
+ */
+function toUtcSqlTimestamp(value?: string | null): string {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  const parsed = raw ? new Date(raw) : new Date();
+  const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return base.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 export function normalizeRoomReadCursorIds(roomIds: Array<string | null | undefined>) {
   return Array.from(
     new Set(
@@ -36,7 +50,7 @@ export async function upsertRoomReadCursors(
 ): Promise<RoomReadCursorWriteResult> {
   const userId = String(params.userId || '').trim();
   const roomIds = normalizeRoomReadCursorIds(params.roomIds);
-  const readAt = String(params.readAt || '').trim() || new Date().toISOString();
+  const readAt = toUtcSqlTimestamp(params.readAt);
 
   if (!userId || roomIds.length === 0) {
     return {

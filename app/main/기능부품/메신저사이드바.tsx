@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Bell, Pin, PinOff, EyeOff, Eye, Search } from 'lucide-react';
 import { MessengerAvatar } from './메신저공통';
-import { getGroupChatRoomBadgeText } from './메신저유틸';
+import { getGroupChatRoomBadgeText, toChatDate } from './메신저유틸';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -101,7 +101,7 @@ function hashRoomTone(seed: string): (typeof TONE_PALETTES)[number] {
 // 마지막 메시지 시각 포맷 — 오늘이면 HH:mm, 아니면 MM/DD
 function formatRoomTime(raw: string | null | undefined): string {
   if (!raw) return '';
-  const d = new Date(raw);
+  const d = toChatDate(raw);
   if (Number.isNaN(d.getTime())) return '';
   const now = new Date();
   const sameDay =

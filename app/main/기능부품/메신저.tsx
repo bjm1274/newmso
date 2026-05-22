@@ -11,7 +11,7 @@ import {
   rememberMissingRelation,
   withMissingColumnsFallback,
 } from '@/lib/supabase-compat';
-import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
+import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { POLL_SELECT } from '@/lib/chat-query-columns';
@@ -653,12 +653,23 @@ export default function ChatView({
     roomIds: Array<string | null | undefined>,
     readAt?: string | null,
   ): Promise<boolean> => {
-    const result = await upsertRoomReadCursors(supabase, {
-      userId: effectiveChatUserId,
-      roomIds,
-      readAt,
-    });
-    return result.ok;
+    // 읽음 커서 쓰기는 서버 라우트에 위임한다. 브라우저는 D1 binding에 직접 접근할 수
+    // 없어 upsertRoomReadCursors를 클라이언트에서 호출하면 항상 실패했고, 이 때문에
+    // 읽음 커서가 영구 저장되지 않아 안 읽음 배지가 사라졌다 재출현했다.
+    const normalizedRoomIds = normalizeRoomReadCursorIds(roomIds);
+    if (!effectiveChatUserId || normalizedRoomIds.length === 0) return false;
+    try {
+      const res = await fetch('/api/chat/read-cursors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomIds: normalizedRoomIds, readAt: readAt ?? undefined }),
+        credentials: 'same-origin',
+      });
+      const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+      return Boolean(res.ok && json?.ok);
+    } catch {
+      return false;
+    }
   }, [effectiveChatUserId]);
   const {
     setRoom,

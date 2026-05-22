@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, memo } from 'react';
+import { useLayoutEffect, useEffect, useState, useRef, useCallback, memo } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
@@ -15,7 +15,7 @@ import {
   type AttachmentPreviewKind,
 } from './메신저첨부';
 import { MessengerAvatar } from './메신저공통';
-import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS } from './메신저유틸';
+import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS, toChatDate } from './메신저유틸';
 import type { ThreadSummary } from './메신저파생훅';
 import { MenuIcon } from './조직도서브/조직도측면창';
 
@@ -56,7 +56,7 @@ const inlineDangerActionButtonClass =
   'shrink-0 rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/5 px-2.5 py-1.5 text-[10px] font-bold text-red-600 shadow-sm transition hover:bg-red-500/10';
 
 const formatTimelineDateKey = (value?: string | null) => {
-  const date = new Date(value || 0);
+  const date = toChatDate(value);
   if (Number.isNaN(date.getTime())) return '';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -244,9 +244,63 @@ function MessengerTimelineComponent({
     };
   }, [messageListRef, selectedRoomId, shouldKeepBottomAligned]);
 
+  // 스크롤 중 현재 보고 있는 메시지의 날짜를 우측에 잠시 표시한다.
+  // 날짜 구분선(data-date-label)들 중 스크롤 상단에 고정(sticky)된 마지막 것이 현재 날짜.
+  const [scrollDateLabel, setScrollDateLabel] = useState('');
+  const [scrollDateShown, setScrollDateShown] = useState(false);
+  const scrollDateRafRef = useRef<number | null>(null);
+  const scrollDateHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateScrollDateIndicator = useCallback(() => {
+    if (scrollDateRafRef.current != null) return;
+    scrollDateRafRef.current = window.requestAnimationFrame(() => {
+      scrollDateRafRef.current = null;
+      const container = messageListRef.current;
+      if (!container) return;
+      const threshold = container.getBoundingClientRect().top + 16;
+      const dividers = container.querySelectorAll<HTMLElement>('[data-date-label]');
+      let current = '';
+      for (let index = 0; index < dividers.length; index += 1) {
+        if (dividers[index].getBoundingClientRect().top <= threshold) {
+          current = dividers[index].dataset.dateLabel || current;
+        } else {
+          break;
+        }
+      }
+      if (!current && dividers.length > 0) {
+        current = dividers[0].dataset.dateLabel || '';
+      }
+      if (current) {
+        setScrollDateLabel(current);
+        setScrollDateShown(true);
+      }
+      if (scrollDateHideTimerRef.current) clearTimeout(scrollDateHideTimerRef.current);
+      scrollDateHideTimerRef.current = setTimeout(() => setScrollDateShown(false), 1100);
+    });
+  }, [messageListRef]);
+
+  const handleMessageListScroll = useCallback(() => {
+    onMessageListScroll();
+    updateScrollDateIndicator();
+  }, [onMessageListScroll, updateScrollDateIndicator]);
+
+  useEffect(() => {
+    setScrollDateShown(false);
+  }, [selectedRoomId]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollDateRafRef.current != null) {
+        window.cancelAnimationFrame(scrollDateRafRef.current);
+      }
+      if (scrollDateHideTimerRef.current) {
+        clearTimeout(scrollDateHideTimerRef.current);
+      }
+    };
+  }, []);
+
   const renderDateDivider = (dateLabel: string, dateKey: string) => (
-    <div data-testid="chat-date-divider" className="sticky top-0 z-10 my-0.5 flex items-center justify-center gap-1 md:my-1 md:gap-2 bg-[var(--card)] py-0.5">
-      <div className="flex-1 h-px bg-[var(--border)]" />
+    <div data-testid="chat-date-divider" data-date-label={dateLabel} className="sticky top-0 z-10 my-0.5 flex items-center justify-center md:my-1 bg-[var(--card)] py-0.5">
       <button
         type="button"
         onClick={() => {
@@ -258,7 +312,6 @@ function MessengerTimelineComponent({
       >
         {dateLabel}
       </button>
-      <div className="flex-1 h-px bg-[var(--border)]" />
     </div>
   );
 
@@ -466,7 +519,7 @@ function MessengerTimelineComponent({
       <div
         ref={messageListRef}
         data-testid="chat-message-list"
-        onScroll={onMessageListScroll}
+        onScroll={handleMessageListScroll}
         onClick={onCloseMessageActions}
         className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
       >
@@ -552,7 +605,7 @@ function MessengerTimelineComponent({
                 const albumMsgs = albumItem.albumMessages || [];
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
                 const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
-                const created = new Date(albumItem.created_at || 0);
+                const created = toChatDate(albumItem.created_at);
                 const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
                 const dateKey = formatTimelineDateKey(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
@@ -668,7 +721,7 @@ function MessengerTimelineComponent({
               const canOpenReadStatus = deliveryState === 'sent' && totalRecipients > 0;
               const displayedReadStatusSummary = isMine ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
-              const created = new Date(msg.created_at || 0);
+              const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {
                 year: 'numeric',
                 month: 'long',
@@ -708,7 +761,7 @@ function MessengerTimelineComponent({
                   ? `스레드 보기 · 답글 ${threadSummary.replyCount}개`
                   : `답글 ${threadSummary?.replyCount || 0}개`;
               const threadBadgeTitle = threadSummary
-                ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${new Date(threadSummary.latestReplyAt).toLocaleString('ko-KR')}` : ''}`
+                ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${toChatDate(threadSummary.latestReplyAt).toLocaleString('ko-KR')}` : ''}`
                 : '';
               const showThreadAttention =
                 Boolean(
@@ -1016,6 +1069,19 @@ function MessengerTimelineComponent({
 
         <div ref={scrollRef} />
       </div>
+
+      {selectedRoomId && scrollDateLabel && (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute right-4 top-3 z-20 transition-opacity duration-300 ${
+            scrollDateShown ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <span className="rounded-full bg-[var(--foreground)]/80 px-2.5 py-1 text-[10px] font-bold text-[var(--card)] shadow-md">
+            {scrollDateLabel}
+          </span>
+        </div>
+      )}
 
       {showScrollToLatest && selectedRoomId && (
         <div className="absolute right-4 bottom-4 z-20">
