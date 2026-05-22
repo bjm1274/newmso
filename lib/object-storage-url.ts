@@ -1,14 +1,5 @@
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
 const MANAGED_DOWNLOAD_MEDIA_QUERY = '(hover: none) and (pointer: coarse), (max-width: 767px)';
-const SUPABASE_PUBLIC_HOST = (() => {
-  const raw = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-  if (!raw) return '';
-  try {
-    return new URL(raw).hostname;
-  } catch {
-    return '';
-  }
-})();
 
 const R2_PUBLIC_BASE = String(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || '')
   .trim()
@@ -61,19 +52,6 @@ export function isInternalStorageObjectUrl(url: string): boolean {
   }
 }
 
-function isPublicSupabaseStorageUrl(url: string): boolean {
-  if (!SUPABASE_PUBLIC_HOST) return false;
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === SUPABASE_PUBLIC_HOST &&
-      parsed.pathname.startsWith('/storage/v1/object/public/')
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function buildInternalStorageDownloadUrl(url: string, fileName: string): string {
   const parsed = new URL(url, 'https://local-storage-proxy.test');
   parsed.searchParams.set('download', '1');
@@ -112,10 +90,9 @@ export function buildStorageInlineUrl(url: string, fileName: string): string {
     return normalizedUrl;
   }
 
-  // 공개 스토리지(Supabase public bucket / R2 custom domain)는 인증 없이
-  // 직접 접근 가능하므로 Cloudflare Workers 프록시를 거치지 않는다.
+  // 공개 R2 CDN URL은 인증 없이 직접 접근 가능하므로 Cloudflare Workers 프록시를 거치지 않는다.
   // 프록시 경유 시 큰 이미지에서 1102(Worker 리소스 초과) 오류 발생.
-  if (isPublicSupabaseStorageUrl(normalizedUrl) || isPublicR2StorageUrl(normalizedUrl)) {
+  if (isPublicR2StorageUrl(normalizedUrl)) {
     return normalizedUrl;
   }
 

@@ -22,12 +22,11 @@ function optionalEnvWithDefault(key: string, defaultValue: string): string {
 }
 
 export const config = {
-  /** Supabase */
+  /** Supabase (lib/supabase.ts 하이브리드 Proxy 유지용 — 계정 해지 전까지 보존) */
   supabase: {
     url: requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
     anonKey: requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
     serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    jwtSecret: optionalEnv('SUPABASE_JWT_SECRET'),
   },
 
   /** 세션 */

@@ -1,7 +1,6 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { supabase } from '@/lib/supabase';
 import { inferAttachmentType } from './게시판공통';
 
 const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
@@ -28,7 +27,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   zip: 'application/zip',
 };
 
-type UploadProvider = 'supabase' | 'r2';
+type UploadProvider = 'r2' | 'supabase';
 
 type UploadResponsePayload = {
   provider?: UploadProvider;
@@ -122,64 +121,17 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
     throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
   }
 
-  const publicUrl =
-    payload.url ||
-    (payload.provider === 'supabase' && payload.bucket
-      ? supabase.storage.from(payload.bucket).getPublicUrl(payload.path).data.publicUrl
-      : '');
+  const publicUrl = payload.url || '';
 
   try {
-    let uploadErrorMessage = '';
-    if (payload.provider === 'supabase' && payload.bucket && payload.token) {
-      const uploadClient = supabase.storage.from(payload.bucket) as typeof supabase.storage extends {
-        from: (...args: unknown[]) => infer TStorageClient;
-      }
-        ? TStorageClient & {
-            uploadToSignedUrl?: (
-              path: string,
-              token: string,
-              fileBody: File,
-              options?: Record<string, unknown>,
-            ) => Promise<{ error: { message?: string } | null }>;
-          }
-        : {
-            uploadToSignedUrl?: (
-              path: string,
-              token: string,
-              fileBody: File,
-              options?: Record<string, unknown>,
-            ) => Promise<{ error: { message?: string } | null }>;
-          };
+    const directUploadResponse = await fetch(payload.signedUrl, {
+      method: 'PUT',
+      headers: payload.headers || { 'content-type': getUploadContentType(file) },
+      body: file,
+    });
 
-      if (typeof uploadClient.uploadToSignedUrl === 'function') {
-        const uploadResult = await uploadClient.uploadToSignedUrl(payload.path, payload.token, file, {
-          contentType: getUploadContentType(file),
-          upsert: false,
-          cacheControl: CACHE_CONTROL,
-        });
-        uploadErrorMessage = uploadResult.error?.message || '';
-      }
-    }
-
-    if (payload.provider !== 'supabase' || uploadErrorMessage) {
-      const directUploadResponse = await fetch(payload.signedUrl, {
-        method: 'PUT',
-        headers:
-          payload.provider === 'r2'
-            ? payload.headers || { 'content-type': getUploadContentType(file) }
-            : {
-                'content-type': getUploadContentType(file),
-                'x-upsert': 'false',
-                'cache-control': CACHE_CONTROL,
-              },
-        body: file,
-      });
-
-      if (!directUploadResponse.ok) {
-        throw new Error(
-          uploadErrorMessage || `Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`,
-        );
-      }
+    if (!directUploadResponse.ok) {
+      throw new Error(`Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
     }
   } catch (directUploadError) {
     logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);

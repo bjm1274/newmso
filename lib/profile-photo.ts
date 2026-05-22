@@ -1,5 +1,4 @@
 const PROFILE_PHOTO_BUCKET = 'profiles';
-const PLACEHOLDER_SUPABASE_URL = 'https://placeholder.supabase.co';
 const STAFF_ALLOWANCE_KEYS = [
   'meal_allowance',
   'night_duty_allowance',
@@ -13,6 +12,13 @@ const STAFF_ALLOWANCE_KEYS = [
   'holiday_work_allowance',
   'annual_leave_pay',
 ] as const;
+
+function getR2PublicBase(): string | null {
+  const raw =
+    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL : undefined;
+  const url = typeof raw === 'string' ? raw.trim().replace(/\/+$/, '') : '';
+  return url || null;
+}
 
 function cleanString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -31,14 +37,6 @@ function cleanFiniteNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function getSupabasePublicBaseUrl(): string | null {
-  const rawUrl =
-    typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined;
-  const url = cleanString(rawUrl);
-  if (!url || url === PLACEHOLDER_SUPABASE_URL) return null;
-  return url.replace(/\/+$/, '');
-}
-
 export function getProfilePhotoPath(source: any): string | null {
   return (
     cleanString(source?.profile_photo_path) ||
@@ -52,10 +50,11 @@ export function buildProfilePhotoUrlFromPath(
   path: string | null | undefined,
   updatedAt?: string | null
 ): string | null {
-  const baseUrl = getSupabasePublicBaseUrl();
+  const r2Base = getR2PublicBase();
   const cleanedPath = cleanString(path);
-  if (!baseUrl || !cleanedPath) return null;
-  const basePhotoUrl = `${baseUrl}/storage/v1/object/public/${PROFILE_PHOTO_BUCKET}/${cleanedPath}`;
+  if (!r2Base || !cleanedPath) return null;
+  const encodedPath = cleanedPath.split('/').map(encodeURIComponent).join('/');
+  const basePhotoUrl = `${r2Base}/${PROFILE_PHOTO_BUCKET}/${encodedPath}`;
   const version = cleanString(updatedAt);
   return version ? `${basePhotoUrl}?v=${encodeURIComponent(version)}` : basePhotoUrl;
 }

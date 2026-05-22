@@ -2,8 +2,6 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 export default function LoginPage() {
@@ -27,7 +25,6 @@ export default function LoginPage() {
         if (!response.ok) {
           localStorage.removeItem(STORAGE_KEYS.USER);
           localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-          persistSupabaseAccessToken(null);
           if (!ignore) setCheckingAuth(false);
           return;
         }
@@ -36,19 +33,15 @@ export default function LoginPage() {
         if (!payload?.authenticated || !payload.user) {
           localStorage.removeItem(STORAGE_KEYS.USER);
           localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-          persistSupabaseAccessToken(null);
           if (!ignore) setCheckingAuth(false);
           return;
         }
 
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
-        persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
-        void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
         router.replace('/main');
       } catch {
         localStorage.removeItem(STORAGE_KEYS.USER);
         localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-        persistSupabaseAccessToken(null);
         if (!ignore) setCheckingAuth(false);
       }
     };
@@ -84,8 +77,6 @@ export default function LoginPage() {
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
       // 서버 발급 시각 우선 사용, 없으면 클라이언트 시각 폴백
       localStorage.setItem(STORAGE_KEYS.LOGIN_AT, payload.issuedAt ?? new Date().toISOString());
-      persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
-      void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
       setLoading(false);
       if (payload.notice) {
         toast(payload.notice);

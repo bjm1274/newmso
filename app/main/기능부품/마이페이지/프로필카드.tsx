@@ -4,7 +4,6 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { performClientLogout } from '@/lib/client-logout';
 import { buildAuditDiff } from '@/lib/audit';
 import {

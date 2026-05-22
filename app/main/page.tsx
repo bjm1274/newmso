@@ -6,7 +6,6 @@ import { toast } from '@/lib/toast';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import {
@@ -338,8 +337,6 @@ function MainPageContent() {
       localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
       persistSelectedCompanyId(null);
-      persistSupabaseAccessToken(null);
-      void supabase.realtime.setAuth(null);
     } catch {
       // ignore
     }
@@ -447,8 +444,6 @@ function MainPageContent() {
         try {
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(sessionUser));
           localStorage.setItem(STORAGE_KEYS.LOGIN_AT, sessionLoginAt);
-          persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
-          void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
         } catch {
           // ignore
         }
@@ -624,8 +619,6 @@ function MainPageContent() {
           return;
         }
 
-        persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
-        void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
       } catch {
         // 갱신 실패 시 무시 (다음 주기에 재시도)
       }

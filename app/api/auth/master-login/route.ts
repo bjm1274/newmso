@@ -3,7 +3,6 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/rate-limit';
 import { createClient } from '@supabase/supabase-js';
 import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
-import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   pickStoredPassword,
   updateStaffPasswordWithFallback,
@@ -41,12 +40,10 @@ async function successResponse(user: any, notice?: string) {
   const safeUser = normalizeSessionUser(user);
   const issuedAt = new Date().toISOString();
   const token = await createSessionToken(safeUser);
-  const supabaseAccessToken = await createSupabaseAccessToken(safeUser);
   const response = NextResponse.json({
     success: true,
     user: safeUser,
     issuedAt,
-    supabaseAccessToken,
     ...(notice ? { notice } : {}),
   });
 

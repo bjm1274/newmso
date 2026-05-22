@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   clearSessionCookie,
   createSessionToken,
@@ -30,14 +29,11 @@ export async function GET(request: NextRequest) {
     // 동기화 실패 시 기존 세션 사용자 유지
   }
 
-  const supabaseAccessToken = await createSupabaseAccessToken(freshSessionUser);
-
   const response = NextResponse.json({
     authenticated: true,
     user: freshSessionUser,
     expiresAt: session.exp,
     issuedAt: new Date(session.iat * 1000).toISOString(),
-    supabaseAccessToken,
   });
 
   const remainingAgeSeconds = Math.max(1, session.exp - Math.floor(Date.now() / 1000));

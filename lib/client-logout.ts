@@ -12,8 +12,6 @@
 
 import { logger } from '@/lib/logger';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
-import { supabase } from '@/lib/supabase';
 
 // ── 내부 헬퍼 ─────────────────────────────────────────────────
 
@@ -116,8 +114,6 @@ export async function performClientLogout(): Promise<void> {
   try {
     localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
-    persistSupabaseAccessToken(null);
-    void supabase.realtime.setAuth(null);
   } catch {
     // ignore
   }

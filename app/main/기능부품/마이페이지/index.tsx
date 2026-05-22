@@ -24,7 +24,6 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
-import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { performClientLogout } from '@/lib/client-logout';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';

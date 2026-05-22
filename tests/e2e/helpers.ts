@@ -2,8 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import { DEFAULT_INCOME_TAX_BRACKET } from '../../lib/use-tax-insurance-rates';
-import { SUPABASE_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/supabase-bridge';
-import { createSupabaseAccessToken } from '../../lib/server-supabase-bridge';
 import {
   createSessionToken,
   getSessionCookieOptions,
@@ -607,12 +605,7 @@ export async function seedSession(page: Page, options: SeedOptions = {}) {
     ...(options.localStorage || {}),
   };
   const token = await createSessionToken(user);
-  const supabaseAccessToken = await createSupabaseAccessToken(user as any);
   const cookieOptions = getSessionCookieOptions();
-
-  if (supabaseAccessToken) {
-    extraStorage[SUPABASE_ACCESS_TOKEN_STORAGE_KEY] = supabaseAccessToken;
-  }
 
   await page.context().addCookies([
     {
@@ -648,12 +641,7 @@ export async function replaceSession(page: Page, options: SeedOptions = {}) {
     ...(options.localStorage || {}),
   };
   const token = await createSessionToken(user);
-  const supabaseAccessToken = await createSupabaseAccessToken(user as any);
   const cookieOptions = getSessionCookieOptions();
-
-  if (supabaseAccessToken) {
-    extraStorage[SUPABASE_ACCESS_TOKEN_STORAGE_KEY] = supabaseAccessToken;
-  }
 
   await page.context().clearCookies();
   await page.context().addCookies([
@@ -673,7 +661,7 @@ export async function replaceSession(page: Page, options: SeedOptions = {}) {
   await page.goto('/api/auth/session', { waitUntil: 'domcontentloaded' });
 
   await page.evaluate(
-    ({ seededUser, seededStorage, tokenKey, accessToken }) => {
+    ({ seededUser, seededStorage }) => {
       window.localStorage.clear();
       window.sessionStorage.clear();
       window.localStorage.setItem('erp_user', JSON.stringify(seededUser));
@@ -681,15 +669,10 @@ export async function replaceSession(page: Page, options: SeedOptions = {}) {
       Object.entries(seededStorage).forEach(([key, value]) => {
         window.localStorage.setItem(key, value);
       });
-      if (accessToken) {
-        window.localStorage.setItem(tokenKey, accessToken);
-      }
     },
     {
       seededUser: user,
       seededStorage: extraStorage,
-      tokenKey: SUPABASE_ACCESS_TOKEN_STORAGE_KEY,
-      accessToken: supabaseAccessToken,
     }
   );
 }

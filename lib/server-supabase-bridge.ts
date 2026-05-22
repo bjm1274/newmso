@@ -1,98 +1,19 @@
+/**
+ * 서버 측 Supabase JWT 생성 브릿지 — 레거시 심볼 유지 파일
+ *
+ * Realtime은 더 이상 사용하지 않으므로 JWT 발급이 불필요하다.
+ * 모든 호출처에서 createSupabaseAccessToken import를 제거했으므로
+ * 이 파일은 안전하게 삭제해도 되나, 잔여 참조가 없는지 확인 후 삭제한다.
+ *
+ * SUPABASE_JWT_SECRET 환경변수는 이 파일이 제거되면 코드에서 완전히 사라진다.
+ */
+
 import type { SessionUser } from './server-session';
-import { ZERO_UUID } from './constants';
 
-const encoder = new TextEncoder();
-
-function getCryptoApi() {
-  if (!globalThis.crypto?.subtle) {
-    throw new Error('Web Crypto API를 사용할 수 없습니다.');
-  }
-  return globalThis.crypto;
-}
-
-function getSupabaseJwtSecret(): string | null {
-  const secret = process.env.SUPABASE_JWT_SECRET?.trim();
-  return secret || null;
-}
-
-function bytesToBase64Url(bytes: Uint8Array) {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/g, '');
-  }
-
-  let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-async function importSigningKey(secret: string) {
-  return getCryptoApi().subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-}
-
-async function signHs256(input: string, secret: string) {
-  const key = await importSigningKey(secret);
-  const signature = await getCryptoApi().subtle.sign('HMAC', key, encoder.encode(input));
-  return bytesToBase64Url(new Uint8Array(signature));
-}
-
-function encodeJson(value: unknown) {
-  return bytesToBase64Url(encoder.encode(JSON.stringify(value)));
-}
-
+/** @deprecated Realtime 인증 제거 — 항상 null 반환 */
 export async function createSupabaseAccessToken(
-  user: SessionUser,
-  maxAgeSeconds = 60 * 60 * 12
-): Promise<string | null> {
-  const secret = getSupabaseJwtSecret();
-  if (!secret) return null;
-
-  const now = Math.floor(Date.now() / 1000);
-  const isMso = Boolean(user?.permissions?.mso);
-  const isAdmin = Boolean(user?.role === 'admin' || user?.permissions?.admin || isMso);
-  const isCompanyAdmin = Boolean(user?.role === 'admin' && !isMso);
-  const canManageCompany = Boolean(isMso || isCompanyAdmin || user?.permissions?.hr);
-  const subject = String(user?.auth_user_id || user?.id || ZERO_UUID);
-
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT',
-  };
-
-  const payload = {
-    aud: 'authenticated',
-    exp: now + maxAgeSeconds,
-    iat: now,
-    iss: process.env.NEXT_PUBLIC_SUPABASE_URL || 'newmso',
-    sub: subject,
-    role: 'authenticated',
-    aal: 'aal1',
-    session_id: globalThis.crypto?.randomUUID?.() || `${Date.now()}`,
-    erp_staff_id: user?.id || null,
-    erp_company_id: user?.company_id || null,
-    erp_company_name: user?.company || null,
-    erp_role: user?.role || null,
-    erp_is_admin: isAdmin,
-    erp_is_mso: isMso,
-    erp_is_company_admin: isCompanyAdmin,
-    erp_can_manage_company: canManageCompany,
-  };
-
-  const encodedHeader = encodeJson(header);
-  const encodedPayload = encodeJson(payload);
-  const unsigned = `${encodedHeader}.${encodedPayload}`;
-  const signature = await signHs256(unsigned, secret);
-
-  return `${unsigned}.${signature}`;
+  _user: SessionUser,
+  _maxAgeSeconds?: number
+): Promise<null> {
+  return null;
 }

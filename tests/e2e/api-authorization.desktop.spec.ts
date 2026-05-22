@@ -10,7 +10,6 @@ function mockSessionRoute(page: Page, user: Record<string, unknown>) {
         authenticated: true,
         user,
         expiresAt: Math.floor(Date.now() / 1000) + 60 * 60,
-        supabaseAccessToken: null,
       }),
     });
   });
