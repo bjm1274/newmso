@@ -27,13 +27,13 @@ interface PayrollTableProps {
   checkedIds?: (number | string)[];
   setCheckedIds?: (ids: (number | string)[]) => void;
   onSelect?: (id: number | string) => void;
-  onSendAll?: React.MouseEventHandler<HTMLButtonElement>;
+  onSend?: React.MouseEventHandler<HTMLButtonElement>;
 }
 
 /** 학습 문서 §5 메인 급여 테이블: 선택 | 직원(아바타·이름·직급·부서) | 근무일 | 지급(비과세) | 지급(과세) | 공제 | 차인지급액 | 명세서 */
 export default function PayrollTable({ staffs = [], payrollRecords = [], yearMonth = '', checkedIds = [], setCheckedIds,
   onSelect,
-  onSendAll,
+  onSend,
 }: PayrollTableProps) {
   const isAllChecked = staffs.length > 0 && checkedIds.length === staffs.length;
   const monthWorkDays = yearMonth ? getWorkDaysInMonth(yearMonth) : 0;
@@ -80,11 +80,12 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
             <span className="text-sm font-medium text-[var(--foreground)]">전체 선택 ({staffs.length}명)</span>
           </div>
           <button
-            onClick={onSendAll}
-            className="px-3 py-1.5 bg-[var(--accent)] text-white text-[10px] font-black rounded-lg hover:scale-105 transition-all shadow-sm flex items-center gap-1.5"
-            title="정산 완료된 모든 직원에게 명세서 알림 발송"
+            onClick={onSend}
+            disabled={checkedIds.length === 0}
+            className="px-3 py-1.5 bg-[var(--accent)] text-white text-[10px] font-black rounded-lg hover:scale-105 transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            title="선택한 직원에게 명세서 알림 발송"
           >
-            🚀 전체 전송
+            🚀 전송하기{checkedIds.length > 0 ? ` (${checkedIds.length})` : ''}
           </button>
         </div>
         <div className="flex justify-between items-center pt-3 border-t border-[var(--border)]">

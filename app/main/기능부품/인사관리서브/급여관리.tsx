@@ -466,12 +466,20 @@ export default function PayrollMain({
                     checkedIds={checkedIds}
                     setCheckedIds={setCheckedIds}
                     onSelect={setSelectedStaffId}
-                    onSendAll={async () => {
-                      const records = payrollRecords.filter(r => r.year_month === yearMonth);
-                      if (records.length === 0) return toast("해당 월에 정산 완료된 레코드가 없습니다.", 'success');
+                    onSend={async () => {
+                      if (checkedIds.length === 0) {
+                        return toast('전송할 직원을 선택해 주세요.', 'warning');
+                      }
+                      const checkedSet = new Set(checkedIds.map((id) => String(id)));
+                      const records = payrollRecords.filter(
+                        (r) => r.year_month === yearMonth && checkedSet.has(String(r.staff_id)),
+                      );
+                      if (records.length === 0) {
+                        return toast('선택한 직원 중 해당 월에 정산 완료된 레코드가 없습니다.', 'warning');
+                      }
                       const confirmed = await openConfirm({
                         title: '급여명세서 알림 발송',
-                        description: `${records.length}명의 직원에게 급여명세서 알림을 발송합니다.`,
+                        description: `선택한 ${records.length}명의 직원에게 급여명세서 알림을 발송합니다.`,
                         confirmText: '발송',
                         tone: 'accent',
                       });
