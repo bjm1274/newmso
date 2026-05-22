@@ -14,7 +14,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { supabase } from '@/lib/supabase';
 import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const result = await upsertRoomReadCursors(supabase, { userId, roomIds, readAt });
+    const result = await upsertRoomReadCursors({ userId, roomIds, readAt });
     return NextResponse.json({ ok: result.ok, readAt: result.readAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';

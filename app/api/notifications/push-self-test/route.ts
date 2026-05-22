@@ -3,23 +3,15 @@
  * 현재 로그인한 사용자의 모든 구독에 실제로 테스트 push를 보냅니다.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   push_subscriptions as pushSubscriptionsTable,
   eq,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
-
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, key);
-}
 
 type SubRow = {
   id: string;
@@ -53,30 +45,20 @@ export async function POST(request: NextRequest) {
 
   // ── 2. DB 구독 정보 확인 ──
   let subs: SubRow[] | null = null;
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (d1) {
-      const db = getD1Drizzle(d1);
-      const rows = await db
-        .select({
-          id: pushSubscriptionsTable.id,
-          endpoint: pushSubscriptionsTable.endpoint,
-          p256dh: pushSubscriptionsTable.p256dh,
-          auth: pushSubscriptionsTable.auth,
-          fcm_token: pushSubscriptionsTable.fcm_token,
-        })
-        .from(pushSubscriptionsTable)
-        .where(eq(pushSubscriptionsTable.staff_id, staffId));
-      subs = rows as SubRow[];
-    }
-  } else {
-    const supabase = getAdminClient();
-    const { data } = await supabase
-      .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth, fcm_token')
-      .eq('staff_id', staffId);
-    subs = data as SubRow[] | null;
+  const d1 = await getD1Binding();
+  if (d1) {
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({
+        id: pushSubscriptionsTable.id,
+        endpoint: pushSubscriptionsTable.endpoint,
+        p256dh: pushSubscriptionsTable.p256dh,
+        auth: pushSubscriptionsTable.auth,
+        fcm_token: pushSubscriptionsTable.fcm_token,
+      })
+      .from(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.staff_id, staffId));
+    subs = rows as SubRow[];
   }
 
   diagnostics.subscriptions = (subs || []).map((s) => ({

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   getDepositCompanyScope,
   readAuthorizedDepositUser,
@@ -8,7 +7,6 @@ import { normalizeDepositDraft } from '@/lib/virtual-account-deposits';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   virtual_account_deposits as virtualAccountDepositsTable,
   and,
   eq,
@@ -19,22 +17,10 @@ import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
 
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
 async function requireD1ForDeposits(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[virtual_account_deposits] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -207,47 +193,26 @@ export async function POST(request: NextRequest) {
     };
     const rawPayloadObj = { source: 'manual', entered_by: access.user.id, ...body };
 
-    const postBackend = await resolveDataBackend();
-    if (postBackend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'virtual_account_deposits:post', backend: postBackend });
-        return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-      const newId = crypto.randomUUID();
-      await db.insert(virtualAccountDepositsTable).values({
-        id: newId,
-        ...newRow,
-        raw_payload: JSON.stringify(rawPayloadObj),
-        created_at: now,
-        updated_at: now,
-      });
-      const rows = await db
-        .select()
-        .from(virtualAccountDepositsTable)
-        .where(eq(virtualAccountDepositsTable.id, newId))
-        .limit(1);
-      return NextResponse.json({ deposit: rows[0] ? deserializeDepositRow(rows[0] as Record<string, unknown>) : null });
-    }
-
-    const supabase = getAdminClient();
-    const { data, error } = await supabase
-      .from('virtual_account_deposits')
-      .insert({
-        ...newRow,
-        raw_payload: rawPayloadObj,
-        created_at: now,
-        updated_at: now,
-      })
-      .select('*')
-      .single();
-
-    if (error) {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'virtual_account_deposits:post', backend: 'd1' });
       return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
     }
-
-    return NextResponse.json({ deposit: data });
+    const db = getD1Drizzle(d1);
+    const newId = crypto.randomUUID();
+    await db.insert(virtualAccountDepositsTable).values({
+      id: newId,
+      ...newRow,
+      raw_payload: JSON.stringify(rawPayloadObj),
+      created_at: now,
+      updated_at: now,
+    });
+    const rows = await db
+      .select()
+      .from(virtualAccountDepositsTable)
+      .where(eq(virtualAccountDepositsTable.id, newId))
+      .limit(1);
+    return NextResponse.json({ deposit: rows[0] ? deserializeDepositRow(rows[0] as Record<string, unknown>) : null });
   } catch {
     return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
   }
@@ -264,43 +229,25 @@ export async function DELETE(request: NextRequest) {
 
     const { companyId, isSystemMaster } = access.scope;
 
-    const deleteBackend = await resolveDataBackend();
-    if (deleteBackend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'virtual_account_deposits:delete', backend: deleteBackend });
-        return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-      const whereExpr =
-        companyId && !isSystemMaster
-          ? and(
-              eq(virtualAccountDepositsTable.id, id),
-              eq(virtualAccountDepositsTable.provider, 'manual'),
-              eq(virtualAccountDepositsTable.company_id, companyId),
-            )
-          : and(
-              eq(virtualAccountDepositsTable.id, id),
-              eq(virtualAccountDepositsTable.provider, 'manual'),
-            );
-      await db.delete(virtualAccountDepositsTable).where(whereExpr);
-      return NextResponse.json({ ok: true });
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'virtual_account_deposits:delete', backend: 'd1' });
+      return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
     }
-
-    const supabase = getAdminClient();
+    const db = getD1Drizzle(d1);
     // 수동 등록된 건만 삭제 가능
-    let q = supabase.from('virtual_account_deposits')
-      .delete()
-      .eq('id', id)
-      .eq('provider', 'manual');
-
-    if (companyId && !isSystemMaster) {
-      q = q.eq('company_id', companyId) as typeof q;
-    }
-
-    const { error } = await q;
-    if (error) return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
-
+    const whereExpr =
+      companyId && !isSystemMaster
+        ? and(
+            eq(virtualAccountDepositsTable.id, id),
+            eq(virtualAccountDepositsTable.provider, 'manual'),
+            eq(virtualAccountDepositsTable.company_id, companyId),
+          )
+        : and(
+            eq(virtualAccountDepositsTable.id, id),
+            eq(virtualAccountDepositsTable.provider, 'manual'),
+          );
+    await db.delete(virtualAccountDepositsTable).where(whereExpr);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
@@ -319,7 +266,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updates = normalizeDepositDraft(body || {});
-    const supabase = getAdminClient();
     const { companyId, isSystemMaster } = access.scope;
 
     // Phase 8-H — existing 조회 read 호출 D1 binding 직접 사용.
@@ -353,46 +299,27 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '수정할 입금 내역을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const patchBackend = await resolveDataBackend();
-    if (patchBackend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        logD1BindingMissing({ label: 'virtual_account_deposits:patch:update', backend: patchBackend });
-        return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-      // raw_payload가 객체면 JSON.stringify
-      const d1Updates = { ...updates } as Record<string, unknown>;
-      if (d1Updates.raw_payload !== undefined && d1Updates.raw_payload !== null && typeof d1Updates.raw_payload !== 'string') {
-        d1Updates.raw_payload = JSON.stringify(d1Updates.raw_payload);
-      }
-      await db
-        .update(virtualAccountDepositsTable)
-        .set({ ...d1Updates, updated_at: new Date().toISOString() } as Parameters<ReturnType<typeof db.update>['set']>[0])
-        .where(eq(virtualAccountDepositsTable.id, id));
-      const updatedRows = await db
-        .select()
-        .from(virtualAccountDepositsTable)
-        .where(eq(virtualAccountDepositsTable.id, id))
-        .limit(1);
-      return NextResponse.json({ deposit: updatedRows[0] ? deserializeDepositRow(updatedRows[0] as Record<string, unknown>) : null });
-    }
-
-    const { data, error } = await supabase
-      .from('virtual_account_deposits')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) {
+    const d1 = await getD1Binding();
+    if (!d1) {
+      logD1BindingMissing({ label: 'virtual_account_deposits:patch:update', backend: 'd1' });
       return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
     }
-
-    return NextResponse.json({ deposit: data });
+    const updateDb = getD1Drizzle(d1);
+    // raw_payload가 객체면 JSON.stringify
+    const d1Updates = { ...updates } as Record<string, unknown>;
+    if (d1Updates.raw_payload !== undefined && d1Updates.raw_payload !== null && typeof d1Updates.raw_payload !== 'string') {
+      d1Updates.raw_payload = JSON.stringify(d1Updates.raw_payload);
+    }
+    await updateDb
+      .update(virtualAccountDepositsTable)
+      .set({ ...d1Updates, updated_at: new Date().toISOString() } as Parameters<ReturnType<typeof updateDb.update>['set']>[0])
+      .where(eq(virtualAccountDepositsTable.id, id));
+    const updatedRows = await updateDb
+      .select()
+      .from(virtualAccountDepositsTable)
+      .where(eq(virtualAccountDepositsTable.id, id))
+      .limit(1);
+    return NextResponse.json({ deposit: updatedRows[0] ? deserializeDepositRow(updatedRows[0] as Record<string, unknown>) : null });
   } catch {
     return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
   }

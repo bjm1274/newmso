@@ -236,8 +236,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 3) 채팅 푸시 디스패치 (전 직원 대상 — chat-push-dispatch가 공지방 폴백 처리)
-    // 본 호출은 Phase 8-I에서 별도 변환 예정 — supabase 인자 생략 시 dispatch 내부에서
-    // admin client를 생성하므로 시그니처 호환 유지.
     let pushResult: Awaited<ReturnType<typeof dispatchChatPushForMessage>> | null = null;
     let pushError: string | null = null;
     try {

@@ -1,12 +1,10 @@
 import { createHash } from 'node:crypto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   messages as messagesTable,
@@ -98,59 +96,6 @@ const CHAT_PUSH_MAX_ATTEMPTS = 5;
 const CHAT_PUSH_RETRY_DELAYS_MINUTES = [1, 5, 15, 30, 60];
 const BOARD_META_START = '[[BOARD_META]]';
 const BOARD_META_END = '[[/BOARD_META]]';
-const CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS = [
-  'processing_started_at',
-  'next_attempt_at',
-  'dead_lettered_at',
-] as const;
-
-let chatPushRetryColumnsSupported: boolean | null = null;
-const unsupportedChatPushQueueColumns = new Set<string>();
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
-function isMissingRelationError(error: any, relationName: string) {
-  if (!error) return false;
-  const code = String(error?.code || '');
-  const message = String(error?.message || error?.details || '').toLowerCase();
-  const target = relationName.toLowerCase();
-  return code === '42P01' || message.includes(target);
-}
-
-function isMissingColumnError(error: any, columnName: string) {
-  if (!error) return false;
-  const code = String(error?.code || '');
-  const message = String(error?.message || error?.details || error?.hint || '').toLowerCase();
-  const needle = columnName.toLowerCase();
-  return (code === '42703' || !code) && message.includes(needle);
-}
-
-function isChatPushQueueMigrationError(error: any) {
-  return CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.some((column) => isMissingColumnError(error, column));
-}
-
-function getSupportedChatPushPatch(patch: Record<string, unknown>) {
-  return Object.fromEntries(
-    Object.entries(patch).filter(([key]) => !unsupportedChatPushQueueColumns.has(key)),
-  );
-}
-
-function rememberUnsupportedChatPushColumns(error: any, patch: Record<string, unknown>) {
-  CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.forEach((column) => {
-    if (column in patch && isMissingColumnError(error, column)) {
-      unsupportedChatPushQueueColumns.add(column);
-    }
-  });
-}
 
 function getRetryDelayMinutes(attemptCount: number) {
   const index = Math.min(
@@ -278,90 +223,6 @@ async function selectPendingChatPushJobsD1(limit: number) {
   };
 }
 
-async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number) {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    return selectPendingChatPushJobsD1(limit);
-  }
-
-  const nowIso = new Date().toISOString();
-  // 2분 이내 processing_started_at이 설정된 job은 현재 다른 경로(API)에서 처리 중 → 건너뜀
-  const staleThresholdIso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const retryAwareSelection =
-    'id, message_id, room_id, created_at, attempt_count, next_attempt_at, dead_lettered_at';
-
-  const selectLegacyJobs = async () => {
-    const fallbackRes = await supabase
-      .from('chat_push_jobs')
-      .select('id, message_id, room_id, created_at, attempt_count')
-      .is('processed_at', null)
-      .order('created_at', { ascending: true })
-      .limit(limit);
-
-    if (!fallbackRes.error) {
-      chatPushRetryColumnsSupported = false;
-      return {
-        jobs: (fallbackRes.data || []) as QueueJobRow[],
-        supportsRetryColumns: false,
-        missingQueueTable: false,
-      };
-    }
-
-    if (isMissingRelationError(fallbackRes.error, 'chat_push_jobs')) {
-      return {
-        jobs: [] as QueueJobRow[],
-        supportsRetryColumns: false,
-        missingQueueTable: true,
-      };
-    }
-
-    throw fallbackRes.error;
-  };
-
-  if (chatPushRetryColumnsSupported === false) {
-    return selectLegacyJobs();
-  }
-
-  const retryAwareRes = await supabase
-    .from('chat_push_jobs')
-    .select(retryAwareSelection)
-    .is('processed_at', null)
-    .is('dead_lettered_at', null)
-    .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
-    .lte('next_attempt_at', nowIso)
-    .order('created_at', { ascending: true })
-    .limit(limit);
-
-  if (!retryAwareRes.error) {
-    chatPushRetryColumnsSupported = true;
-    return {
-      jobs: (retryAwareRes.data || []) as QueueJobRow[],
-      supportsRetryColumns: true,
-      missingQueueTable: false,
-    };
-  }
-
-  if (isChatPushQueueMigrationError(retryAwareRes.error)) {
-    CHAT_PUSH_OPTIONAL_QUEUE_COLUMNS.forEach((column) => {
-      if (isMissingColumnError(retryAwareRes.error, column)) {
-        unsupportedChatPushQueueColumns.add(column);
-      }
-    });
-    chatPushRetryColumnsSupported = false;
-    return selectLegacyJobs();
-  }
-
-  if (isMissingRelationError(retryAwareRes.error, 'chat_push_jobs')) {
-    return {
-      jobs: [] as QueueJobRow[],
-      supportsRetryColumns: false,
-      missingQueueTable: true,
-    };
-  }
-
-  throw retryAwareRes.error;
-}
-
 function toFiniteNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -402,43 +263,29 @@ function buildPreview(message: MessageRow) {
   return '새 메시지가 도착했습니다.';
 }
 
-async function resolveThreadRootIdForMessage(
-  supabase: SupabaseClient,
-  message: MessageRow,
-) {
+async function resolveThreadRootIdForMessage(message: MessageRow) {
   let currentParentId = String(message.reply_to_id || '').trim();
   if (!currentParentId) return null;
 
   const visited = new Set<string>();
   let resolvedRootId = currentParentId;
 
-  const backend = await resolveDataBackend();
+  const d1 = await getD1Binding();
+  if (!d1) return resolvedRootId || null;
+  const db = getD1Drizzle(d1);
 
   while (currentParentId && !visited.has(currentParentId)) {
     visited.add(currentParentId);
     resolvedRootId = currentParentId;
 
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) break;
-      const db = getD1Drizzle(d1);
-      const rows = await db
-        .select({ id: messagesTable.id, reply_to_id: messagesTable.reply_to_id })
-        .from(messagesTable)
-        .where(eq(messagesTable.id, currentParentId))
-        .limit(1);
-      const data = rows[0] ?? null;
-      if (!data) break;
-      currentParentId = String(data.reply_to_id || '').trim();
-    } else {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('id, reply_to_id')
-        .eq('id', currentParentId)
-        .maybeSingle();
-      if (error || !data) break;
-      currentParentId = String(data.reply_to_id || '').trim();
-    }
+    const rows = await db
+      .select({ id: messagesTable.id, reply_to_id: messagesTable.reply_to_id })
+      .from(messagesTable)
+      .where(eq(messagesTable.id, currentParentId))
+      .limit(1);
+    const data = rows[0] ?? null;
+    if (!data) break;
+    currentParentId = String(data.reply_to_id || '').trim();
   }
 
   return resolvedRootId || null;
@@ -478,232 +325,127 @@ function choosePreferredChatNotification(rows: ExistingChatNotificationRow[]) {
   };
 }
 
-async function getMutedUserIds(supabase: SupabaseClient, roomId: string) {
+async function getMutedUserIds(roomId: string) {
   try {
-    const backend = await resolveDataBackend();
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) return new Set<string>();
-      const db = getD1Drizzle(d1);
-      const rows = await db
-        .select({ user_id: roomNotificationSettingsTable.user_id })
-        .from(roomNotificationSettingsTable)
-        .where(
-          and(
-            eq(roomNotificationSettingsTable.room_id, roomId),
-            eq(roomNotificationSettingsTable.notifications_enabled, 0),
-          ),
-        );
-      return new Set(rows.map((row) => String(row.user_id)));
-    }
-
-    // 기존 Supabase 경로
-    const { data, error } = await supabase
-      .from('room_notification_settings')
-      .select('user_id')
-      .eq('room_id', roomId)
-      .eq('notifications_enabled', false);
-
-    if (error) return new Set<string>();
-    return new Set((data || []).map((row: { user_id: string }) => String(row.user_id)));
+    const d1 = await getD1Binding();
+    if (!d1) return new Set<string>();
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({ user_id: roomNotificationSettingsTable.user_id })
+      .from(roomNotificationSettingsTable)
+      .where(
+        and(
+          eq(roomNotificationSettingsTable.room_id, roomId),
+          eq(roomNotificationSettingsTable.notifications_enabled, 0),
+        ),
+      );
+    return new Set(rows.map((row) => String(row.user_id)));
   } catch {
     return new Set<string>();
   }
 }
 
 async function updateChatPushJobByMessageId(
-  supabase: SupabaseClient,
   messageId: string,
   patch: Record<string, unknown>,
 ) {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return;
-    const db = getD1Drizzle(d1);
-    await db
-      .update(chatPushJobsTable)
-      .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
-      .where(eq(chatPushJobsTable.message_id, messageId));
-    return;
-  }
-
-  // 기존 Supabase 경로
-  const supportedPatch = getSupportedChatPushPatch(patch);
-  if (Object.keys(supportedPatch).length === 0) return;
-
-  const { error } = await supabase
-    .from('chat_push_jobs')
-    .update(supportedPatch)
-    .eq('message_id', messageId);
-
-  if (error && isChatPushQueueMigrationError(error)) {
-    rememberUnsupportedChatPushColumns(error, supportedPatch);
-    const retryPatch = getSupportedChatPushPatch(supportedPatch);
-    if (Object.keys(retryPatch).length === 0) return;
-    const retryRes = await supabase
-      .from('chat_push_jobs')
-      .update(retryPatch)
-      .eq('message_id', messageId);
-    if (!retryRes.error) return;
-    if (!isMissingRelationError(retryRes.error, 'chat_push_jobs')) {
-      console.error('chat_push_jobs update failed', retryRes.error);
-    }
-    return;
-  }
-
-  if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
-    console.error('chat_push_jobs update failed', error);
-  }
+  const d1 = await getD1Binding();
+  if (!d1) return;
+  const db = getD1Drizzle(d1);
+  await db
+    .update(chatPushJobsTable)
+    .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+    .where(eq(chatPushJobsTable.message_id, messageId));
 }
 
 async function updateChatPushJobById(
-  supabase: SupabaseClient,
   jobId: string,
   patch: Record<string, unknown>,
 ) {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return;
-    const db = getD1Drizzle(d1);
-    await db
-      .update(chatPushJobsTable)
-      .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
-      .where(eq(chatPushJobsTable.id, jobId));
-    return;
-  }
-
-  // 기존 Supabase 경로
-  const supportedPatch = getSupportedChatPushPatch(patch);
-  if (Object.keys(supportedPatch).length === 0) return;
-
-  const { error } = await supabase
-    .from('chat_push_jobs')
-    .update(supportedPatch)
-    .eq('id', jobId);
-
-  if (error && isChatPushQueueMigrationError(error)) {
-    rememberUnsupportedChatPushColumns(error, supportedPatch);
-    const retryPatch = getSupportedChatPushPatch(supportedPatch);
-    if (Object.keys(retryPatch).length === 0) return;
-    const retryRes = await supabase
-      .from('chat_push_jobs')
-      .update(retryPatch)
-      .eq('id', jobId);
-    if (!retryRes.error) return;
-    if (!isMissingRelationError(retryRes.error, 'chat_push_jobs')) {
-      console.error('chat_push_jobs update failed', retryRes.error);
-    }
-    return;
-  }
-
-  if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
-    console.error('chat_push_jobs update failed', error);
-  }
+  const d1 = await getD1Binding();
+  if (!d1) return;
+  const db = getD1Drizzle(d1);
+  await db
+    .update(chatPushJobsTable)
+    .set(patch as Parameters<ReturnType<typeof db.update>['set']>[0])
+    .where(eq(chatPushJobsTable.id, jobId));
 }
 
 async function fetchMessageAndRoom(
-  supabase: SupabaseClient,
   messageId: string,
   roomId: string,
 ): Promise<{ message: MessageRow | null; room: ChatRoomRow | null }> {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { message: null, room: null };
-    const db = getD1Drizzle(d1);
-    const [msgRows, roomRows] = await Promise.all([
-      db
-        .select({
-          id: messagesTable.id,
-          room_id: messagesTable.room_id,
-          sender_id: messagesTable.sender_id,
-          content: messagesTable.content,
-          reply_to_id: messagesTable.reply_to_id,
-          created_at: messagesTable.created_at,
-          file_url: messagesTable.file_url,
-          file_kind: messagesTable.file_kind,
-          album_id: messagesTable.album_id,
-          album_index: messagesTable.album_index,
-          album_total: messagesTable.album_total,
-        })
-        .from(messagesTable)
-        .where(eq(messagesTable.id, messageId))
-        .limit(1),
-      db
-        .select({
-          id: chatRoomsTable.id,
-          name: chatRoomsTable.name,
-          type: chatRoomsTable.type,
-          members: chatRoomsTable.members,
-        })
-        .from(chatRoomsTable)
-        .where(eq(chatRoomsTable.id, roomId))
-        .limit(1),
-    ]);
-
-    const rawMsg = msgRows[0] ?? null;
-    const rawRoom = roomRows[0] ?? null;
-
-    if (!rawMsg || !rawRoom) return { message: null, room: null };
-
-    // D1 members는 TEXT(JSON) → 파싱
-    let parsedMembers: string[] | null = null;
-    if (typeof rawRoom.members === 'string' && rawRoom.members.length > 0) {
-      try {
-        const parsed = JSON.parse(rawRoom.members) as unknown;
-        if (Array.isArray(parsed)) parsedMembers = parsed.map((m) => String(m));
-      } catch { parsedMembers = null; }
-    } else if (Array.isArray(rawRoom.members)) {
-      parsedMembers = (rawRoom.members as unknown[]).map((m) => String(m));
-    }
-
-    return {
-      message: rawMsg as MessageRow,
-      room: { ...rawRoom, members: parsedMembers } as ChatRoomRow,
-    };
-  }
-
-  // Supabase 경로
-  const [msgRes, roomRes] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('id, room_id, sender_id, content, reply_to_id, created_at, file_url, file_kind, album_id, album_index, album_total')
-      .eq('id', messageId)
-      .single(),
-    supabase
-      .from('chat_rooms')
-      .select('id, name, type, members')
-      .eq('id', roomId)
-      .single(),
+  const d1 = await getD1Binding();
+  if (!d1) return { message: null, room: null };
+  const db = getD1Drizzle(d1);
+  const [msgRows, roomRows] = await Promise.all([
+    db
+      .select({
+        id: messagesTable.id,
+        room_id: messagesTable.room_id,
+        sender_id: messagesTable.sender_id,
+        content: messagesTable.content,
+        reply_to_id: messagesTable.reply_to_id,
+        created_at: messagesTable.created_at,
+        file_url: messagesTable.file_url,
+        file_kind: messagesTable.file_kind,
+        album_id: messagesTable.album_id,
+        album_index: messagesTable.album_index,
+        album_total: messagesTable.album_total,
+      })
+      .from(messagesTable)
+      .where(eq(messagesTable.id, messageId))
+      .limit(1),
+    db
+      .select({
+        id: chatRoomsTable.id,
+        name: chatRoomsTable.name,
+        type: chatRoomsTable.type,
+        members: chatRoomsTable.members,
+      })
+      .from(chatRoomsTable)
+      .where(eq(chatRoomsTable.id, roomId))
+      .limit(1),
   ]);
 
-  if (msgRes.error || roomRes.error || !msgRes.data || !roomRes.data) {
-    return { message: null, room: null };
+  const rawMsg = msgRows[0] ?? null;
+  const rawRoom = roomRows[0] ?? null;
+
+  if (!rawMsg || !rawRoom) return { message: null, room: null };
+
+  // D1 members는 TEXT(JSON) → 파싱
+  let parsedMembers: string[] | null = null;
+  if (typeof rawRoom.members === 'string' && rawRoom.members.length > 0) {
+    try {
+      const parsed = JSON.parse(rawRoom.members) as unknown;
+      if (Array.isArray(parsed)) parsedMembers = parsed.map((m) => String(m));
+    } catch { parsedMembers = null; }
+  } else if (Array.isArray(rawRoom.members)) {
+    parsedMembers = (rawRoom.members as unknown[]).map((m) => String(m));
   }
-  return { message: msgRes.data as MessageRow, room: roomRes.data as ChatRoomRow };
+
+  return {
+    message: rawMsg as MessageRow,
+    room: { ...rawRoom, members: parsedMembers } as ChatRoomRow,
+  };
 }
 
 export async function dispatchChatPushForMessage(params: {
   roomId: string;
   messageId: string;
   expectedSenderId?: string;
-  supabase?: SupabaseClient;
 }) {
-  const supabase = params.supabase || getAdminClient();
-
   // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
   const [, fetchResult, mutedIdsEarly] = await Promise.all([
-    updateChatPushJobByMessageId(supabase, params.messageId, {
+    updateChatPushJobByMessageId(params.messageId, {
       processing_started_at: new Date().toISOString(),
     }),
-    fetchMessageAndRoom(supabase, params.messageId, params.roomId),
-    getMutedUserIds(supabase, params.roomId),
+    fetchMessageAndRoom(params.messageId, params.roomId),
+    getMutedUserIds(params.roomId),
   ]);
 
   if (!fetchResult.message || !fetchResult.room) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
       last_error: 'message-or-room-not-found',
@@ -728,7 +470,7 @@ export async function dispatchChatPushForMessage(params: {
   }
 
   if (albumContext.isAlbumBatch && !albumContext.isLastAlbumItem) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
       last_error: 'album-batch-intermediate-suppressed',
@@ -744,7 +486,7 @@ export async function dispatchChatPushForMessage(params: {
   }
 
   if (shouldSuppressBoardAutoAnnouncementPush(message, room)) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
       last_error: 'board-auto-announcement-suppressed',
@@ -764,23 +506,15 @@ export async function dispatchChatPushForMessage(params: {
   const isNoticeRoom =
     String(room.id || '') === NOTICE_ROOM_ID || String(room.type || '').trim() === 'notice';
   if (members.length === 0 && isNoticeRoom) {
-    const dispatchBackend = await resolveDataBackend();
-    if (dispatchBackend === 'd1') {
-      const d1 = await getD1Binding();
-      if (d1) {
-        const db = getD1Drizzle(d1);
-        const staffRows = await db.select({ id: staffMembersTable.id }).from(staffMembersTable);
-        members = staffRows.map((row) => String(row.id || '').trim()).filter(Boolean);
-      }
-    } else {
-      const { data: allStaff } = await supabase.from('staff_members').select('id');
-      members = ((allStaff || []) as Array<{ id: string | null }>)
-        .map((row) => String(row.id || '').trim())
-        .filter(Boolean);
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const staffRows = await db.select({ id: staffMembersTable.id }).from(staffMembersTable);
+      members = staffRows.map((row) => String(row.id || '').trim()).filter(Boolean);
     }
   }
   if (members.length === 0) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
       last_error: null,
@@ -798,7 +532,7 @@ export async function dispatchChatPushForMessage(params: {
   const targetIds = members.filter((id) => id && id !== senderId && !mutedIdsEarly.has(id));
 
   if (targetIds.length === 0) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
       last_error: null,
@@ -816,8 +550,7 @@ export async function dispatchChatPushForMessage(params: {
   let subscriptions: PushSubscriptionRow[] = [];
   let senderName = '새 메시지';
 
-  const dispatchBackend2 = await resolveDataBackend();
-  if (dispatchBackend2 === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[chat-push-dispatch] D1 binding not available (subscriptions)');
     const db = getD1Drizzle(d1);
@@ -842,21 +575,6 @@ export async function dispatchChatPushForMessage(params: {
     ]);
     subscriptions = subRows as PushSubscriptionRow[];
     senderName = String(senderRows[0]?.name || '새 메시지');
-  } else {
-    const [subscriptionRes, senderRes] = await Promise.all([
-      supabase
-        .from('push_subscriptions')
-        .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
-        .in('staff_id', targetIds),
-      supabase
-        .from('staff_members')
-        .select('name')
-        .eq('id', senderId)
-        .maybeSingle(),
-    ]);
-    if (subscriptionRes.error) throw subscriptionRes.error;
-    subscriptions = (subscriptionRes.data || []) as PushSubscriptionRow[];
-    senderName = String((senderRes.data as { name?: string } | null)?.name || '새 메시지');
   }
   const title =
     room.type === 'notice'
@@ -866,14 +584,13 @@ export async function dispatchChatPushForMessage(params: {
         : senderName;
 
   const previewBody = buildPreview(message);
-  const threadRootId = await resolveThreadRootIdForMessage(supabase, message);
+  const threadRootId = await resolveThreadRootIdForMessage(message);
 
   // 기존 알림 조회 (중복 방지용)
+  // D1에서는 metadata JSON 텍스트 full-scan으로 message_id 필터
+  // (JSONPath 필터 미지원) — metadata를 파싱 후 JS단에서 필터
   const existingNotificationsByUser = new Map<string, ExistingChatNotificationRow[]>();
-  const dispatchBackend3 = await resolveDataBackend();
-  if (dispatchBackend3 === 'd1') {
-    // D1에서는 metadata JSON 텍스트 full-scan으로 message_id 필터
-    // (JSONPath 필터 미지원) — metadata를 파싱 후 JS단에서 필터
+  {
     const d1 = await getD1Binding();
     if (d1) {
       const db = getD1Drizzle(d1);
@@ -918,26 +635,6 @@ export async function dispatchChatPushForMessage(params: {
           notifRow,
         ]);
       }
-    }
-  } else {
-    const { data: existingNotificationData, error: existingNotificationError } = await supabase
-      .from('notifications')
-      .select('id,user_id,type,metadata,created_at')
-      .in('user_id', targetIds)
-      .in('type', ['message', 'mention'])
-      .filter('metadata->>message_id', 'eq', params.messageId);
-
-    if (existingNotificationError) {
-      console.warn('chat notification legacy lookup failed', existingNotificationError);
-    }
-
-    for (const row of (existingNotificationData || []) as ExistingChatNotificationRow[]) {
-      const targetUserId = String(row.user_id || '').trim();
-      if (!targetUserId) continue;
-      existingNotificationsByUser.set(targetUserId, [
-        ...(existingNotificationsByUser.get(targetUserId) || []),
-        row,
-      ]);
     }
   }
 
@@ -985,53 +682,37 @@ export async function dispatchChatPushForMessage(params: {
   const notificationInsertPromise: Promise<void> =
     notificationRows.length > 0
       ? (async () => {
-          const notifBackend = await resolveDataBackend();
-          if (notifBackend === 'd1') {
-            const d1 = await getD1Binding();
-            if (!d1) return;
-            const db = getD1Drizzle(d1);
-            try {
-              for (const row of notificationRows) {
-                // metadata는 객체 → JSON.stringify
-                await db
-                  .insert(notificationsTable)
-                  .values({
-                    ...row,
+          const d1 = await getD1Binding();
+          if (!d1) return;
+          const db = getD1Drizzle(d1);
+          try {
+            for (const row of notificationRows) {
+              // metadata는 객체 → JSON.stringify
+              await db
+                .insert(notificationsTable)
+                .values({
+                  ...row,
+                  metadata: JSON.stringify(row.metadata),
+                })
+                .onConflictDoUpdate({
+                  target: notificationsTable.id,
+                  set: {
+                    title: row.title,
+                    body: row.body,
                     metadata: JSON.stringify(row.metadata),
-                  })
-                  .onConflictDoUpdate({
-                    target: notificationsTable.id,
-                    set: {
-                      title: row.title,
-                      body: row.body,
-                      metadata: JSON.stringify(row.metadata),
-                    },
-                  });
-              }
+                  },
+                });
+            }
+          } catch (err) {
+            console.error('chat notification D1 insert failed', err);
+          }
+          if (staleNotificationIds.size > 0) {
+            try {
+              await db
+                .delete(notificationsTable)
+                .where(inArray(notificationsTable.id, Array.from(staleNotificationIds)));
             } catch (err) {
-              console.error('chat notification D1 insert failed', err);
-            }
-            if (staleNotificationIds.size > 0) {
-              try {
-                await db
-                  .delete(notificationsTable)
-                  .where(inArray(notificationsTable.id, Array.from(staleNotificationIds)));
-              } catch (err) {
-                console.error('chat notification D1 cleanup failed', err);
-              }
-            }
-          } else {
-            const { error } = await supabase
-              .from('notifications')
-              .upsert(notificationRows, { onConflict: 'id' });
-            if (error) console.error('chat notification insert failed', error);
-
-            if (staleNotificationIds.size > 0) {
-              const { error: cleanupError } = await supabase
-                .from('notifications')
-                .delete()
-                .in('id', Array.from(staleNotificationIds));
-              if (cleanupError) console.error('chat notification cleanup failed', cleanupError);
+              console.error('chat notification D1 cleanup failed', err);
             }
           }
         })()
@@ -1086,7 +767,7 @@ export async function dispatchChatPushForMessage(params: {
   if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
     await Promise.all([
       notificationInsertPromise,
-      updateChatPushJobByMessageId(supabase, params.messageId, {
+      updateChatPushJobByMessageId(params.messageId, {
         processed_at: new Date().toISOString(),
         processing_started_at: null,
         last_error: 'no-active-subscriptions',
@@ -1150,23 +831,15 @@ export async function dispatchChatPushForMessage(params: {
       // error 토큰(5xx·네트워크 실패)은 유효할 수 있으므로 무효화하지 않는다.
       // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
       if (fcmResult.expired.length > 0) {
-        const fcmBackend = await resolveDataBackend();
-        if (fcmBackend === 'd1') {
-          const d1b = await getD1Binding();
-          if (d1b) {
-            const dbFcm = getD1Drizzle(d1b);
-            for (const expiredToken of fcmResult.expired) {
-              await dbFcm
-                .update(pushSubscriptionsTable)
-                .set({ fcm_token: null })
-                .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
-            }
+        const d1b = await getD1Binding();
+        if (d1b) {
+          const dbFcm = getD1Drizzle(d1b);
+          for (const expiredToken of fcmResult.expired) {
+            await dbFcm
+              .update(pushSubscriptionsTable)
+              .set({ fcm_token: null })
+              .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
           }
-        } else {
-          await supabase
-            .from('push_subscriptions')
-            .update({ fcm_token: null })
-            .in('fcm_token', fcmResult.expired);
         }
       }
     } catch (fcmErr) {
@@ -1213,22 +886,17 @@ export async function dispatchChatPushForMessage(params: {
   await Promise.all([notificationInsertPromise, webPushPromise]);
 
   if (expiredIds.length > 0) {
-    const expiredBackend = await resolveDataBackend();
-    if (expiredBackend === 'd1') {
-      const d1b = await getD1Binding();
-      if (d1b) {
-        const dbExp = getD1Drizzle(d1b);
-        await dbExp.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, expiredIds));
-      }
-    } else {
-      await supabase.from('push_subscriptions').delete().in('id', expiredIds);
+    const d1b = await getD1Binding();
+    if (d1b) {
+      const dbExp = getD1Drizzle(d1b);
+      await dbExp.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, expiredIds));
     }
   }
 
   const hasUndeliveredWebPushTargets = uniqueSubscriptions.size > 0;
 
   if (pushDisabled && hasUndeliveredWebPushTargets) {
-    await updateChatPushJobByMessageId(supabase, params.messageId, {
+    await updateChatPushJobByMessageId(params.messageId, {
       processing_started_at: null,
       last_error: 'web-push-disabled',
     });
@@ -1243,7 +911,7 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  await updateChatPushJobByMessageId(supabase, params.messageId, {
+  await updateChatPushJobByMessageId(params.messageId, {
     processed_at: new Date().toISOString(),
     processing_started_at: null,
     last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null,
@@ -1259,8 +927,7 @@ export async function dispatchChatPushForMessage(params: {
 }
 
 export async function processPendingChatPushJobs(limit = 25) {
-  const supabase = getAdminClient();
-  const queueSelection = await selectPendingChatPushJobs(supabase, limit);
+  const queueSelection = await selectPendingChatPushJobsD1(limit);
 
   if (queueSelection.missingQueueTable) {
     return { processed: 0, sent: 0, failed: 0, skipped: 0, reason: 'queue-table-missing' };
@@ -1276,12 +943,12 @@ export async function processPendingChatPushJobs(limit = 25) {
     const quietHoursPatch = buildQuietHoursDeferredPatch(job, queueSelection.supportsRetryColumns);
     if (quietHoursPatch) {
       skipped += 1;
-      await updateChatPushJobById(supabase, job.id, quietHoursPatch);
+      await updateChatPushJobById(job.id, quietHoursPatch);
       continue;
     }
 
     const nextAttemptCount = Number(job.attempt_count || 0) + 1;
-    await updateChatPushJobById(supabase, job.id, {
+    await updateChatPushJobById(job.id, {
       processing_started_at: new Date().toISOString(),
       attempt_count: nextAttemptCount,
       last_error: null,
@@ -1291,7 +958,6 @@ export async function processPendingChatPushJobs(limit = 25) {
       const result = await dispatchChatPushForMessage({
         roomId: String(job.room_id),
         messageId: String(job.message_id),
-        supabase,
       });
       processed += 1;
       sent += result.sent;
@@ -1300,12 +966,11 @@ export async function processPendingChatPushJobs(limit = 25) {
         skipped += 1;
         if (queueSelection.supportsRetryColumns) {
           await updateChatPushJobById(
-            supabase,
             job.id,
             buildQueueFailurePatch(nextAttemptCount, result.reason, true),
           );
         } else {
-          await updateChatPushJobById(supabase, job.id, {
+          await updateChatPushJobById(job.id, {
             processed_at: new Date().toISOString(),
             processing_started_at: null,
             last_error: result.reason,
@@ -1314,10 +979,9 @@ export async function processPendingChatPushJobs(limit = 25) {
         continue;
       }
       if (result.reason) skipped += 1;
-    } catch (error: any) {
+    } catch (error: unknown) {
       failed += 1;
       await updateChatPushJobById(
-        supabase,
         job.id,
         buildQueueFailurePatch(nextAttemptCount, error, queueSelection.supportsRetryColumns),
       );

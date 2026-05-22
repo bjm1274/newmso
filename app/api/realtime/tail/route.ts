@@ -15,12 +15,8 @@
 // Phase 6   — d1 모드: D1 drizzle로 테이블별 max(created_at) 조회
 // ============================================================
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
-import {
-  getD1Binding,
-  resolveDataBackend,
-} from '@/lib/db';
+import { getD1Binding } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,27 +64,6 @@ function userId(user: SessionUser | null | undefined): string | null {
   return trimmed || null;
 }
 
-function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server configuration is missing.');
-  return createClient(url, key);
-}
-
-async function fetchMaxCreatedAt(
-  supabase: SupabaseClient,
-  table: string,
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(table)
-    .select('created_at')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle<{ created_at: string | null }>();
-  if (error || !data) return null;
-  return data.created_at;
-}
-
 // D1에서 테이블의 max(created_at) 조회 — allowedTables whitelist 내에서만 호출됨
 async function fetchMaxCreatedAtD1(
   d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,
@@ -125,25 +100,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: true, tail: {} });
     }
 
-    const backend = await resolveDataBackend();
     const tail: Record<string, string | null> = {};
 
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) throw new Error('[realtime/tail] D1 binding not available');
-      await Promise.all(
-        tables.map(async (t) => {
-          tail[t] = await fetchMaxCreatedAtD1(d1, t);
-        }),
-      );
-    } else {
-      const supabase = createAdminClient();
-      await Promise.all(
-        tables.map(async (t) => {
-          tail[t] = await fetchMaxCreatedAt(supabase, t);
-        }),
-      );
-    }
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[realtime/tail] D1 binding not available');
+    await Promise.all(
+      tables.map(async (t) => {
+        tail[t] = await fetchMaxCreatedAtD1(d1, t);
+      }),
+    );
 
     return NextResponse.json({ ok: true, tail });
   } catch (err) {
