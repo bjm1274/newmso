@@ -100,30 +100,44 @@ function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims
   };
 }
 
+/**
+ * D1(SQLite)은 boolean을 bound parameter로 받지 못한다(D1_TYPE_ERROR).
+ * 클라이언트의 .eq('is_active', true) 같은 호출이 그대로 깨지므로,
+ * SQL 바인딩 직전에 boolean → 정수(0/1)로 정규화한다. 배열(IN 절)도 원소별 변환.
+ */
+function normalizeBindValue(value: unknown): unknown {
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (Array.isArray(value)) {
+    return value.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+  }
+  return value;
+}
+
 function buildWhereSql(where: Payload['where']): SQL[] {
   if (!where || where.length === 0) return [];
   const out: SQL[] = [];
   for (const cond of where) {
     const col = sql.identifier(cond.field);
-    if (cond.op === 'eq') out.push(sql`${col} = ${cond.value}`);
-    else if (cond.op === 'neq') out.push(sql`${col} != ${cond.value}`);
-    else if (cond.op === 'lt') out.push(sql`${col} < ${cond.value}`);
-    else if (cond.op === 'gt') out.push(sql`${col} > ${cond.value}`);
-    else if (cond.op === 'lte') out.push(sql`${col} <= ${cond.value}`);
-    else if (cond.op === 'gte') out.push(sql`${col} >= ${cond.value}`);
+    const value = normalizeBindValue(cond.value);
+    if (cond.op === 'eq') out.push(sql`${col} = ${value}`);
+    else if (cond.op === 'neq') out.push(sql`${col} != ${value}`);
+    else if (cond.op === 'lt') out.push(sql`${col} < ${value}`);
+    else if (cond.op === 'gt') out.push(sql`${col} > ${value}`);
+    else if (cond.op === 'lte') out.push(sql`${col} <= ${value}`);
+    else if (cond.op === 'gte') out.push(sql`${col} >= ${value}`);
     else if (cond.op === 'is') {
-      if (cond.value === null) out.push(sql`${col} IS NULL`);
-      else out.push(sql`${col} IS ${cond.value}`);
+      if (value === null) out.push(sql`${col} IS NULL`);
+      else out.push(sql`${col} IS ${value}`);
     } else if (cond.op === 'isNot') {
-      if (cond.value === null) out.push(sql`${col} IS NOT NULL`);
-      else out.push(sql`${col} IS NOT ${cond.value}`);
+      if (value === null) out.push(sql`${col} IS NOT NULL`);
+      else out.push(sql`${col} IS NOT ${value}`);
     } else if (cond.op === 'like') {
-      out.push(sql`${col} LIKE ${cond.value}`);
+      out.push(sql`${col} LIKE ${value}`);
     } else if (cond.op === 'ilike') {
       // SQLite는 LIKE 기본 case-insensitive
-      out.push(sql`${col} LIKE ${cond.value}`);
+      out.push(sql`${col} LIKE ${value}`);
     } else if (cond.op === 'in') {
-      const arr = Array.isArray(cond.value) ? cond.value : [];
+      const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) {
         out.push(sql`1 = 0`); // empty in → no match
       } else {
@@ -141,7 +155,8 @@ function buildWhereSql(where: Payload['where']): SQL[] {
 function buildFilterNodeSql(node: FilterNode): SQL {
   if (node.kind === 'cond') {
     const col = sql.identifier(node.field);
-    const { op, value } = node;
+    const { op } = node;
+    const value = normalizeBindValue(node.value);
     if (op === 'eq') return sql`(${col} = ${value})`;
     if (op === 'neq') return sql`(${col} != ${value})`;
     if (op === 'lt') return sql`(${col} < ${value})`;
@@ -256,19 +271,6 @@ function buildSelectSql(payload: Payload): SQL {
   return sql`SELECT ${colsSql} FROM ${tableSql}${whereSql}${orderSql}${limitSql}${rangeSql}`;
 }
 
-function buildCountSql(payload: Payload): SQL {
-  const tableSql = sql.identifier(payload.table);
-  const whereParts = [
-    ...buildWhereSql(payload.where),
-    ...buildOrFilterParts(payload.orFilters),
-  ];
-  const whereSql =
-    whereParts.length > 0
-      ? sql` WHERE ${sql.join(whereParts, sql` AND `)}`
-      : sql.raw('');
-  return sql`SELECT COUNT(*) AS count FROM ${tableSql}${whereSql}`;
-}
-
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -304,12 +306,20 @@ export async function POST(request: Request) {
     const claims = buildClaimsFromSession(session?.user);
 
     if (payload.count) {
-      // 주의: COUNT(*)는 filterByPolicy를 거치지 않음 — PUBLIC 외 정책 테이블은
-      // 사용자가 볼 수 없는 row까지 카운트될 수 있음(컷오버 전 정책 인식 카운트 보강 필요).
-      const countResult = await db.run(buildCountSql(payload));
-      const rows = ((countResult as { results?: unknown[] }).results ?? []) as Array<{ count: number }>;
-      const count = rows[0]?.count ?? 0;
-      return NextResponse.json({ ok: true, count });
+      // 정책 인식 카운트: 단순 COUNT(*)는 filterByPolicy를 우회해 사용자가 볼 수
+      // 없는 타 회사·타인 row까지 집계된다. row를 읽어 정책 필터를 적용한 뒤 개수를
+      // 센다. 정책 평가에 필요한 컬럼이 누락되지 않도록 전체 컬럼을 읽고, limit/range는
+      // 무시한다(전체 집계가 목적).
+      const countPayload: Payload = {
+        ...payload,
+        columns: undefined,
+        limit: undefined,
+        range: undefined,
+      };
+      const countResult = await db.run(buildSelectSql(countPayload));
+      const rawRows = ((countResult as { results?: unknown[] }).results ?? []) as Array<Record<string, unknown>>;
+      const filtered = await filterByPolicy(db, claims, payload.table, rawRows);
+      return NextResponse.json({ ok: true, count: filtered.length });
     }
 
     const result = await db.run(buildSelectSql(payload));

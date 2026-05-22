@@ -16,7 +16,7 @@
 // ============================================================
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { sql, type SQL } from 'drizzle-orm';
+import { sql, getTableColumns, type SQL } from 'drizzle-orm';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
   getD1Binding,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/db';
 import type { ErpClaims } from '@/lib/db/auth/claims';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
+import * as schema from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,26 +102,39 @@ function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims
   };
 }
 
+/**
+ * D1(SQLite)은 boolean을 bound parameter로 받지 못한다(D1_TYPE_ERROR).
+ * SQL 바인딩 직전에 boolean → 정수(0/1)로 정규화한다. 배열(IN 절)도 원소별 변환.
+ */
+function normalizeBindValue(value: unknown): unknown {
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (Array.isArray(value)) {
+    return value.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v));
+  }
+  return value;
+}
+
 function buildWhereSql(where: { field: string; op: string; value: unknown }[]): SQL[] {
   const out: SQL[] = [];
   for (const cond of where) {
     const col = sql.identifier(cond.field);
-    if (cond.op === 'eq') out.push(sql`${col} = ${cond.value}`);
-    else if (cond.op === 'neq') out.push(sql`${col} != ${cond.value}`);
-    else if (cond.op === 'lt') out.push(sql`${col} < ${cond.value}`);
-    else if (cond.op === 'gt') out.push(sql`${col} > ${cond.value}`);
-    else if (cond.op === 'lte') out.push(sql`${col} <= ${cond.value}`);
-    else if (cond.op === 'gte') out.push(sql`${col} >= ${cond.value}`);
+    const value = normalizeBindValue(cond.value);
+    if (cond.op === 'eq') out.push(sql`${col} = ${value}`);
+    else if (cond.op === 'neq') out.push(sql`${col} != ${value}`);
+    else if (cond.op === 'lt') out.push(sql`${col} < ${value}`);
+    else if (cond.op === 'gt') out.push(sql`${col} > ${value}`);
+    else if (cond.op === 'lte') out.push(sql`${col} <= ${value}`);
+    else if (cond.op === 'gte') out.push(sql`${col} >= ${value}`);
     else if (cond.op === 'is') {
-      if (cond.value === null) out.push(sql`${col} IS NULL`);
-      else out.push(sql`${col} IS ${cond.value}`);
+      if (value === null) out.push(sql`${col} IS NULL`);
+      else out.push(sql`${col} IS ${value}`);
     } else if (cond.op === 'isNot') {
-      if (cond.value === null) out.push(sql`${col} IS NOT NULL`);
-      else out.push(sql`${col} IS NOT ${cond.value}`);
+      if (value === null) out.push(sql`${col} IS NOT NULL`);
+      else out.push(sql`${col} IS NOT ${value}`);
     } else if (cond.op === 'like' || cond.op === 'ilike') {
-      out.push(sql`${col} LIKE ${cond.value}`);
+      out.push(sql`${col} LIKE ${value}`);
     } else if (cond.op === 'in') {
-      const arr = Array.isArray(cond.value) ? cond.value : [];
+      const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) out.push(sql`1 = 0`);
       else out.push(sql`${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)})`);
     }
@@ -151,6 +165,9 @@ function serializeRecord(row: Record<string, unknown>): Record<string, unknown> 
   for (const [k, v] of Object.entries(row)) {
     if (v !== null && typeof v === 'object') {
       result[k] = JSON.stringify(v);
+    } else if (typeof v === 'boolean') {
+      // D1(SQLite)은 boolean bound parameter를 거부 — 정수(0/1)로 변환
+      result[k] = v ? 1 : 0;
     } else {
       result[k] = v;
     }
@@ -197,6 +214,23 @@ function buildReturningSql(returning: string[] | undefined): SQL {
   return sql` RETURNING ${sql.join(returning.map((c) => sql.identifier(c)), sql`, `)}`;
 }
 
+/**
+ * INSERT 시 id 컬럼에 UUID를 채워야 하는 테이블인지 판별.
+ * Supabase→D1 마이그레이션 과정에서 Postgres의 `id DEFAULT gen_random_uuid()`가
+ * 유실되어, text PK인 id는 클라이언트가 값을 넘기지 않으면 NOT NULL 위반이 난다.
+ * integer PK(SQLite rowid 자동 부여)·id 없는 테이블은 제외한다.
+ */
+function tableHasTextId(table: string): boolean {
+  const def = (schema as Record<string, unknown>)[table];
+  if (!def) return false;
+  try {
+    const idCol = getTableColumns(def as Parameters<typeof getTableColumns>[0]).id;
+    return !!idCol && idCol.getSQLType().toLowerCase().startsWith('text');
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -230,8 +264,16 @@ export async function POST(request: Request) {
       for (const row of payload.values) {
         await assertAccess({ db, claims, table: payload.table, op: 'insert', row });
       }
+      // text PK인 id가 누락된 행에 UUID 생성 — D1에는 id DEFAULT가 없다.
+      const fillId = tableHasTextId(payload.table);
       // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
-      const serializedValues = payload.values.map(serializeRecord);
+      const serializedValues = payload.values.map((row) => {
+        const withId =
+          fillId && (row.id === undefined || row.id === null)
+            ? { ...row, id: crypto.randomUUID() }
+            : row;
+        return serializeRecord(withId);
+      });
       const tableSql = sql.identifier(payload.table);
       const allCols = Array.from(
         serializedValues.reduce<Set<string>>((acc, row) => {
@@ -256,7 +298,8 @@ export async function POST(request: Request) {
           sql`, `,
         );
         const conflictSet = new Set(payload.conflict.columns);
-        const updateCols = allCols.filter((c) => !conflictSet.has(c));
+        // PK(id)는 conflict UPDATE 대상에서 제외 — 기존 행의 기본키를 덮어쓰지 않도록.
+        const updateCols = allCols.filter((c) => !conflictSet.has(c) && c !== 'id');
         const shouldUpdate =
           payload.conflict.action === 'update' && updateCols.length > 0;
         const onConflictClause = shouldUpdate
