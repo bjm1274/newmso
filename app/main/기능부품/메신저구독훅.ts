@@ -99,9 +99,6 @@ type UseChatRealtimeSubscriptionsParams = {
   globalRealtimeRetryToken: number;
   roomRealtimeRetryToken: number;
   presenceChannelRef: MutableRefObject<ReturnType<typeof supabase.channel> | null>;
-  typingChannelRef: MutableRefObject<ReturnType<typeof supabase.channel> | null>;
-  typingClearRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-  typingPeersTimeoutRef: MutableRefObject<Record<string, ReturnType<typeof setTimeout>>>;
   syncChannelRef: MutableRefObject<BroadcastChannel | null>;
   chatRoomsRef: MutableRefObject<ChatRoom[]>;
   visibleMessageIdsRef?: MutableRefObject<Set<string>>;
@@ -113,7 +110,6 @@ type UseChatRealtimeSubscriptionsParams = {
   setPresenceMap: Dispatch<SetStateAction<Record<string, PresenceInfo>>>;
   setGlobalRealtimeState: Dispatch<SetStateAction<ChatRealtimeState>>;
   setRoomRealtimeState: Dispatch<SetStateAction<ChatRealtimeState>>;
-  setTypingUsers: Dispatch<SetStateAction<Record<string, string>>>;
   setChatRooms: Dispatch<SetStateAction<ChatRoom[]>>;
   fetchData: (options?: { force?: boolean }) => Promise<void>;
   updateUnreadForRooms: (rooms: ChatRoom[]) => void | Promise<void>;
@@ -126,7 +122,6 @@ type UseChatRealtimeSubscriptionsParams = {
   handleIncomingRealtimeMessage: (row: ChatMessage) => Promise<void>;
   scheduleRealtimeReconnect: (scope: 'global' | 'room') => void;
   isRoomInSelectedConversation: (roomId: string | null | undefined, rooms?: ChatRoom[]) => boolean;
-  emitTypingState: (isTyping: boolean) => void;
   fetchMessageByIdWithRetry: (messageId: string, attempts?: number) => Promise<ChatMessage | null>;
   sortChatRoomsWithNoticeFirst: (rooms: ChatRoom[]) => ChatRoom[];
 };
@@ -140,9 +135,6 @@ export function useChatRealtimeSubscriptions({
   globalRealtimeRetryToken,
   roomRealtimeRetryToken,
   presenceChannelRef,
-  typingChannelRef,
-  typingClearRef,
-  typingPeersTimeoutRef,
   syncChannelRef,
   chatRoomsRef,
   selectedRoomIdRef,
@@ -152,7 +144,6 @@ export function useChatRealtimeSubscriptions({
   setPresenceMap,
   setGlobalRealtimeState,
   setRoomRealtimeState,
-  setTypingUsers,
   setChatRooms,
   fetchData,
   updateUnreadForRooms,
@@ -165,7 +156,6 @@ export function useChatRealtimeSubscriptions({
   handleIncomingRealtimeMessage,
   scheduleRealtimeReconnect,
   isRoomInSelectedConversation,
-  emitTypingState,
   fetchMessageByIdWithRetry,
   sortChatRoomsWithNoticeFirst,
 }: UseChatRealtimeSubscriptionsParams) {
@@ -364,29 +354,8 @@ export function useChatRealtimeSubscriptions({
     chatRoomsRef,
   ]);
 
-  useEffect(() => {
-    // Phase 5-C-2 — typing 채널 비활성화 (broadcast는 polling으로 대체 불가).
-    // 타이핑 표시 UI는 빈 typingUsers를 받아 자동으로 안 보임.
-    if (!selectedRoomId) {
-      setTypingUsers({});
-      return;
-    }
-    setTypingUsers({});
-    return () => {
-      if (typingClearRef.current) {
-        clearTimeout(typingClearRef.current);
-        typingClearRef.current = null;
-      }
-      Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
-      typingPeersTimeoutRef.current = {};
-      setTypingUsers({});
-    };
-  }, [
-    selectedRoomId,
-    setTypingUsers,
-    typingClearRef,
-    typingPeersTimeoutRef,
-  ]);
+  // Phase 5-C-2 → Phase 6: typing은 useChatTypingD1이 전담.
+  // 구독훅에서는 typing 관련 처리를 하지 않음.
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;

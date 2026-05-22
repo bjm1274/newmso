@@ -41,6 +41,7 @@ import { useChatMessageSending } from './메신저전송훅';
 import { useScheduledNoticeDispatcher } from './메신저예약공지훅';
 import { useChatRoomPreferences } from './메신저방환경설정훅';
 import { useChatRealtimeSubscriptions } from './메신저구독훅';
+import { useChatTypingD1 } from './useChatTypingD1';
 import { useChatWorkflowDrafts } from './메신저입력워크플로훅';
 import {
   useChatGroupedStaffs,
@@ -230,11 +231,9 @@ export default function ChatView({
   const messagesRef = useRef<ChatMessage[]>([]);
   const deliveryStatesRef = useRef<Record<string, DeliveryState>>({});
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // typingChannelRef, typingPeersTimeoutRef, lastTypingEmitAtRef 제거됨.
+  // D1 polling 기반 typing은 useChatTypingD1(useChatRealtimeBridge 내부)이 전담.
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** typing=true broadcast throttle: 마지막 emit 시각(ms). 짧은 시간 안에 매 키마다 supabase realtime broadcast 보내는 것을 차단 */
-  const lastTypingEmitAtRef = useRef(0);
-  const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
   const incomingRealtimeMessageIdsRef = useRef<Map<string, number>>(new Map());
   const isNearBottomRef = useRef(true);
@@ -565,8 +564,6 @@ export default function ChatView({
       clearTimeout(typingClearRef.current);
       typingClearRef.current = null;
     }
-    Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
-    typingPeersTimeoutRef.current = {};
     setTypingUsers({});
     closeReadStatusModal();
     setReactionDetailTarget(null);
@@ -1106,19 +1103,14 @@ export default function ChatView({
     }
   }, []);
 
-  const emitTypingState = useCallback((isTyping: boolean) => {
-    if (!typingChannelRef.current || !selectedRoomId || !effectiveChatUserId) return;
-    typingChannelRef.current.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: {
-        roomId: selectedRoomId,
-        userId: String(effectiveChatUserId),
-        name: user?.name || 'Unknown',
-        isTyping,
-      },
-    });
-  }, [selectedRoomId, effectiveChatUserId, user?.name]);
+  // D1 polling 기반 typing — emit과 수신 폴링 모두 useChatTypingD1이 담당.
+  const { emitTyping: emitTypingState, handleTypingInput } = useChatTypingD1({
+    selectedRoomId,
+    effectiveChatUserId,
+    userName: user?.name,
+    setTypingUsers,
+    typingClearRef,
+  });
 
   const handleComposerChange = useCallback((value: string, caret: number) => {
     inputMsgRef.current = value;
@@ -1132,29 +1124,9 @@ export default function ChatView({
       setShowMentionList(false);
       setMentionQuery('');
     }
-
-    if (typingClearRef.current) {
-      clearTimeout(typingClearRef.current);
-      typingClearRef.current = null;
-    }
-
-    if (value.trim()) {
-      // 매 키마다 supabase broadcast를 보내면 입력이 버벅이므로 3초 간격으로 throttle
-      const now = Date.now();
-      if (now - lastTypingEmitAtRef.current > 3000) {
-        lastTypingEmitAtRef.current = now;
-        emitTypingState(true);
-      }
-      typingClearRef.current = setTimeout(() => {
-        lastTypingEmitAtRef.current = 0;
-        emitTypingState(false);
-        typingClearRef.current = null;
-      }, 1800);
-    } else {
-      lastTypingEmitAtRef.current = 0;
-      emitTypingState(false);
-    }
-  }, [emitTypingState]);
+    // D1 기반 typing emit — 입력 값으로 throttle/debounce 처리
+    handleTypingInput(value);
+  }, [inputMsgRef, handleTypingInput]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1890,9 +1862,6 @@ export default function ChatView({
     globalRealtimeRetryToken,
     roomRealtimeRetryToken,
     presenceChannelRef,
-    typingChannelRef,
-    typingClearRef,
-    typingPeersTimeoutRef,
     syncChannelRef,
     chatRoomsRef,
     selectedRoomIdRef,
@@ -1902,7 +1871,6 @@ export default function ChatView({
     setPresenceMap,
     setGlobalRealtimeState,
     setRoomRealtimeState,
-    setTypingUsers,
     setChatRooms,
     fetchData,
     updateUnreadForRooms,
@@ -1915,7 +1883,6 @@ export default function ChatView({
     handleIncomingRealtimeMessage,
     scheduleRealtimeReconnect,
     isRoomInSelectedConversation,
-    emitTypingState,
     fetchMessageByIdWithRetry,
     sortChatRoomsWithNoticeFirst,
   });

@@ -10,6 +10,7 @@ import type { PresenceInfo } from './메신저타입';
 import { getMessageDisplayText } from './메신저첨부';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { useChatRealtimeSubscriptions, type ChatRealtimeState } from './메신저구독훅';
+import { useChatTypingD1 } from './useChatTypingD1';
 import {
   getConversationRoomIdsByRoomId,
   NOTICE_ROOM_ID,
@@ -111,9 +112,7 @@ export function useChatRealtimeBridge({
 
   const selfChatCreationInFlightRef = useRef(false);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const incomingRealtimeMessageIdsRef = useRef<Map<string, number>>(new Map());
   const globalRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomRealtimeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,19 +131,14 @@ export function useChatRealtimeBridge({
     }, 1200);
   }, []);
 
-  const emitTypingState = useCallback((isTyping: boolean) => {
-    if (!typingChannelRef.current || !selectedRoomId || !effectiveChatUserId) return;
-    typingChannelRef.current.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: {
-        roomId: selectedRoomId,
-        userId: String(effectiveChatUserId),
-        name: userName || 'Unknown',
-        isTyping,
-      },
-    });
-  }, [effectiveChatUserId, selectedRoomId, userName]);
+  // D1 polling 기반 typing — useChatTypingD1이 emit과 폴링을 전담.
+  const { emitTyping: emitTypingState } = useChatTypingD1({
+    selectedRoomId,
+    effectiveChatUserId,
+    userName,
+    setTypingUsers,
+    typingClearRef,
+  });
 
   const claimIncomingRealtimeMessage = useCallback((messageId: string | null | undefined) => {
     const nextId = String(messageId || '').trim();
@@ -553,9 +547,6 @@ export function useChatRealtimeBridge({
     globalRealtimeRetryToken,
     roomRealtimeRetryToken,
     presenceChannelRef,
-    typingChannelRef,
-    typingClearRef,
-    typingPeersTimeoutRef,
     syncChannelRef,
     chatRoomsRef,
     visibleMessageIdsRef,
@@ -567,7 +558,6 @@ export function useChatRealtimeBridge({
     setPresenceMap,
     setGlobalRealtimeState,
     setRoomRealtimeState,
-    setTypingUsers,
     setChatRooms,
     fetchData,
     updateUnreadForRooms,
@@ -579,7 +569,6 @@ export function useChatRealtimeBridge({
     handleIncomingRealtimeMessage,
     scheduleRealtimeReconnect,
     isRoomInSelectedConversation,
-    emitTypingState,
     fetchMessageByIdWithRetry,
     sortChatRoomsWithNoticeFirst,
   });
@@ -589,10 +578,8 @@ export function useChatRealtimeBridge({
       clearTimeout(typingClearRef.current);
       typingClearRef.current = null;
     }
-    Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
-    typingPeersTimeoutRef.current = {};
     setTypingUsers({});
-  }, [setTypingUsers]);
+  }, [setTypingUsers, typingClearRef]);
 
   return {
     globalRealtimeState,
