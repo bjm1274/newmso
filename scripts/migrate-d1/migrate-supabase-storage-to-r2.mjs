@@ -11,7 +11,7 @@
  *   - board-attachments → R2 prefix: board/ DB: document_repository.file_url,
  *                                               document_versions.file_url,
  *                                               license_continuing_education.file_url,
- *                                               posts.attachments (JSON 배열 내 url 필드),
+ *                                               board_posts.attachments (JSON 배열 내 url 필드),
  *                                               approvals.meta_data (JSON 내 attachments[].url),
  *                                               messages.file_url (board 업로드 경유 파일만)
  *   - mso-backups    → R2 prefix: backup/   DB 참조 없음 — 파일만 복사
@@ -82,7 +82,7 @@ const BUCKET_CONFIG = {
   'board-attachments': {
     r2Prefix: 'board/',
     skipDbUpdate: false,
-    description: '게시판 첨부 → 다수 테이블 URL 갱신',
+    description: '게시판 첨부 → board_posts.attachments + 다수 테이블 URL 갱신',
   },
   'mso-backups': {
     r2Prefix: 'backup/',
@@ -325,8 +325,8 @@ async function updateDbUrls(bucket, oldUrl, newUrl, dryRun, remote) {
       count += await updateSimpleColumn('document_versions', 'file_url', oldUrl, newUrl, dryRun, remote);
       // 면허 보수교육 첨부
       count += await updateSimpleColumn('license_continuing_education', 'file_url', oldUrl, newUrl, dryRun, remote);
-      // 게시글 attachments JSON 배열
-      count += await updateJsonColumn('posts', 'attachments', oldUrl, newUrl, dryRun, remote);
+      // 게시글 attachments JSON 배열 (D1 실제 테이블명: board_posts)
+      count += await updateJsonColumn('board_posts', 'attachments', oldUrl, newUrl, dryRun, remote);
       // 결재 meta_data JSON (attachments[].url)
       count += await updateJsonColumn('approvals', 'meta_data', oldUrl, newUrl, dryRun, remote);
       // 메시지 (board 업로드 경유 파일)
