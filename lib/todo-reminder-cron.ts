@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { NotificationRow } from './notification-utils';
 import {
   todo_reminder_logs as todoReminderLogsTable,
+  todos as todosTable,
   notifications as notificationsTable,
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
+  eq,
+  and,
+  asc,
+  isNotNull,
+  lte,
+  inArray,
 } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
@@ -46,11 +52,6 @@ type DueTodoRow = {
   reminder_at?: string | null;
 };
 
-type ReminderLogRow = {
-  todo_id?: string | null;
-  reminder_at?: string | null;
-};
-
 export type TodoReminderDispatchResult = {
   ok: boolean;
   scanned: number;
@@ -59,15 +60,6 @@ export type TodoReminderDispatchResult = {
   failed: number;
   errors: string[];
 };
-
-function getAdminClient(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
-  }
-  return createClient(supabaseUrl, serviceKey);
-}
 
 function buildDeterministicNotificationId(userId: string, dedupeKey: string) {
   const source = `erp-notification:${userId}:${dedupeKey}`;
@@ -92,29 +84,32 @@ export async function processDueTodoRemindersServer(
   limit = 100,
   userIds?: string[] | null
 ): Promise<TodoReminderDispatchResult> {
-  const supabase = getAdminClient();
   const nowIso = new Date().toISOString();
   const scopedUserIds = normalizeScopedUserIds(userIds);
+  const db = await requireD1ForTodoReminder('todos:query');
 
-  let dueQuery = supabase
-    .from('todos')
-    .select('id,user_id,content,task_date,reminder_at')
-    .eq('is_complete', false)
-    .not('reminder_at', 'is', null)
-    .lte('reminder_at', nowIso)
-    .order('reminder_at', { ascending: true })
+  const dueConditions = [
+    eq(todosTable.is_complete, 0),
+    isNotNull(todosTable.reminder_at),
+    lte(todosTable.reminder_at, nowIso),
+  ];
+  if (scopedUserIds.length > 0) {
+    dueConditions.push(inArray(todosTable.user_id, scopedUserIds));
+  }
+  const dueRows = await db
+    .select({
+      id: todosTable.id,
+      user_id: todosTable.user_id,
+      content: todosTable.content,
+      task_date: todosTable.task_date,
+      reminder_at: todosTable.reminder_at,
+    })
+    .from(todosTable)
+    .where(and(...dueConditions))
+    .orderBy(asc(todosTable.reminder_at))
     .limit(limit);
 
-  if (scopedUserIds.length > 0) {
-    dueQuery = dueQuery.in('user_id', scopedUserIds);
-  }
-
-  const { data: dueRows, error: dueError } = await dueQuery;
-  if (dueError) {
-    throw dueError;
-  }
-
-  const todos = (dueRows || []) as DueTodoRow[];
+  const todos = dueRows as DueTodoRow[];
   if (todos.length === 0) {
     return {
       ok: true,
@@ -127,20 +122,22 @@ export async function processDueTodoRemindersServer(
   }
 
   const todoIds = todos.map((row) => String(row.id || '')).filter(Boolean);
-  const { data: logRows, error: logError } = await supabase
-    .from('todo_reminder_logs')
-    .select('todo_id,reminder_at')
-    .in('todo_id', todoIds);
-
-  if (logError) {
-    throw logError;
+  // D1 bound parameter 한도(100) 가드 — todo_id IN (...) 청크 분할 조회
+  const loggedKeys = new Set<string>();
+  const LOG_CHUNK = 90;
+  for (let i = 0; i < todoIds.length; i += LOG_CHUNK) {
+    const chunk = todoIds.slice(i, i + LOG_CHUNK);
+    const logRows = await db
+      .select({
+        todo_id: todoReminderLogsTable.todo_id,
+        reminder_at: todoReminderLogsTable.reminder_at,
+      })
+      .from(todoReminderLogsTable)
+      .where(inArray(todoReminderLogsTable.todo_id, chunk));
+    for (const row of logRows) {
+      loggedKeys.add(`${String(row.todo_id || '')}:${String(row.reminder_at || '')}`);
+    }
   }
-
-  const loggedKeys = new Set(
-    ((logRows || []) as ReminderLogRow[]).map(
-      (row) => `${String(row.todo_id || '')}:${String(row.reminder_at || '')}`
-    )
-  );
 
   let created = 0;
   let skipped = 0;
