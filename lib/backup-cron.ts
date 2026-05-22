@@ -3,13 +3,20 @@
  * - 6h: 핵심 6개 테이블
  * - 24h: 전체 주요 테이블
  * Cloudflare R2 버킷 'pchos-files'의 backup/ prefix에 JSON 저장.
+ *
+ * 데이터 소스: Cloudflare D1 (운영 진실원). D1 컷오버 이후 Supabase는 stale하므로
+ * 반드시 D1에서 직접 읽는다.
  */
 import 'server-only';
-import { createClient } from '@supabase/supabase-js';
 import { FULL_BACKUP_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
 import { uploadToR2, isR2ChatStorageEnabled } from '@/lib/object-storage';
+import { getD1Binding } from '@/lib/db';
 
 const R2_BUCKET = 'pchos-files';
+const PAGE_SIZE = 1000;
+// 백업 대상 테이블명은 backup-config의 하드코딩 화이트리스트지만, 식별자를
+// SQL에 직접 끼우므로 방어적으로 형식을 한 번 더 검증한다.
+const TABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export type BackupType = '6h' | '24h';
 
@@ -32,17 +39,16 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
     };
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
+  const d1 = await getD1Binding();
+  if (!d1) {
     return {
       ok: false,
       type,
-      error: 'Missing Supabase env',
+      error: 'D1 binding not available',
+      hint: 'Cloudflare Workers 환경에서만 백업을 실행할 수 있습니다.',
     };
   }
 
-  const supabase = createClient(supabaseUrl, serviceKey);
   const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
   const data: Record<string, unknown[]> = {};
   const now = new Date();
@@ -50,20 +56,19 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   const dateOnly = now.toISOString().slice(0, 10);
 
   for (const table of tables) {
+    if (!TABLE_NAME_RE.test(table)) {
+      console.warn(`[backup] skip invalid table name: ${table}`);
+      continue;
+    }
     try {
       const allRows: unknown[] = [];
-      const PAGE_SIZE = 1000;
       let offset = 0;
-      while (true) {
-        const { data: rows, error } = await supabase
-          .from(table)
-          .select('*')
-          .range(offset, offset + PAGE_SIZE - 1);
-        if (error) {
-          console.warn(`[backup] skip ${table}:`, error.message);
-          break;
-        }
-        if (!rows || rows.length === 0) break;
+      for (;;) {
+        const result = await d1
+          .prepare(`SELECT * FROM "${table}" LIMIT ? OFFSET ?`)
+          .bind(PAGE_SIZE, offset)
+          .all();
+        const rows = (result.results ?? []) as unknown[];
         allRows.push(...rows);
         if (rows.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
