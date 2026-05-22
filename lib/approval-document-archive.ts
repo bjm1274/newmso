@@ -1,5 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from './supabase';
 import {
   getReportApprovalSummary,
   normalizeApprovalAttachments,
@@ -7,10 +5,8 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   document_repository as documentRepositoryTable,
   eq,
-  and,
   desc,
 } from '@/lib/db';
 
@@ -327,7 +323,6 @@ export function mapApprovalToDocumentRepositoryEntry(item: ApprovalArchiveSource
 
 export async function syncApprovalToDocumentRepository(
   item: ApprovalArchiveSource,
-  client: SupabaseClient = supabase
 ) {
   const title = String(item.title || '').trim();
   if (!title) return;
@@ -345,62 +340,19 @@ export async function syncApprovalToDocumentRepository(
   const docNumber = resolveApprovalDocNumber(item);
   const companyName = nextRow.company_name;
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[approval-document-archive] D1 binding not available (syncApprovalToDocumentRepository)');
-    const db = getD1Drizzle(d1);
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[approval-document-archive] D1 binding not available (syncApprovalToDocumentRepository)');
+  const db = getD1Drizzle(d1);
 
-    const baseQuery = db
-      .select()
-      .from(documentRepositoryTable)
-      .orderBy(desc(documentRepositoryTable.updated_at))
-      .limit(300);
+  const baseQuery = db
+    .select()
+    .from(documentRepositoryTable)
+    .orderBy(desc(documentRepositoryTable.updated_at))
+    .limit(300);
 
-    const existingDocs = companyName && companyName !== '전체'
-      ? await baseQuery.where(eq(documentRepositoryTable.company_name, companyName))
-      : await baseQuery;
-
-    const matchedDoc = (existingDocs || []).find((doc) => {
-      const archivedDocNumber = extractApprovalDocNumberFromDocument(doc as Record<string, unknown>);
-      if (docNumber && archivedDocNumber) {
-        return archivedDocNumber === docNumber;
-      }
-      return hasMatchingFallbackDocument(doc as Record<string, unknown>, item);
-    }) as Record<string, unknown> | undefined;
-
-    const now = new Date().toISOString();
-    if (matchedDoc?.id) {
-      const currentVersion = Number(matchedDoc.version) || 1;
-      await db
-        .update(documentRepositoryTable)
-        .set({
-          ...nextRow,
-          updated_at: now,
-          version: currentVersion,
-          file_url: (matchedDoc.file_url as string | null) || null,
-        })
-        .where(eq(documentRepositoryTable.id, String(matchedDoc.id)));
-      return matchedDoc.id;
-    }
-
-    const newId = crypto.randomUUID();
-    await db.insert(documentRepositoryTable).values({
-      id: newId,
-      ...nextRow,
-      created_at: now,
-      updated_at: now,
-    });
-    return newId;
-  }
-
-  let query = client.from('document_repository').select('*').order('updated_at', { ascending: false }).limit(300);
-  if (companyName && companyName !== '전체') {
-    query = query.eq('company_name', companyName);
-  }
-
-  const { data: existingDocs, error: listError } = await query;
-  if (listError) throw listError;
+  const existingDocs = companyName && companyName !== '전체'
+    ? await baseQuery.where(eq(documentRepositoryTable.company_name, companyName))
+    : await baseQuery;
 
   const matchedDoc = (existingDocs || []).find((doc) => {
     const archivedDocNumber = extractApprovalDocNumberFromDocument(doc as Record<string, unknown>);
@@ -410,26 +362,27 @@ export async function syncApprovalToDocumentRepository(
     return hasMatchingFallbackDocument(doc as Record<string, unknown>, item);
   }) as Record<string, unknown> | undefined;
 
+  const now = new Date().toISOString();
   if (matchedDoc?.id) {
     const currentVersion = Number(matchedDoc.version) || 1;
-    const { error } = await client
-      .from('document_repository')
-      .update({
+    await db
+      .update(documentRepositoryTable)
+      .set({
         ...nextRow,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
         version: currentVersion,
-        file_url: matchedDoc.file_url || null,
+        file_url: (matchedDoc.file_url as string | null) || null,
       })
-      .eq('id', matchedDoc.id);
-    if (error) throw error;
+      .where(eq(documentRepositoryTable.id, String(matchedDoc.id)));
     return matchedDoc.id;
   }
 
-  const { data, error } = await client
-    .from('document_repository')
-    .insert(nextRow)
-    .select('id')
-    .single();
-  if (error) throw error;
-  return data?.id || null;
+  const newId = crypto.randomUUID();
+  await db.insert(documentRepositoryTable).values({
+    id: newId,
+    ...nextRow,
+    created_at: now,
+    updated_at: now,
+  });
+  return newId;
 }

@@ -24,9 +24,8 @@ import {
   eq,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
 } from '@/lib/db';
-import { logD1BindingMissing, logD1MirrorFailure } from '@/lib/db/mirror-metrics';
+import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 //
@@ -37,10 +36,9 @@ import { logD1BindingMissing, logD1MirrorFailure } from '@/lib/db/mirror-metrics
 // (handlePersonnelOrder / handleLeaveAttendance / handleAttendanceFix /
 //  handleCertificateIssue) 로 분리 권장.
 async function requireD1ForApprovalProcessing(label: string) {
-  const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
-    logD1BindingMissing({ label, backend });
+    logD1BindingMissing({ label, backend: 'd1' });
     throw new Error(`[server-approval-processing] D1 binding not available (${label})`);
   }
   return getD1Drizzle(d1);
@@ -78,7 +76,6 @@ function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {
 }
 
 async function upsertAttendanceCorrectionRows(
-  _supabase: SupabaseClient,
   correctionRows: Array<Record<string, unknown>>
 ) {
   if (correctionRows.length === 0) return;
@@ -146,8 +143,7 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
     inventory_workflow: workflow,
   };
 
-  const supplyBackend = await resolveDataBackend();
-  if (supplyBackend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[server-approval-processing] D1 binding not available (supply:approvals.update)');
     const db = getD1Drizzle(d1);
@@ -155,33 +151,11 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
       .update(approvalsTable)
       .set({ meta_data: JSON.stringify(nextMetaData) })
       .where(eq(approvalsTable.id, String(item.id)));
-  } else {
-    const { error: metaError } = await supabase
-      .from('approvals')
-      .update({ meta_data: nextMetaData })
-      .eq('id', String(item.id));
-    if (metaError) throw metaError;
-
-    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
-    if (supplyBackend === 'dual-write') {
-      try {
-        const d1 = await getD1Binding();
-        if (d1) {
-          const db = getD1Drizzle(d1);
-          await db
-            .update(approvalsTable)
-            .set({ meta_data: JSON.stringify(nextMetaData) })
-            .where(eq(approvalsTable.id, String(item.id)));
-        }
-      } catch (mirrorErr) {
-        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.supply_workflow', backend: supplyBackend });
-      }
-    }
   }
 
   try {
     let inventoryManagerRows: Array<{ id: string; name: string }> = [];
-    if (supplyBackend === 'd1') {
+    {
       const d1 = await getD1Binding();
       if (d1) {
         const db = getD1Drizzle(d1);
@@ -197,13 +171,6 @@ async function prepareSupplyApprovalInventoryWorkflow(supabase: SupabaseClient, 
           );
         inventoryManagerRows = rows.map((r) => ({ id: String(r.id ?? ''), name: String(r.name ?? '') }));
       }
-    } else {
-      const { data: inventoryManagers } = await supabase
-        .from('staff_members')
-        .select('id, name')
-        .eq('company', INVENTORY_SUPPORT_COMPANY)
-        .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
-      inventoryManagerRows = (inventoryManagers || []) as Array<{ id: string; name: string }>;
     }
     // 이하 코드를 위해 inventoryManagers 변수명으로 통합
     const inventoryManagers = inventoryManagerRows;
@@ -283,8 +250,7 @@ export async function processFinalApprovalEffects(
     },
   };
 
-  const processingBackend = await resolveDataBackend();
-  if (processingBackend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (d1) {
       const db = getD1Drizzle(d1);
@@ -294,27 +260,6 @@ export async function processFinalApprovalEffects(
         .where(eq(approvalsTable.id, String(item.id)));
     }
     // d1 binding 없으면 silently skip — 마커 실패가 처리를 막지 않도록
-  } else {
-    await supabase
-      .from('approvals')
-      .update({ meta_data: baseMetaData })
-      .eq('id', String(item.id));
-
-    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
-    if (processingBackend === 'dual-write') {
-      try {
-        const d1 = await getD1Binding();
-        if (d1) {
-          const db = getD1Drizzle(d1);
-          await db
-            .update(approvalsTable)
-            .set({ meta_data: JSON.stringify(baseMetaData) })
-            .where(eq(approvalsTable.id, String(item.id)));
-        }
-      } catch (mirrorErr) {
-        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.processing_start', backend: processingBackend });
-      }
-    }
   }
 
   const steps: string[] = [];
@@ -322,7 +267,7 @@ export async function processFinalApprovalEffects(
   let supplySummary: ReturnType<typeof summarizeSupplyRequestWorkflow> | null = null;
 
   try {
-    await syncApprovalToDocumentRepository(item, supabase);
+    await syncApprovalToDocumentRepository(item);
     steps.push('document_repository');
   } catch (error) {
     warnings.push(`문서보관함 동기화 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
@@ -351,7 +296,7 @@ export async function processFinalApprovalEffects(
       let currentStaffDept: string | null | undefined;
       let currentStaffPosition: string | null | undefined;
 
-      if (processingBackend === 'd1') {
+      {
         const d1 = await getD1Binding();
         if (!d1) throw new Error('[server-approval-processing] D1 binding not available (personnel_order:staff_members.select)');
         const db = getD1Drizzle(d1);
@@ -361,14 +306,6 @@ export async function processFinalApprovalEffects(
           .where(eq(staffMembersTable.id, orderTargetId));
         currentStaffDept = rows[0]?.department ?? null;
         currentStaffPosition = rows[0]?.position ?? null;
-      } else {
-        const { data: currentStaff } = await supabase
-          .from('staff_members')
-          .select('department, position')
-          .eq('id', orderTargetId)
-          .maybeSingle();
-        currentStaffDept = currentStaff?.department;
-        currentStaffPosition = currentStaff?.position;
       }
 
       const staffUpdate: Record<string, unknown> = {};
@@ -378,7 +315,7 @@ export async function processFinalApprovalEffects(
       }
 
       if (Object.keys(staffUpdate).length > 0) {
-        if (processingBackend === 'd1') {
+        {
           const d1 = await getD1Binding();
           if (!d1) throw new Error('[server-approval-processing] D1 binding not available (personnel_order:staff_members.update)');
           const db = getD1Drizzle(d1);
@@ -386,12 +323,6 @@ export async function processFinalApprovalEffects(
             .update(staffMembersTable)
             .set(staffUpdate as Parameters<ReturnType<typeof db.update>['set']>[0])
             .where(eq(staffMembersTable.id, orderTargetId));
-        } else {
-          const { error: updateError } = await supabase
-            .from('staff_members')
-            .update(staffUpdate)
-            .eq('id', orderTargetId);
-          if (updateError) throw updateError;
         }
 
         const transferRow = {
@@ -530,7 +461,7 @@ export async function processFinalApprovalEffects(
         approved_at: approvedAt,
       }));
 
-      await upsertAttendanceCorrectionRows(supabase, correctionRows);
+      await upsertAttendanceCorrectionRows(correctionRows);
 
       const { att, atts } = resolveAttendanceCorrectionStatusPair(correctionType);
       // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
@@ -599,7 +530,7 @@ export async function processFinalApprovalEffects(
   }
 
   try {
-    const officialDocResult = await syncOfficialDocumentLogFromApproval(supabase, item);
+    const officialDocResult = await syncOfficialDocumentLogFromApproval(item);
     if (officialDocResult) {
       steps.push('official_document_log');
     }
@@ -620,7 +551,7 @@ export async function processFinalApprovalEffects(
     },
   };
 
-  if (processingBackend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (d1) {
       const db = getD1Drizzle(d1);
@@ -630,27 +561,6 @@ export async function processFinalApprovalEffects(
         .where(eq(approvalsTable.id, String(item.id)));
     }
     // d1 binding 없으면 silently skip — 완료 마커 실패가 결과를 바꾸지 않도록
-  } else {
-    await supabase
-      .from('approvals')
-      .update({ meta_data: nextMetaData })
-      .eq('id', String(item.id));
-
-    // dual-write: Supabase 성공 후 D1 미러 (best-effort)
-    if (processingBackend === 'dual-write') {
-      try {
-        const d1 = await getD1Binding();
-        if (d1) {
-          const db = getD1Drizzle(d1);
-          await db
-            .update(approvalsTable)
-            .set({ meta_data: JSON.stringify(nextMetaData) })
-            .where(eq(approvalsTable.id, String(item.id)));
-        }
-      } catch (mirrorErr) {
-        logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.processing_complete', backend: processingBackend });
-      }
-    }
   }
 
   return {

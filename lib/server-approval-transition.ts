@@ -15,9 +15,7 @@ import {
   inArray,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
 } from '@/lib/db';
-import { logD1MirrorFailure } from '@/lib/db/mirror-metrics';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -33,11 +31,6 @@ type ActorContext = {
 type StaffRow = {
   id: string;
   permissions?: Record<string, unknown> | null;
-};
-
-type NotificationRow = {
-  id: string;
-  metadata?: Record<string, unknown> | null;
 };
 
 export type ApprovalTransitionResult = {
@@ -101,51 +94,35 @@ function resolveStoredCurrentApproverId(item: ApprovalRow): string | null {
   return lineIds[0] ?? null;
 }
 
-async function fetchStaffMap(supabase: SupabaseClient, staffIds: string[]) {
+async function fetchStaffMap(staffIds: string[]) {
   const uniqueIds = Array.from(new Set(staffIds.map((id) => String(id || '').trim()).filter(Boolean)));
   if (uniqueIds.length === 0) {
     return new Map<string, StaffRow>();
   }
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[server-approval-transition] D1 binding not available (fetchStaffMap)');
-    const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({ id: staffMembersTable.id, permissions: staffMembersTable.permissions })
-      .from(staffMembersTable)
-      .where(inArray(staffMembersTable.id, uniqueIds));
-    // D1에서 permissions는 TEXT(JSON) → 파싱
-    return new Map(
-      rows.map((row) => {
-        let parsedPermissions: Record<string, unknown> | null = null;
-        if (typeof row.permissions === 'string' && row.permissions.length > 0) {
-          try {
-            const parsed = JSON.parse(row.permissions) as unknown;
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              parsedPermissions = parsed as Record<string, unknown>;
-            }
-          } catch {
-            parsedPermissions = null;
-          }
-        }
-        return [String(row.id), { id: String(row.id), permissions: parsedPermissions }];
-      })
-    );
-  }
-
-  const { data, error } = await supabase
-    .from('staff_members')
-    .select('id, permissions')
-    .in('id', uniqueIds);
-
-  if (error) {
-    throw error;
-  }
-
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[server-approval-transition] D1 binding not available (fetchStaffMap)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({ id: staffMembersTable.id, permissions: staffMembersTable.permissions })
+    .from(staffMembersTable)
+    .where(inArray(staffMembersTable.id, uniqueIds));
+  // D1에서 permissions는 TEXT(JSON) → 파싱
   return new Map(
-    ((data || []) as StaffRow[]).map((staff) => [String(staff.id), staff])
+    rows.map((row) => {
+      let parsedPermissions: Record<string, unknown> | null = null;
+      if (typeof row.permissions === 'string' && row.permissions.length > 0) {
+        try {
+          const parsed = JSON.parse(row.permissions) as unknown;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            parsedPermissions = parsed as Record<string, unknown>;
+          }
+        } catch {
+          parsedPermissions = null;
+        }
+      }
+      return [String(row.id), { id: String(row.id), permissions: parsedPermissions }];
+    })
   );
 }
 
@@ -248,68 +225,33 @@ function serializeApprovalUpdateForD1(updateData: Record<string, unknown>): Reco
 }
 
 async function updateApprovalRecord(
-  supabase: SupabaseClient,
   approvalId: string,
   updateData: Record<string, unknown>
 ) {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[server-approval-transition] D1 binding not available (updateApprovalRecord)');
-    const db = getD1Drizzle(d1);
-    // JSON 컬럼(meta_data, approver_line, approval_line)은 TEXT로 직렬화
-    const d1UpdateData = serializeApprovalUpdateForD1(updateData);
-    const rows = await db
-      .update(approvalsTable)
-      .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
-      .where(eq(approvalsTable.id, approvalId))
-      .returning();
-    const row = rows[0] ?? null;
-    if (!row) return null;
-    // meta_data 등 JSON 컬럼 파싱해서 반환
-    const result: ApprovalRow = { ...row };
-    for (const col of ['meta_data', 'approver_line', 'approval_line'] as const) {
-      const raw = result[col];
-      if (typeof raw === 'string' && raw.length > 0) {
-        try { result[col] = JSON.parse(raw); } catch { /* 파싱 실패는 원본 유지 */ }
-      }
-    }
-    return result;
-  }
-
-  const { data, error } = await supabase
-    .from('approvals')
-    .update(updateData)
-    .eq('id', approvalId)
-    .select('*')
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  // dual-write: Supabase 성공 후 D1 미러 (best-effort)
-  if (backend === 'dual-write') {
-    try {
-      const d1 = await getD1Binding();
-      if (d1) {
-        const db = getD1Drizzle(d1);
-        const d1UpdateData = serializeApprovalUpdateForD1(updateData);
-        await db
-          .update(approvalsTable)
-          .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
-          .where(eq(approvalsTable.id, approvalId));
-      }
-    } catch (mirrorErr) {
-      logD1MirrorFailure(mirrorErr, { label: 'mirror:approvals.update', backend });
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[server-approval-transition] D1 binding not available (updateApprovalRecord)');
+  const db = getD1Drizzle(d1);
+  // JSON 컬럼(meta_data, approver_line, approval_line)은 TEXT로 직렬화
+  const d1UpdateData = serializeApprovalUpdateForD1(updateData);
+  const rows = await db
+    .update(approvalsTable)
+    .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
+    .where(eq(approvalsTable.id, approvalId))
+    .returning();
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  // meta_data 등 JSON 컬럼 파싱해서 반환
+  const result: ApprovalRow = { ...row };
+  for (const col of ['meta_data', 'approver_line', 'approval_line'] as const) {
+    const raw = result[col];
+    if (typeof raw === 'string' && raw.length > 0) {
+      try { result[col] = JSON.parse(raw); } catch { /* 파싱 실패는 원본 유지 */ }
     }
   }
-
-  return (data || null) as ApprovalRow | null;
+  return result;
 }
 
 async function markApprovalNotificationsAsRead(
-  supabase: SupabaseClient,
   actorId: string | null,
   approvalIds: string[]
 ) {
@@ -322,103 +264,50 @@ async function markApprovalNotificationsAsRead(
     return;
   }
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[server-approval-transition] D1 binding not available (markApprovalNotificationsAsRead)');
-    const db = getD1Drizzle(d1);
-    // D1에서 notifications 조회: user_id 일치 + type in ['approval','inventory'] + read_at IS NULL
-    const { and, eq: drizzleEq, inArray: drizzleInArray, isNull } = await import('drizzle-orm');
-    const rows = await db
-      .select({ id: notificationsTable.id, metadata: notificationsTable.metadata })
-      .from(notificationsTable)
-      .where(
-        and(
-          drizzleEq(notificationsTable.user_id, normalizedActorId),
-          drizzleInArray(notificationsTable.type, ['approval', 'inventory']),
-          isNull(notificationsTable.read_at),
-        )
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[server-approval-transition] D1 binding not available (markApprovalNotificationsAsRead)');
+  const db = getD1Drizzle(d1);
+  // D1에서 notifications 조회: user_id 일치 + type in ['approval','inventory'] + read_at IS NULL
+  const { and, eq: drizzleEq, inArray: drizzleInArray, isNull } = await import('drizzle-orm');
+  const rows = await db
+    .select({ id: notificationsTable.id, metadata: notificationsTable.metadata })
+    .from(notificationsTable)
+    .where(
+      and(
+        drizzleEq(notificationsTable.user_id, normalizedActorId),
+        drizzleInArray(notificationsTable.type, ['approval', 'inventory']),
+        isNull(notificationsTable.read_at),
       )
-      .limit(500);
-    const matchedIds = rows
-      .map((row) => {
-        // D1의 metadata는 TEXT → JSON.parse
-        let metadata: Record<string, unknown> | null = null;
-        if (typeof row.metadata === 'string' && row.metadata.length > 0) {
-          try {
-            const parsed = JSON.parse(row.metadata) as unknown;
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              metadata = parsed as Record<string, unknown>;
-            }
-          } catch { metadata = null; }
-        } else if (row.metadata && typeof row.metadata === 'object') {
-          metadata = row.metadata as Record<string, unknown>;
-        }
-        return { id: String(row.id || '').trim(), metadata };
-      })
-      .filter((row) =>
-        normalizedApprovalIds.some((approvalId) => notificationMatchesApprovalId(row.metadata, approvalId))
-      )
-      .map((row) => row.id)
-      .filter(Boolean);
-
-    if (matchedIds.length === 0) return;
-    const readAt = new Date().toISOString();
-    await db
-      .update(notificationsTable)
-      .set({ read_at: readAt })
-      .where(inArray(notificationsTable.id, matchedIds));
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('id, metadata')
-    .eq('user_id', normalizedActorId)
-    .in('type', ['approval', 'inventory'])
-    .is('read_at', null)
+    )
     .limit(500);
-
-  if (error) {
-    throw error;
-  }
-
-  const matchedIds = ((data || []) as NotificationRow[])
+  const matchedIds = rows
+    .map((row) => {
+      // D1의 metadata는 TEXT → JSON.parse
+      let metadata: Record<string, unknown> | null = null;
+      if (typeof row.metadata === 'string' && row.metadata.length > 0) {
+        try {
+          const parsed = JSON.parse(row.metadata) as unknown;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            metadata = parsed as Record<string, unknown>;
+          }
+        } catch { metadata = null; }
+      } else if (row.metadata && typeof row.metadata === 'object') {
+        metadata = row.metadata as Record<string, unknown>;
+      }
+      return { id: String(row.id || '').trim(), metadata };
+    })
     .filter((row) =>
       normalizedApprovalIds.some((approvalId) => notificationMatchesApprovalId(row.metadata, approvalId))
     )
-    .map((row) => String(row.id || '').trim())
+    .map((row) => row.id)
     .filter(Boolean);
 
-  if (matchedIds.length === 0) {
-    return;
-  }
-
+  if (matchedIds.length === 0) return;
   const readAt = new Date().toISOString();
-  const { error: updateError } = await supabase
-    .from('notifications')
-    .update({ read_at: readAt })
-    .in('id', matchedIds);
-
-  if (updateError) {
-    throw updateError;
-  }
-
-  // dual-write: Supabase 성공 후 D1 미러 (best-effort)
-  if (backend === 'dual-write') {
-    try {
-      const d1 = await getD1Binding();
-      if (d1) {
-        const db = getD1Drizzle(d1);
-        await db
-          .update(notificationsTable)
-          .set({ read_at: readAt })
-          .where(inArray(notificationsTable.id, matchedIds));
-      }
-    } catch (mirrorErr) {
-      logD1MirrorFailure(mirrorErr, { label: 'mirror:notifications.read_at', backend });
-    }
-  }
+  await db
+    .update(notificationsTable)
+    .set({ read_at: readAt })
+    .where(inArray(notificationsTable.id, matchedIds));
 }
 
 async function transitionSingleApproval(params: {
@@ -519,7 +408,6 @@ async function transitionSingleApproval(params: {
   }
 
   const staffMap = await fetchStaffMap(
-    supabase,
     [storedCurrentApproverId, ...lineIds].filter(Boolean)
   );
   const effectiveCurrentApproverId =
@@ -558,7 +446,7 @@ async function transitionSingleApproval(params: {
       revision,
     });
 
-    await updateApprovalRecord(supabase, approvalId, {
+    await updateApprovalRecord(approvalId, {
       status: '반려',
       meta_data: {
         ...nextRejectedMetaData,
@@ -618,7 +506,7 @@ async function transitionSingleApproval(params: {
         },
       };
 
-  const updatedApproval = await updateApprovalRecord(supabase, approvalId, updateData);
+  const updatedApproval = await updateApprovalRecord(approvalId, updateData);
 
   if (!isFinalApproval) {
     return {
@@ -681,38 +569,24 @@ export async function transitionApprovals(params: {
     };
   }
 
-  const backend = await resolveDataBackend();
-  let fetchedRows: ApprovalRow[];
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[server-approval-transition] D1 binding not available (transitionApprovals)');
-    const db = getD1Drizzle(d1);
-    const rows = await db
-      .select()
-      .from(approvalsTable)
-      .where(inArray(approvalsTable.id, normalizedIds));
-    // JSON 컬럼(meta_data, approver_line, approval_line) 파싱
-    fetchedRows = rows.map((row) => {
-      const result: ApprovalRow = { ...row };
-      for (const col of ['meta_data', 'approver_line', 'approval_line'] as const) {
-        const raw = result[col];
-        if (typeof raw === 'string' && raw.length > 0) {
-          try { result[col] = JSON.parse(raw); } catch { /* 파싱 실패는 원본 유지 */ }
-        }
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[server-approval-transition] D1 binding not available (transitionApprovals)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select()
+    .from(approvalsTable)
+    .where(inArray(approvalsTable.id, normalizedIds));
+  // JSON 컬럼(meta_data, approver_line, approval_line) 파싱
+  const fetchedRows: ApprovalRow[] = rows.map((row) => {
+    const result: ApprovalRow = { ...row };
+    for (const col of ['meta_data', 'approver_line', 'approval_line'] as const) {
+      const raw = result[col];
+      if (typeof raw === 'string' && raw.length > 0) {
+        try { result[col] = JSON.parse(raw); } catch { /* 파싱 실패는 원본 유지 */ }
       }
-      return result;
-    });
-  } else {
-    const { data, error } = await supabase
-      .from('approvals')
-      .select('*')
-      .in('id', normalizedIds);
-
-    if (error) {
-      throw error;
     }
-    fetchedRows = (data || []) as ApprovalRow[];
-  }
+    return result;
+  });
 
   const approvalMap = new Map(
     fetchedRows.map((item) => [String(item.id || ''), item])
@@ -775,7 +649,7 @@ export async function transitionApprovals(params: {
 
   if (successfulApprovalIds.length > 0) {
     try {
-      await markApprovalNotificationsAsRead(supabase, actor.id, successfulApprovalIds);
+      await markApprovalNotificationsAsRead(actor.id, successfulApprovalIds);
     } catch {
       // Approval state should win even if notification cleanup is delayed.
     }

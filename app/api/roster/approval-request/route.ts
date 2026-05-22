@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
@@ -12,7 +11,6 @@ import {
   inArray,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
 } from '@/lib/db';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
@@ -61,36 +59,6 @@ type NotificationInsertRow = {
   body: string;
   metadata: Record<string, unknown>;
 };
-
-function getAdminClient(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
-function isMissingRelationError(error: unknown, relationNames: string[]) {
-  const payload = error as {
-    code?: string | null;
-    message?: string | null;
-    details?: string | null;
-    hint?: string | null;
-  } | null;
-  const code = String(payload?.code || '').trim();
-  const message = [payload?.message, payload?.details, payload?.hint]
-    .map((value) => String(value || '').toLowerCase())
-    .join(' ');
-
-  return (
-    code === '42P01' ||
-    code === 'PGRST205' ||
-    relationNames.some((relationName) => message.includes(relationName.toLowerCase()))
-  );
-}
 
 function canRequestRosterApproval(user: SessionUser | null | undefined) {
   const position = String(user?.position || '').trim();
@@ -234,7 +202,6 @@ function buildImmediatePushPayload(row: NotificationInsertRow) {
 }
 
 async function dispatchImmediateApprovalPush(
-  supabase: SupabaseClient,
   notificationRows: NotificationInsertRow[],
 ) {
   const targetUserIds = Array.from(
@@ -246,8 +213,7 @@ async function dispatchImmediateApprovalPush(
   }
 
   let subscriptions: PushSubscriptionRow[] = [];
-  const pushBackend = await resolveDataBackend();
-  if (pushBackend === 'd1') {
+  {
     const d1 = await getD1Binding();
     if (d1) {
       const db = getD1Drizzle(d1);
@@ -273,17 +239,6 @@ async function dispatchImmediateApprovalPush(
         created_at: r.created_at ?? null,
       }));
     }
-  } else {
-    const { data: subscriptionRows, error: subscriptionError } = await supabase
-      .from('push_subscriptions')
-      .select('id, staff_id, endpoint, p256dh, auth, fcm_token, created_at')
-      .in('staff_id', targetUserIds);
-
-    if (subscriptionError) {
-      console.error('roster approval push subscription lookup failed:', subscriptionError);
-      return { pushTargetCount: targetUserIds.length, pushSentCount: 0 };
-    }
-    subscriptions = (subscriptionRows || []) as PushSubscriptionRow[];
   }
   const sampleNotification = notificationRows[0];
   const payload = buildImmediatePushPayload(sampleNotification);
@@ -364,7 +319,6 @@ async function dispatchImmediateApprovalPush(
 }
 
 async function insertLegacyApprovalRequest(params: {
-  supabase: SupabaseClient;
   companyName: string;
   teamName: string;
   yearMonth: string;
@@ -373,72 +327,37 @@ async function insertLegacyApprovalRequest(params: {
   requestedByName: string;
   approverIds: string[];
 }) {
-  const { supabase, companyName, teamName, yearMonth, assignments, requestedBy, requestedByName, approverIds } = params;
+  const { companyName, teamName, yearMonth, assignments, requestedBy, requestedByName, approverIds } = params;
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[roster/approval-request] D1 binding not available (insertLegacyApprovalRequest)');
-    const db = getD1Drizzle(d1);
-    const newId = crypto.randomUUID();
-    const metaDataObj = {
-      type: 'approval',
-      approval_view: 'roster_schedule',
-      approval_source: 'approvals',
-      roster_request_type: 'monthly_schedule',
-      company_name: companyName || null,
-      team_name: teamName,
-      year_month: yearMonth,
-      assignments,
-      approver_line: approverIds,
-    };
-    await db.insert(approvalsTable).values({
-      id: newId,
-      sender_id: requestedBy,
-      sender_name: requestedByName,
-      sender_company: companyName || null,
-      current_approver_id: approverIds[0] || null,
-      type: ROSTER_APPROVAL_TYPE,
-      title: `${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD`,
-      content: `${requestedByName}\uB2D8\uC758 ${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD\uC785\uB2C8\uB2E4.`,
-      status: LEGACY_APPROVAL_PENDING_STATUS,
-      meta_data: JSON.stringify(metaDataObj),
-      created_at: new Date().toISOString(),
-    });
-    return newId;
-  }
-
-  const { data, error } = await supabase
-    .from('approvals')
-    .insert({
-      sender_id: requestedBy,
-      sender_name: requestedByName,
-      sender_company: companyName || null,
-      current_approver_id: approverIds[0] || null,
-      type: ROSTER_APPROVAL_TYPE,
-      title: `${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD`,
-      content: `${requestedByName}\uB2D8\uC758 ${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD\uC785\uB2C8\uB2E4.`,
-      status: LEGACY_APPROVAL_PENDING_STATUS,
-      meta_data: {
-        type: 'approval',
-        approval_view: 'roster_schedule',
-        approval_source: 'approvals',
-        roster_request_type: 'monthly_schedule',
-        company_name: companyName || null,
-        team_name: teamName,
-        year_month: yearMonth,
-        assignments,
-        approver_line: approverIds,
-      },
-    })
-    .select('id')
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return String(data?.id || '').trim();
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[roster/approval-request] D1 binding not available (insertLegacyApprovalRequest)');
+  const db = getD1Drizzle(d1);
+  const newId = crypto.randomUUID();
+  const metaDataObj = {
+    type: 'approval',
+    approval_view: 'roster_schedule',
+    approval_source: 'approvals',
+    roster_request_type: 'monthly_schedule',
+    company_name: companyName || null,
+    team_name: teamName,
+    year_month: yearMonth,
+    assignments,
+    approver_line: approverIds,
+  };
+  await db.insert(approvalsTable).values({
+    id: newId,
+    sender_id: requestedBy,
+    sender_name: requestedByName,
+    sender_company: companyName || null,
+    current_approver_id: approverIds[0] || null,
+    type: ROSTER_APPROVAL_TYPE,
+    title: `${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD`,
+    content: `${requestedByName}\uB2D8\uC758 ${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD\uC785\uB2C8\uB2E4.`,
+    status: LEGACY_APPROVAL_PENDING_STATUS,
+    meta_data: JSON.stringify(metaDataObj),
+    created_at: new Date().toISOString(),
+  });
+  return newId;
 }
 
 export async function POST(request: Request) {
@@ -473,18 +392,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = getAdminClient();
     const companyName = String(payload?.companyName || session.user.company || '').trim();
     const teamName = String(payload?.teamName || '').trim() || '\uC804\uCCB4';
     const requestedBy = String(session.user.id || '').trim();
     const requestedByName = String(session.user.name || '').trim() || '\uC774\uB984 \uC5C6\uC74C';
     const now = new Date().toISOString();
 
-    const rosterBackend = await resolveDataBackend();
-
-    // staff_members \uC870\uD68C \u2014 D1 \uBD84\uAE30
+    // staff_members \uC870\uD68C (D1)
     let staffRows: ApproverRow[] = [];
-    if (rosterBackend === 'd1') {
+    {
       const d1 = await getD1Binding();
       if (!d1) {
         return NextResponse.json({ error: 'D1 binding not available' }, { status: 500 });
@@ -514,23 +430,6 @@ export async function POST(request: Request) {
         company: r.company ?? null,
         role: r.role ?? null,
       }));
-    } else {
-      const approverFilter = [
-        `position.eq.${ROSTER_APPROVER_POSITIONS[0]}`,
-        `position.eq.${ROSTER_APPROVER_POSITIONS[1]}`,
-        'role.eq.admin',
-        'role.eq.master',
-      ].join(',');
-
-      const { data: supaStaffRows, error: staffError } = await supabase
-        .from('staff_members')
-        .select('id, name, position, company, role')
-        .or(approverFilter);
-
-      if (staffError) {
-        return NextResponse.json({ error: staffError.message }, { status: 500 });
-      }
-      staffRows = (supaStaffRows || []) as ApproverRow[];
     }
 
     const approvers = resolveApprovers(staffRows, requestedBy, companyName);
@@ -548,8 +447,8 @@ export async function POST(request: Request) {
     let requestId = '';
     let storage: 'roster_approval_requests' | 'approvals' = 'roster_approval_requests';
 
-    if (rosterBackend === 'd1') {
-      // D1 \uBAA8\uB4DC: roster_approval_requests \uC9C1\uC811 INSERT
+    {
+      // D1: roster_approval_requests \uC9C1\uC811 INSERT
       const d1 = await getD1Binding();
       if (!d1) {
         return NextResponse.json({ error: 'D1 binding not available (roster_approval_requests)' }, { status: 500 });
@@ -575,7 +474,6 @@ export async function POST(request: Request) {
         storage = 'approvals';
         try {
           requestId = await insertLegacyApprovalRequest({
-            supabase,
             companyName,
             teamName,
             yearMonth,
@@ -592,50 +490,6 @@ export async function POST(request: Request) {
           console.error('D1 roster approval insert fallback failed:', d1InsertError, legacyInsertError);
           return NextResponse.json({ error: message }, { status: 500 });
         }
-      }
-    } else {
-      const { data: insertedRequest, error: insertError } = await supabase
-        .from('roster_approval_requests')
-        .insert({
-          company_name: companyName || null,
-          team_name: teamName,
-          year_month: yearMonth,
-          assignments,
-          requested_by: requestedBy,
-          requested_by_name: requestedByName,
-          status: 'pending',
-          created_at: now,
-          updated_at: now,
-        })
-        .select('id')
-        .single();
-
-      if (insertError) {
-        if (!isMissingRelationError(insertError, ['roster_approval_requests'])) {
-          return NextResponse.json({ error: insertError.message }, { status: 500 });
-        }
-
-        storage = 'approvals';
-        try {
-          requestId = await insertLegacyApprovalRequest({
-            supabase,
-            companyName,
-            teamName,
-            yearMonth,
-            assignments,
-            requestedBy,
-            requestedByName,
-            approverIds,
-          });
-        } catch (legacyInsertError) {
-          const message =
-            legacyInsertError instanceof Error
-              ? legacyInsertError.message
-              : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
-          return NextResponse.json({ error: message }, { status: 500 });
-        }
-      } else {
-        requestId = String(insertedRequest?.id || '').trim();
       }
     }
 
@@ -659,7 +513,7 @@ export async function POST(request: Request) {
       try {
         await insertNotificationsOrThrow(notificationRows as NotificationRow[]);
         notifiedApproverCount = notificationRows.length;
-        const pushResult = await dispatchImmediateApprovalPush(supabase, notificationRows);
+        const pushResult = await dispatchImmediateApprovalPush(notificationRows);
         pushSentCount = pushResult.pushSentCount;
       } catch (notificationError) {
         console.error('roster approval notification insert failed:', notificationError);

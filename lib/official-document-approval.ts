@@ -1,13 +1,10 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   official_doc_log as officialDocLogTable,
   like,
   count,
-  sql,
 } from '@/lib/db';
 
 export type OfficialDocRequest = {
@@ -69,34 +66,21 @@ export function buildOfficialDocumentApprovalContent(request: OfficialDocRequest
   ].join('\n');
 }
 
-async function issueOfficialDocNumber(supabase: SupabaseClient, sentDate: string) {
+async function issueOfficialDocNumber(sentDate: string) {
   const baseDate = /^\d{4}-\d{2}-\d{2}$/.test(sentDate) ? new Date(sentDate) : new Date();
   const year = baseDate.getFullYear();
   const month = String(baseDate.getMonth() + 1).padStart(2, '0');
   const prefix = `공문-${year}${month}`;
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[official-document-approval] D1 binding not available (issueOfficialDocNumber)');
-    const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({ cnt: count() })
-      .from(officialDocLogTable)
-      .where(like(officialDocLogTable.doc_number, `${prefix}%`));
-    const existingCount = Number(rows[0]?.cnt ?? 0);
-    const sequence = String(existingCount + 1).padStart(3, '0');
-    return `${prefix}-${sequence}`;
-  }
-
-  const { count: existingCount, error } = await supabase
-    .from('official_doc_log')
-    .select('*', { count: 'exact', head: true })
-    .like('doc_number', `${prefix}%`);
-
-  if (error) throw error;
-
-  const sequence = String((existingCount ?? 0) + 1).padStart(3, '0');
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[official-document-approval] D1 binding not available (issueOfficialDocNumber)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({ cnt: count() })
+    .from(officialDocLogTable)
+    .where(like(officialDocLogTable.doc_number, `${prefix}%`));
+  const existingCount = Number(rows[0]?.cnt ?? 0);
+  const sequence = String(existingCount + 1).padStart(3, '0');
   return `${prefix}-${sequence}`;
 }
 
@@ -108,7 +92,6 @@ function buildOfficialDocNote(baseNote: string, approval: Record<string, unknown
 }
 
 export async function syncOfficialDocumentLogFromApproval(
-  supabase: SupabaseClient,
   approval: Record<string, unknown>,
 ) {
   const metaData =
@@ -121,7 +104,7 @@ export async function syncOfficialDocumentLogFromApproval(
     return null;
   }
 
-  const docNumber = request.doc_number || await issueOfficialDocNumber(supabase, request.sent_date);
+  const docNumber = request.doc_number || await issueOfficialDocNumber(request.sent_date);
   const payload = {
     sent_date: request.sent_date || getTodayDateKey(),
     doc_number: docNumber,
