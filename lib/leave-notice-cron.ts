@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   extractLeaveRequestMeta,
   formatLeaveNoticeMessage,
@@ -8,13 +7,19 @@ import {
   LEAVE_NOTICE_TIMEZONE,
 } from '@/lib/leave-notice';
 import {
-  mirrorRowsToD1,
   messages as messagesTable,
+  approvals as approvalsTable,
+  staff_members as staffMembersTable,
   getD1Binding,
   getD1Drizzle,
   updateChatRoomLastMessage,
-  resolveDataBackend,
+  eq,
+  and,
+  inArray,
+  desc,
 } from '@/lib/db';
+
+type D1Db = ReturnType<typeof getD1Drizzle>;
 
 type LeaveApprovalRow = {
   id: string;
@@ -48,15 +53,22 @@ export type LeaveNoticeDispatchResult = {
   errors: string[];
 };
 
-function getAdminClient(): SupabaseClient {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase service role configuration is missing.');
+/** D1 TEXT(JSON) 컬럼 값을 객체로 파싱. 실패·비객체는 null. */
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
   }
-
-  return createClient(supabaseUrl, serviceKey);
+  if (typeof value === 'string' && value.length > 0) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* 파싱 실패 → null */
+    }
+  }
+  return null;
 }
 
 function buildDeterministicMessageId(approvalId: string, targetDate: string) {
@@ -68,46 +80,78 @@ function buildDeterministicMessageId(approvalId: string, targetDate: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-async function fetchApprovedLeaveApprovals(supabase: SupabaseClient, pageSize = 500) {
-  const rows: LeaveApprovalRow[] = [];
+async function fetchApprovedLeaveApprovals(db: D1Db): Promise<LeaveApprovalRow[]> {
+  const result: LeaveApprovalRow[] = [];
+  const PAGE_SIZE = 500;
 
   for (let page = 0; page < 20; page += 1) {
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    const { data, error } = await supabase
-      .from('approvals')
-      .select('id,sender_id,sender_name,sender_company,company_id,title,meta_data,created_at')
-      .eq('status', '승인')
-      .in('type', ['연차/휴가', '휴가신청'])
-      .order('created_at', { ascending: false })
-      .range(from, to);
+    const rows = await db
+      .select({
+        id: approvalsTable.id,
+        sender_id: approvalsTable.sender_id,
+        sender_name: approvalsTable.sender_name,
+        sender_company: approvalsTable.sender_company,
+        company_id: approvalsTable.company_id,
+        title: approvalsTable.title,
+        meta_data: approvalsTable.meta_data,
+        created_at: approvalsTable.created_at,
+      })
+      .from(approvalsTable)
+      .where(
+        and(
+          eq(approvalsTable.status, '승인'),
+          inArray(approvalsTable.type, ['연차/휴가', '휴가신청']),
+        ),
+      )
+      .orderBy(desc(approvalsTable.created_at))
+      .limit(PAGE_SIZE)
+      .offset(page * PAGE_SIZE);
 
-    if (error) throw error;
+    for (const row of rows) {
+      result.push({
+        id: String(row.id),
+        sender_id: row.sender_id,
+        sender_name: row.sender_name,
+        sender_company: row.sender_company,
+        company_id: row.company_id,
+        title: row.title,
+        meta_data: parseJsonObject(row.meta_data),
+        created_at: row.created_at,
+      });
+    }
 
-    const batch = (data || []) as LeaveApprovalRow[];
-    rows.push(...batch);
+    if (rows.length < PAGE_SIZE) break;
+  }
 
-    if (batch.length < pageSize) {
-      break;
+  return result;
+}
+
+async function fetchStaffDirectory(db: D1Db, staffIds: string[]) {
+  const map = new Map<string, StaffRow>();
+  if (staffIds.length === 0) return map;
+
+  // D1 bound parameter 한도(100) 가드 — id IN (...) 청크 분할
+  const CHUNK = 90;
+  for (let i = 0; i < staffIds.length; i += CHUNK) {
+    const chunk = staffIds.slice(i, i + CHUNK);
+    const rows = await db
+      .select({
+        id: staffMembersTable.id,
+        name: staffMembersTable.name,
+        company: staffMembersTable.company,
+        company_id: staffMembersTable.company_id,
+        department: staffMembersTable.department,
+        team: staffMembersTable.team,
+        position: staffMembersTable.position,
+      })
+      .from(staffMembersTable)
+      .where(inArray(staffMembersTable.id, chunk));
+    for (const row of rows) {
+      map.set(String(row.id), row as StaffRow);
     }
   }
 
-  return rows;
-}
-
-async function fetchStaffDirectory(supabase: SupabaseClient, staffIds: string[]) {
-  if (staffIds.length === 0) return new Map<string, StaffRow>();
-
-  const { data, error } = await supabase
-    .from('staff_members')
-    .select('id,name,company,company_id,department,team,position')
-    .in('id', staffIds);
-
-  if (error) throw error;
-
-  return new Map(
-    ((data || []) as StaffRow[]).map((staff) => [String(staff.id), staff])
-  );
+  return map;
 }
 
 function resolveDepartmentLabel(staff: StaffRow | undefined, approval: LeaveApprovalRow) {
@@ -119,9 +163,14 @@ function resolveDepartmentLabel(staff: StaffRow | undefined, approval: LeaveAppr
 }
 
 export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNoticeDispatchResult> {
-  const supabase = getAdminClient();
+  const d1 = await getD1Binding();
+  if (!d1) {
+    throw new Error('[leave-notice-cron] D1 binding not available');
+  }
+  const db = getD1Drizzle(d1);
+
   const targetDate = getTimeZoneDateKeyOffset(1, LEAVE_NOTICE_TIMEZONE, now);
-  const approvals = await fetchApprovedLeaveApprovals(supabase);
+  const approvals = await fetchApprovedLeaveApprovals(db);
   const dueApprovals = approvals.filter((approval) => {
     const leaveMeta = extractLeaveRequestMeta(
       approval.meta_data && typeof approval.meta_data === 'object'
@@ -149,7 +198,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
         .filter(Boolean)
     )
   );
-  const staffMap = await fetchStaffDirectory(supabase, senderIds);
+  const staffMap = await fetchStaffDirectory(db, senderIds);
 
   let created = 0;
   let skipped = 0;
@@ -190,41 +239,31 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       content,
       created_at: nowIso,
     };
-    const { error: messageError } = await supabase.from('messages').insert(messageRow);
 
-    const duplicateMessage =
-      Boolean(messageError) &&
-      (String((messageError as { code?: string } | null)?.code || '') === '23505' ||
-        /duplicate key|unique constraint/i.test(
-          String((messageError as { message?: string } | null)?.message || '')
-        ));
-
-    if (messageError && !duplicateMessage) {
+    // 메시지 INSERT — id가 결정적(deterministic)이라 중복은 onConflictDoNothing.
+    // returning 결과가 비어 있으면 이미 발송된 공지(중복).
+    let duplicateMessage = false;
+    try {
+      const inserted = await db
+        .insert(messagesTable)
+        .values(messageRow)
+        .onConflictDoNothing()
+        .returning({ id: messagesTable.id });
+      duplicateMessage = inserted.length === 0;
+    } catch (err) {
       failed += 1;
-      errors.push(`${approval.id}: ${String(messageError.message || messageError)}`);
+      errors.push(`${approval.id}: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
 
-    // D1 미러 — id가 결정적(deterministic)이라 중복 INSERT는 onConflictDoNothing.
-    // chat_rooms.last_message_at / preview도 함께 업데이트 (Postgres 트리거 대체).
-    await mirrorRowsToD1(messagesTable, messageRow, {
-      label: 'messages',
-      onConflict: 'do_nothing',
-    });
+    // chat_rooms.last_message_at / preview 갱신 (중복이 아닐 때만 — Postgres 트리거 대체)
     if (!duplicateMessage) {
-      // 중복이 아닐 때만 last_message 갱신 (이미 더 최신 메시지가 있을 수 있음)
       try {
-        const backend = await resolveDataBackend();
-        if (backend !== 'supabase') {
-          const d1 = await getD1Binding();
-          if (d1) {
-            await updateChatRoomLastMessage(getD1Drizzle(d1), {
-              room_id: LEAVE_NOTICE_ROOM_ID,
-              created_at: nowIso,
-              content,
-            });
-          }
-        }
+        await updateChatRoomLastMessage(db, {
+          room_id: LEAVE_NOTICE_ROOM_ID,
+          created_at: nowIso,
+          content,
+        });
       } catch (err) {
         console.warn('[leave-notice-cron] chat_rooms last_message D1 sync failed', err);
       }
@@ -236,14 +275,14 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       leave_notice_announced_at: nowIso,
       leave_notice_message_id: messageId,
     };
-    const { error: approvalUpdateError } = await supabase
-      .from('approvals')
-      .update({ meta_data: nextMetaData })
-      .eq('id', String(approval.id));
-
-    if (approvalUpdateError) {
+    try {
+      await db
+        .update(approvalsTable)
+        .set({ meta_data: JSON.stringify(nextMetaData) })
+        .where(eq(approvalsTable.id, String(approval.id)));
+    } catch (err) {
       failed += 1;
-      errors.push(`${approval.id}: ${String(approvalUpdateError.message || approvalUpdateError)}`);
+      errors.push(`${approval.id}: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
 
