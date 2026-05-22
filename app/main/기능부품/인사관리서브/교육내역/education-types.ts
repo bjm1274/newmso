@@ -4,7 +4,8 @@
 // ============================================================
 
 // ──────────────────────────────────────────────────────────────
-// Supabase 클라이언트 최소 인터페이스 (any 대체)
+// 데이터 조회 결과 최소 인터페이스
+// (D1 호환 클라이언트가 Supabase와 동일한 { data, error } 형태를 반환)
 // ──────────────────────────────────────────────────────────────
 export interface SupabaseQueryResult<T = unknown> {
   data: T | null;
@@ -18,8 +19,8 @@ export interface SupabaseError {
   hint?: string | null;
 }
 
-// SupabaseLike: 실제 SupabaseClient와 호환되도록 from() 반환을 any로 허용
-// (PostgrestQueryBuilder 제네릭이 복잡하여 구조 매칭이 어려움)
+// SupabaseLike: from() 메서드만 노출하는 최소 클라이언트 인터페이스.
+// 클라이언트 `supabase`는 D1 호환 Proxy(d1Client)로 라우팅된다.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type SupabaseLike = Pick<import('@supabase/supabase-js').SupabaseClient<any, 'public', any>, 'from'>;
 

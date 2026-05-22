@@ -5,13 +5,11 @@
  * - PATCH /:id                   : 인사가 승인/반려 (별도 라우트 [id]/route.ts)
  */
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   license_continuing_education as licenseCETable,
   eq,
   and,
@@ -19,13 +17,6 @@ import {
 } from '@/lib/db';
 
 export const runtime = 'nodejs';
-
-function adminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) throw new Error('Supabase 서버 설정이 없습니다.');
-  return createClient(url, key);
-}
 
 function isHrUser(session: { user?: { permissions?: Record<string, unknown> } | null }): boolean {
   const perms = session.user?.permissions ?? {};
@@ -57,44 +48,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const backend = await resolveDataBackend();
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) throw new Error('[license-ce] D1 binding not available (GET)');
-      const db = getD1Drizzle(d1);
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[license-ce] D1 binding not available (GET)');
+    const db = getD1Drizzle(d1);
 
-      const conditions = [];
-      if (staffId) {
-        conditions.push(eq(licenseCETable.staff_id, staffId));
-      } else if (!hr) {
-        conditions.push(eq(licenseCETable.staff_id, me));
-      }
-      if (status) {
-        conditions.push(eq(licenseCETable.status, status));
-      }
-
-      const rows = await db
-        .select()
-        .from(licenseCETable)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(licenseCETable.submitted_at));
-
-      return NextResponse.json({ ok: true, items: rows ?? [] });
+    const conditions = [];
+    if (staffId) {
+      conditions.push(eq(licenseCETable.staff_id, staffId));
+    } else if (!hr) {
+      conditions.push(eq(licenseCETable.staff_id, me));
+    }
+    if (status) {
+      conditions.push(eq(licenseCETable.status, status));
     }
 
-    const sb = adminClient();
-    let query = sb
-      .from('license_continuing_education')
-      .select('*')
-      .order('submitted_at', { ascending: false });
+    const rows = await db
+      .select()
+      .from(licenseCETable)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(licenseCETable.submitted_at));
 
-    if (staffId) query = query.eq('staff_id', staffId);
-    else if (!hr) query = query.eq('staff_id', me);
-    if (status) query = query.eq('status', status);
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return NextResponse.json({ ok: true, items: data ?? [] });
+    return NextResponse.json({ ok: true, items: rows ?? [] });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -131,36 +105,24 @@ export async function POST(req: Request) {
       status: 'pending',
     };
 
-    const backend = await resolveDataBackend();
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) throw new Error('[license-ce] D1 binding not available (POST)');
-      const db = getD1Drizzle(d1);
-      const newId = crypto.randomUUID();
-      await db.insert(licenseCETable).values({
-        id: newId,
-        ...newRow,
-        submitted_at: now,
-        created_at: now,
-        updated_at: now,
-      });
-      // D1에서 삽입된 행을 반환
-      const rows = await db
-        .select()
-        .from(licenseCETable)
-        .where(eq(licenseCETable.id, newId))
-        .limit(1);
-      return NextResponse.json({ ok: true, item: rows[0] ?? null });
-    }
-
-    const sb = adminClient();
-    const { data, error } = await sb
-      .from('license_continuing_education')
-      .insert(newRow)
-      .select('*')
-      .single();
-    if (error) throw error;
-    return NextResponse.json({ ok: true, item: data });
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[license-ce] D1 binding not available (POST)');
+    const db = getD1Drizzle(d1);
+    const newId = crypto.randomUUID();
+    await db.insert(licenseCETable).values({
+      id: newId,
+      ...newRow,
+      submitted_at: now,
+      created_at: now,
+      updated_at: now,
+    });
+    // D1에서 삽입된 행을 반환
+    const rows = await db
+      .select()
+      .from(licenseCETable)
+      .where(eq(licenseCETable.id, newId))
+      .limit(1);
+    return NextResponse.json({ ok: true, item: rows[0] ?? null });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
