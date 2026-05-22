@@ -4,7 +4,6 @@
  * dedupe key: `payroll:{record_id}`
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -16,7 +15,6 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   payroll_records as payrollRecordsTable,
   gte,
 } from '@/lib/db';
@@ -30,37 +28,22 @@ type PayrollRow = {
 
 const PAYROLL_LOOKBACK_MIN = 60;
 
-export async function checkPayrollSettled(
-  supabase: SupabaseClient,
-): Promise<CheckJobResult> {
+export async function checkPayrollSettled(): Promise<CheckJobResult> {
   const cutoff = new Date(Date.now() - PAYROLL_LOOKBACK_MIN * 60 * 1000).toISOString();
-  let rows: PayrollRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-payroll] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: payrollRecordsTable.id,
-        staff_id: payrollRecordsTable.staff_id,
-        year_month: payrollRecordsTable.year_month,
-        net_pay: payrollRecordsTable.net_pay,
-      })
-      .from(payrollRecordsTable)
-      .where(gte(payrollRecordsTable.created_at, cutoff))
-      .limit(500);
-    rows = d1Rows as PayrollRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('payroll_records')
-      .select('id, staff_id, year_month, net_pay')
-      .gte('created_at', cutoff)
-      .limit(500);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    rows = (data ?? []) as PayrollRow[];
-  }
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-payroll] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: payrollRecordsTable.id,
+      staff_id: payrollRecordsTable.staff_id,
+      year_month: payrollRecordsTable.year_month,
+      net_pay: payrollRecordsTable.net_pay,
+    })
+    .from(payrollRecordsTable)
+    .where(gte(payrollRecordsTable.created_at, cutoff))
+    .limit(500);
+  const rows = d1Rows as PayrollRow[];
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(
@@ -68,7 +51,7 @@ export async function checkPayrollSettled(
   );
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'payroll', userIds);
+    sentKeys = await loadExistingDedupeKeys('payroll', userIds);
   } catch (err) {
     return { detected: rows.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -102,6 +85,6 @@ export async function checkPayrollSettled(
   if (toInsert.length === 0) {
     return { detected: rows.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: rows.length, created, errors };
 }

@@ -5,7 +5,6 @@
  * dedupe key: `education:{record_id}`
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -17,7 +16,6 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   education_records as educationRecordsTable,
   and,
   gte,
@@ -35,53 +33,35 @@ type EducationRow = {
   status: string | null;
 };
 
-export async function checkEducationDeadline(
-  supabase: SupabaseClient,
-): Promise<CheckJobResult> {
+export async function checkEducationDeadline(): Promise<CheckJobResult> {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const horizon = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
   const todayIso = today.toISOString().slice(0, 10);
   const horizonIso = horizon.toISOString().slice(0, 10);
-  let rows: EducationRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-education] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: educationRecordsTable.id,
-        staff_id: educationRecordsTable.staff_id,
-        education_name: educationRecordsTable.education_name,
-        deadline: educationRecordsTable.deadline,
-        completed_at: educationRecordsTable.completed_at,
-        status: educationRecordsTable.status,
-      })
-      .from(educationRecordsTable)
-      .where(
-        and(
-          isNotNull(educationRecordsTable.deadline),
-          isNull(educationRecordsTable.completed_at),
-          gte(educationRecordsTable.deadline, todayIso),
-          lte(educationRecordsTable.deadline, horizonIso),
-        )
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-education] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: educationRecordsTable.id,
+      staff_id: educationRecordsTable.staff_id,
+      education_name: educationRecordsTable.education_name,
+      deadline: educationRecordsTable.deadline,
+      completed_at: educationRecordsTable.completed_at,
+      status: educationRecordsTable.status,
+    })
+    .from(educationRecordsTable)
+    .where(
+      and(
+        isNotNull(educationRecordsTable.deadline),
+        isNull(educationRecordsTable.completed_at),
+        gte(educationRecordsTable.deadline, todayIso),
+        lte(educationRecordsTable.deadline, horizonIso),
       )
-      .limit(500);
-    rows = d1Rows as EducationRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('education_records')
-      .select('id, staff_id, education_name, deadline, completed_at, status')
-      .not('deadline', 'is', null)
-      .is('completed_at', null)
-      .gte('deadline', todayIso)
-      .lte('deadline', horizonIso)
-      .limit(500);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    rows = (data ?? []) as EducationRow[];
-  }
+    )
+    .limit(500);
+  const rows = d1Rows as EducationRow[];
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(
@@ -89,7 +69,7 @@ export async function checkEducationDeadline(
   );
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'education', userIds);
+    sentKeys = await loadExistingDedupeKeys('education', userIds);
   } catch (err) {
     return { detected: rows.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -120,7 +100,7 @@ export async function checkEducationDeadline(
   if (toInsert.length === 0) {
     return { detected: rows.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: rows.length, created, errors };
 }
 
@@ -129,9 +109,6 @@ export async function checkEducationDeadline(
  * 채팅 알림은 lib/chat-push-dispatch.ts 에서 notifications insert + 푸시까지
  * 일괄 처리되므로 본 cron 에서는 no-op 로 유지.
  */
-export async function checkRecentMessages(
-  _supabase: SupabaseClient,
-): Promise<CheckJobResult> {
-  void _supabase; // 미사용 매개변수 경고 회피
+export async function checkRecentMessages(): Promise<CheckJobResult> {
   return emptyResult();
 }

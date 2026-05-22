@@ -5,7 +5,6 @@
  * dedupe key: `inventory:low:{item_id}:{stock}`
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -17,7 +16,6 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   inventory as inventoryTable,
   staff_members as staffMembersTable,
   eq,
@@ -56,32 +54,20 @@ function parsePermissions(
   }
 }
 
-async function loadInventoryRecipients(supabase: SupabaseClient): Promise<string[]> {
-  const backend = await resolveDataBackend();
-
-  let rows: StaffPermissionRow[];
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[check-inventory] D1 binding not available (loadInventoryRecipients)');
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: staffMembersTable.id,
-        department: staffMembersTable.department,
-        permissions: staffMembersTable.permissions,
-      })
-      .from(staffMembersTable)
-      .where(eq(staffMembersTable.status, '재직'));
-    // D1에서 permissions는 TEXT(JSON) → parsePermissions가 문자열도 처리하므로 그대로 전달 가능
-    rows = d1Rows as StaffPermissionRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('staff_members')
-      .select('id, department, permissions')
-      .eq('status', '재직');
-    if (error) throw error;
-    rows = (data ?? []) as StaffPermissionRow[];
-  }
+async function loadInventoryRecipients(): Promise<string[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[check-inventory] D1 binding not available (loadInventoryRecipients)');
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: staffMembersTable.id,
+      department: staffMembersTable.department,
+      permissions: staffMembersTable.permissions,
+    })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.status, '재직'));
+  // D1에서 permissions는 TEXT(JSON) → parsePermissions가 문자열도 처리하므로 그대로 전달 가능
+  const rows = d1Rows as StaffPermissionRow[];
 
   const result = new Set<string>();
   for (const row of rows) {
@@ -100,36 +86,22 @@ async function loadInventoryRecipients(supabase: SupabaseClient): Promise<string
   return Array.from(result);
 }
 
-export async function checkInventoryLowStock(
-  supabase: SupabaseClient,
-): Promise<CheckJobResult> {
-  let items: InventoryRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-inventory] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: inventoryTable.id,
-        item_name: inventoryTable.item_name,
-        quantity: inventoryTable.quantity,
-        stock: inventoryTable.stock,
-        min_stock: inventoryTable.min_stock,
-        min_quantity: inventoryTable.min_quantity,
-      })
-      .from(inventoryTable)
-      .limit(1000);
-    items = d1Rows as InventoryRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('id, item_name, quantity, stock, min_stock, min_quantity')
-      .limit(1000);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    items = (data ?? []) as InventoryRow[];
-  }
+export async function checkInventoryLowStock(): Promise<CheckJobResult> {
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-inventory] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: inventoryTable.id,
+      item_name: inventoryTable.item_name,
+      quantity: inventoryTable.quantity,
+      stock: inventoryTable.stock,
+      min_stock: inventoryTable.min_stock,
+      min_quantity: inventoryTable.min_quantity,
+    })
+    .from(inventoryTable)
+    .limit(1000);
+  const items = d1Rows as InventoryRow[];
   const lowStockItems = items.filter((item) => {
     const minStock = Number(item.min_stock ?? item.min_quantity ?? 0);
     if (minStock <= 0) return false;
@@ -140,7 +112,7 @@ export async function checkInventoryLowStock(
 
   let recipients: string[];
   try {
-    recipients = await loadInventoryRecipients(supabase);
+    recipients = await loadInventoryRecipients();
   } catch (err) {
     return { detected: lowStockItems.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -150,7 +122,7 @@ export async function checkInventoryLowStock(
 
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'inventory', recipients);
+    sentKeys = await loadExistingDedupeKeys('inventory', recipients);
   } catch (err) {
     return { detected: lowStockItems.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -183,6 +155,6 @@ export async function checkInventoryLowStock(
   if (toInsert.length === 0) {
     return { detected: lowStockItems.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: lowStockItems.length, created, errors };
 }

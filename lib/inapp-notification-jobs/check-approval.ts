@@ -5,7 +5,6 @@
  * dedupe key: `approval:{approval_id}:{approver_id}`
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -17,7 +16,6 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   approvals as approvalsTable,
   eq,
   and,
@@ -33,42 +31,28 @@ type ApprovalRow = {
   type: string | null;
 };
 
-export async function checkApprovalQueue(supabase: SupabaseClient): Promise<CheckJobResult> {
-  let rows: ApprovalRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-approval] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: approvalsTable.id,
-        current_approver_id: approvalsTable.current_approver_id,
-        title: approvalsTable.title,
-        sender_name: approvalsTable.sender_name,
-        doc_type: approvalsTable.doc_type,
-        type: approvalsTable.type,
-      })
-      .from(approvalsTable)
-      .where(
-        and(
-          eq(approvalsTable.status, '대기'),
-          isNotNull(approvalsTable.current_approver_id),
-        )
+export async function checkApprovalQueue(): Promise<CheckJobResult> {
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-approval] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: approvalsTable.id,
+      current_approver_id: approvalsTable.current_approver_id,
+      title: approvalsTable.title,
+      sender_name: approvalsTable.sender_name,
+      doc_type: approvalsTable.doc_type,
+      type: approvalsTable.type,
+    })
+    .from(approvalsTable)
+    .where(
+      and(
+        eq(approvalsTable.status, '대기'),
+        isNotNull(approvalsTable.current_approver_id),
       )
-      .limit(500);
-    rows = d1Rows as ApprovalRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('approvals')
-      .select('id, current_approver_id, title, sender_name, doc_type, type')
-      .eq('status', '대기')
-      .not('current_approver_id', 'is', null)
-      .limit(500);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    rows = (data ?? []) as ApprovalRow[];
-  }
+    )
+    .limit(500);
+  const rows = d1Rows as ApprovalRow[];
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(
@@ -76,7 +60,7 @@ export async function checkApprovalQueue(supabase: SupabaseClient): Promise<Chec
   );
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'approval', userIds);
+    sentKeys = await loadExistingDedupeKeys('approval', userIds);
   } catch (err) {
     return { detected: rows.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -107,6 +91,6 @@ export async function checkApprovalQueue(supabase: SupabaseClient): Promise<Chec
   if (toInsert.length === 0) {
     return { detected: rows.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: rows.length, created, errors };
 }

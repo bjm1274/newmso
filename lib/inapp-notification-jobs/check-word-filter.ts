@@ -11,7 +11,6 @@
  *    별도 동기화 채널 필요 (현재 범위 밖. 후속 phase 에서 신규 테이블로 확장 가능).
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -24,7 +23,6 @@ import { DEFAULT_BANNED } from '../banned-words';
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   messages as messagesTable,
   staff_members as staffMembersTable,
   eq,
@@ -68,75 +66,48 @@ function parseBannedWordsEnv(): string[] {
   return list.length > 0 ? list : DEFAULT_BANNED;
 }
 
-async function loadMasterUserIds(supabase: SupabaseClient): Promise<string[]> {
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[check-word-filter] D1 binding not available (loadMasterUserIds)');
-    const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({ id: staffMembersTable.id })
-      .from(staffMembersTable)
-      .where(eq(staffMembersTable.is_system_master, 1));
-    return rows.map((r) => String(r.id || '')).filter(Boolean);
-  }
-
-  const { data, error } = await supabase
-    .from('staff_members')
-    .select('id')
-    .eq('is_system_master', 1);
-  if (error) throw error;
-  const rows = (data ?? []) as { id: string | null }[];
+async function loadMasterUserIds(): Promise<string[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[check-word-filter] D1 binding not available (loadMasterUserIds)');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({ id: staffMembersTable.id })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.is_system_master, 1));
   return rows.map((r) => String(r.id || '')).filter(Boolean);
 }
 
-export async function checkWordFilter(
-  supabase: SupabaseClient,
-): Promise<CheckJobResult> {
+export async function checkWordFilter(): Promise<CheckJobResult> {
   const banned = parseBannedWordsEnv();
   if (banned.length === 0) return emptyResult();
 
   const cutoff = new Date(Date.now() - MESSAGE_LOOKBACK_MIN * 60 * 1000).toISOString();
-  let rows: MessageRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-word-filter] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: messagesTable.id,
-        sender_id: messagesTable.sender_id,
-        sender_name: messagesTable.sender_name,
-        content: messagesTable.content,
-        room_id: messagesTable.room_id,
-        created_at: messagesTable.created_at,
-      })
-      .from(messagesTable)
-      .where(
-        and(
-          gte(messagesTable.created_at, cutoff),
-          isNotNull(messagesTable.content),
-        )
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-word-filter] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: messagesTable.id,
+      sender_id: messagesTable.sender_id,
+      sender_name: messagesTable.sender_name,
+      content: messagesTable.content,
+      room_id: messagesTable.room_id,
+      created_at: messagesTable.created_at,
+    })
+    .from(messagesTable)
+    .where(
+      and(
+        gte(messagesTable.created_at, cutoff),
+        isNotNull(messagesTable.content),
       )
-      .limit(500);
-    rows = d1Rows as MessageRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, sender_id, sender_name, content, room_id, created_at')
-      .gte('created_at', cutoff)
-      .not('content', 'is', null)
-      .limit(500);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    rows = (data ?? []) as MessageRow[];
-  }
+    )
+    .limit(500);
+  const rows = d1Rows as MessageRow[];
   if (rows.length === 0) return emptyResult();
 
   let masters: string[];
   try {
-    masters = await loadMasterUserIds(supabase);
+    masters = await loadMasterUserIds();
   } catch (err) {
     return { detected: rows.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -154,7 +125,7 @@ export async function checkWordFilter(
 
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'word-filter', masters);
+    sentKeys = await loadExistingDedupeKeys('word-filter', masters);
   } catch (err) {
     return { detected: hits.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -186,6 +157,6 @@ export async function checkWordFilter(
   if (toInsert.length === 0) {
     return { detected: hits.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: hits.length, created, errors };
 }

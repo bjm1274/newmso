@@ -13,7 +13,6 @@
  * 호출자: app/api/cron/inapp-notifications/route.ts
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CheckJobResult } from './inapp-notification-jobs/types';
 import { checkApprovalQueue } from './inapp-notification-jobs/check-approval';
 import { checkInventoryLowStock } from './inapp-notification-jobs/check-inventory';
@@ -63,9 +62,7 @@ async function runIsolated(
   }
 }
 
-export async function runInappNotificationJobs(
-  supabase: SupabaseClient,
-): Promise<InappNotificationJobsResult> {
+export async function runInappNotificationJobs(): Promise<InappNotificationJobsResult> {
   const [
     approval,
     inventory,
@@ -75,13 +72,13 @@ export async function runInappNotificationJobs(
     attendance,
     wordFilter,
   ] = await Promise.all([
-    runIsolated('approval', () => checkApprovalQueue(supabase)),
-    runIsolated('inventory', () => checkInventoryLowStock(supabase)),
-    runIsolated('payroll', () => checkPayrollSettled(supabase)),
-    runIsolated('education', () => checkEducationDeadline(supabase)),
-    runIsolated('messages', () => checkRecentMessages(supabase)),
-    runIsolated('attendance', () => checkAttendanceEvents(supabase)),
-    runIsolated('wordFilter', () => checkWordFilter(supabase)),
+    runIsolated('approval', () => checkApprovalQueue()),
+    runIsolated('inventory', () => checkInventoryLowStock()),
+    runIsolated('payroll', () => checkPayrollSettled()),
+    runIsolated('education', () => checkEducationDeadline()),
+    runIsolated('messages', () => checkRecentMessages()),
+    runIsolated('attendance', () => checkAttendanceEvents()),
+    runIsolated('wordFilter', () => checkWordFilter()),
   ]);
 
   return {

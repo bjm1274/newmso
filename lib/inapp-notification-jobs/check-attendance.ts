@@ -4,7 +4,6 @@
  * dedupe key: `attendance:{id}:{status_key}` (status_key: checkin/checkout/late/absent)
  */
 import 'server-only';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -16,7 +15,6 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
   attendance as attendanceTable,
   gte,
 } from '@/lib/db';
@@ -69,39 +67,24 @@ function resolveAttendanceEvent(row: AttendanceRow): {
   return null;
 }
 
-export async function checkAttendanceEvents(
-  supabase: SupabaseClient,
-): Promise<CheckJobResult> {
+export async function checkAttendanceEvents(): Promise<CheckJobResult> {
   const cutoff = new Date(Date.now() - ATTENDANCE_LOOKBACK_MIN * 60 * 1000).toISOString();
-  let rows: AttendanceRow[];
-
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return { detected: 0, created: 0, errors: ['[check-attendance] D1 binding not available'] };
-    const db = getD1Drizzle(d1);
-    const d1Rows = await db
-      .select({
-        id: attendanceTable.id,
-        staff_id: attendanceTable.staff_id,
-        date: attendanceTable.date,
-        check_in: attendanceTable.check_in,
-        check_out: attendanceTable.check_out,
-        status: attendanceTable.status,
-      })
-      .from(attendanceTable)
-      .where(gte(attendanceTable.created_at, cutoff))
-      .limit(500);
-    rows = d1Rows as AttendanceRow[];
-  } else {
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('id, staff_id, date, check_in, check_out, status')
-      .gte('created_at', cutoff)
-      .limit(500);
-    if (error) return { detected: 0, created: 0, errors: [error.message] };
-    rows = (data ?? []) as AttendanceRow[];
-  }
+  const d1 = await getD1Binding();
+  if (!d1) return { detected: 0, created: 0, errors: ['[check-attendance] D1 binding not available'] };
+  const db = getD1Drizzle(d1);
+  const d1Rows = await db
+    .select({
+      id: attendanceTable.id,
+      staff_id: attendanceTable.staff_id,
+      date: attendanceTable.date,
+      check_in: attendanceTable.check_in,
+      check_out: attendanceTable.check_out,
+      status: attendanceTable.status,
+    })
+    .from(attendanceTable)
+    .where(gte(attendanceTable.created_at, cutoff))
+    .limit(500);
+  const rows = d1Rows as AttendanceRow[];
   if (rows.length === 0) return emptyResult();
 
   const userIds = Array.from(
@@ -109,7 +92,7 @@ export async function checkAttendanceEvents(
   );
   let sentKeys: Set<string>;
   try {
-    sentKeys = await loadExistingDedupeKeys(supabase, 'attendance', userIds);
+    sentKeys = await loadExistingDedupeKeys('attendance', userIds);
   } catch (err) {
     return { detected: rows.length, created: 0, errors: [errorMessage(err)] };
   }
@@ -140,6 +123,6 @@ export async function checkAttendanceEvents(
   if (toInsert.length === 0) {
     return { detected: rows.length, created: 0, errors: [] };
   }
-  const { created, errors } = await insertNotificationsChunked(supabase, toInsert);
+  const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: rows.length, created, errors };
 }
