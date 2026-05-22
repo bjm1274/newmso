@@ -1,7 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
 import { normalizeProfileUser } from './profile-photo';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
@@ -65,17 +63,6 @@ function getSessionSecret() {
     return 'dev-only-session-secret-change-this';
   }
   throw new Error('SESSION_SECRET 환경변수가 설정되지 않았습니다.');
-}
-
-function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -197,8 +184,6 @@ export function normalizeSessionUser(input: any): SessionUser {
   };
 }
 
-const STAFF_SESSION_COLUMNS = 'id, employee_no, name, role, department, company, company_id, position, photo_url, avatar_url, profile_photo_path, profile_photo_updated_at, email, phone, auth_user_id, is_system_master, permissions';
-
 type StaffSessionRow = {
   id: string;
   employee_no: string;
@@ -249,89 +234,57 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
 
   if (!sessionUserId && !sessionEmployeeNo && !sessionName) return normalizedUser;
 
-  const backend = await resolveDataBackend();
-  if (backend === 'd1') {
-    const d1 = await getD1Binding();
-    if (!d1) return normalizedUser;
-    const db = getD1Drizzle(d1);
-
-    // 단일 OR 쿼리로 N+1 제거 — id/employee_no/name 중 하나로 매칭
-    const conditions: ReturnType<typeof eq>[] = [];
-    if (sessionUserId) conditions.push(eq(staffMembersTable.id, sessionUserId));
-    if (sessionEmployeeNo) conditions.push(eq(staffMembersTable.employee_no, sessionEmployeeNo));
-    if (sessionName) conditions.push(eq(staffMembersTable.name, sessionName));
-
-    const rows = await db
-      .select({
-        id: staffMembersTable.id,
-        employee_no: staffMembersTable.employee_no,
-        name: staffMembersTable.name,
-        role: staffMembersTable.role,
-        department: staffMembersTable.department,
-        company: staffMembersTable.company,
-        company_id: staffMembersTable.company_id,
-        position: staffMembersTable.position,
-        photo_url: staffMembersTable.photo_url,
-        avatar_url: staffMembersTable.avatar_url,
-        profile_photo_path: staffMembersTable.profile_photo_path,
-        profile_photo_updated_at: staffMembersTable.profile_photo_updated_at,
-        email: staffMembersTable.email,
-        phone: staffMembersTable.phone,
-        auth_user_id: staffMembersTable.auth_user_id,
-        is_system_master: staffMembersTable.is_system_master,
-        permissions: staffMembersTable.permissions,
-      })
-      .from(staffMembersTable)
-      .where(or(...conditions))
-      .limit(10);
-
-    if (rows.length === 0) return normalizedUser;
-
-    // 우선순위: id > employee_no > name (단일 매칭만)
-    const byId = sessionUserId
-      ? rows.find((r) => String(r.id) === sessionUserId)
-      : null;
-    if (byId) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byId as StaffSessionRow) });
-
-    const byEmpNo = sessionEmployeeNo
-      ? rows.find((r) => String(r.employee_no) === sessionEmployeeNo)
-      : null;
-    if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byEmpNo as StaffSessionRow) });
-
-    const byName = sessionName
-      ? rows.filter((r) => String(r.name) === sessionName)
-      : [];
-    if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byName[0] as StaffSessionRow) });
-
-    return normalizedUser;
-  }
-
-  // Supabase 경로 (dual-write / supabase 모드)
-  const supabase = getAdminClient();
+  const d1 = await getD1Binding();
+  if (!d1) return normalizedUser;
+  const db = getD1Drizzle(d1);
 
   // 단일 OR 쿼리로 N+1 제거 — id/employee_no/name 중 하나로 매칭
-  const orConditions: string[] = [];
-  if (sessionUserId) orConditions.push(`id.eq.${sessionUserId}`);
-  if (sessionEmployeeNo) orConditions.push(`employee_no.eq.${sessionEmployeeNo}`);
-  if (sessionName) orConditions.push(`name.eq.${sessionName}`);
+  const conditions: ReturnType<typeof eq>[] = [];
+  if (sessionUserId) conditions.push(eq(staffMembersTable.id, sessionUserId));
+  if (sessionEmployeeNo) conditions.push(eq(staffMembersTable.employee_no, sessionEmployeeNo));
+  if (sessionName) conditions.push(eq(staffMembersTable.name, sessionName));
 
-  const { data, error } = await supabase
-    .from('staff_members')
-    .select(STAFF_SESSION_COLUMNS)
-    .or(orConditions.join(','))
+  const rows = await db
+    .select({
+      id: staffMembersTable.id,
+      employee_no: staffMembersTable.employee_no,
+      name: staffMembersTable.name,
+      role: staffMembersTable.role,
+      department: staffMembersTable.department,
+      company: staffMembersTable.company,
+      company_id: staffMembersTable.company_id,
+      position: staffMembersTable.position,
+      photo_url: staffMembersTable.photo_url,
+      avatar_url: staffMembersTable.avatar_url,
+      profile_photo_path: staffMembersTable.profile_photo_path,
+      profile_photo_updated_at: staffMembersTable.profile_photo_updated_at,
+      email: staffMembersTable.email,
+      phone: staffMembersTable.phone,
+      auth_user_id: staffMembersTable.auth_user_id,
+      is_system_master: staffMembersTable.is_system_master,
+      permissions: staffMembersTable.permissions,
+    })
+    .from(staffMembersTable)
+    .where(or(...conditions))
     .limit(10);
 
-  if (error || !data || data.length === 0) return normalizedUser;
+  if (rows.length === 0) return normalizedUser;
 
   // 우선순위: id > employee_no > name (단일 매칭만)
-  const byId = sessionUserId ? data.find((r: Record<string, unknown>) => String(r.id) === sessionUserId) : null;
-  if (byId) return normalizeSessionUser({ ...normalizedUser, ...byId });
+  const byId = sessionUserId
+    ? rows.find((r) => String(r.id) === sessionUserId)
+    : null;
+  if (byId) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byId as StaffSessionRow) });
 
-  const byEmpNo = sessionEmployeeNo ? data.find((r: Record<string, unknown>) => String(r.employee_no) === sessionEmployeeNo) : null;
-  if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...byEmpNo });
+  const byEmpNo = sessionEmployeeNo
+    ? rows.find((r) => String(r.employee_no) === sessionEmployeeNo)
+    : null;
+  if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byEmpNo as StaffSessionRow) });
 
-  const byName = sessionName ? data.filter((r: Record<string, unknown>) => String(r.name) === sessionName) : [];
-  if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...byName[0] });
+  const byName = sessionName
+    ? rows.filter((r) => String(r.name) === sessionName)
+    : [];
+  if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byName[0] as StaffSessionRow) });
 
   return normalizedUser;
 }

@@ -9,10 +9,8 @@
 //   3) force_logout_at, 변경 가능성 있는 user payload 반환
 // ============================================================
 import { NextResponse } from 'next/server';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
@@ -26,13 +24,6 @@ function userId(user: SessionUser | null | undefined): string | null {
   const candidate = (user.id ?? user.user_id ?? '') as string;
   const trimmed = String(candidate).trim();
   return trimmed || null;
-}
-
-function createAdminClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase server configuration is missing.');
-  return createClient(url, key);
 }
 
 function parsePermissions(raw: unknown): Record<string, unknown> {
@@ -60,52 +51,37 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const backend = await resolveDataBackend();
-    if (backend === 'd1') {
-      const d1 = await getD1Binding();
-      if (!d1) {
-        return NextResponse.json({ ok: false, error: 'D1 binding not available' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-      const rows = await db
-        .select({
-          id: staffMembersTable.id,
-          force_logout_at: staffMembersTable.force_logout_at,
-          role: staffMembersTable.role,
-          permissions: staffMembersTable.permissions,
-          status: staffMembersTable.status,
-          name: staffMembersTable.name,
-          email: staffMembersTable.email,
-          phone: staffMembersTable.phone,
-          company: staffMembersTable.company,
-          company_id: staffMembersTable.company_id,
-          department: staffMembersTable.department,
-          position: staffMembersTable.position,
-          team: staffMembersTable.team,
-        })
-        .from(staffMembersTable)
-        .where(eq(staffMembersTable.id, id))
-        .limit(1);
-      const row = rows[0] ?? null;
-      if (!row) {
-        return NextResponse.json({ ok: false, error: 'Not found' }, { status: 404 });
-      }
-      // D1에서 permissions는 TEXT → 파싱
-      const user = { ...row, permissions: parsePermissions(row.permissions) };
-      return NextResponse.json({ ok: true, user });
+    const d1 = await getD1Binding();
+    if (!d1) {
+      return NextResponse.json({ ok: false, error: 'D1 binding not available' }, { status: 500 });
     }
-
-    // Supabase 경로 (dual-write / supabase 모드)
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from('staff_members')
-      .select('id, force_logout_at, role, permissions, status, name, email, phone, company, company_id, department, position, team')
-      .eq('id', id)
-      .maybeSingle();
-    if (error || !data) {
-      return NextResponse.json({ ok: false, error: error?.message || 'Not found' }, { status: 404 });
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({
+        id: staffMembersTable.id,
+        force_logout_at: staffMembersTable.force_logout_at,
+        role: staffMembersTable.role,
+        permissions: staffMembersTable.permissions,
+        status: staffMembersTable.status,
+        name: staffMembersTable.name,
+        email: staffMembersTable.email,
+        phone: staffMembersTable.phone,
+        company: staffMembersTable.company,
+        company_id: staffMembersTable.company_id,
+        department: staffMembersTable.department,
+        position: staffMembersTable.position,
+        team: staffMembersTable.team,
+      })
+      .from(staffMembersTable)
+      .where(eq(staffMembersTable.id, id))
+      .limit(1);
+    const row = rows[0] ?? null;
+    if (!row) {
+      return NextResponse.json({ ok: false, error: 'Not found' }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, user: data });
+    // D1에서 permissions는 TEXT → 파싱
+    const user = { ...row, permissions: parsePermissions(row.permissions) };
+    return NextResponse.json({ ok: true, user });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

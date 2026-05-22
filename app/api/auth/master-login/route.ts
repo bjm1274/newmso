@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isActiveStaff } from '@/lib/active-staff';
 import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/rate-limit';
-import { createClient } from '@supabase/supabase-js';
-import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
+import { getAdminCredentialConfig, verifyPrivilegedLogin } from '@/lib/admin-credentials';
 import {
   pickStoredPassword,
   updateStaffPasswordWithFallback,
   verifyStoredPassword,
   type StaffCredentialRow,
 } from '@/lib/staff-password';
-import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   clearSessionCookie,
   createSessionToken,
@@ -18,23 +16,11 @@ import {
   SESSION_COOKIE_NAME,
 } from '@/lib/server-session';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
   eq,
 } from '@/lib/db';
-
-function getAdminClient() {
-  const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
-  const serviceKey = getRuntimeEnv('SUPABASE_SERVICE_ROLE_KEY');
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase URL 또는 Service Role Key가 설정되지 않았습니다.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
 
 async function successResponse(user: any, notice?: string) {
   const safeUser = normalizeSessionUser(user);
@@ -60,62 +46,6 @@ function failureResponse(error?: string, status = 200) {
 }
 
 const isActiveStaffForLogin = (row: any) => isActiveStaff(row);
-const STAFF_LOGIN_COLUMNS = [
-  'id',
-  'employee_no',
-  'name',
-  'role',
-  'department',
-  'company',
-  'company_id',
-  'position',
-  'status',
-  'permissions',
-  'photo_url',
-  'avatar_url',
-  'profile_photo_path',
-  'profile_photo_updated_at',
-  'email',
-  'phone',
-  'auth_user_id',
-  'is_system_master',
-  'password',
-  'passwd',
-  'password_reset_required',
-] as const;
-const STAFF_LOGIN_OPTIONAL_COLUMNS = [
-  'role',
-  'department',
-  'company',
-  'company_id',
-  'position',
-  'status',
-  'permissions',
-  'photo_url',
-  'avatar_url',
-  'profile_photo_path',
-  'profile_photo_updated_at',
-  'email',
-  'phone',
-  'auth_user_id',
-  'is_system_master',
-  'password',
-  'passwd',
-  'password_reset_required',
-];
-
-function buildStaffLoginSelect(omittedColumns: ReadonlySet<string>) {
-  return STAFF_LOGIN_COLUMNS.filter((column) => !omittedColumns.has(column)).join(', ');
-}
-
-async function runStaffLoginSelect<T>(
-  runSelect: (selectClause: string) => PromiseLike<{ data: T | null; error: any }>
-) {
-  return withMissingColumnsFallback<T>(
-    (omittedColumns) => runSelect(buildStaffLoginSelect(omittedColumns)),
-    STAFF_LOGIN_OPTIONAL_COLUMNS
-  );
-}
 
 // ----------------------------------------------------------------
 // D1 전용 staff_members 로그인 행 조회 헬퍼
@@ -306,75 +236,28 @@ export async function POST(request: NextRequest) {
       return privilegedResponse;
     }
 
-    const backend = await resolveDataBackend();
-    const supabase = getAdminClient();
     let userRow: any = null;
 
-    if (backend === 'd1') {
-      // d1 모드: Drizzle로 직접 조회
-      try {
-        const byEmployeeNo = await fetchStaffLoginRowByEmployeeNoD1(loginId);
-        if (byEmployeeNo) {
-          userRow = byEmployeeNo;
-        } else {
-          const byNameRows = await fetchStaffLoginRowsByNameD1(loginId);
-          const activeNameMatches = byNameRows.filter(isActiveStaffForLogin);
-          if (activeNameMatches.length > 1) {
-            return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
-          }
-          if (activeNameMatches.length === 1) {
-            userRow = activeNameMatches[0];
-          } else if (byNameRows.length === 1) {
-            userRow = byNameRows[0];
-          }
-        }
-      } catch (d1Err) {
-        console.error('[master-login] D1 staff_members 조회 실패:', d1Err instanceof Error ? d1Err.message : String(d1Err));
-        return authDataUnavailableResponse(d1Err);
-      }
-    } else {
-      // Supabase 경로 (dual-write / supabase 모드)
-      const { data: byEmployeeNo, error: byEmployeeNoError } = await runStaffLoginSelect((selectClause) =>
-        supabase
-          .from('staff_members')
-          .select(selectClause)
-          .eq('employee_no', loginId)
-          .maybeSingle()
-      );
-
-      if (byEmployeeNoError) {
-        console.error('[master-login] staff_members employee_no 조회 실패:', JSON.stringify(byEmployeeNoError));
-        return authDataUnavailableResponse(byEmployeeNoError);
-      }
-
+    // D1: Drizzle로 직접 조회
+    try {
+      const byEmployeeNo = await fetchStaffLoginRowByEmployeeNoD1(loginId);
       if (byEmployeeNo) {
         userRow = byEmployeeNo;
       } else {
-        const { data: byName, error: byNameError } = await runStaffLoginSelect<any[]>((selectClause) =>
-          supabase
-            .from('staff_members')
-            .select(selectClause)
-            .eq('name', loginId)
-            .limit(10)
-        );
-
-        if (byNameError) {
-          console.error('[master-login] staff_members name 조회 실패:', JSON.stringify(byNameError));
-          return authDataUnavailableResponse(byNameError);
-        }
-
-        const activeNameMatches = (byNameError ? [] : (byName ?? [])).filter(isActiveStaffForLogin);
-
+        const byNameRows = await fetchStaffLoginRowsByNameD1(loginId);
+        const activeNameMatches = byNameRows.filter(isActiveStaffForLogin);
         if (activeNameMatches.length > 1) {
           return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
         }
-
         if (activeNameMatches.length === 1) {
           userRow = activeNameMatches[0];
-        } else if (byName?.length === 1) {
-          userRow = byName[0];
+        } else if (byNameRows.length === 1) {
+          userRow = byNameRows[0];
         }
       }
+    } catch (d1Err) {
+      console.error('[master-login] D1 staff_members 조회 실패:', d1Err instanceof Error ? d1Err.message : String(d1Err));
+      return authDataUnavailableResponse(d1Err);
     }
 
     if (!userRow) {
@@ -385,33 +268,11 @@ export async function POST(request: NextRequest) {
         let msoRow: any = null;
 
         if (adminName) {
-          if (backend === 'd1') {
-            msoRow = await fetchStaffLoginRowByNameSingleD1(adminName).catch(() => null);
-          } else {
-            const { data } = await runStaffLoginSelect((selectClause) =>
-              supabase
-                .from('staff_members')
-                .select(selectClause)
-                .eq('name', adminName)
-                .maybeSingle()
-            );
-            msoRow = data ?? null;
-          }
+          msoRow = await fetchStaffLoginRowByNameSingleD1(adminName).catch(() => null);
         }
 
         if (!msoRow && /^\d+$/.test(loginId)) {
-          if (backend === 'd1') {
-            msoRow = await fetchStaffLoginRowByEmployeeNoD1(loginId).catch(() => null);
-          } else {
-            const { data } = await runStaffLoginSelect((selectClause) =>
-              supabase
-                .from('staff_members')
-                .select(selectClause)
-                .eq('employee_no', loginId)
-                .maybeSingle()
-            );
-            msoRow = data ?? null;
-          }
+          msoRow = await fetchStaffLoginRowByEmployeeNoD1(loginId).catch(() => null);
         }
 
         const user = msoRow
@@ -492,8 +353,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 관리자가 초기화한 계정 — 입력 비밀번호를 새 비밀번호로 설정
-      // updateStaffPasswordWithFallback은 내부에서 resolveDataBackend() 분기 처리
-      const { error: setPasswordError } = await updateStaffPasswordWithFallback(supabase, userRow.id, password);
+      const { error: setPasswordError } = await updateStaffPasswordWithFallback(userRow.id, password);
       if (setPasswordError) {
         const message = setPasswordError instanceof Error
           ? setPasswordError.message
@@ -501,33 +361,19 @@ export async function POST(request: NextRequest) {
         return failureResponse(message);
       }
 
-      // 플래그 해제 — d1 모드는 Drizzle, 그 외 Supabase (컬럼 없으면 graceful skip)
-      if (backend === 'd1') {
-        try {
-          const d1 = await getD1Binding();
-          if (d1) {
-            const db = getD1Drizzle(d1);
-            await db
-              .update(staffMembersTable)
-              .set({ password_reset_required: 0 })
-              .where(eq(staffMembersTable.id, userRow.id));
-          }
-        } catch (flagErr) {
-          console.error('[master-login] D1 password_reset_required 플래그 해제 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
-          // 플래그 해제 실패는 로그인 성공을 막지 않음
+      // 플래그 해제 — D1 (boolean 바인딩 불가 → 정수 0)
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          await db
+            .update(staffMembersTable)
+            .set({ password_reset_required: 0 })
+            .where(eq(staffMembersTable.id, userRow.id));
         }
-      } else {
-        const flagClearResult = await supabase
-          .from('staff_members')
-          .update({ password_reset_required: false })
-          .eq('id', userRow.id);
-
-        if (flagClearResult.error) {
-          if (!isMissingColumnError(flagClearResult.error, 'password_reset_required')) {
-            console.error('[master-login] password_reset_required 플래그 해제 실패:', flagClearResult.error);
-            // 플래그 해제 실패는 로그인 성공 자체를 막지 않음
-          }
-        }
+      } catch (flagErr) {
+        console.error('[master-login] D1 password_reset_required 플래그 해제 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
+        // 플래그 해제 실패는 로그인 성공을 막지 않음
       }
 
       await resetAttempts(loginId);
@@ -593,7 +439,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (verified.needsHashUpgrade) {
-        await updateStaffPasswordWithFallback(supabase, userRow.id, password);
+        await updateStaffPasswordWithFallback(userRow.id, password);
       }
     }
 

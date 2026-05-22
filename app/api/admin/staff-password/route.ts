@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { clearStaffPasswordWithFallback, updateStaffPasswordWithFallback } from '@/lib/staff-password';
-import { isMissingColumnError } from '@/lib/supabase-compat';
 import {
-  resolveDataBackend,
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
@@ -44,17 +41,6 @@ async function insertAuditLogToD1(row: {
   }
 }
 
-function createAdminSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error('Supabase server configuration is missing.');
-  }
-
-  return createClient(supabaseUrl, serviceKey);
-}
-
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -75,52 +61,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Password is required' }, { status: 400 });
     }
 
-    const backend = await resolveDataBackend();
-    const supabase = createAdminSupabase();
     const adminUserId = String(session.user?.id ?? session.user?.user_id ?? 'unknown');
     const adminUserName = String(session.user?.name ?? session.user?.username ?? '');
 
     if (clearPassword) {
-      // clearStaffPasswordWithFallback은 내부에서 resolveDataBackend() 분기 처리
-      const { error, clearedColumns } = await clearStaffPasswordWithFallback(supabase, staffId);
+      const { error, clearedColumns } = await clearStaffPasswordWithFallback(staffId);
 
       if (error) {
-        const message = error instanceof Error ? error.message : String(error?.message || 'Password clear failed');
+        const message = error instanceof Error ? error.message : String(error || 'Password clear failed');
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
       }
 
-      // 비밀번호 초기화 플래그 설정 — d1 모드는 Drizzle, 그 외 Supabase
-      if (backend === 'd1') {
-        try {
-          const d1 = await getD1Binding();
-          if (d1) {
-            const db = getD1Drizzle(d1);
-            await db
-              .update(staffMembersTable)
-              .set({ password_reset_required: 1 })
-              .where(eq(staffMembersTable.id, staffId));
-          }
-        } catch (flagErr) {
-          console.error('[staff-password] D1 password_reset_required 플래그 설정 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
-          // 플래그 설정 실패가 본 흐름을 막지 않음
+      // 비밀번호 초기화 플래그 설정 — D1 (boolean 바인딩 불가 → 정수 1)
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          await db
+            .update(staffMembersTable)
+            .set({ password_reset_required: 1 })
+            .where(eq(staffMembersTable.id, staffId));
         }
-      } else {
-        const flagUpdate = await supabase
-          .from('staff_members')
-          .update({ password_reset_required: true })
-          .eq('id', staffId);
-
-        if (flagUpdate.error) {
-          const flagErr: unknown = flagUpdate.error;
-          if (!isMissingColumnError(flagErr, 'password_reset_required')) {
-            const message = flagErr instanceof Error
-              ? flagErr.message
-              : String((flagErr as { message?: string })?.message || 'Flag update failed');
-            return NextResponse.json({ ok: false, error: message }, { status: 500 });
-          }
-          // 컬럼 없음 — 플래그 update 건너뜀, 비번 클리어 결과는 유지
-          console.warn('[staff-password] password_reset_required 컬럼 없음 — 플래그 update 건너뜀 (마이그레이션 필요)');
-        }
+      } catch (flagErr) {
+        console.error('[staff-password] D1 password_reset_required 플래그 설정 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
+        // 플래그 설정 실패가 본 흐름을 막지 않음
       }
 
       // 감사 로그 기록 — D1 직접 INSERT
@@ -137,10 +101,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, cleared: true, clearedColumns });
     }
 
-    const { error, updatedColumn } = await updateStaffPasswordWithFallback(supabase, staffId, password);
+    const { error, updatedColumn } = await updateStaffPasswordWithFallback(staffId, password);
 
     if (error) {
-      const message = error instanceof Error ? error.message : String(error?.message || 'Password update failed');
+      const message = error instanceof Error ? error.message : String(error || 'Password update failed');
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 
