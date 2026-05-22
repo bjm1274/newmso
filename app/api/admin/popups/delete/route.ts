@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { deleteFromR2, isInternalStorageObjectUrl } from '@/lib/object-storage';
+import {
+  resolveDataBackend,
+  getD1Binding,
+  getD1Drizzle,
+  popups as popupsTable,
+  eq,
+} from '@/lib/db';
 
 const R2_BUCKET = 'pchos-files';
 
@@ -78,29 +85,54 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: '삭제할 팝업 정보가 올바르지 않습니다.' }, { status: 400 });
     }
 
-    const supabase = getAdminClient();
-    const { data: popup, error: selectError } = await supabase
-      .from('popups')
-      .select('id, title, media_url')
-      .eq('id', popupId)
-      .maybeSingle();
+    const backend = await resolveDataBackend();
 
-    if (selectError) {
-      return NextResponse.json({ error: selectError.message }, { status: 500 });
-    }
-    if (!popup) {
-      return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
-    }
+    let typedPopup: PopupRow;
 
-    const typedPopup = popup as PopupRow;
+    if (backend === 'd1') {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        return NextResponse.json({ error: '[popups/delete] D1 binding not available' }, { status: 500 });
+      }
+      const db = getD1Drizzle(d1);
 
-    const { error: deleteError } = await supabase
-      .from('popups')
-      .delete()
-      .eq('id', popupId);
+      const rows = await db
+        .select({ id: popupsTable.id, title: popupsTable.title, media_url: popupsTable.media_url })
+        .from(popupsTable)
+        .where(eq(popupsTable.id, popupId))
+        .limit(1);
 
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      if (rows.length === 0) {
+        return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
+      }
+      typedPopup = { id: rows[0].id, title: rows[0].title ?? null, media_url: rows[0].media_url ?? null };
+
+      await db.delete(popupsTable).where(eq(popupsTable.id, popupId));
+    } else {
+      const supabase = getAdminClient();
+      const { data: popup, error: selectError } = await supabase
+        .from('popups')
+        .select('id, title, media_url')
+        .eq('id', popupId)
+        .maybeSingle();
+
+      if (selectError) {
+        return NextResponse.json({ error: selectError.message }, { status: 500 });
+      }
+      if (!popup) {
+        return NextResponse.json({ error: '삭제할 팝업을 찾을 수 없습니다.' }, { status: 404 });
+      }
+
+      typedPopup = popup as PopupRow;
+
+      const { error: deleteError } = await supabase
+        .from('popups')
+        .delete()
+        .eq('id', popupId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      }
     }
 
     const objectKey = extractR2ObjectKey(typedPopup.media_url);

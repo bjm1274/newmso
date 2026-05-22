@@ -32,9 +32,9 @@ const realSupabase: SupabaseClient = createClient(url, key, {
 });
 
 // Phase 7 — Cloudflare D1 cutover.
-// ENABLE_D1_CLIENT=true 면 클라이언트(브라우저)의 `supabase.from()` 호출만
-// d1Client로 라우팅(/api/d1/query·/api/d1/mutate). 나머지 supabase 내장 API
-// (.realtime, .auth, .storage, .channel, .rpc 등)는 realSupabase로 그대로 흘러감.
+// ENABLE_D1_CLIENT=true 면 클라이언트(브라우저)의 `supabase.from()`·`supabase.rpc()`
+// 호출을 d1Client로 라우팅(/api/d1/query·/api/d1/mutate·/api/d1/rpc/*). 나머지
+// supabase 내장 API(.realtime, .auth, .storage, .channel 등)는 realSupabase로 흘러감.
 //
 // Phase 8-J — 이전 cutover 시도(전체 d1Client cast)는 login page의
 // `supabase.realtime.setAuth()` 호출이 undefined.setAuth → runtime error로
@@ -47,12 +47,18 @@ const ENABLE_D1_CLIENT = true;
 const isClientD1 = typeof window !== 'undefined' && ENABLE_D1_CLIENT;
 
 function createHybridSupabase(): SupabaseClient {
-  // .from()만 d1Client로 가로채고, 나머지 prop은 realSupabase 그대로 사용.
+  // .from()·.rpc()만 d1Client로 가로채고, 나머지 prop은 realSupabase 그대로 사용.
   return new Proxy(realSupabase, {
     get(target, prop, receiver) {
       if (prop === 'from') {
         // 클라이언트가 supabase.from(table)을 호출하면 d1Client.from()이 처리
         return d1Client.from.bind(d1Client);
+      }
+      if (prop === 'rpc') {
+        // .rpc()를 가로채지 않으면 realSupabase(폐기된 Supabase)로 새어나가
+        // D1에 반영되지 않는다. d1Client.rpc는 RPC_ROUTES에 매핑된 함수를
+        // /api/d1/rpc/* 라우트로 디스패치한다.
+        return d1Client.rpc.bind(d1Client);
       }
       return Reflect.get(target, prop, receiver);
     },
