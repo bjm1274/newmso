@@ -118,7 +118,6 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [tab, setTab] = useState<'월별' | '연간'>('월별');
-  const [applying, setApplying] = useState(false);
   const [customHolidays, setCustomHolidays] = useState<CompanyHoliday[]>([]);
   const [loadingCustomHolidays, setLoadingCustomHolidays] = useState(false);
   const [savingCustomHoliday, setSavingCustomHoliday] = useState(false);
@@ -291,31 +290,6 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
     }
   };
 
-  const handleApplyAttendance = async () => {
-    const confirmed = await openConfirm({
-      title: '공휴일 근태 반영',
-      description: `${year}년 ${month + 1}월 공휴일 ${monthHolidays.length}건을 근태 기록에 반영합니다.`,
-      confirmText: '반영',
-      tone: 'accent',
-    });
-    if (!confirmed) return;
-    setApplying(true);
-    try {
-      const inserts = monthHolidays.map((holiday) => ({
-        work_date: holiday.date,
-        type: '공휴일',
-        note: holiday.name,
-        company: selectedCo === '전체' ? undefined : selectedCo,
-      }));
-      await supabase.from('attendance_records').upsert(inserts, { onConflict: 'work_date' });
-      toast('공휴일이 근태 기록에 반영되었습니다.');
-    } catch {
-      toast('반영에 실패했습니다.', 'error');
-    } finally {
-      setApplying(false);
-    }
-  };
-
   const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
 
@@ -394,13 +368,6 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
                   </div>
                 ))}
               </div>
-              <button
-                onClick={handleApplyAttendance}
-                disabled={applying || monthHolidays.length === 0}
-                className="w-full py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
-              >
-                {applying ? '반영 중...' : '근태 반영'}
-              </button>
             </div>
           </div>
 

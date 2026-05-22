@@ -46,6 +46,18 @@ export function getProfilePhotoPath(source: any): string | null {
   );
 }
 
+// 업로드 라우트는 R2 objectKey(`profiles/{id}/avatar`)를 그대로 path로 저장하지만,
+// 레거시 경로는 버킷 상대 경로(`{id}/avatar`)다. 아래에서 항상 버킷명을 다시 붙이므로
+// 선행 버킷 prefix가 있으면 제거해 URL이 중복(`/profiles/profiles/...`)되지 않게 한다.
+function toBucketRelativePath(path: string): string {
+  const prefix = `${PROFILE_PHOTO_BUCKET}/`;
+  let result = path;
+  while (result.startsWith(prefix)) {
+    result = result.slice(prefix.length);
+  }
+  return result;
+}
+
 export function buildProfilePhotoUrlFromPath(
   path: string | null | undefined,
   updatedAt?: string | null
@@ -53,7 +65,9 @@ export function buildProfilePhotoUrlFromPath(
   const r2Base = getR2PublicBase();
   const cleanedPath = cleanString(path);
   if (!r2Base || !cleanedPath) return null;
-  const encodedPath = cleanedPath.split('/').map(encodeURIComponent).join('/');
+  const relativePath = toBucketRelativePath(cleanedPath);
+  if (!relativePath) return null;
+  const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
   const basePhotoUrl = `${r2Base}/${PROFILE_PHOTO_BUCKET}/${encodedPath}`;
   const version = cleanString(updatedAt);
   return version ? `${basePhotoUrl}?v=${encodeURIComponent(version)}` : basePhotoUrl;
