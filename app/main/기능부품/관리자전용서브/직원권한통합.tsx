@@ -1118,12 +1118,27 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
                       if (!confirmed) {
                         return;
                       }
-                      const { error } = await supabase
-                        .from('staff_members')
-                        .update({ force_logout_at: new Date().toISOString() })
-                        .eq('id', selectedStaff.id);
-                      if (!error) toast('강제 로그아웃 명령이 전송되었습니다.', 'success');
-                      else toast('처리 중 오류가 발생했습니다.', 'error');
+                      // 신규 서버 라우트 — force_logout_at 갱신 + 인앱 알림 + 푸시(FCM/WebPush) 일괄.
+                      // 단순 supabase update 만으로는 인앱 알림/푸시가 없어 사용자가 인지하지 못한다.
+                      try {
+                        const response = await fetch('/api/admin/force-logout', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'same-origin',
+                          body: JSON.stringify({ staffId: selectedStaff.id }),
+                        });
+                        const body = (await response.json().catch(() => null)) as
+                          | { ok?: boolean; error?: string }
+                          | null;
+                        if (response.ok && body?.ok) {
+                          toast('강제 로그아웃 명령이 전송되었습니다.', 'success');
+                        } else {
+                          toast(body?.error || '처리 중 오류가 발생했습니다.', 'error');
+                        }
+                      } catch (err) {
+                        console.error('[force-logout] request failed:', err);
+                        toast('처리 중 오류가 발생했습니다.', 'error');
+                      }
                     }}
                     className="w-full py-2 bg-danger text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-[var(--danger-hover)] transition-colors shadow-sm"
                   >

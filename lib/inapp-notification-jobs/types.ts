@@ -101,6 +101,11 @@ export async function insertNotificationsChunked(
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[inapp-notification-jobs/types] D1 binding not available (insertNotificationsChunked)');
   const db = getD1Drizzle(d1);
+
+  // 성공적으로 INSERT된 row만 모아 chunk 단위로 푸시 발송.
+  // (chunk insert 실패 시 해당 chunk는 push 대상에서 제외 → 중복 발송 차단)
+  const successfullyInserted: NotificationInsertRow[] = [];
+
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
     const d1Rows = chunk.map((row) => ({
@@ -119,9 +124,38 @@ export async function insertNotificationsChunked(
     try {
       await db.insert(notificationsTable).values(d1Rows).onConflictDoNothing();
       created += chunk.length;
+      successfullyInserted.push(...chunk);
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
     }
   }
+
+  // INSERT 성공한 row에 대해서만 푸시 발송 (JM3: 푸시 실패가 insert 결과에 영향 없음).
+  // 동적 import — 순환 의존 회피 + cron 외 경로에서 push 의존성 강제 로드 방지.
+  if (successfullyInserted.length > 0) {
+    try {
+      const { dispatchPushForNotificationRows } = await import(
+        '../notification-push-dispatch'
+      );
+      const pushRows = successfullyInserted.map((row) => ({
+        user_id: row.user_id,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        metadata: row.metadata ?? null,
+      }));
+      const pushResult = await dispatchPushForNotificationRows(pushRows);
+      if (pushResult.errors.length > 0) {
+        console.warn(
+          '[insertNotificationsChunked] push dispatch had errors:',
+          pushResult.errors.slice(0, 5),
+        );
+      }
+    } catch (err) {
+      // 푸시 실패는 insert 결과에 영향 없음 — 로그만 남김
+      console.error('[insertNotificationsChunked] push dispatch failed:', err);
+    }
+  }
+
   return { created, errors };
 }

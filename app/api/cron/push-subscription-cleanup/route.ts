@@ -5,6 +5,10 @@ import {
   type ContractExpiryJobResult,
 } from '@/lib/contract-expiry-jobs';
 import {
+  runInappNotificationJobs,
+  type InappNotificationJobsResult,
+} from '@/lib/inapp-notification-jobs';
+import {
   getD1Binding,
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
@@ -262,6 +266,23 @@ export async function GET(req: Request) {
       console.error('[push-subscription-cleanup] retention cleanup failed:', err);
     }
 
+    // 인앱 알림 보강(결재 차례/재고/급여/교육/근태/금지어/메시지) cron 통합 실행.
+    // Workers Free Plan cron 5개 한도(wrangler.toml) 때문에 단독 cron 등록이 불가능 →
+    // 본 새벽 정리 cron에 piggyback 한다. KST 12:00 1회/일 실행이라 즉시성은 낮지만
+    // "영영 알림이 만들어지지 않는" 상태는 해소된다.
+    // 더 자주 발송이 필요하다면 외부 cron 서비스(GitHub Actions, cron-job.org 등)에서
+    // Bearer CRON_SECRET 로 /api/cron/inapp-notifications 를 5분 주기로 호출하면 된다.
+    // 단독 잡 실패가 cleanup·license·contract·retention 결과에 영향 없도록 try/catch 격리.
+    let inappNotifications: InappNotificationJobsResult | null = null;
+    let inappNotificationsError: string | null = null;
+    try {
+      inappNotifications = await runInappNotificationJobs();
+    } catch (err) {
+      inappNotificationsError =
+        err instanceof Error ? err.message : 'inapp-notification-jobs failed';
+      console.error('[push-subscription-cleanup] inapp-notification-jobs failed:', err);
+    }
+
     return NextResponse.json({
       ok: true,
       ...result,
@@ -271,6 +292,8 @@ export async function GET(req: Request) {
       ...(contractError ? { contractError } : {}),
       retention,
       ...(retentionError ? { retentionError } : {}),
+      inappNotifications,
+      ...(inappNotificationsError ? { inappNotificationsError } : {}),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Push subscription cleanup failed';
