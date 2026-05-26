@@ -141,7 +141,7 @@ const CHART_DATA: BarRow[] = [
   { m: '4월', rev: 368, cost: 258, prof: 110 },
   { m: '5월', rev: 182, cost: 128, prof: 54, partial: true },
 ];
-const MAX_BAR = 400;
+const MAX_BAR = Math.max(...CHART_DATA.map((b) => b.rev + b.cost + b.prof));
 
 const PnlChart = memo(function PnlChart() {
   return (
