@@ -72,6 +72,9 @@ import {
 
 export const PUSH_STATUS_CHANGED_EVENT = 'erp-push-status-changed';
 export const PUSH_DEBUG_EVENT = 'erp-push-debug';
+// JM2: notifications 테이블에 대해 NotificationSystem이 단일 polling 진실원.
+// 다른 컴포넌트(GlobalNotificationBell, 알림인박스 등)는 이 이벤트를 listen해 데이터 공유.
+export const NOTIFICATION_LIST_UPDATED_EVENT = 'erp-notification-list-updated';
 
 const pushInitInFlightMap = new Map<string, Promise<void>>();
 
@@ -1341,6 +1344,37 @@ export default function NotificationSystem({
         if (!row?.read_at) emitIncomingNotification(row);
       });
       void syncBadge();
+      // 새 알림이 들어왔을 가능성이 있으면 list 전체를 broadcast — 구독 컴포넌트 동기 갱신
+      if (rows && rows.length > 0) {
+        void broadcastNotificationList();
+      }
+    };
+
+    // JM2: 동일 데이터를 GlobalBell·인박스가 중복 폴링하지 않도록, 여기서 한 번 조회 후 broadcast.
+    // 인박스/벨이 사용하는 최대 컬럼셋(*)을 한 번에 가져온다.
+    let broadcastInFlight = false;
+    const broadcastNotificationList = async () => {
+      if (broadcastInFlight) return;
+      broadcastInFlight = true;
+      try {
+        const { data: rows } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent(NOTIFICATION_LIST_UPDATED_EVENT, {
+              detail: { notifications: rows || [] },
+            }),
+          );
+        }
+      } catch {
+        // ignore — 다음 폴링 사이클에서 다시 시도됨
+      } finally {
+        broadcastInFlight = false;
+      }
     };
 
     const runDueTodoReminderDispatch = async () => {
@@ -1516,9 +1550,10 @@ export default function NotificationSystem({
     // 일부 인앱 알림(결재 차례/재고 부족/단어 필터 등)은 사라짐 — 옵션 A
     // trade-off. 운영 영향 큰 알림은 후속 phase에서 서버 cron 추가 검토.
     let lastNotificationsSeenAt = mountedAt;
-    // Phase 5-D — 폴링 비용 절감(2026-05-20).
-    // 알림: 3000→8000ms. 푸시(FCM)와 인앱 알림이 병행 동작하므로 8초 폴링으로 충분.
-    // 인앱 뱃지 갱신은 최대 8초 지연 가능하나 푸시는 즉시 도착.
+    // Phase 5-E — 폴링 비용 절감(2026-05-26).
+    // 알림: 8000→30000ms. 푸시(FCM/WebPush)가 모든 INSERT 직후 즉시 발송되므로
+    // 폴링은 백업 경로로만 사용. GlobalBell·인박스는 NOTIFICATION_LIST_UPDATED_EVENT를
+    // listen해 같은 데이터를 공유 — 3중 폴링 → 단일 폴링으로 통합.
     const unsubscribeNotifications = subscribeRealtime(
       `noti-db-${uid}`,
       [{ table: 'notifications' }],
@@ -1528,11 +1563,13 @@ export default function NotificationSystem({
         lastNotificationsSeenAt = new Date().toISOString();
         void fetchUnreadNotificationsSince(since);
         void syncBadge();
+        void broadcastNotificationList();
       },
-      { pollIntervalMs: 8000 },
+      { pollIntervalMs: 30_000 },
     );
-    // initial: fetch once + prime metadata
+    // initial: fetch once + prime metadata + broadcast 초기 list
     void fetchUnreadNotificationsSince(mountedAt);
+    void broadcastNotificationList();
     void processDueTodoReminders();
     void queuePayrollAnomalyAlert();
 
@@ -1584,12 +1621,32 @@ export default function NotificationSystem({
       void processDueTodoReminders();
     }, { intervalMs: 60_000 });
 
+    // 즉시성 보강: SW push 도착 또는 외부 트리거 시 즉시 list 재조회.
+    // 짧은 cooldown(2초)으로 burst를 흡수해 동일 push가 여러 번 와도 1회만 fetch.
+    let lastForcedRefreshAt = 0;
+    const handleForcedRefresh = () => {
+      const now = Date.now();
+      if (now - lastForcedRefreshAt < 2000) return;
+      lastForcedRefreshAt = now;
+      const since = lastNotificationsSeenAt;
+      lastNotificationsSeenAt = new Date().toISOString();
+      void fetchUnreadNotificationsSince(since);
+      void syncBadge();
+      void broadcastNotificationList();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('erp-notification-refresh-request', handleForcedRefresh);
+    }
+
     return () => {
       notificationRealtimeReady = false;
       window.clearTimeout(quickCatchupTimer);
       unbindFallbackPoll();
       unbindTodoReminderPoll();
       unsubscribeNotifications();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('erp-notification-refresh-request', handleForcedRefresh);
+      }
     };
   }, [user?.department, user?.name, user?.permissions, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);
 
@@ -1639,6 +1696,11 @@ export default function NotificationSystem({
 
       if (message.type === 'erp-push-preview' && message.payload) {
         emitIncomingNotification(buildNotificationRowFromPushPreview(message.payload));
+        // 푸시 도착 → notifications 테이블에 INSERT가 이미 끝났을 가능성 높음.
+        // 30초 폴링을 기다리지 말고 즉시 list 재조회/broadcast (JM2: 즉시성 보강).
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
+        }
         return;
       }
 
@@ -1700,7 +1762,7 @@ export default function NotificationSystem({
     };
   }, [effectiveUserId]);
 
-  // 백그라운드 복귀 시 놓친 알림 재조회
+  // 백그라운드 복귀 시 놓친 알림 재조회 + 다른 컴포넌트(GlobalBell·인박스) refresh 트리거
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === 'hidden') { lastHiddenRef.current = Date.now(); return; }
@@ -1712,6 +1774,10 @@ export default function NotificationSystem({
             emitIncomingNotification(row);
           });
           void syncBadge();
+          // 다른 알림 컴포넌트도 즉시 갱신되도록 broadcast 트리거
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
+          }
         });
     };
     document.addEventListener('visibilitychange', onVis);

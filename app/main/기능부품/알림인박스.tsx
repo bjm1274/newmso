@@ -1,9 +1,8 @@
 ﻿'use client';
 
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   resolveNotificationTarget,
   toNotificationMetadataRecord,
@@ -14,6 +13,7 @@ import {
   initNotificationService,
   loadNotifSettings,
   NOTIFICATION_DELIVERY_EVENT,
+  NOTIFICATION_LIST_UPDATED_EVENT,
   NotifSettings,
   PUSH_DEBUG_EVENT,
   PUSH_STATUS_CHANGED_EVENT,
@@ -758,25 +758,72 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const lastFetchedAtRef = useRef<number>(0);
   const fetchNotifications = useCallback(async () => {
     if (!_u?.id) { setLoading(false); return; }
     try {
       const { data } = await supabase.from('notifications').select('*').eq('user_id', _u.id as string).order('created_at', { ascending: false }).limit(200);
+      lastFetchedAtRef.current = Date.now();
       setNotifications(data || []);
     } catch { setNotifications([]); } finally { setLoading(false); }
   }, [_u?.id]);
 
+  // JM2: NotificationSystem이 단일 polling 진실원. 인박스는 mount 시 1회 fetch한 뒤
+  // NOTIFICATION_LIST_UPDATED_EVENT로 갱신만 받아 중복 폴링 제거.
   useEffect(() => {
     setLoading(true);
     fetchNotifications();
     if (!_u?.id) return;
-    const userId = _u.id as string;
-    const unsub = subscribeRealtime(
-      `inbox-${userId}`,
-      [{ table: 'notifications', filter: `user_id=eq.${userId}` }],
-      () => fetchNotifications(),
-    );
-    return () => unsub();
+    // JM3: SSR/구형 브라우저 가드
+    if (typeof window === 'undefined') return;
+
+    const handleListUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ notifications?: unknown }>).detail;
+      const next = Array.isArray(detail?.notifications) ? detail.notifications : null;
+      if (!next) return;
+      lastFetchedAtRef.current = Date.now();
+      setNotifications(next);
+      setLoading(false);
+    };
+    window.addEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
+
+    // visibility 복귀 시 짧은 cooldown(5초) 후 즉시 fetch — push 누락 보완
+    const handleVisibility = () => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+      if (Date.now() - lastFetchedAtRef.current < 5000) return;
+      void fetchNotifications();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // SW push 메시지 직접 수신 → 즉시 fetch
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: string } | null;
+      if (message?.type === 'erp-push-preview') {
+        if (Date.now() - lastFetchedAtRef.current < 1500) return;
+        void fetchNotifications();
+      }
+    };
+    let swSupported = false;
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      try {
+        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        swSupported = true;
+      } catch {
+        swSupported = false;
+      }
+    }
+
+    return () => {
+      window.removeEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (swSupported) {
+        try {
+          navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        } catch {
+          // ignore
+        }
+      }
+    };
   }, [_u?.id, fetchNotifications]);
 
   // 인박스가 열리면 1.5초 후 자동으로 전체 읽음 처리 (뱃지 클리어)

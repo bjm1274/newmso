@@ -16,7 +16,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   buildApprovalNotificationHref,
   buildBoardNotificationHref,
@@ -25,6 +24,7 @@ import {
   buildMenuNotificationHref,
   resolveNotificationOpenMenu,
 } from '@/lib/notification-metadata';
+import { NOTIFICATION_LIST_UPDATED_EVENT } from '@/app/main/기능부품/알림시스템';
 
 const TYPE_ICONS: Record<string, LucideIcon> = {
   approval: FileText,
@@ -57,22 +57,30 @@ type NotificationItem = {
   created_at?: string | null;
 };
 
-const NOTIFICATION_SELECT = 'id, user_id, type, title, body, is_read, metadata, created_at';
-const LIST_MAX = 100;
-const STALE_MS = 5 * 60 * 1000; // 5분
+const NOTIFICATION_SELECT = 'id, user_id, type, title, body, is_read, read_at, metadata, created_at';
 
-/** unknown payload를 NotificationItem으로 안전하게 정규화 (JM4) */
+/** unknown payload를 NotificationItem으로 안전하게 정규화 (JM4)
+ *  - is_read 컬럼이 없는 경우(read_at만 있는 경우) read_at 존재 여부로 파생.
+ */
 function normalizePayload(raw: unknown): NotificationItem | null {
   if (raw === null || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.id !== 'string') return null;
+  let isRead: boolean | null = null;
+  if (typeof r.is_read === 'boolean') {
+    isRead = r.is_read;
+  } else if (typeof r.read_at === 'string' && r.read_at) {
+    isRead = true;
+  } else if (r.read_at === null) {
+    isRead = false;
+  }
   return {
     id: r.id,
     user_id: typeof r.user_id === 'string' ? r.user_id : null,
     type: typeof r.type === 'string' ? r.type : null,
     title: typeof r.title === 'string' ? r.title : null,
     body: typeof r.body === 'string' ? r.body : null,
-    is_read: typeof r.is_read === 'boolean' ? r.is_read : null,
+    is_read: isRead,
     metadata: r.metadata !== null && typeof r.metadata === 'object'
       ? (r.metadata as NotificationItem['metadata'])
       : null,
@@ -107,84 +115,127 @@ export default function GlobalNotificationBell({
   useEffect(() => {
     if (!user?.id) return;
 
-    // prevIds를 closure에 담아 변경 감지 시 diff 수행
+    const userId = user.id;
+    // prevIds를 closure에 담아 변경 감지 시 diff 수행 (toast 발화 판정용)
     let prevIds: Set<string> = new Set();
-    let unsubscribe: (() => void) | null = null;
+    let isPrimed = false;
 
-    const fetchList = async () => {
-      const { data } = await supabase
-        .from('notifications')
-        .select(NOTIFICATION_SELECT)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      lastFetchedAtRef.current = Date.now();
-      const nextList = Array.isArray(data) ? (data as NotificationItem[]) : [];
-      setList(nextList);
-      setUnreadCount(nextList.filter((item) => !item.is_read).length);
+    // JM4: unknown payload를 안전하게 NotificationItem[]로 정규화
+    const normalizeList = (raw: unknown): NotificationItem[] => {
+      if (!Array.isArray(raw)) return [];
+      const normalized: NotificationItem[] = [];
+      for (const entry of raw) {
+        const item = normalizePayload(entry);
+        if (item) normalized.push(item);
+      }
+      return normalized;
     };
 
-    const handleChange = async () => {
-      const { data } = await supabase
-        .from('notifications')
-        .select(NOTIFICATION_SELECT)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
+    const applyList = (nextList: NotificationItem[]) => {
       lastFetchedAtRef.current = Date.now();
-      const nextList = Array.isArray(data) ? (data as NotificationItem[]) : [];
-      setList(nextList);
-      setUnreadCount(nextList.filter((item) => !item.is_read).length);
+      // 상위 10건만 화면에 사용
+      const slim = nextList.slice(0, 10);
+      setList(slim);
+      setUnreadCount(slim.filter((item) => !item.is_read).length);
 
-      // 이전에 없던 항목 → toast
-      const newItems = nextList.filter((item) => !prevIds.has(item.id));
-      prevIds = new Set(nextList.map((item) => item.id));
-
-      if (newItems.length > 0) {
-        const newest = newItems[0];
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          try {
-            new Notification(newest.title || '새 알림', {
-              body: newest.body || '확인할 새 알림이 있습니다.',
-              icon: '/sy-logo.png',
-            });
-          } catch {
-            // ignore browser notification failures
+      // toast: 이전 id 셋에 없던 항목이면 가장 최신 1건만 알림
+      if (isPrimed) {
+        const newItems = slim.filter((item) => !prevIds.has(item.id));
+        if (newItems.length > 0) {
+          const newest = newItems[0];
+          if (
+            typeof window !== 'undefined' &&
+            'Notification' in window &&
+            Notification.permission === 'granted'
+          ) {
+            try {
+              new Notification(newest.title || '새 알림', {
+                body: newest.body || '확인할 새 알림이 있습니다.',
+                icon: '/sy-logo.png',
+              });
+            } catch {
+              // ignore browser notification failures
+            }
           }
+          setToastNotification(newest);
+          if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = window.setTimeout(() => setToastNotification(null), 5000);
         }
-        setToastNotification(newest);
-        toastTimerRef.current = window.setTimeout(() => setToastNotification(null), 5000);
+      }
+      prevIds = new Set(slim.map((item) => item.id));
+      isPrimed = true;
+    };
+
+    // mount 시 1회 초기 fetch — NotificationSystem 미마운트 화면(로그인 직후 등)에서도 안전.
+    // 이후 갱신은 NOTIFICATION_LIST_UPDATED_EVENT 또는 visibility/SW 트리거로 수행 (JM2).
+    const fetchOnce = async () => {
+      try {
+        const { data } = await supabase
+          .from('notifications')
+          .select(NOTIFICATION_SELECT)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        applyList(normalizeList(data));
+      } catch {
+        // ignore — 다음 이벤트/visibility로 다시 갱신
       }
     };
 
-    const setup = async () => {
-      // mount 시 1회 전체 fetch
-      await fetchList();
+    void fetchOnce();
 
-      // 초기 ID 목록 수집 (false positive toast 방지)
-      const { data: initData } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      prevIds = new Set(Array.isArray(initData) ? initData.map((r: { id: string }) => r.id) : []);
+    // JM3: SSR/구형 브라우저에서도 안전하도록 window 가드.
+    if (typeof window === 'undefined') {
+      return () => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      };
+    }
 
-      unsubscribe = subscribeRealtime(
-        `notifications-${String(user.id)}`,
-        [{ table: 'notifications', event: '*' }],
-        () => { void handleChange(); },
-        { pollIntervalMs: 5000 },
-      );
+    // NotificationSystem이 broadcast하는 전체 list를 수신해 자기 상태 갱신.
+    const handleListUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ notifications?: unknown }>).detail;
+      const nextList = normalizeList(detail?.notifications);
+      applyList(nextList);
     };
+    window.addEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
 
-    void setup();
+    // visibility 복귀 시 짧은 cooldown(5초) 후 1회 즉시 fetch — push 누락 보완.
+    const handleVisibility = () => {
+      if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+      if (Date.now() - lastFetchedAtRef.current < 5000) return;
+      void fetchOnce();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // SW push 메시지 직접 수신 → 즉시 fetch (NotificationSystem이 없는 화면에서도 동작).
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      const message = event.data as { type?: string } | null;
+      if (message?.type === 'erp-push-preview') {
+        if (Date.now() - lastFetchedAtRef.current < 1500) return;
+        void fetchOnce();
+      }
+    };
+    let swSupported = false;
+    if ('serviceWorker' in navigator) {
+      try {
+        navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+        swSupported = true;
+      } catch {
+        swSupported = false;
+      }
+    }
 
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      if (unsubscribe) unsubscribe();
+      window.removeEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (swSupported) {
+        try {
+          navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+        } catch {
+          // ignore
+        }
+      }
     };
   }, [user?.id]);
 
