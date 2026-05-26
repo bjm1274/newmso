@@ -6,6 +6,7 @@ import SalarySlipContainer from './급여명세서';
 import MyCertificates from './증명서관리';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { supabase } from '@/lib/supabase';
+import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 
@@ -111,11 +112,17 @@ export function PayrollAndCertificatesHub({
     }
 
     const fetchSummary = async () => {
-      const [salaryRes, certRes, approvedDocsRes] = await Promise.all([
+      const [salaryRecordsRes, salaryNotiRes, certRes, approvedDocsRes] = await Promise.all([
+        // 명세서 뷰어와 동일 기준으로 집계하도록 레코드와 발송 알림을 함께 조회한다.
         supabase
           .from('payroll_records')
-          .select('id', { count: 'exact', head: true })
+          .select('record_type, status, year_month')
           .eq('staff_id', user.id),
+        supabase
+          .from('notifications')
+          .select('title, body')
+          .eq('user_id', user.id)
+          .eq('type', '급여명세'),
         supabase
           .from('certificate_issuances')
           .select('id', { count: 'exact', head: true })
@@ -129,8 +136,13 @@ export function PayrollAndCertificatesHub({
           .in('type', ['양식신청', '증명서발급']),
       ]);
 
+      const issuedSalaryRecords = resolveIssuedPayrollRecords(
+        (salaryRecordsRes.data ?? []) as { record_type?: unknown; status?: unknown; year_month?: unknown }[],
+        (salaryNotiRes.data ?? []) as { title?: unknown; body?: unknown }[],
+      );
+
       setSummary({
-        salaryCount: salaryRes.count || 0,
+        salaryCount: issuedSalaryRecords.length,
         certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0),
       });
     };

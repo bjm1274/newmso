@@ -471,20 +471,52 @@ export default function PayrollMain({
                         return toast('전송할 직원을 선택해 주세요.', 'warning');
                       }
                       const checkedSet = new Set(checkedIds.map((id) => String(id)));
-                      const records = payrollRecords.filter(
-                        (r) => r.year_month === yearMonth && checkedSet.has(String(r.staff_id)),
+                      const targetRecords = payrollRecords.filter(
+                        (r) =>
+                          r.year_month === yearMonth &&
+                          checkedSet.has(String(r.staff_id)) &&
+                          String(r.status ?? '').trim() === '확정',
                       );
-                      if (records.length === 0) {
-                        return toast('선택한 직원 중 해당 월에 정산 완료된 레코드가 없습니다.', 'warning');
+                      if (targetRecords.length === 0) {
+                        return toast('선택한 직원 중 해당 월에 확정된 급여명세서가 없습니다.', 'warning');
                       }
                       const confirmed = await openConfirm({
-                        title: '급여명세서 알림 발송',
-                        description: `선택한 ${records.length}명의 직원에게 급여명세서 알림을 발송합니다.`,
+                        title: '급여명세서 발송',
+                        description: `선택한 ${targetRecords.length}명에게 ${yearMonth} 급여명세서를 지금 발송합니다.`,
                         confirmText: '발송',
                         tone: 'accent',
                       });
                       if (!confirmed) return;
-                      toast(`${records.length}건의 알림 발송이 예약되었습니다.`, 'success');
+
+                      let sent = 0;
+                      let failed = 0;
+                      try {
+                        for (const record of targetRecords) {
+                          const { error } = await supabase.from('notifications').insert({
+                            user_id: record.staff_id,
+                            type: '급여명세',
+                            title: `[${yearMonth}] 급여명세서가 도착했습니다`,
+                            body: `${yearMonth} 급여명세서가 등록되었습니다. 내정보 > 급여·증명서에서 확인해 주세요.`,
+                            read_at: null,
+                          });
+                          if (error) {
+                            console.error('급여명세서 발송 실패:', error);
+                            failed += 1;
+                          } else {
+                            sent += 1;
+                          }
+                        }
+                      } catch (sendError) {
+                        console.error('급여명세서 발송 중 오류:', sendError);
+                      }
+
+                      if (sent === 0) {
+                        toast('급여명세서 발송에 실패했습니다.', 'error');
+                      } else if (failed === 0) {
+                        toast(`${sent}명에게 급여명세서를 발송했습니다.`, 'success');
+                      } else {
+                        toast(`급여명세서 발송 완료 — 성공 ${sent}명, 실패 ${failed}명`, 'warning');
+                      }
                     }}
                   />
                 </div>

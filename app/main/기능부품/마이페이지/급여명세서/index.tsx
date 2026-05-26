@@ -2,7 +2,7 @@
 import { logger } from '@/lib/logger';
 
 import { useEffect, useMemo, useState } from 'react';
-import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
+import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -62,19 +62,6 @@ function formatYearMonthLabel(yearMonth: string) {
   const [year, month] = String(yearMonth || '').split('-');
   if (!year || !month) return yearMonth;
   return `${year}년 ${Number(month)}월`;
-}
-
-function extractYearMonthFromText(value: unknown) {
-  const text = String(value || '');
-  const dashMatch = text.match(/(20\d{2})-(\d{1,2})/);
-  if (dashMatch) {
-    return `${dashMatch[1]}-${String(Number(dashMatch[2])).padStart(2, '0')}`;
-  }
-  const koreanMatch = text.match(/(20\d{2})년\s*(\d{1,2})월/);
-  if (koreanMatch) {
-    return `${koreanMatch[1]}-${String(Number(koreanMatch[2])).padStart(2, '0')}`;
-  }
-  return null;
 }
 
 function SalaryTrendChart({ history }: { history: SalaryHistoryItem[] }) {
@@ -221,24 +208,10 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         return;
       }
 
-      const allRecords = filterNonInterimPayrollRecords(
+      const visibleRecords = resolveIssuedPayrollRecords(
         (recordsResult.data || []) as SalaryRecord[],
+        (notificationsResult.data || []) as { title?: string; body?: string }[],
       );
-      const issuedCandidates = allRecords.filter((record) => {
-        const status = String(record.status || '').trim();
-        return status === '확정' || status === '';
-      });
-
-      const sentMonths = new Set(
-        ((notificationsResult.data || []) as { title?: string; body?: string }[])
-          .map((row) => extractYearMonthFromText(`${row.title || ''} ${row.body || ''}`))
-          .filter((value): value is string => Boolean(value)),
-      );
-
-      const visibleRecords =
-        sentMonths.size > 0
-          ? issuedCandidates.filter((record) => sentMonths.has(String(record.year_month || '')))
-          : issuedCandidates;
 
       const sortedRecords = [...visibleRecords].sort((a, b) =>
         String(b.year_month || '').localeCompare(String(a.year_month || '')),
