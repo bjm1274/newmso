@@ -240,17 +240,16 @@ export function useChatRealtimeSubscriptions({
     if (!userId) return;
     setGlobalRealtimeState('connected');
     globalRealtimeHealthyRef.current = true;
-    // Phase 5-D — 폴링 비용 절감(2026-05-20).
-    // global messages: 3000→8000ms. selectedRoomId 안에서는 chat-realtime-${roomId}
-    // 채널(2500ms)이 messages를 더 짧게 감지하므로 global은 백그라운드 보조 역할만
-    // 수행해도 충분. chat-rooms-list(5000ms)도 last_message_at 변경을 감지해 보완.
+    // 다른 방 신규 메시지 알림(배지)용 백그라운드 폴링.
+    // 2026-05-26 — 8000→4000ms. 활성 방 폴링과 별개로 다른 방 알림 도착 지연을 줄임.
+    // 본인 send 시 pokeChannel('chat-global-messages')로 즉시 트리거.
     const unsubscribe = subscribeRealtime(
       'chat-global-messages',
       [{ table: 'messages' }],
       () => {
         void fetchDataLatestRef.current({ force: true });
       },
-      { pollIntervalMs: 8000 },
+      { pollIntervalMs: 4000 },
     );
     return () => {
       globalRealtimeHealthyRef.current = false;
@@ -333,10 +332,11 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
         }
       },
-      // Phase 5-D — 폴링 비용 절감(2026-05-20).
-      // 방 내부: 1500→2500ms. 활성 채팅 중 다른 사람 메시지 도착 체감 차이 미미.
-      // 자체 메시지는 낙관적 업데이트로 즉시 표시되므로 폴링 간격과 무관.
-      { pollIntervalMs: 2500 },
+      // 2026-05-26 — Phase 5-D의 2500ms는 ALLOWED_TABLES whitelist 누락(7개)으로
+      // 메시지 외 갱신이 사실상 polling으로 안 흐르던 상태였음. whitelist 복구
+      // 후엔 1500ms로 환원해 읽음 표시·반응·핀·투표 갱신 체감 즉시.
+      // 본인 send 시 pokeChannel로 즉시 트리거하므로 주기에 의존하지 않음.
+      { pollIntervalMs: 1500 },
     );
 
     return () => {

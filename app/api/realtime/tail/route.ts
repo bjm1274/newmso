@@ -27,6 +27,13 @@ const MAX_TABLES_PER_REQUEST = 10;
 const ALLOWED_TABLES = new Set<string>([
   'messages',
   'chat_rooms',
+  // 채팅 활성 방 폴링용 — 읽음 표시·반응·북마크·핀·투표 갱신
+  'room_read_cursors',
+  'message_reactions',
+  'message_bookmarks',
+  'pinned_messages',
+  'polls',
+  'poll_votes',
   'notifications',
   'board_posts',
   'board_post_comments',
@@ -56,6 +63,13 @@ const ALLOWED_TABLES = new Set<string>([
   'staff_evaluations',
 ]);
 
+// 변경 감지에 사용할 timestamp 컬럼명 — 대부분 created_at, 일부 예외.
+// 예: room_read_cursors는 INSERT가 아닌 UPSERT(읽음 위치 갱신)라 last_read_at 사용.
+const TABLE_TIMESTAMP_COLUMN: Record<string, string> = {
+  room_read_cursors: 'last_read_at',
+  pinned_messages: 'pinned_at',
+};
+
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
@@ -64,17 +78,18 @@ function userId(user: SessionUser | null | undefined): string | null {
   return trimmed || null;
 }
 
-// D1에서 테이블의 max(created_at) 조회 — allowedTables whitelist 내에서만 호출됨
+// D1에서 테이블의 최신 변경 timestamp 조회 — allowedTables whitelist 내에서만 호출됨.
+// 컬럼명은 TABLE_TIMESTAMP_COLUMN 매핑에서 우선 결정, 없으면 created_at.
 async function fetchMaxCreatedAtD1(
   d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,
   tableName: string,
 ): Promise<string | null> {
-  // D1 raw 쿼리 사용. tableName은 ALLOWED_TABLES whitelist에서 검증됨
+  const column = TABLE_TIMESTAMP_COLUMN[tableName] ?? 'created_at';
   try {
     const result = await d1
-      .prepare(`SELECT created_at FROM "${tableName}" ORDER BY created_at DESC LIMIT 1`)
-      .first<{ created_at: string | null }>();
-    return result?.created_at ?? null;
+      .prepare(`SELECT "${column}" AS ts FROM "${tableName}" ORDER BY "${column}" DESC LIMIT 1`)
+      .first<{ ts: string | null }>();
+    return result?.ts ?? null;
   } catch {
     return null;
   }

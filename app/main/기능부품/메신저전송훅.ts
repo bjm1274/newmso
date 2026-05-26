@@ -1,6 +1,7 @@
 'use client';
 
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { pokeChannel } from '@/lib/polling-bus';
 import { toast } from '@/lib/toast';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
@@ -266,6 +267,12 @@ export function useChatMessageSending({
       );
 
       broadcastChatSync('message-sent', roomId);
+      // 본인 송신 직후 다음 polling 주기를 기다리지 않고 즉시 tail 재조회 트리거.
+      // 같은 탭 내 다른 구독자(방 목록 배지 등)와 같은 사용자의 다른 탭은
+      // BroadcastChannel 경로로, 다른 사용자는 본인 측 polling이 곧바로 발화.
+      pokeChannel(`chat-realtime-${roomId}`);
+      pokeChannel('chat-global-messages');
+      pokeChannel('chat-rooms-list');
       if (shouldTriggerImmediateChatPush({
         albumId: inserted.album_id,
         albumIndex: inserted.album_index,

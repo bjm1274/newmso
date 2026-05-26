@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
+import { pokeChannel } from '@/lib/polling-bus';
 import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
 import type { MessengerMentionInboxItem } from './메신저사이드바';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
@@ -48,7 +49,14 @@ export function useChatReadSync({
           credentials: 'same-origin',
         });
         const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-        return Boolean(res.ok && json?.ok);
+        const ok = Boolean(res.ok && json?.ok);
+        if (ok) {
+          // 본인 읽음 처리 직후 다른 방·다른 탭의 polling이 다음 주기를 기다리지
+          // 않고 즉시 변경 감지하도록 트리거(상대방의 "1" 배지 빠른 해제).
+          normalizedRoomIds.forEach((roomId) => pokeChannel(`chat-realtime-${roomId}`));
+          pokeChannel('chat-rooms-list');
+        }
+        return ok;
       } catch {
         return false;
       }

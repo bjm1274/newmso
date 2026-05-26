@@ -199,3 +199,12 @@ export function subscribeRealtimeBatched(
   entry.batchCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.batchCallbacks.delete(callback));
 }
+
+// 본인이 변경을 발생시켰을 때(예: 메시지 전송, 읽음 갱신) 다음 polling 간격을
+// 기다리지 않고 즉시 tail을 확인해 같은 탭 내 다른 구독자에게 알린다.
+// channelKey가 등록돼 있지 않거나 이미 조회 중이면 무시.
+export function pokeChannel(channelKey: string): void {
+  const entry = channelRegistry.get(channelKey);
+  if (!entry || entry.inFlight) return;
+  void pollOnce(entry);
+}
