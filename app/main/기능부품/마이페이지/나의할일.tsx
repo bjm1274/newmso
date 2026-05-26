@@ -587,21 +587,40 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
       <div className="space-y-2 sm:space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="w-full sm:w-auto">
-            <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-3)] sm:text-xs">나의 할일 관리</h3>
-            <p className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-4)] sm:mt-1 sm:text-[12px]">
-              우선순위와 리마인더를 함께 관리할 수 있습니다.
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              active={priorityFilter === 'all'}
+              label={`전체 ${tasks.filter((task) => !task.is_complete).length}`}
+              onClick={() => setPriorityFilter('all')}
+              tone="accent"
+            />
+            {PRIORITY_OPTIONS.map((option) => {
+              const toneMap: Record<TodoPriority, FilterChipTone> = {
+                urgent: 'danger',
+                high: 'warning',
+                medium: 'accent',
+                low: 'muted',
+              };
+              return (
+                <FilterChip
+                  key={option.value}
+                  active={priorityFilter === option.value}
+                  label={`${option.label} ${priorityCounts[option.value]}`}
+                  onClick={() => setPriorityFilter(option.value)}
+                  tone={toneMap[option.value]}
+                />
+              );
+            })}
           </div>
 
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <div className="flex flex-1 gap-1 rounded-[var(--radius-md)] bg-[var(--muted)] p-1 sm:flex-none">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 rounded-[var(--radius-md)] bg-[var(--muted)] p-1">
               {(['day', 'week', 'month'] as const).map((range) => (
                 <button
                   key={range}
                   type="button"
                   onClick={() => setViewRange(range)}
-                  className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-bold sm:flex-none ${viewRange === range ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+                  className={`whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-bold ${viewRange === range ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
                 >
                   {range === 'day' ? '일별' : range === 'week' ? '주간' : '월간'}
                 </button>
@@ -612,7 +631,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               type={viewRange === 'month' ? 'month' : 'date'}
               value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
               onChange={(event) => setSelectedDate(viewRange === 'month' ? `${event.target.value}-01` : event.target.value)}
-              className="min-w-0 flex-1 cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:flex-none sm:px-3"
+              className="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
             />
           </div>
         </div>
@@ -622,32 +641,6 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
             {viewRange === 'week' ? `${currentRange.start} ~ ${currentRange.end}` : `${selectedDate.slice(0, 7)} 전체`}
           </p>
         ) : null}
-
-        <div className="flex flex-wrap gap-2">
-          <FilterChip
-            active={priorityFilter === 'all'}
-            label={`전체 ${tasks.filter((task) => !task.is_complete).length}`}
-            onClick={() => setPriorityFilter('all')}
-            tone="accent"
-          />
-          {PRIORITY_OPTIONS.map((option) => {
-            const toneMap: Record<TodoPriority, FilterChipTone> = {
-              urgent: 'danger',
-              high: 'warning',
-              medium: 'accent',
-              low: 'muted',
-            };
-            return (
-              <FilterChip
-                key={option.value}
-                active={priorityFilter === option.value}
-                label={`${option.label} ${priorityCounts[option.value]}`}
-                onClick={() => setPriorityFilter(option.value)}
-                tone={toneMap[option.value]}
-              />
-            );
-          })}
-        </div>
       </div>
 
       <div className="space-y-2 rounded-[16px] border border-[var(--border)] bg-[var(--background)]/40 p-2.5 sm:rounded-[24px] sm:p-3">
@@ -682,18 +675,19 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           </button>
         </div>
 
-        {/* 메타 칩 영역 — native select를 칩처럼 스타일링해 기존 onChange 바인딩 유지 */}
+        {/* 메타 칩 영역 — 가시 칩(span) 위에 투명한 native control을 오버레이해 네이티브 placeholder·아이콘 노출 방지 */}
         <div className="flex flex-wrap gap-2">
           {/* 우선순위 칩 */}
-          <label className="relative flex items-center">
-            <span className="pointer-events-none absolute left-2.5 text-[11px] font-bold text-[var(--toss-gray-4)]" aria-hidden="true">
+          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
+            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
               {getPriorityMeta(newPriority).label}
+              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
             </span>
             <select
               value={newPriority}
               onChange={(event) => setNewPriority(event.target.value as TodoPriority)}
               aria-label="우선순위 선택"
-              className="h-7 cursor-pointer appearance-none rounded-full border border-[var(--border)] bg-[var(--muted)] pl-8 pr-6 text-[11px] font-bold text-transparent outline-none focus:border-[var(--accent)] focus:bg-[var(--card)] sm:h-8"
+              className="absolute inset-0 cursor-pointer opacity-0"
             >
               {PRIORITY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -701,19 +695,19 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 text-[10px] text-[var(--toss-gray-3)]" aria-hidden="true">▾</span>
           </label>
 
           {/* 반복 칩 */}
-          <label className="relative flex items-center">
-            <span className="pointer-events-none absolute left-2.5 text-[11px] font-bold text-[var(--toss-gray-4)]" aria-hidden="true">
-              {newRepeatType === 'none' ? '반복없음' : getRepeatLabel(newRepeatType)}
+          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
+            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
+              {newRepeatType === 'none' ? '반복 없음' : getRepeatLabel(newRepeatType)}
+              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
             </span>
             <select
               value={newRepeatType}
               onChange={(event) => setNewRepeatType(event.target.value as TodoRepeatType)}
               aria-label="반복 유형 선택"
-              className="h-7 cursor-pointer appearance-none rounded-full border border-[var(--border)] bg-[var(--muted)] pl-14 pr-6 text-[11px] font-bold text-transparent outline-none focus:border-[var(--accent)] focus:bg-[var(--card)] sm:h-8"
+              className="absolute inset-0 cursor-pointer opacity-0"
             >
               {REPEAT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -721,19 +715,19 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 text-[10px] text-[var(--toss-gray-3)]" aria-hidden="true">▾</span>
           </label>
 
           {/* 담당 칩 */}
-          <label className="relative flex items-center">
-            <span className="pointer-events-none absolute left-2.5 text-[11px] font-bold text-[var(--toss-gray-4)]" aria-hidden="true">
+          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
+            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
               {getAssigneeLabel(newAssigneeKind)}
+              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
             </span>
             <select
               value={newAssigneeKind}
               onChange={(event) => setNewAssigneeKind(event.target.value as TodoAssigneeKind)}
               aria-label="담당 유형 선택"
-              className="h-7 cursor-pointer appearance-none rounded-full border border-[var(--border)] bg-[var(--muted)] pl-14 pr-6 text-[11px] font-bold text-transparent outline-none focus:border-[var(--accent)] focus:bg-[var(--card)] sm:h-8"
+              className="absolute inset-0 cursor-pointer opacity-0"
             >
               {ASSIGNEE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -741,33 +735,34 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2 text-[10px] text-[var(--toss-gray-3)]" aria-hidden="true">▾</span>
           </label>
 
-          {/* 리마인더 날짜·시간 칩 */}
-          <label className="relative flex items-center gap-0.5">
-            <span className="pointer-events-none absolute left-2.5 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap" aria-hidden="true">
-              {newReminderDate ? `📅 ${newReminderDate}${newReminderTime ? ' ' + newReminderTime : ''}` : '날짜'}
+          {/* 리마인더 날짜 칩 */}
+          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
+            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
+              📅 {newReminderDate || '날짜'}
             </span>
             <input
               type="date"
               value={newReminderDate}
               onChange={(event) => setNewReminderDate(event.target.value)}
               aria-label="리마인더 날짜"
-              className="h-7 cursor-pointer appearance-none rounded-full border border-[var(--border)] bg-[var(--muted)] pl-16 pr-2 text-[11px] font-bold text-transparent outline-none focus:border-[var(--accent)] focus:bg-[var(--card)] sm:h-8"
+              className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
+
+          {/* 리마인더 시간 칩 (날짜 선택 시에만 노출) */}
           {newReminderDate ? (
-            <label className="relative flex items-center">
-              <span className="pointer-events-none absolute left-2.5 text-[11px] font-bold text-[var(--toss-gray-4)]" aria-hidden="true">
-                {newReminderTime || '시간'}
+            <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
+              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
+                ⏰ {newReminderTime || '시간'}
               </span>
               <input
                 type="time"
                 value={newReminderTime}
                 onChange={(event) => setNewReminderTime(event.target.value)}
                 aria-label="리마인더 시간"
-                className="h-7 cursor-pointer appearance-none rounded-full border border-[var(--border)] bg-[var(--muted)] pl-12 pr-2 text-[11px] font-bold text-transparent outline-none focus:border-[var(--accent)] focus:bg-[var(--card)] sm:h-8"
+                className="absolute inset-0 cursor-pointer opacity-0"
               />
             </label>
           ) : null}
