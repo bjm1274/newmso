@@ -393,6 +393,11 @@ function MainPageContent() {
     let ignore = false;
 
     const bootstrap = async () => {
+      // outer catch에서도 참조 가능하도록 hoist.
+      let sessionUser: ErpUser | null = null;
+      let payload: { user?: unknown; issuedAt?: string; authenticated?: boolean } | null = null;
+      let mustLogout = false;
+
       try {
         const navigationQuery =
           typeof window !== 'undefined'
@@ -408,20 +413,47 @@ function MainPageContent() {
               })()
             : null;
 
-        const response = await fetch('/api/auth/session', {
-          method: 'GET',
-          cache: 'no-store',
-        });
+        // /api/auth/session — 401·{authenticated:false}만 로그아웃 처리하고,
+        // 5xx/네트워크 오류는 캐시된 세션을 유지한다(모바일 네트워크 블립으로
+        // 인한 부당 로그아웃 방지).
+        try {
+          const response = await fetch('/api/auth/session', {
+            method: 'GET',
+            cache: 'no-store',
+          });
+          if (response.status === 401) {
+            mustLogout = true;
+          } else if (response.ok) {
+            payload = await response.json().catch(() => null);
+            if (payload?.authenticated === false) {
+              mustLogout = true;
+            } else {
+              sessionUser = (normalizeProfileUser(payload?.user) ?? null) as ErpUser | null;
+            }
+          }
+          // 5xx 등 일시 오류 → fall through → 캐시 fallback
+        } catch {
+          // 네트워크 오류 → 캐시 fallback
+        }
 
-        if (!response.ok) {
+        if (mustLogout) {
           await clearClientSession();
           router.replace('/');
           return;
         }
 
-        const payload = await response.json();
-        const sessionUser = normalizeProfileUser(payload?.user);
         if (!sessionUser) {
+          // 일시 오류 시 localStorage 캐시 fallback
+          try {
+            const cachedRaw = localStorage.getItem(STORAGE_KEYS.USER);
+            if (cachedRaw) sessionUser = (normalizeProfileUser(JSON.parse(cachedRaw)) ?? null) as ErpUser | null;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (!sessionUser) {
+          // 캐시도 없으면 로그인 필요
           await clearClientSession();
           router.replace('/');
           return;
@@ -522,9 +554,13 @@ function MainPageContent() {
           const savedId = getSelectedCompanyId();
           if (!ignore) setSelectedCompanyIdState(savedId);
         }
-      } catch {
-        await clearClientSession();
-        router.replace('/');
+      } catch (err) {
+        // 예상 못 한 오류 — 로그아웃하지 않음(부당 로그아웃 방지).
+        // sessionUser가 결정됐는데 persistClientUser 전에 throw된 경우 보강.
+        console.error('[main bootstrap] unexpected error:', err);
+        if (sessionUser && !ignore) {
+          try { persistClientUser(sessionUser); } catch { /* ignore */ }
+        }
       }
     };
 
@@ -592,15 +628,25 @@ function MainPageContent() {
     const refreshSession = async () => {
       try {
         const response = await fetch('/api/auth/session', { method: 'GET', cache: 'no-store' });
-        if (!response.ok) {
+        if (response.status === 401) {
+          // 명시적 인증 실패만 로그아웃
           await clearClientSession();
           router.replace('/');
           return;
         }
+        if (!response.ok) {
+          // 5xx 등 일시 오류 — 세션 유지, 다음 30분 주기에 재시도
+          return;
+        }
         const payload = await response.json();
-        if (!payload?.authenticated || !payload?.user) {
+        if (payload?.authenticated === false) {
+          // 서버가 명시적으로 비인증 응답 — 로그아웃
           await clearClientSession();
           router.replace('/');
+          return;
+        }
+        if (!payload?.user) {
+          // 사용자 정보 누락 — 세션 유지, 다음 주기 재시도
           return;
         }
 
