@@ -1751,6 +1751,15 @@ export default function ChatView({
     if (!chatListResetToken) return;
     if (chatListResetToken === lastHandledChatListResetTokenRef.current) return;
 
+    // 딥링크(initialOpenChatRoomId)가 살아 있으면 그쪽 effect가 방을 결정한다.
+    // 마이페이지 → 할일 "↗ 채팅" 같은 진입 경로에서 ChatView가 새로 마운트될 때,
+    // 부모 state에 누적된 chatListResetToken(>0) 때문에 이 reset effect가 같은
+    // commit에 발화해 setRoom(NOTICE_ROOM_ID)로 덮어쓰던 회귀 방지.
+    if (initialOpenChatRoomId) {
+      lastHandledChatListResetTokenRef.current = chatListResetToken;
+      return;
+    }
+
     lastHandledChatListResetTokenRef.current = chatListResetToken;
     pendingScrollMsgIdRef.current = null;
     pendingThreadRootIdRef.current = null;
@@ -1764,7 +1773,7 @@ export default function ChatView({
     // 사이드바 채팅 메뉴 재클릭(=재진입) → 공지방을 기본으로 (PC만)
     setRoom(isMobileChatViewport() ? null : NOTICE_ROOM_ID);
     onConsumeOpenChatRoomId?.();
-  }, [chatListResetToken, onConsumeOpenChatRoomId]);
+  }, [chatListResetToken, initialOpenChatRoomId, onConsumeOpenChatRoomId]);
 
   useEffect(() => {
     const targetMsgId = pendingScrollMsgIdRef.current;

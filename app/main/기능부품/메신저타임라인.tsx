@@ -262,20 +262,20 @@ function MessengerTimelineComponent({
       let current = '';
       for (let index = 0; index < dividers.length; index += 1) {
         if (dividers[index].getBoundingClientRect().top <= threshold) {
-          current = dividers[index].dataset.dateLabel || current;
+          current = dividers[index].dataset.dateShort || dividers[index].dataset.dateLabel || current;
         } else {
           break;
         }
       }
       if (!current && dividers.length > 0) {
-        current = dividers[0].dataset.dateLabel || '';
+        current = dividers[0].dataset.dateShort || dividers[0].dataset.dateLabel || '';
       }
       if (current) {
         setScrollDateLabel(current);
         setScrollDateShown(true);
       }
       if (scrollDateHideTimerRef.current) clearTimeout(scrollDateHideTimerRef.current);
-      scrollDateHideTimerRef.current = setTimeout(() => setScrollDateShown(false), 1100);
+      scrollDateHideTimerRef.current = setTimeout(() => setScrollDateShown(false), 2000);
     });
   }, [messageListRef]);
 
@@ -299,8 +299,8 @@ function MessengerTimelineComponent({
     };
   }, []);
 
-  const renderDateDivider = (dateLabel: string, dateKey: string) => (
-    <div data-testid="chat-date-divider" data-date-label={dateLabel} className="sticky top-0 z-10 my-0.5 flex items-center justify-center md:my-1 bg-[var(--card)] py-0.5">
+  const renderDateDivider = (dateLabel: string, dateKey: string, dateShort?: string) => (
+    <div data-testid="chat-date-divider" data-date-label={dateLabel} data-date-short={dateShort || dateLabel} className="my-2 flex items-center justify-center md:my-3">
       <button
         type="button"
         onClick={() => {
@@ -515,7 +515,7 @@ function MessengerTimelineComponent({
   };
 
   return (
-    <>
+    <div className="relative flex flex-1 min-h-0 flex-col">
       <div
         ref={messageListRef}
         data-testid="chat-message-list"
@@ -607,6 +607,7 @@ function MessengerTimelineComponent({
                 const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
                 const created = toChatDate(albumItem.created_at);
                 const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                const dateShort = `${created.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { weekday: 'short' })})`;
                 const dateKey = formatTimelineDateKey(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
@@ -635,7 +636,7 @@ function MessengerTimelineComponent({
                     className={showDateDivider ? 'mt-0.5 md:mt-1' : 'mt-[2px]'}
                   >
                     {showDateDivider && (
-                      renderDateDivider(dateLabel, dateKey)
+                      renderDateDivider(dateLabel, dateKey, dateShort)
                     )}
                     <div className={`flex items-end gap-2 ${isMineAlbum ? 'flex-row-reverse' : 'flex-row'}`}>
                       {!isMineAlbum && (
@@ -728,6 +729,7 @@ function MessengerTimelineComponent({
                 day: 'numeric',
                 weekday: 'short',
               });
+              const dateShort = `${created.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { weekday: 'short' })})`;
               const dateKey = formatTimelineDateKey(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
@@ -775,7 +777,7 @@ function MessengerTimelineComponent({
               return (
                 <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
                   {showDateDivider && (
-                    renderDateDivider(dateLabel, dateKey)
+                    renderDateDivider(dateLabel, dateKey, dateShort)
                   )}
                   {isSystemInvite ? (
                     <div className="flex justify-center my-1" role="status" aria-live="polite">
@@ -1096,7 +1098,7 @@ function MessengerTimelineComponent({
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
