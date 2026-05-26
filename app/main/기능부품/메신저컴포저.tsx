@@ -366,7 +366,7 @@ function MessengerComposerImpl({
           multiple
         />
 
-        {/* 좌측 액션바: +(첨부) / 이모지 / 투표 / @멘션 */}
+        {/* 좌측 액션바: +(첨부) / 이모지 — 투표는 채팅방 정보(드로어)에서, 멘션은 @ 입력으로 */}
         <div className="flex shrink-0 items-center gap-0.5 pb-0.5">
           {/* 첨부 */}
           <button
@@ -408,7 +408,7 @@ function MessengerComposerImpl({
               <div
                 role="dialog"
                 aria-label="이모지 선택"
-                className="absolute bottom-full left-0 z-30 mb-1 grid grid-cols-6 gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-md"
+                className="absolute bottom-full left-0 z-30 mb-1 grid grid-cols-6 gap-1.5 w-max rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-md"
               >
                 {QUICK_EMOJIS.map((emoji) => (
                   <button
@@ -424,37 +424,6 @@ function MessengerComposerImpl({
               </div>
             )}
           </div>
-          {/* 투표 */}
-          {onOpenPollModal ? (
-            <button
-              type="button"
-              data-testid="chat-poll-button"
-              onClick={onOpenPollModal}
-              aria-label="투표 만들기"
-              title="투표 만들기"
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="13" width="3" height="4" rx="0.5" />
-                <rect x="8.5" y="9" width="3" height="8" rx="0.5" />
-                <rect x="14" y="5" width="3" height="12" rx="0.5" />
-              </svg>
-            </button>
-          ) : null}
-          {/* @멘션 */}
-          <button
-            type="button"
-            data-testid="chat-mention-button"
-            onClick={handleInsertMention}
-            aria-label="멘션 삽입 (@)"
-            title="멘션 (@)"
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="10" cy="10" r="3.5" />
-              <path d="M13.5 10c0 2.5.8 3.5 2 3.5 0-1 .5-7.5-5.5-7.5S4 8 4 10s1.5 6 7 5" />
-            </svg>
-          </button>
         </div>
 
         {/* 가운데: 자라나는 textarea */}
@@ -467,9 +436,7 @@ function MessengerComposerImpl({
             placeholder={
               selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
                 ? '부서장 이상만 공지 작성 가능'
-                : selectedRoomName
-                  ? `#${selectedRoomName}에 메시지 보내기 (@이름 멘션 가능)`
-                  : '메시지를 입력하세요... (@이름 멘션 가능)'
+                : '메시지를 입력하세요'
             }
             value={inputMsg}
             onChange={(event) => {
