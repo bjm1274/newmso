@@ -1,6 +1,18 @@
 'use client';
 
-import { useRef, useState, useEffect, memo, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from 'react';
+import {
+  forwardRef,
+  memo,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type RefObject,
+} from 'react';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
@@ -8,6 +20,12 @@ import { isMobileChatViewport, NOTICE_ROOM_ID } from './메신저유틸';
 import type { AttachmentRetryQueueEntry } from './메신저첨부재시도큐';
 
 const QUICK_EMOJIS = ['👍', '😊', '😂', '❤️', '🔥', '✅', '👏', '🎉', '🙏', '😅', '💪', '😄'] as const;
+
+// 부모(메신저.tsx)가 컴포저 내부 value를 imperative하게 갱신하기 위한 핸들.
+// 키 입력마다 발생하던 부모 전체 리렌더를 피하려고 value state를 컴포저로 끌어내림.
+export type MessengerComposerHandle = {
+  setValue: (value: string) => void;
+};
 
 type MessengerComposerProps = {
   replyTo: ChatMessage | null;
@@ -19,7 +37,8 @@ type MessengerComposerProps = {
   selectedRoomId: string | null;
   canWriteNotice: boolean;
   composerRef: RefObject<HTMLTextAreaElement | null>;
-  inputMsg: string;
+  // 부모가 최신 입력값을 동기로 읽기 위한 ref. 컴포저가 onChange마다 동기 갱신.
+  inputMsgRef: MutableRefObject<string>;
   showScrollToLatest?: boolean;
   onScrollToLatest?: () => void;
   showMentionList: boolean;
@@ -55,7 +74,7 @@ function MessengerComposerImpl({
   selectedRoomId,
   canWriteNotice,
   composerRef,
-  inputMsg,
+  inputMsgRef,
   showMentionList,
   mentionCandidates,
   onCloseReply,
@@ -77,12 +96,48 @@ function MessengerComposerImpl({
   onSelectMention,
   onOpenPollModal,
   selectedRoomName,
-}: MessengerComposerProps) {
+}: MessengerComposerProps, controlRef: React.ForwardedRef<MessengerComposerHandle>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const albumFileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // 컴포저 내부에서 value를 관리. 부모 메신저.tsx가 직접 state로 들고 있던
+  // 시절엔 모든 키 입력이 3,448줄짜리 부모 함수 전체를 리렌더시켜 입력 지연
+  // 주범이었음. 부모는 setInputMsg를 호출하면 controlRef.setValue로 전달됨.
+  // 초기값은 inputMsgRef(부모가 마운트 직전 복원한 draft) 에서 읽는다.
+  const [inputMsg, setInputMsg] = useState<string>(() => inputMsgRef.current || '');
+
+  useImperativeHandle(
+    controlRef,
+    () => ({
+      setValue: (next: string) => {
+        inputMsgRef.current = next;
+        setInputMsg(next);
+      },
+    }),
+    [inputMsgRef],
+  );
+
+  // 부모가 동기로 inputMsgRef를 읽을 때 항상 최신 textarea 값을 보장하기 위해
+  // change 핸들러 안에서 ref를 함께 갱신한다(아래 textarea onChange 참조).
+  const propagateChange = (next: string, caret: number) => {
+    inputMsgRef.current = next;
+    setInputMsg(next);
+    onComposerChange(next, caret);
+  };
+
+  // 입력 폭/줄바꿈에 맞춰 textarea 높이 자동 조절 — 부모에 있던 effect를
+  // value owner인 컴포저로 함께 이동. 매 입력마다 부모 함수 재실행을 피한다.
+  useEffect(() => {
+    const composerEl = composerRef.current;
+    if (!composerEl) return;
+    const maxHeight = isMobileChatViewport() ? 44 : 72;
+    composerEl.style.height = 'auto';
+    composerEl.style.height = `${Math.min(maxHeight, composerEl.scrollHeight)}px`;
+    composerEl.style.overflowY = composerEl.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [inputMsg, composerRef]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -106,13 +161,13 @@ function MessengerComposerImpl({
     setShowEmojiPicker(false);
     const ta = composerRef.current;
     if (!ta) {
-      onComposerChange(inputMsg + emoji, (inputMsg + emoji).length);
+      propagateChange(inputMsg + emoji, (inputMsg + emoji).length);
       return;
     }
     const start = ta.selectionStart ?? inputMsg.length;
     const end = ta.selectionEnd ?? inputMsg.length;
     const next = inputMsg.slice(0, start) + emoji + inputMsg.slice(end);
-    onComposerChange(next, start + emoji.length);
+    propagateChange(next, start + emoji.length);
     requestAnimationFrame(() => {
       ta.focus();
       ta.setSelectionRange(start + emoji.length, start + emoji.length);
@@ -124,7 +179,7 @@ function MessengerComposerImpl({
     const start = ta ? (ta.selectionStart ?? inputMsg.length) : inputMsg.length;
     const end = ta ? (ta.selectionEnd ?? inputMsg.length) : inputMsg.length;
     const next = inputMsg.slice(0, start) + '@' + inputMsg.slice(end);
-    onComposerChange(next, start + 1);
+    propagateChange(next, start + 1);
     requestAnimationFrame(() => {
       if (ta) {
         ta.focus();
@@ -441,7 +496,7 @@ function MessengerComposerImpl({
             value={inputMsg}
             onChange={(event) => {
               const value = event.target.value;
-              onComposerChange(value, event.target.selectionStart ?? value.length);
+              propagateChange(value, event.target.selectionStart ?? value.length);
             }}
             onPaste={(event) => {
               void onComposerPaste(event);
@@ -484,4 +539,4 @@ function MessengerComposerImpl({
   );
 }
 
-export const MessengerComposer = memo(MessengerComposerImpl);
+export const MessengerComposer = memo(forwardRef(MessengerComposerImpl));

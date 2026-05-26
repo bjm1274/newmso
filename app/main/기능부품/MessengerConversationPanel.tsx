@@ -179,8 +179,9 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
             fileUploading={c.fileUploading}
             selectedRoomId={c.selectedRoomId}
             canWriteNotice={c.canWriteNotice}
+            ref={c.composerControlRef}
             composerRef={c.composerRef}
-            inputMsg={c.inputMsg}
+            inputMsgRef={c.inputMsgRef}
             showScrollToLatest={c.showScrollToLatest}
             showMentionList={c.showMentionList}
             mentionCandidates={c.mentionCandidates}

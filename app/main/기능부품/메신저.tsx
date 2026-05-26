@@ -2,7 +2,7 @@
 import { logger } from '@/lib/logger';
 
 import { toast } from '@/lib/toast';
-import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
@@ -23,7 +23,7 @@ import {
   getAttachmentDisplayName,
 } from './메신저첨부';
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
-import { MessengerComposer } from './메신저컴포저';
+import { MessengerComposer, type MessengerComposerHandle } from './메신저컴포저';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
@@ -184,7 +184,9 @@ export default function ChatView({
   const [chatSearch, setChatSearch] = useState('');
   const deferredOmniSearch = useDeferredValue(omniSearch);
   const deferredChatSearch = useDeferredValue(chatSearch);
-  const [inputMsg, setInputMsg] = useState('');
+  // inputMsg state는 컴포저 내부로 이동. 부모는 inputMsgRef로 동기 읽기,
+  // setInputMsg(이전 dispatch 시그니처 그대로)로 imperative 쓰기만 한다.
+  // 3,448줄짜리 부모 함수가 매 키 입력마다 재실행되던 입력 지연 주범 제거.
   const [activeActionMsg, setActiveActionMsg] = useState<ChatMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [wardQuickReplySendingMessageId, setWardQuickReplySendingMessageId] = useState<string | null>(null);
@@ -261,6 +263,21 @@ export default function ChatView({
   const draftMapRef = useRef<Map<string, string>>(new Map());
   /** setRoom 바깥에서도 최신 입력값을 읽기 위한 ref */
   const inputMsgRef = useRef('');
+  /** 컴포저에 imperative하게 value를 push하기 위한 핸들 ref */
+  const composerControlRef = useRef<MessengerComposerHandle | null>(null);
+  /**
+   * 기존 useState setInputMsg를 대체. 시그니처는 Dispatch<SetStateAction<string>>
+   * 그대로 유지해 호출부(전송훅 clear, 업로드훅 share-target, 방전환훅 draft 복원,
+   * 멘션 선택)는 변경 없이 동작. 부모 리렌더를 트리거하지 않음.
+   */
+  const setInputMsg = useCallback<Dispatch<SetStateAction<string>>>((valueOrUpdater) => {
+    const next =
+      typeof valueOrUpdater === 'function'
+        ? (valueOrUpdater as (prev: string) => string)(inputMsgRef.current)
+        : valueOrUpdater;
+    inputMsgRef.current = next;
+    composerControlRef.current?.setValue(next);
+  }, []);
 
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionList, setShowMentionList] = useState(false);
@@ -1124,8 +1141,8 @@ export default function ChatView({
   });
 
   const handleComposerChange = useCallback((value: string, caret: number) => {
-    inputMsgRef.current = value;
-    setInputMsg(value);
+    // value/inputMsgRef는 컴포저 내부에서 이미 갱신. 부모는 멘션 인식과
+    // typing emit만 처리해 부모 트리 리렌더(키 입력당 setInputMsg)를 회피.
     const upToCaret = value.slice(0, caret);
     const match = upToCaret.match(/@([^\s@]{0,20})$/);
     if (match) {
@@ -1137,7 +1154,7 @@ export default function ChatView({
     }
     // D1 기반 typing emit — 입력 값으로 throttle/debounce 처리
     handleTypingInput(value);
-  }, [inputMsgRef, handleTypingInput]);
+  }, [handleTypingInput]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1220,14 +1237,8 @@ export default function ChatView({
     });
   }, [retryQueueActorId, selectedRoomId, user]);
 
-  useEffect(() => {
-    const composerEl = composerRef.current;
-    if (!composerEl) return;
-    const maxHeight = isMobileChatViewport() ? 44 : 72;
-    composerEl.style.height = 'auto';
-    composerEl.style.height = `${Math.min(maxHeight, composerEl.scrollHeight)}px`;
-    composerEl.style.overflowY = composerEl.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [inputMsg]);
+  // textarea 자동 높이 조절 effect는 inputMsg가 부모 state였을 때 여기 있었음.
+  // value owner를 컴포저로 옮긴 뒤 컴포저 내부 useEffect로 이전.
 
   const [reactions, setReactions] = useState<Record<string, Record<string, number>>>({});
   const [reactionUsersByMessage, setReactionUsersByMessage] = useState<ReactionUsersByMessage>({});
@@ -3146,6 +3157,7 @@ export default function ChatView({
               </div>
             ) : null}
             <MessengerComposer
+              ref={composerControlRef}
               replyTo={replyTo}
               pendingAlbumFiles={pendingAlbumFiles}
               albumPreviewUrls={albumPreviewUrls}
@@ -3155,7 +3167,7 @@ export default function ChatView({
               selectedRoomId={selectedRoomId}
               canWriteNotice={canWriteNotice}
               composerRef={composerRef}
-              inputMsg={inputMsg}
+              inputMsgRef={inputMsgRef}
               showScrollToLatest={showScrollToLatest}
               showMentionList={showMentionList}
               mentionCandidates={mentionCandidates}
