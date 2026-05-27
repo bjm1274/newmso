@@ -36,6 +36,7 @@ import SApprovalApproverPicker, {
   toApproverPick,
   type ApproverPick,
 } from './결재선피커';
+import AttachmentPicker, { type AttachmentEntry } from './AttachmentPicker';
 
 type LeaveKind = '연차' | '반차';
 
@@ -61,6 +62,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   const [end, setEnd] = useState(today);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentEntry[]>([]);
   const [approverDefaults, setApproverDefaults] = useState<ApproverPick[]>([]);
   const [approverLine, setApproverLine] = useState<ApproverPick[]>([]);
   const [approverLoading, setApproverLoading] = useState(true);
@@ -255,8 +257,11 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
       });
       if (apprError) throw new Error(apprError);
 
+      const queuedAttachments = attachments.filter((a) => a.state === 'queued').length;
       if (leaveQueued || apprQueued) {
         toast('오프라인 — 연차 신청이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
+      } else if (queuedAttachments > 0) {
+        toast(`연차 신청이 상신되었습니다. 첨부 ${queuedAttachments}개는 온라인 복귀 시 자동 업로드됩니다.`, 'warning');
       } else {
         toast('연차 신청이 결재선에 올라갔습니다.', 'success');
       }
@@ -429,6 +434,11 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
               ? '결재선을 직접 지정했습니다. "기본값으로" 버튼으로 되돌릴 수 있어요.'
               : '직급 위계에 따라 자동 매핑되었습니다. "변경"으로 수정할 수 있어요.'}
           </div>
+        </div>
+
+        {/* 첨부 파일 */}
+        <div className="m-section">
+          <AttachmentPicker onChange={setAttachments} />
         </div>
 
         <div style={{ height: 32 }} />

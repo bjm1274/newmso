@@ -1,50 +1,78 @@
 'use client';
 
 /**
- * SDocs — 모바일 서류 제출 현황
- *   - 칩바: 전체 / 미제출 / 제출완료
- *   - 필수 서류 16종 + 각 항목 상태 카드
- *   - 우상단 + : 카메라/파일 선택 (다음 라운드)
- * 데이터: document_repository (PC와 동일 테이블)
- * JM(파일당 500줄), JM3(에러는 toast), JM6(button 시맨틱)
+ * SDocs — 모바일 서류 제출
+ *
+ * 기능:
+ *  - 서류 종류 chip 선택 (재직증명서·경력증명서 등 6종)
+ *  - 발급 사유 입력 (선택)
+ *  - "사진 촬영" (capture=environment) / "파일 선택" 업로드
+ *    → 즉시 enqueueUpload (planRequester: 'submission')
+ *    → onSuccessAction: document_submissions insert
+ *  - 제출 이력: SubmissionHistory 컴포넌트에 위임
+ *  - 오프라인 큐 시 "오프라인 — 제출 대기 중" 토스트 + 폼 reset
+ *
+ * JM: 단일 책임, ~280줄
+ * JM2: fetchHistory 1회 + 제출 성공 후 refetch
+ * JM3: 카메라 권한 거부·MIME 비허용·파일 크기 초과 각각 명시
+ * JM4: any 금지, SubmissionRow 타입은 서류제출이력.tsx에서 export
+ * JM5: 본인 staffId만 업로드 가능, 민감 정보 로그 미포함
+ * JM6: visually-hidden input + label 래퍼, aria-label
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { enqueueUpload } from '@/lib/offline-upload-queue';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
-import MChip from '../공통/MChip';
+import SubmissionHistory, { type SubmissionRow } from './서류제출이력';
 
-type DocFilter = 'all' | 'todo' | 'done';
+// ─────────────────────────────────────────────────────────────
+// 상수
+// ─────────────────────────────────────────────────────────────
 
-type DocRow = {
-  id: string;
-  doc_type: string;
-  status: string;
-  file_url?: string | null;
-  uploaded_at?: string | null;
-  created_at?: string | null;
-};
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
+const ALLOWED_MIMES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/gif',
+  'application/pdf',
+]);
 
-const REQUIRED_DOCS: { id: string; label: string }[] = [
-  { id: '가족관계',     label: '가족관계증명서' },
-  { id: '개인정보보호', label: '개인정보 보호교육' },
-  { id: '면허자격',     label: '면허(자격)증 사본' },
-  { id: '보건증',       label: '보건선결과(보건증)' },
-  { id: '안전보건',     label: '산업안전 보건교육' },
-  { id: '성희롱예방',   label: '성희롱 예방교육' },
-  { id: '신분증',       label: '신분증 사본' },
-  { id: '일반검진',     label: '일반 건강검진' },
-  { id: '잠복결핵',     label: '잠복결핵 검진결과' },
-  { id: '장애인인식',   label: '장애인 인식개선교육' },
-  { id: '등본',         label: '주민등록등본' },
-  { id: '초본',         label: '주민등록초본' },
-  { id: '괴롭힘예방',   label: '직장내 괴롭힘 예방교육' },
-  { id: '통장',         label: '통장사본' },
-  { id: '퇴직연금',     label: '퇴직연금교육' },
-  { id: '특수검진',     label: '특수 건강검진' },
-];
+const SUBMISSION_TYPES = [
+  '재직증명서',
+  '경력증명서',
+  '근로계약서',
+  '급여명세서',
+  '재직확인서',
+  '기타',
+] as const;
+
+type SubmissionType = (typeof SUBMISSION_TYPES)[number];
+type UploadMode = 'camera' | 'file';
+
+// ─────────────────────────────────────────────────────────────
+// 헬퍼
+// ─────────────────────────────────────────────────────────────
+
+function normalizeMime(raw: string): string {
+  if (raw === 'image/jpg' || raw === 'image/pjpeg') return 'image/jpeg';
+  if (raw === 'image/x-png') return 'image/png';
+  return raw || 'application/octet-stream';
+}
+
+function mimeErrorMsg(mime: string): string {
+  if (!mime) return '파일 형식을 확인할 수 없습니다. JPEG·PNG·PDF 파일을 사용하세요.';
+  return `허용되지 않는 파일 형식입니다 (${mime}). JPEG·PNG·WEBP·HEIC·PDF만 가능합니다.`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 컴포넌트
+// ─────────────────────────────────────────────────────────────
 
 export type SDocsProps = {
   staffId: string | null;
@@ -52,138 +80,343 @@ export type SDocsProps = {
 };
 
 export default function SDocs({ staffId, onBack }: SDocsProps) {
-  const [filter, setFilter] = useState<DocFilter>('all');
-  const [docs, setDocs] = useState<DocRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const cameraInputId = useId();
+  const fileInputId = useId();
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const fetchDocs = useCallback(async () => {
+  // ── 폼 상태
+  const [selectedType, setSelectedType] = useState<SubmissionType | null>(null);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── 이력 상태
+  const [history, setHistory] = useState<SubmissionRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
     if (!staffId) return;
-    setLoading(true);
+    setHistoryLoading(true);
     try {
       const { data, error } = await supabase
-        .from('document_repository')
-        .select('id, doc_type, status, file_url, uploaded_at, created_at')
-        .eq('created_by', staffId)
-        .order('created_at', { ascending: false });
+        .from('document_submissions')
+        .select('id, submission_type, reason, file_url, status, submitted_at, processed_at')
+        .eq('staff_id', staffId)
+        .order('submitted_at', { ascending: false })
+        .limit(20);
       if (error) throw error;
-      setDocs((data as DocRow[]) ?? []);
+      setHistory((data as SubmissionRow[]) ?? []);
     } catch (err) {
-      toast(`서류 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
+      console.error('[SDocs] history fetch failed', err);
     } finally {
-      setLoading(false);
+      setHistoryLoading(false);
     }
   }, [staffId]);
 
-  useEffect(() => { void fetchDocs(); }, [fetchDocs]);
+  useEffect(() => {
+    void fetchHistory();
+  }, [fetchHistory]);
 
-  const docStatusByType = useMemo(() => {
-    const m = new Map<string, DocRow>();
-    for (const d of docs) {
-      const existing = m.get(d.doc_type);
-      if (!existing) m.set(d.doc_type, d);
-    }
-    return m;
-  }, [docs]);
+  const resetForm = useCallback(() => {
+    setSelectedType(null);
+    setReason('');
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (fileRef.current) fileRef.current.value = '';
+  }, []);
 
-  const counts = useMemo(() => {
-    const done = REQUIRED_DOCS.filter(r => {
-      const row = docStatusByType.get(r.id);
-      return row && (row.status === '제출완료' || row.status === '승인');
-    }).length;
-    return { done, total: REQUIRED_DOCS.length, todo: REQUIRED_DOCS.length - done };
-  }, [docStatusByType]);
+  // ── 파일 업로드 처리 (공통)
+  const handleFileUpload = useCallback(
+    async (file: File, mode: UploadMode) => {
+      const clearInput = () => {
+        if (mode === 'camera' && cameraRef.current) cameraRef.current.value = '';
+        if (mode === 'file' && fileRef.current) fileRef.current.value = '';
+      };
 
-  const filtered = REQUIRED_DOCS.filter((r) => {
-    const row = docStatusByType.get(r.id);
-    const isDone = !!row && (row.status === '제출완료' || row.status === '승인');
-    if (filter === 'todo') return !isDone;
-    if (filter === 'done') return isDone;
-    return true;
-  });
+      if (!staffId) {
+        toast('계정 정보를 확인할 수 없습니다.', 'error');
+        clearInput();
+        return;
+      }
+      if (!selectedType) {
+        toast('서류 종류를 먼저 선택해 주세요.', 'warning');
+        clearInput();
+        return;
+      }
+      // 파일 크기 검증 (JM3)
+      if (file.size > MAX_FILE_SIZE) {
+        toast(
+          `파일 크기는 30MB 이하여야 합니다. 현재: ${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+          'error',
+        );
+        clearInput();
+        return;
+      }
+      // MIME 검증 (JM3)
+      const mime = normalizeMime(file.type || '');
+      if (!ALLOWED_MIMES.has(mime)) {
+        toast(mimeErrorMsg(file.type), 'error');
+        clearInput();
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        // JM2: input.change → 즉시 enqueueUpload
+        const result = await enqueueUpload({
+          file,
+          filename: file.name || `submission_${Date.now()}.${mime.split('/')[1] ?? 'bin'}`,
+          mimeType: mime,
+          planRequester: 'submission',
+          planParams: { submissionType: selectedType },
+          onSuccessAction: {
+            kind: 'insert',
+            table: 'document_submissions',
+            payloadTemplate: {
+              staff_id: staffId,
+              submission_type: selectedType,
+              reason: reason.trim() || null,
+              file_url: '{fileUrl}',
+              status: '대기',
+              submitted_at: new Date().toISOString(),
+            },
+          },
+        });
+
+        if (result.uploaded) {
+          toast(`${selectedType} 제출이 완료되었습니다.`, 'success');
+          resetForm();
+          void fetchHistory();
+        } else if (result.queued) {
+          toast(
+            `오프라인 — ${selectedType} 제출이 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.`,
+            'warning',
+          );
+          resetForm();
+        } else {
+          toast(`제출 실패: ${result.error ?? '알 수 없는 오류'}`, 'error');
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '제출 중 오류 발생';
+        toast(msg, 'error');
+      } finally {
+        setSubmitting(false);
+        clearInput();
+      }
+    },
+    [staffId, selectedType, reason, resetForm, fetchHistory],
+  );
+
+  const onCameraChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) void handleFileUpload(file, 'camera');
+    },
+    [handleFileUpload],
+  );
+
+  const onFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) void handleFileUpload(file, 'file');
+    },
+    [handleFileUpload],
+  );
 
   return (
     <div className="m-screen">
       <MobileHeader
         title="서류 제출"
-        sub={`${counts.done} / ${counts.total} 제출 완료`}
+        sub="증명서·서류 발급 신청"
         back={onBack}
       />
-      <div className="m-chip-bar">
-        <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>
-          전체<span className="cnt">{counts.total}</span>
-        </button>
-        <button type="button" className={filter === 'todo' ? 'on' : ''} onClick={() => setFilter('todo')}>
-          미제출<span className="cnt">{counts.todo}</span>
-        </button>
-        <button type="button" className={filter === 'done' ? 'on' : ''} onClick={() => setFilter('done')}>
-          제출완료<span className="cnt">{counts.done}</span>
-        </button>
-      </div>
-
-      {/* 진행률 카드 */}
-      <div style={{ padding: '12px 16px 0' }}>
-        <div className="m-card" style={{ padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="m-tnum" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em' }}>
-              {counts.done}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 700 }}>
-              / {counts.total}건 제출 완료
-            </span>
-          </div>
-          <div style={{
-            marginTop: 10, height: 8, borderRadius: 999, background: 'var(--z-100)', overflow: 'hidden',
-          }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.round((counts.done / counts.total) * 100)}%`,
-              background: 'linear-gradient(90deg, var(--m-accent), var(--m-accent-700))',
-              transition: 'width 0.3s',
-            }} />
-          </div>
-        </div>
-      </div>
 
       <div className="m-scroll">
-        <div style={{ padding: '12px 16px' }}>
-          {loading && filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
-              불러오는 중…
-            </div>
-          )}
-          <div className="m-card flush">
-            {filtered.map((r) => {
-              const row = docStatusByType.get(r.id);
-              const isDone = !!row && (row.status === '제출완료' || row.status === '승인');
-              const isPending = !!row && row.status !== '제출완료' && row.status !== '승인';
-              return (
-                <div key={r.id} className="m-list-row">
-                  <div
-                    className={'ico-tile ' + (isDone ? 'tone-success' : isPending ? 'tone-warning' : '')}
-                    aria-hidden="true"
-                  >
-                    <MIcon name={isDone ? 'checkCircle' : 'fileText'} size={18} />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="lbl">{r.label}</div>
-                    <div className="sub">
-                      {isDone ? `제출 완료${row?.uploaded_at ? ` · ${new Date(row.uploaded_at).toLocaleDateString('ko-KR')}` : ''}` :
-                       isPending ? `처리 중 · ${row?.status ?? ''}` :
-                       '미제출'}
-                    </div>
-                  </div>
-                  {isDone ? <MChip tone="success">완료</MChip> :
-                   isPending ? <MChip tone="warning">대기</MChip> :
-                   <MChip>필요</MChip>}
-                </div>
-              );
-            })}
+        {/* ── 서류 종류 선택 */}
+        <div className="m-section">
+          <div className="m-section-h">
+            <div className="lbl">서류 종류 선택</div>
           </div>
-
-          <div style={{ padding: '14px 4px', fontSize: 11, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.6 }}>
-            📎 첨부·업로드는 데스크톱에서 진행해주세요. 모바일에서는 제출 현황과 진행 단계만 확인합니다.
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '0 16px 4px' }}>
+            {SUBMISSION_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={selectedType === type}
+                onClick={() => setSelectedType(type)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 20,
+                  border: `1.5px solid ${selectedType === type ? 'var(--m-accent)' : 'var(--m-border)'}`,
+                  background: selectedType === type ? 'var(--m-accent-soft)' : 'var(--m-card)',
+                  color: selectedType === type ? 'var(--m-accent)' : 'var(--z-700)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {type}
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* ── 발급 사유 */}
+        <div className="m-section">
+          <div className="m-section-h">
+            <div className="lbl">
+              발급 사유{' '}
+              <span style={{ fontWeight: 500, color: 'var(--z-500)' }}>(선택)</span>
+            </div>
+          </div>
+          <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+            <div style={{ padding: '8px 16px' }}>
+              <textarea
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="예: 은행 제출용, 취업 준비 등"
+                aria-label="발급 사유"
+                style={{
+                  width: '100%',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  resize: 'none',
+                  color: 'var(--z-900)',
+                  padding: '8px 0',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ── 파일 첨부 */}
+        <div className="m-section">
+          <div className="m-section-h">
+            <div className="lbl">파일 첨부</div>
+          </div>
+          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* 사진 촬영 — capture=environment (JM3: 권한 거부 시 브라우저 알림) */}
+            <input
+              ref={cameraRef}
+              id={cameraInputId}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={onCameraChange}
+              disabled={submitting}
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                padding: 0,
+                margin: -1,
+                overflow: 'hidden',
+                clip: 'rect(0,0,0,0)',
+                whiteSpace: 'nowrap',
+                borderWidth: 0,
+              }}
+              aria-label="카메라로 사진 촬영"
+            />
+            <label
+              htmlFor={cameraInputId}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '13px 16px',
+                borderRadius: 12,
+                border: '1.5px solid var(--m-border)',
+                background: 'var(--m-card)',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontSize: 14,
+                fontWeight: 700,
+                color: submitting ? 'var(--z-400)' : 'var(--z-800)',
+              }}
+            >
+              <MIcon name="camera" size={18} color={submitting ? 'var(--z-400)' : 'var(--m-accent)'} />
+              사진 촬영
+            </label>
+
+            {/* 파일 선택 (JM6) */}
+            <input
+              ref={fileRef}
+              id={fileInputId}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={onFileChange}
+              disabled={submitting}
+              style={{
+                position: 'absolute',
+                width: 1,
+                height: 1,
+                padding: 0,
+                margin: -1,
+                overflow: 'hidden',
+                clip: 'rect(0,0,0,0)',
+                whiteSpace: 'nowrap',
+                borderWidth: 0,
+              }}
+              aria-label="파일 선택 (이미지 또는 PDF)"
+            />
+            <label
+              htmlFor={fileInputId}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '13px 16px',
+                borderRadius: 12,
+                border: '1.5px solid var(--m-border)',
+                background: 'var(--m-card)',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                fontSize: 14,
+                fontWeight: 700,
+                color: submitting ? 'var(--z-400)' : 'var(--z-800)',
+              }}
+            >
+              <MIcon name="paperclip" size={18} color={submitting ? 'var(--z-400)' : 'var(--m-accent)'} />
+              파일 선택 (이미지·PDF)
+            </label>
+
+            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.6 }}>
+              허용 형식: JPEG·PNG·WEBP·HEIC·PDF · 최대 30MB
+              <br />
+              파일 선택 즉시 업로드가 시작됩니다.
+            </div>
+
+            {submitting && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: 'var(--m-accent-soft)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--m-accent)',
+                }}
+                role="status"
+                aria-live="polite"
+              >
+                <MIcon name="upload" size={15} />
+                제출 중…
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 제출 이력 */}
+        <SubmissionHistory
+          rows={history}
+          loading={historyLoading}
+          onRefresh={() => void fetchHistory()}
+        />
+
+        <div style={{ height: 32 }} />
       </div>
     </div>
   );

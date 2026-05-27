@@ -36,7 +36,7 @@ const RETRY_BACKOFF_MS = 5000;
 // 타입
 // ─────────────────────────────────────────────────────────────
 
-export type UploadPlanRequester = 'chat' | 'board';
+export type UploadPlanRequester = 'chat' | 'board' | 'approval' | 'submission';
 
 export type UploadSuccessAction = {
   kind: 'insert' | 'update';
@@ -156,7 +156,13 @@ async function requestPlan(
   mimeType: string,
   sizeBytes: number,
 ): Promise<{ ok: true; signedUrl: string; publicUrl: string; headers: Record<string, string> } | { ok: false; error: string }> {
-  const endpoint = requester === 'chat' ? '/api/chat/upload' : '/api/board/upload';
+  const endpointMap: Record<UploadPlanRequester, string> = {
+    chat: '/api/chat/upload',
+    board: '/api/board/upload',
+    approval: '/api/approval/upload',
+    submission: '/api/submission/upload',
+  };
+  const endpoint = endpointMap[requester];
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
