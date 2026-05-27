@@ -48,16 +48,13 @@ export function MessengerConversationPanel({ controller }: MessengerConversation
               )}
             </div>
             <div className="min-w-0">
-              <h3 className={`text-[13px] font-bold text-foreground ${c.selectedRoom.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'}`}>
+              <h3 className={`chat-h-name ${c.selectedRoom.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'}`}>
                 {c.selectedRoomLabel}
+                {!c.selectedPeer && c.roomMembers?.length > 0 && (
+                  <span className="chat-h-cnt">{c.roomMembers.length}명</span>
+                )}
               </h3>
-              <div className="flex items-center gap-1.5 text-[10px] font-medium">
-                {!c.selectedPeer ? (
-                  <>
-                    <p className="text-[var(--toss-gray-4)]">{c.roomMembers.length || 0}명 참여중</p>
-                    <span className="text-[var(--toss-gray-4)]">·</span>
-                  </>
-                ) : null}
+              <div className="chat-h-sub">
                 <span className={`inline-flex items-center gap-1 ${c.realtimeConnectionMeta.textClassName}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${c.realtimeConnectionMeta.dotClassName}`} />
                   <span>{c.realtimeConnectionMeta.label}</span>

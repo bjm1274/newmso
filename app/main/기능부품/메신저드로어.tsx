@@ -119,10 +119,10 @@ function DrawerSectionHeader({
   onArchive?: (() => void) | null;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 px-1">
+    <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
-        <p className="truncate text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">{title}</p>
-        <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+        <p className="lbl truncate">{title}</p>
+        <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
           {count}
         </span>
       </div>
@@ -261,23 +261,92 @@ function MessengerDrawerImpl({
       <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" onClick={onClose} aria-hidden="true" />
       <div
         data-testid="chat-room-drawer"
-        className="absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-sm animate-in slide-in-from-right duration-300 md:w-[260px] dark:bg-zinc-900"
+        className="chat-drawer absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 border-l border-[var(--border)] animate-in slide-in-from-right duration-300 md:w-[260px]"
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] p-4">
-          <span className="text-sm font-bold">채팅방 정보</span>
+        <div className="chat-drawer-head">
+          <span>채팅방 정보</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[var(--radius-md)] p-2 text-[var(--toss-gray-3)] hover:text-[var(--foreground)]"
+            className="x"
+            aria-label="닫기"
           >
-            닫기
+            ✕
           </button>
         </div>
 
-        <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
-          <div className="space-y-2 rounded-2xl bg-[var(--tab-bg)] p-3 dark:bg-zinc-800/50">
+        <div className="chat-drawer-body custom-scrollbar">
+          {/* 참여자 (라이브 정답 1순위 — 맨 위) */}
+          <div className="chat-drawer-sec">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold">알림 설정</span>
+              <p className="lbl">
+                참여자 ({roomMembers.length || 0})
+              </p>
+              {selectedRoom?.id !== NOTICE_ROOM_ID ? (
+                <button
+                  type="button"
+                  data-testid="chat-open-add-member-modal"
+                  onClick={onOpenAddMemberModal}
+                  className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-3)] transition-colors hover:text-[var(--success)]"
+                  aria-label="멤버 추가"
+                >
+                  +
+                </button>
+              ) : null}
+            </div>
+            <div className="chat-mem-grid">
+              {roomMembers.map((member, index) => {
+                const memberId = String(member.id);
+                const resolvedMember =
+                  selectedRoom?.id === NOTICE_ROOM_ID || !selectedRoom
+                    ? member
+                    : resolveRoomMemberProfile(selectedRoom, memberId) || member;
+                const tones = ['pink', 'violet', 'blue', 'green', 'gray'] as const;
+                const tone = tones[index % tones.length];
+                const initial = String(resolvedMember?.name || '?').charAt(0);
+                const photoUrl = getProfilePhotoUrl(resolvedMember);
+
+                return (
+                  <div
+                    data-testid={`chat-room-member-${memberId}`}
+                    key={memberId}
+                    className="group relative"
+                    title={resolvedMember?.name || '이름 없음'}
+                  >
+                    <div className={`chat-mem tone-${tone}`}>
+                      {photoUrl ? (
+                        <img
+                          src={photoUrl}
+                          alt=""
+                          className="h-full w-full rounded-[inherit] object-cover"
+                        />
+                      ) : (
+                        initial
+                      )}
+                    </div>
+                    {isOwner && memberId !== ownerId ? (
+                      <button
+                        type="button"
+                        data-testid={`chat-remove-member-${memberId}`}
+                        onClick={() => {
+                          void onRemoveRoomMember(memberId);
+                        }}
+                        aria-label={`${resolvedMember?.name || '멤버'} 내보내기`}
+                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 알림 설정 */}
+          <div className="chat-drawer-sec">
+            <div className="chat-drawer-row">
+              <span className="text-[12px] font-bold text-[var(--foreground)]">알림 설정</span>
               <button
                 type="button"
                 onClick={() => void onToggleRoomNotify()}
@@ -288,17 +357,17 @@ function MessengerDrawerImpl({
               </button>
             </div>
             {roomNotifyOn && (
-              <div className="border-t border-[var(--border)] pt-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">알림 모드</span>
+              <>
+                <div className="chat-drawer-row">
+                  <span>알림 모드</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     roomNotificationMode === 'all'
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                      ? 'bg-[var(--accent-soft)] text-[var(--accent)]'
                       : roomNotificationMode === 'mention_only'
-                        ? 'bg-amber-500/10 text-amber-700'
+                        ? 'bg-[var(--warning-soft)] text-[var(--warning)]'
                         : roomNotificationMode === 'keyword'
-                          ? 'bg-emerald-500/10 text-emerald-700'
-                          : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                          ? 'bg-[var(--success-soft)] text-[var(--success)]'
+                          : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
                   }`}>
                     {roomNotificationMode === 'all'
                       ? '모든 메시지'
@@ -310,18 +379,18 @@ function MessengerDrawerImpl({
                   </span>
                 </div>
                 {roomNotificationMode === 'keyword' && (
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <span className="text-[10px] text-[var(--toss-gray-4)]">키워드</span>
+                  <div className="chat-drawer-row">
+                    <span>키워드 필터</span>
                     {roomNotificationKeyword ? (
-                      <span className="rounded-[var(--radius-md)] bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--accent)]">
-                        {roomNotificationKeyword.split(',').filter(Boolean).length}개 설정됨
+                      <span className="rounded-[var(--radius-md)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent)]">
+                        {roomNotificationKeyword.split(',').filter(Boolean).length}개
                       </span>
                     ) : (
                       <span className="text-[10px] text-[var(--toss-gray-3)]">없음</span>
                     )}
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
@@ -338,18 +407,16 @@ function MessengerDrawerImpl({
             <span className="text-[10px] font-bold text-blue-400 transition-transform group-hover:translate-x-1">열기</span>
           </button>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 px-1">
+          <div className="chat-drawer-sec">
+            <div className="flex items-center gap-1.5">
               <span className="text-[11px]" aria-hidden="true">📌</span>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">상단 공지</p>
+              <p className="lbl">상단 공지</p>
             </div>
             <div
               data-testid="chat-drawer-notice"
-              className={`rounded-[var(--radius-lg)] border p-3.5 ${
-                hasNoticeMessage
-                  ? 'border-[var(--accent)]/20 bg-[var(--accent-light,_#eff6ff)] dark:border-[var(--accent)]/30 dark:bg-[var(--accent)]/10'
-                  : 'border-[var(--border)] bg-[var(--tab-bg)] dark:bg-zinc-800/30'
-              }`}
+              className={hasNoticeMessage
+                ? 'chat-pin'
+                : 'rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-3 text-center'}
             >
               {hasNoticeMessage ? (
                 <div className="space-y-2">
@@ -396,9 +463,9 @@ function MessengerDrawerImpl({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">최근 스레드</p>
+          <div className="chat-drawer-sec">
+            <div className="flex items-center justify-between">
+              <p className="lbl">최근 스레드</p>
               <span className="rounded-full bg-[var(--tab-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
                 {threadOverviews.length}
               </span>
@@ -506,7 +573,7 @@ function MessengerDrawerImpl({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="chat-drawer-sec">
             <DrawerSectionHeader
               title="사진 및 동영상"
               count={sortedMediaMessages.length}
@@ -516,11 +583,11 @@ function MessengerDrawerImpl({
               archiveTestId="chat-open-media-archive-media"
               onArchive={sortedMediaMessages.length > 0 ? () => onOpenMediaArchive('media') : null}
             />
-            <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-2xl">
+            <div className="chat-media-grid">
               {visibleMediaMessages.map((message) => (
                 <div
                   key={message.id}
-                  className="group relative aspect-square cursor-pointer bg-[var(--tab-bg)] dark:bg-zinc-800"
+                  className="chat-media group relative cursor-pointer overflow-hidden bg-[var(--muted)]"
                   onClick={() => onPreviewMessage(message)}
                 >
                   {resolveAttachmentKind(message.file_url, message.file_kind) === 'image' ? (
@@ -727,65 +794,6 @@ function MessengerDrawerImpl({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
-                참여자 ({roomMembers.length || 0})
-              </p>
-              {selectedRoom?.id !== NOTICE_ROOM_ID ? (
-                <button
-                  type="button"
-                  data-testid="chat-open-add-member-modal"
-                  onClick={onOpenAddMemberModal}
-                  className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] transition-colors hover:text-emerald-500 dark:bg-zinc-800"
-                >
-                  +
-                </button>
-              ) : null}
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {roomMembers.map((member) => {
-                const memberId = String(member.id);
-                const resolvedMember =
-                  selectedRoom?.id === NOTICE_ROOM_ID || !selectedRoom
-                    ? member
-                    : resolveRoomMemberProfile(selectedRoom, memberId) || member;
-
-                return (
-                  <div
-                    data-testid={`chat-room-member-${memberId}`}
-                    key={memberId}
-                    className="group relative flex flex-col items-center gap-1"
-                  >
-                    <div className="relative">
-                      <MessengerAvatar
-                        name={resolvedMember?.name}
-                        photoUrl={getProfilePhotoUrl(resolvedMember)}
-                        className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-600 dark:bg-emerald-900/30"
-                        decorative
-                      />
-                      {isOwner && memberId !== ownerId ? (
-                        <button
-                          type="button"
-                          data-testid={`chat-remove-member-${memberId}`}
-                          onClick={() => {
-                            void onRemoveRoomMember(memberId);
-                          }}
-                          aria-label={`${resolvedMember?.name || '멤버'} 내보내기`}
-                          className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-                        >
-                          ×
-                        </button>
-                      ) : null}
-                    </div>
-                    <p className="w-full truncate text-center text-[9px] font-bold text-[var(--foreground)]">
-                      {resolvedMember?.name || '이름 없음'}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         <div className="flex flex-col gap-2 border-t border-[var(--border)] bg-[var(--tab-bg)] p-4 dark:bg-zinc-800/50">

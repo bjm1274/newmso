@@ -79,23 +79,16 @@ type MessengerSidebarProps = {
   onOpenDirectChat: (staff: StaffMember) => void | Promise<void>;
 };
 
-// room id/name 해시로 팔레트 인덱스 파생 — tone 데이터가 없을 때 사용
-const TONE_PALETTES = [
-  { bg: 'bg-blue-500', text: 'text-white' },
-  { bg: 'bg-amber-500', text: 'text-white' },
-  { bg: 'bg-green-500', text: 'text-white' },
-  { bg: 'bg-cyan-500', text: 'text-white' },
-  { bg: 'bg-violet-500', text: 'text-white' },
-  { bg: 'bg-pink-500', text: 'text-white' },
-  { bg: 'bg-gray-500', text: 'text-white' },
-] as const;
+// 라이브 정답 tone 팔레트 (handoff/03-chat-채팅) — .chat-room-pic.tone-*
+const TONE_NAMES = ['blue', 'amber', 'green', 'cyan', 'violet', 'pink', 'gray'] as const;
+type ChatRoomTone = (typeof TONE_NAMES)[number];
 
-function hashRoomTone(seed: string): (typeof TONE_PALETTES)[number] {
+function hashRoomTone(seed: string): ChatRoomTone {
   let h = 0;
   for (let i = 0; i < seed.length; i++) {
     h = (h * 31 + seed.charCodeAt(i)) & 0xffff;
   }
-  return TONE_PALETTES[h % TONE_PALETTES.length];
+  return TONE_NAMES[h % TONE_NAMES.length];
 }
 
 // 마지막 메시지 시각 포맷 — 오늘이면 HH:mm, 아니면 MM/DD
@@ -149,21 +142,16 @@ export function MessengerSidebar({
 
   return (
     <aside
-      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-[var(--submenu-width,220px)] border-r border-[var(--border)] bg-[var(--card)] flex-col shrink-0 z-50 transition-all`}
+      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} chat-side w-full md:w-[var(--submenu-width,220px)] border-r border-[var(--border)] bg-[var(--card)] shrink-0 z-50 transition-all`}
     >
-      {/* 상단 헤더: 세그먼트 토글 + 검색 */}
-      <div className="px-3 pt-3 pb-2 space-y-2 shrink-0">
-        {/* 채팅/조직도 세그먼트 토글 — 높이 24px 고정 */}
-        <div className="flex h-6 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5 gap-0.5">
+      {/* 상단 헤더: 채팅/조직도 탭 + 검색 (라이브 §2-1 .chat-side-head) */}
+      <div className="chat-side-head">
+        <div className="chat-tabs">
           <button
             type="button"
             data-testid="chat-tab-chat"
             onClick={() => onViewModeChange('chat')}
-            className={`flex-1 text-[10px] font-bold rounded-[var(--radius-sm)] transition-all ${
-              viewMode === 'chat'
-                ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
-                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)]'
-            }`}
+            className={viewMode === 'chat' ? 'on' : ''}
           >
             채팅
           </button>
@@ -171,18 +159,13 @@ export function MessengerSidebar({
             type="button"
             data-testid="chat-tab-org"
             onClick={() => onViewModeChange('org')}
-            className={`flex-1 text-[10px] font-bold rounded-[var(--radius-sm)] transition-all ${
-              viewMode === 'org'
-                ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
-                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)]'
-            }`}
+            className={viewMode === 'org' ? 'on' : ''}
           >
             조직도
           </button>
         </div>
 
-        {/* 검색 input — 돋보기 아이콘 내부 좌측, 클릭·포커스 시 전역 검색 모달 오픈 */}
-        <div className="relative">
+        <div className="relative flex-1 min-w-0">
           <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">
             <Search size={12} />
           </span>
@@ -190,18 +173,18 @@ export function MessengerSidebar({
             type="text"
             data-testid="chat-open-global-search"
             readOnly
-            placeholder="대화 검색"
+            placeholder="이름·메시지 검색"
             onClick={onOpenGlobalSearch}
             onFocus={onOpenGlobalSearch}
-            className="w-full h-7 pl-7 pr-2 text-[11px] bg-[var(--tab-bg)] border border-transparent rounded-[var(--radius-md)] text-[var(--toss-gray-4)] placeholder:text-[var(--toss-gray-3)] cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-colors"
+            className="w-full h-7 pl-7 pr-2 text-[11px] bg-[var(--muted)] border border-transparent rounded-[var(--radius-md)] text-[var(--toss-gray-5)] placeholder:text-[var(--toss-gray-3)] cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-colors"
           />
         </div>
       </div>
 
       {/* 방 목록 / 조직도 */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 custom-scrollbar">
+      <div className="chat-side-scroll px-2 pb-2 custom-scrollbar">
         {viewMode === 'chat' ? (
-          <div className="space-y-0.5">
+          <>
             {/* 숨김 토글 링크 */}
             <div className="flex items-center justify-end px-1 py-1">
               <button
@@ -216,46 +199,42 @@ export function MessengerSidebar({
 
             {/* 고정 그룹 */}
             {pinnedItems.length > 0 && (
-              <div className="mb-1">
-                <p className="px-1 py-0.5 text-[11px] font-[800] text-[var(--muted)]">고정</p>
-                <div className="space-y-0.5">
-                  {pinnedItems.map((item) => (
-                    <RoomRow
-                      key={item.roomId}
-                      item={item}
-                      actionRoomId={actionRoomId}
-                      isMobile={isMobile}
-                      onRoomClick={onRoomClick}
-                      onToggleRoomPinned={onToggleRoomPinned}
-                      onToggleRoomHidden={onToggleRoomHidden}
-                      setActionRoomId={setActionRoomId}
-                    />
-                  ))}
-                </div>
-              </div>
+              <>
+                <div className="chat-side-lbl">고정</div>
+                {pinnedItems.map((item) => (
+                  <RoomRow
+                    key={item.roomId}
+                    item={item}
+                    actionRoomId={actionRoomId}
+                    isMobile={isMobile}
+                    onRoomClick={onRoomClick}
+                    onToggleRoomPinned={onToggleRoomPinned}
+                    onToggleRoomHidden={onToggleRoomHidden}
+                    setActionRoomId={setActionRoomId}
+                  />
+                ))}
+              </>
             )}
 
             {/* 대화 그룹 */}
             {unpinnedItems.length > 0 && (
-              <div>
-                <p className="px-1 py-0.5 text-[11px] font-[800] text-[var(--muted)]">대화</p>
-                <div className="space-y-0.5">
-                  {unpinnedItems.map((item) => (
-                    <RoomRow
-                      key={item.roomId}
-                      item={item}
-                      actionRoomId={actionRoomId}
-                      isMobile={isMobile}
-                      onRoomClick={onRoomClick}
-                      onToggleRoomPinned={onToggleRoomPinned}
-                      onToggleRoomHidden={onToggleRoomHidden}
-                      setActionRoomId={setActionRoomId}
-                    />
-                  ))}
-                </div>
-              </div>
+              <>
+                <div className="chat-side-lbl" style={{ marginTop: 6 }}>대화</div>
+                {unpinnedItems.map((item) => (
+                  <RoomRow
+                    key={item.roomId}
+                    item={item}
+                    actionRoomId={actionRoomId}
+                    isMobile={isMobile}
+                    onRoomClick={onRoomClick}
+                    onToggleRoomPinned={onToggleRoomPinned}
+                    onToggleRoomHidden={onToggleRoomHidden}
+                    setActionRoomId={setActionRoomId}
+                  />
+                ))}
+              </>
             )}
-          </div>
+          </>
         ) : (
           /* 조직도 뷰 */
           <div data-testid="chat-org-list" className="space-y-3 pt-1">
@@ -416,23 +395,21 @@ function RoomRow({
     onRoomClick(room.id);
   };
 
+  // 라이브 정답 tone: 공지=accent, 그룹/DM=hashRoomTone, peer avatar는 사진 우선
+  const picTone = isNoticeChannel ? 'accent' : tone;
+  const presence = peerName && !isGroupRoom && !isNoticeChannel
+    ? (isPeerOnline ? 'on' : 'off')
+    : null;
+
   const cardBody = (
     <div
       onDoubleClick={(e) => {
         e.preventDefault();
         setActionRoomId((current) => (current === roomId ? null : roomId));
       }}
-      className={`group rounded-[var(--radius-md)] cursor-pointer transition-all border relative overflow-hidden ${
-        isSelected
-          ? 'bg-zinc-800 border-zinc-700 shadow-sm'
-          : 'bg-transparent border-transparent hover:bg-[var(--tab-bg)] hover:border-[var(--border)]'
-      }`}
+      className="relative"
     >
-      {isSelected && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
-      )}
-
-      {/* 메인 행 — 그리드 30/1fr/auto */}
+      {/* 메인 row — 라이브 §2-1 .chat-room */}
       <div
         role="button"
         tabIndex={0}
@@ -444,93 +421,58 @@ function RoomRow({
             handlePrimaryClick();
           }
         }}
-        className="grid grid-cols-[30px_1fr_auto] items-center gap-2 px-2 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] rounded-[var(--radius-md)]"
+        className={`chat-room${isSelected ? ' on' : ''} focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]`}
       >
-        {/* 좌: 30×30 아바타 */}
+        {/* 좌: 30×30 아바타 (.chat-room-pic.tone-*) */}
         <div
           data-testid={`chat-room-icon-${roomId}`}
-          className="relative w-[30px] h-[30px] shrink-0 flex items-center justify-center rounded-[var(--radius-md)] overflow-hidden"
+          className={`chat-room-pic tone-${picTone}`}
         >
           {isNoticeChannel ? (
-            <div className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]`}>
-              <Bell size={13} />
-            </div>
+            <Bell size={14} />
+          ) : peerName && !isGroupRoom && peerPhotoUrl ? (
+            <MessengerAvatar
+              name={peerName || label}
+              photoUrl={peerPhotoUrl}
+              className="w-full h-full flex items-center justify-center overflow-hidden rounded-full text-[10px] font-bold"
+              decorative
+            />
           ) : isGroupRoom ? (
-            <div
-              className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] text-[9px] font-black leading-none ${tone.bg} ${tone.text}`}
-            >
-              {groupBadgeText}
-            </div>
-          ) : peerName ? (
-            <>
-              <MessengerAvatar
-                name={peerName || label}
-                photoUrl={peerPhotoUrl}
-                className="w-full h-full flex items-center justify-center overflow-hidden rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-4)]"
-                decorative
-              />
-              {/* 출근 dot: 출근중=green, 출근전=amber */}
-              <span
-                className={`absolute right-0 bottom-0 w-2 h-2 rounded-full border-2 border-[var(--card)] ${
-                  isPeerOnline ? 'bg-[var(--success,#10B981)]' : 'bg-[#FBBF24]'
-                }`}
-              />
-            </>
+            <span>{groupBadgeText}</span>
           ) : (
-            <div
-              className={`w-full h-full flex items-center justify-center rounded-[var(--radius-md)] text-[9px] font-black ${tone.bg} ${tone.text}`}
-            >
-              {label.charAt(0)}
-            </div>
+            <span>{(peerName || label || '?').charAt(0)}</span>
           )}
+          {presence && <span className={`chat-room-dot ${presence}`} />}
         </div>
 
-        {/* 중: 이름 row1 + 미리보기 row2 */}
-        <div
-          data-testid={`chat-room-summary-${roomId}`}
-          className="min-w-0 flex flex-col gap-0.5"
-        >
-          {/* row1: 이름 + 인원 + 시각 */}
-          <div className="flex items-center gap-1 min-w-0">
-            <p
+        {/* 중: 이름 row1 + 미리보기 row2 (.chat-room-body) */}
+        <div className="chat-room-body" data-testid={`chat-room-summary-${roomId}`}>
+          <div className="chat-room-top">
+            <span
+              className="chat-room-name"
               title={isGroupRoom ? label : undefined}
-              className={`truncate text-[12px] font-[800] leading-tight flex-1 min-w-0 ${
-                isSelected ? 'text-white' : 'text-[var(--foreground)]'
-              }`}
             >
               {label || '단체 채팅방'}
-            </p>
+            </span>
             {isGroupRoom && participantCount > 0 && (
-              <span className={`shrink-0 text-[10px] ${isSelected ? 'text-white/60' : 'text-[var(--toss-gray-3)]'}`}>
-                {participantCount}
-              </span>
+              <span className="chat-room-cnt">{participantCount}명</span>
             )}
+            {timeStr && <span className="chat-room-at">{timeStr}</span>}
           </div>
-
-          {/* row2: 미리보기 */}
-          <p
+          <div
+            className="chat-room-last"
             data-testid={`chat-room-preview-${roomId}`}
-            className={`text-[11px] truncate leading-tight ${
-              isSelected ? 'text-white/60' : 'text-[var(--toss-gray-3)]'
-            }`}
           >
             {preview}
-          </p>
+          </div>
         </div>
 
-        {/* 우: 시각 + 배지 */}
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {timeStr && (
-            <span className={`text-[10px] tabular-nums leading-tight ${isSelected ? 'text-white/50' : 'text-[var(--toss-gray-3)]'}`}>
-              {timeStr}
-            </span>
-          )}
-          {unread > 0 && (
-            <span className="inline-flex w-[18px] h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-bold text-white leading-none">
-              {unread > 99 ? '99+' : unread}
-            </span>
-          )}
-        </div>
+        {/* 우: 안 읽음 chip (.chat-room-badge) */}
+        {unread > 0 && (
+          <span className="chat-room-badge">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
       </div>
 
       {/* 더블클릭 액션 패널 */}
@@ -606,7 +548,7 @@ function NewConversationButton({ onOpenGroupModal }: { onOpenGroupModal?: () => 
         data-testid="chat-new-conversation"
         onClick={onOpenGroupModal}
         disabled={!onOpenGroupModal}
-        className="w-full h-8 flex items-center justify-center gap-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] border border-dashed border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        className="chat-side-add w-full disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <span className="text-base leading-none">+</span>
         새 대화 시작

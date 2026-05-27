@@ -398,7 +398,7 @@ function MessengerComposerImpl({
         </div>
       )}
 
-      <div className={`flex items-end gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/50 px-1.5 py-1 transition-all md:gap-1.5 md:px-2 md:py-1.5 ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+      <div className={`chat-composer items-end ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
         ? 'opacity-60 pointer-events-none'
         : ''
         }`}>
@@ -422,7 +422,7 @@ function MessengerComposerImpl({
         />
 
         {/* 좌측 액션바: +(첨부) / 이모지 — 투표는 채팅방 정보(드로어)에서, 멘션은 @ 입력으로 */}
-        <div className="flex shrink-0 items-center gap-0.5 pb-0.5">
+        <div className="chat-comp-actions shrink-0 pb-0.5">
           {/* 첨부 */}
           <button
             type="button"
@@ -482,7 +482,7 @@ function MessengerComposerImpl({
         </div>
 
         {/* 가운데: 자라나는 textarea */}
-        <div className="relative flex-1">
+        <div className="chat-comp-input relative flex-1">
           <textarea
             ref={composerRef}
             data-testid="chat-message-input"
@@ -522,13 +522,13 @@ function MessengerComposerImpl({
           )}
         </div>
 
-        {/* 우측: 36×36 accent 원형 send 버튼 */}
+        {/* 우측: 라이브 §2-2 .chat-comp-send */}
         <button
           type="button"
           data-testid="chat-send-button"
           onClick={() => void onSendMessage()}
           aria-label="메시지 전송"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 mb-0.5"
+          className="chat-comp-send shrink-0 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 mb-0.5"
         >
           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 10l12-6-4 6 4 6-12-6z" />

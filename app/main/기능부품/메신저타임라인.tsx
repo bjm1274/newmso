@@ -1,5 +1,5 @@
 'use client';
-
+// 2026-05-27 (14) 채팅 액션 박스 통합 — MessageActionsHost via 메신저액션서브
 import { useLayoutEffect, useEffect, useState, useRef, useCallback, memo } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
@@ -17,6 +17,7 @@ import {
 import { MessengerAvatar } from './메신저공통';
 import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS, toChatDate } from './메신저유틸';
 import type { ThreadSummary } from './메신저파생훅';
+import { MessageActionsHost } from './메신저액션서브';
 import { MenuIcon } from './조직도서브/조직도측면창';
 
 type PollItem = {
@@ -774,16 +775,50 @@ function MessengerTimelineComponent({
                 );
               lastSenderId = String(msg.sender_id);
 
+              const hostEnabled = !isSystemInvite && !isDeletedMessage;
+              const hostReact = (emoji: string) => {
+                void onToggleReaction(msg, emoji);
+              };
+              const hostReply = () => onStartReplyToMessage(msg);
+              const hostCopy = () => {
+                void copyMessageText(msg);
+              };
+              const hostForward = () => onForwardMessage(msg);
+              const hostBookmark = () => {
+                void onToggleBookmark(msg);
+              };
+              const hostTask = () => {
+                void onAddTask(msg);
+              };
+              const hostDelete = isMine
+                ? () => {
+                    void onDeleteMessage(msg);
+                  }
+                : undefined;
+
               return (
-                <div key={msg.id} data-testid={`chat-message-row-${msg.id}`} className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}>
+                <MessageActionsHost
+                  key={msg.id}
+                  mine={isMine}
+                  canDelete={isMine && !isDeletedMessage}
+                  enableHoverToolbar={hostEnabled}
+                  enableContextMenu={hostEnabled}
+                  testId={`chat-message-row-${msg.id}`}
+                  className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}
+                  onReact={hostReact}
+                  onReply={hostReply}
+                  onCopy={hostCopy}
+                  onForward={hostForward}
+                  onBookmark={hostBookmark}
+                  onTask={hostTask}
+                  onDelete={hostDelete}
+                >
                   {showDateDivider && (
                     renderDateDivider(dateLabel, dateKey, dateShort)
                   )}
                   {isSystemInvite ? (
                     <div className="flex justify-center my-1" role="status" aria-live="polite">
-                      <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
-                        초대 {systemText}
-                      </span>
+                      <span className="chat-system">초대 {systemText}</span>
                     </div>
                   ) : (
                     <div
@@ -812,7 +847,7 @@ function MessengerTimelineComponent({
                           {!isMine && showIncomingAvatar && (
                             <span
                               data-testid={`chat-message-sender-name-${msg.id}`}
-                              className="mb-1 px-0.5 text-[11px] font-bold leading-none text-[var(--toss-gray-4)]"
+                              className="chat-bub-name"
                             >
                               {senderName}
                             </span>
@@ -1063,7 +1098,7 @@ function MessengerTimelineComponent({
                       )}
                     </div>
                   )}
-                </div>
+                </MessageActionsHost>
               );
             });
           })()
