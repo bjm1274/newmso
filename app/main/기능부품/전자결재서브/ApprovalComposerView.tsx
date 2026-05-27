@@ -14,8 +14,7 @@ import ReportApprovalForm from './ReportApprovalForm';
 import type { ApprovalCcUser, ApproverTemplate } from '../전자결재-types';
 import { normalizeComposeFormType } from '../전자결재-utils';
 import { LucideIcon } from '../조직도서브/조직도측면창';
-import ApprovalApproverLinePanel from './ApprovalApproverLinePanel';
-import ApprovalLineTimeline from './ApprovalLineTimeline';
+import ApprovalFlowCard from './ApprovalFlowCard';
 
 type ApprovalComposerViewProps = {
   user: StaffMember | null;
@@ -189,20 +188,8 @@ export default function ApprovalComposerView({
 
   const submitDisabled = !hasApproverSelection || !contentReady || isSubmitting;
 
-  // 결재 흐름 미리보기용 가상 item (작성 중 모드)
-  const composePreviewItem = useMemo<Record<string, unknown>>(
-    () => ({
-      sender_id: user?.id || '',
-      sender_name: user?.name || '기안자(나)',
-      status: '대기',
-      created_at: new Date().toISOString(),
-      meta_data: { approver_line: approverLine.map((approver) => String(approver.id)) },
-    }),
-    [user, approverLine],
-  );
-
   return (
-    <div className="mx-auto w-full max-w-[62.4rem] space-y-3 pb-6">
+    <div className="mx-auto w-full max-w-[62.4rem] pb-6 ap-compose single space-y-3">
       {isEditingApproval && (
         <div className="app-card flex items-start gap-3 border-[var(--accent)]/25 bg-[var(--accent-selected-subtle)] p-3">
           <span className="erp-icon-box h-8 w-8 shrink-0 bg-[var(--card)] text-[var(--accent)]">
@@ -240,8 +227,8 @@ export default function ApprovalComposerView({
         </div>
       )}
 
-      {/* 헤더: 양식 드롭다운 + 상신 액션 (H1·서브 라인 제거 — 사용자 결정 27번) */}
-      <header className="app-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* 헤더: 양식 드롭다운 + 상신 액션 (라이브 §3-4 .mod-pageheader) */}
+      <header className="mod-pageheader">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2">
             <span className="text-[11px] font-black text-[var(--muted-foreground)]">양식</span>
@@ -317,47 +304,33 @@ export default function ApprovalComposerView({
         </div>
       </header>
 
-      {/* 결재 흐름 카드 — 상신 버튼 바로 아래 (사용자 결정 29번) */}
-      <section className="app-card px-3 py-2.5">
-        <div className="mb-1.5 flex items-center justify-between gap-2">
-          <h2 className="text-[12px] font-black text-[var(--foreground)]">결재 흐름</h2>
-          <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
-            상신 시 첫 결재자에게 알림 발송
-          </span>
-        </div>
-        <ApprovalLineTimeline
-          item={composePreviewItem}
-          staffs={approvalDirectoryStaffs}
-          resolveApprovalLineIds={() => approverLine.map((approver) => String(approver.id))}
-          resolveCurrentApproverId={() => (approverLine[0]?.id ? String(approverLine[0].id) : null)}
-          composeMode
-        />
-        <ApprovalApproverLinePanel
-          approverCandidates={approverCandidates}
-          referenceCandidates={referenceCandidates}
-          approvalDirectoryStaffs={approvalDirectoryStaffs}
-          approverLine={approverLine}
-          setApproverLine={setApproverLine}
-          ccLine={ccLine}
-          setCcLine={setCcLine}
-          hasApproverSelection={hasApproverSelection}
-          approverTemplates={approverTemplates}
-          setApproverTemplates={setApproverTemplates}
-          persistApproverTemplates={persistApproverTemplates}
-          showApproverTemplateMenu={showApproverTemplateMenu}
-          setShowApproverTemplateMenu={setShowApproverTemplateMenu}
-          setTemplateNameInput={setTemplateNameInput}
-          setShowTemplateModal={setShowTemplateModal}
-        />
-      </section>
+      {/* 결재 흐름 카드 — 단계 카드 가로 배치 + dashed 추가 + 참조자 chip row (지시서 05_approval §4-2 (1)) */}
+      <ApprovalFlowCard
+        user={user}
+        approverCandidates={approverCandidates}
+        referenceCandidates={referenceCandidates}
+        approvalDirectoryStaffs={approvalDirectoryStaffs}
+        approverLine={approverLine}
+        setApproverLine={setApproverLine}
+        ccLine={ccLine}
+        setCcLine={setCcLine}
+        hasApproverSelection={hasApproverSelection}
+        approverTemplates={approverTemplates}
+        setApproverTemplates={setApproverTemplates}
+        persistApproverTemplates={persistApproverTemplates}
+        showApproverTemplateMenu={showApproverTemplateMenu}
+        setShowApproverTemplateMenu={setShowApproverTemplateMenu}
+        setTemplateNameInput={setTemplateNameInput}
+        setShowTemplateModal={setShowTemplateModal}
+      />
 
-      {/* 본문 — 단일 컬럼 (사용자 결정 28번) */}
-      <section className="app-card overflow-hidden">
+      {/* 본문 — 단일 컬럼 (라이브 §3-4 card+card-row+ctitle) */}
+      <section className="app-card card overflow-hidden">
         <div className="space-y-4 p-3 sm:p-4">
-          <header className="flex items-center justify-between gap-2">
-            <h2 className="text-[13px] font-black text-[var(--foreground)]">본문 · {activeFormLabel}</h2>
+          <div className="card-row">
+            <div className="ctitle">본문 · {activeFormLabel}</div>
             {isOfficialDispatch && <span className="erp-status erp-status-blue">자동 반영</span>}
-          </header>
+          </div>
 
           <div className="min-h-[220px]">
             {['연차/휴가', '연장근무'].includes(formType) ? (

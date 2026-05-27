@@ -25,6 +25,10 @@ type ApprovalLineTimelineProps = {
   resolveCurrentApproverId: (item: ApprovalRecord) => string | null;
   /** 작성하기 미리보기 모드 (지금/상신 시 알림 표시) */
   composeMode?: boolean;
+  /** composeMode 전용 — staff 카드 hover 시 ✕ 노출 */
+  onRemoveApprover?: (staffId: string, index: number) => void;
+  /** composeMode 전용 — 끝에 dashed `+ 결재자 추가` step 노출 */
+  onAddApprover?: () => void;
 };
 
 const STATE_STYLE: Record<
@@ -211,18 +215,46 @@ function buildSteps({
   return { drafterStep, steps };
 }
 
-function StepCard({ step }: { step: Step }) {
-  const style = STATE_STYLE[step.state];
+// 라이브 정답 state → .ap-line-step 클래스 매핑
+const STATE_STEP_CLASS: Record<ApprovalLineStepState, string> = {
+  draft: 'me',
+  done: 'done',
+  rejected: 'rejected',
+  on: 'on',
+  pending: 'pending',
+};
+
+// 라이브 정답 state → .ap-line-when 톤 매핑
+const STATE_WHEN_TONE: Record<ApprovalLineStepState, string> = {
+  draft: 'accent',
+  done: 'success',
+  rejected: 'danger',
+  on: 'waiting',
+  pending: 'muted',
+};
+
+function StepCard({
+  step,
+  onRemove,
+}: {
+  step: Step;
+  onRemove?: () => void;
+}) {
+  const stepClass = STATE_STEP_CLASS[step.state];
+  const whenTone = STATE_WHEN_TONE[step.state];
   return (
-    <div
-      className="flex min-w-[96px] flex-col items-center gap-1 rounded-[var(--radius-md)] border bg-[var(--card)] px-2 py-1.5"
-      style={{ borderColor: style.border }}
-    >
-      <span
-        aria-hidden
-        className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full text-[12px] font-black"
-        style={{ background: style.pillBg, color: style.pillColor }}
-      >
+    <div className={`ap-line-step ${stepClass}`}>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`${step.name} 결재자 제거`}
+          className="ap-line-step-remove"
+        >
+          <LucideIcon name="X" size={10} strokeWidth={2.6} />
+        </button>
+      )}
+      <div className="ap-line-pic" aria-hidden>
         {step.state === 'done' ? (
           <LucideIcon name="Check" size={12} strokeWidth={2.6} />
         ) : step.state === 'rejected' ? (
@@ -232,36 +264,50 @@ function StepCard({ step }: { step: Step }) {
         ) : (
           (step.name || '·').charAt(0)
         )}
-      </span>
-      <p className="text-center text-[11px] font-black leading-tight" style={{ color: style.nameColor }}>
-        {step.name}
-      </p>
-      <p className="text-center text-[9px] font-semibold leading-tight text-[var(--muted-foreground)]">{step.role}</p>
-      <div
-        className="flex w-full flex-col items-center rounded-[var(--radius-sm,4px)] px-1 py-0.5"
-        style={{ background: style.pillBg, color: style.pillColor }}
-      >
-        <span className="text-[9px] font-black uppercase tracking-wider leading-tight">{step.actionLabel}</span>
-        {step.timeLabel && <span className="text-[9px] font-semibold leading-tight opacity-90">{step.timeLabel}</span>}
+      </div>
+      <div className="ap-line-name">{step.name}</div>
+      <div className="ap-line-role">{step.role}</div>
+      <div className={`ap-line-when ${whenTone}`}>
+        <span className="ap-line-when-act">{step.actionLabel}</span>
+        {step.timeLabel && <span className="ap-line-when-ts">{step.timeLabel}</span>}
       </div>
     </div>
   );
 }
 
-function ConnectorBar({ done }: { done: boolean }) {
+function AddStepButton({ onClick }: { onClick: () => void }) {
   return (
-    <span
-      aria-hidden
-      className="h-0 w-4 shrink-0 self-center border-t-2 border-dashed"
-      style={{ borderColor: done ? 'var(--success)' : 'var(--border)' }}
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="결재자 추가"
+      data-testid="approval-add-approver-step"
+      className="ap-line-step ap-line-step-add"
+    >
+      <span className="ap-line-pic ap-line-pic-add" aria-hidden>
+        <LucideIcon name="Plus" size={14} strokeWidth={2.6} />
+      </span>
+      <div className="ap-line-name">결재자 추가</div>
+      <div className="ap-line-role">단계 추가</div>
+      <div className="ap-line-when muted">
+        <span className="ap-line-when-act">선택 필요</span>
+      </div>
+    </button>
   );
+}
+
+function ConnectorBar({ done }: { done: boolean }) {
+  return <span aria-hidden className={`ap-line-bar${done ? ' done' : ''}`} />;
 }
 
 export default function ApprovalLineTimeline(props: ApprovalLineTimelineProps) {
   const { drafterStep, steps } = useMemo(() => buildSteps(props), [props]);
+  const composeMode = Boolean(props.composeMode);
+  const { onRemoveApprover, onAddApprover } = props;
   const allSteps = drafterStep ? [drafterStep, ...steps] : steps;
-  if (allSteps.length === 0) {
+  const showAddStep = composeMode && Boolean(onAddApprover);
+
+  if (allSteps.length === 0 && !showAddStep) {
     return (
       <p className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[12px] font-semibold text-[var(--muted-foreground)]">
         결재선이 지정되지 않았습니다.
@@ -269,17 +315,33 @@ export default function ApprovalLineTimeline(props: ApprovalLineTimelineProps) {
     );
   }
 
+  const drafterOffset = drafterStep ? 1 : 0;
+
   return (
-    <div className="overflow-x-auto">
-      <div className="flex min-w-fit items-stretch gap-0 pb-1">
-        {allSteps.map((step, index) => (
-          <Fragment key={`${step.staffId || 'drafter'}-${index}`}>
-            <StepCard step={step} />
-            {index < allSteps.length - 1 && (
-              <ConnectorBar done={step.state === 'done' || step.state === 'draft'} />
-            )}
-          </Fragment>
-        ))}
+    <div className={`ap-line${composeMode ? ' compose' : ''} overflow-x-auto`}>
+      <div className="ap-line-row min-w-fit pb-1">
+        {allSteps.map((step, index) => {
+          const isDrafterCard = drafterStep && index === 0;
+          const approverIndex = index - drafterOffset;
+          const canRemove =
+            composeMode && !isDrafterCard && onRemoveApprover && step.staffId !== null;
+          return (
+            <Fragment key={`${step.staffId || 'drafter'}-${index}`}>
+              <StepCard
+                step={step}
+                onRemove={
+                  canRemove
+                    ? () => onRemoveApprover!(step.staffId as string, approverIndex)
+                    : undefined
+                }
+              />
+              {(index < allSteps.length - 1 || showAddStep) && (
+                <ConnectorBar done={step.state === 'done' || step.state === 'draft'} />
+              )}
+            </Fragment>
+          );
+        })}
+        {showAddStep && <AddStepButton onClick={onAddApprover!} />}
       </div>
     </div>
   );
