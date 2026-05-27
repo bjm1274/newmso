@@ -4,8 +4,10 @@
  * 채팅 — 모바일 채팅 라우터.
  * 내부 상태(view=list|room|new + selectedRoomId)로 3 화면을 전환한다.
  * MobileShell이 tab === 'chat' 일 때 마운트.
- * onBack은 시스템 뒤로가기 핸들러 (예약 — 현재 뷰는 모두 자체 뒤로 액션 보유).
- * JM(단일 책임 — 분기만), JM4(any 금지).
+ *
+ * rooms는 여기서 1회 fetch — SChatList와 SChatRoom(QuickSwitchBar) 공유 (JM2 중복 fetch 금지).
+ *
+ * JM(단일 책임 — 분기만), JM2(rooms 1회 fetch), JM4(any 금지).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -13,7 +15,7 @@ import type { ChatRoom, ErpUser } from '@/types';
 import SChatList from './채팅목록';
 import SChatRoom from './채팅방';
 import SFormChat from './새대화';
-import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
+import { useChatRoomsForMobile } from './data-hooks';
 
 type ChatView = 'list' | 'room' | 'new';
 
@@ -27,30 +29,32 @@ export default function 채팅({ user }: 채팅Props) {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
 
-  // 방 진입 시 ChatRoom row 조회 (room props 전달용)
+  const userId = typeof user.id === 'string' ? user.id : null;
+
+  // JM2: 채팅 라우터 최상위에서 1회 fetch — SChatList·QuickSwitchBar 공유
+  const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId);
+
+  // 방 진입 시 rooms 배열에서 room row 찾기 (별도 fetch 불필요)
   useEffect(() => {
     if (view !== 'room' || !selectedRoomId) {
       setSelectedRoom(null);
       return;
     }
-    let active = true;
-    (async () => {
-      try {
-        const { data } = await fetchAllChatRooms();
-        if (!active) return;
-        const found =
-          (Array.isArray(data) ? data : []).find(
-            (room) => String(room.id) === String(selectedRoomId),
-          ) || null;
-        setSelectedRoom(found);
-      } catch {
-        if (active) setSelectedRoom(null);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [view, selectedRoomId]);
+    const found = rooms.find((r) => String(r.id) === selectedRoomId) ?? null;
+    if (found) {
+      setSelectedRoom(found);
+    }
+  }, [view, selectedRoomId, rooms]);
+
+  // rooms가 없을 때 방 진입 시 폴백 — rooms 로드 전 최소 객체로 렌더
+  useEffect(() => {
+    if (view !== 'room' || !selectedRoomId) return;
+    if (selectedRoom) return;
+    // rooms 아직 빈 상태면 refresh 트리거
+    if (rooms.length === 0) {
+      void refreshRooms();
+    }
+  }, [view, selectedRoomId, selectedRoom, rooms.length, refreshRooms]);
 
   const openRoom = useCallback((roomId: string) => {
     setSelectedRoomId(roomId);
@@ -75,18 +79,28 @@ export default function 채팅({ user }: 채팅Props) {
   if (view === 'new') {
     return <SFormChat user={user} onBack={backToList} onCreated={handleCreated} />;
   }
-  if (view === 'room' && selectedRoomId && selectedRoom) {
-    return <SChatRoom user={user} room={selectedRoom} onBack={backToList} />;
-  }
-  if (view === 'room' && selectedRoomId && !selectedRoom) {
-    // 방 조회 중 — 임시로 최소 룸 객체로 렌더 (헤더는 일반 표기)
+
+  if (view === 'room' && selectedRoomId) {
+    const roomForRender: ChatRoom = selectedRoom ??
+      ({ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom);
     return (
       <SChatRoom
         user={user}
-        room={{ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom}
+        room={roomForRender}
         onBack={backToList}
+        recentRooms={rooms}
+        onSwitchRoom={openRoom}
       />
     );
   }
-  return <SChatList user={user} onOpen={openRoom} onNew={openNew} />;
+
+  return (
+    <SChatList
+      user={user}
+      rooms={rooms}
+      onOpen={openRoom}
+      onNew={openNew}
+      onRefresh={refreshRooms}
+    />
+  );
 }

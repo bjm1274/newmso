@@ -150,6 +150,7 @@ export default function 게시판({ user, onBack }: 게시판Props) {
       onBack={onBack}
       userId={userId}
       onStarChanged={handleStarChanged}
+      onRefresh={refetch}
     />
   );
 }

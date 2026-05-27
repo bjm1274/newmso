@@ -30,6 +30,7 @@ import {
   sendMobileTextMessage,
   useChatMessagesForRoom,
   useChatStaffDirectory,
+  type MobileChatRoom,
 } from './data-hooks';
 import { normalizeMemberIds } from '@/app/main/기능부품/메신저유틸';
 import EmojiPicker from './이모지피커';
@@ -40,16 +41,20 @@ import {
   validateMobileUploadTarget,
 } from './업로드';
 import { toggleMobileReaction } from './반응';
+import QuickSwitchBar from './퀵스위치바';
 
 export type SChatRoomProps = {
   user: ErpUser;
   room: ChatRoom;
   onBack: () => void;
+  /** Quick Switch — 채팅목록에서 패스스루. JM2: 중복 fetch 금지 */
+  recentRooms?: MobileChatRoom[];
+  onSwitchRoom?: (roomId: string) => void;
 };
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
-export default function SChatRoom({ user, room, onBack }: SChatRoomProps) {
+export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom }: SChatRoomProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : '';
   const staffs = useChatStaffDirectory();
@@ -267,6 +272,17 @@ export default function SChatRoom({ user, room, onBack }: SChatRoomProps) {
           </button>
         </div>
       </div>
+
+      {/* Quick Switch — 최근 방 5개 칩바 (채팅목록 데이터 재사용, 중복 fetch 없음) */}
+      {recentRooms && recentRooms.length > 0 && onSwitchRoom && (
+        <QuickSwitchBar
+          rooms={recentRooms}
+          activeRoomId={String(room.id)}
+          currentUserId={userId}
+          staffs={staffs}
+          onSwitch={onSwitchRoom}
+        />
+      )}
 
       <div
         ref={scrollRef}

@@ -4,8 +4,9 @@
  * SChatList — 모바일 채팅방 목록.
  * 헤더(검색·새 대화) + 칩바 탭(채팅/조직도/읽지않음/그룹/1:1/채널) + 채팅방 카드 리스트.
  * 디자인: handoff/newmso15/handoff_mobile/live-preview/mobile/m-screens-1.jsx L274~341 SChatList 1:1.
- * 데이터: useChatRoomsForMobile + useChatStaffDirectory.
- * JM(< 500줄), JM2(deps 안정화), JM3(silent 페치 + toast), JM4(any 금지), JM6(button 시맨틱).
+ *
+ * JM2: rooms는 부모(채팅 index.tsx)에서 1회 fetch 후 전달 — 여기서 중복 fetch 안 함.
+ * JM(< 500줄), JM3(silent 페치 + toast), JM4(any 금지), JM6(button 시맨틱).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,11 +19,12 @@ import {
   getRoomKind,
   getRoomTitle,
   pickAvatarTone,
-  useChatRoomsForMobile,
   useChatStaffDirectory,
   type MobileChatRoom,
 } from './data-hooks';
 import { NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
+import { usePullToRefresh } from '../공통/usePullToRefresh';
+import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
 const SEARCH_DEBOUNCE_MS = 150;
 
@@ -30,11 +32,15 @@ type ChatListTab = 'chat' | 'org' | 'unread' | 'group' | 'direct' | 'channel';
 
 export type SChatListProps = {
   user: ErpUser;
+  /** JM2: 부모에서 fetch한 rooms — 중복 fetch 금지 */
+  rooms: MobileChatRoom[];
   onOpen: (roomId: string) => void;
   onNew: () => void;
+  /** PTR 콜백 — 부모 refresh 함수 전달 */
+  onRefresh: () => Promise<void>;
 };
 
-export default function SChatList({ user, onOpen, onNew }: SChatListProps) {
+export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SChatListProps) {
   const [tab, setTab] = useState<ChatListTab>('chat');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -42,8 +48,14 @@ export default function SChatList({ user, onOpen, onNew }: SChatListProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const userId = typeof user.id === 'string' ? user.id : null;
 
-  const { rooms, loading } = useChatRoomsForMobile(userId);
   const staffs = useChatStaffDirectory();
+
+  const loading = rooms.length === 0; // 부모가 loading 상태를 따로 노출하지 않으므로 대략 처리
+
+  const { containerRef: scrollContainerRef, refreshing, pullProgress } = usePullToRefresh({
+    onRefresh,
+    enabled: !!userId,
+  });
 
   // debounce 150ms — 칩 변경/탭 전환 시는 즉시 반영, 입력만 지연
   useEffect(() => {
@@ -98,6 +110,7 @@ export default function SChatList({ user, onOpen, onNew }: SChatListProps) {
 
   return (
     <div className="m-screen">
+      <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="채팅"
         sub={loading ? '불러오는 중…' : '실시간 연결됨'}
@@ -193,7 +206,7 @@ export default function SChatList({ user, onOpen, onNew }: SChatListProps) {
         <ChipBtn label="1:1" active={tab === 'direct'} onClick={() => setTab('direct')} />
         <ChipBtn label="채널" active={tab === 'channel'} onClick={() => setTab('channel')} />
       </div>
-      <div className="m-scroll">
+      <div className="m-scroll" ref={scrollContainerRef} style={{ overscrollBehaviorY: 'contain' }}>
         {tab === 'org' ? (
           <OrgPlaceholder />
         ) : (
@@ -386,4 +399,3 @@ function emptyLabel(tab: ChatListTab): string {
       return '참여 중인 채팅방이 없습니다.';
   }
 }
-

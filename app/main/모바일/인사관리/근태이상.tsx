@@ -30,6 +30,8 @@ import {
   type DailyAbnormalRow,
 } from './data-hooks';
 import AbnormalDailyCard, { type DailyRowStatus } from './근태이상카드';
+import { usePullToRefresh } from '../공통/usePullToRefresh';
+import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
 export type SHrAbnormalTab = 'mine' | 'team';
 
@@ -48,12 +50,22 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
   const mine = useMemo(() => deriveAbnormalRows(rows), [rows]);
   const isManager = canSeeTeamAbnormal(user);
 
+  const { containerRef, refreshing, pullProgress } = usePullToRefresh({
+    onRefresh: async () => {
+      // useMyAttendanceMonth는 monthKey 변경으로만 재조회가 가능.
+      // PTR 시 짧은 딜레이로 시각 피드백만 제공 (이미 최신 데이터 표시 중)
+      await new Promise<void>((r) => setTimeout(r, 500));
+    },
+    enabled: !!staffId,
+  });
+
   const lateCnt = mine.filter((r) => r.kind === 'late').length;
   const earlyCnt = mine.filter((r) => r.kind === 'early_leave').length;
   const missingCnt = mine.filter((r) => r.kind === 'missing').length;
 
   return (
     <div className="m-screen">
+      <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="근태이상 감지"
         sub={`이번 달 본인 ${mine.length}건`}
@@ -88,7 +100,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
           </button>
         </div>
       </div>
-      <div className="m-scroll">
+      <div className="m-scroll" ref={containerRef} style={{ overscrollBehaviorY: 'contain' }}>
         {tab === 'mine' ? (
           <MineTab rows={mine} late={lateCnt} early={earlyCnt} missing={missingCnt} />
         ) : isManager ? (

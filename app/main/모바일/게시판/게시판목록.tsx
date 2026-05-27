@@ -21,6 +21,8 @@ import {
   pickAvatarTone,
 } from './data-hooks';
 import { toggleStarServer } from './별표훅';
+import { usePullToRefresh } from '../공통/usePullToRefresh';
+import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
 export type SBoardProps = {
   posts: BoardListPost[];
@@ -33,6 +35,8 @@ export type SBoardProps = {
   userId: string | null;
   /** 별표 토글 반영용 — 부모 state를 재조회 */
   onStarChanged: (postId: string, starred: boolean) => void;
+  /** PTR 콜백 — 부모 refetch */
+  onRefresh?: () => Promise<void>;
 };
 
 function filterByCat(posts: BoardListPost[], cat: BoardCatId): BoardListPost[] {
@@ -172,11 +176,18 @@ function SBoardBase({
   onBack,
   userId,
   onStarChanged,
+  onRefresh,
 }: SBoardProps) {
   const filtered = useMemo(() => filterByCat(posts, cat), [posts, cat]);
 
+  const { containerRef, refreshing, pullProgress } = usePullToRefresh({
+    onRefresh: onRefresh ?? (() => Promise.resolve()),
+    enabled: !!onRefresh,
+  });
+
   return (
     <div className="m-screen">
+      <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="게시판"
         sub="박철홍정형외과"
@@ -206,7 +217,7 @@ function SBoardBase({
           </button>
         ))}
       </div>
-      <div className="m-scroll">
+      <div className="m-scroll" ref={containerRef} style={{ overscrollBehaviorY: 'contain' }}>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {loading && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
