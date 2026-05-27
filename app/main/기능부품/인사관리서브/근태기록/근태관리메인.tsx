@@ -374,8 +374,9 @@ function buildMonthCalendarCells(selectedMonth: string) {
 
 // 근무형태에 "교대근무 전용 스케줄 여부"(is_shift)가 체크된 경우에만
 // 근무표 생성 도구상자에 노출한다.
+// D1/SQLite에서 BOOLEAN은 INTEGER(0/1)로 반환되므로 Boolean() 변환 사용.
 function isShiftBasedShift(shift: Record<string, unknown>): boolean {
-  return shift?.is_shift === true;
+  return Boolean(shift?.is_shift);
 }
 
 export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, initialView = 'calendar', initialLeaveTab }: AttendanceMainProps) {
