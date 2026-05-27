@@ -16,8 +16,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import {
@@ -77,15 +77,27 @@ export default function 연차신청({
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('leave_requests').insert({
-        staff_id: staffId,
-        leave_type: kind,
-        start_date: start,
-        end_date: end,
-        reason: reason || null,
-        status: '대기',
+      const { queued, error } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'leave_requests',
+        payload: {
+          staff_id: staffId,
+          leave_type: kind,
+          start_date: start,
+          end_date: end,
+          reason: reason || null,
+          status: '대기',
+        },
       });
-      if (error) throw error;
+      if (error) {
+        toast(`연차 신청 실패: ${error}`, 'error');
+        return;
+      }
+      if (queued) {
+        toast('오프라인 — 연차 신청 대기 중', 'info');
+        onBack();
+        return;
+      }
       toast('연차 신청이 결재 라인에 올라갔습니다.', 'success');
       await reload();
       onBack();

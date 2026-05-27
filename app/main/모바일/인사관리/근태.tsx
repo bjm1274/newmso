@@ -17,13 +17,14 @@ import { useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
-import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import {
   useMyAttendanceMonth,
   useDerivedMonthKey,
   formatDateShort,
   type AttendanceDailyRow,
 } from './data-hooks';
+import 근태조정신청 from './근태조정신청';
+import { CalTab } from './근태달력탭';
 
 export type SHrAttendTab = 'dash' | 'schedule' | 'cal';
 
@@ -36,10 +37,22 @@ export type SHrAttendProps = {
 export default function 근태({ staffId, company, onBack }: SHrAttendProps) {
   const [tab, setTab] = useState<SHrAttendTab>('dash');
   const [cursor, setCursor] = useState(() => new Date());
+  const [adjustDate, setAdjustDate] = useState<string | null>(null);
   const monthKey = useDerivedMonthKey(cursor);
   const { rows, loading } = useMyAttendanceMonth(staffId, monthKey);
 
   const summary = useMemo(() => deriveMonthSummary(rows), [rows]);
+
+  // 근태 조정 신청 폼으로 진입
+  if (adjustDate && staffId) {
+    return (
+      <근태조정신청
+        staffId={staffId}
+        targetDate={adjustDate}
+        onBack={() => setAdjustDate(null)}
+      />
+    );
+  }
 
   return (
     <div className="m-screen">
@@ -104,7 +117,9 @@ export default function 근태({ staffId, company, onBack }: SHrAttendProps) {
             불러오는 중...
           </div>
         )}
-        {!loading && tab === 'dash' && <DashTab rows={rows} summary={summary} />}
+        {!loading && tab === 'dash' && (
+          <DashTab rows={rows} summary={summary} onAdjust={setAdjustDate} />
+        )}
         {!loading && tab === 'schedule' && <ScheduleTab rows={rows} cursor={cursor} />}
         {!loading && tab === 'cal' && (
           <CalTab rows={rows} cursor={cursor} onChange={setCursor} />
@@ -144,7 +159,15 @@ function deriveMonthSummary(rows: AttendanceDailyRow[]): MonthSummary {
 // 대시 탭
 // ─────────────────────────────────────────────────────────────
 
-function DashTab({ rows, summary }: { rows: AttendanceDailyRow[]; summary: MonthSummary }) {
+function DashTab({
+  rows,
+  summary,
+  onAdjust,
+}: {
+  rows: AttendanceDailyRow[];
+  summary: MonthSummary;
+  onAdjust: (date: string) => void;
+}) {
   const recent = useMemo(
     () =>
       [...rows]
@@ -230,18 +253,39 @@ function DashTab({ rows, summary }: { rows: AttendanceDailyRow[]; summary: Month
           <div className="m-card flush">
             {recent.map((r) => {
               const tone = statusTone(r.status);
+              const adjustable =
+                r.status === 'late' || r.status === 'early_leave' || r.status === 'missing';
               return (
                 <div key={r.date} className="m-list-row">
                   <div className={'ico-tile tone-' + (tone || '')}>
                     <MIcon name="clock" size={18} />
                   </div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div className="lbl">{formatDateShort(r.date)}</div>
                     <div className="sub">
                       {fmtHm(r.check_in)} ~ {fmtHm(r.check_out)}
                     </div>
                   </div>
-                  <MChip tone={tone}>{statusLabel(r.status)}</MChip>
+                  {adjustable ? (
+                    <button
+                      type="button"
+                      onClick={() => onAdjust(r.date)}
+                      aria-label={`${r.date} 근태 조정 신청`}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--m-accent)',
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        background: 'var(--m-accent-soft, rgba(37,99,235,.08))',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      조정 신청
+                    </button>
+                  ) : (
+                    <MChip tone={tone}>{statusLabel(r.status)}</MChip>
+                  )}
                 </div>
               );
             })}
@@ -392,138 +436,4 @@ function ScheduleTab({ rows, cursor }: { rows: AttendanceDailyRow[]; cursor: Dat
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 달력 탭
-// ─────────────────────────────────────────────────────────────
-
-function CalTab({
-  rows,
-  cursor,
-  onChange,
-}: {
-  rows: AttendanceDailyRow[];
-  cursor: Date;
-  onChange: (next: Date) => void;
-}) {
-  const byDate = useMemo(() => {
-    const map = new Map<string, AttendanceDailyRow>();
-    for (const r of rows) map.set(r.date, r);
-    return map;
-  }, [rows]);
-
-  const y = cursor.getFullYear();
-  const m = cursor.getMonth();
-  const firstDow = new Date(y, m, 1).getDay();
-  const lastDate = new Date(y, m + 1, 0).getDate();
-  const today = new Date();
-  const todayStr = today.toLocaleDateString('en-CA');
-
-  return (
-    <div style={{ padding: '14px 16px 0' }}>
-      <div className="m-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <button
-            type="button"
-            onClick={() => onChange(new Date(y, m - 1, 1))}
-            aria-label="이전 달"
-            style={{ color: 'var(--z-500)' }}
-          >
-            <MIcon name="chevL" size={18} />
-          </button>
-          <span style={{ flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 800 }}>
-            {y}년 {m + 1}월
-          </span>
-          <button
-            type="button"
-            onClick={() => onChange(new Date(y, m + 1, 1))}
-            aria-label="다음 달"
-            style={{ color: 'var(--z-500)' }}
-          >
-            <MIcon name="chevR" size={18} />
-          </button>
-        </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: 4,
-            fontSize: 11,
-            fontWeight: 700,
-            color: 'var(--z-500)',
-            marginBottom: 6,
-          }}
-        >
-          {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
-            <div
-              key={d}
-              style={{
-                textAlign: 'center',
-                color:
-                  i === 0
-                    ? 'var(--m-danger)'
-                    : i === 6
-                      ? 'var(--m-accent)'
-                      : 'var(--z-500)',
-              }}
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-          {Array.from({ length: firstDow + lastDate }).map((_, i) => {
-            const day = i - firstDow + 1;
-            if (day < 1 || day > lastDate) return <div key={i} style={{ aspectRatio: 1 }} />;
-            const dt = new Date(y, m, day);
-            const dateStr = dt.toLocaleDateString('en-CA');
-            const row = byDate.get(dateStr);
-            const isToday = dateStr === todayStr;
-            const isHoliday = isKoreanPublicHoliday(dateStr) || dt.getDay() === 0;
-            const dot = dotColorForStatus(row?.status ?? null);
-            return (
-              <div
-                key={i}
-                style={{
-                  aspectRatio: 1,
-                  position: 'relative',
-                  background: isToday ? 'var(--m-accent)' : 'transparent',
-                  color: isToday ? '#fff' : isHoliday ? 'var(--m-danger)' : 'var(--z-700)',
-                  borderRadius: 8,
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: 13,
-                  fontWeight: isToday ? 800 : 600,
-                }}
-              >
-                {day}
-                {dot && !isToday && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      bottom: 3,
-                      width: 4,
-                      height: 4,
-                      borderRadius: 999,
-                      background: dot,
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div style={{ height: 24 }} />
-    </div>
-  );
-}
-
-function dotColorForStatus(status: string | null): string | null {
-  if (!status) return null;
-  if (status === 'late' || status === 'early_leave') return 'var(--m-warning)';
-  if (status === 'absent' || status === 'missing') return 'var(--m-danger)';
-  if (status === 'present') return 'var(--m-success)';
-  if (status === 'annual_leave' || status === 'half_leave' || status === 'sick_leave')
-    return 'var(--m-accent)';
-  return null;
-}
+// CalTab은 근태달력탭.tsx로 분리됨 (JM 500줄 이내 유지)

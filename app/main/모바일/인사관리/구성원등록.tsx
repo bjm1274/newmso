@@ -18,6 +18,7 @@ import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MIcon from '../공통/MIcon';
 import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import {
   MFormHeader,
   MField,
@@ -28,6 +29,8 @@ import {
 } from './form-helpers';
 
 export type SFormMemberProps = {
+  /** 등록 완료 후 콜백 (새 직원 id 전달). 미전달 시 onBack 호출. */
+  onCreated?: (id: string) => void;
   onBack: () => void;
 };
 
@@ -51,8 +54,9 @@ const DEPT_OPTIONS = ['경영지원팀', '영상의학팀', '간호부', '외래
 
 const STEP_TITLES = ['기본 정보', '계약·근무', '권한 설정'];
 
-export default function 구성원등록({ onBack }: SFormMemberProps) {
+export default function 구성원등록({ onBack, onCreated }: SFormMemberProps) {
   const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<FormState>({
     name: '',
     emp: '',
@@ -70,14 +74,62 @@ export default function 구성원등록({ onBack }: SFormMemberProps) {
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (step < 2) {
       setStep(step + 1);
       return;
     }
-    // 마지막 단계: PC 안내 후 닫기. (모바일에서 권한 부여 미허용 — JM5)
-    toast('구성원 등록은 PC에서 최종 확정해주세요.', 'info');
-    onBack();
+
+    // 마지막 단계: staff_members insert (JM5: 주민번호 등 민감 정보 제외, 오프라인 큐 적용)
+    if (!form.name.trim()) {
+      toast('이름을 입력해주세요.', 'warning');
+      return;
+    }
+    setSubmitting(true);
+
+    // JM5: payload에 토큰·주민번호·비밀번호 등 민감 정보 포함 금지.
+    // 연봉(salary)은 숫자 파싱 후 포함 — 큐에 저장될 수 있으므로 문자열 그대로 전달.
+    const salaryNum = form.salary ? Number(form.salary.replace(/[^0-9]/g, '')) : null;
+    const hireDate = form.start.replaceAll('.', '-');
+
+    const payload: Record<string, unknown> = {
+      name: form.name.trim(),
+      department: form.dept,
+      position: form.role,
+      employment_type: form.type,
+      hire_date: hireDate || null,
+      role: form.auth,
+      status: '재직',
+    };
+    if (form.emp.trim()) payload.employee_no = form.emp.trim();
+    if (form.phone.trim()) payload.phone = form.phone.trim();
+    if (form.email.trim()) payload.email = form.email.trim();
+    if (salaryNum && salaryNum > 0) payload.salary = salaryNum;
+
+    const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
+      kind: 'insert',
+      table: 'staff_members',
+      payload,
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      toast(`직원 등록 실패: ${error}`, 'error');
+      return;
+    }
+    if (queued) {
+      toast('오프라인 — 직원 등록 대기 중', 'info');
+      onBack();
+      return;
+    }
+    toast('직원이 등록되었습니다.', 'success');
+    const row = Array.isArray(data)
+      ? (data as { id: string }[])[0]
+      : (data as { id: string } | null);
+    const newId = String(row?.id ?? '');
+    if (onCreated && newId) onCreated(newId);
+    else onBack();
   };
 
   return (
@@ -86,23 +138,23 @@ export default function 구성원등록({ onBack }: SFormMemberProps) {
         onCancel={onBack}
         title="구성원 등록"
         sub={`${step + 1}/3 · ${STEP_TITLES[step] ?? ''}`}
-        saveLabel={step < 2 ? '다음' : '등록'}
-        onSave={handleSave}
-        saveDisabled={step === 0 && form.name.trim() === ''}
+        saveLabel={submitting ? '등록 중...' : step < 2 ? '다음' : '등록'}
+        onSave={() => void handleSave()}
+        saveDisabled={(step === 0 && form.name.trim() === '') || submitting}
       />
       <MStepDots total={3} cur={step} />
-      <div className="m-scroll">
+      <div className="m-scroll" aria-busy={submitting}>
         {step === 0 && <Step0 form={form} update={update} fieldId={fieldId} />}
         {step === 1 && <Step1 form={form} update={update} fieldId={fieldId} />}
         {step === 2 && <Step2 form={form} update={update} />}
       </div>
       {step > 0 && (
         <div className="m-sticky-foot">
-          <MBtn block onClick={() => setStep(step - 1)}>
+          <MBtn block onClick={() => setStep(step - 1)} disabled={submitting}>
             이전
           </MBtn>
-          <MBtn block variant="primary" onClick={handleSave}>
-            {step < 2 ? '다음' : '등록 완료'}
+          <MBtn block variant="primary" onClick={() => void handleSave()} disabled={submitting}>
+            {submitting ? '등록 중...' : step < 2 ? '다음' : '등록 완료'}
           </MBtn>
         </div>
       )}

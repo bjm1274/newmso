@@ -14,6 +14,9 @@ import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import { BOARD_CATS, type BoardCatId, createBoardPost } from './data-hooks';
 import { uploadBoardAttachments, type DraftAttachment, type UploadProgress } from './첨부업로드';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { toast } from '@/lib/toast';
+import { PostOptions } from './글작성옵션';
 
 export type SFormPostProps = {
   user: {
@@ -73,10 +76,64 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    if (!user?.id) {
+      toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
+      return;
+    }
     setSubmitting(true);
+
     const anonymousFinal = ANONYMOUS_ALLOWED_CATS.has(form.cat) && form.anonymous;
     const pinFinal = canAdmin && form.pin;
     const scheduledFinal = canAdmin ? form.scheduledPublishAt : '';
+    const cat = BOARD_CATS.find((c) => c.id === form.cat);
+    const boardType = cat?.boardType ?? '자유게시판';
+
+    // 첨부 없는 텍스트 게시만 오프라인 큐 대상.
+    // 첨부 있는 경우 네트워크(R2 업로드) 필수이므로 헬퍼 경로 유지.
+    if (attachments.length === 0) {
+      const importance = form.importance === 'urgent' ? '중요' : null;
+      const payload: Record<string, unknown> = {
+        board_type: boardType,
+        title: form.title.trim(),
+        content: form.body.trim(),
+        author_id: anonymousFinal ? null : user.id,
+        author_name: anonymousFinal ? '익명' : (user.name ?? '익명'),
+        company: anonymousFinal ? null : (user.company ?? null),
+        company_id: anonymousFinal ? null : (user.company_id ?? null),
+        is_anonymous: anonymousFinal,
+      };
+      if (pinFinal) payload.is_pinned = true;
+      if (importance) payload.status = importance;
+      if (scheduledFinal) {
+        const d = new Date(scheduledFinal);
+        if (!Number.isNaN(d.getTime()) && d.getTime() > Date.now()) {
+          payload.scheduled_publish_at = d.toISOString();
+        }
+      }
+
+      const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
+        kind: 'insert',
+        table: 'board_posts',
+        payload,
+      });
+      setSubmitting(false);
+      if (error) {
+        toast(`등록 실패: ${error}`, 'error');
+        return;
+      }
+      if (queued) {
+        toast('오프라인 — 게시 대기 중', 'info');
+        onCreated('queued');
+        return;
+      }
+      if (data) {
+        const row = Array.isArray(data) ? (data as { id: string }[])[0] : (data as { id: string });
+        onCreated(String(row?.id ?? ''));
+      }
+      return;
+    }
+
+    // 첨부 있는 경우 — 기존 헬퍼 경로 (네트워크 필수)
     const inserted = await createBoardPost({
       catId: form.cat,
       title: form.title,
@@ -349,133 +406,18 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
         </div>
 
         {/* 옵션 섹션 */}
-        <div className="m-section">
-          <div className="m-section-h"><div className="lbl">옵션</div></div>
-          <div className="m-card flush">
-            {/* 상단 고정 — 관리자만 노출 (JM5: 권한 게이트) */}
-            {canAdmin && (
-              <div className="m-list-row">
-                <div className="ico-tile tone-accent">
-                  <MIcon name="pin" size={18} />
-                </div>
-                <div>
-                  <div className="lbl">상단 고정</div>
-                  <div className="sub">목록 최상단에 노출 (관리자)</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => set('pin', !form.pin)}
-                  aria-label="상단 고정 토글"
-                  aria-pressed={form.pin}
-                  style={{
-                    width: 44,
-                    height: 24,
-                    borderRadius: 999,
-                    background: form.pin ? 'var(--m-accent)' : 'var(--z-200)',
-                    position: 'relative',
-                  }}
-                >
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: 2,
-                      left: form.pin ? 22 : 2,
-                      width: 20,
-                      height: 20,
-                      borderRadius: 999,
-                      background: '#fff',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                      transition: 'left .15s',
-                    }}
-                  />
-                </button>
-              </div>
-            )}
-
-            {/* 중요도 segmented */}
-            <div className="m-list-row">
-              <div className="ico-tile tone-warning">
-                <MIcon name="alertTri" size={18} />
-              </div>
-              <div>
-                <div className="lbl">중요도</div>
-                <div className="sub">일반 / 긴급</div>
-              </div>
-              <div className="m-seg" style={{ width: 120 }}>
-                <button
-                  type="button"
-                  className={form.importance === 'normal' ? 'on' : ''}
-                  onClick={() => set('importance', 'normal')}
-                  aria-pressed={form.importance === 'normal'}
-                >
-                  일반
-                </button>
-                <button
-                  type="button"
-                  className={form.importance === 'urgent' ? 'on' : ''}
-                  onClick={() => set('importance', 'urgent')}
-                  aria-pressed={form.importance === 'urgent'}
-                >
-                  긴급
-                </button>
-              </div>
-            </div>
-
-            {/* 익명 작성 — 자유게시판일 때만 (JM5: PII 노출 방지) */}
-            {ANONYMOUS_ALLOWED_CATS.has(form.cat) && (
-              <div className="m-list-row">
-                <div className="ico-tile tone-success">
-                  <MIcon name="user" size={18} />
-                </div>
-                <div>
-                  <label htmlFor="board-anonymous-toggle" className="lbl">
-                    익명으로 작성
-                  </label>
-                  <div className="sub">작성자 이름이 &lsquo;익명&rsquo;으로 표시됩니다</div>
-                </div>
-                <input
-                  id="board-anonymous-toggle"
-                  type="checkbox"
-                  checked={form.anonymous}
-                  onChange={(e) => set('anonymous', e.target.checked)}
-                  style={{ width: 22, height: 22, accentColor: 'var(--m-accent)' }}
-                />
-              </div>
-            )}
-
-            {/* 예약 발행 — 관리자만 (JM6: label + datetime-local) */}
-            {canAdmin && (
-              <div className="m-list-row" style={{ alignItems: 'flex-start' }}>
-                <div className="ico-tile tone-warning">
-                  <MIcon name="calendar" size={18} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <label htmlFor="board-schedule-input" className="lbl">
-                    예약 발행
-                  </label>
-                  <div className="sub" style={{ marginBottom: 6 }}>
-                    선택한 시각 이후 목록에 노출됩니다 (비워두면 즉시 발행)
-                  </div>
-                  <input
-                    id="board-schedule-input"
-                    type="datetime-local"
-                    value={form.scheduledPublishAt}
-                    onChange={(e) => set('scheduledPublishAt', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      fontSize: 13,
-                      border: '1px solid var(--m-border)',
-                      borderRadius: 8,
-                      background: 'var(--m-bg)',
-                      color: 'var(--z-800)',
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <PostOptions
+          cat={form.cat}
+          canAdmin={canAdmin}
+          pin={form.pin}
+          importance={form.importance}
+          anonymous={form.anonymous}
+          scheduledPublishAt={form.scheduledPublishAt}
+          onTogglePin={() => set('pin', !form.pin)}
+          onImportance={(v) => set('importance', v)}
+          onAnonymous={(v) => set('anonymous', v)}
+          onScheduled={(v) => set('scheduledPublishAt', v)}
+        />
 
         <div style={{ padding: '16px' }}>
           <MBtn variant="primary" block lg onClick={() => void handleSubmit()} disabled={!canSubmit}>
@@ -493,3 +435,5 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
     </div>
   );
 }
+
+// PostOptions는 글작성옵션.tsx로 분리됨 (JM 500줄 이내 유지)
