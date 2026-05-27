@@ -53,7 +53,7 @@ type UseApprovalComposeDraftParams = {
   composeSeedApproval: ApprovalRecord | null;
   setComposeSeedApproval: Dispatch<SetStateAction<ApprovalRecord | null>>;
   setSupplyInventoryReview: Dispatch<SetStateAction<any>>;
-  setApprovalStatusFilter: Dispatch<SetStateAction<'전체' | '대기' | '승인' | '반려'>>;
+  setApprovalStatusFilter: Dispatch<SetStateAction<'전체' | '대기' | '승인' | '반려' | '회수'>>;
   setApprovalDocumentFilter: Dispatch<SetStateAction<string>>;
   setApprovalKeyword: Dispatch<SetStateAction<string>>;
   setApprovalDateMode: Dispatch<SetStateAction<'month' | 'week' | 'range'>>;
@@ -207,7 +207,7 @@ export function useApprovalComposeDraft({
     if (typeof initialComposeRequest?.statusFilter === 'string') {
       const requestedStatusFilter = initialComposeRequest.statusFilter.trim();
       setApprovalStatusFilter(
-        requestedStatusFilter === '대기' || requestedStatusFilter === '승인' || requestedStatusFilter === '반려'
+        requestedStatusFilter === '대기' || requestedStatusFilter === '승인' || requestedStatusFilter === '반려' || requestedStatusFilter === '회수'
           ? requestedStatusFilter
           : '전체'
       );

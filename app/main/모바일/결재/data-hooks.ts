@@ -105,17 +105,23 @@ export function classifyForStaff(rows: ApprovalRow[], staffId: string) {
 
   for (const row of rows) {
     const status = String(row.status || '');
+    const isRecalled = status === '회수';
     const isMine = String(row.sender_id || '') === staffId;
     const currentApprover = resolveCurrentApproverId(row);
     const lineIds = resolveLineIds(row);
     const ccIds = resolveCcUserIds(row);
 
-    // 기안함: 본인이 기안
+    // 기안함: 본인이 기안 (회수 포함 — 본인 기안함에서 회수 상태 확인 가능)
     if (isMine) {
       sent.push(row);
-      if (status === '대기') progress.push(row);
-      else if (status === '승인' || status === '반려') done.push(row);
+      if (!isRecalled) {
+        if (status === '대기') progress.push(row);
+        else if (status === '승인' || status === '반려') done.push(row);
+      }
     }
+
+    // 회수된 문서는 결재함/진행/완료/참조함에서 비표시 (요구사항 4번)
+    if (isRecalled) continue;
 
     // 결재함: 본인이 현재 결재자 + 대기
     if (status === '대기' && currentApprover === staffId && !isMine) {
@@ -132,7 +138,7 @@ export function classifyForStaff(rows: ApprovalRow[], staffId: string) {
       done.push(row);
     }
 
-    // 참조함: cc에 본인
+    // 참조함: cc에 본인 (회수된 문서 비표시)
     if (ccIds.includes(staffId)) {
       ref.push(row);
     }
@@ -214,6 +220,32 @@ export async function fetchApprovalById(id: string): Promise<ApprovalRow | null>
 // ─────────────────────────────────────────────
 
 export type TransitionAction = 'approve' | 'reject';
+
+// ─────────────────────────────────────────────
+// 액션 — /api/approval/recall
+// ─────────────────────────────────────────────
+
+export type RecallResult = { ok: true; approvalId: string } | { ok: false; error: string };
+
+export async function postRecall(params: {
+  approvalId: string;
+  note?: string | null;
+}): Promise<RecallResult> {
+  const response = await fetch('/api/approval/recall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ approvalId: params.approvalId, note: params.note ?? null }),
+  });
+  const payload = (await response.json().catch(() => null)) as RecallResult | null;
+  if (!response.ok || !payload?.ok) {
+    const errMsg =
+      payload && !payload.ok && payload.error
+        ? payload.error
+        : response.statusText || '회수 처리 실패';
+    return { ok: false, error: errMsg };
+  }
+  return payload;
+}
 
 type TransitionResult = {
   ok: boolean;

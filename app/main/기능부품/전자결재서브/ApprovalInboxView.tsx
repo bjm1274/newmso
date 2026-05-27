@@ -40,8 +40,8 @@ type ApprovalInboxViewProps = {
   effectiveApprovalDateRange: { from: string; to: string };
   hasApprovalFilterOverrides: boolean;
   dateRangeInvalid: boolean;
-  approvalStatusFilter: '전체' | '대기' | '승인' | '반려';
-  setApprovalStatusFilter: Dispatch<SetStateAction<'전체' | '대기' | '승인' | '반려'>>;
+  approvalStatusFilter: '전체' | '대기' | '승인' | '반려' | '회수';
+  setApprovalStatusFilter: Dispatch<SetStateAction<'전체' | '대기' | '승인' | '반려' | '회수'>>;
   bulkTargetList: ApprovalRecord[];
   allBulkSelected: boolean;
   selectedApprovalIds: string[];
@@ -258,10 +258,10 @@ export default function ApprovalInboxView({
 
           <select
             value={approvalStatusFilter}
-            onChange={(event) => setApprovalStatusFilter(event.target.value as '전체' | '대기' | '승인' | '반려')}
+            onChange={(event) => setApprovalStatusFilter(event.target.value as '전체' | '대기' | '승인' | '반려' | '회수')}
             className="h-8 w-auto min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 pr-7 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
           >
-            {['전체', '대기', '승인', '반려'].map((option) => (
+            {['전체', '대기', '승인', '반려', '회수'].map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>

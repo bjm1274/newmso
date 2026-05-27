@@ -28,6 +28,7 @@ import MSheet from '../공통/MSheet';
 import {
   fetchApprovalById,
   postTransition,
+  postRecall,
   resolveCurrentApproverId,
   resolveLineIds,
   resolveCcUserIds,
@@ -156,9 +157,9 @@ export default function SApprovalDetail({
 }: SApprovalDetailProps) {
   const [tab, setTab] = useState<DetailTab>('form');
   const [row, setRow] = useState<ApprovalRow | null>(initialRow);
-  const [busy, setBusy] = useState<'none' | 'approve' | 'reject'>('none');
+  const [busy, setBusy] = useState<'none' | 'approve' | 'reject' | 'recall'>('none');
   const [reason, setReason] = useState('');
-  const [sheetAction, setSheetAction] = useState<'approve' | 'reject' | null>(null);
+  const [sheetAction, setSheetAction] = useState<'approve' | 'reject' | 'recall' | null>(null);
 
   // 최초 마운트 시 상세 fetch (라인/comment 최신화)
   useEffect(() => {
@@ -212,6 +213,10 @@ export default function SApprovalDetail({
   const canApprove = Boolean(
     row && String(row.status) === '대기' && staffId && currentApproverId === staffId
   );
+  // 회수 가능: 기안자 본인 + 대기 상태 + 결재 승인 전
+  const canRecall = Boolean(
+    row && String(row.status) === '대기' && staffId && String(row.sender_id || '') === staffId && !canApprove
+  );
   const status = String(row?.status || '');
   const comments = useMemo(() => readHistory(row), [row]);
 
@@ -257,6 +262,33 @@ export default function SApprovalDetail({
       }
     },
     [row, reason, approvalId, onChanged]
+  );
+
+  const handleRecall = useCallback(
+    async (note: string) => {
+      if (!row) return;
+      setBusy('recall');
+      const prevRow = row;
+      // 낙관적 업데이트
+      setRow({ ...row, status: '회수' });
+      try {
+        const result = await postRecall({ approvalId: String(row.id), note: note.trim() || null });
+        if (!result.ok) throw new Error(result.error);
+        toast('기안을 회수했습니다. 기안함에서 확인할 수 있습니다.', 'success');
+        setSheetAction(null);
+        setReason('');
+        const fresh = await fetchApprovalById(approvalId);
+        if (fresh) setRow(fresh);
+        onChanged();
+        onBack();
+      } catch (err) {
+        setRow(prevRow);
+        toast(`회수 실패: ${err instanceof Error ? err.message : '오류'}`, 'error');
+      } finally {
+        setBusy('none');
+      }
+    },
+    [row, approvalId, onChanged, onBack]
   );
 
   if (!row) {
@@ -348,6 +380,21 @@ export default function SApprovalDetail({
               승인
             </MBtn>
           </>
+        ) : canRecall ? (
+          <>
+            <MBtn block onClick={onBack}>
+              닫기
+            </MBtn>
+            <MBtn
+              block
+              variant="warning"
+              disabled={busy !== 'none'}
+              ariaLabel="기안 회수"
+              onClick={() => setSheetAction('recall')}
+            >
+              회수
+            </MBtn>
+          </>
         ) : (
           <>
             <MBtn block onClick={onBack}>
@@ -368,20 +415,43 @@ export default function SApprovalDetail({
             setReason('');
           }
         }}
-        title={sheetAction === 'approve' ? '결재 승인' : '결재 반려'}
+        title={
+          sheetAction === 'approve' ? '결재 승인' :
+          sheetAction === 'recall' ? '기안 회수' :
+          '결재 반려'
+        }
       >
-        <div style={{ padding: '4px 20px 20px' }}>
+        <div
+          role="dialog"
+          aria-label={
+            sheetAction === 'approve' ? '결재 승인 확인' :
+            sheetAction === 'recall' ? '기안 회수 확인' :
+            '결재 반려 확인'
+          }
+          style={{ padding: '4px 20px 20px' }}
+        >
           <div style={{ fontSize: 12, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.6, marginBottom: 12 }}>
             {sheetAction === 'approve'
               ? '승인 시 다음 결재자에게 자동 전달됩니다. 코멘트는 선택입니다.'
+              : sheetAction === 'recall'
+              ? '회수된 문서는 기안함에서 확인할 수 있습니다. 결재자/참조자에게는 더 이상 표시되지 않습니다.'
               : '반려 사유를 입력해 주세요. 기안자에게 전달됩니다.'}
           </div>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder={sheetAction === 'approve' ? '승인 코멘트 (선택)' : '반려 사유'}
+            placeholder={
+              sheetAction === 'approve' ? '승인 코멘트 (선택)' :
+              sheetAction === 'recall' ? '회수 사유 (선택)' :
+              '반려 사유'
+            }
             rows={4}
             disabled={busy !== 'none'}
+            aria-label={
+              sheetAction === 'approve' ? '승인 코멘트' :
+              sheetAction === 'recall' ? '회수 사유 입력' :
+              '반려 사유 입력'
+            }
             style={{
               width: '100%',
               padding: '10px 12px',
@@ -405,14 +475,30 @@ export default function SApprovalDetail({
             >
               취소
             </MBtn>
-            <MBtn
-              block
-              variant={sheetAction === 'approve' ? 'primary' : 'danger'}
-              disabled={busy !== 'none' || (sheetAction === 'reject' && !reason.trim())}
-              onClick={() => sheetAction && handleAction(sheetAction)}
-            >
-              {busy === 'none' ? (sheetAction === 'approve' ? '승인하기' : '반려하기') : '처리 중…'}
-            </MBtn>
+            {sheetAction === 'recall' ? (
+              <MBtn
+                block
+                variant="warning"
+                disabled={busy !== 'none'}
+                ariaLabel="회수 확인"
+                onClick={() => handleRecall(reason)}
+              >
+                {busy === 'none' ? '회수하기' : '처리 중…'}
+              </MBtn>
+            ) : (
+              <MBtn
+                block
+                variant={sheetAction === 'approve' ? 'primary' : 'danger'}
+                disabled={busy !== 'none' || (sheetAction === 'reject' && !reason.trim())}
+                onClick={() => {
+                  if (sheetAction === 'approve' || sheetAction === 'reject') {
+                    void handleAction(sheetAction);
+                  }
+                }}
+              >
+                {busy === 'none' ? (sheetAction === 'approve' ? '승인하기' : '반려하기') : '처리 중…'}
+              </MBtn>
+            )}
           </div>
         </div>
       </MSheet>

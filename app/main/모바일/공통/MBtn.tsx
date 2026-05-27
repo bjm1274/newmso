@@ -2,7 +2,7 @@
 
 /**
  * MBtn — 모바일 버튼.
- * variant: default | primary | danger | ghost
+ * variant: default | primary | danger | warning | ghost
  * size: default(44px) | lg(52px)
  * block: 100% 폭
  * JM: 단일 책임, ~60줄
@@ -12,7 +12,7 @@
 import { memo, type ReactNode } from 'react';
 import MIcon from './MIcon';
 
-export type MBtnVariant = 'default' | 'primary' | 'danger' | 'ghost';
+export type MBtnVariant = 'default' | 'primary' | 'danger' | 'warning' | 'ghost';
 
 export type MBtnProps = {
   variant?: MBtnVariant;

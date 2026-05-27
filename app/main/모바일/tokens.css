@@ -234,6 +234,7 @@
 }
 .mso-mobile .m-btn.primary { background: var(--m-accent); color: #fff; border-color: transparent; }
 .mso-mobile .m-btn.danger  { background: var(--m-danger); color: #fff; border-color: transparent; }
+.mso-mobile .m-btn.warning { background: #f59e0b; color: #fff; border-color: transparent; }
 .mso-mobile .m-btn.ghost   { background: transparent; border-color: transparent; color: var(--z-700); }
 .mso-mobile .m-btn.block   { width: 100%; }
 .mso-mobile .m-btn.lg      { height: 52px; font-size: 15px; border-radius: 14px; }

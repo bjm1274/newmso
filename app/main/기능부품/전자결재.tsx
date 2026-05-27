@@ -109,7 +109,7 @@ const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [composeSeedApproval, setComposeSeedApproval] = useState<Record<string, unknown> | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
-const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('대기');
+const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려' | '회수'>('대기');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
   const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('week');
@@ -876,6 +876,8 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     const uid = user?.id != null ? String(user.id) : '';
     if (!uid) return [];
     return visibleApprovals.filter((item) => {
+      // 회수된 문서는 참조자 화면에서 비표시 (요구사항 4번)
+      if (APPROVAL_INBOX_HIDDEN_STATUSES.has(String(item?.status || ''))) return false;
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
       const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
       return ccUsers.some((ccUser) => String(ccUser.id) === uid);
