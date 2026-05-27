@@ -14,6 +14,9 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import PushSettingCard from './푸시설정카드';
+import { usePullToRefresh } from '../공통/usePullToRefresh';
+import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
 type AlertCategory = 'all' | 'approval' | 'chat' | 'hr' | 'inventory' | 'other';
 
@@ -107,6 +110,11 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
 
   useEffect(() => { void fetchItems(); }, [fetchItems]);
 
+  const { containerRef, refreshing, pullProgress } = usePullToRefresh({
+    onRefresh: fetchItems,
+    enabled: !!staffId,
+  });
+
   const counts = useMemo(() => {
     const result: Record<AlertCategory, number> = {
       all: items.length, approval: 0, chat: 0, hr: 0, inventory: 0, other: 0,
@@ -139,6 +147,7 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
 
   return (
     <div className="m-screen">
+      <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="알림"
         sub={`안 읽음 ${unreadCount}건`}
@@ -149,6 +158,8 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
           </button>
         }
       />
+      <PushSettingCard staffId={staffId} />
+
       <div className="m-chip-bar">
         {(['all', 'approval', 'chat', 'hr', 'inventory', 'other'] as AlertCategory[]).map(c => (
           <button
@@ -162,7 +173,7 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
         ))}
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" ref={containerRef} style={{ overscrollBehaviorY: 'contain' }}>
         <div style={{ padding: '12px 16px' }}>
           {loading && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
