@@ -33,14 +33,20 @@ const SurgeryExamTemplateManager = dynamic(
   () => import('../관리자전용서브/수술검사템플릿관리'),
   { ssr: false, loading: Loading }
 );
+// 신규 — reference 명세 메시지 템플릿 / 외부 연동.
+// 정적 import: Turbopack의 한글 폴더+영문 하위 경로 dynamic panic 회피.
+import MessageTemplatesTab from './OpsWorkcenter/MessageTemplatesTab';
+import IntegrationsTab from './OpsWorkcenter/IntegrationsTab';
 
-type OpsTabId = 'general' | 'notify' | 'popup' | 'template';
+type OpsTabId = 'general' | 'msg' | 'notify' | 'popup' | 'template' | 'int';
 
-const TABS: { id: OpsTabId; label: string }[] = [
+const TABS: { id: OpsTabId; label: string; count?: number }[] = [
   { id: 'general', label: '일반 설정' },
+  { id: 'msg', label: '메시지 템플릿', count: 12 },
   { id: 'notify', label: '알림 자동화' },
   { id: 'popup', label: '팝업 관리' },
   { id: 'template', label: '수술·검사 템플릿' },
+  { id: 'int', label: '외부 연동', count: 6 },
 ];
 
 const DEFAULT_TOGGLES = [
@@ -133,7 +139,7 @@ export default function OpsWorkcenter() {
     <>
       <WorkcenterHeader
         title={meta.label}
-        subtitle="일반 설정·알림 자동화·팝업 관리·수술검사 템플릿 통합"
+        subtitle="일반 설정·메시지 템플릿·알림 자동화·팝업 관리·수술검사 템플릿·외부 연동 통합"
         mergedCount={meta.mergedCount}
         mergedTitles={meta.mergedTitles}
         actions={<SmBtn primary onClick={() => setTab('notify')}>알림 자동화 →</SmBtn>}
@@ -142,9 +148,11 @@ export default function OpsWorkcenter() {
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'general' && <GeneralTab />}
+      {tab === 'msg' && <MessageTemplatesTab />}
       {tab === 'notify' && <NotificationAutomation user={null} />}
       {tab === 'popup' && <PopupManager />}
       {tab === 'template' && <SurgeryExamTemplateManager user={null} />}
+      {tab === 'int' && <IntegrationsTab />}
     </>
   );
 }
