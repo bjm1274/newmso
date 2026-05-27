@@ -3659,6 +3659,18 @@ button, a, [role="button"] {
   flex: 0 1 auto;
 }
 
+/* 전자결재 컴포저: 상신 버튼 포함 헤더 — 스크롤 시 항상 화면 상단에 고정 */
+.ap-compose-submit-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--page-bg);
+  /* 위아래 약간의 여백으로 카드와 자연스럽게 분리 */
+  padding-block: 6px;
+  /* 카드 밖으로 나가는 shadow가 헤더를 가리지 않도록 */
+  margin-bottom: -2px;
+}
+
 .ctitle {
   font-size: 16px;
   font-weight: 800;

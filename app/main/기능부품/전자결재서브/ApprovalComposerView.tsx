@@ -227,8 +227,8 @@ export default function ApprovalComposerView({
         </div>
       )}
 
-      {/* 헤더: 양식 드롭다운 + 상신 액션 (라이브 §3-4 .mod-pageheader) */}
-      <header className="mod-pageheader">
+      {/* 헤더: 양식 드롭다운 + 상신 액션 (라이브 §3-4 .mod-pageheader) — sticky로 항상 상단 고정 */}
+      <header className="mod-pageheader ap-compose-submit-header">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2">
             <span className="text-[11px] font-black text-[var(--muted-foreground)]">양식</span>
