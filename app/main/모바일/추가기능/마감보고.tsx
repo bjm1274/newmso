@@ -8,13 +8,15 @@
  */
 
 import { useState } from 'react';
+import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
-import { useClosingToday } from './data-hooks';
+import { useClosingToday, todayISO } from './data-hooks';
 
 type Tab = 'today' | 'week' | 'month';
 
@@ -26,6 +28,41 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
   const company = typeof user.company === 'string' ? user.company : undefined;
   const { day, loading } = useClosingToday({ company });
   const [tab, setTab] = useState<Tab>('today');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (submitting || !day || day.submitted) return;
+    const staffName =
+      typeof (user as Record<string, unknown>).name === 'string'
+        ? (user as Record<string, unknown>).name as string
+        : '';
+
+    setSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = {
+        report_date: day.date ?? todayISO(),
+        total_amount: day.total,
+        submitted_by: user.id,
+        submitted_by_name: staffName,
+        company: company ?? null,
+        status: 'submitted',
+        created_at: new Date().toISOString(),
+      };
+
+      const { queued, error } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'daily_reports',
+        payload,
+        retryable: true,
+      });
+
+      if (error) { toast(`제출 실패: ${error}`, 'error'); return; }
+      if (queued) { toast('오프라인 — 마감 보고 대기 중', 'info'); return; }
+      toast('마감 보고가 제출되었습니다.', 'success');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="m-screen">
@@ -165,8 +202,15 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
 
       <div className="m-sticky-foot">
         <MBtn block icon="download">초안 보기</MBtn>
-        <MBtn block variant="primary" icon="send" disabled={!day || day.submitted}>
-          {day?.submitted ? '제출 완료' : '대표 결재 제출'}
+        <MBtn
+          block
+          variant="primary"
+          icon="send"
+          disabled={!day || day.submitted || submitting}
+          ariaLabel={submitting ? '제출 중' : '대표 결재 제출'}
+          onClick={() => { void handleSubmit(); }}
+        >
+          {submitting ? '제출 중…' : day?.submitted ? '제출 완료' : '대표 결재 제출'}
         </MBtn>
       </div>
     </div>

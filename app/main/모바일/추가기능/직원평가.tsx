@@ -8,21 +8,49 @@
  */
 
 import { useMemo, useState } from 'react';
+import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MAvatar from '../공통/MAvatar';
 import MBtn from '../공통/MBtn';
-import { pickTone, useStaffEvaluations, useOrgDepartments } from './data-hooks';
+import {
+  MFormHeader,
+  MField,
+  MInput,
+  MSegRow,
+  useFieldIdPrefix,
+} from '../인사관리/form-helpers';
+import { pickTone, useStaffEvaluations, useOrgDepartments, type OrgMember } from './data-hooks';
 
 type Tab = 'mine' | 'target' | 'result';
+
+type EvalFormState = {
+  score: string; // '1'~'5'
+  comment: string;
+};
+
+const EVAL_FORM_INITIAL: EvalFormState = { score: '5', comment: '' };
 
 export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: () => void }) {
   const company = typeof user.company === 'string' ? user.company : undefined;
   const { mine, loading } = useStaffEvaluations({ company, selfId: user.id });
   const { groups } = useOrgDepartments(company);
   const [tab, setTab] = useState<Tab>('mine');
+  const [evalTarget, setEvalTarget] = useState<OrgMember | null>(null);
+
+  if (evalTarget) {
+    return (
+      <EvalWriteForm
+        user={user}
+        company={company}
+        target={evalTarget}
+        onClose={() => setEvalTarget(null)}
+      />
+    );
+  }
 
   const myAverage = useMemo(() => {
     if (mine.length === 0) return 0;
@@ -168,14 +196,20 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
             <div className="m-card flush">
               {groups.flatMap((g) =>
                 g.members.map((m) => (
-                  <div key={m.id} className="m-list-row">
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="m-list-row"
+                    onClick={() => setEvalTarget(m)}
+                    style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                  >
                     <MAvatar tone={pickTone(m.id)} size="sm">{m.name.charAt(0)}</MAvatar>
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="lbl">{m.name}</div>
                       <div className="sub">{m.department}</div>
                     </div>
-                    <MChip>미시작</MChip>
-                  </div>
+                    <MChip>평가하기</MChip>
+                  </button>
                 )),
               )}
               {targetCount === 0 && (
@@ -209,13 +243,100 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
         )}
       </div>
 
-      {tab === 'target' && (
-        <div className="m-sticky-foot">
-          <MBtn block variant="primary" icon="edit" disabled>
-            평가 작성은 데스크톱에서
-          </MBtn>
+    </div>
+  );
+}
+
+// ─── 평가 작성 폼 ─────────────────────────────────────────────
+function EvalWriteForm({
+  user,
+  company,
+  target,
+  onClose,
+}: {
+  user: ErpUser;
+  company: string | undefined;
+  target: OrgMember;
+  onClose: () => void;
+}) {
+  const [v, setV] = useState<EvalFormState>(EVAL_FORM_INITIAL);
+  const [saving, setSaving] = useState(false);
+  const fid = useFieldIdPrefix('eval');
+
+  const set = <K extends keyof EvalFormState>(k: K, val: EvalFormState[K]) =>
+    setV((prev) => ({ ...prev, [k]: val }));
+
+  const handleSave = async () => {
+    if (saving) return;
+    const score = Number(v.score);
+    if (!Number.isFinite(score) || score < 1 || score > 5) {
+      toast('점수는 1~5점이어야 합니다.', 'error');
+      return;
+    }
+    const evaluatorName =
+      typeof (user as Record<string, unknown>).name === 'string'
+        ? (user as Record<string, unknown>).name as string
+        : '';
+
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        evaluator_id: user.id,
+        evaluator_name: evaluatorName,
+        target_id: target.id,
+        target_name: target.name,
+        target_department: target.department,
+        score,
+        comment: v.comment.trim() || null,
+        company: company ?? null,
+        created_at: new Date().toISOString(),
+      };
+
+      const { queued, error } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'staff_evaluations',
+        payload,
+        retryable: true,
+      });
+
+      if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
+      if (queued) { toast('오프라인 — 평가 대기 중', 'info'); onClose(); return; }
+      toast(`${target.name} 평가가 저장되었습니다.`, 'success');
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="m-screen">
+      <MFormHeader
+        title={`${target.name} 평가`}
+        onCancel={onClose}
+        onSave={() => { void handleSave(); }}
+        saveDisabled={saving}
+        saveLabel={saving ? '저장 중…' : '저장'}
+      />
+      <div className="m-scroll">
+        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+          <MField label="점수 (1~5)">
+            <MSegRow
+              ariaLabel="평가 점수"
+              value={v.score}
+              onPick={(s) => set('score', s)}
+              options={['1', '2', '3', '4', '5'].map((s) => ({ id: s, label: `${s}점` }))}
+            />
+          </MField>
+          <MField label="코멘트" htmlFor={fid('comment')}>
+            <MInput
+              id={fid('comment')}
+              value={v.comment}
+              onChange={(val) => set('comment', val)}
+              placeholder="평가 의견을 입력하세요 (선택)"
+            />
+          </MField>
         </div>
-      )}
+      </div>
     </div>
   );
 }

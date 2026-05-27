@@ -22,8 +22,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser } from '@/types';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -134,43 +133,40 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
 
     setSaving(true);
     try {
-      const buildPayload = (omittedColumns: ReadonlySet<string>): Record<string, unknown> => {
-        const payload: InventoryInsertPayload = {
-          item_name: trimmedName,
-          category: CATEGORY_TO_DB[v.cat],
-          quantity: 0, // 모바일 등록은 0으로 시작 — 입고는 별도 흐름
-          stock: 0,
-          min_quantity: parsedSafety,
-          unit_price: parsedPrice,
-          unit: UNIT_TO_DB[v.unit],
-          supplier_name: v.vendor.trim() || null,
-          insurance_code: v.sku.trim() || null,
-          company,
-          department: typeof user.department === 'string' ? user.department : '',
-          is_udi: false,
-        };
-        const out: Record<string, unknown> = { ...payload };
-        if (omittedColumns.has('department')) delete out.department;
-        if (omittedColumns.has('unit')) delete out.unit;
-        return out;
+      const payload: InventoryInsertPayload = {
+        item_name: trimmedName,
+        category: CATEGORY_TO_DB[v.cat],
+        quantity: 0, // 모바일 등록은 0으로 시작 — 입고는 별도 흐름
+        stock: 0,
+        min_quantity: parsedSafety,
+        unit_price: parsedPrice,
+        unit: UNIT_TO_DB[v.unit],
+        supplier_name: v.vendor.trim() || null,
+        insurance_code: v.sku.trim() || null,
+        company,
+        department: typeof user.department === 'string' ? user.department : '',
+        is_udi: false,
       };
 
-      const { error, data } = await withMissingColumnsFallback(
-        (omittedColumns) =>
-          supabase.from('inventory').insert([buildPayload(omittedColumns)]).select('id'),
-        ['department', 'unit'],
-      );
+      const { queued, error } = await enqueueSupabaseMutation<{ id: string }[]>({
+        kind: 'insert',
+        table: 'inventory',
+        payload: payload as unknown as Record<string, unknown>,
+        retryable: true,
+      });
 
-      if (error) throw error;
-      if (!data || (Array.isArray(data) && data.length === 0)) {
-        throw new Error('inventory 테이블 권한을 확인해주세요.');
+      if (error) {
+        toast(`저장 실패: ${error}`, 'error');
+        return;
+      }
+      if (queued) {
+        toast('오프라인 — 물품 등록 대기 중', 'info');
+        onBack();
+        return;
       }
 
       toast(`${trimmedName} 등록이 완료되었습니다.`, 'success');
       onBack();
-    } catch (err) {
-      const msg = (err as { message?: string })?.message ?? '오류';
-      toast(`저장 실패: ${msg}`, 'error');
     } finally {
       setSaving(false);
     }

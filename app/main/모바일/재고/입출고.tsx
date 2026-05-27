@@ -33,6 +33,7 @@ import {
   canPlaceOrder,
   type StockMutateUser,
 } from './data-hooks';
+import { IORecordForm, KpiCard } from './입출고-form';
 
 export type IOTab = 'io' | 'order' | 'vendor' | 'doc' | 'history';
 
@@ -52,8 +53,18 @@ const TABS: ReadonlyArray<{ id: IOTab; label: string }> = [
 
 export default function 입출고({ user, onBack, onPlaceOrder }: 입출고Props) {
   const [tab, setTab] = useState<IOTab>('io');
+  const [showForm, setShowForm] = useState(false);
   const data = useIOData();
   const allowOrder = canPlaceOrder(user);
+
+  if (showForm) {
+    return (
+      <IORecordForm
+        user={user}
+        onClose={() => setShowForm(false)}
+      />
+    );
+  }
 
   return (
     <div className="m-screen">
@@ -66,8 +77,12 @@ export default function 입출고({ user, onBack, onPlaceOrder }: 입출고Props
             <button type="button" aria-label="검색">
               <MIcon name="search" size={20} />
             </button>
-            <button type="button" aria-label="QR 스캔">
-              <MIcon name="qr" size={20} />
+            <button
+              type="button"
+              aria-label="입출고 기록"
+              onClick={() => setShowForm(true)}
+            >
+              <MIcon name="plus" size={20} />
             </button>
           </>
         }
@@ -422,51 +437,3 @@ function HistoryPane({
   );
 }
 
-// ─── KPI 카드 ─────────────────────────────────────────────────
-function KpiCard({
-  label,
-  value,
-  unit,
-  tone,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  tone: 'accent' | 'success' | 'warning' | 'danger';
-}) {
-  const color =
-    tone === 'accent'
-      ? 'var(--m-accent)'
-      : tone === 'success'
-        ? 'var(--m-success)'
-        : tone === 'warning'
-          ? 'var(--m-warning)'
-          : 'var(--m-danger)';
-  return (
-    <div className="m-card" style={{ padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
-      <div
-        className="m-tnum"
-        style={{
-          fontSize: 22,
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          marginTop: 4,
-          color,
-        }}
-      >
-        {value}
-        <span
-          style={{
-            fontSize: 11,
-            color: 'var(--z-500)',
-            fontWeight: 700,
-            marginLeft: 3,
-          }}
-        >
-          {unit}
-        </span>
-      </div>
-    </div>
-  );
-}
