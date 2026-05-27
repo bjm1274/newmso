@@ -1,6 +1,8 @@
 ﻿'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
+// 2026-05-27 회귀 방지: 일부 chunk가 isMobile 변수를 참조하는 stale 컴파일 잔재 — 안전 정의 유지
+import { useIsMobile } from '@/app/components/useIsMobile';
 import {
   calculateMonthlyAttendance,
   type MonthlyAttendance,
@@ -17,6 +19,7 @@ import {
   TabButton,
 } from './마이페이지공통섹션';
 import AnnualLeaveUsagePanel from './연차휴가내역';
+import HomeTabHeader, { type HomeKpiCard } from './홈탭헤더';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { supabase } from '@/lib/supabase';
@@ -26,12 +29,6 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { performClientLogout } from '@/lib/client-logout';
 import { LucideIcon } from '../조직도서브/조직도측면창';
-import { useIsMobile } from '@/app/components/useIsMobile';
-import {
-  MobileAttendanceEntry,
-  MobileAttendanceViewContainer,
-  type MobileAttendanceView,
-} from './모바일근태진입점';
 import {
   FAVORITES_KEY,
   buildMenuEntry,
@@ -122,10 +119,12 @@ function MyPageMain({
   setSubView,
   onOpenChatMessage,
 }: MyPageMainProps) {
+  // 2026-05-27: chunk가 isMobile 변수 참조하는 stale 잔재 — 안전 정의
+  // (현재 본문에서 사용 안 해도 컴파일된 코드의 미정의 참조 회귀 방지)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const isMobile = useIsMobile();
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isRetired = !isActiveStaff(user ?? {});
-  const isMobile = useIsMobile();
-  const [mobileView, setMobileView] = useState<MobileAttendanceView | null>(null);
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'leave' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteEntry[]>([]);
@@ -711,25 +710,6 @@ function MyPageMain({
     </div>
   );
 
-  // 모바일 근태 화면 진입 시 마이페이지 전체를 해당 화면으로 대체 (뒤로 가기 헤더 포함)
-  if (isMobile && mobileView) {
-    const staffIdValue = typeof user.id === 'string' ? user.id : null;
-    const staffNameValue = typeof user.name === 'string' ? user.name : undefined;
-    return (
-      <>
-        {dialog}
-        <MobileAttendanceViewContainer
-          view={mobileView}
-          staffId={staffIdValue}
-          staffName={staffNameValue}
-          onBack={() => setMobileView(null)}
-          onCheckedIn={fetchMonthlyAttendanceSummary}
-          onCheckedOut={fetchMonthlyAttendanceSummary}
-        />
-      </>
-    );
-  }
-
   const joinedAt = user.joined_at || user.join_date || user.hire_date || user.created_at;
   const joinedAtLabel = formatCompactDate(joinedAt);
   const tenureLabel = getTenureLabel(joinedAt);
@@ -739,11 +719,9 @@ function MyPageMain({
     Math.max(0, Number(user.annual_leave_total || 15) - Number(user.annual_leave_used || 0)) ||
     8.5;
   const pendingApprovalCount = Math.max(0, Number(user.pending_approval_count ?? 0));
-  // 이번 달 근태: 실 데이터(monthlyAttendance) 우선, 없으면 '집계 중'
-  const attendanceValue = monthlyAttendance
-    ? `${monthlyAttendance.present}/${monthlyAttendance.total}`
-    : '—';
-  const attendanceNote = !monthlyAttendance
+  // 이번 달 근태: 실 데이터(monthlyAttendance) 우선, 없으면 '집계 중'.
+  // KPI는 분수 (present / total) 형식 — value.main = present, value.fraction = "/total"
+  const attendanceSub = !monthlyAttendance
     ? '집계 중'
     : monthlyAttendance.absent > 0
       ? `결근 ${monthlyAttendance.absent}일`
@@ -752,52 +730,63 @@ function MyPageMain({
         : monthlyAttendance.present > 0
           ? '개근'
           : '집계 중';
-  const profileQuickCards = [
+
+  // 지시서 handoff/01-mypage-내정보 §3-2 — KPI 5장 단일 행.
+  const homeKpis: HomeKpiCard[] = [
     {
+      key: 'attendance',
       label: '이번 달 근태',
-      value: attendanceValue,
-      note: attendanceNote,
+      sub: attendanceSub,
       icon: 'Clock',
-      tone: 'text-teal-500 bg-teal-50',
+      tone: 'neutral',
+      value: monthlyAttendance
+        ? {
+            main: String(monthlyAttendance.present),
+            fraction: `/${monthlyAttendance.total}`,
+          }
+        : null,
       onClick: isRetired ? undefined : () => setActiveTab('commute'),
     },
     {
+      key: 'leave',
       label: '연차휴가',
-      value: `${leaveRemaining}일`,
-      note: '사용 내역 확인',
+      sub: '사용 내역 확인',
       icon: 'CalendarDays',
-      tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
+      tone: 'success',
+      value: { main: String(leaveRemaining), unit: '일' },
       onClick: isRetired ? undefined : () => setActiveTab('leave'),
     },
     {
-      // §3-2 결정사항: 급여명세서/증명서 카드는 값 없음 → chevron만 표시
+      key: 'salary',
       label: '급여명세서',
-      value: '',
-      note: '월별 명세서 확인',
+      sub: '월별 명세서 확인',
       icon: 'Receipt',
-      tone: 'text-blue-600 bg-blue-50',
+      tone: 'neutral',
+      value: null,
       onClick: () => {
         setRecordsView('salary');
         setActiveTab('records');
       },
     },
     {
+      key: 'certificates',
       label: '증명서',
-      value: '',
-      note: '발급 문서 확인',
+      sub: '발급 문서 확인',
       icon: 'FileText',
-      tone: 'text-indigo-600 bg-indigo-50',
+      tone: 'neutral',
+      value: null,
       onClick: () => {
         setRecordsView('certificates');
         setActiveTab('records');
       },
     },
     {
+      key: 'approvals',
       label: '미결재',
-      value: `${pendingApprovalCount}건`,
-      note: '결재 대기중',
+      sub: '결재 대기중',
       icon: 'FileWarning',
-      tone: 'text-amber-500 bg-amber-50',
+      tone: 'warn',
+      value: { main: String(pendingApprovalCount), unit: '건' },
     },
   ];
 
@@ -1023,96 +1012,17 @@ function MyPageMain({
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--page-bg)] px-5 py-5 transition-all duration-300 md:px-6">
           {activeTab === 'profile' && (
             <div data-testid="mypage-profile-tab" className="animate-premium-fade flex min-h-full flex-col gap-4 pb-4">
-              <section className="erp-card rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-5">
-                  <div className="flex min-w-0 items-center gap-5">
-                    <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#BFD2FF] bg-[#EAF1FF] text-[22px] font-black text-[var(--accent)]">
-                      {profileSummary.avatarUrl ? (
-                        <img src={profileSummary.avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" />
-                      ) : (
-                        <span>{initial}</span>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="text-[16px] font-bold text-[var(--foreground)]">
-                        {profileSummary.name || String(user.name || '사용자')}
-                      </h2>
-                      <p className="mt-2 text-[12px] font-medium text-[var(--toss-gray-4)]">
-                        {profileSummary.position || '직책 정보 없음'} · {profileSummary.department || '소속 정보 없음'}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className={isRetired ? 'erp-status erp-status-red' : 'erp-status erp-status-green'}>{isRetired ? '퇴직' : '재직중'}</span>
-                        <span className="erp-status erp-status-blue">정규직</span>
-                        <span className="erp-chip">{tenureLabel}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hidden text-right text-[12px] font-medium text-[var(--toss-gray-3)] sm:block">
-                    <p>사번 {profileSummary.employeeNo || String(user.employee_no || '00123')}</p>
-                    <p className="mt-3">입사 {joinedAtLabel}</p>
-                  </div>
-                </div>
-              </section>
-
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                {profileQuickCards.map((item) => {
-                  const noteTone =
-                    item.note === '개근' ||
-                    (!item.note.startsWith('지각') &&
-                      item.note !== '집계 중' &&
-                      item.note !== '결재 대기중')
-                      ? 'text-[var(--success)]'
-                      : 'text-[var(--toss-gray-3)]';
-                  const content = (
-                    <>
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${item.tone}`}>
-                          <LucideIcon name={item.icon} size={15} />
-                        </span>
-                        <div className="min-w-0 text-left">
-                          <p className="truncate text-[11px] font-bold text-[var(--toss-gray-4)]">{item.label}</p>
-                          <p className={`mt-0.5 truncate text-[10px] font-semibold ${noteTone}`}>
-                            {item.note}
-                          </p>
-                        </div>
-                      </div>
-                      {item.value ? (
-                        <p className="shrink-0 text-[18px] font-black leading-none text-[var(--foreground)]">
-                          {item.value}
-                        </p>
-                      ) : item.onClick ? (
-                        <LucideIcon name="ChevronRight" size={18} className="shrink-0 text-[var(--toss-gray-3)]" />
-                      ) : null}
-                    </>
-                  );
-
-                  if (item.onClick) {
-                    return (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={item.onClick}
-                        className="flex min-h-[52px] items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
-                      >
-                        {content}
-                      </button>
-                    );
-                  }
-
-                  return (
-                    <article
-                      key={item.label}
-                      className="flex min-h-[52px] items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 shadow-sm"
-                    >
-                      {content}
-                    </article>
-                  );
-                })}
-              </div>
-
-              {isMobile && !isRetired && (
-                <MobileAttendanceEntry onSelect={(view) => setMobileView(view)} />
-              )}
+              <HomeTabHeader
+                name={profileSummary.name || String(user.name || '사용자')}
+                positionAndDept={`${profileSummary.position || '직책 정보 없음'} · ${profileSummary.department || '소속 정보 없음'}`}
+                employeeNo={profileSummary.employeeNo || String(user.employee_no || '00123')}
+                joinedAtLabel={joinedAtLabel}
+                tenureLabel={tenureLabel}
+                isRetired={isRetired}
+                initial={initial}
+                avatarUrl={profileSummary.avatarUrl}
+                kpis={homeKpis}
+              />
 
               {isEditingProfile && (
                 <section data-testid="mypage-profile-edit-panel" className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] p-4 shadow-sm">

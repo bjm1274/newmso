@@ -263,21 +263,25 @@ export default function HandoverNotes({ user }: Props) {
   async function loadNotes() {
     setLoading(true);
     try {
+      // /api/d1/query 라우트의 MAX_LIMIT=1000 (app/api/d1/query/route.ts).
+      // 1500 호출 시 zod 검증 실패 → 400 Invalid payload (PostgREST 시절 잔재).
       const { data, error } = await supabase
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1500);
+        .limit(1000);
 
       if (error) {
-        console.error('인계노트 조회 실패:', error);
+        const errAny = error as unknown as Record<string, unknown>;
+        console.error(`인계노트 조회 실패: ${String(errAny?.message ?? error)}`);
         setNotes([]);
         return;
       }
 
       setNotes(((data || []) as HandoverNoteRow[]).map(normalizeHandoverNote));
     } catch (error) {
-      console.error('인계노트 조회 중 오류:', error);
+      const errAny = error as { message?: string };
+      console.error(`인계노트 조회 중 오류: ${String(errAny?.message ?? error)}`);
       setNotes([]);
     } finally {
       setLoading(false);

@@ -1,6 +1,5 @@
 'use client';
 
-import { useIsMobile } from '@/app/components/useIsMobile';
 import { calculateDistance as calculateDistanceMeters } from '@/lib/geo';
 import { ALLOWED_DISTANCE_M,WORKPLACE_LOCATION } from '@/lib/location';
 import { logger } from '@/lib/logger';
@@ -17,7 +16,6 @@ import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 import { useCallback,useEffect,useRef,useState } from 'react';
-import 모바일체크인 from '../../근태기록/모바일체크인';
 import {
   buildFallbackShiftBoundary,
   buildShiftBoundary,
@@ -143,7 +141,6 @@ function shouldTreatAsAbsent(log: CommuteLog, currentDateKey: string) {
 }
 
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
-  const isMobile = useIsMobile();
   const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
   const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
   const [logs, setLogs] = useState<CommuteLog[]>([]);
@@ -962,41 +959,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const workedDaysCount = logs.filter((log) => !!log.check_in && !!log.check_out && getDisplayStatus(log) !== '결근').length;
   const lateCount = logs.filter((log) => getDisplayStatus(log) === '지각').length;
   const normalCount = logs.filter((log) => getDisplayStatus(log) === '정상').length;
-
-  // 모바일 통계: 평균 근무시간(분) — 출+퇴 둘 다 있는 로그만 평균
-  const completedLogs = logs.filter(
-    (log) => !!log.check_in && !!log.check_out && getDisplayStatus(log) !== '결근',
-  );
-  const avgWorkedMinutes = completedLogs.length
-    ? Math.round(
-        completedLogs.reduce((acc, log) => {
-          const inMs = new Date(log.check_in as string).getTime();
-          const outMs = new Date(log.check_out as string).getTime();
-          const diff = Math.max(0, outMs - inMs);
-          return acc + Math.round(diff / 60000);
-        }, 0) / completedLogs.length,
-      )
-    : 0;
-
-  if (isMobile) {
-    return (
-      <모바일체크인
-        staffId={effectiveUserId || null}
-        companyLocation={WORKPLACE_LOCATION}
-        monthlySummary={{
-          workedDays: workedDaysCount,
-          lateCount,
-          avgWorkedMinutes,
-        }}
-        onCheckedIn={() => {
-          void initCommuteData();
-        }}
-        onCheckedOut={() => {
-          void initCommuteData();
-        }}
-      />
-    );
-  }
 
   return (
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-4 py-4 sm:p-5 h-full flex flex-col space-y-5">

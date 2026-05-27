@@ -201,27 +201,34 @@ export type FeatureCard = {
   icon: string;
   subView: string;
   testId: string;
+  /** .ac-ico.ico-* 토큰 (라이브 정답 컬러 그룹) */
+  iconKey: string;
+  desc: string;
+  /** 'chart' = Chart 이관 예정 / 'iframe' = 외부 연동 */
+  external?: 'chart' | 'iframe';
+  /** legacy — 카드 마크업이 .addon-card 기반으로 교체된 후 미사용. 잔존 호환용 */
   accentClass: string;
 };
 
+// 지시서 §2 사이드바 순서 그대로
 export const FEATURE_CARDS: FeatureCard[] = [
-  { id: '조직도', label: '조직도', icon: 'Building2', subView: '조직도', testId: 'org-chart', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '부서별재고', label: '부서별 재고', icon: 'Package', subView: '부서별재고', testId: 'department-inventory', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '근무현황', label: '근무현황', icon: 'CalendarDays', subView: '근무현황', testId: 'work-status', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '인계노트', label: '인계노트', icon: 'FileCheck2', subView: '인계노트', testId: 'handover-note', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '퇴원심사', label: '퇴원심사', icon: 'Hospital', subView: '퇴원심사', testId: 'discharge-review', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '마감보고', label: '마감보고', icon: 'Banknote', subView: '마감보고', testId: 'closing-report', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '직원평가', label: '직원평가', icon: 'SquarePen', subView: '직원평가', testId: 'staff-evaluation', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '입금실시간조회', label: '입금 실시간 조회', icon: 'Landmark', subView: '입금실시간조회', testId: 'realtime-deposit', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: '수술상담', label: '수술상담 분석', icon: 'Mic', subView: '수술상담', testId: 'surgery-consultation', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: 'OP체크', label: 'OP체크', icon: 'Stethoscope', subView: 'OP체크', testId: 'op-check', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
-  { id: 'ESL관리', label: 'ESL 관리', icon: 'Tag', subView: 'ESL관리', testId: 'esl-manager', accentClass: 'bg-[var(--muted)] text-[var(--accent)] group-hover:bg-[var(--toss-blue-light)]' },
+  { id: '조직도',         label: '조직도',          icon: 'Building2',    iconKey: 'org',       desc: '병원장 → 부서그룹 → 직원',         subView: '조직도',         testId: 'org-chart',             accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '부서별재고',     label: '부서별 재고',     icon: 'Package',      iconKey: 'inventory', desc: '부서/본사 컨텍스트 · 주 기반 최소재고', subView: '부서별재고',     testId: 'department-inventory',  accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '근무현황',       label: '근무현황',        icon: 'CalendarDays', iconKey: 'worknow',   desc: '시프트 + 월간 캘린더',              subView: '근무현황',       testId: 'work-status',           accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '인계노트',       label: '인계노트',        icon: 'FileCheck2',   iconKey: 'handoff',   desc: '캘린더 + 공통·환자별 인계',         subView: '인계노트',       testId: 'handover-note',         accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '직원평가',       label: '직원평가',        icon: 'Star',         iconKey: 'eval',      desc: '슬라이더 1~5 + 히스토리',           subView: '직원평가',       testId: 'staff-evaluation',      accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '퇴원심사',       label: '퇴원심사',        icon: 'Hospital',     iconKey: 'discharge', desc: '목록 / 새 심사 / 기본 항목 설정',   subView: '퇴원심사',       testId: 'discharge-review',      accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '수술상담',       label: '수술상담',        icon: 'Mic',          iconKey: 'consult',   desc: '음성 녹음 + AI 분석',               subView: '수술상담',       testId: 'surgery-consultation',  accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: 'OP체크',         label: 'OP체크',          icon: 'Stethoscope',  iconKey: 'opcheck',   desc: '진행 스텝 4단계 + 체크리스트',      subView: 'OP체크',         testId: 'op-check',              accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
+  { id: '입금실시간조회', label: '입금 실시간 조회', icon: 'Landmark',     iconKey: 'deposit',   desc: 'Chart 프로그램으로 이관 예정',      subView: '입금실시간조회', testId: 'realtime-deposit',      accentClass: 'bg-[var(--muted)] text-[var(--accent)]', external: 'chart' },
+  { id: '마감보고',       label: '마감보고',        icon: 'Banknote',     iconKey: 'closing',   desc: 'Chart 프로그램으로 이관 예정',      subView: '마감보고',       testId: 'closing-report',        accentClass: 'bg-[var(--muted)] text-[var(--accent)]', external: 'chart' },
+  { id: 'ESL관리',        label: 'ESL 관리',        icon: 'Tag',          iconKey: 'org',       desc: '전자가격표시 시스템',               subView: 'ESL관리',        testId: 'esl-manager',           accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
 ];
 
-// 결정 #14: 외부 시스템 미러링 카드 — 벤더명 + 외부 시스템 표시. 실제 API 연동은 후속 차수.
+// 결정 #14: 외부 시스템 미러링 — 모듈 카드와 동일 마크업으로 그리드 안에 통합
 export const EXTERNAL_LINKS = [
-  { id: 'km-park', label: '주차관제', vendor: 'ParkSys Pro', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: 'CircleParking' },
-  { id: 'webfax', label: '웹팩스', vendor: 'WebFax Cloud', url: 'https://webfax.uplus.co.kr/m', icon: 'Printer' },
+  { id: 'km-park', label: '주차관제', vendor: 'ParkSys Pro',  url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: 'CircleParking', iconKey: 'parking' },
+  { id: 'webfax',  label: '웹팩스',   vendor: 'WebFax Cloud', url: 'https://webfax.uplus.co.kr/m',                            icon: 'Printer',       iconKey: 'webfax' },
 ];
 
 export function FeatureShell({

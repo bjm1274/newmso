@@ -305,7 +305,31 @@ function InspectPanel({
   const emptyMessage = useEmptyMessage(loading, error, rows.length);
   const totalCount = rows.reduce((s, r) => s + r.total, 0);
   const doneCount = rows.reduce((s, r) => s + r.done, 0);
-  const remain = Math.max(0, totalCount - doneCount);
+
+  // reference §1340 — 3 segment(완료·진행·미실시) 분류
+  // 완료: ratio>=1 위치의 done 합
+  // 진행 중: 0<ratio<1 위치의 done 합 (진행 중 위치에서 처리한 부분)
+  // 미실시: 진행 중 위치의 남은(total-done) + ratio==0 위치의 total
+  let completedCount = 0;
+  let inProgressCount = 0;
+  let pendingCount = 0;
+  for (const r of rows) {
+    const ratio = r.total > 0 ? r.done / r.total : 0;
+    if (ratio >= 1) {
+      completedCount += r.done;
+    } else if (ratio > 0) {
+      inProgressCount += r.done;
+      pendingCount += Math.max(0, r.total - r.done);
+    } else {
+      pendingCount += r.total;
+    }
+  }
+  // 안전 가드: 합이 totalCount와 일치
+  const sum = completedCount + inProgressCount + pendingCount;
+  if (sum !== totalCount) {
+    // 차이를 미실시로 보정
+    pendingCount += totalCount - sum;
+  }
 
   return (
     <section className="app-card flex flex-col gap-3 p-4">
@@ -327,20 +351,35 @@ function InspectPanel({
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label="실사 진행률"
+        aria-label={`실사 진행률 — 완료 ${completedCount}, 진행 ${inProgressCount}, 미실시 ${pendingCount}`}
       >
-        <div
-          className="flex items-center justify-center text-[10px] font-bold text-white"
-          style={{ flex: Math.max(1, pct), background: 'var(--success)' }}
-        >
-          실사 완료 {doneCount}
-        </div>
-        <div
-          className="flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-5)]"
-          style={{ flex: Math.max(1, 100 - pct), background: 'var(--muted)' }}
-        >
-          미실시 {remain}
-        </div>
+        {completedCount > 0 && (
+          <div
+            className="flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ flex: Math.max(1, completedCount), background: 'var(--success)' }}
+            title={`완료 ${completedCount}`}
+          >
+            완료 {completedCount}
+          </div>
+        )}
+        {inProgressCount > 0 && (
+          <div
+            className="flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ flex: Math.max(1, inProgressCount), background: 'var(--warning)' }}
+            title={`진행 중 ${inProgressCount}`}
+          >
+            진행 {inProgressCount}
+          </div>
+        )}
+        {pendingCount > 0 && (
+          <div
+            className="flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-5)]"
+            style={{ flex: Math.max(1, pendingCount), background: 'var(--muted)' }}
+            title={`미실시 ${pendingCount}`}
+          >
+            미실시 {pendingCount}
+          </div>
+        )}
       </div>
       {emptyMessage ? (
         <p className="px-4 py-12 text-center text-[12px] text-[var(--toss-gray-4)]">

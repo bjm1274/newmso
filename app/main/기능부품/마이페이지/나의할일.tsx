@@ -13,15 +13,6 @@ type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
 type TodoRepeatType = 'none' | 'daily' | 'weekly' | 'monthly';
 type TodoAssigneeKind = 'self' | 'team' | 'follow_up';
 type TodoViewRange = 'day' | 'week' | 'month';
-type FilterChipTone = 'accent' | 'danger' | 'warning' | 'muted' | 'neutral';
-
-const FILTER_CHIP_ACTIVE_CLASS: Record<FilterChipTone, string> = {
-  accent: 'bg-[var(--accent)] text-white',
-  danger: 'bg-[var(--danger)] text-white',
-  warning: 'bg-[var(--warning)] text-white',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  neutral: 'bg-[var(--accent)] text-white',
-};
 
 type TodoRow = {
   id: string | number;
@@ -581,108 +572,125 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
   const currentRange = getDateRange(viewRange, selectedDate);
 
+  // 라이브 reference: tones[urgent]=danger / high=warn / medium=accent / low=muted
+  const priToneMap: Record<TodoPriority | 'all', 'accent' | 'danger' | 'warn' | 'muted'> = {
+    all: 'accent',
+    urgent: 'danger',
+    high: 'warn',
+    medium: 'accent',
+    low: 'muted',
+  };
+  const allOpenCount = tasks.filter((t) => !t.is_complete).length;
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    const ac = Number(Boolean(a.is_complete));
+    const bc = Number(Boolean(b.is_complete));
+    if (ac !== bc) return ac - bc;
+    return String(a.reminder_at || a.task_date || '').localeCompare(String(b.reminder_at || b.task_date || ''));
+  });
+  const rangeLabel =
+    viewRange === 'day'
+      ? selectedDate
+      : viewRange === 'week'
+        ? `${currentRange.start} ~ ${currentRange.end}`
+        : `${selectedDate.slice(0, 7)}`;
+
+  const shiftSelectedDate = (delta: number) => {
+    const base = new Date(`${selectedDate}T12:00:00`);
+    if (viewRange === 'day') base.setDate(base.getDate() + delta);
+    else if (viewRange === 'week') base.setDate(base.getDate() + 7 * delta);
+    else base.setMonth(base.getMonth() + delta);
+    setSelectedDate(base.toLocaleDateString('en-CA'));
+  };
+
   return (
-    <div className="flex h-full flex-col space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm sm:space-y-4 sm:p-5">
+    <div className="flex h-full flex-col gap-3 sm:gap-4">
       {dialog}
 
-      <div className="space-y-2 sm:space-y-3">
+      {/* 컨트롤 바 — 우선순위 5칩 + 일별/주간/월간 + 날짜 페이저 */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-[var(--shadow-xs)] sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <FilterChip
-              active={priorityFilter === 'all'}
-              label={`전체 ${tasks.filter((task) => !task.is_complete).length}`}
+            <button
+              type="button"
+              className={`todo-chip tone-${priToneMap.all}${priorityFilter === 'all' ? ' on' : ''}`}
               onClick={() => setPriorityFilter('all')}
-              tone="accent"
-            />
-            {PRIORITY_OPTIONS.map((option) => {
-              const toneMap: Record<TodoPriority, FilterChipTone> = {
-                urgent: 'danger',
-                high: 'warning',
-                medium: 'accent',
-                low: 'muted',
-              };
-              return (
-                <FilterChip
-                  key={option.value}
-                  active={priorityFilter === option.value}
-                  label={`${option.label} ${priorityCounts[option.value]}`}
-                  onClick={() => setPriorityFilter(option.value)}
-                  tone={toneMap[option.value]}
-                />
-              );
-            })}
+            >
+              전체 <span className="cnt">{allOpenCount}</span>
+            </button>
+            {PRIORITY_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`todo-chip tone-${priToneMap[option.value]}${priorityFilter === option.value ? ' on' : ''}`}
+                onClick={() => setPriorityFilter(option.value)}
+              >
+                {option.label} <span className="cnt">{priorityCounts[option.value]}</span>
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex gap-1 rounded-[var(--radius-md)] bg-[var(--muted)] p-1">
+            <div className="seg">
               {(['day', 'week', 'month'] as const).map((range) => (
                 <button
                   key={range}
                   type="button"
                   onClick={() => setViewRange(range)}
-                  className={`whitespace-nowrap rounded-md px-3 py-1.5 text-[11px] font-bold ${viewRange === range ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+                  className={viewRange === range ? 'on' : ''}
                 >
                   {range === 'day' ? '일별' : range === 'week' ? '주간' : '월간'}
                 </button>
               ))}
             </div>
-
-            <input
-              type={viewRange === 'month' ? 'month' : 'date'}
-              value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
-              onChange={(event) => setSelectedDate(viewRange === 'month' ? `${event.target.value}-01` : event.target.value)}
-              className="cursor-pointer rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-            />
+            <div className="att-month">
+              <button
+                type="button"
+                className="att-mo-btn"
+                onClick={() => shiftSelectedDate(-1)}
+                aria-label="이전 기간"
+              >
+                ‹
+              </button>
+              <span className="att-mo-lbl">{rangeLabel}</span>
+              <button
+                type="button"
+                className="att-mo-btn"
+                onClick={() => shiftSelectedDate(1)}
+                aria-label="다음 기간"
+              >
+                ›
+              </button>
+            </div>
           </div>
         </div>
-
-        {viewRange !== 'day' ? (
-          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-            {viewRange === 'week' ? `${currentRange.start} ~ ${currentRange.end}` : `${selectedDate.slice(0, 7)} 전체`}
-          </p>
-        ) : null}
       </div>
 
-      <div className="space-y-2 rounded-[16px] border border-[var(--border)] bg-[var(--background)]/40 p-2.5 sm:rounded-[24px] sm:p-3">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newTask}
-            onChange={(event) => setNewTask(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                void handleAddTask();
-              }
-            }}
-            placeholder={
-              effectiveUserId
-                ? `${selectedDate} 일정이나 할일을 입력해 주세요.`
-                : recoverAttempted
-                  ? '직원 계정으로 로그인하면 할일을 등록할 수 있습니다.'
-                  : '사용자 정보를 확인하는 중입니다.'
+      {/* 빠른 등록 1줄 + 메타 미리보기 */}
+      <div className="todo-quickadd">
+        <span aria-hidden="true" className="text-[var(--zinc-400)] text-[18px] leading-none">+</span>
+        <input
+          type="text"
+          className="todo-input"
+          value={newTask}
+          onChange={(event) => setNewTask(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              void handleAddTask();
             }
-            disabled={!effectiveUserId}
-            className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[13px] font-bold text-[var(--foreground)] outline-none transition-colors focus:border-[var(--accent)] focus:bg-[var(--card)] disabled:bg-[var(--muted)] sm:rounded-[18px] sm:px-4 sm:py-3 sm:text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => void handleAddTask()}
-            disabled={!effectiveUserId || !newTask.trim()}
-            className="shrink-0 rounded-[var(--radius-md)] bg-[var(--foreground)] px-3 py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-50 sm:rounded-[18px] sm:px-4 sm:py-3 sm:text-sm"
-          >
-            등록
-          </button>
-        </div>
-
-        {/* 메타 칩 영역 — 가시 칩(span) 위에 투명한 native control을 오버레이해 네이티브 placeholder·아이콘 노출 방지 */}
-        <div className="flex flex-wrap gap-2">
-          {/* 우선순위 칩 */}
-          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
-            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
-              {getPriorityMeta(newPriority).label}
-              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
-            </span>
+          }}
+          placeholder={
+            effectiveUserId
+              ? "할 일을 입력하고 Enter — 예: '내일 오후 3시 의료기기 점검 결재'"
+              : recoverAttempted
+                ? '직원 계정으로 로그인하면 할일을 등록할 수 있습니다.'
+                : '사용자 정보를 확인하는 중입니다.'
+          }
+          disabled={!effectiveUserId}
+        />
+        <div className="todo-quick-meta">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <span>⚑ {getPriorityMeta(newPriority).label}</span>
             <select
               value={newPriority}
               onChange={(event) => setNewPriority(event.target.value as TodoPriority)}
@@ -690,19 +698,12 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               {PRIORITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
-
-          {/* 반복 칩 */}
-          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
-            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
-              {newRepeatType === 'none' ? '반복 없음' : getRepeatLabel(newRepeatType)}
-              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
-            </span>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <span>↻ {newRepeatType === 'none' ? '반복 없음' : getRepeatLabel(newRepeatType)}</span>
             <select
               value={newRepeatType}
               onChange={(event) => setNewRepeatType(event.target.value as TodoRepeatType)}
@@ -710,19 +711,12 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               {REPEAT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
-
-          {/* 담당 칩 */}
-          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
-            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
-              {getAssigneeLabel(newAssigneeKind)}
-              <span className="text-[10px] text-[var(--toss-gray-3)]">▾</span>
-            </span>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <span>◎ {getAssigneeLabel(newAssigneeKind)}</span>
             <select
               value={newAssigneeKind}
               onChange={(event) => setNewAssigneeKind(event.target.value as TodoAssigneeKind)}
@@ -730,18 +724,12 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               className="absolute inset-0 cursor-pointer opacity-0"
             >
               {ASSIGNEE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
-
-          {/* 리마인더 날짜 칩 */}
-          <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
-            <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
-              📅 {newReminderDate || '날짜'}
-            </span>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <span>▦ {newReminderDate || selectedDate}</span>
             <input
               type="date"
               value={newReminderDate}
@@ -750,13 +738,9 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               className="absolute inset-0 cursor-pointer opacity-0"
             />
           </label>
-
-          {/* 리마인더 시간 칩 (날짜 선택 시에만 노출) */}
           {newReminderDate ? (
-            <label className="relative inline-flex items-center rounded-full focus-within:ring-2 focus-within:ring-[var(--accent)]/40">
-              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 text-[11px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap sm:h-8">
-                ⏰ {newReminderTime || '시간'}
-              </span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <span>⏱ {newReminderTime || '시간'}</span>
               <input
                 type="time"
                 value={newReminderTime}
@@ -767,103 +751,75 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
             </label>
           ) : null}
         </div>
+        <button
+          type="button"
+          onClick={() => void handleAddTask()}
+          disabled={!effectiveUserId || !newTask.trim()}
+          className="inline-flex h-9 shrink-0 items-center rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-[12px] font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-50"
+        >
+          등록
+        </button>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto pr-2 custom-scrollbar">
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" />
+      {/* 리스트 카드 */}
+      <div className="flex-1 min-h-0 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-[var(--shadow-xs)] sm:p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[15px] font-extrabold tracking-tight text-[var(--foreground)]">
+              {priorityFilter === 'all' ? '전체' : getPriorityMeta(priorityFilter).label} 할 일
+            </div>
+            <div className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              {sortedTasks.length}건 · 마감 오름차순
+            </div>
           </div>
-        ) : !effectiveUserId ? (
-          <div className="flex h-60 flex-col items-center justify-center gap-3 px-4 text-center text-[var(--toss-gray-3)]">
-            <span className="text-3xl">🗂</span>
-            <p className="text-xs font-bold">할일은 직원 계정으로 로그인해야 사용할 수 있습니다.</p>
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="flex h-60 flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-[var(--border)] px-6 text-center text-[var(--toss-gray-3)]">
-            <span className="text-4xl opacity-40">📝</span>
-            <p className="text-[13px] font-bold text-[var(--foreground)]">{selectedDate} 일정이 비어 있습니다.</p>
-            <p className="text-[11px] text-[var(--toss-gray-4)]">위 입력창에 할 일을 적고 Enter를 눌러보세요.</p>
-          </div>
-        ) : (
-          <>
-            <section className="space-y-3">
-              <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase text-[var(--accent)]">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-                진행 중 ({inProgressTasks.length})
-              </h4>
-              {inProgressTasks.length > 0 ? (
-                inProgressTasks.map((task) => (
-                  <TodoItem
-                    key={String(task.id)}
-                    task={task}
-                    onToggle={toggleTask}
-                    onDelete={deleteTask}
-                    onChatNavigate={handleOpenChatSource}
-                  />
-                ))
-              ) : (
-                <p className="pl-3 text-[11px] italic text-[var(--toss-gray-3)]">진행 중인 할일이 없습니다.</p>
-              )}
-            </section>
+        </div>
 
-            {completedTasks.length > 0 ? (
-              <section className="space-y-3 opacity-65">
-                <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--toss-gray-3)]" />
-                  완료 이력 ({completedTasks.length})
-                </h4>
-                {completedTasks.map((task) => (
-                  <TodoItem
-                    key={String(task.id)}
-                    task={task}
-                    onToggle={toggleTask}
-                    onDelete={deleteTask}
-                    onChatNavigate={handleOpenChatSource}
-                  />
-                ))}
-              </section>
-            ) : null}
-          </>
-        )}
+        <div className="overflow-y-auto pr-1 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 360px)' }}>
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)]" />
+            </div>
+          ) : !effectiveUserId ? (
+            <div className="empty-pad">
+              <div className="empty-ico" aria-hidden="true">🗂</div>
+              <div className="empty-title">로그인이 필요합니다</div>
+              <div className="empty-sub">할일은 직원 계정으로 로그인해야 사용할 수 있습니다.</div>
+            </div>
+          ) : sortedTasks.length === 0 ? (
+            <div className="empty-pad">
+              <div className="empty-ico" aria-hidden="true">✓</div>
+              <div className="empty-title">선택한 우선순위에 할 일이 없습니다.</div>
+              <div className="empty-sub">위 빠른 등록으로 추가하거나, 우선순위 필터를 바꿔보세요.</div>
+            </div>
+          ) : (
+            <div className="todo-list">
+              {sortedTasks.map((task) => (
+                <TodoItem
+                  key={String(task.id)}
+                  task={task}
+                  priToneMap={priToneMap}
+                  onToggle={toggleTask}
+                  onDelete={deleteTask}
+                  onChatNavigate={handleOpenChatSource}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function FilterChip({
-  active,
-  label,
-  onClick,
-  tone = 'neutral',
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  tone?: FilterChipTone;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors ${
-        active
-          ? FILTER_CHIP_ACTIVE_CLASS[tone]
-          : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function TodoItem({
   task,
+  priToneMap,
   onToggle,
   onDelete,
   onChatNavigate,
 }: {
   task: TodoRow;
+  priToneMap: Record<TodoPriority | 'all', 'accent' | 'danger' | 'warn' | 'muted'>;
   onToggle: (id: string | number, currentStatus: boolean) => void;
   onDelete: (id: string | number) => void;
   onChatNavigate?: (task: TodoRow) => void;
@@ -873,87 +829,52 @@ function TodoItem({
   const reminderLabel = formatReminder(task.reminder_at);
   const repeatLabel = getRepeatLabel(task.repeat_type);
   const assigneeLabel = getAssigneeLabel(task.assignee_kind);
-
-  const priorityPinClassMap: Record<string, string> = {
-    urgent: 'bg-[var(--danger)]',
-    high: 'bg-[var(--warning)]',
-    medium: 'bg-[var(--accent)]',
-    low: 'bg-[var(--toss-gray-3)]',
-  };
-  const priorityPinClass = priorityPinClassMap[String(task.priority || 'medium')] ?? 'bg-[var(--accent)]';
-
-  const chatButton = isChatSource && onChatNavigate ? (
-    <button
-      type="button"
-      data-testid={`todo-open-chat-${task.id}`}
-      onClick={() => onChatNavigate(task)}
-      className="shrink-0 rounded-md bg-[var(--toss-blue-light)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)] transition-all hover:bg-[var(--accent)] hover:text-white"
-      title="채팅 메시지로 이동"
-    >
-      ↗ 채팅
-    </button>
-  ) : null;
-
-  const deleteButton = (
-    <button
-      type="button"
-      onClick={() => void onDelete(task.id)}
-      className="shrink-0 rounded-md bg-[var(--muted)] px-2 py-1 text-[11px] font-semibold text-[var(--toss-gray-3)] transition-all hover:bg-red-500/10 hover:text-red-500 sm:opacity-0 sm:group-hover:opacity-100"
-    >
-      삭제
-    </button>
-  );
+  const tone = priToneMap[(task.priority as TodoPriority) || 'medium'] || 'accent';
+  const dueLabel = reminderLabel || task.task_date;
 
   return (
-    <div className="group rounded-[14px] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 transition-all hover:border-[var(--accent)] hover:shadow-sm sm:rounded-[20px] sm:px-4 sm:py-3">
-      {/*
-        5열 grid:
-        [체크박스 20px] [우선순위 핀 8px] [제목 1fr] [메타 배지 auto] [액션 auto]
-      */}
-      <div className="grid items-start gap-x-2 sm:gap-x-3" style={{ gridTemplateColumns: '20px 8px 1fr auto auto' }}>
-        {/* 열1: 체크박스 */}
+    <label className={`todo-row${task.is_complete ? ' is-done' : ''}`}>
+      <input
+        type="checkbox"
+        className="todo-check"
+        checked={task.is_complete}
+        onChange={() => onToggle(task.id, task.is_complete)}
+        aria-label={task.is_complete ? '완료 해제' : '완료 표시'}
+      />
+      <span className={`pri-pill tone-${tone}`}>{priorityMeta.label}</span>
+      <div className="todo-title" title={task.content}>{task.content}</div>
+      <div className="todo-meta">
+        <span>📅 {dueLabel}</span>
+        <span>◎ {assigneeLabel}</span>
+        {repeatLabel ? <span>↻ {repeatLabel}</span> : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {isChatSource && onChatNavigate ? (
+          <button
+            type="button"
+            data-testid={`todo-open-chat-${task.id}`}
+            onClick={(event) => {
+              event.preventDefault();
+              onChatNavigate(task);
+            }}
+            className="inline-flex h-7 items-center rounded-md bg-[var(--accent-soft)] px-2 text-[11px] font-bold text-[var(--accent)] hover:brightness-95"
+            title="채팅 메시지로 이동"
+          >
+            ↗
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={() => onToggle(task.id, task.is_complete)}
-          aria-label={task.is_complete ? '완료 해제' : '완료 표시'}
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-[var(--radius-md)] border-2 transition-all sm:h-6 sm:w-6 ${task.is_complete ? 'border-[var(--success)] bg-[var(--success)] text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}
+          onClick={(event) => {
+            event.preventDefault();
+            void onDelete(task.id);
+          }}
+          className="inline-flex h-7 items-center rounded-md bg-[var(--muted)] px-2 text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--danger-soft)] hover:text-[var(--danger)]"
+          aria-label="할일 삭제"
         >
-          {task.is_complete ? <span className="text-[10px] font-bold sm:text-[11px]">✓</span> : null}
+          ✕
         </button>
-
-        {/* 열2: 우선순위 핀 dot */}
-        <span
-          className={`mt-2 h-2 w-2 shrink-0 rounded-full ${priorityPinClass}`}
-          aria-label={`우선순위: ${priorityMeta.label}`}
-          title={priorityMeta.label}
-        />
-
-        {/* 열3: 제목 */}
-        <span
-          className={`min-w-0 break-words text-[13px] font-bold leading-snug sm:text-sm ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}
-        >
-          {task.content}
-        </span>
-
-        {/* 열4: 메타 배지 (날짜·태그·반복) */}
-        <div className="flex flex-wrap items-start justify-end gap-1 text-[10px] font-bold sm:gap-1.5 sm:text-[11px]">
-          <span className={`rounded-full px-2 py-0.5 ${priorityMeta.className}`}>{priorityMeta.label}</span>
-          <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[var(--toss-gray-4)]">{assigneeLabel}</span>
-          {repeatLabel ? (
-            <span className="rounded-full bg-[var(--accent-light)] px-2 py-0.5 text-[var(--accent)]">{repeatLabel}</span>
-          ) : null}
-          {reminderLabel ? (
-            <span className="rounded-full bg-[var(--success-light)] px-2 py-0.5 text-[var(--success)]">알림 {reminderLabel}</span>
-          ) : null}
-          <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[var(--toss-gray-3)]">{task.task_date}</span>
-        </div>
-
-        {/* 열5: 액션 버튼 */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          {chatButton}
-          {deleteButton}
-        </div>
       </div>
-    </div>
+    </label>
   );
 }

@@ -115,12 +115,13 @@ export default function HandoverNotes({ user }: Props) {
   async function loadNotes() {
     setLoading(true);
     try {
-      // 부서 격리: 로그인 사용자의 부서/회사 노트만 조회
+      // 부서 격리: 로그인 사용자의 부서/회사 노트만 조회.
+      // /api/d1/query MAX_LIMIT=1000 (app/api/d1/query/route.ts) — 1500은 400.
       let query = supabase
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(1500);
+        .limit(1000);
 
       // 사용자 회사가 있으면 해당 회사의 노트만 조회 (데이터 격리)
       if (user?.company) {

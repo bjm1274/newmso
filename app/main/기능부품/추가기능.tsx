@@ -246,44 +246,54 @@ export default function ExtraFeatures({
     </div>
   );
 
-  const renderCard = useCallback((card: FeatureCard) => (
-    <div
-      key={card.id}
-      data-testid={`extra-card-shell-${card.testId}`}
-      className="group relative flex min-h-[112px] flex-col justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/35"
-    >
-      <button
-        type="button"
-        data-testid={`extra-card-${card.testId}`}
+  const renderCard = useCallback((card: FeatureCard) => {
+    const isFav = favorites.includes(card.id);
+    return (
+      <div
+        key={card.id}
+        role="button"
+        tabIndex={0}
+        data-testid={`extra-card-shell-${card.testId}`}
+        className="addon-card group"
         onClick={() => handleFeatureClick(card.id, card.subView)}
-        className="flex h-full w-full flex-col items-start justify-between text-left"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleFeatureClick(card.id, card.subView);
+          }
+        }}
+        aria-label={`${card.label} 열기 — ${card.desc}`}
       >
-        <div className="flex w-full items-start justify-between gap-3 pr-8">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] transition-colors ${card.accentClass}`}>
-            <LucideIcon name={card.icon} size={22} strokeWidth={1.9} />
-          </div>
+        <div className={`ac-ico ico-${card.iconKey}`} aria-hidden="true">
+          <LucideIcon name={card.icon} size={20} strokeWidth={1.9} />
         </div>
-        <div className="mt-3 min-w-0">
-          <h3 className="text-[13px] font-black text-[var(--foreground)]">{card.label}</h3>
+        <div className="flex items-center gap-1.5">
+          <div className="ac-label">{card.label}</div>
+          {card.external === 'chart' && <span className="ac-tag tone-warn">Chart 이관 예정</span>}
+          {card.external === 'iframe' && <span className="ac-tag tone-muted">외부 연동</span>}
         </div>
-      </button>
-      <button
-        type="button"
-        data-testid={`extra-favorite-${card.testId}`}
-        onClick={(event) => toggleFavorite(card.id, event)}
-        className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] opacity-100 transition-all hover:bg-[var(--muted)] hover:text-[var(--accent)]"
-        title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-        aria-label={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-      >
-        <LucideIcon
-          name="Star"
-          size={17}
-          fill={favorites.includes(card.id) ? 'currentColor' : 'none'}
-          className={favorites.includes(card.id) ? 'text-[var(--accent)]' : undefined}
-        />
-      </button>
-    </div>
-  ), [favorites, handleFeatureClick, toggleFavorite]);
+        <div className="ac-desc">{card.desc}</div>
+        <div className="ac-chev" aria-hidden="true">
+          <LucideIcon name="ChevronRight" size={16} />
+        </div>
+        <button
+          type="button"
+          data-testid={`extra-favorite-${card.testId}`}
+          onClick={(event) => toggleFavorite(card.id, event)}
+          className="absolute bottom-3 right-3 flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] opacity-0 transition-all hover:bg-[var(--muted)] hover:text-[var(--accent)] group-hover:opacity-100 focus:opacity-100"
+          title={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+          aria-label={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+        >
+          <LucideIcon
+            name="Star"
+            size={14}
+            fill={isFav ? 'currentColor' : 'none'}
+            className={isFav ? 'text-[var(--accent)]' : undefined}
+          />
+        </button>
+      </div>
+    );
+  }, [favorites, handleFeatureClick, toggleFavorite]);
 
   if (resolvedSubView) {
     return (
@@ -321,46 +331,40 @@ export default function ExtraFeatures({
         {compactToolbar}
       </div>
 
-      <div className="w-full space-y-5">
-          {/* §4-1, §13.17 단일 리스트 — 그룹 구분선/라벨 삭제. 순서: 즐겨찾기 → 최근 → 전체 → 외부연동. */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {favoriteCards.map(renderCard)}
-            {recentCards
-              .filter((card) => !favorites.includes(card.id))
-              .map(renderCard)}
-            {normalCards
-              .filter((card) => !recentFeatures.includes(card.id))
-              .map(renderCard)}
-          </div>
-
-          <div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {EXTERNAL_LINKS.map((item) => (
-              <a
-                key={item.id}
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${item.label} — 외부 시스템 ${item.vendor} 새 창에서 열기`}
-                className="group flex min-h-[112px] flex-col items-start justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50"
-              >
-                <div className="flex w-full items-start justify-between gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--accent)] transition-colors group-hover:bg-[var(--toss-blue-light)]">
-                    <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] font-black text-[var(--muted-foreground)]">
-                    외부 시스템
-                    <LucideIcon name="ArrowUpRight" size={10} strokeWidth={2.4} />
-                  </span>
-                </div>
-                <div className="mt-3 min-w-0">
-                  <h3 className="text-[13px] font-black text-[var(--foreground)]">{item.label}</h3>
-                  <p className="mt-0.5 truncate text-[10px] font-bold text-[var(--toss-gray-3)]">{item.vendor}</p>
-                </div>
-              </a>
-              ))}
-            </div>
-          </div>
+      <div className="w-full">
+        {/* 라이브 정답: .addon-grid 단일 그리드. 즐겨찾기 → 최근 → 일반 → 외부연동 순. */}
+        <div className="addon-grid">
+          {favoriteCards.map(renderCard)}
+          {recentCards
+            .filter((card) => !favorites.includes(card.id))
+            .map(renderCard)}
+          {normalCards
+            .filter((card) => !recentFeatures.includes(card.id))
+            .map(renderCard)}
+          {EXTERNAL_LINKS.map((item) => (
+            <a
+              key={item.id}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${item.label} — 외부 시스템 ${item.vendor} 새 창에서 열기`}
+              className="addon-card group"
+              style={{ textDecoration: 'none' }}
+            >
+              <div className={`ac-ico ico-${item.iconKey}`} aria-hidden="true">
+                <LucideIcon name={item.icon} size={20} strokeWidth={1.8} />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="ac-label">{item.label}</div>
+                <span className="ac-tag tone-muted">외부 연동</span>
+              </div>
+              <div className="ac-desc">{item.vendor}</div>
+              <div className="ac-chev" aria-hidden="true">
+                <LucideIcon name="ArrowUpRight" size={16} />
+              </div>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );

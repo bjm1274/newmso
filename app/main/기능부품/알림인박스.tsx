@@ -99,6 +99,35 @@ function matchesNotificationSearch(notification: Record<string, unknown>, rawQue
   return haystack.includes(query);
 }
 
+// 라이브 reference (handoff/01-mypage-내정보) alert kind 매핑
+// chat=blue / approval=warning / hr=violet / stock=success / etc=gray
+const TYPE_TO_KIND: Record<string, 'chat' | 'approval' | 'hr' | 'stock' | 'etc'> = {
+  message: 'chat',
+  mention: 'chat',
+  approval: 'approval',
+  payroll: 'hr',
+  attendance: 'hr',
+  education: 'hr',
+  인사: 'hr',
+  inventory: 'stock',
+  board: 'etc',
+  notification: 'etc',
+};
+const KIND_LABEL: Record<'chat' | 'approval' | 'hr' | 'stock' | 'etc', string> = {
+  chat: '채팅',
+  approval: '결재',
+  hr: '인사',
+  stock: '재고',
+  etc: '기타',
+};
+const KIND_ICON: Record<'chat' | 'approval' | 'hr' | 'stock' | 'etc', string> = {
+  chat: '💬',
+  approval: '📋',
+  hr: '👥',
+  stock: '📦',
+  etc: '🔔',
+};
+
 const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border: string }> = {
   message:      { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30',    text: 'text-blue-600',   border: 'border-blue-300'   },
   mention:      { icon: '📣', bg: 'bg-indigo-500/10 dark:bg-indigo-950/30', text: 'text-indigo-600', border: 'border-indigo-300' },
@@ -743,6 +772,30 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   );
 }
 
+// 7일 이상된 알림 자동 삭제 — 사용자별, 24시간 throttle.
+// 실제 DELETE는 서버 cron이 아닌 클라이언트 마운트 시점 1회로 충분 (개인 인박스).
+const NOTIFICATIONS_CLEANUP_KEY = 'erp_notif_cleanup_last';
+const NOTIFICATIONS_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const NOTIFICATIONS_CLEANUP_THROTTLE_MS = 24 * 60 * 60 * 1000;
+
+async function cleanupOldNotifications(userId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const lastRaw = window.localStorage.getItem(NOTIFICATIONS_CLEANUP_KEY);
+    const last = lastRaw ? Number(lastRaw) : 0;
+    if (Number.isFinite(last) && Date.now() - last < NOTIFICATIONS_CLEANUP_THROTTLE_MS) return;
+    const cutoff = new Date(Date.now() - NOTIFICATIONS_RETENTION_MS).toISOString();
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', userId)
+      .lt('created_at', cutoff);
+    window.localStorage.setItem(NOTIFICATIONS_CLEANUP_KEY, String(Date.now()));
+  } catch {
+    // JM3: cleanup 실패는 silent — 다음 마운트에서 재시도
+  }
+}
+
 // ─── 메인 컴포넌트 ───
 function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown>) {
   const _u = (_rawUser ?? {}) as Record<string, unknown>;
@@ -762,6 +815,8 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   const fetchNotifications = useCallback(async () => {
     if (!_u?.id) { setLoading(false); return; }
     try {
+      // 7일 이상된 알림을 먼저 자동 정리 (24시간 throttle, silent fail)
+      await cleanupOldNotifications(_u.id as string);
       const { data } = await supabase.from('notifications').select('*').eq('user_id', _u.id as string).order('created_at', { ascending: false }).limit(200);
       lastFetchedAtRef.current = Date.now();
       setNotifications(data || []);
@@ -992,91 +1047,59 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
         <div className="flex-1 overflow-y-auto custom-scrollbar"><SettingsTab userId={_u?.id as string | undefined} /></div>
       ) : (
         <>
-          {/* Stat 3종 카드 */}
-          <div className="shrink-0 grid grid-cols-3 gap-2 px-4 pt-3 pb-0 bg-[var(--card)]">
-            <button
-              type="button"
-              data-testid="notification-stat-unread"
-              onClick={() => { setStateFilter(stateFilter === 'unread' ? 'all' : 'unread'); setShowUnreadOnly(stateFilter !== 'unread'); }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
-                stateFilter === 'unread'
-                  ? 'border-[var(--accent)] bg-[var(--accent-light)]'
-                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
-              }`}
-            >
-              <span className={`text-base font-black tabular-nums ${stateFilter === 'unread' ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
-                {unreadCount}
-              </span>
-              <span className={`text-[10px] font-bold ${stateFilter === 'unread' ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>안읽음</span>
-            </button>
-            <button
-              type="button"
-              data-testid="notification-stat-action"
-              onClick={() => { const next = stateFilter === 'action' ? 'all' : 'action'; setStateFilter(next); setShowUnreadOnly(false); }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
-                stateFilter === 'action'
-                  ? 'border-[var(--warning)] bg-[var(--warning-light)]'
-                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
-              }`}
-            >
-              <span className={`text-base font-black tabular-nums ${stateFilter === 'action' ? 'text-[var(--warning)]' : 'text-[var(--foreground)]'}`}>
-                {actionRequiredCount}
-              </span>
-              <span className={`text-[10px] font-bold ${stateFilter === 'action' ? 'text-[var(--warning)]' : 'text-[var(--toss-gray-3)]'}`}>액션 필요</span>
-            </button>
-            <button
-              type="button"
-              data-testid="notification-stat-total"
-              onClick={() => { setStateFilter('all'); setShowUnreadOnly(false); }}
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-md)] border px-2 py-2.5 transition-colors ${
-                stateFilter === 'all'
-                  ? 'border-[var(--accent)] bg-[var(--accent-light)]'
-                  : 'border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)]'
-              }`}
-            >
-              <span className={`text-base font-black tabular-nums ${stateFilter === 'all' ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
-                {notifications.length}
-              </span>
-              <span className={`text-[10px] font-bold ${stateFilter === 'all' ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>전체</span>
-            </button>
-          </div>
-
-          <div className="shrink-0 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 space-y-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <input
-                data-testid="notification-search-input"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="제목, 본문, 발신자, 메뉴명 검색"
-                className="h-10 flex-1 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-              />
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="notification-unread-filter"
-                  onClick={() => {
-                    const next = stateFilter === 'unread' ? 'all' : 'unread';
-                    setStateFilter(next);
-                    setShowUnreadOnly(next === 'unread');
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border ${
-                    showUnreadOnly || stateFilter === 'unread'
-                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                      : 'border-[var(--border)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  안읽음만
-                </button>
-                <button
-                  type="button"
-                  data-testid="notification-action-required-filter"
-                  onClick={() => {
-                    const next = stateFilter === 'action' ? 'all' : 'action';
-                    setStateFilter(next);
-                    setShowUnreadOnly(false);
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border ${
-                    stateFilter === 'action'
+          {/* 상단 카드 — Stat 3종 + 검색 + 분류칩 (라이브 §3-6) */}
+          <div className="shrink-0 px-4 py-3 bg-[var(--card)] border-b border-[var(--border)]">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-xs)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    data-testid="notification-stat-unread"
+                    onClick={() => { setStateFilter(stateFilter === 'unread' ? 'all' : 'unread'); setShowUnreadOnly(stateFilter !== 'unread'); }}
+                    className={`alert-stat cursor-pointer transition-opacity ${stateFilter === 'unread' ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                  >
+                    <div className="as-val" style={stateFilter === 'unread' ? { color: 'var(--accent)' } : undefined}>{unreadCount}</div>
+                    <div className="as-lbl">안 읽음</div>
+                  </button>
+                  <div style={{ width: 1, height: 32, background: 'var(--border)' }} />
+                  <button
+                    type="button"
+                    data-testid="notification-stat-action"
+                    onClick={() => { const next = stateFilter === 'action' ? 'all' : 'action'; setStateFilter(next); setShowUnreadOnly(false); }}
+                    className={`alert-stat cursor-pointer transition-opacity ${stateFilter === 'action' ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                  >
+                    <div className="as-val" style={{ color: 'var(--warning)' }}>{actionRequiredCount}</div>
+                    <div className="as-lbl">액션 필요</div>
+                  </button>
+                  <div style={{ width: 1, height: 32, background: 'var(--border)' }} />
+                  <button
+                    type="button"
+                    data-testid="notification-stat-total"
+                    onClick={() => { setStateFilter('all'); setShowUnreadOnly(false); }}
+                    className={`alert-stat cursor-pointer transition-opacity ${stateFilter === 'all' ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                  >
+                    <div className="as-val" style={{ color: 'var(--toss-gray-3)' }}>{notifications.length}</div>
+                    <div className="as-lbl">전체</div>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    data-testid="notification-search-input"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="제목·본문·발신자 검색"
+                    className="h-8 min-w-[240px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    data-testid="notification-action-required-filter"
+                    onClick={() => {
+                      const next = stateFilter === 'action' ? 'all' : 'action';
+                      setStateFilter(next);
+                      setShowUnreadOnly(false);
+                    }}
+                    className={`h-8 rounded-[var(--radius-md)] border px-3 text-[11px] font-bold transition-colors ${
+                      stateFilter === 'action'
                       ? 'border-[var(--warning)] bg-[var(--warning)] text-white'
                       : 'border-[var(--border)] text-[var(--toss-gray-3)]'
                   }`}
@@ -1087,25 +1110,40 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
                   data-testid="notification-date-filter"
                   value={dateRange}
                   onChange={(event) => setDateRange(event.target.value as InboxDateRange)}
-                  className="h-10 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-xs font-bold text-[var(--foreground)] outline-none"
+                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none"
                 >
                   {INBOX_DATE_FILTERS.map((filter) => (
-                    <option key={filter.id} value={filter.id}>
-                      {filter.label}
-                    </option>
+                    <option key={filter.id} value={filter.id}>{filter.label}</option>
                   ))}
                 </select>
               </div>
             </div>
 
+            {/* 분류 5칩 — todo-chip 재사용 */}
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {TABS.map(tab => {
+                const badge = tabBadge(tab.types as string[] | null);
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`todo-chip tone-accent${activeTab === tab.id ? ' on' : ''}`}
+                  >
+                    {tab.label} <span className="cnt">{badge}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {selectionMode && (
-              <div className="flex flex-wrap items-center gap-2" data-testid="notification-selection-toolbar">
-                <span className="text-xs font-bold text-[var(--toss-gray-3)]">선택 {selectedCount}건</span>
+              <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="notification-selection-toolbar">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">선택 {selectedCount}건</span>
                 <button
                   type="button"
                   onClick={markSelectedAsRead}
                   disabled={selectedCount === 0}
-                  className="px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] disabled:opacity-40"
                 >
                   선택 읽음
                 </button>
@@ -1113,162 +1151,130 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
                   type="button"
                   onClick={deleteSelected}
                   disabled={selectedCount === 0}
-                  className="px-3 py-1.5 rounded-xl border border-red-200 bg-red-500/10 text-xs font-bold text-red-600 disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger-soft)] text-[11px] font-bold text-[var(--danger)] disabled:opacity-40"
                 >
                   선택 삭제
                 </button>
               </div>
             )}
+            </div>
           </div>
 
-          {/* 타입 탭 가로 스크롤 */}
-          <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--card)] border-b border-[var(--border)] overflow-x-auto no-scrollbar shrink-0">
-            {TABS.map(tab => {
-              const badge = tabBadge(tab.types as string[] | null);
-              return (
-                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold whitespace-nowrap transition-all shrink-0 ${activeTab === tab.id
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-[var(--border)]'}`}>
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                  {badge > 0 && (
-                    <span className={`text-[9px] font-black px-1 py-0 rounded-[var(--radius-md)] ${activeTab === tab.id ? 'bg-[var(--card)]/30 text-white' : 'bg-red-500/100 text-white'}`}>{badge}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 알림 목록 */}
-          <main className="flex-1 overflow-y-auto custom-scrollbar">
+          {/* 알림 목록 — 라이브 reference: alert-list / alert-row */}
+          <main className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--page-bg)] px-4 py-3">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-8 h-8 border-2 border-[var(--toss-blue-light)] border-t-[var(--accent)] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-[var(--accent-soft)] border-t-[var(--accent)] rounded-full animate-spin" />
                 <p className="text-xs text-[var(--toss-gray-3)] font-medium">알림을 불러오는 중...</p>
               </div>
             ) : !_u?.id ? (
-              <div className="text-center py-20 text-[var(--toss-gray-3)] text-sm font-medium">직원 계정으로 로그인하면 알림을 확인할 수 있습니다.</div>
+              <div className="empty-pad">
+                <div className="empty-ico" aria-hidden="true">🔐</div>
+                <div className="empty-title">로그인이 필요합니다</div>
+                <div className="empty-sub">직원 계정으로 로그인하면 알림을 확인할 수 있습니다.</div>
+              </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-20">
-                <p className="text-4xl mb-3 opacity-20">📭</p>
-                <p className="text-sm font-medium text-[var(--toss-gray-3)]">알림이 없습니다</p>
+              <div className="empty-pad">
+                <div className="empty-ico" aria-hidden="true">📭</div>
+                <div className="empty-title">알림이 없습니다</div>
+                <div className="empty-sub">새 알림이 도착하면 여기에 표시됩니다.</div>
               </div>
             ) : (
-              <div>
+              <div className="flex flex-col gap-4">
                 {GROUP_ORDER.filter(g => grouped[g]?.length).map(group => (
                   <div key={group}>
-                    {/* 날짜 그룹 헤더 */}
-                    <div className="sticky top-0 px-5 py-2 bg-[var(--background)]/90 backdrop-blur-sm z-10 border-b border-[var(--border)]/50">
-                      <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">{group}</span>
-                    </div>
-
-                    {/* 알림 아이템 */}
-                    <div className="divide-y divide-[var(--border)]/50">
+                    <div className="alert-section-lbl">{group}</div>
+                    <div className="alert-list">
                       {grouped[group].map(n => {
-                        const cfg = getTypeCfg(n.type);
+                        const kind = TYPE_TO_KIND[String(n.type)] || 'etc';
                         const isSelected = selectedIds.includes(String(n.id));
                         const isUnread = !n.read_at;
                         const needsAction = isActionRequiredNotification(n);
+                        const fromLabel = String(
+                          (n.metadata as Record<string, unknown> | null)?.from_name
+                          || (n.metadata as Record<string, unknown> | null)?.sender_name
+                          || n.title
+                          || ''
+                        );
                         return (
                           <div
                             key={n.id}
-                            onClick={() => handleClick(n)}
-                            className={`relative flex items-start gap-3.5 px-5 py-3.5 cursor-pointer transition-colors group
-                              ${isUnread
-                                ? 'bg-[var(--accent-light)] hover:bg-blue-100/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
-                                : 'opacity-75 hover:bg-[var(--muted)]'}
-                              ${needsAction ? 'ring-1 ring-[var(--warning)]/20' : ''}
-                              ${isSelected ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]' : ''}`}
                             data-testid={`notification-inbox-item-${n.id}`}
+                            onClick={() => handleClick(n)}
+                            className={`alert-row${isUnread ? ' unread' : ''} group cursor-pointer ${isSelected ? 'ring-2 ring-[var(--accent)]' : ''}`}
                           >
-                            {selectionMode && (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleSelected(String(n.id));
-                                }}
-                                className={`mt-1 h-5 w-5 shrink-0 rounded-md border text-[11px] font-black ${
-                                  isSelected
-                                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
-                                    : 'border-[var(--border)] text-transparent'
-                                }`}
-                                aria-label="선택"
-                              >
-                                ✓
-                              </button>
-                            )}
-
-                            {/* 안읽음 dot */}
-                            {isUnread && (
-                              <span className="mt-2 w-2 h-2 shrink-0 bg-[var(--accent)] rounded-full" />
-                            )}
-
-                            {/* 타입 아이콘 */}
-                            <div className={`w-10 h-10 rounded-[var(--radius-md)] flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
-                              {cfg.icon}
-                            </div>
-
-                            {/* 내용 */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-baseline gap-2">
-                                <p className={`text-sm leading-snug flex-1 truncate ${n.read_at ? 'font-medium text-[var(--toss-gray-3)]' : 'font-bold text-[var(--foreground)]'}`}>
-                                  {n.title}
-                                </p>
-                                <span className="text-[10px] text-[var(--toss-gray-3)] whitespace-nowrap shrink-0">{timeAgo(n.created_at)}</span>
-                              </div>
-                              {n.body && (
-                                <p className="text-xs text-[var(--toss-gray-3)] mt-0.5 truncate leading-relaxed">{n.body}</p>
-                              )}
-                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                {isUnread && (
-                                  <span className="rounded-[var(--radius-sm)] bg-[var(--accent-light)] px-2 py-0.5 text-[10px] font-black text-[var(--accent)]">
-                                    안읽음
-                                  </span>
-                                )}
-                                {needsAction && (
-                                  <span className="rounded-[var(--radius-sm)] bg-[var(--warning-light)] px-2 py-0.5 text-[10px] font-black text-[var(--warning)]">
-                                    액션 필요
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* 인라인 액션: hover 시 노출 (바로가기 + 읽음 + 삭제) */}
-                            <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {/* 바로가기 */}
-                              <button
-                                type="button"
-                                data-testid={`notification-inbox-goto-${n.id}`}
-                                onClick={(e) => { e.stopPropagation(); handleClick(n); }}
-                                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors text-sm"
-                                aria-label="바로가기"
-                              >
-                                →
-                              </button>
-                              {/* 읽음 처리 (안읽음인 경우만) */}
-                              {isUnread && (
+                            <div className="flex items-center gap-2">
+                              {selectionMode && (
                                 <button
                                   type="button"
-                                  data-testid={`notification-inbox-read-${n.id}`}
-                                  onClick={(e) => { e.stopPropagation(); void markAsRead(n.id); }}
-                                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)] transition-colors text-sm"
-                                  aria-label="읽음 처리"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleSelected(String(n.id));
+                                  }}
+                                  className={`h-5 w-5 shrink-0 rounded-md border text-[11px] font-black ${
+                                    isSelected
+                                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                                      : 'border-[var(--border)] text-transparent'
+                                  }`}
+                                  aria-label="선택"
                                 >
                                   ✓
                                 </button>
                               )}
-                              {/* 삭제 */}
-                              <button
-                                type="button"
-                                data-testid={`notification-inbox-delete-${n.id}`}
-                                onClick={(e) => deleteNotif(n.id, e)}
-                                className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-500/10 transition-colors text-xs"
-                                aria-label="삭제"
-                              >
-                                ✕
-                              </button>
+                              <div className={`alert-ico kind-${kind}`}>
+                                <span aria-hidden="true">{KIND_ICON[kind]}</span>
+                              </div>
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="alert-row1">
+                                <span className="alert-kind">{KIND_LABEL[kind]}</span>
+                                <span className="alert-sep">·</span>
+                                <span className="alert-from truncate"><b>{fromLabel}</b></span>
+                                {isUnread && <span className="alert-dot-unread" aria-hidden="true" />}
+                                {needsAction && (
+                                  <span className="ml-1 inline-flex items-center rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[10px] font-black text-[var(--warning)]">
+                                    액션
+                                  </span>
+                                )}
+                              </div>
+                              <div className="alert-msg">{n.body || n.title}</div>
+                            </div>
+
+                            <div className="alert-right">
+                              <div className="alert-time">{timeAgo(n.created_at)}</div>
+                              <div className="mt-1.5 flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                <button
+                                  type="button"
+                                  data-testid={`notification-inbox-goto-${n.id}`}
+                                  onClick={(e) => { e.stopPropagation(); handleClick(n); }}
+                                  className="alert-link"
+                                  aria-label="바로가기"
+                                >
+                                  바로가기
+                                </button>
+                                {isUnread ? (
+                                  <button
+                                    type="button"
+                                    data-testid={`notification-inbox-read-${n.id}`}
+                                    onClick={(e) => { e.stopPropagation(); void markAsRead(n.id); }}
+                                    className="alert-link mute"
+                                    aria-label="읽음 처리"
+                                  >
+                                    읽음
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    data-testid={`notification-inbox-delete-${n.id}`}
+                                    onClick={(e) => deleteNotif(n.id, e)}
+                                    className="alert-link mute"
+                                    aria-label="삭제"
+                                  >
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
