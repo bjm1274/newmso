@@ -23,6 +23,7 @@ import 더보기 from './더보기';
 import 오프라인배너 from '../공통/오프라인배너';
 import 오프라인실패배너 from '../공통/오프라인실패배너';
 import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
+import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -46,6 +47,12 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
   // 오프라인 큐 자동 flush 초기화 (앱 마운트 시 1회)
   useEffect(() => {
     const stop = initOfflineQueueFlush();
+    return stop;
+  }, []);
+
+  // 업로드 큐 자동 flush 초기화 (앱 마운트 시 1회)
+  useEffect(() => {
+    const stop = initUploadQueueFlush();
     return stop;
   }, []);
 

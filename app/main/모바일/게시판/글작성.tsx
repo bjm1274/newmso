@@ -13,8 +13,9 @@ import { useRef, useState } from 'react';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import { BOARD_CATS, type BoardCatId, createBoardPost } from './data-hooks';
-import { uploadBoardAttachments, type DraftAttachment, type UploadProgress } from './첨부업로드';
+import { uploadBoardAttachments, type DraftAttachment, type UploadProgress, validateFile } from './첨부업로드';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueUpload } from '@/lib/offline-upload-queue';
 import { toast } from '@/lib/toast';
 import { PostOptions } from './글작성옵션';
 
@@ -76,10 +77,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    if (!user?.id) {
-      toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
-      return;
-    }
+    if (!user?.id) { toast('로그인한 후 글을 등록할 수 있습니다.', 'error'); return; }
     setSubmitting(true);
 
     const anonymousFinal = ANONYMOUS_ALLOWED_CATS.has(form.cat) && form.anonymous;
@@ -87,72 +85,61 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
     const scheduledFinal = canAdmin ? form.scheduledPublishAt : '';
     const cat = BOARD_CATS.find((c) => c.id === form.cat);
     const boardType = cat?.boardType ?? '자유게시판';
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const hasPendingAtts = attachments.some((a) => a.url.startsWith('queued:'));
 
-    // 첨부 없는 텍스트 게시만 오프라인 큐 대상.
-    // 첨부 있는 경우 네트워크(R2 업로드) 필수이므로 헬퍼 경로 유지.
-    if (attachments.length === 0) {
-      const importance = form.importance === 'urgent' ? '중요' : null;
-      const payload: Record<string, unknown> = {
-        board_type: boardType,
-        title: form.title.trim(),
-        content: form.body.trim(),
-        author_id: anonymousFinal ? null : user.id,
-        author_name: anonymousFinal ? '익명' : (user.name ?? '익명'),
-        company: anonymousFinal ? null : (user.company ?? null),
-        company_id: anonymousFinal ? null : (user.company_id ?? null),
-        is_anonymous: anonymousFinal,
-      };
-      if (pinFinal) payload.is_pinned = true;
-      if (importance) payload.status = importance;
-      if (scheduledFinal) {
-        const d = new Date(scheduledFinal);
-        if (!Number.isNaN(d.getTime()) && d.getTime() > Date.now()) {
-          payload.scheduled_publish_at = d.toISOString();
-        }
-      }
-
-      const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
-        kind: 'insert',
-        table: 'board_posts',
-        payload,
+    // 온라인 + 첨부 모두 완료 — 기존 헬퍼 경로
+    if (!isOffline && attachments.length > 0 && !hasPendingAtts) {
+      const inserted = await createBoardPost({
+        catId: form.cat, title: form.title, content: form.body,
+        attachments: attachments.map((a) => ({ name: a.name, url: a.url, type: a.type, size: a.size })),
+        anonymous: anonymousFinal, pinned: pinFinal, importance: form.importance,
+        scheduledPublishAt: scheduledFinal, user,
       });
       setSubmitting(false);
-      if (error) {
-        toast(`등록 실패: ${error}`, 'error');
-        return;
-      }
-      if (queued) {
-        toast('오프라인 — 게시 대기 중', 'info');
-        onCreated('queued');
-        return;
-      }
-      if (data) {
-        const row = Array.isArray(data) ? (data as { id: string }[])[0] : (data as { id: string });
-        onCreated(String(row?.id ?? ''));
-      }
+      if (inserted) onCreated(String(inserted.id));
       return;
     }
 
-    // 첨부 있는 경우 — 기존 헬퍼 경로 (네트워크 필수)
-    const inserted = await createBoardPost({
-      catId: form.cat,
-      title: form.title,
-      content: form.body,
-      attachments: attachments.map((a) => ({
-        name: a.name,
-        url: a.url,
-        type: a.type,
-        size: a.size,
-      })),
-      anonymous: anonymousFinal,
-      pinned: pinFinal,
-      importance: form.importance,
-      scheduledPublishAt: scheduledFinal,
-      user,
+    // 나머지 경로 — enqueueSupabaseMutation (텍스트 전용 or 오프라인 첨부 포함)
+    const importance = form.importance === 'urgent' ? '중요' : null;
+    const payload: Record<string, unknown> = {
+      board_type: boardType,
+      title: form.title.trim(), content: form.body.trim(),
+      author_id: anonymousFinal ? null : user.id,
+      author_name: anonymousFinal ? '익명' : (user.name ?? '익명'),
+      company: anonymousFinal ? null : (user.company ?? null),
+      company_id: anonymousFinal ? null : (user.company_id ?? null),
+      is_anonymous: anonymousFinal,
+      attachments: attachments
+        .filter((a) => !a.url.startsWith('queued:'))
+        .map((a) => ({ name: a.name, url: a.url, type: a.type, size: a.size })),
+    };
+    if (pinFinal) payload.is_pinned = true;
+    if (importance) payload.status = importance;
+    if (!hasPendingAtts && scheduledFinal) {
+      const d = new Date(scheduledFinal);
+      if (!Number.isNaN(d.getTime()) && d.getTime() > Date.now()) {
+        payload.scheduled_publish_at = d.toISOString();
+      }
+    }
+
+    const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
+      kind: 'insert', table: 'board_posts', payload,
     });
     setSubmitting(false);
-    if (inserted) {
-      onCreated(String(inserted.id));
+    if (error) { toast(`등록 실패: ${error}`, 'error'); return; }
+    if (queued) {
+      const msg = hasPendingAtts
+        ? '오프라인 — 게시 + 첨부 업로드 대기 중. 온라인 복귀 시 자동 처리됩니다.'
+        : '오프라인 — 게시 대기 중';
+      toast(msg, 'info');
+      onCreated('queued');
+      return;
+    }
+    if (data) {
+      const row = Array.isArray(data) ? (data as { id: string }[])[0] : (data as { id: string });
+      onCreated(String(row?.id ?? ''));
     }
   };
 
@@ -164,8 +151,41 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
     const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // 같은 파일 재선택 허용
     if (files.length === 0) return;
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
     const cat = BOARD_CATS.find((c) => c.id === form.cat);
     const boardType = cat?.boardType ?? '자유게시판';
+
+    if (isOffline) {
+      // 오프라인 — 각 파일을 업로드 큐에 적재하고 pending 첨부로 표시
+      const pending: DraftAttachment[] = [];
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          toast(`${file.name}: ${validationError}`, 'error');
+          continue;
+        }
+        const result = await enqueueUpload({
+          file,
+          filename: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          planRequester: 'board',
+          planParams: { boardType },
+        });
+        if (result.queued) {
+          // 오프라인 큐에 적재됨 — placeholder URL로 표시
+          pending.push({ name: file.name, url: `queued:${file.name}`, type: 'file', size: file.size });
+        } else if (result.error) {
+          toast(`${file.name}: ${result.error}`, 'error');
+        }
+      }
+      if (pending.length > 0) {
+        setAttachments((prev) => [...prev, ...pending]);
+        toast('오프라인 — 첨부 업로드 대기 중. 온라인 복귀 시 자동 처리됩니다.', 'info');
+      }
+      return;
+    }
+
+    // 온라인 — 기존 즉시 업로드 경로
     setUploading(true);
     setUploadProgress({ fileName: files[0].name, total: files.length, done: 0 });
     const uploaded = await uploadBoardAttachments(files, boardType, (p) => setUploadProgress(p));

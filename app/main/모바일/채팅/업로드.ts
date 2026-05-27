@@ -23,6 +23,7 @@ import {
   CHAT_MAX_VIDEO_SIZE_BYTES,
 } from '@/lib/chat-upload-constants';
 import type { ChatMessage } from '@/types';
+import { enqueueUpload } from '@/lib/offline-upload-queue';
 
 export type FileKind = 'image' | 'video' | 'file';
 
@@ -34,6 +35,7 @@ export type UploadAndSendInput = {
 
 export type UploadAndSendResult =
   | { ok: true; message: ChatMessage }
+  | { ok: true; queued: true; message: null }
   | { ok: false; error: string };
 
 type UploadPlanResponse = {
@@ -140,7 +142,9 @@ async function uploadViaServerFallback(file: File): Promise<{ ok: true; url: str
 
 /**
  * 파일을 R2에 업로드한 뒤 messages insert까지 한 번에 실행한다.
- * - 직접 업로드(PUT signed URL) → 실패 시 서버 fallback(/api/chat/upload formData) 순.
+ * - 온라인: 직접 업로드(PUT signed URL) → 실패 시 서버 fallback(/api/chat/upload formData) 순.
+ * - 오프라인 또는 네트워크 실패: 업로드 큐에 적재 후 queued: true 반환.
+ *   onSuccessAction으로 messages insert가 업로드 완료 후 체이닝됨.
  */
 export async function sendMobileFileMessage(
   input: UploadAndSendInput,
@@ -156,10 +160,37 @@ export async function sendMobileFileMessage(
 
   const mime = normalizeMimeType(input.file);
   const fileKind: FileKind = resolveFileKind(mime);
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
-  // 1) Signed upload plan 요청
-  const plan = await requestUploadPlan(input.file);
+  // 오프라인 선조건 — 즉시 큐잉
+  if (isOffline) {
+    const insertPayloadTemplate: Record<string, unknown> = {
+      room_id: input.roomId,
+      sender_id: input.senderId,
+      message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
+      file_url: '{fileUrl}',
+      file_name: input.file.name,
+      file_size_bytes: input.file.size,
+    };
+    const result = await enqueueUpload({
+      file: input.file,
+      filename: input.file.name,
+      mimeType: mime,
+      planRequester: 'chat',
+      planParams: { roomId: input.roomId },
+      onSuccessAction: {
+        kind: 'insert',
+        table: 'chat_messages',
+        payloadTemplate: insertPayloadTemplate,
+      },
+    });
+    if (result.queued) return { ok: true, queued: true, message: null };
+    if (result.error) return { ok: false, error: result.error };
+  }
+
+  // 온라인 경로 — 직접 업로드 먼저, 실패 시 enqueueUpload로 폴백 큐잉
   let publicUrl = '';
+  const plan = await requestUploadPlan(input.file);
   if (plan.ok) {
     try {
       const putRes = await fetch(plan.payload.signedUrl as string, {
@@ -172,12 +203,38 @@ export async function sendMobileFileMessage(
       }
       publicUrl = String(plan.payload.url || '');
     } catch {
+      // R2 PUT 실패 — 서버 fallback 시도
       const fb = await uploadViaServerFallback(input.file);
-      if (!fb.ok) return { ok: false, error: fb.error };
-      publicUrl = fb.url;
+      if (fb.ok) {
+        publicUrl = fb.url;
+      } else {
+        // 서버 fallback도 실패 → 오프라인 큐 적재
+        const insertPayloadTemplate: Record<string, unknown> = {
+          room_id: input.roomId,
+          sender_id: input.senderId,
+          message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
+          file_url: '{fileUrl}',
+          file_name: input.file.name,
+          file_size_bytes: input.file.size,
+        };
+        const qResult = await enqueueUpload({
+          file: input.file,
+          filename: input.file.name,
+          mimeType: mime,
+          planRequester: 'chat',
+          planParams: { roomId: input.roomId },
+          onSuccessAction: {
+            kind: 'insert',
+            table: 'chat_messages',
+            payloadTemplate: insertPayloadTemplate,
+          },
+        });
+        if (qResult.queued) return { ok: true, queued: true, message: null };
+        return { ok: false, error: fb.error };
+      }
     }
   } else {
-    // 2) plan 실패 → 서버 multipart fallback
+    // plan 실패 → 서버 multipart fallback
     const fb = await uploadViaServerFallback(input.file);
     if (!fb.ok) return { ok: false, error: fb.error };
     publicUrl = fb.url;
@@ -187,7 +244,7 @@ export async function sendMobileFileMessage(
     return { ok: false, error: '업로드된 파일 URL을 확인하지 못했습니다.' };
   }
 
-  // 3) messages insert
+  // messages insert
   const retryPayload: MessageRetryPayload = {
     roomId: input.roomId,
     content: '',

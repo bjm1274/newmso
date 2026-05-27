@@ -27,7 +27,7 @@ function fileExt(file: File): string {
   return i > -1 && i < name.length - 1 ? name.slice(i + 1).toLowerCase() : '';
 }
 
-function validateFile(file: File): string | null {
+export function validateFile(file: File): string | null {
   if (!file) return '파일이 비어 있습니다.';
   const ext = fileExt(file);
   if (BLOCKED_EXT.has(ext)) {

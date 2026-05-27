@@ -173,9 +173,12 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           });
           if (!result.ok) {
             toast(`${file.name}: ${result.error}`, 'error');
+          } else if ('queued' in result && result.queued) {
+            // 오프라인 큐 적재 — 낙관적 안내 메시지
+            toast(`${file.name} — 오프라인 대기 중. 온라인 복귀 시 자동 전송됩니다.`, 'info');
           }
         }
-        // 업로드 완료 후 즉시 새 메시지 반영
+        // 업로드 완료 후 즉시 새 메시지 반영 (큐 상태면 새 메시지 없음)
         void refresh();
       } finally {
         setUploading(false);
