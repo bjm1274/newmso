@@ -38,6 +38,11 @@ import {
   type WorkcenterTab,
 } from './workcenter-common';
 import ContractGenWizard from './DocsWorkcenter/ContractGenWizard';
+import DocsContractSummary from './DocsWorkcenter/DocsContractSummary';
+import DocsGenSummary from './DocsWorkcenter/DocsGenSummary';
+import DocsStoreSummary from './DocsWorkcenter/DocsStoreSummary';
+import DocsCertSummary from './DocsWorkcenter/DocsCertSummary';
+import DocsSubmSummary from './DocsWorkcenter/DocsSubmSummary';
 import type { DocsTabId } from './DocsWorkcenter/types';
 
 // ─── lazy import (활성 탭만 마운트 — JM2) ───────────────────────────
@@ -304,51 +309,66 @@ export default function DocsWorkcenter({
     >
       <div className="min-h-0 flex-1">
         {tab === 'contract' && (
-          <WorkcenterEmbed label="계약 현황">
-            <ContractMain
-              staffs={staffs}
-              selectedCo={selectedCo || '전체'}
-              onRefresh={onRefresh}
-              showAdminPolicyTabs={false}
-              showTemplateEditor={false}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <DocsContractSummary />
+            <WorkcenterEmbed label="계약 현황">
+              <ContractMain
+                staffs={staffs}
+                selectedCo={selectedCo || '전체'}
+                onRefresh={onRefresh}
+                showAdminPolicyTabs={false}
+                showTemplateEditor={false}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'autogen' && (
-          <WorkcenterEmbed label="계약서 자동생성">
-            <ContractAutoGenerator
-              staffs={staffs}
-              selectedCo={selectedCo || '전체'}
-              user={user}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <DocsGenSummary />
+            <WorkcenterEmbed label="계약서 자동생성">
+              <ContractAutoGenerator
+                staffs={staffs}
+                selectedCo={selectedCo || '전체'}
+                user={user}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'repository' && (
-          <WorkcenterEmbed label="문서보관함">
-            <DocumentRepository
-              user={user}
-              selectedCo={selectedCo || '전체'}
-              linkedTarget={linkedTarget}
-              canManageDocuments={canManageDocuments}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <DocsStoreSummary />
+            <WorkcenterEmbed label="문서보관함">
+              <DocumentRepository
+                user={user}
+                selectedCo={selectedCo || '전체'}
+                linkedTarget={linkedTarget}
+                canManageDocuments={canManageDocuments}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'certificate' && (
-          <WorkcenterEmbed label="증명서 발급">
-            <CertificateGenerator
-              staffs={staffs}
-              selectedCo={selectedCo || '전체'}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <DocsCertSummary />
+            <WorkcenterEmbed label="증명서 발급">
+              <CertificateGenerator
+                staffs={staffs}
+                selectedCo={selectedCo || '전체'}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'submission' && (
-          <WorkcenterEmbed label="서류 제출">
-            <DocumentScanner
-              user={user || undefined}
-              staffs={staffs}
-              selectedCo={selectedCo || '전체'}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <DocsSubmSummary />
+            <WorkcenterEmbed label="서류 제출">
+              <DocumentScanner
+                user={user || undefined}
+                staffs={staffs}
+                selectedCo={selectedCo || '전체'}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
       </div>
     </WorkcenterShell>

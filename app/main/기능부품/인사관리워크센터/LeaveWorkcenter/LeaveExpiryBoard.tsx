@@ -71,6 +71,7 @@ const Row = memo(function ExpiryRow({ item, busy, onAlert, onSuggestUse }: RowPr
 
 function LeaveExpiryBoardInner({ items, loading, onSuggestUse }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const handleAlert = async (item: LeaveExpiryItem) => {
     if (pendingId) return;
@@ -84,6 +85,29 @@ function LeaveExpiryBoardInner({ items, loading, onSuggestUse }: Props) {
       toast(message, 'error');
     } finally {
       setPendingId(null);
+    }
+  };
+
+  // reference §1106: "일괄 권고 알림 발송" — 보드 상단 액션
+  const handleBulkAlert = async () => {
+    if (bulkBusy || items.length === 0) return;
+    setBulkBusy(true);
+    let success = 0;
+    let fail = 0;
+    for (const item of items) {
+      try {
+        await sendExpiryAlert(String(item.staff.id), item.remaining, item.expiryDate);
+        success += 1;
+      } catch (error) {
+        console.error('일괄 권고 알림 — 개별 실패:', error);
+        fail += 1;
+      }
+    }
+    setBulkBusy(false);
+    if (fail === 0) {
+      toast(`${success}명에게 일괄 권고 알림을 발송했습니다.`, 'success');
+    } else {
+      toast(`성공 ${success}건 · 실패 ${fail}건. 실패 건은 콘솔을 확인하세요.`, 'error');
     }
   };
 
@@ -109,17 +133,33 @@ function LeaveExpiryBoardInner({ items, loading, onSuggestUse }: Props) {
   }
 
   return (
-    <ul className="flex flex-col gap-2">
-      {items.map((item) => (
-        <Row
-          key={String(item.staff.id)}
-          item={item}
-          busy={pendingId === String(item.staff.id)}
-          onAlert={handleAlert}
-          onSuggestUse={onSuggestUse}
-        />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold text-[var(--toss-gray-4)]">
+          소멸 임박 대상자 {items.length}명
+        </span>
+        <button
+          type="button"
+          onClick={() => void handleBulkAlert()}
+          disabled={bulkBusy || items.length === 0}
+          aria-label="일괄 권고 알림 발송"
+          className="rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-1 text-[11px] font-bold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20 disabled:opacity-50"
+        >
+          {bulkBusy ? '발송 중…' : `일괄 권고 알림 (${items.length})`}
+        </button>
+      </div>
+      <ul className="flex flex-col gap-2">
+        {items.map((item) => (
+          <Row
+            key={String(item.staff.id)}
+            item={item}
+            busy={pendingId === String(item.staff.id)}
+            onAlert={handleAlert}
+            onSuggestUse={onSuggestUse}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 

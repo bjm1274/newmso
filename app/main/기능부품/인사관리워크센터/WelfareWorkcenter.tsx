@@ -26,6 +26,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import WelfareFamilySummary from './WelfareWorkcenter/WelfareFamilySummary';
+import WelfareCheckupSummary from './WelfareWorkcenter/WelfareCheckupSummary';
+import WelfareLicenseSummary from './WelfareWorkcenter/WelfareLicenseSummary';
+import WelfareDeviceSummary from './WelfareWorkcenter/WelfareDeviceSummary';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
@@ -84,7 +88,7 @@ interface WelfareCounts {
   checkupTarget: number;   // 검진 대상자 (재직 인원 — 연 1회 기본)
   checkupDone: number;     // 완료 인원
   licenseExpiring: number; // 면허 만료 임박 (D-90 이내)
-  deviceDue: number;       // 의료기기 점검 필요 (D-30 이내 + 지연)
+  deviceDue: number;       // 의료기기 점검 필요 (D-90 이내, KPI/보드 범위 일원화)
 }
 
 const INITIAL_COUNTS: WelfareCounts = {
@@ -204,12 +208,12 @@ export default function WelfareWorkcenter({
           if (d <= 90) licenseExpiring += 1;
         }
 
-        // 의료기기: D-30 이내 (지연/오늘/임박)
+        // 의료기기: D-90 이내 (지연/오늘/임박) — KPI/만료 보드 범위 일원화
         let deviceDue = 0;
         for (const r of devRows) {
           const d = daysUntil(r.next_inspection_date);
           if (d === null) continue;
-          if (d <= 30) deviceDue += 1;
+          if (d <= 90) deviceDue += 1;
         }
 
         // 건강검진: 완료 인원 (전체 재직 인원이 대상)
@@ -276,7 +280,7 @@ export default function WelfareWorkcenter({
         label: '의료기기 점검 필요',
         value: fmt(counts.deviceDue),
         unit: '건',
-        sub: '30일 이내 점검·지연',
+        sub: '90일 이내 점검·지연',
         tone: 'danger',
       },
     ];
@@ -317,31 +321,43 @@ export default function WelfareWorkcenter({
     >
       <div className="min-h-0 flex-1">
         {tab === 'family' && (
-          <WorkcenterEmbed label="경조사">
-            <CongratulationsCondolences staffs={staffs} selectedCo={selectedCo} />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <WelfareFamilySummary />
+            <WorkcenterEmbed label="경조사">
+              <CongratulationsCondolences staffs={staffs} selectedCo={selectedCo} />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'checkup' && (
-          <WorkcenterEmbed label="건강검진">
-            <HealthCheckupManagement staffs={staffs} selectedCo={selectedCo} />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <WelfareCheckupSummary />
+            <WorkcenterEmbed label="건강검진">
+              <HealthCheckupManagement staffs={staffs} selectedCo={selectedCo} />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'license' && (
-          <WorkcenterEmbed label="면허·자격">
-            <LicenseManager
-              staffs={staffs}
-              selectedCo={selectedCo || '전체'}
-              user={user}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <WelfareLicenseSummary />
+            <WorkcenterEmbed label="면허·자격">
+              <LicenseManager
+                staffs={staffs}
+                selectedCo={selectedCo || '전체'}
+                user={user}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
         {tab === 'device' && (
-          <WorkcenterEmbed label="의료기기 점검">
-            <MedicalDeviceInspection
-              selectedCo={selectedCo || '전체'}
-              user={user}
-            />
-          </WorkcenterEmbed>
+          <div className="flex flex-col gap-3">
+            <WelfareDeviceSummary />
+            <WorkcenterEmbed label="의료기기 점검">
+              <MedicalDeviceInspection
+                selectedCo={selectedCo || '전체'}
+                user={user}
+              />
+            </WorkcenterEmbed>
+          </div>
         )}
       </div>
     </WorkcenterShell>

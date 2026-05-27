@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
+import { getKoreanPublicHolidayName } from '@/lib/korean-public-holidays';
 import { isActive } from '../MemberWorkcenter/data';
 import {
   formatIsoDate,
@@ -234,6 +235,8 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
             }
             const isToday = cell.iso === todayIso;
             const isWeekend = cell.dow >= 5;
+            const holidayName = getKoreanPublicHolidayName(cell.iso);
+            const isHoliday = Boolean(holidayName);
             const stats = byDate.get(cell.iso);
             return (
               <div
@@ -241,16 +244,26 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
                 className={`flex min-h-[64px] flex-col gap-1 rounded-[var(--radius-md)] border px-1.5 py-1 ${
                   isToday
                     ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
-                    : 'border-[var(--border)] bg-[var(--page-bg)]'
+                    : isHoliday
+                      ? 'border-red-200 bg-red-50/40'
+                      : 'border-[var(--border)] bg-[var(--page-bg)]'
                 }`}
               >
                 <div
                   className={`text-[11px] font-bold ${
-                    isToday ? 'text-[var(--accent)]' : isWeekend ? 'text-red-700' : 'text-[var(--foreground)]'
+                    isToday ? 'text-[var(--accent)]' : isWeekend || isHoliday ? 'text-red-700' : 'text-[var(--foreground)]'
                   }`}
                 >
                   {cell.day}
                 </div>
+                {holidayName && (
+                  <span
+                    title={holidayName}
+                    className="truncate rounded-[var(--radius-sm,4px)] bg-red-100 px-1 py-0.5 text-[9.5px] font-bold text-red-700"
+                  >
+                    {holidayName}
+                  </span>
+                )}
                 {stats && (
                   <div className="flex flex-col gap-0.5 text-[10px] font-semibold">
                     {stats.ok > 0 && (

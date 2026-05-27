@@ -12,7 +12,8 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
   formatJoinDate,
@@ -131,6 +132,8 @@ function StaffDrawerInner({
           <MetaCell label="소속" value={staff.department || '-'} />
         </dl>
 
+        <RecentActivitySection staffId={String(staff.id)} />
+
         <section>
           <div className="section-title mb-2">인사 이력 타임라인</div>
           <StaffHistoryTimeline staffId={String(staff.id)} staffName={staff.name ?? ''} />
@@ -150,6 +153,174 @@ function StaffDrawerInner({
         )}
       </div>
     </aside>
+  );
+}
+
+// ─── 최근 활동 (근태/연차/서류) — reference §781~787 ─────────────────────
+interface RecentActivityState {
+  attend: { label: string; meta: string; tone: ChipTone } | null;
+  leave: { label: string; meta: string; tone: ChipTone } | null;
+  document: { label: string; meta: string; tone: ChipTone } | null;
+  loading: boolean;
+}
+
+function formatDateShort(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '';
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${m}/${d}`;
+}
+
+function RecentActivitySection({ staffId }: { staffId: string }) {
+  const [state, setState] = useState<RecentActivityState>({
+    attend: null,
+    leave: null,
+    document: null,
+    loading: true,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAll = async () => {
+      setState((prev) => ({ ...prev, loading: true }));
+      // JM3: 각 도메인은 독립 try, 한 곳이 실패해도 나머지 표시
+      const safeQuery = async <T,>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | null> => {
+        try {
+          const { data } = await p;
+          return data ?? null;
+        } catch {
+          return null;
+        }
+      };
+      const [att, lv, doc] = await Promise.all([
+        safeQuery(
+          supabase
+            .from('attendances')
+            .select('work_date, status, check_in_time')
+            .eq('staff_id', staffId)
+            .order('work_date', { ascending: false })
+            .limit(1)
+            .maybeSingle() as unknown as PromiseLike<{
+              data: { work_date?: string; status?: string; check_in_time?: string } | null;
+              error: unknown;
+            }>,
+        ),
+        safeQuery(
+          supabase
+            .from('leave_requests')
+            .select('start_date, end_date, leave_type, status, created_at')
+            .eq('staff_id', staffId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle() as unknown as PromiseLike<{
+              data: {
+                start_date?: string;
+                end_date?: string;
+                leave_type?: string;
+                status?: string;
+                created_at?: string;
+              } | null;
+              error: unknown;
+            }>,
+        ),
+        safeQuery(
+          supabase
+            .from('staff_documents')
+            .select('document_type, status, submitted_at, updated_at')
+            .eq('staff_id', staffId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle() as unknown as PromiseLike<{
+              data: {
+                document_type?: string;
+                status?: string;
+                submitted_at?: string;
+                updated_at?: string;
+              } | null;
+              error: unknown;
+            }>,
+        ),
+      ]);
+      if (cancelled) return;
+
+      const attendDisplay = att
+        ? {
+            label: '근태',
+            meta:
+              `${formatDateShort(att.work_date)} · ${att.status || '기록'}` +
+              (att.check_in_time ? ` · ${String(att.check_in_time).slice(0, 5)}` : ''),
+            tone: (att.status === '지각' ? 'warn' : att.status === '결근' ? 'warn' : 'success') as ChipTone,
+          }
+        : null;
+
+      const leaveDisplay = lv
+        ? {
+            label: '연차',
+            meta:
+              `${lv.leave_type || '연차'} · ${formatDateShort(lv.start_date)}` +
+              (lv.end_date && lv.end_date !== lv.start_date ? `~${formatDateShort(lv.end_date)}` : '') +
+              ` · ${lv.status || '신청'}`,
+            tone: (lv.status === '반려' ? 'warn' : lv.status === '승인' ? 'success' : 'accent') as ChipTone,
+          }
+        : null;
+
+      const docDisplay = doc
+        ? {
+            label: '서류',
+            meta:
+              `${doc.document_type || '문서'} · ${formatDateShort(doc.submitted_at ?? doc.updated_at)}` +
+              (doc.status ? ` · ${doc.status}` : ''),
+            tone: (doc.status === '완료' || doc.status === '제출' ? 'success' : 'muted') as ChipTone,
+          }
+        : null;
+
+      setState({
+        attend: attendDisplay,
+        leave: leaveDisplay,
+        document: docDisplay,
+        loading: false,
+      });
+    };
+
+    void fetchAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [staffId]);
+
+  const items = [state.attend, state.leave, state.document].filter(Boolean) as Array<
+    NonNullable<RecentActivityState['attend']>
+  >;
+
+  return (
+    <section>
+      <div className="section-title mb-2">최근 활동</div>
+      {state.loading ? (
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-4 text-center text-[11px] text-[var(--toss-gray-4)]">
+          최근 활동을 불러오는 중…
+        </div>
+      ) : items.length === 0 ? (
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-4 text-center text-[11px] text-[var(--toss-gray-4)]">
+          최근 활동 기록이 없습니다.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {items.map((row) => (
+            <li
+              key={row.label}
+              className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-1.5"
+            >
+              <Chip tone={row.tone}>{row.label}</Chip>
+              <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--foreground)]">
+                {row.meta}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

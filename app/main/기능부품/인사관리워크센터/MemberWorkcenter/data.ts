@@ -130,13 +130,37 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
     .filter(Boolean)
     .join(' · ');
 
+  // 고용 유형 집계 (reference §706 "정규 N · 계약 M · 수습 K")
+  const employTypeCounts: { 정규: number; 계약: number; 수습: number; 기타: number } = {
+    정규: 0,
+    계약: 0,
+    수습: 0,
+    기타: 0,
+  };
+  for (const s of active) {
+    const raw = String((s as Record<string, unknown>).employ_type ?? '').trim();
+    if (raw.includes('정규')) employTypeCounts.정규 += 1;
+    else if (raw.includes('계약')) employTypeCounts.계약 += 1;
+    else if (raw.includes('수습')) employTypeCounts.수습 += 1;
+    else if (raw === '') employTypeCounts.정규 += 1; // 미지정은 정규로 간주
+    else employTypeCounts.기타 += 1;
+  }
+  const employSubParts: string[] = [];
+  if (employTypeCounts.정규 > 0) employSubParts.push(`정규 ${employTypeCounts.정규}`);
+  if (employTypeCounts.계약 > 0) employSubParts.push(`계약 ${employTypeCounts.계약}`);
+  if (employTypeCounts.수습 > 0) employSubParts.push(`수습 ${employTypeCounts.수습}`);
+  if (employTypeCounts.기타 > 0) employSubParts.push(`기타 ${employTypeCounts.기타}`);
+  const employSub = employSubParts.length > 0 ? employSubParts.join(' · ') : '데이터 없음';
+
+  const totalSubPrefix = selectedCo && selectedCo !== '전체' ? `${selectedCo} · ` : '';
+
   return [
     {
       key: 'total',
       label: '전체 인원',
       value: String(total),
       unit: '명',
-      sub: selectedCo && selectedCo !== '전체' ? selectedCo : '전체 사업체',
+      sub: `${totalSubPrefix}${employSub}`,
     },
     {
       key: 'new',

@@ -44,6 +44,7 @@ import {
 import AttendDashboard from './AttendWorkcenter/AttendDashboard';
 import RosterGrid from './AttendWorkcenter/RosterGrid';
 import AttendCalendar from './AttendWorkcenter/AttendCalendar';
+import AbnormalWorkcenter from './AbnormalWorkcenter';
 
 const AttendanceMain = dynamic(() => import('../인사관리서브/근태기록/근태관리메인'), {
   ssr: false,
@@ -54,13 +55,14 @@ const AttendanceMain = dynamic(() => import('../인사관리서브/근태기록/
   ),
 });
 
-type AttendTabId = 'dashboard' | 'schedule' | 'calendar';
+type AttendTabId = 'dashboard' | 'schedule' | 'calendar' | 'abnormal';
 type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'issues';
 
 const ATTEND_TABS: WorkcenterTab<AttendTabId>[] = [
   { id: 'dashboard', label: '대시보드' },
   { id: 'schedule', label: '근무표 편성', count: 'AI · 3교대' },
   { id: 'calendar', label: '달력' },
+  { id: 'abnormal', label: '근태이상 감지' },
 ];
 
 interface AttendWorkcenterProps {
@@ -214,6 +216,16 @@ export default function AttendWorkcenter({
               staffs={staffs}
               selectedCo={selectedCo}
               onOpenLegacyCalendar={() => setLegacyView('calendar')}
+            />
+          </WorkcenterEmbed>
+        )}
+
+        {tab === 'abnormal' && (
+          <WorkcenterEmbed label="근태이상 감지">
+            <AbnormalWorkcenter
+              staffs={staffs}
+              selectedCo={selectedCo}
+              user={user}
             />
           </WorkcenterEmbed>
         )}

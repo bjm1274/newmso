@@ -74,6 +74,8 @@ export interface AttendDailyCounts {
   late: number;
   absent: number;
   onLeave: number; // 연차·반차·병가 합산
+  /** 지각자 상위 (이름 sub 표기용, KPI 부문구) — staff_id + check_in_time */
+  lateDetails: Array<{ staffId: string; checkInTime: string | null }>;
 }
 
 export function aggregateDailyCounts({ staffs, rows, today }: AttendKpiInput): AttendDailyCounts {
@@ -85,6 +87,7 @@ export function aggregateDailyCounts({ staffs, rows, today }: AttendKpiInput): A
   let late = 0;
   let absent = 0;
   let onLeave = 0;
+  const lateDetails: Array<{ staffId: string; checkInTime: string | null }> = [];
 
   const accountedIds = new Set<string>();
   for (const row of todayRows) {
@@ -94,6 +97,7 @@ export function aggregateDailyCounts({ staffs, rows, today }: AttendKpiInput): A
     else if (status === 'late') {
       present += 1;
       late += 1;
+      lateDetails.push({ staffId: String(row.staff_id), checkInTime: row.check_in_time ?? null });
     } else if (status === 'absent') absent += 1;
     else if (status === 'annual_leave' || status === 'sick_leave' || status === 'half_leave') {
       onLeave += 1;
@@ -109,13 +113,86 @@ export function aggregateDailyCounts({ staffs, rows, today }: AttendKpiInput): A
     }
   }
 
-  return { present, late, absent, onLeave };
+  return { present, late, absent, onLeave, lateDetails };
+}
+
+/** check_in_time(예: '2026-05-26T09:18:42+09:00' 또는 'HH:MM:SS')에서 'HH:MM'만 추출 */
+function formatLateTime(value: string | null): string {
+  if (!value) return '';
+  const isoMatch = /T(\d{2}:\d{2})/.exec(value);
+  if (isoMatch) return isoMatch[1];
+  const hmsMatch = /^(\d{2}:\d{2})/.exec(value);
+  return hmsMatch ? hmsMatch[1] : '';
+}
+
+/** check_in/out 시각 → 시간(0~23). 파싱 실패 시 null. */
+function pickHour(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const isoMatch = /T(\d{2}):/.exec(value);
+  if (isoMatch) {
+    const h = parseInt(isoMatch[1], 10);
+    return Number.isFinite(h) ? h : null;
+  }
+  const hmsMatch = /^(\d{2}):/.exec(value);
+  if (hmsMatch) {
+    const h = parseInt(hmsMatch[1], 10);
+    return Number.isFinite(h) ? h : null;
+  }
+  return null;
+}
+
+/** 07~20시 범위 시간대별 입·퇴근 인원 집계 — reference §868~899 시간대 차트용 */
+export interface HourlyInOutSlot {
+  /** "07" ~ "20" */
+  hour: string;
+  /** 입실(check_in) 인원 */
+  in: number;
+  /** 퇴실(check_out) 인원 */
+  out: number;
+}
+
+export function aggregateHourlyInOut({ rows, today }: Pick<AttendKpiInput, 'rows' | 'today'>): HourlyInOutSlot[] {
+  const todayRows = rows.filter((row) => String(row.work_date ?? '').startsWith(today));
+  const slots: HourlyInOutSlot[] = [];
+  for (let h = 7; h <= 20; h += 1) {
+    slots.push({ hour: String(h).padStart(2, '0'), in: 0, out: 0 });
+  }
+  const idxOf = (h: number) => (h < 7 || h > 20 ? -1 : h - 7);
+  for (const row of todayRows) {
+    const hIn = pickHour(row.check_in_time);
+    if (hIn !== null) {
+      const idx = idxOf(hIn);
+      if (idx >= 0) slots[idx].in += 1;
+    }
+    const hOut = pickHour(row.check_out_time);
+    if (hOut !== null) {
+      const idx = idxOf(hOut);
+      if (idx >= 0) slots[idx].out += 1;
+    }
+  }
+  return slots;
 }
 
 export function computeAttendKpis(input: AttendKpiInput): WorkcenterKpi[] {
   const total = input.staffs.filter(isActive).length;
   const counts = aggregateDailyCounts(input);
   const ratio = total > 0 ? Math.round((counts.present / total) * 100) : 0;
+
+  // 지각자 상위 2~3명 이름·시간 부문구 (reference §859-861 명세)
+  const staffNameMap = new Map<string, string>();
+  for (const staff of input.staffs) {
+    if (staff.id) staffNameMap.set(String(staff.id), staff.name || '');
+  }
+  const lateNamesSub = counts.lateDetails.length === 0
+    ? '오늘 기준'
+    : counts.lateDetails
+        .slice(0, 3)
+        .map(({ staffId, checkInTime }) => {
+          const name = staffNameMap.get(staffId) || '직원';
+          const time = formatLateTime(checkInTime);
+          return time ? `${name} ${time}` : name;
+        })
+        .join(' · ') + (counts.lateDetails.length > 3 ? ` 외 ${counts.lateDetails.length - 3}명` : '');
 
   return [
     {
@@ -131,7 +208,7 @@ export function computeAttendKpis(input: AttendKpiInput): WorkcenterKpi[] {
       label: '지각',
       value: String(counts.late),
       unit: '명',
-      sub: '오늘 기준',
+      sub: lateNamesSub,
       tone: counts.late > 0 ? 'warn' : 'neutral',
     },
     {

@@ -118,13 +118,28 @@ export default function AbnormalWorkcenter({
 
   // KPI 계산
   const kpis = useMemo<WorkcenterKpi[]>(() => {
+    // reference §1294~1335 표현: 도메인별 카운트를 sub에 합성 ("지각 N · 조퇴 M · 결근 K")
+    const kindLabel: Record<string, string> = {
+      late: '지각',
+      leaveEarly: '조퇴',
+      earlyLeave: '조기퇴근',
+      missing: '미기록',
+      consecutive: '연속결근',
+      pattern: '패턴',
+    };
+    const groupParts = data.groups
+      .filter((g) => g.count > 0)
+      .slice(0, 4)
+      .map((g) => `${kindLabel[String(g.kind)] ?? String(g.kind)} ${g.count}`);
+    const detectedSub = groupParts.length > 0 ? groupParts.join(' · ') : '실시간 자동 감지';
+
     return [
       {
         key: 'todayDetected',
         label: '오늘 감지',
         value: data.todayDetected.toString(),
         unit: '건',
-        sub: '실시간 자동 감지',
+        sub: detectedSub,
         tone: 'warn',
       },
       {
@@ -152,7 +167,7 @@ export default function AbnormalWorkcenter({
         tone: 'accent',
       },
     ];
-  }, [data.todayDetected, data.unresolved, data.ruleActiveCount, resolvedLog.length, rules.length]);
+  }, [data.todayDetected, data.unresolved, data.ruleActiveCount, data.groups, resolvedLog.length, rules.length]);
 
   const selectedGroup: DetectionGroup | null = useMemo(() => {
     if (!selectedKind) return null;

@@ -35,6 +35,7 @@ import {
 import { LeaveBalanceTable } from './LeaveWorkcenter/LeaveBalanceTable';
 import LeaveQuickForm from './LeaveWorkcenter/LeaveQuickForm';
 import { LeaveExpiryBoard } from './LeaveWorkcenter/LeaveExpiryBoard';
+import LeaveCalendar, { type LeaveCalendarEntry } from './LeaveWorkcenter/LeaveCalendar';
 import {
   fetchLeaveData,
   type LeaveDataResult,
@@ -56,6 +57,7 @@ interface SuggestModalState {
 
 const EMPTY_RESULT: LeaveDataResult = {
   rows: [],
+  requests: [],
   expiryItems: [],
   totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 },
 };
@@ -172,6 +174,37 @@ export default function LeaveWorkcenter({
     setSuggest({ open: false, item: null });
   }, []);
 
+  // 캘린더용 entries — leave_requests의 start_date~end_date를 일자 단위로 펼침
+  const calendarEntries = useMemo<LeaveCalendarEntry[]>(() => {
+    const staffMap = new Map<string, string>();
+    for (const s of staffs) {
+      if (s.id) staffMap.set(String(s.id), s.name || '');
+    }
+    const list: LeaveCalendarEntry[] = [];
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    for (const req of data.requests) {
+      const startStr = (req.start_date || '').slice(0, 10);
+      const endStr = (req.end_date || req.start_date || '').slice(0, 10);
+      if (!startStr) continue;
+      const startMs = Date.parse(`${startStr}T00:00:00`);
+      const endMs = Date.parse(`${endStr}T00:00:00`);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue;
+      const status: 'pending' | 'approved' | 'rejected' =
+        req.status === '승인' ? 'approved' : req.status === '반려' ? 'rejected' : 'pending';
+      for (let t = startMs; t <= endMs; t += DAY_MS) {
+        const d = new Date(t);
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        list.push({
+          date: iso,
+          status,
+          staffName: staffMap.get(String(req.staff_id)) || null,
+          leaveType: req.leave_type || null,
+        });
+      }
+    }
+    return list;
+  }, [data.requests, staffs]);
+
   const confirmSuggest = useCallback(() => {
     const item = suggest.item;
     if (!item) {
@@ -217,6 +250,8 @@ export default function LeaveWorkcenter({
           onSubmitted={handleSubmitted}
         />
       </div>
+
+      <LeaveCalendar entries={calendarEntries} />
 
       <WorkcenterSection
         title={`소멸 예정 알림 · ${data.expiryItems.length}명`}

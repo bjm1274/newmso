@@ -17,10 +17,12 @@ import { isActive } from '../MemberWorkcenter/data';
 import {
   aggregateDeptBreakdown,
   aggregateDailyCounts,
+  aggregateHourlyInOut,
   getTodayIso,
   resolveAttendanceStatus,
   type AttendanceRow,
 } from './data';
+import AttendHourlyChart from './AttendHourlyChart';
 
 interface AttendDashboardProps {
   staffs: StaffMember[];
@@ -112,8 +114,25 @@ export default function AttendDashboard({ staffs, selectedCo, rowsOverride }: At
     [scopedStaffs, effectiveRows, todayIso],
   );
 
+  const hourlySlots = useMemo(
+    () => aggregateHourlyInOut({ rows: effectiveRows, today: todayIso }),
+    [effectiveRows, todayIso],
+  );
+
+  const hourlyMax = useMemo(() => {
+    let m = 0;
+    for (const s of hourlySlots) {
+      if (s.in > m) m = s.in;
+      if (s.out > m) m = s.out;
+    }
+    return Math.max(m, 4); // 빈 차트도 너무 납작하지 않게 최소 4명 기준
+  }, [hourlySlots]);
+
   return (
-    <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <section className="flex flex-col gap-3">
+      <AttendHourlyChart slots={hourlySlots} maxValue={hourlyMax} todayIso={todayIso} />
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="app-card flex flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2.5 md:px-4 md:py-3">
           <h3 className="text-[13px] font-bold text-[var(--foreground)]">부서별 출근 현황</h3>
@@ -215,6 +234,7 @@ export default function AttendDashboard({ staffs, selectedCo, rowsOverride }: At
             </ul>
           )}
         </div>
+      </div>
       </div>
     </section>
   );
