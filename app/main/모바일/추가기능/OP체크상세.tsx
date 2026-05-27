@@ -14,6 +14,7 @@ import type { ErpUser, StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
@@ -119,25 +120,24 @@ export default function OP체크상세({
   }, [load]);
 
   const persistChecklist = useCallback(
-    async (next: CheckItem[]) => {
-      try {
-        const { error } = await supabase
-          .from('op_patient_checks')
-          .upsert(
-            {
-              schedule_post_id: card.scheduleId,
-              schedule_date: new Date().toISOString().slice(0, 10),
-              checklist: next,
-              last_updated_by: user.id,
-              last_updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'schedule_post_id' },
-          );
-        if (error) throw error;
-      } catch (err) {
+    async (next: CheckItem[]): Promise<{ queued: boolean }> => {
+      const { queued, error } = await enqueueSupabaseMutation({
+        kind: 'upsert',
+        table: 'op_patient_checks',
+        payload: {
+          schedule_post_id: card.scheduleId,
+          schedule_date: new Date().toISOString().slice(0, 10),
+          checklist: next as unknown as Record<string, unknown>[],
+          last_updated_by: user.id,
+          last_updated_at: new Date().toISOString(),
+        },
+      });
+      if (error) {
+        const err = new Error(error);
         console.warn('[mobile-addon] checklist save', err);
         throw err;
       }
+      return { queued };
     },
     [card.scheduleId, user.id],
   );
@@ -149,7 +149,10 @@ export default function OP체크상세({
     setChecklist(next);
     setSaving(true);
     try {
-      await persistChecklist(next);
+      const { queued } = await persistChecklist(next);
+      if (queued) {
+        toast('오프라인 — 동기화 대기 중', 'warning');
+      }
     } catch {
       setChecklist(prev);
       toast('체크리스트 저장에 실패했습니다.', 'error');

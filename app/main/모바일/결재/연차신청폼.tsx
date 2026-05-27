@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
@@ -152,17 +153,23 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
 
     // 1) leave_requests insert (기존 인사관리 모듈 동일 컬럼)
     let leaveRequestInserted = false;
+    let leaveQueued = false;
     try {
-      const { error: leaveError } = await supabase.from('leave_requests').insert({
-        staff_id: staffId,
-        leave_type: kind,
-        start_date: start,
-        end_date: end,
-        reason: reason || null,
-        status: '대기',
+      const { queued, error: leaveError } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'leave_requests',
+        payload: {
+          staff_id: staffId,
+          leave_type: kind,
+          start_date: start,
+          end_date: end,
+          reason: reason || null,
+          status: '대기',
+        },
       });
-      if (leaveError) throw leaveError;
+      if (leaveError) throw new Error(leaveError);
       leaveRequestInserted = true;
+      leaveQueued = queued;
     } catch (err) {
       console.error('[mobile-approval] leave_requests insert failed', err);
       const message = err instanceof Error ? err.message : '신청 실패';
@@ -241,10 +248,18 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         row.doc_number = docNumber;
       }
 
-      const { error: apprError } = await supabase.from('approvals').insert([row]);
-      if (apprError) throw apprError;
+      const { queued: apprQueued, error: apprError } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'approvals',
+        payload: row,
+      });
+      if (apprError) throw new Error(apprError);
 
-      toast('연차 신청이 결재선에 올라갔습니다.', 'success');
+      if (leaveQueued || apprQueued) {
+        toast('오프라인 — 연차 신청이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
+      } else {
+        toast('연차 신청이 결재선에 올라갔습니다.', 'success');
+      }
       onSubmitted();
     } catch (err) {
       console.error('[mobile-approval] approvals insert failed', err);

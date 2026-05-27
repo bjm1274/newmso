@@ -17,6 +17,7 @@ import { calculateDistance } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -128,30 +129,40 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
       const today = formatLocalDateKey(new Date());
       const nowIso = new Date().toISOString();
       if (state === 'before') {
-        const { data, error: e } = await supabase
-          .from('attendance')
-          .upsert(
-            [{ staff_id: staffId, date: today, check_in: nowIso, status: '정상' }],
-            { onConflict: 'staff_id,date' },
-          )
-          .select()
-          .single();
-        if (e) throw e;
-        setOpenLog(data as OpenLog);
-        toast('출근 체크인이 완료되었습니다.', 'success');
+        const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
+          kind: 'upsert',
+          table: 'attendance',
+          payload: { staff_id: staffId, date: today, check_in: nowIso, status: '정상' },
+        });
+        if (error) throw new Error(error);
+        if (queued) {
+          // 낙관적 업데이트 — 큐잉됨
+          setOpenLog({ id: 'pending', date: today, check_in: nowIso, check_out: null });
+          toast('오프라인 — 출근 기록이 동기화 대기 중입니다.', 'warning');
+        } else {
+          const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
+          if (row) setOpenLog(row);
+          toast('출근 체크인이 완료되었습니다.', 'success');
+        }
       } else if (state === 'in') {
-        const { data, error: e } = await supabase
-          .from('attendance')
-          .update({ check_out: nowIso })
-          .eq('staff_id', staffId)
-          .eq('date', openLog?.date ?? today)
-          .is('check_out', null)
-          .select()
-          .maybeSingle();
-        if (e) throw e;
-        if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
-        setOpenLog(data as OpenLog);
-        toast('퇴근 체크아웃이 완료되었습니다.', 'success');
+        const dateKey = openLog?.date ?? today;
+        const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
+          kind: 'update',
+          table: 'attendance',
+          payload: { check_out: nowIso },
+          match: { staff_id: staffId, date: dateKey },
+        });
+        if (error) throw new Error(error);
+        if (queued) {
+          // 낙관적 업데이트 — 큐잉됨
+          if (openLog) setOpenLog({ ...openLog, check_out: nowIso });
+          toast('오프라인 — 퇴근 기록이 동기화 대기 중입니다.', 'warning');
+        } else {
+          const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
+          if (row) setOpenLog(row);
+          else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
+          toast('퇴근 체크아웃이 완료되었습니다.', 'success');
+        }
       }
       void refetch();
       window.dispatchEvent(new CustomEvent('erp-attendance-updated', { detail: { staffId } }));

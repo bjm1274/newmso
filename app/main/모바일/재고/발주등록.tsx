@@ -23,7 +23,7 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import MAvatar from '../공통/MAvatar';
@@ -158,13 +158,23 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
       };
       if (expectedDelivery) payload.expected_delivery_date = expectedDelivery;
 
-      const { error } = await supabase.from('purchase_orders').insert([payload]);
-      if (error) throw error;
-
       // PC 패턴 분석: purchase_orders에 status='대기'로 insert.
       // 결재 흐름은 같은 테이블의 status 업데이트(대기→승인)로 처리되며
       // approvals 테이블에는 별도 insert하지 않음(PC 발주관리.tsx 244~256 동일).
-      toast('발주가 등록되었습니다. 결재함에서 확인하세요.', 'success');
+      const { queued, error } = await enqueueSupabaseMutation({
+        kind: 'insert',
+        table: 'purchase_orders',
+        payload: payload as Record<string, unknown>,
+      });
+      if (error) {
+        toast(`발주 실패: ${error}`, 'error');
+        return;
+      }
+      if (queued) {
+        toast('오프라인 — 발주가 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
+      } else {
+        toast('발주가 등록되었습니다. 결재함에서 확인하세요.', 'success');
+      }
       onBack();
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? '오류';

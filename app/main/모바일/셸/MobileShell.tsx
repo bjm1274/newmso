@@ -20,6 +20,8 @@ import 채팅 from '../채팅';
 import 게시판 from '../게시판';
 import 결재 from '../결재';
 import 더보기 from './더보기';
+import 오프라인배너 from '../공통/오프라인배너';
+import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -40,6 +42,12 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
     return () => mql.removeEventListener('change', handler);
   }, []);
 
+  // 오프라인 큐 자동 flush 초기화 (앱 마운트 시 1회)
+  useEffect(() => {
+    const stop = initOfflineQueueFlush();
+    return stop;
+  }, []);
+
   const switchTab = (tab: MTab) => {
     setRoute({ tab });
   };
@@ -54,6 +62,7 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
     <div className={containerClass}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'absolute', inset: 0 }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <오프라인배너 />
           {route.tab === 'home' && (
             <내정보
               user={user}

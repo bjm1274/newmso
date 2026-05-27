@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -105,16 +106,19 @@ export default function STodo({ staffId, onBack }: STodoProps) {
   }), [todos, today]);
 
   const toggleDone = async (todo: Todo) => {
-    setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, is_complete: !t.is_complete } : t));
-    try {
-      const { error } = await supabase
-        .from('todos')
-        .update({ is_complete: !todo.is_complete })
-        .eq('id', todo.id);
-      if (error) throw error;
-    } catch (err) {
+    const nextComplete = !todo.is_complete;
+    setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, is_complete: nextComplete } : t));
+    const { queued, error } = await enqueueSupabaseMutation({
+      kind: 'update',
+      table: 'todos',
+      payload: { is_complete: nextComplete },
+      match: { id: todo.id },
+    });
+    if (error) {
       setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, is_complete: todo.is_complete } : t));
-      toast(`상태 변경 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
+      toast(`상태 변경 실패: ${error}`, 'error');
+    } else if (queued) {
+      toast('오프라인 — 동기화 대기 중', 'warning');
     }
   };
 
@@ -122,21 +126,28 @@ export default function STodo({ staffId, onBack }: STodoProps) {
     const content = draft.trim();
     if (!content || !staffId) return;
     setAdding(true);
-    try {
-      const { data, error } = await supabase
-        .from('todos')
-        .insert([{ user_id: staffId, content, is_complete: false, task_date: today, priority: 'medium' }])
-        .select()
-        .single();
-      if (error) throw error;
-      setTodos(prev => [data as Todo, ...prev]);
+    const newPayload = { user_id: staffId, content, is_complete: false, task_date: today, priority: 'medium' as const };
+    const { data, queued, error } = await enqueueSupabaseMutation<Todo>({
+      kind: 'insert',
+      table: 'todos',
+      payload: newPayload,
+    });
+    if (error) {
+      toast(`추가 실패: ${error}`, 'error');
+    } else if (queued) {
+      // 낙관적 추가 (임시 id)
+      const optimistic: Todo = { ...newPayload, id: `pending-${Date.now()}`, priority: 'medium' };
+      setTodos(prev => [optimistic, ...prev]);
       setDraft('');
       setShowInput(false);
-    } catch (err) {
-      toast(`추가 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
-    } finally {
-      setAdding(false);
+      toast('오프라인 — 동기화 대기 중', 'warning');
+    } else {
+      const row = Array.isArray(data) ? (data[0] as Todo) : (data as Todo | null);
+      if (row) setTodos(prev => [row, ...prev]);
+      setDraft('');
+      setShowInput(false);
     }
+    setAdding(false);
   };
 
   return (
