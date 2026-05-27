@@ -21,8 +21,9 @@
  * JM6: D-day chip aria-label, row는 button + aria-label.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 import type { WelfareTabId } from './types';
 
 // ─── 만료 항목 타입 ─────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export interface ExpiryItem {
   kind: string;       // 표시용 종류 (예: 면허 갱신)
   until: string;      // YYYY-MM-DD
   days: number;       // 오늘 기준 남은 일수 (음수 = 만료)
-  tone: 'warn' | 'danger' | 'neutral';
+  tone: 'warn' | 'danger';
   tabId: WelfareTabId;
 }
 
@@ -67,11 +68,10 @@ interface DeviceDbRow {
 // ─── 필터 segmented ─────────────────────────────────────────────────
 type ExpiryFilter = 'all' | 'd7' | 'd30';
 
-// ─── 톤 계산 ────────────────────────────────────────────────────────
-function toneFor(days: number): 'warn' | 'danger' | 'neutral' {
+// ─── 톤 계산 — reference 2단계 (warn/danger). 만료 임박은 무조건 warn 이상 ───
+function toneFor(days: number): 'warn' | 'danger' {
   if (days <= 7) return 'danger';
-  if (days <= 30) return 'warn';
-  return 'neutral';
+  return 'warn';
 }
 
 // ─── 일수 계산 (KST 기준) ───────────────────────────────────────────
@@ -343,9 +343,7 @@ function ExpiryRow({
   const chipColor =
     item.tone === 'danger'
       ? 'border-[#EF4444] bg-[#EF4444]/10 text-[#DC2626]'
-      : item.tone === 'warn'
-        ? 'border-[#F59E0B] bg-[#F59E0B]/10 text-[#D97706]'
-        : 'border-[var(--border)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
+      : 'border-[#F59E0B] bg-[#F59E0B]/10 text-[#D97706]';
 
   const dayLabel =
     item.days < 0
@@ -356,13 +354,31 @@ function ExpiryRow({
 
   const dayChip = item.days < 0 ? `만료+${Math.abs(item.days)}` : `D-${item.days}`;
 
+  // reference §1151~1162: 각 row 우측에 "알림 발송" / "처리" 버튼 2개
+  const handleNotify = () => {
+    toast(`${item.who}에게 ${item.kind} 만료 알림을 전송했습니다.`, 'success');
+  };
+
+  const handleProcess = () => {
+    onJump(item.tabId);
+  };
+
+  const handleRowKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onJump(item.tabId);
+    }
+  };
+
   return (
     <li>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onJump(item.tabId)}
+        onKeyDown={handleRowKey}
         aria-label={`${item.kind} · ${item.who} · ${item.what} · ${dayLabel} · ${item.tabId} 탭으로 이동`}
-        className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-left transition-colors hover:bg-[var(--muted)]"
+        className="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-left transition-colors hover:bg-[var(--muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       >
         <span
           aria-hidden="true"
@@ -381,7 +397,31 @@ function ExpiryRow({
             · {item.what} · 만료 {item.until}
           </span>
         </span>
-      </button>
+        <span
+          role="group"
+          aria-label="만료 항목 액션"
+          className="ml-1 flex shrink-0 items-center gap-1"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={handleNotify}
+            aria-label={`${item.who} ${item.kind} 알림 발송`}
+            className="inline-flex h-7 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-bold text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
+          >
+            알림 발송
+          </button>
+          <button
+            type="button"
+            onClick={handleProcess}
+            aria-label={`${item.who} ${item.kind} 처리`}
+            className="inline-flex h-7 items-center rounded-[var(--radius-md)] bg-[var(--accent)] px-2 text-[11px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"
+          >
+            처리
+          </button>
+        </span>
+      </div>
     </li>
   );
 }

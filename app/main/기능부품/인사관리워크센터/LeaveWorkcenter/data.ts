@@ -54,6 +54,8 @@ export interface LeaveExpiryItem {
 
 export interface LeaveDataResult {
   rows: LeaveStaffRow[];
+  /** 캘린더용 — 모든 leave_requests 노출 */
+  requests: LeaveRequest[];
   expiryItems: LeaveExpiryItem[];
   totals: {
     remaining: number;
@@ -91,6 +93,13 @@ function daysBetween(future: Date, base: Date): number {
 }
 
 // ─── 정규화 ───────────────────────────────────────────────────────
+// JM4 강화: ISO 날짜·숫자 fallback. Invalid Date / NaN 발생 방지.
+function safeDate(raw: string | null, fallback: Date): Date {
+  if (!raw) return fallback;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
 function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalanceRow {
   const staffId = String(row.staff_id ?? '');
   const total = pickNumber(row.total_days ?? row.annual_total ?? row.granted_days ?? 0);
@@ -100,7 +109,8 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
     Math.max(0, total - used),
   );
   const expiryRaw = pickString(row.expiry_date);
-  const expiry = expiryRaw ? new Date(expiryRaw) : new Date(now.getFullYear(), 11, 31);
+  const expiryFallback = new Date(now.getFullYear(), 11, 31);
+  const expiry = safeDate(expiryRaw, expiryFallback);
   const daysUntilExpiry = daysBetween(expiry, now);
   return {
     staff_id: staffId,
@@ -148,6 +158,7 @@ export async function fetchLeaveData({
     return {
       rows: [],
       expiryItems: [],
+      requests: [],
       totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 },
     };
   }
@@ -229,7 +240,7 @@ export async function fetchLeaveData({
   );
   totals.expiringStaff = expiryItems.length;
 
-  return { rows, expiryItems, totals };
+  return { rows, requests, expiryItems, totals };
 }
 
 // ─── 신청 submit ───────────────────────────────────────────────────
