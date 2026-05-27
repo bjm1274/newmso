@@ -801,7 +801,6 @@ function MessengerTimelineComponent({
                   key={msg.id}
                   mine={isMine}
                   canDelete={isMine && !isDeletedMessage}
-                  enableHoverToolbar={hostEnabled}
                   enableContextMenu={hostEnabled}
                   testId={`chat-message-row-${msg.id}`}
                   className={isContinuous ? 'mt-[2px]' : 'mt-0.5 md:mt-1'}

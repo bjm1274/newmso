@@ -3695,26 +3695,8 @@ button, a, [role="button"] {
   --shadow-pop-lg: 0 20px 50px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.06);
 }
 
-/* 3-1. 호버 플로팅 툴바
- * 컴포넌트는 `.message-hover-toolbar`로 렌더되며 항상 마운트되지만
- * 부모 row(`[data-chat-message-row]`)가 호버 상태일 때만 200ms delay 후 표시.
- * 모바일/터치(`(hover: none)`)에서는 노출 안 함. */
-.message-hover-toolbar {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(2px);
-  transition: opacity .15s, transform .15s;
-}
-[data-chat-message-row]:hover .message-hover-toolbar {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-  transition-delay: 200ms;
-}
-[data-chat-message-row] .message-hover-toolbar { transition-delay: 50ms; }
-@media (hover: none), (pointer: coarse) {
-  .message-hover-toolbar { display: none !important; }
-}
+/* 3-1. 호버 플로팅 툴바 — 2026-05-27 사용자 요청으로 기능 제거됨
+ * 우클릭 컨텍스트 메뉴(.message-ctx-menu)와 이모지 피커는 유지. */
 
 /* 3-2. 컨텍스트 메뉴 — disabled item */
 .message-ctx-menu .item[aria-disabled="true"] {

@@ -16,17 +16,14 @@
 import { useCallback, useState, type MouseEvent, type ReactNode } from 'react';
 import EmojiPicker from './EmojiPicker';
 import MessageContextMenu from './MessageContextMenu';
-import MessageHoverToolbar from './MessageHoverToolbar';
 
 type Anchor = { x: number; y: number };
 
 interface MessageActionsHostProps {
-  /** 본인이 보낸 메시지인지(툴바 좌우 반전 + 삭제 가능 여부) */
+  /** 본인이 보낸 메시지인지(삭제 가능 여부) */
   mine: boolean;
   /** 삭제 가능 여부(보통 mine && !isDeletedMessage). 미지정 시 mine 사용 */
   canDelete?: boolean;
-  /** 호버 툴바를 표시할지(예: 삭제된 메시지에서는 false로 숨김) */
-  enableHoverToolbar?: boolean;
   /** 우클릭 메뉴를 활성화할지 */
   enableContextMenu?: boolean;
   /** 메시지 내용을 그대로 자식으로 받음(말풍선 등) */
@@ -52,7 +49,6 @@ interface MessageActionsHostProps {
 export default function MessageActionsHost({
   mine,
   canDelete,
-  enableHoverToolbar = true,
   enableContextMenu = true,
   children,
   className,
@@ -99,10 +95,6 @@ export default function MessageActionsHost({
     setPicker({ x, y });
   }, []);
 
-  const openCtxMenu = useCallback((x: number, y: number) => {
-    setCtxMenu({ x, y });
-  }, []);
-
   return (
     <div
       ref={containerRef}
@@ -113,16 +105,6 @@ export default function MessageActionsHost({
       style={style}
     >
       {children}
-      {enableHoverToolbar && (
-        <MessageHoverToolbar
-          mine={mine}
-          onReact={onReact}
-          onAddEmoji={openPicker}
-          onReply={onReply}
-          onCopy={onCopy}
-          onMore={openCtxMenu}
-        />
-      )}
       {ctxMenu && (
         <MessageContextMenu
           x={ctxMenu.x}
