@@ -21,6 +21,7 @@ import 게시판 from '../게시판';
 import 결재 from '../결재';
 import 더보기 from './더보기';
 import 오프라인배너 from '../공통/오프라인배너';
+import 오프라인실패배너 from '../공통/오프라인실패배너';
 import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 
 export type MobileShellProps = {
@@ -62,6 +63,7 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
     <div className={containerClass}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'absolute', inset: 0 }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <오프라인실패배너 />
           <오프라인배너 />
           {route.tab === 'home' && (
             <내정보
