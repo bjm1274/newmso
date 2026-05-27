@@ -2181,6 +2181,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       다음달
                     </button>
                   </div>
+                  {canCreatePost && (
+                    <button
+                      type="button"
+                      data-testid="board-schedule-new"
+                      onClick={() => setShowNewPost((v) => !v)}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+                      aria-label={showNewPost ? '일정 등록 취소' : (activeBoard === '수술일정' ? '+ 새 수술일정 등록' : '+ 새 MRI일정 등록')}
+                    >
+                      {showNewPost ? '취소' : (activeBoard === '수술일정' ? '+ 새 수술일정' : '+ 새 MRI일정')}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2324,6 +2335,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               onToggleNewPost={() => setShowNewPost((v) => !v)}
               onSelectPost={(postId) => setSelectedPostId(postId)}
               onToggleLike={(post) => { void handleLike(post); }}
+              onEditPost={(postId) => {
+                const post = posts.find((p) => String(p.id) === String(postId));
+                if (post) handleEditPostStart(post);
+              }}
+              onDeletePost={(postId) => {
+                const post = posts.find((p) => String(p.id) === String(postId));
+                if (post) void handleDeletePost(post);
+              }}
+              canEditPost={canEditPost}
+              canDeletePost={canDeletePost}
               emptyDescription={
                 activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
                   ? '작성된 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'

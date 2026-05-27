@@ -34,6 +34,7 @@ import {
   type ReadFilter,
   type SortKey,
 } from './post-table-helpers';
+import PostMoreMenu from './PostMoreMenu';
 
 export type { SortKey, ReadFilter } from './post-table-helpers';
 
@@ -50,6 +51,13 @@ interface PostTableViewProps {
   onToggleNewPost: () => void;
   onSelectPost: (postId: string) => void;
   onToggleLike: (post: BoardPost) => void;
+  /** ⋯ more 메뉴 액션 (handoff/04-board §3-4). 미전달 시 메뉴 항목 비노출. */
+  onEditPost?: (postId: string) => void;
+  onDeletePost?: (postId: string) => void;
+  onShareToChat?: (postId: string) => void;
+  /** 작성자/관리자 권한 판정. 미전달 시 메뉴 항목 비노출. */
+  canEditPost?: (post: BoardPost) => boolean;
+  canDeletePost?: (post: BoardPost) => boolean;
   emptyDescription?: string;
 }
 
@@ -66,6 +74,11 @@ export default function PostTableView({
   onToggleNewPost,
   onSelectPost,
   onToggleLike,
+  onEditPost,
+  onDeletePost,
+  onShareToChat,
+  canEditPost,
+  canDeletePost,
   emptyDescription,
 }: PostTableViewProps) {
   // ── 상태: 검색, 정렬, 태그, 안읽음/즐겨찾기, 즐겨찾기 ──
@@ -304,12 +317,11 @@ export default function PostTableView({
         </div>
       </div>
 
-      {/* ── 표 ── */}
+      {/* ── 표 (라이브 §3-3: ★ 컬럼 폐지, 7열) ── */}
       <div className="erp-table-card">
-        <table className="data-table compact" aria-label={`${boardLabel} 게시물 목록`}>
+        <table className="data-table compact board-tbl" aria-label={`${boardLabel} 게시물 목록`}>
           <thead>
             <tr>
-              <th scope="col" style={{ width: 40 }}><span className="sr-only">즐겨찾기</span></th>
               <th scope="col" style={{ width: 60, textAlign: 'right' }}>번호</th>
               <th scope="col">제목</th>
               <th scope="col" style={{ width: 140 }}>작성자</th>
@@ -323,14 +335,14 @@ export default function PostTableView({
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`skeleton-${i}`}>
-                  <td colSpan={8}>
+                  <td colSpan={7}>
                     <div className="h-5 w-full animate-pulse rounded bg-[var(--border)]" />
                   </td>
                 </tr>
               ))
             ) : filteredPosts.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={7}>
                   <EmptyState
                     title="게시물이 없습니다"
                     description={emptyDescription ?? '새 게시물이 등록되면 이 목록에 표시됩니다.'}
@@ -353,42 +365,39 @@ export default function PostTableView({
                 const isLiked = myLikedPostIds.has(postId);
                 const dateLabel = formatShortDate(post.created_at as string | null, post.scheduled_publish_at as string | null);
                 const unread = isUnread(post);
+                const canEditThis = canEditPost ? canEditPost(post) : false;
+                const canDeleteThis = canDeletePost ? canDeletePost(post) : false;
 
                 return (
                   <tr
                     key={postId || idx}
                     data-testid={`board-post-${postId}`}
                     onClick={() => onSelectPost(postId)}
-                    className="cursor-pointer"
+                    className="board-tr cursor-pointer"
                   >
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => toggleFavorite(postId)}
-                        aria-pressed={isFav}
-                        aria-label={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill={isFav ? 'var(--warning)' : 'none'}
-                          stroke={isFav ? 'var(--warning)' : 'var(--toss-gray-2)'}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                      </button>
-                    </td>
                     <td className="tnum" style={{ textAlign: 'right' }}>
-                      <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">{number}</span>
+                      <span className="board-num">{number}</span>
                     </td>
                     <td>
                       <div className="flex flex-col gap-1 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
+                          {/* 인라인 ★ 인디케이터 (지시서 §3-3: 별표된 경우만 노란) */}
+                          {isFav && (
+                            <svg
+                              aria-label="별표"
+                              className="shrink-0"
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="#F59E0B"
+                              stroke="#F59E0B"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                          )}
                           {isImportant && (
                             <span className="shrink-0 rounded-[var(--radius-md)] bg-[var(--danger,#EF4444)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--danger,#EF4444)]">
                               중요
@@ -397,7 +406,7 @@ export default function PostTableView({
                           {unread && (
                             <span aria-label="안 읽음" className="shrink-0 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                           )}
-                          <span className={`min-w-0 truncate text-[13px] font-bold ${unread ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-4)]'}`}>
+                          <span className={`board-title min-w-0 truncate ${unread ? '' : 'opacity-60'}`}>
                             {postTitle}
                           </span>
                           {attachCount > 0 && (
@@ -406,15 +415,15 @@ export default function PostTableView({
                             </span>
                           )}
                           {commentCount > 0 && (
-                            <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">
+                            <span className="board-cm shrink-0">
                               💬 {commentCount}
                             </span>
                           )}
                         </div>
                         {tags.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1">
+                          <div className="board-tags-row">
                             {tags.slice(0, 4).map((t) => (
-                              <span key={t} className="text-[10px] font-bold text-[var(--accent)]">
+                              <span key={t} className="board-tag-mini">
                                 #{t}
                               </span>
                             ))}
@@ -460,18 +469,16 @@ export default function PostTableView({
                       </button>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        aria-label="더보기"
-                        onClick={() => onSelectPost(postId)}
-                        className="row-actions inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="5" cy="12" r="1.5" />
-                          <circle cx="12" cy="12" r="1.5" />
-                          <circle cx="19" cy="12" r="1.5" />
-                        </svg>
-                      </button>
+                      <PostMoreMenu
+                        postId={postId}
+                        isFavorite={isFav}
+                        canEdit={canEditThis}
+                        canDelete={canDeleteThis}
+                        onToggleFavorite={toggleFavorite}
+                        onEdit={onEditPost}
+                        onShareToChat={onShareToChat}
+                        onDelete={onDeletePost}
+                      />
                     </td>
                   </tr>
                 );
