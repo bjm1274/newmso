@@ -1,0 +1,256 @@
+'use client';
+
+/**
+ * SBoard — 게시판 목록.
+ *   - MobileHeader + 카테고리 7 칩바 + 글 카드 리스트
+ *   - pin / star / badge 표시
+ * JM(파일당 500줄), JM2(필요한 칼럼만 select·useMemo), JM3(toast), JM6(button 시맨틱)
+ */
+
+import { memo, useMemo } from 'react';
+import MobileHeader from '../셸/MobileHeader';
+import MIcon from '../공통/MIcon';
+import MChip from '../공통/MChip';
+import MAvatar from '../공통/MAvatar';
+import {
+  BOARD_CATS,
+  type BoardCatId,
+  type BoardListPost,
+  boardTypeToCat,
+  formatShortDate,
+  pickAvatarTone,
+} from './data-hooks';
+import { toggleStarServer } from './별표훅';
+
+export type SBoardProps = {
+  posts: BoardListPost[];
+  loading: boolean;
+  cat: BoardCatId;
+  onCat: (c: BoardCatId) => void;
+  onOpen: (postId: string) => void;
+  onWrite: () => void;
+  onBack: () => void;
+  userId: string | null;
+  /** 별표 토글 반영용 — 부모 state를 재조회 */
+  onStarChanged: (postId: string, starred: boolean) => void;
+};
+
+function filterByCat(posts: BoardListPost[], cat: BoardCatId): BoardListPost[] {
+  if (cat === 'all') return posts;
+  if (cat === 'meal') {
+    return posts.filter((p) => {
+      const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t)) : [];
+      return tags.includes('식단') || /식단/.test(String(p.title ?? ''));
+    });
+  }
+  return posts.filter((p) => boardTypeToCat(p.board_type as string | null) === cat);
+}
+
+function countByCat(posts: BoardListPost[], cat: BoardCatId): number {
+  return filterByCat(posts, cat).length;
+}
+
+function PostCard({
+  post,
+  onOpen,
+  onToggleStar,
+}: {
+  post: BoardListPost;
+  onOpen: () => void;
+  onToggleStar: () => void;
+}) {
+  const cat = boardTypeToCat(post.board_type as string | null);
+  const catDef = BOARD_CATS.find((c) => c.id === cat);
+  const isImportant = (post.status === '중요') ||
+    (Array.isArray(post.tags) && post.tags.map((t) => String(t)).includes('중요'));
+  const isPinned = Boolean(post.is_pinned);
+  const authorName = String(post.author_name ?? '익명');
+  const initial = authorName.charAt(0) || '?';
+  const tone = pickAvatarTone(String(post.id ?? authorName));
+  const views = typeof post.views === 'number' ? post.views : 0;
+  const commentCount = post.comment_count ?? 0;
+  const starred = Boolean(post.starred);
+
+  return (
+    <div
+      className="m-card"
+      style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${post.title} 상세 보기`}
+        style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          {isPinned && <MIcon name="pin" size={12} color="var(--m-accent)" />}
+          <MChip tone={catDef?.tone || ''}>{catDef?.label ?? '기타'}</MChip>
+          {isImportant && <MChip tone="danger">중요</MChip>}
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+            {formatShortDate(post.created_at as string | null)}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '-0.018em',
+            lineHeight: 1.45,
+            color: 'var(--z-900)',
+          }}
+        >
+          {post.title}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 8,
+            fontSize: 11,
+            color: 'var(--z-500)',
+            fontWeight: 600,
+          }}
+        >
+          <MAvatar tone={tone} size="sm">{initial}</MAvatar>
+          <b style={{ color: 'var(--z-700)' }}>{authorName}</b>
+          {post.company && (
+            <>
+              <span style={{ color: 'var(--z-400)' }}>·</span>
+              <span>{String(post.company)}</span>
+            </>
+          )}
+          <div style={{ flex: 1 }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <MIcon name="user" size={11} />
+            {views}
+          </span>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+              color: commentCount > 0 ? 'var(--m-accent)' : 'var(--z-500)',
+            }}
+          >
+            <MIcon name="chat" size={11} />
+            {commentCount}
+          </span>
+        </div>
+      </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+        <button
+          type="button"
+          onClick={onToggleStar}
+          aria-label={starred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+          aria-pressed={starred}
+          style={{
+            width: 28,
+            height: 28,
+            display: 'grid',
+            placeItems: 'center',
+            color: starred ? 'var(--m-warning)' : 'var(--z-400)',
+          }}
+        >
+          <MIcon name="star" size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const PostCardMemo = memo(PostCard);
+
+function SBoardBase({
+  posts,
+  loading,
+  cat,
+  onCat,
+  onOpen,
+  onWrite,
+  onBack,
+  userId,
+  onStarChanged,
+}: SBoardProps) {
+  const filtered = useMemo(() => filterByCat(posts, cat), [posts, cat]);
+
+  return (
+    <div className="m-screen">
+      <MobileHeader
+        title="게시판"
+        sub="박철홍정형외과"
+        back={onBack}
+        actions={
+          <>
+            <button type="button" aria-label="검색">
+              <MIcon name="search" size={20} />
+            </button>
+            <button type="button" onClick={onWrite} aria-label="새 글 작성">
+              <MIcon name="edit" size={20} />
+            </button>
+          </>
+        }
+      />
+      <div className="m-chip-bar">
+        {BOARD_CATS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={cat === c.id ? 'on' : ''}
+            onClick={() => onCat(c.id)}
+            aria-pressed={cat === c.id}
+          >
+            {c.label}
+            <span className="cnt">{countByCat(posts, c.id)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="m-scroll">
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {loading && filtered.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
+              불러오는 중…
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="m-card" style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <MIcon name="board" size={24} color="var(--z-400)" />
+              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+                해당 카테고리에 게시글이 없습니다
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+                우상단 글쓰기 버튼으로 등록할 수 있어요
+              </div>
+            </div>
+          )}
+          {filtered.map((post) => (
+            <PostCardMemo
+              key={String(post.id)}
+              post={post}
+              onOpen={() => onOpen(String(post.id))}
+              onToggleStar={() => {
+                const id = String(post.id);
+                const prev = Boolean(post.starred);
+                // 낙관적
+                onStarChanged(id, !prev);
+                void (async () => {
+                  const res = await toggleStarServer(userId, id);
+                  if (res.starred !== !prev) {
+                    // 롤백
+                    onStarChanged(id, prev);
+                  } else {
+                    onStarChanged(id, res.starred);
+                  }
+                })();
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SBoard = memo(SBoardBase);
+export default SBoard;

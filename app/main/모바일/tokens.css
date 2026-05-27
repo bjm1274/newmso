@@ -1,0 +1,332 @@
+/* ─────────────────────────────────────────────────────────────
+ * MSO 모바일 — 디자인 토큰 + 공통 컴포넌트 클래스
+ * 모든 셀렉터를 .mso-mobile 안쪽으로 스코프 → PC CSS와 충돌 0
+ * handoff/newmso15/handoff_mobile/live-preview/mobile/m-tokens.css 1:1 이식
+ * ─────────────────────────────────────────────────────────────*/
+
+.mso-mobile {
+  --m-font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+  --m-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --z-50:  #FAFAFB;
+  --z-100: #F4F4F5;
+  --z-150: #EEEEF1;
+  --z-200: #E4E4E7;
+  --z-300: #D4D4D8;
+  --z-400: #A1A1AA;
+  --z-500: #71717A;
+  --z-600: #52525B;
+  --z-700: #3F3F46;
+  --z-800: #27272A;
+  --z-900: #18181B;
+
+  --m-accent: #2563EB;
+  --m-accent-700: #1D4ED8;
+  --m-accent-soft: #EBF2FF;
+  --m-accent-tint: rgba(37, 99, 235, 0.10);
+
+  --m-success: #10B981;
+  --m-success-soft: #ECFDF5;
+  --m-warning: #F59E0B;
+  --m-warning-soft: #FFFBEB;
+  --m-danger: #EF4444;
+  --m-danger-soft: #FEF2F2;
+
+  --m-border: #E9E9EC;
+  --m-border-strong: #D4D4D8;
+  --m-bg: #F5F5F7;
+  --m-card: #FFFFFF;
+
+  --m-radius-sm: 8px;
+  --m-radius-md: 10px;
+  --m-radius-lg: 14px;
+  --m-radius-xl: 20px;
+
+  --m-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  --m-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.05);
+
+  position: fixed;
+  inset: 0;
+  font-family: var(--m-font);
+  font-size: 14px;
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+  color: var(--z-900);
+  background: var(--m-bg);
+  word-break: keep-all;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.mso-mobile.dark {
+  --z-50:  #18181B;
+  --z-100: #1F1F23;
+  --z-150: #26262B;
+  --z-200: #2E2E33;
+  --z-300: #3F3F46;
+  --z-400: #71717A;
+  --z-500: #A1A1AA;
+  --z-600: #D4D4D8;
+  --z-700: #E4E4E7;
+  --z-800: #F4F4F5;
+  --z-900: #FAFAFB;
+  --m-border: #2E2E33;
+  --m-border-strong: #3F3F46;
+  --m-bg: #0B0B0D;
+  --m-card: #18181B;
+  --m-accent-soft: rgba(37, 99, 235, 0.18);
+  --m-accent-tint: rgba(37, 99, 235, 0.22);
+  --m-success-soft: rgba(16, 185, 129, 0.16);
+  --m-warning-soft: rgba(245, 158, 11, 0.16);
+  --m-danger-soft: rgba(239, 68, 68, 0.16);
+}
+
+/* 리셋 — .mso-mobile 내부만 */
+.mso-mobile *,
+.mso-mobile *::before,
+.mso-mobile *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+.mso-mobile button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+.mso-mobile a { color: inherit; text-decoration: none; }
+.mso-mobile input,
+.mso-mobile textarea {
+  font-family: inherit; font-size: inherit; color: inherit;
+  border: 0; outline: 0; background: transparent;
+}
+
+/* ─── 셸 ─────────────────────────────────────────────────────*/
+.mso-mobile .m-screen {
+  width: 100%; height: 100%; min-height: 100%;
+  background: var(--m-bg);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.mso-mobile .m-scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.mso-mobile .m-section { padding: 14px 16px 0; }
+.mso-mobile .m-section-h {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.mso-mobile .m-section-h .lbl {
+  font-size: 11px; font-weight: 800; color: var(--z-500);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.mso-mobile .m-section-h .more { font-size: 11px; font-weight: 700; color: var(--m-accent); }
+
+/* ─── 헤더 ───────────────────────────────────────────────────*/
+.mso-mobile .m-header {
+  padding: 14px 16px 12px;
+  background: var(--m-card);
+  border-bottom: 1px solid var(--m-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.mso-mobile .m-header .back {
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  margin-left: -6px;
+  color: var(--z-700);
+}
+.mso-mobile .m-header .title { font-size: 17px; font-weight: 800; letter-spacing: -0.025em; flex: 1; min-width: 0; }
+.mso-mobile .m-header .sub { font-size: 11px; color: var(--z-500); font-weight: 600; margin-top: 1px; }
+.mso-mobile .m-header .actions { display: flex; gap: 4px; }
+.mso-mobile .m-header .actions button {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center; color: var(--z-700);
+  position: relative;
+}
+.mso-mobile .m-header .actions button:active { background: var(--z-100); }
+.mso-mobile .m-header .actions .badge {
+  position: absolute; top: 4px; right: 5px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--m-danger); color: #fff;
+  border-radius: 999px; font-size: 9px; font-weight: 800;
+  display: grid; place-items: center; border: 2px solid var(--m-card);
+}
+
+/* ─── 바텀탭 ─────────────────────────────────────────────────*/
+.mso-mobile .m-bottom-tab {
+  display: flex;
+  background: var(--m-card);
+  border-top: 1px solid var(--m-border);
+  padding: 6px 6px calc(22px + env(safe-area-inset-bottom));
+  position: relative;
+  flex-shrink: 0;
+}
+.mso-mobile .m-bottom-tab > button {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+  padding: 8px 4px; color: var(--z-500); font-weight: 700;
+  border-radius: 12px; min-height: 56px; justify-content: center;
+}
+.mso-mobile .m-bottom-tab > button.on { color: var(--m-accent); }
+.mso-mobile .m-bottom-tab > button .lab { font-size: 10px; letter-spacing: -0.01em; }
+.mso-mobile .m-bottom-tab > button .ico-wrap {
+  width: 24px; height: 24px; display: grid; place-items: center; position: relative;
+}
+.mso-mobile .m-bottom-tab > button .dot {
+  position: absolute; top: 0; right: 0;
+  width: 7px; height: 7px; background: var(--m-danger); border-radius: 999px;
+  border: 1.5px solid var(--m-card);
+}
+
+/* ─── 카드 / 리스트 행 ─────────────────────────────────────*/
+.mso-mobile .m-card {
+  background: var(--m-card);
+  border-radius: var(--m-radius-lg);
+  padding: 14px 16px;
+  border: 1px solid var(--m-border);
+}
+.mso-mobile .m-card.flush { padding: 0; overflow: hidden; }
+.mso-mobile .m-list-row {
+  display: grid; grid-template-columns: 40px 1fr auto;
+  align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--m-border);
+  min-height: 56px;
+}
+.mso-mobile .m-list-row:last-child { border-bottom: 0; }
+.mso-mobile .m-list-row:active { background: var(--z-50); }
+.mso-mobile .m-list-row .ico-tile {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--z-100); color: var(--z-700);
+  display: grid; place-items: center;
+}
+.mso-mobile .m-list-row .ico-tile.tone-accent  { background: var(--m-accent-soft); color: var(--m-accent); }
+.mso-mobile .m-list-row .ico-tile.tone-success { background: var(--m-success-soft); color: var(--m-success); }
+.mso-mobile .m-list-row .ico-tile.tone-warning { background: var(--m-warning-soft); color: var(--m-warning); }
+.mso-mobile .m-list-row .ico-tile.tone-danger  { background: var(--m-danger-soft); color: var(--m-danger); }
+.mso-mobile .m-list-row .lbl { font-size: 14px; font-weight: 700; letter-spacing: -0.012em; }
+.mso-mobile .m-list-row .sub { font-size: 11px; color: var(--z-500); margin-top: 1px; font-weight: 500; }
+.mso-mobile .m-list-row .val { font-size: 15px; font-weight: 800; letter-spacing: -0.012em; font-feature-settings: "tnum"; }
+.mso-mobile .m-list-row .val .u { font-size: 10px; color: var(--z-500); font-weight: 700; margin-left: 2px; }
+
+/* ─── 칩 ─────────────────────────────────────────────────────*/
+.mso-mobile .m-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  background: var(--z-100); color: var(--z-700);
+  white-space: nowrap;
+}
+.mso-mobile .m-chip.accent  { background: var(--m-accent-tint); color: var(--m-accent); }
+.mso-mobile .m-chip.success { background: var(--m-success-soft); color: var(--m-success); }
+.mso-mobile .m-chip.warning { background: var(--m-warning-soft); color: var(--m-warning); }
+.mso-mobile .m-chip.danger  { background: var(--m-danger-soft); color: var(--m-danger); }
+.mso-mobile .m-chip.dot::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+/* ─── 버튼 ───────────────────────────────────────────────────*/
+.mso-mobile .m-btn {
+  height: 44px; padding: 0 16px;
+  border-radius: 12px;
+  background: var(--m-card); color: var(--z-900);
+  border: 1px solid var(--m-border);
+  font-size: 14px; font-weight: 700; letter-spacing: -0.012em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap;
+  transition: transform 0.06s;
+}
+.mso-mobile .m-btn.primary { background: var(--m-accent); color: #fff; border-color: transparent; }
+.mso-mobile .m-btn.danger  { background: var(--m-danger); color: #fff; border-color: transparent; }
+.mso-mobile .m-btn.ghost   { background: transparent; border-color: transparent; color: var(--z-700); }
+.mso-mobile .m-btn.block   { width: 100%; }
+.mso-mobile .m-btn.lg      { height: 52px; font-size: 15px; border-radius: 14px; }
+.mso-mobile .m-btn:active  { transform: scale(0.98); }
+.mso-mobile .m-btn:disabled { opacity: 0.5; }
+
+/* ─── 세그먼티드 ─────────────────────────────────────────────*/
+.mso-mobile .m-seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: var(--z-100); padding: 3px; border-radius: 10px; gap: 2px;
+}
+.mso-mobile .m-seg button {
+  height: 32px; font-size: 12px; font-weight: 700; color: var(--z-500);
+  border-radius: 7px;
+}
+.mso-mobile .m-seg button.on { background: var(--m-card); color: var(--z-900); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+
+/* ─── 필터 칩바 (가로 스크롤) ────────────────────────────────*/
+.mso-mobile .m-chip-bar {
+  display: flex; gap: 6px; padding: 10px 16px;
+  overflow-x: auto; scrollbar-width: none;
+  background: var(--m-card); border-bottom: 1px solid var(--m-border);
+  flex-shrink: 0;
+}
+.mso-mobile .m-chip-bar::-webkit-scrollbar { display: none; }
+.mso-mobile .m-chip-bar > button {
+  flex: 0 0 auto;
+  height: 32px; padding: 0 12px; border-radius: 999px;
+  background: var(--m-bg); color: var(--z-700);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.mso-mobile .m-chip-bar > button.on { background: var(--m-accent); color: #fff; }
+.mso-mobile .m-chip-bar > button .cnt {
+  font-size: 10px; opacity: 0.7; font-weight: 800;
+}
+
+/* ─── 아바타 ─────────────────────────────────────────────────*/
+.mso-mobile .m-avatar {
+  width: 44px; height: 44px; border-radius: 12px;
+  color: #fff; font-weight: 800; font-size: 14px;
+  display: grid; place-items: center; flex-shrink: 0;
+  letter-spacing: -0.02em;
+}
+.mso-mobile .m-avatar.lg { width: 56px; height: 56px; font-size: 18px; border-radius: 16px; }
+.mso-mobile .m-avatar.sm { width: 32px; height: 32px; font-size: 11px; border-radius: 9px; }
+.mso-mobile .m-avatar.tone-blue   { background: linear-gradient(135deg, #3B82F6, #2563EB); }
+.mso-mobile .m-avatar.tone-violet { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
+.mso-mobile .m-avatar.tone-pink   { background: linear-gradient(135deg, #EC4899, #DB2777); }
+.mso-mobile .m-avatar.tone-green  { background: linear-gradient(135deg, #10B981, #059669); }
+.mso-mobile .m-avatar.tone-orange { background: linear-gradient(135deg, #F59E0B, #D97706); }
+.mso-mobile .m-avatar.tone-cyan   { background: linear-gradient(135deg, #06B6D4, #0891B2); }
+.mso-mobile .m-avatar.tone-gray   { background: linear-gradient(135deg, #94A3B8, #64748B); }
+
+/* ─── 보조 유틸 ─────────────────────────────────────────────*/
+.mso-mobile .m-tnum { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+.mso-mobile .m-divider { height: 1px; background: var(--m-border); margin: 8px 0; }
+.mso-mobile .m-section-gap { height: 14px; }
+
+/* 스티키 푸터 */
+.mso-mobile .m-sticky-foot {
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--m-card);
+  border-top: 1px solid var(--m-border);
+  display: flex; gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 빠른액션 그리드 셀 */
+.mso-mobile .m-quick {
+  background: var(--m-card);
+  border: 1px solid var(--m-border);
+  border-radius: 14px;
+  padding: 12px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  position: relative;
+  color: var(--z-700);
+}
+.mso-mobile .m-quick:active { transform: scale(0.97); }
+.mso-mobile .m-quick .lbl { font-size: 11px; font-weight: 700; color: var(--z-700); }
+.mso-mobile .m-quick .badge {
+  position: absolute; top: 6px; right: 10px;
+  min-width: 14px; height: 14px; padding: 0 4px;
+  background: var(--m-danger); color: #fff;
+  border-radius: 999px; font-size: 9px; font-weight: 800;
+  display: grid; place-items: center; border: 2px solid var(--m-card);
+}
+.mso-mobile .m-quick .ico {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--z-100); color: var(--z-700);
+  display: grid; place-items: center;
+}
+.mso-mobile .m-quick .ico.tone-accent  { background: var(--m-accent-soft); color: var(--m-accent); }
+.mso-mobile .m-quick .ico.tone-success { background: var(--m-success-soft); color: var(--m-success); }
+.mso-mobile .m-quick .ico.tone-warning { background: var(--m-warning-soft); color: var(--m-warning); }
+.mso-mobile .m-quick .ico.tone-danger  { background: var(--m-danger-soft); color: var(--m-danger); }

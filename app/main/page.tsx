@@ -14,7 +14,9 @@ import {
 } from '@/lib/staff-query-columns';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
-import { unsubscribePushOnLogout } from '@/lib/client-logout';
+import { performClientLogout, unsubscribePushOnLogout } from '@/lib/client-logout';
+import { useIsMobile } from '@/app/components/useIsMobile';
+import MobileShell from './모바일/셸/MobileShell';
 import {
   canAccessAdminSection,
   canAccessApprovalSection,
@@ -109,6 +111,7 @@ function MainPageFallback() {
 function MainPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
   const [user, setUser] = useState<ErpUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
@@ -1186,6 +1189,39 @@ function MainPageContent() {
         <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
         <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
       </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <NavigationProvider value={navigationContextValue}>
+        <CompanyProvider value={companyContextValue}>
+          <AppDataProvider value={appDataContextValue}>
+            <PermissionPromptModal />
+            <ChatAlertBanner
+              onOpenChat={handleOpenChatRoom}
+              onOpenMessage={handleOpenChatMessage}
+            />
+            <NotificationSystem
+              user={user as Parameters<typeof NotificationSystem>[0]['user']}
+              onOpenChatRoom={handleOpenChatRoom}
+              onOpenMessage={handleOpenChatMessage}
+              onOpenApproval={handleOpenApproval}
+              onOpenAdmin={handleOpenAdmin}
+              onOpenInventory={handleOpenInventory}
+              onOpenBoard={handleOpenBoard}
+              onOpenPost={handleOpenPost}
+            />
+            <MobileShell
+              user={user}
+              onLogout={async () => {
+                await performClientLogout();
+                window.location.replace('/');
+              }}
+            />
+          </AppDataProvider>
+        </CompanyProvider>
+      </NavigationProvider>
     );
   }
 
