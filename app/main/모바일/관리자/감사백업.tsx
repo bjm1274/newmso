@@ -167,20 +167,26 @@ const LogTab = memo(function LogTab({ company }: { company: string }) {
         </span>
       </div>
       <div className="m-card flush">
-        {logs.map((row) => (
-          <div key={row.id} className="m-list-row">
-            <MChip tone={pcToneToMobile(row.tone)}>{row.severity}</MChip>
-            <div>
-              <div className="lbl">{row.title}</div>
-              <div className="sub">
-                {row.actor}
-                {row.target ? ` · ${row.target}` : ''}
-                {row.at ? ` · ${row.at}` : ''}
-              </div>
-            </div>
-            <MIcon name="chevR" size={18} color="var(--z-400)" />
+        {logs.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: 'var(--z-500)' }}>
+            기록된 감사 로그가 없습니다.
           </div>
-        ))}
+        ) : (
+          logs.map((row) => (
+            <div key={row.id} className="m-list-row">
+              <MChip tone={pcToneToMobile(row.tone)}>{row.severity}</MChip>
+              <div>
+                <div className="lbl">{row.title}</div>
+                <div className="sub">
+                  {row.actor}
+                  {row.target ? ` · ${row.target}` : ''}
+                  {row.at ? ` · ${row.at}` : ''}
+                </div>
+              </div>
+              <MIcon name="chevR" size={18} color="var(--z-400)" />
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -195,23 +201,29 @@ const AnomalyTab = memo(function AnomalyTab() {
     <div style={{ padding: '14px 16px 0' }}>
       <DesktopHint>처리·차단 액션은 데스크톱에서</DesktopHint>
       <div className="m-card flush" style={{ marginTop: 12 }}>
-        {FALLBACK_ANOMALIES.map((a, i) => {
-          const tone: MChipTone = a.tone === 'danger' ? 'danger' : a.tone === 'warn' ? 'warning' : 'accent';
-          return (
-            <div key={i} className="m-list-row">
-              <div className={'ico-tile tone-' + tone}>
-                <MIcon name="alertTri" size={18} />
-              </div>
-              <div>
-                <div className="lbl">{a.kind}</div>
-                <div className="sub">
-                  {a.who} · {a.when} · {a.reason}
+        {FALLBACK_ANOMALIES.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: 'var(--z-500)' }}>
+            감지된 이상 징후가 없습니다.
+          </div>
+        ) : (
+          FALLBACK_ANOMALIES.map((a, i) => {
+            const tone: MChipTone = a.tone === 'danger' ? 'danger' : a.tone === 'warn' ? 'warning' : 'accent';
+            return (
+              <div key={i} className="m-list-row">
+                <div className={'ico-tile tone-' + tone}>
+                  <MIcon name="alertTri" size={18} />
                 </div>
+                <div>
+                  <div className="lbl">{a.kind}</div>
+                  <div className="sub">
+                    {a.who} · {a.when} · {a.reason}
+                  </div>
+                </div>
+                <MChip tone={tone}>{a.recommend}</MChip>
               </div>
-              <MChip tone={tone}>{a.recommend}</MChip>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

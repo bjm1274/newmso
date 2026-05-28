@@ -42,14 +42,14 @@ export interface AuditSummary {
 }
 
 export const FALLBACK_AUDIT_SUMMARY: AuditSummary = {
-  todayLogs: 1284,
-  todayLogsSub: '로그인 86 · 수정 142 · 조회 1,056',
-  anomalyCount: 3,
-  anomalySub: '대량 수정 1 · 비정상 시간 1 · 권한 외 1',
-  payrollOutlierCount: 2,
-  payrollOutlierSub: '전월 대비 30%+ 차이',
-  lastBackupHoursAgo: 12,
-  lastBackupSub: '자동 백업 정상',
+  todayLogs: 0,
+  todayLogsSub: '로그인 0 · 수정 0 · 조회 0',
+  anomalyCount: 0,
+  anomalySub: '이상 감지 기록 없음',
+  payrollOutlierCount: 0,
+  payrollOutlierSub: '전월 대비 이상치 없음',
+  lastBackupHoursAgo: 0,
+  lastBackupSub: '자동 백업 정보 없음',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -110,13 +110,7 @@ export interface AuditLogItem {
   tone: ChipTone;
 }
 
-const FALLBACK_AUDIT_LOGS: AuditLogItem[] = [
-  { id: 'a1', severity: '심각', title: '관리자 권한 부여', actor: '백정민', target: '홍자비', at: '14:22', tone: 'danger' },
-  { id: 'a2', severity: '경고', title: '급여 정책 변경 (야근수당)', actor: '박유진', target: '5월 정책', at: '13:08', tone: 'warn' },
-  { id: 'a3', severity: '경고', title: '역할 매트릭스 수정', actor: '백정민', target: '팀장 권한', at: '어제', tone: 'warn' },
-  { id: 'a4', severity: '정보', title: '재고 발주 자동 실행', actor: '시스템', target: '3건', at: '어제', tone: 'muted' },
-  { id: 'a5', severity: '정보', title: '백업 완료', actor: '시스템', target: '2.4GB', at: '어제', tone: 'success' },
-];
+const FALLBACK_AUDIT_LOGS: AuditLogItem[] = [];
 
 function pickSeverity(value: unknown): AuditSeverity {
   if (value === '심각' || value === 'critical' || value === 'error') return '심각';

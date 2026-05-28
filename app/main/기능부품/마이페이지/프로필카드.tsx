@@ -388,108 +388,73 @@ export default function MyProfileCard({
       {/* 상세 정보 + 나의 근태/연차 요약 */}
         <div className={hideHeader ? '' : 'pt-3 sm:pt-4'}>
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-5">
-          {/* 인사 관리 정보 */}
-          <div className="space-y-3">
-            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--accent)] pl-3 mb-1">
-              인사 관리 정보
-            </h3>
-            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
-              <InfoItem label="사번" value={user.employee_no} />
-              <InfoItem label="입사일" value={user.join_date} />
-              <InfoItem label="이메일" value={user.email} />
-            </div>
-            {isEditing ? (
-              <>
-                <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
-                  <EditableItem
-                    label="연락처"
-                    value={editForm.phone}
-                    onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
-                    testId="mypage-profile-phone-input"
-                    placeholder="'-' 없이 숫자만 입력"
-                  />
-                  <EditableItem
-                    label="내선번호"
-                    value={editForm.extension}
-                    onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
-                    testId="mypage-profile-extension-input"
-                    placeholder="내선번호 입력"
-                  />
-                  <EditableItem
-                    label="거주지"
-                    value={editForm.address}
-                    onChange={(v: string) => setEditForm((f) => ({ ...f, address: v }))}
-                    testId="mypage-profile-address-input"
-                    placeholder="도로명 주소를 입력하세요"
-                  />
-                </div>
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-4 gap-y-3 pt-1">
-                  <div className="xl:col-span-2 space-y-3">
-                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide block">계좌정보</span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <input
-                        type="text"
-                        data-testid="mypage-profile-bank-name-input"
-                        value={editForm.bank_name}
-                        onChange={(e) =>
-                          setEditForm((f) => ({ ...f, bank_name: e.target.value }))
-                        }
-                        placeholder="은행명"
-                        className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
-                      />
-                      <input
-                        type="text"
-                        data-testid="mypage-profile-bank-account-input"
-                        value={editForm.bank_account}
-                        onChange={(e) =>
-                          setEditForm((f) => ({ ...f, bank_account: e.target.value }))
-                        }
-                        placeholder="계좌번호"
-                        className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
+          {/* 인사 관리 정보 (수정 모드일 때만 정보 수정창 노출, 평상시에는 완전 삭제) */}
+          {isEditing ? (
+            <div className="space-y-3">
+              <h3 className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-widest border-l-4 border-[var(--accent)] pl-3 mb-1">
+                내 정보 수정
+              </h3>
               <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
-                <InfoItem label="연락처" value={showSecret ? user.phone : MASKED_TEXT} isMasked={!showSecret} />
-                <InfoItem label="내선번호" value={user.extension || (user.permissions as Record<string, unknown>)?.extension} />
-                <InfoItem label="거주지" value={showSecret ? user.address : MASKED_TEXT} isMasked={!showSecret} />
-                <InfoItem
-                  label="기본급"
-                  value={
-                    showSecret
-                      ? `₩ ${(user.base_salary || 0).toLocaleString()}`
-                      : MASKED_TEXT
-                  }
-                  isMasked={!showSecret}
+                <EditableItem
+                  label="이메일"
+                  value={editForm.email}
+                  onChange={(v: string) => setEditForm((f) => ({ ...f, email: v }))}
+                  placeholder="이메일 주소 입력"
                 />
-                {showSecret && [
-                  { key: 'meal_allowance', label: '식대 (비과세)' },
-                  { key: 'vehicle_allowance', label: '자가운전 (비과세)' },
-                  { key: 'childcare_allowance', label: '보육수당 (비과세)' },
-                  { key: 'research_allowance', label: '연구활동비 (비과세)' },
-                  { key: 'other_taxfree', label: '기타 비과세' },
-                ].filter(({ key }) => Number(user[key as keyof typeof user] ?? 0) > 0).map(({ key, label }) => (
-                  <InfoItem
-                    key={key}
-                    label={label}
-                    value={`₩ ${(Number(user[key as keyof typeof user]) || 0).toLocaleString()}`}
-                  />
-                ))}
-                <InfoItem
-                  label="계좌정보"
-                  value={
-                    showSecret
-                      ? `${user.bank_name || ''} ${user.bank_account || ''}`.trim()
-                      : MASKED_TEXT
-                  }
-                  isMasked={!showSecret}
+                <EditableItem
+                  label="연락처"
+                  value={editForm.phone}
+                  onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
+                  testId="mypage-profile-phone-input"
+                  placeholder="'-' 없이 숫자만 입력"
+                />
+                <EditableItem
+                  label="내선번호"
+                  value={editForm.extension}
+                  onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
+                  testId="mypage-profile-extension-input"
+                  placeholder="내선번호 입력"
+                />
+                <EditableItem
+                  label="거주지 (주소)"
+                  value={editForm.address}
+                  onChange={(v: string) => setEditForm((f) => ({ ...f, address: v }))}
+                  testId="mypage-profile-address-input"
+                  placeholder="도로명 주소를 입력하세요"
                 />
               </div>
-            )}
-          </div>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-4 gap-y-3 pt-1">
+                <div className="xl:col-span-2 space-y-3">
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide block">계좌정보</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <input
+                      type="text"
+                      data-testid="mypage-profile-bank-name-input"
+                      value={editForm.bank_name}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, bank_name: e.target.value }))
+                      }
+                      placeholder="은행명"
+                      className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
+                    />
+                    <input
+                      type="text"
+                      data-testid="mypage-profile-bank-account-input"
+                      value={editForm.bank_account}
+                      onChange={(e) =>
+                        setEditForm((f) => ({ ...f, bank_account: e.target.value }))
+                      }
+                      placeholder="계좌번호"
+                      className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // 평상시에는 인사 정보 렌더링을 완전히 생략합니다
+            <div className="hidden xl:block"></div>
+          )}
 
           {/* 나의 근태 · 연차 */}
           <div className="space-y-2.5">
