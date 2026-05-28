@@ -37,20 +37,20 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
         try {
             const { data, error } = await supabase
                 .from('staff_evaluations')
-                .select(`
-          *,
-          evaluator:evaluator_id ( name, position )
-        `)
+                .select('*')
                 .eq('staff_id', staffId)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            const formatted = (data || []).map((item: any) => ({
-                ...item,
-                evaluator_name: item.evaluator?.name || '관리자',
-                evaluator_position: item.evaluator?.position || ''
-            }));
+            const formatted = (data || []).map((item: any) => {
+                const evaluator = staffs.find((s: any) => s.id === item.evaluator_id) || (item.evaluator_id === user.id ? user : null);
+                return {
+                    ...item,
+                    evaluator_name: evaluator?.name || '관리자',
+                    evaluator_position: evaluator?.position || ''
+                };
+            });
 
             setEvaluations(formatted);
         } catch (err) {
