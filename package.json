@@ -41,6 +41,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@ast-grep/napi": "^0.43.0",
     "@cloudflare/workers-types": "^4.20260517.1",
     "@next/bundle-analyzer": "^16.1.6",
     "@opennextjs/cloudflare": "^1.19.1",
