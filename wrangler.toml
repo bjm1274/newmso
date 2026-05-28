@@ -34,9 +34,10 @@ NEXT_PUBLIC_FCM_VAPID_KEY = "BCk7ISKIUPeXrOw0GwuRH4a8zBHKdKospS3rCQc5CWxiI8ukae0
 NEXT_PUBLIC_VAPID_PUBLIC_KEY = "BMf4VkZmz6KBu1gqZSPypXMmYurULhlG31-m0F-GO-dH9fkBHkFeyyFLOqcd86M0sRQGxG_eBc7aXsF3yynxMww"
 
 # Cron Triggers
-# Daily full backup stays paused to avoid unnecessary Supabase egress.
+# Daily full backup (KST 00:00 = UTC 15:00) using D1 (no Supabase egress)
 [triggers]
 crons = [
+  "0 15 * * *",   # /api/cron/backup
   "0 17 * * *",   # /api/cron/chat-retention
   "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 8 * * *",    # /api/cron/leave-notice-announcements

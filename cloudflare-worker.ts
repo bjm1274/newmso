@@ -22,6 +22,7 @@ const openNextHandler = handler as OpenNextHandler;
 // wrangler.toml [triggers] crons 와 정확히 일치해야 한다.
 // license-expiry-check 는 별도 cron 이 아니라 push-subscription-cleanup 끝에 통합 실행됨.
 const CRON_ROUTE_BY_SCHEDULE: Record<string, string> = {
+  '0 15 * * *': '/api/cron/backup',
   '0 17 * * *': '/api/cron/chat-retention',
   '0 23 * * *': '/api/cron/chat-push-dispatch',
   '0 8 * * *': '/api/cron/leave-notice-announcements',

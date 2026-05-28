@@ -37,13 +37,6 @@ import {
 
 type AuditTab = 'log' | 'anomaly' | 'payroll' | 'backup';
 
-const TABS: { id: AuditTab; label: string; count?: number }[] = [
-  { id: 'log', label: '감사 로그' },
-  { id: 'anomaly', label: '이상감지', count: 3 },
-  { id: 'payroll', label: '급여 이상치', count: 2 },
-  { id: 'backup', label: '백업·DR' },
-];
-
 export interface 감사백업Props {
   user: ErpUser;
   onBack: () => void;
@@ -53,11 +46,22 @@ export default function 감사백업({ user, onBack }: 감사백업Props) {
   const [tab, setTab] = useState<AuditTab>('log');
   const company = typeof user.company === 'string' ? user.company : '';
   const { summary } = useAuditSummary();
+
+  const anomalyCount = FALLBACK_ANOMALIES.length;
+  const payrollCount = FALLBACK_PAYROLL_OUTLIERS.length;
+
+  const tabs = [
+    { id: 'log' as const, label: '감사 로그' },
+    { id: 'anomaly' as const, label: '이상감지', count: anomalyCount },
+    { id: 'payroll' as const, label: '급여 이상치', count: payrollCount },
+    { id: 'backup' as const, label: '백업·DR' },
+  ];
+
   return (
     <div className="m-screen">
       <MobileHeader title="감사·백업" sub={company || '감사 콘솔'} back={onBack} />
       <div className="m-chip-bar" role="tablist" aria-label="감사·백업 탭">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -67,7 +71,7 @@ export default function 감사백업({ user, onBack }: 감사백업Props) {
             onClick={() => setTab(t.id)}
           >
             {t.label}
-            {typeof t.count === 'number' && (
+            {typeof t.count === 'number' && t.count > 0 && (
               <span className="cnt" style={{ marginLeft: 4 }}>
                 {t.count}
               </span>

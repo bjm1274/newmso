@@ -32,6 +32,7 @@ import {
   type AuditLogRow,
   type ChipTone,
 } from './admin-types';
+import { FALLBACK_ANOMALIES, FALLBACK_PAYROLL_OUTLIERS } from './AuditWorkcenter/fallback';
 
 const Loading = () => (
   <div className="flex items-center justify-center py-20" role="status" aria-label="로딩 중">
@@ -62,30 +63,30 @@ type AuditTabId = 'access' | 'anomaly' | 'salary' | 'backup';
 const FALLBACK_KPI: AdminKpi[] = [
   {
     label: '오늘 로그',
-    value: '1,284',
+    value: '0',
     unit: '건',
-    sub: '로그인 86 · 수정 142 · 조회 1,056',
+    sub: '로그인 0 · 수정 0 · 조회 0',
   },
   {
     label: '이상 감지',
-    value: '3',
+    value: '0',
     unit: '건',
-    sub: '대량 수정 1 · 비정상 시간 1 · 권한 외 1',
-    tone: 'warn',
+    sub: '이상 감지 기록 없음',
+    tone: 'success',
   },
   {
     label: '급여 이상치',
-    value: '2',
+    value: '0',
     unit: '건',
-    sub: '전월 대비 30%+ 차이',
-    tone: 'danger',
+    sub: '전월 대비 이상치 없음',
+    tone: 'success',
   },
   {
     label: '마지막 백업',
-    value: '12',
-    unit: '시간 전',
-    sub: '자동 백업 정상',
-    tone: 'success',
+    value: '-',
+    unit: '',
+    sub: '자동 백업 정보 없음',
+    tone: 'warn',
   },
 ];
 
@@ -156,11 +157,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
 }
 
 // ─── 감사 로그 탭의 미리보기 표 (헤더 카드용) ─────────────────
-const PREVIEW_LOG_ROWS: (AuditLogRow & { tone: ChipTone })[] = [
-  { time: '14:23:48', who: '박유진', action: '급여 정산 결재', target: '2026.5 정산', ip: '192.168.1.42', status: '성공', tone: 'success' },
-  { time: '14:15:22', who: '백민', action: '직원 정보 수정', target: '송소현 (2025-018)', ip: '192.168.1.18', status: '성공', tone: 'success' },
-  { time: '13:32:05', who: '(미인증)', action: '로그인 시도', target: 'admin', ip: '58.224.x.x', status: '실패', tone: 'danger' },
-];
+const PREVIEW_LOG_ROWS: (AuditLogRow & { tone: ChipTone })[] = [];
 
 function AccessLogTab() {
   return (
@@ -178,23 +175,31 @@ function AccessLogTab() {
               </tr>
             </thead>
             <tbody>
-              {PREVIEW_LOG_ROWS.map((r, i) => (
-                <tr key={i} className="border-b border-[var(--border)]/60">
-                  <td className="px-3 py-1.5 tabular-nums text-[10.5px] text-[var(--toss-gray-4)]">
-                    {r.time}
-                  </td>
-                  <td className="px-2 py-1.5 font-bold text-[12px]">{r.who}</td>
-                  <td className="px-2 py-1.5 text-[10.5px] text-[var(--toss-gray-4)]">
-                    {r.action}
-                  </td>
-                  <td className="px-2 py-1.5 text-[10.5px] text-[var(--toss-gray-4)]">
-                    {r.target}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <Chip tone={r.tone}>{r.status}</Chip>
+              {PREVIEW_LOG_ROWS.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-[var(--toss-gray-4)]">
+                    오늘 기록된 주요 로그가 없습니다.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                PREVIEW_LOG_ROWS.map((r, i) => (
+                  <tr key={i} className="border-b border-[var(--border)]/60">
+                    <td className="px-3 py-1.5 tabular-nums text-[10.5px] text-[var(--toss-gray-4)]">
+                      {r.time}
+                    </td>
+                    <td className="px-2 py-1.5 font-bold text-[12px]">{r.who}</td>
+                    <td className="px-2 py-1.5 text-[10.5px] text-[var(--toss-gray-4)]">
+                      {r.action}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10.5px] text-[var(--toss-gray-4)]">
+                      {r.target}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Chip tone={r.tone}>{r.status}</Chip>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -206,17 +211,17 @@ function AccessLogTab() {
   );
 }
 
-const TABS: { id: AuditTabId; label: string; count?: number }[] = [
-  { id: 'access', label: '감사 로그' },
-  { id: 'anomaly', label: '이상 감지', count: 3 },
-  { id: 'salary', label: '급여 이상치', count: 2 },
-  { id: 'backup', label: '백업·복원' },
-];
-
 export default function AuditWorkcenter() {
   const meta = ADMIN_WORKCENTERS.audit;
   const [tab, setTab] = useState<AuditTabId>('access');
   const [kpi, setKpi] = useState<AdminKpi[]>(FALLBACK_KPI);
+
+  const tabs: { id: AuditTabId; label: string; count?: number }[] = [
+    { id: 'access', label: '감사 로그' },
+    { id: 'anomaly', label: '이상 감지', count: FALLBACK_ANOMALIES.length },
+    { id: 'salary', label: '급여 이상치', count: FALLBACK_PAYROLL_OUTLIERS.length },
+    { id: 'backup', label: '백업·복원' },
+  ];
 
   useEffect(() => {
     let alive = true;
@@ -260,7 +265,7 @@ export default function AuditWorkcenter() {
       {/* 항상 보이는 4 KPI 헤더 */}
       <KpiGrid items={kpi} cols={4} />
 
-      <TabBar tabs={TABS} active={tab} onChange={setTab} />
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
 
       {tab === 'access' && <AccessLogTab />}
       {tab === 'anomaly' && <AuditAnomalyTab />}
