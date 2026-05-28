@@ -465,7 +465,7 @@ export default function HRMainView({
               />
             ) : activeMenu === 'payroll' && initialMenu !== 'payroll' ? (
               <ClassicPayrollMain
-                staffs={인사직원목록}
+                staffs={인사직원목록 as any}
                 selectedCo={선택사업체}
                 onRefresh={onRefresh}
                 showAdminPolicyTabs={false}
