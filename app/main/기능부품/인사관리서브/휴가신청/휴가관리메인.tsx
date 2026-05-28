@@ -195,7 +195,7 @@ export default function LeaveManagement({
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === targetLeave.staff_id);
           
           const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = row.status === '승인' || row.status === 'approved';
+            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
             if (!isApproved) return sum;
             
             const type = String(row.leave_type || '').trim().toLowerCase();
@@ -282,7 +282,7 @@ export default function LeaveManagement({
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
           
           const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = row.status === '승인' || row.status === 'approved';
+            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
             if (!isApproved) return sum;
             
             const type = String(row.leave_type || '').trim().toLowerCase();
@@ -367,7 +367,7 @@ export default function LeaveManagement({
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
           
           const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = row.status === '승인' || row.status === 'approved';
+            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
             if (!isApproved) return sum;
             
             const type = String(row.leave_type || '').trim().toLowerCase();
