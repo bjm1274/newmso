@@ -19,6 +19,7 @@ import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_O
 import type { ThreadSummary } from './메신저파생훅';
 import { MessageActionsHost } from './메신저액션서브';
 import { MenuIcon } from './조직도서브/조직도측면창';
+import { useIsMobile } from '@/app/components/useIsMobile';
 
 type PollItem = {
   id: string;
@@ -195,6 +196,8 @@ function MessengerTimelineComponent({
   onMediaLoad,
   onOpenDateJump,
 }: MessengerTimelineProps) {
+  const isMobile = useIsMobile();
+
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
 
@@ -315,205 +318,6 @@ function MessengerTimelineComponent({
       </button>
     </div>
   );
-
-  const renderMessageActions = (
-    message: ChatMessage,
-    isMine: boolean,
-    canOpenReadStatus: boolean,
-    isDeletedMessage: boolean,
-  ) => {
-    const messageId = String(message.id);
-    if (isDeletedMessage || activeActionMessageId !== messageId) return null;
-
-    const isPinnedMessage = pinnedIds.includes(messageId);
-    const isBookmarkedMessage = bookmarkedIds.has(messageId);
-    const openThread = onOpenThreadPanel || onOpenThread;
-
-    return (
-      <div
-        data-chat-active-action-scope="true"
-        data-testid="chat-message-actions-panel"
-        className={`mt-1 flex max-w-[88vw] overflow-x-auto pb-0.5 custom-scrollbar ${
-          isMine ? 'self-end justify-end' : 'self-start justify-start'
-        }`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className={`flex items-center gap-1 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
-          {INLINE_ACTION_REACTIONS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              title={`${emoji} 반응`}
-              aria-label={`${emoji} 반응`}
-              onClick={(event) => {
-                event.stopPropagation();
-                void onToggleReaction(message, emoji);
-                onCloseMessageActions();
-              }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-base shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-            >
-              {emoji}
-            </button>
-          ))}
-          <button
-            type="button"
-            data-testid="chat-message-action-reply"
-            onClick={(event) => {
-              event.stopPropagation();
-              onStartReplyToMessage(message);
-            }}
-            className={inlineActionButtonClass}
-          >
-            답장
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-add-task"
-            onClick={(event) => {
-              event.stopPropagation();
-              void onAddTask(message);
-              onCloseMessageActions();
-            }}
-            className={inlineActionButtonClass}
-          >
-            할일
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-pin"
-            onClick={(event) => {
-              event.stopPropagation();
-              void onTogglePin(message);
-              onCloseMessageActions();
-            }}
-            className={`${inlineActionButtonClass} ${
-              isPinnedMessage ? 'border-amber-300 bg-amber-50 text-amber-700' : ''
-            }`}
-          >
-            {isPinnedMessage ? '해제' : '고정'}
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-copy-text"
-            onClick={(event) => {
-              event.stopPropagation();
-              void copyMessageText(message);
-              onCloseMessageActions();
-            }}
-            className={inlineActionButtonClass}
-          >
-            복사
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-forward"
-            onClick={(event) => {
-              event.stopPropagation();
-              onForwardMessage(message);
-              onCloseMessageActions();
-            }}
-            className={inlineActionButtonClass}
-          >
-            전달
-          </button>
-          {canOpenReadStatus && isMine ? (
-            <button
-              type="button"
-              data-testid="chat-message-action-read-status"
-              onClick={(event) => {
-                event.stopPropagation();
-                (onOpenReadStatusPanel || onLoadReadStatus)(message);
-                onCloseMessageActions();
-              }}
-              className={inlineActionButtonClass}
-            >
-              읽음
-            </button>
-          ) : null}
-          <button
-            type="button"
-            data-testid="chat-message-action-thread"
-            onClick={(event) => {
-              event.stopPropagation();
-              openThread(message);
-              onCloseMessageActions();
-            }}
-            className={inlineActionButtonClass}
-          >
-            스레드
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-copy-link"
-            onClick={(event) => {
-              event.stopPropagation();
-              void onCopyMessageLink(message);
-              onCloseMessageActions();
-            }}
-            className={inlineActionButtonClass}
-          >
-            링크
-          </button>
-          <button
-            type="button"
-            data-testid="chat-message-action-bookmark"
-            onClick={(event) => {
-              event.stopPropagation();
-              void onToggleBookmark(message);
-              onCloseMessageActions();
-            }}
-            className={`${inlineActionButtonClass} ${
-              isBookmarkedMessage ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]' : ''
-            }`}
-          >
-            {isBookmarkedMessage ? '북마크 해제' : '북마크'}
-          </button>
-          {isMine ? (
-            <button
-              type="button"
-              data-testid="chat-message-action-edit"
-              onClick={(event) => {
-                event.stopPropagation();
-                onStartEdit(message);
-                onCloseMessageActions();
-              }}
-              className={inlineActionButtonClass}
-            >
-              수정
-            </button>
-          ) : null}
-          {message.edited_at ? (
-            <button
-              type="button"
-              data-testid="chat-message-action-edit-history"
-              onClick={(event) => {
-                event.stopPropagation();
-                void onOpenEditHistory(message);
-                onCloseMessageActions();
-              }}
-              className={inlineActionButtonClass}
-            >
-              이력
-            </button>
-          ) : null}
-          {isMine ? (
-            <button
-              type="button"
-              data-testid="chat-message-action-delete"
-              onClick={(event) => {
-                event.stopPropagation();
-                void onDeleteMessage(message);
-                onCloseMessageActions();
-              }}
-              className={inlineDangerActionButtonClass}
-            >
-              삭제
-            </button>
-          ) : null}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="relative flex flex-1 min-h-0 flex-col">
@@ -856,7 +660,15 @@ function MessengerTimelineComponent({
                             onClick={(event) => {
                               if (isDeletedMessage) return;
                               event.stopPropagation();
-                              onOpenMessageActions(msg);
+                              if (isMobile) {
+                                const customEvent = new MouseEvent('contextmenu', {
+                                  bubbles: true,
+                                  cancelable: true,
+                                  clientX: event.clientX,
+                                  clientY: event.clientY,
+                                });
+                                event.currentTarget.dispatchEvent(customEvent);
+                              }
                             }}
                             className={`group relative ${
                               isDeletedMessage
@@ -995,7 +807,6 @@ function MessengerTimelineComponent({
                               </span>
                             </div>
                           </div>
-                          {renderMessageActions(msg, isMine, canOpenReadStatus, isDeletedMessage)}
                           {showWardQuickReplies && (
                             <div
                               data-testid={`chat-ward-quick-replies-${msg.id}`}

@@ -49,24 +49,20 @@ const TableRow = memo(function TableRow({ row, active, onPick }: RowProps) {
   const name = row.staff.name ?? '직원';
   return (
     <tr
-      className={`border-b border-[var(--border)] last:border-b-0 transition-colors ${
+      onClick={() => onPick(row)}
+      className={`border-b border-[var(--border)] last:border-b-0 transition-colors cursor-pointer bg-[var(--card)] ${
         active ? 'bg-[var(--muted)]' : 'hover:bg-[var(--muted)]/60'
       }`}
     >
-      <td className="sticky left-0 z-[1] bg-[var(--card)] px-3 py-2">
-        <button
-          type="button"
-          onClick={() => onPick(row)}
-          aria-label={`${name} 잔여 ${row.remaining}일 — 빠른 신청 폼에 채우기`}
-          className="flex items-center gap-2 text-left"
-        >
+      <td className="sticky left-0 z-[1] bg-inherit px-3 py-2">
+        <div className="flex items-center gap-2 text-left">
           <span className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)]/10 text-[10px] font-bold text-[var(--accent)]">
             {name.charAt(0)}
           </span>
           <span className="text-[12px] font-bold text-[var(--foreground)]">
             {name}
           </span>
-        </button>
+        </div>
       </td>
       <td className="px-3 py-2 text-[11px] text-[var(--toss-gray-4)]">
         {row.staff.department ?? '-'}
