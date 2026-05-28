@@ -33,13 +33,15 @@ function InfoItem({
   label,
   value,
   highlight = false,
+  colSpanClass = '',
 }: {
   label: string;
   value?: string;
   highlight?: boolean;
+  colSpanClass?: string;
 }) {
   return (
-    <div className="min-w-0 border-r border-b border-slate-200 bg-white px-3 py-2 print:px-2 print:py-1.5">
+    <div className={`min-w-0 border-r border-b border-slate-200 bg-white px-3 py-2 print:px-2 print:py-1.5 ${colSpanClass}`}>
       <p className="text-[10px] font-bold text-slate-500 print:text-[8.5px]">{label}</p>
       <p
         className={`mt-1 truncate text-[13px] font-extrabold print:text-[10px] ${
@@ -481,13 +483,14 @@ export default function SalaryDetail({
     >
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           [data-testid="salary-detail-card"] {
-            width: 194mm !important;
-            max-width: 194mm !important;
-            min-height: 0 !important;
+            width: 190mm !important;
+            max-width: 190mm !important;
+            height: 270mm !important;
+            min-height: 270mm !important;
             margin: 0 auto !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             break-inside: avoid;
             page-break-inside: avoid;
             color: #020617 !important;
@@ -528,9 +531,7 @@ export default function SalaryDetail({
           <InfoItem label="부서" value={staff?.department} />
           <InfoItem label="직위" value={staff?.position} />
           <InfoItem label="지급월" value={monthLabel} />
-          <InfoItem label="주당 근로시간" value={`${weeklyHours.toLocaleString('ko-KR')}시간`} />
-          <InfoItem label="월 소정근로시간" value={`${monthlyWorkingHours.toLocaleString('ko-KR')}시간`} />
-          <InfoItem label="시급 환산" value={`${hourlyRate.toLocaleString('ko-KR')}원`} highlight />
+          <InfoItem label="시급 환산" value={`${hourlyRate.toLocaleString('ko-KR')}원`} highlight colSpanClass="col-span-3" />
         </div>
 
         <div className="salary-print-avoid mb-4 grid grid-cols-3 overflow-hidden border border-slate-300 print:mb-2">

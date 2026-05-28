@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { logger } from '@/lib/logger';
 
 import { toast } from '@/lib/toast';
@@ -173,6 +173,7 @@ export default function ChatView({
 }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
+  const directMessageLoadTargetRef = useRef<string | null>(null);
   const pendingThreadRootIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
   const readyBottomAlignRoomIdRef = useRef<string | null>(null);
@@ -1337,6 +1338,7 @@ export default function ChatView({
     refreshVisibleMessageBookmarks,
     refreshRoomPinnedMessages,
     refreshRoomPolls,
+    loadMessagesAroundMessage,
   } = useChatRoomDataSync({
     selectedRoomId,
     selectedRoomIdRef,
@@ -1799,6 +1801,59 @@ export default function ChatView({
       }
     }
   }, [clearPendingMessageScrollTimer, messages, scrollToMessage]);
+
+  // 과거 메시지 바로가기 시 해당 메시지 중심의 히스토리를 불러오는 로직 이식
+  useEffect(() => {
+    const targetMsgId = String(pendingScrollMsgIdRef.current || '').trim();
+    if (!targetMsgId) {
+      directMessageLoadTargetRef.current = null;
+      return;
+    }
+    if (!selectedRoomId || !loadMessagesAroundMessage) return;
+    if (String(timelineRoomId || '') !== String(selectedRoomId)) return;
+    if (messages.some((message) => String(message.id) === targetMsgId)) {
+      directMessageLoadTargetRef.current = null;
+      return;
+    }
+
+    const loadKey = `${selectedRoomId}:${targetMsgId}`;
+    if (directMessageLoadTargetRef.current === loadKey) return;
+
+    directMessageLoadTargetRef.current = loadKey;
+    pendingBottomAlignRoomIdRef.current = null;
+    isNearBottomRef.current = false;
+    setShowScrollToLatest(false);
+
+    void loadMessagesAroundMessage(targetMsgId)
+      .then((result) => {
+        if (directMessageLoadTargetRef.current !== loadKey) return;
+        if (result.ok) {
+          pendingScrollMsgIdRef.current = result.messageId || targetMsgId;
+          return;
+        }
+        if (result.reason === 'room-changed') {
+          directMessageLoadTargetRef.current = null;
+          return;
+        }
+        pendingScrollMsgIdRef.current = null;
+        directMessageLoadTargetRef.current = null;
+      })
+      .catch(() => {
+        if (directMessageLoadTargetRef.current === loadKey) {
+          pendingScrollMsgIdRef.current = null;
+          directMessageLoadTargetRef.current = null;
+        }
+      });
+  }, [
+    selectedRoomId,
+    timelineRoomId,
+    loadMessagesAroundMessage,
+    messages,
+    pendingBottomAlignRoomIdRef,
+    pendingScrollMsgIdRef,
+    isNearBottomRef,
+    setShowScrollToLatest,
+  ]);
 
   // fetchDataRef가 항상 최신 fetchData를 가리키게 유지
   useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
