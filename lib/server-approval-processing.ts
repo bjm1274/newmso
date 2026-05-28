@@ -524,6 +524,49 @@ export async function processFinalApprovalEffects(
     }
   }
 
+  if (item.type === '근무표') {
+    try {
+      const assignments = Array.isArray(itemMetaData?.assignments) ? itemMetaData.assignments : [];
+      if (assignments.length > 0) {
+        const companyName = String(itemMetaData?.company_name || item.sender_company || '').trim();
+        const db = await requireD1ForApprovalProcessing('shift_assignments.upsert');
+        const { shift_assignments: shiftAssignmentsTable } = await import('@/lib/db');
+        const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
+
+        for (const a of assignments) {
+          const staffId = String(a.staff_id || '').trim();
+          const workDate = String(a.work_date || '').trim();
+          const shiftId = a.shift_id ? String(a.shift_id).trim() : null;
+          if (!staffId || !workDate) continue;
+
+          // Delete existing to simulate upsert safely without unique index
+          await db
+            .delete(shiftAssignmentsTable)
+            .where(
+              drizzleAnd(
+                drizzleEq(shiftAssignmentsTable.staff_id, staffId),
+                drizzleEq(shiftAssignmentsTable.work_date, workDate)
+              )
+            );
+
+          // Insert new assignment
+          await db
+            .insert(shiftAssignmentsTable)
+            .values({
+              id: crypto.randomUUID(),
+              staff_id: staffId,
+              work_date: workDate,
+              shift_id: shiftId,
+              company_name: companyName || null,
+            });
+        }
+        steps.push('shift_assignments_sync');
+      }
+    } catch (error) {
+      warnings.push(`근무표 배정 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
+    }
+  }
+
   try {
     const officialDocResult = await syncOfficialDocumentLogFromApproval(item);
     if (officialDocResult) {

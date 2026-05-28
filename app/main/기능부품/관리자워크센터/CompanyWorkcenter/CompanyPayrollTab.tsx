@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_PAY_RULES } from './fallback-data';
 import type { RuleRow } from './types';
+import AttendanceDeductionRules from '../../관리자전용서브/근태차감규칙설정';
 
 interface DBPayrollRule {
   id?: string;
@@ -228,6 +229,11 @@ export default function CompanyPayrollTab() {
           </div>
         )}
       </Card>
+
+      <AttendanceDeductionRules
+        selectedCo={selectedCompany}
+        disabled={!selectedCompany}
+      />
     </div>
   );
 }

@@ -130,14 +130,16 @@ export function formatLeaveNoticeMessage({
   endDate?: string | null;
   delegateName?: string | null;
 }) {
+  const resolvedDelegate = String(delegateName || '').trim() || '-';
+  const typeLabel = normalizeLeaveTypeLabel(leaveType);
+  const dateRange = formatLeaveNoticeDateRange(startDate, endDate);
+
   return [
-    `[ ${normalizeLeaveTypeLabel(leaveType)} ]`,
-    `- 성명 : ${String(employeeName || '').trim() || '-'}`,
-    `- 소속 : ${String(department || '').trim() || '-'}`,
-    `- 일시 : ${formatLeaveNoticeDateRange(startDate, endDate)}`,
-    `- 업무대행 : ${String(delegateName || '').trim()}`,
+    `🌴 오늘 [ ${String(department || '').trim() || '-'} ] ${String(employeeName || '').trim() || '-'}님이 휴가(${typeLabel})를 가십니다!`,
+    `- 기간 : ${dateRange}`,
+    `- 업무대행 : ${resolvedDelegate}`,
     '',
-    '업무에 참고 바랍니다.',
+    '오늘 하루 푹 쉬고 돌아오실 수 있도록 급한 용무는 대행자분께 연락 부탁드려요. ☺️'
   ].join('\n');
 }
 

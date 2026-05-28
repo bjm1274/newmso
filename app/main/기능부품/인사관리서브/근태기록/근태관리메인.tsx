@@ -15,6 +15,7 @@ import AttendanceAnomalyPanel from '../휴가신청/근태이상탐지';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import AttendanceBulkEditModal from './근태일괄수정모달';
+import NurseSchedule from '../간호근무표';
 
 type StaffMember = {
   id: string;
@@ -30,7 +31,7 @@ type StaffMember = {
 const ROSTER_CREATOR_POSITIONS = ['간호과장', '간호부장', '실장'];
 const ROSTER_APPROVER_POSITIONS = ['총무부장', '이사'];
 const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
-const LEGACY_ROSTER_APPROVAL_TYPE = 'roster_schedule_approval';
+const LEGACY_ROSTER_APPROVAL_TYPE = '근무표';
 const LEGACY_APPROVAL_PENDING_STATUS = '\uB300\uAE30';
 const LEGACY_APPROVAL_APPROVED_STATUS = '\uC2B9\uC778';
 const LEGACY_APPROVAL_REJECTED_STATUS = '\uBC18\uB824';
@@ -75,10 +76,17 @@ function isMissingRosterWorkflowTableError(error: unknown, tableName: string) {
 }
 
 function mapLegacyApprovalRequest(row: any) {
-  const metaData =
-    row?.meta_data && typeof row.meta_data === 'object' && !Array.isArray(row.meta_data)
-      ? (row.meta_data as Record<string, unknown>)
-      : {};
+  let metaData = row?.meta_data;
+  if (typeof metaData === 'string') {
+    try {
+      metaData = JSON.parse(metaData);
+    } catch {
+      metaData = {};
+    }
+  }
+  if (!metaData || typeof metaData !== 'object' || Array.isArray(metaData)) {
+    metaData = {};
+  }
   const rawStatus = String(row?.status || '').trim();
 
   return {
@@ -400,6 +408,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const [shiftAssignments, setShiftAssignments] = useState<Record<string, string>>({}); // key: `${staff_id}_${work_date}` -> shift_id or ''
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [showShiftWizard, setShowShiftWizard] = useState(false);
 
   // Roster planner
   const [rosterTeam, setRosterTeam] = useState<string>('전체');
@@ -408,6 +417,18 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const [approvalRejectReason, setApprovalRejectReason] = useState('');
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [rosterWarnings, setRosterWarnings] = useState<string[]>([]);
+  const [orgTeams, setOrgTeams] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (viewMode !== 'schedule') return;
+    let query = supabase.from('org_teams').select('*');
+    if (selectedCo !== '전체') {
+      query = query.eq('company_name', selectedCo);
+    }
+    query.then(({ data }) => {
+      setOrgTeams(data || []);
+    });
+  }, [selectedCo, viewMode]);
 
   // Shift Swap State
   const [showSwapModal, setShowSwapModal] = useState(false);
@@ -728,9 +749,27 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   }, [filtered, rosterTeam]);
   const visibleWorkShifts = useMemo(() => {
     const scopedDepartment = rosterTeam === '전체' ? '' : rosterTeam;
+
+    if (scopedDepartment) {
+      const activeTeam = orgTeams.find((t) => t.team_name === scopedDepartment);
+      if (activeTeam?.applicable_shifts) {
+        try {
+          const shiftIds = JSON.parse(activeTeam.applicable_shifts) as string[];
+          if (Array.isArray(shiftIds) && shiftIds.length > 0) {
+            const matched = workShifts.filter((shift: any) => shiftIds.includes(String(shift.id)));
+            if (matched.length > 0) {
+              return matched;
+            }
+          }
+        } catch (e) {
+          console.error('[visibleWorkShifts] applicable_shifts 파싱 오류:', e);
+        }
+      }
+    }
+
     const scopedShifts = filterRosterShiftsForDepartment(scopedDepartment, workShifts as any[]);
     return scopedShifts.length > 0 ? scopedShifts : workShifts;
-  }, [rosterTeam, workShifts]);
+  }, [rosterTeam, workShifts, orgTeams]);
   const toolboxShifts = useMemo(() => {
     const seen = new Set<string>();
     const result: typeof visibleWorkShifts = [];
@@ -921,7 +960,15 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       .filter(([, v]) => v)
       .map(([k, v]) => {
         const [staff_id, work_date] = k.split('_');
-        return { staff_id, work_date, shift_id: v };
+        const staffObj = staffs.find(s => String(s.id) === staff_id);
+        const shiftObj = workShifts.find(w => String(w.id) === v);
+        return {
+          staff_id,
+          staff_name: staffObj?.name || staff_id,
+          work_date,
+          shift_id: v,
+          shift_name: shiftObj?.name || v,
+        };
       });
     if (assignments.length === 0) return toast('근무표에 배정된 근무가 없습니다.', 'warning');
 
@@ -1470,6 +1517,30 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         ? `${weekDates[0]} ~ ${weekDates[weekDates.length - 1]}`
         : selectedMonth;
 
+  if (showShiftWizard) {
+    return (
+      <div className="h-full flex flex-col bg-[var(--page-bg)] animate-in fade-in duration-300">
+        <header className="px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between shrink-0 shadow-sm z-10 sticky top-0">
+          <h3 className="text-sm font-bold text-foreground">3교대 마법사</h3>
+          <button
+            type="button"
+            title="근태관리로 돌아가기"
+            onClick={() => setShowShiftWizard(false)}
+            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-colors focus:outline-none"
+          >
+            ← 돌아가기
+          </button>
+        </header>
+        <div className="flex-1 min-h-0 overflow-auto">
+          <NurseSchedule
+            staffs={staffs}
+            selectedCo={selectedCo}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
     {dialog}
@@ -1568,6 +1639,16 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
                   >
                     {teamList.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
+                  {canCreateRoster && (
+                    <button
+                      type="button"
+                      onClick={() => setShowShiftWizard(true)}
+                      className="px-4 py-2 bg-purple-500/10 text-purple-600 border border-purple-500/20 font-bold text-[11px] rounded-[var(--radius-lg)] shadow-sm hover:bg-purple-500/20 transition-all shrink-0 flex items-center gap-2 focus:outline-none"
+                    >
+                      <MenuIcon name="edit" className="h-4 w-4 shrink-0" />
+                      3교대 마법사
+                    </button>
+                  )}
                 </div>
               </div>
 

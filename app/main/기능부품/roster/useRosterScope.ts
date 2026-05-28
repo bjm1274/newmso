@@ -228,6 +228,22 @@ export function useRosterScope({
     [offShift?.id, workShifts]
   );
 
+  const [orgTeams, setOrgTeams] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!selectedCompany) {
+      setOrgTeams([]);
+      return;
+    }
+    supabase
+      .from('org_teams')
+      .select('*')
+      .eq('company_name', selectedCompany)
+      .then(({ data }) => {
+        setOrgTeams(data || []);
+      });
+  }, [selectedCompany]);
+
   const teamScopedWorkingShifts = useMemo(() => {
     const scopedDepartments = [selectedDepartment, ...includedDepartments]
       .map((department) => String(department || '').trim())
@@ -237,6 +253,28 @@ export function useRosterScope({
 
     const scopedShiftMap = new Map<string, WorkShift>();
     scopedDepartments.forEach((department) => {
+      // 1순위: 선택된 팀에 설정된 applicable_shifts가 있는지 확인
+      const activeTeam = orgTeams.find(t => t.team_name === department);
+      if (activeTeam?.applicable_shifts) {
+        try {
+          const shiftIds = JSON.parse(activeTeam.applicable_shifts) as string[];
+          if (Array.isArray(shiftIds) && shiftIds.length > 0) {
+            const matched = workingShifts.filter((shift) => shiftIds.includes(String(shift.id)));
+            if (matched.length > 0) {
+              matched.forEach((shift) => {
+                if (!scopedShiftMap.has(shift.id)) {
+                  scopedShiftMap.set(shift.id, shift);
+                }
+              });
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('[useRosterScope] applicable_shifts 파싱 오류:', e);
+        }
+      }
+
+      // 2순위 (폴백): 기존의 키워드 기반 필터링
       filterRosterShiftsForDepartment(department, workingShifts, {
         includeOffShift: false,
       }).forEach((shift) => {
@@ -248,7 +286,7 @@ export function useRosterScope({
 
     const scopedShifts = [...scopedShiftMap.values()];
     return scopedShifts.length > 0 ? scopedShifts : workingShifts;
-  }, [includedDepartments, selectedDepartment, workingShifts]);
+  }, [includedDepartments, selectedDepartment, workingShifts, orgTeams]);
 
   const defaultShiftPool =
     teamScopedWorkingShifts.length > 0 ? teamScopedWorkingShifts : workingShifts;

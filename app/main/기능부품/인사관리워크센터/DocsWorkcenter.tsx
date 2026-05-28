@@ -41,7 +41,6 @@ import ContractGenWizard from './DocsWorkcenter/ContractGenWizard';
 import DocsContractSummary from './DocsWorkcenter/DocsContractSummary';
 import DocsGenSummary from './DocsWorkcenter/DocsGenSummary';
 import DocsStoreSummary from './DocsWorkcenter/DocsStoreSummary';
-import DocsCertSummary from './DocsWorkcenter/DocsCertSummary';
 import DocsSubmSummary from './DocsWorkcenter/DocsSubmSummary';
 import type { DocsTabId } from './DocsWorkcenter/types';
 
@@ -349,7 +348,6 @@ export default function DocsWorkcenter({
         )}
         {tab === 'certificate' && (
           <div className="flex flex-col gap-3">
-            <DocsCertSummary />
             <WorkcenterEmbed label="증명서 발급">
               <CertificateGenerator
                 staffs={staffs}

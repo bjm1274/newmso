@@ -4,7 +4,7 @@
  * 화면 렌더링(React)과 분리하여 순수 비즈니스 로직만 보유.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/d1-supabase-compat';
 import { logger } from '@/lib/logger';
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ export async function drawBoardPollPrize(
     }
 
     const winners: BoardPollPrizeWinner[] = selectedIds.map((id) => {
-      const found = (staffRows ?? []).find(
+      const found = ((staffRows as any) ?? []).find(
         (s: { id: unknown; name: unknown }) => String(s.id) === id,
       );
       return { id, name: String(found?.name ?? '알 수 없음') };

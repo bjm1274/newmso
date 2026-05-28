@@ -9,7 +9,7 @@ import {
   shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload,
 } from '@/lib/object-storage-url';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/d1-supabase-compat';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
@@ -17,6 +17,7 @@ import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { uploadBoardAttachmentFile } from '../게시판업로드';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
+import GuideDetailPanel from './GuideDetailPanel';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
 const GUIDE_DISPLAY_NAME = '업무공유';
@@ -421,7 +422,7 @@ function sortGuideTasks(tasks: GuideTask[]) {
 }
 
 async function runGuideMutation<T>(
-  mutation: (payload: Record<string, unknown>) => PromiseLike<{ data: T | null; error: unknown }>,
+  mutation: (payload: Record<string, unknown>) => PromiseLike<any>,
   payload: Record<string, unknown>,
 ) {
   let nextPayload = { ...payload };
@@ -1106,6 +1107,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     }
   }, [activeTeam, canManagePost, editingResourceId, resetComposer, selectedResourceId]);
 
+
+
   const startTaskEdit = useCallback((task: GuideTask) => {
     setEditingTaskId(task.id);
     setTaskTitle(task.title || '');
@@ -1673,130 +1676,14 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         {/* 우측 콘텐츠 영역 */}
         <div className="min-w-0 space-y-3">
           {/* 상세 보기 */}
-          {selectedResource ? (
-            <article data-testid="guide-detail" className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-              {/* 상단 메타 */}
-              <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="badge badge-blue">{getGuideKindLabel(selectedResource.kind)}</span>
-                      <span className="badge badge-gray">{getGuideAudienceLabel(selectedResource.audience)}</span>
-                      <span className="badge badge-gray">{selectedResource.teamName || '미지정'}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedResource.title}</h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[var(--toss-gray-4)]">
-                      <span>{selectedResource.author_name || '작성자 미상'}</span>
-                      <span className="text-[var(--border)]">|</span>
-                      <span>{selectedResource.companyName || activeCompanyLabel || '기본 기관'}</span>
-                      <span className="text-[var(--border)]">|</span>
-                      <span>{formatDate(selectedResource.updated_at || selectedResource.created_at)}</span>
-                    </div>
-                  </div>
-
-                  {canEditSelected && (
-                    <div className="flex gap-1.5">
-                      <button
-                        type="button"
-                        data-testid="guide-edit"
-                        onClick={() => startEdit(selectedResource)}
-                        className="btn-premium-secondary"
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="guide-delete"
-                        onClick={() => void deleteResource(selectedResource)}
-                        className="btn-premium-danger"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {selectedResource.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedResource.keywords.map((keyword) => (
-                      <span key={keyword} className="badge badge-gray">#{keyword}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 본문 */}
-              <div className="space-y-4 p-4">
-                <section className="space-y-2">
-                  <h4 className="text-xs font-bold text-[var(--toss-gray-5)]">프로세스 설명</h4>
-                  <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3 text-[13px] font-medium leading-7 text-[var(--foreground)] whitespace-pre-wrap">
-                    {selectedResource.description || '설명 없음'}
-                  </div>
-                </section>
-
-                <section className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-[var(--toss-gray-5)]">첨부 자료</h4>
-                    <span className="text-[11px] font-semibold text-[var(--toss-gray-4)]">{selectedResource.attachments.length}개</span>
-                  </div>
-                  {selectedResource.attachments.length === 0 ? (
-                    <EmptyState
-                      title="첨부파일이 없습니다"
-                      description="이미지, 영상, 문서가 첨부되면 이 영역에 바로 표시됩니다."
-                      compact
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="grid gap-2 md:grid-cols-2">
-                        {selectedResource.attachments.map((attachment, index) => (
-                          <a
-                            key={`${attachment.url}-${index}`}
-                            href={buildStorageDownloadUrl(attachment.url, attachment.name)}
-                            onClick={(event) => void handleAttachmentDownloadClick(event, attachment.url, attachment.name)}
-                            download={attachment.name}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 transition-colors hover:border-[var(--accent)]"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] font-bold text-[var(--foreground)]">{attachment.name}</p>
-                              <p className="mt-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
-                                {attachment.type === 'image' ? '이미지' : attachment.type === 'video' ? '동영상' : '파일'}
-                              </p>
-                            </div>
-                            <span className="badge badge-blue shrink-0">열기</span>
-                          </a>
-                        ))}
-                      </div>
-
-                      {selectedResource.attachments.some((attachment) => attachment.type === 'image') && (
-                        <div className="grid gap-2 md:grid-cols-2">
-                          {selectedResource.attachments
-                            .filter((attachment) => attachment.type === 'image')
-                            .map((attachment, index) => (
-                              <a
-                                key={`${attachment.url}-preview-${index}`}
-                                href={attachment.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]"
-                              >
-                                <img src={attachment.url} alt={attachment.name} className="h-40 w-full object-cover" />
-                              </a>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </article>
-          ) : (
-            <EmptyState
-              title="공유자료를 선택해 주세요"
-              description="왼쪽 목록에서 자료를 선택하면 상세 정보와 첨부 자료를 확인할 수 있습니다."
-            />
-          )}
+          <GuideDetailPanel
+            selectedResource={selectedResource}
+            activeCompanyLabel={activeCompanyLabel}
+            canEditSelected={canEditSelected}
+            onEdit={startEdit}
+            onDelete={deleteResource}
+            onAttachmentPreview={(attachments, clicked) => window.open(clicked.url, '_blank')}
+          />
 
           {/* 팀별 할일 */}
           <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm" data-testid="guide-team-task-board">

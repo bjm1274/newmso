@@ -89,8 +89,6 @@ function PayrollWorkcenterInner({ initialModule }: { initialModule?: string | nu
       // ignore
     }
   }, [initialModule]);
-  const { yearMonth, setYearMonth, loading } = usePayroll();
-
   const handlePick = useCallback((id: PayrollModuleId) => {
     setCurrent(id);
   }, []);
@@ -108,31 +106,6 @@ function PayrollWorkcenterInner({ initialModule }: { initialModule?: string | nu
   if (!current) {
     return (
       <div className="app-page p-4" data-testid="payroll-view">
-        <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-[20px] font-extrabold text-[var(--foreground)]">급여 워크센터</h1>
-            <p className="text-[12px] text-[var(--toss-gray-4)] mt-0.5">
-              정산·대장·시뮬레이터부터 4대보험·원천징수까지 13개 모듈을 한 곳에서 관리합니다.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-[11px] font-bold text-[var(--toss-gray-4)]" htmlFor="payroll-ym">
-              정산 월
-            </label>
-            <input
-              id="payroll-ym"
-              type="month"
-              value={yearMonth}
-              onChange={(e) => setYearMonth(e.target.value)}
-              className="text-[12px] px-2 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] font-bold text-[var(--foreground)]"
-            />
-            {loading && (
-              <span className="text-[10px] text-[var(--toss-gray-3)]" aria-live="polite">
-                불러오는 중…
-              </span>
-            )}
-          </div>
-        </header>
         <PayrollDashboard onPick={handlePick} />
       </div>
     );

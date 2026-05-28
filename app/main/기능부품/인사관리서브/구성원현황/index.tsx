@@ -759,6 +759,37 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
         weekly_rotation_shift_ids: selectedShiftIds.slice(1),
         secondary_shift_id: selectedShiftIds[1] || null,
       };
+      // ── 주민번호 기반 생일 자동 추출 ──────────────────────────────
+      let birthDateStr: string | null = null;
+      if (신규직원.주민번호) {
+        const digits = String(신규직원.주민번호).replace(/[^0-9]/g, '');
+        if (digits.length >= 7) {
+          const yearPrefix = Number(digits.slice(0, 2));
+          const month = Number(digits.slice(2, 4));
+          const day = Number(digits.slice(4, 6));
+          const genderDigit = digits.slice(6, 7);
+          const century =
+            genderDigit === '1' || genderDigit === '2' || genderDigit === '5' || genderDigit === '6'
+              ? 1900
+              : genderDigit === '3' || genderDigit === '4' || genderDigit === '7' || genderDigit === '8'
+              ? 2000
+              : genderDigit === '9' || genderDigit === '0'
+              ? 1800
+              : null;
+          if (century !== null) {
+            const year = century + yearPrefix;
+            const date = new Date(year, month - 1, day);
+            if (
+              date.getFullYear() === year &&
+              date.getMonth() === month - 1 &&
+              date.getDate() === day
+            ) {
+              birthDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+          }
+        }
+      }
+
       const commonData = {
         name: normalizeStaffName(신규직원.성명),
         phone: 신규직원.전화번호,
@@ -766,6 +797,7 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
         department: 신규직원.팀 === '' ? null : 신규직원.팀,
         position: 신규직원.직함,
         resident_no: 신규직원.주민번호.trim(),
+        birth_date: birthDateStr,
         email: 신규직원.이메일,
         address: 신규직원.주소,
         license: 신규직원.면허사항,

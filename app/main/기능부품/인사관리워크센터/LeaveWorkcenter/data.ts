@@ -165,7 +165,11 @@ export async function fetchLeaveData({
 
   const now = new Date();
   const [balanceRes, requestRes] = await Promise.all([
-    supabase.from('leave_balances').select('*').in('staff_id', staffIds),
+    supabase
+      .from('leave_balances')
+      .select('*')
+      .in('staff_id', staffIds)
+      .eq('year', now.getFullYear()),
     supabase
       .from('leave_requests')
       .select('id, staff_id, leave_type, start_date, end_date, reason, status, created_at')
@@ -202,8 +206,8 @@ export async function fetchLeaveData({
 
   const rows: LeaveStaffRow[] = targetStaff.map((staff) => {
     const balance = balances.get(String(staff.id));
-    const total = balance?.total_days ?? pickNumber(staff.annual_days ?? 0);
-    const used = balance?.used_days ?? pickNumber(staff.annual_used ?? 0);
+    const total = balance?.total_days ?? pickNumber(staff.annual_leave_total ?? staff.annual_days ?? 0);
+    const used = balance?.used_days ?? pickNumber(staff.annual_leave_used ?? staff.annual_used ?? 0);
     const remaining = balance?.remaining_days ?? Math.max(0, total - used);
     const expiry = balance?.expiry_date ?? null;
     const daysUntilExpiry = balance?.days_until_expiry ?? 365;

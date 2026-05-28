@@ -64,6 +64,7 @@ type MessengerDrawerProps = {
   onCancelEditingRoomName: () => void;
   onStartEditingRoomName: () => void;
   onLeaveRoom: () => void;
+  onOpenStaffProfile?: (staff: StaffMember) => void;
 };
 
 const COLLAPSED_LIMITS: Record<DrawerSectionKey, number> = {
@@ -195,6 +196,7 @@ function MessengerDrawerImpl({
   onCancelEditingRoomName,
   onStartEditingRoomName,
   onLeaveRoom,
+  onOpenStaffProfile,
 }: MessengerDrawerProps) {
   const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
 
@@ -307,10 +309,14 @@ function MessengerDrawerImpl({
                 const photoUrl = getProfilePhotoUrl(resolvedMember);
 
                 return (
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (resolvedMember) onOpenStaffProfile?.(resolvedMember);
+                    }}
                     data-testid={`chat-room-member-${memberId}`}
                     key={memberId}
-                    className="group relative"
+                    className="group relative focus-visible:outline-none hover:opacity-85 transition-opacity"
                     title={resolvedMember?.name || '이름 없음'}
                   >
                     <div className={`chat-mem tone-${tone}`}>
@@ -328,7 +334,8 @@ function MessengerDrawerImpl({
                       <button
                         type="button"
                         data-testid={`chat-remove-member-${memberId}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation(); // 모달 팝업 방지
                           void onRemoveRoomMember(memberId);
                         }}
                         aria-label={`${resolvedMember?.name || '멤버'} 내보내기`}
@@ -337,7 +344,7 @@ function MessengerDrawerImpl({
                         ×
                       </button>
                     ) : null}
-                  </div>
+                  </button>
                 );
               })}
             </div>

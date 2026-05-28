@@ -44,6 +44,8 @@ export interface StaffMember {
   gender?: string | null;
   annual_days?: number | null;
   annual_used?: number | null;
+  annual_leave_total?: number | null;
+  annual_leave_used?: number | null;
   salary?: number | null;
   presence_status?: 'online' | 'away' | 'offline' | null;
   permissions?: StaffPermissions | null;

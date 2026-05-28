@@ -169,7 +169,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
   }
   const db = getD1Drizzle(d1);
 
-  const targetDate = getTimeZoneDateKeyOffset(1, LEAVE_NOTICE_TIMEZONE, now);
+  const targetDate = getTimeZoneDateKeyOffset(0, LEAVE_NOTICE_TIMEZONE, now);
   const approvals = await fetchApprovedLeaveApprovals(db);
   const dueApprovals = approvals.filter((approval) => {
     const leaveMeta = extractLeaveRequestMeta(

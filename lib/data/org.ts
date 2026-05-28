@@ -60,6 +60,7 @@ export type OrgTeam = {
   division: string;
   team_name: string;
   sort_order: number | null;
+  applicable_shifts?: string | null;
 };
 
 /**
@@ -99,6 +100,7 @@ export type OrgTeamCreateInput = {
   division: string;
   team_name: string;
   sort_order: number;
+  applicable_shifts?: string | null;
 };
 
 async function requireOrgD1() {
@@ -124,6 +126,7 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
         team_name: input.team_name,
         sort_order: input.sort_order,
         created_at: new Date().toISOString(),
+        applicable_shifts: input.applicable_shifts || null,
       });
       if (error) throw error;
       invalidateOrgTeams(input.company_name);
@@ -138,6 +141,7 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
       team_name: input.team_name,
       sort_order: input.sort_order,
       created_at: new Date().toISOString(),
+      applicable_shifts: input.applicable_shifts || null,
     });
     invalidateOrgTeams(input.company_name);
     return { error: null };
@@ -170,3 +174,53 @@ export async function deleteOrgTeam(id: string, company?: string): Promise<{ err
     return { error };
   }
 }
+
+export type OrgTeamUpdateInput = {
+  id: string;
+  company_name: string;
+  division: string;
+  team_name: string;
+  sort_order?: number;
+  applicable_shifts?: string | null;
+};
+
+/**
+ * 팀 수정. 성공 시 해당 회사의 org:teams 캐시 자동 무효화.
+ */
+export async function updateOrgTeam(input: OrgTeamUpdateInput): Promise<{ error: Error | null }> {
+  try {
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    if (typeof window !== 'undefined') {
+      const { supabase: sb } = await import('@/lib/supabase');
+      const { error } = await sb
+        .from('org_teams')
+        .update({
+          division: input.division,
+          team_name: input.team_name,
+          sort_order: input.sort_order,
+          applicable_shifts: input.applicable_shifts || null,
+        })
+        .eq('id', input.id);
+      if (error) throw error;
+      invalidateOrgTeams(input.company_name);
+      return { error: null };
+    }
+    // 서버: D1 binding 직접 사용
+    const db = await requireOrgD1();
+    await db
+      .update(orgTeamsTable)
+      .set({
+        division: input.division,
+        team_name: input.team_name,
+        sort_order: input.sort_order,
+        applicable_shifts: input.applicable_shifts || null,
+      })
+      .where(eq(orgTeamsTable.id, input.id));
+    invalidateOrgTeams(input.company_name);
+    return { error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { error };
+  }
+}
+

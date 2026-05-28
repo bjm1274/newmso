@@ -7,7 +7,7 @@
  *  - 4 chip-bar (경조사 / 건강검진 / 면허·자격 / 의료기기)
  *  - 만료 임감 D-day chip 강조.
  *
- * 데이터: useWelfareBundle (family_events / health_checkups / licenses / medical_devices).
+ * 데이터: useWelfareBundle (congratulations_condolences / health_checkups / licenses / medical_devices).
  *
  * JM6: chip-bar 버튼은 aria-pressed 사용.
  */

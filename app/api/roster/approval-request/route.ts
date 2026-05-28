@@ -17,7 +17,7 @@ const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD8
 const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
 const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
 const DIRECTOR_POSITION = '\uC774\uC0AC';
-const ROSTER_APPROVAL_TYPE = 'roster_schedule_approval';
+const ROSTER_APPROVAL_TYPE = '\uADFC\uBB34\uD45C'; // '근무표'
 const LEGACY_APPROVAL_PENDING_STATUS = '\uB300\uAE30';
 const ADMIN_LIKE_POSITIONS = ['\uCD5C\uACE0\uAD00\uB9AC\uC790', '\uC2DC\uC2A4\uD15C\uAD00\uB9AC\uC790', '\uB300\uD45C', '\uAD00\uB9AC\uC790'];
 
@@ -61,13 +61,21 @@ type NotificationInsertRow = {
 };
 
 function canRequestRosterApproval(user: SessionUser | null | undefined) {
-  const position = String(user?.position || '').trim();
-  const role = String(user?.role || '').trim().toLowerCase();
-  return (
+  if (!user) return false;
+  const position = String(user.position || '').trim();
+  const role = String(user.role || '').trim().toLowerCase();
+  const userPermissions = user.permissions || {};
+
+  const explicitRosterCreatePermission = Object.prototype.hasOwnProperty.call(userPermissions, 'hr_근무표생성')
+    ? userPermissions.hr_근무표생성 === true
+    : null;
+
+  const canCreateRosterByPosition =
     ROSTER_CREATOR_POSITIONS.includes(position) ||
     ['admin', 'master'].includes(role) ||
-    ADMIN_LIKE_POSITIONS.includes(position)
-  );
+    ADMIN_LIKE_POSITIONS.includes(position);
+
+  return explicitRosterCreatePermission ?? canCreateRosterByPosition;
 }
 
 function normalizeAssignments(assignments: ApprovalAssignment[] = []) {
@@ -333,6 +341,8 @@ async function insertLegacyApprovalRequest(params: {
   if (!d1) throw new Error('[roster/approval-request] D1 binding not available (insertLegacyApprovalRequest)');
   const db = getD1Drizzle(d1);
   const newId = crypto.randomUUID();
+  const docNumber = `ROSTER-${yearMonth.replace('-', '')}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+
   const metaDataObj = {
     type: 'approval',
     approval_view: 'roster_schedule',
@@ -343,7 +353,12 @@ async function insertLegacyApprovalRequest(params: {
     year_month: yearMonth,
     assignments,
     approver_line: approverIds,
+    form_slug: 'roster',
+    form_name: '\uADFC\uBB34\uD45C', // '근무표'
+    doc_number: docNumber,
+    revision: 1,
   };
+
   await db.insert(approvalsTable).values({
     id: newId,
     sender_id: requestedBy,
@@ -355,6 +370,8 @@ async function insertLegacyApprovalRequest(params: {
     content: `${requestedByName}\uB2D8\uC758 ${teamName} ${yearMonth} \uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD\uC785\uB2C8\uB2E4.`,
     status: LEGACY_APPROVAL_PENDING_STATUS,
     meta_data: JSON.stringify(metaDataObj),
+    approver_line: JSON.stringify(approverIds),
+    doc_number: docNumber,
     created_at: new Date().toISOString(),
   });
   return newId;
@@ -445,52 +462,25 @@ export async function POST(request: Request) {
     }
 
     let requestId = '';
-    let storage: 'roster_approval_requests' | 'approvals' = 'roster_approval_requests';
+    let storage: 'roster_approval_requests' | 'approvals' = 'approvals';
 
-    {
-      // D1: roster_approval_requests \uC9C1\uC811 INSERT
-      const d1 = await getD1Binding();
-      if (!d1) {
-        return NextResponse.json({ error: 'D1 binding not available (roster_approval_requests)' }, { status: 500 });
-      }
-      const db = getD1Drizzle(d1);
-      try {
-        const newRosterId = crypto.randomUUID();
-        await db.insert(rosterApprovalRequestsTable).values({
-          id: newRosterId,
-          company_name: companyName || null,
-          team_name: teamName,
-          year_month: yearMonth,
-          assignments: JSON.stringify(assignments),
-          requested_by: requestedBy,
-          requested_by_name: requestedByName,
-          status: 'pending',
-          created_at: now,
-          updated_at: now,
-        });
-        requestId = newRosterId;
-      } catch (d1InsertError) {
-        // roster_approval_requests\uAC00 D1\uC5D0 \uC5C6\uC73C\uBA74 approvals\uB85C \uD3F4\uBC31
-        storage = 'approvals';
-        try {
-          requestId = await insertLegacyApprovalRequest({
-            companyName,
-            teamName,
-            yearMonth,
-            assignments,
-            requestedBy,
-            requestedByName,
-            approverIds,
-          });
-        } catch (legacyInsertError) {
-          const message =
-            legacyInsertError instanceof Error
-              ? legacyInsertError.message
-              : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
-          console.error('D1 roster approval insert fallback failed:', d1InsertError, legacyInsertError);
-          return NextResponse.json({ error: message }, { status: 500 });
-        }
-      }
+    try {
+      requestId = await insertLegacyApprovalRequest({
+        companyName,
+        teamName,
+        yearMonth,
+        assignments,
+        requestedBy,
+        requestedByName,
+        approverIds,
+      });
+    } catch (legacyInsertError) {
+      const message =
+        legacyInsertError instanceof Error
+          ? legacyInsertError.message
+          : '\uADFC\uBB34\uD45C \uC2B9\uC778\uC694\uCCAD \uC800\uC7A5 \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.';
+      console.error('D1 roster approval insert failed:', legacyInsertError);
+      return NextResponse.json({ error: message }, { status: 500 });
     }
 
     const notificationRows = buildApprovalNotificationRows({

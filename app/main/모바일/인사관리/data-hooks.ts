@@ -403,7 +403,7 @@ export function useWelfareBundle(company: string | undefined) {
         const useCompany = Boolean(company) && company !== '전체';
 
         let familyQ = supabase
-          .from('family_events')
+          .from('congratulations_condolences')
           .select(
             'id, staff_id, staff_name, event_type, event_date, amount, relation, status, company',
           )

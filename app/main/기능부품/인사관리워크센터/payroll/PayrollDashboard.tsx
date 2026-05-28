@@ -69,7 +69,7 @@ function deriveSettlementSteps(
 
 export default function PayrollDashboard({ onPick }: Props) {
   const data = usePayrollData();
-  const { loading } = usePayroll();
+  const { loading, yearMonth, setYearMonth } = usePayroll();
 
   const kpis = useMemo(() => calculateKpis(data), [data]);
   const alerts = useMemo(() => detectAlerts(data), [data]);
@@ -101,7 +101,6 @@ export default function PayrollDashboard({ onPick }: Props) {
     [kpis, diffPct, data.yearMonth],
   );
 
-  const monthLabel = formatMonthLabel(data.yearMonth);
   const totalLabel = grossSum.toLocaleString();
 
   return (
@@ -114,7 +113,7 @@ export default function PayrollDashboard({ onPick }: Props) {
         </div>
       )}
 
-      {/* ── 1. 다크 hero ─────────────────────────── */}
+      {/* ── 1. 다크 hero ────────────────────────── */}
       <section
         className="
           rounded-[var(--radius-lg)] overflow-hidden
@@ -124,8 +123,33 @@ export default function PayrollDashboard({ onPick }: Props) {
         "
       >
         <div>
-          <div className="text-[11px] text-[var(--zinc-400)] font-medium">
-            이번 달 정산 · {monthLabel}
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--zinc-400)] font-medium mb-1.5">
+            <span>이번 달 정산</span>
+            <span className="text-[var(--zinc-600)]" aria-hidden="true">|</span>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="payroll-ym" className="font-semibold text-[var(--zinc-400)] cursor-pointer">
+                정산 월
+              </label>
+              <input
+                id="payroll-ym"
+                type="month"
+                value={yearMonth}
+                onChange={(e) => setYearMonth(e.target.value)}
+                className="
+                  text-[11px] px-2 py-0.5 rounded-[var(--radius-sm)]
+                  border border-[var(--zinc-700)] bg-[var(--zinc-800)]
+                  font-bold text-white
+                  focus:outline-none focus:ring-1 focus:ring-[var(--accent)]
+                  cursor-pointer
+                  [color-scheme:dark]
+                "
+              />
+              {loading && (
+                <span className="text-[10px] text-[var(--zinc-500)] animate-pulse" aria-live="polite">
+                  불러오는 중…
+                </span>
+              )}
+            </div>
           </div>
           <div className="mt-1 text-[20px] font-extrabold">
             정산 중 <span className="ml-1 text-[14px] font-semibold text-[var(--zinc-300)]">{done}/5 단계</span>

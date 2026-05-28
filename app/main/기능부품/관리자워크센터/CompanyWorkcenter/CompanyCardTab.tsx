@@ -38,7 +38,7 @@ export default function CompanyCardTab() {
         .select('issuer,card_nickname,last_four,status,company_name,id')
         .limit(100);
       
-      if (error || !Array.isArray(data) || data.length === 0) {
+      if (error || !Array.isArray(data)) {
         setRows(FALLBACK_CARDS);
       } else {
         const list = data.filter(isRecord).map((r, index): CorpCardRow => {
@@ -206,38 +206,46 @@ export default function CompanyCardTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
-                  const tone = r.status === '한도 임박' ? 'warn' : r.status === '정지' ? 'danger' : 'success';
-                  return (
-                    <tr
-                      key={r.card}
-                      className="border-b border-[var(--border)]/60 hover:bg-[var(--muted)]"
-                    >
-                      <td className="px-2 py-2 font-bold tabular-nums">{r.card}</td>
-                      <td className="px-2 py-2">{r.user}</td>
-                      <td className="px-2 py-2 tabular-nums">{r.usedM}M</td>
-                      <td className="px-2 py-2 tabular-nums text-[var(--toss-gray-4)]">{r.limitM}M</td>
-                      <td className="px-2 py-2">
-                        <div
-                          className="flex items-center gap-1.5"
-                          role="progressbar"
-                          aria-valuenow={r.pct}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={`${r.card} 사용률 ${r.pct}%`}
-                        >
-                          <div className="w-20">
-                            <ProgressBar value={r.pct} tone={r.pct > 90 ? 'danger' : r.pct > 70 ? 'warn' : 'accent'} />
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[12px] text-[var(--toss-gray-4)] font-semibold">
+                      등록된 법인카드가 없습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => {
+                    const tone = r.status === '한도 임박' ? 'warn' : r.status === '정지' ? 'danger' : 'success';
+                    return (
+                      <tr
+                        key={r.card}
+                        className="border-b border-[var(--border)]/60 hover:bg-[var(--muted)]"
+                      >
+                        <td className="px-2 py-2 font-bold tabular-nums">{r.card}</td>
+                        <td className="px-2 py-2">{r.user}</td>
+                        <td className="px-2 py-2 tabular-nums">{r.usedM}M</td>
+                        <td className="px-2 py-2 tabular-nums text-[var(--toss-gray-4)]">{r.limitM}M</td>
+                        <td className="px-2 py-2">
+                          <div
+                            className="flex items-center gap-1.5"
+                            role="progressbar"
+                            aria-valuenow={r.pct}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`${r.card} 사용률 ${r.pct}%`}
+                          >
+                            <div className="w-20">
+                              <ProgressBar value={r.pct} tone={r.pct > 90 ? 'danger' : r.pct > 70 ? 'warn' : 'accent'} />
+                            </div>
+                            <span className="text-[10.5px] tabular-nums text-[var(--toss-gray-4)]">{r.pct}%</span>
                           </div>
-                          <span className="text-[10.5px] tabular-nums text-[var(--toss-gray-4)]">{r.pct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Chip tone={tone}>{r.status}</Chip>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-2 py-2">
+                          <Chip tone={tone}>{r.status}</Chip>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

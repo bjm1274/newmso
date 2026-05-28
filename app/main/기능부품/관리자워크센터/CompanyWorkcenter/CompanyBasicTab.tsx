@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Card, Chip, SmBtn } from '../admin-workcenter-common';
+import TeamManager from '../../관리자전용서브/팀관리';
 
 interface CompanyData {
   id: string;
@@ -379,6 +380,15 @@ export default function CompanyBasicTab() {
           )}
         </Card>
       </div>
+
+      {info && (
+        <TeamManager
+          selectedCompany={info.name}
+          hideCompanySelect
+          embedded
+          disabled={!info.name}
+        />
+      )}
 
       {/* ─── 새 회사 추가 모달 ─── */}
       {showAddModal && (

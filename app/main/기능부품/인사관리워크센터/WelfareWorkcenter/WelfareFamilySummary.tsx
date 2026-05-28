@@ -6,7 +6,7 @@
  * 좌: 최근 경조사 hr-family-list 4행 (이름 + 유형 chip + 일자)
  * 우: 경조사 규정 hr-rules 5규칙 (이름/일수·금액)
  *
- * 데이터: family_events 또는 인접 테이블에서 최근 4건 fetch.
+ * 데이터: congratulations_condolences 또는 인접 테이블에서 최근 4건 fetch.
  * 규정: 정적 (회사 정책)
  *
  * JM3: fetch 실패 시 inline 메시지, 풀 화면(CongratulationsCondolences)이 폴백
@@ -55,7 +55,7 @@ export default function WelfareFamilySummary() {
       setErrMsg(null);
       try {
         const { data, error } = await supabase
-          .from('family_events')
+          .from('congratulations_condolences')
           .select('id, staff_name, event_type, event_date')
           .order('event_date', { ascending: false })
           .limit(4);

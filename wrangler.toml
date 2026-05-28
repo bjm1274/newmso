@@ -40,9 +40,8 @@ crons = [
   "0 15 * * *",   # /api/cron/backup
   "0 17 * * *",   # /api/cron/chat-retention
   "0 23 * * *",   # /api/cron/chat-push-dispatch
-  "0 8 * * *",    # /api/cron/leave-notice-announcements
   "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
-  "0 0 * * *",    # /api/cron/unread-notification-repush (KST 09:00 — 안 읽은 공지/결재 1회 재알림)
+  "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements
 ]
 
 # Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)

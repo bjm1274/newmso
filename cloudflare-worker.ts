@@ -21,13 +21,16 @@ const openNextHandler = handler as OpenNextHandler;
 
 // wrangler.toml [triggers] crons 와 정확히 일치해야 한다.
 // license-expiry-check 는 별도 cron 이 아니라 push-subscription-cleanup 끝에 통합 실행됨.
-const CRON_ROUTE_BY_SCHEDULE: Record<string, string> = {
-  '0 15 * * *': '/api/cron/backup',
-  '0 17 * * *': '/api/cron/chat-retention',
-  '0 23 * * *': '/api/cron/chat-push-dispatch',
-  '0 8 * * *': '/api/cron/leave-notice-announcements',
-  '0 3 * * *': '/api/cron/push-subscription-cleanup',
-  '0 0 * * *': '/api/cron/unread-notification-repush',
+const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
+  '0 15 * * *': ['/api/cron/backup'],
+  '0 17 * * *': ['/api/cron/chat-retention'],
+  '0 23 * * *': ['/api/cron/chat-push-dispatch'],
+  '0 3 * * *': ['/api/cron/push-subscription-cleanup'],
+  '0 0 * * *': [
+    '/api/cron/unread-notification-repush',
+    '/api/cron/leave-notice-announcements',
+    '/api/cron/birthday-announcements'
+  ],
 };
 
 async function callCronRoute(
@@ -67,12 +70,14 @@ const worker = {
     env: WorkerEnv,
     context: WorkerExecutionContext,
   ) {
-    const route = CRON_ROUTE_BY_SCHEDULE[controller.cron];
-    if (!route) return;
+    const routes = CRON_ROUTES_BY_SCHEDULE[controller.cron] || [];
+    if (routes.length === 0) return;
 
-    const task = callCronRoute(route, controller.cron, env, context);
-    context.waitUntil?.(task);
-    await task;
+    const tasks = routes.map((route) => callCronRoute(route, controller.cron, env, context));
+    for (const task of tasks) {
+      context.waitUntil?.(task);
+    }
+    await Promise.all(tasks);
   },
 };
 

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { EmptyState } from '@/app/components/StatePanel';
+import { ANESTHESIA_OPTIONS } from './op-check-types';
 
 type StatusTabOption = {
   value: string;
@@ -492,14 +493,19 @@ export function OpCheckWorkspaceMetaPanel({
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
           마취 유형
-          <input
+          <select
             data-testid="op-check-anesthesia-select"
-            list="op-check-anesthesia-options"
             value={anesthesiaType}
             onChange={(event) => onAnesthesiaTypeChange(event.target.value)}
-            placeholder="예: 전신마취"
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-sm font-medium"
-          />
+            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-sm font-semibold text-[var(--foreground)] outline-none cursor-pointer"
+          >
+            <option value="">선택 안 함</option>
+            {ANESTHESIA_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className="flex flex-wrap items-center gap-1.5">

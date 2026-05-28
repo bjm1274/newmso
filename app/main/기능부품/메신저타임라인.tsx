@@ -141,6 +141,7 @@ type MessengerTimelineProps = {
   onMediaLoad?: () => void;
   onOpenBoardPost?: (boardType: string, postId: string) => void;
   onOpenDateJump?: (dateKey: string) => void;
+  onOpenStaffProfile?: (staff: StaffMember) => void;
 };
 
 function MessengerTimelineComponent({
@@ -195,6 +196,7 @@ function MessengerTimelineComponent({
   shouldKeepBottomAligned,
   onMediaLoad,
   onOpenDateJump,
+  onOpenStaffProfile,
 }: MessengerTimelineProps) {
   const isMobile = useIsMobile();
 
@@ -445,12 +447,22 @@ function MessengerTimelineComponent({
                     )}
                     <div className={`flex items-end gap-2 ${isMineAlbum ? 'flex-row-reverse' : 'flex-row'}`}>
                       {!isMineAlbum && (
-                        <MessengerAvatar
-                          name={senderName}
-                          photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
-                          className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-4)]"
-                          decorative
-                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const staff = resolveStaffProfile(albumItem.sender_id, senderName);
+                            if (staff) onOpenStaffProfile?.(staff);
+                          }}
+                          className="mb-1 shrink-0 self-end focus-visible:outline-none hover:opacity-85 transition-opacity"
+                          title={senderName}
+                        >
+                          <MessengerAvatar
+                            name={senderName}
+                            photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
+                            className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-4)]"
+                            decorative
+                          />
+                        </button>
                       )}
                       <div className={`group flex flex-col gap-1 max-w-[75%] ${isMineAlbum ? 'items-end' : 'items-start'}`}>
                         {!isMineAlbum && (
@@ -631,14 +643,23 @@ function MessengerTimelineComponent({
                       <div className={`flex ${isMine ? 'max-w-[78%] flex-col items-end md:max-w-[72%]' : 'w-full items-start gap-2'}`}>
                         {!isMine ? (
                           showIncomingAvatar ? (
-                            <div data-testid={`chat-message-sender-avatar-${msg.id}`} className="shrink-0 self-start pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const staff = resolveStaffProfile(msg.sender_id, senderName);
+                                if (staff) onOpenStaffProfile?.(staff);
+                              }}
+                              data-testid={`chat-message-sender-avatar-${msg.id}`}
+                              className="shrink-0 self-start pt-0.5 focus-visible:outline-none hover:opacity-85 transition-opacity"
+                              title={senderName}
+                            >
                               <MessengerAvatar
                                 name={senderName}
                                 photoUrl={senderPhotoUrl}
                                 className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-black/5"
                                 decorative
                               />
-                            </div>
+                            </button>
                           ) : (
                             <div aria-hidden="true" className="w-7 shrink-0" />
                           )

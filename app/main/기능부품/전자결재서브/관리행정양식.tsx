@@ -22,7 +22,8 @@ export default function AdminForms({ staffs, formType, setExtraData }: AdminForm
     '업무기안': "1. 기안 목적:\n2. 주요 내용:\n3. 관련 부서 협조 사항:\n4. 기대 효과:",
     '업무보고': "1. 금주 주요 성과:\n2. 미결 및 지연 사항:\n3. 차주 업무 계획:\n4. 건의 사항:",
     '회의록': "1. 회의 안건:\n2. 논의 내용:\n3. 결정 사항:\n4. 향후 일정:",
-    '업무협조': "상기 부서에 다음과 같이 업무 협조를 요청합니다.\n\n[협조 내용]:"
+    '업무협조': "상기 부서에 다음과 같이 업무 협조를 요청합니다.\n\n[협조 내용]:",
+    '근무표': "[근무표 승인 기안서]\n\n1. 대상 부서: \n2. 대상 년월: \n3. 배정 건수: \n\n상기 부서의 월간 근무표를 확정하여 보고하오니 재가하여 주시기 바랍니다."
   };
   void hospitalGuides;
 
@@ -189,6 +190,29 @@ export default function AdminForms({ staffs, formType, setExtraData }: AdminForm
                 <option>제도 변경</option>
                 <option>기타</option>
               </select>
+            </div>
+          </div>
+        )}
+
+        {/* 📋 6. 근무표: 부서 근무표 승인 서식 */}
+        {formType === '근무표' && (
+          <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-emerald-600 ml-1">대상 년월</label>
+              <input
+                type="month"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-emerald-100"
+                onChange={e => setExtraData((p) => ({ ...p, yearMonth: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-emerald-600 ml-1">대상 부서/팀</label>
+              <input
+                type="text"
+                placeholder="예: 병동팀, 외래팀"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-emerald-100"
+                onChange={e => setExtraData((p) => ({ ...p, teamName: e.target.value }))}
+              />
             </div>
           </div>
         )}

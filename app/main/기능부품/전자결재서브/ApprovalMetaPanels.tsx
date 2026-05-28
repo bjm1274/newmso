@@ -445,3 +445,209 @@ export function ApprovalAttachmentsPanel({ metaData }: { metaData: ApprovalMetaD
     </div>
   );
 }
+
+export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
+  if (!metaData || (metaData.form_name !== '근무표' && metaData.form_slug !== 'roster' && metaData.roster_request_type !== 'monthly_schedule')) {
+    return '';
+  }
+  const yearMonth = String(metaData.year_month || '').trim();
+  const assignments = Array.isArray(metaData.assignments) ? metaData.assignments : [];
+  if (!yearMonth || assignments.length === 0) return '';
+
+  const [year, month] = yearMonth.split('-').map(Number);
+  if (!year || !month) return '';
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // 직원별 일자 배정 맵 구축
+  const staffRowMap = new Map<string, { staffName: string; cells: Record<number, string> }>();
+  assignments.forEach((a: any) => {
+    const staffId = String(a.staff_id || '').trim();
+    const staffName = String(a.staff_name || '').trim() || staffId;
+    const dateStr = String(a.work_date || '').trim();
+    const day = Number(dateStr.slice(8, 10));
+    const shiftName = String(a.shift_name || '').trim();
+
+    if (!staffId || !day) return;
+    if (!staffRowMap.has(staffId)) {
+      staffRowMap.set(staffId, { staffName, cells: {} });
+    }
+    staffRowMap.get(staffId)!.cells[day] = shiftName;
+  });
+
+  const staffRows = Array.from(staffRowMap.values());
+  if (staffRows.length === 0) return '';
+
+  const resolveBand = (shift: string) => {
+    const s = String(shift || '').toLowerCase();
+    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd') return 'day';
+    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e') return 'evening';
+    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n') return 'night';
+    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o') return 'off';
+    return 'day';
+  };
+
+  const getStyleForBand = (band: string) => {
+    switch (band) {
+      case 'day': return 'background:#ecfdf5;color:#047857;border-color:#a7f3d0;';
+      case 'evening': return 'background:#fff7ed;color:#c2410c;border-color:#fed7aa;';
+      case 'night': return 'background:#eef2ff;color:#4338ca;border-color:#c7d2fe;';
+      case 'off': default: return 'background:#f8fafc;color:#64748b;border-color:#e2e8f0;';
+    }
+  };
+
+  const headers = daysArray.map(d => {
+    const dow = new Date(year, month - 1, d).getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const weekendColor = dow === 0 ? 'color:#ef4444' : dow === 6 ? 'color:#3b82f6' : '';
+    return `<th style="text-align:center;padding:4px 2px;font-size:9px;min-width:22px;border:1px solid #cbd5e1;${weekendColor}">
+      <div>${d}</div>
+      <div style="font-size:8px;font-weight:normal;opacity:0.8">${['일','월','화','수','목','금','토'][dow]}</div>
+    </th>`;
+  }).join('');
+
+  const bodyRows = staffRows.map(row => {
+    const cellsHtml = daysArray.map(d => {
+      const shift = row.cells[d] || '휴무';
+      const band = resolveBand(shift);
+      const style = getStyleForBand(band);
+      const shortLabel = band === 'day' ? 'D' : band === 'evening' ? 'E' : band === 'night' ? 'N' : 'OFF';
+      return `<td style="text-align:center;padding:4px 2px;font-size:9px;border:1px solid #cbd5e1;font-weight:bold;${style}" title="${escapeHtml(shift)}">
+        ${shortLabel}
+      </td>`;
+    }).join('');
+
+    return `<tr>
+      <td style="padding:6px 8px;font-size:11px;font-weight:bold;border:1px solid #cbd5e1;background:#f8fafc;white-space:nowrap;">${escapeHtml(row.staffName)}</td>
+      ${cellsHtml}
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="section" style="margin-top:16px;">
+      <div class="section-title" style="font-size:14px;font-weight:bold;margin-bottom:8px;color:#111827;">근무표 배정 상세 (${yearMonth})</div>
+      <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;background:#fff;margin-bottom:12px;">
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="text-align:left;padding:6px 8px;font-size:10px;border:1px solid #cbd5e1;white-space:nowrap;">직원명</th>
+              ${headers}
+            </tr>
+          </thead>
+          <tbody>
+            ${bodyRows}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:12px;font-size:10px;color:#64748b;font-weight:600;margin-top:4px;">
+        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ecfdf5;border:1px solid #a7f3d0;"></span> D · 데이</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fff7ed;border:1px solid #fed7aa;"></span> E · 이브닝</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eef2ff;border:1px solid #c7d2fe;"></span> N · 나이트</span>
+        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f8fafc;border:1px solid #e2e8f0;"></span> OFF · 휴무</span>
+      </div>
+    </div>
+  `;
+}
+
+export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaData }) {
+  if (!metaData || (metaData.form_name !== '근무표' && metaData.form_slug !== 'roster' && metaData.roster_request_type !== 'monthly_schedule')) {
+    return null;
+  }
+  const yearMonth = String(metaData.year_month || '').trim();
+  const assignments = Array.isArray(metaData.assignments) ? metaData.assignments : [];
+  if (!yearMonth || assignments.length === 0) return null;
+
+  const [year, month] = yearMonth.split('-').map(Number);
+  if (!year || !month) return null;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // 직원별 일자 배정 맵 구축
+  const staffRowMap = new Map<string, { staffName: string; cells: Record<number, string> }>();
+  assignments.forEach((a: any) => {
+    const staffId = String(a.staff_id || '').trim();
+    const staffName = String(a.staff_name || '').trim() || staffId;
+    const dateStr = String(a.work_date || '').trim();
+    const day = Number(dateStr.slice(8, 10));
+    const shiftName = String(a.shift_name || '').trim();
+
+    if (!staffId || !day) return;
+    if (!staffRowMap.has(staffId)) {
+      staffRowMap.set(staffId, { staffName, cells: {} });
+    }
+    staffRowMap.get(staffId)!.cells[day] = shiftName;
+  });
+
+  const staffRows = Array.from(staffRowMap.values());
+  if (staffRows.length === 0) return null;
+
+  const resolveBand = (shift: string) => {
+    const s = String(shift || '').toLowerCase();
+    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd') return 'day';
+    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e') return 'evening';
+    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n') return 'night';
+    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o') return 'off';
+    return 'day';
+  };
+
+  const getStyleForBand = (band: string) => {
+    switch (band) {
+      case 'day': return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400';
+      case 'evening': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400';
+      case 'night': return 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/20 dark:text-indigo-400';
+      case 'off': default: return 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900/20 dark:text-slate-400';
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm overflow-hidden">
+      <div className="border-b border-[var(--border)] pb-3 mb-3">
+        <h4 className="text-sm font-bold text-[var(--foreground)]">근무표 배정 상세 ({yearMonth})</h4>
+      </div>
+      <div className="overflow-x-auto border border-[var(--border)] rounded-xl custom-scrollbar">
+        <table className="w-full border-collapse text-left text-[11px]">
+          <thead>
+            <tr className="bg-[var(--tab-bg)] border-b border-[var(--border)] text-[var(--toss-gray-4)] font-bold">
+              <th className="px-3 py-2 border-r border-[var(--border)] whitespace-nowrap sticky left-0 bg-[var(--tab-bg)] z-10">직원명</th>
+              {daysArray.map(d => {
+                const dow = new Date(year, month - 1, d).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const colorCls = dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : '';
+                return (
+                  <th key={d} className={`px-1 py-1.5 text-center border-r border-[var(--border)] min-w-[28px] ${colorCls}`}>
+                    <div>{d}</div>
+                    <div className="text-[8px] font-medium opacity-60">{['일','월','화','수','목','금','토'][dow]}</div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {staffRows.map((row, idx) => (
+              <tr key={idx} className="hover:bg-slate-50/50">
+                <td className="px-3 py-2 border-r border-[var(--border)] font-bold text-[var(--foreground)] whitespace-nowrap sticky left-0 bg-[var(--card)] z-10">{row.staffName}</td>
+                {daysArray.map(d => {
+                  const shift = row.cells[d] || '휴무';
+                  const band = resolveBand(shift);
+                  const styleCls = getStyleForBand(band);
+                  const shortLabel = band === 'day' ? 'D' : band === 'evening' ? 'E' : band === 'night' ? 'N' : 'OFF';
+                  return (
+                    <td key={d} className={`px-1 py-2 text-center border-r border-[var(--border)] font-bold text-[10px] border-l-0 border-t-0 border-b-0 ${styleCls}`} title={shift}>
+                      {shortLabel}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-wrap gap-4 mt-3 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-300"></span> D · 데이</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400 border border-amber-300"></span> E · 이브닝</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-indigo-600 border border-indigo-400"></span> N · 나이트</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-300"></span> OFF · 휴무</span>
+      </div>
+    </div>
+  );
+}

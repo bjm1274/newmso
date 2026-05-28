@@ -167,3 +167,4 @@ class D1ClientImpl {
 }
 
 export const d1Client = new D1ClientImpl();
+export const supabase = d1Client;

@@ -26,8 +26,6 @@ import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterBackButton,
-  WorkcenterDarkBanner,
-  WorkcenterDarkBannerCta,
   WorkcenterEmbed,
   WorkcenterKpiRow,
   WorkcenterShell,
@@ -60,7 +58,7 @@ type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'iss
 
 const ATTEND_TABS: WorkcenterTab<AttendTabId>[] = [
   { id: 'dashboard', label: '대시보드' },
-  { id: 'schedule', label: '근무표 편성', count: 'AI · 3교대' },
+  { id: 'schedule', label: '근무표 편성' },
   { id: 'calendar', label: '달력' },
   { id: 'abnormal', label: '근태이상 감지' },
 ];
@@ -130,28 +128,6 @@ export default function AttendWorkcenter({
     [scopedStaffs, todayRows],
   );
 
-  const scheduleBanner =
-    tab === 'schedule' ? (
-      <WorkcenterDarkBanner
-        kicker="근무표 편성 도구 — 3장 통합"
-        title="월간 근무표 · AI 자동 제안 · 3교대 마법사를 한 흐름으로"
-        description="셀을 클릭해 D→E→N→OFF 토글, 상세 편성은 우측 버튼으로 진입하세요."
-        actions={
-          <>
-            <WorkcenterDarkBannerCta variant="ghost" ariaLabel="이전달 근무표 복제" onClick={() => setLegacyView('schedule')}>
-              이전달 복제
-            </WorkcenterDarkBannerCta>
-            <WorkcenterDarkBannerCta variant="primary" ariaLabel="AI 자동 편성 실행" onClick={() => setLegacyView('schedule')}>
-              ✨ AI 자동 편성
-            </WorkcenterDarkBannerCta>
-            <WorkcenterDarkBannerCta variant="ghost" ariaLabel="3교대 마법사 실행" onClick={() => setLegacyView('schedule')}>
-              3교대 마법사
-            </WorkcenterDarkBannerCta>
-          </>
-        }
-      />
-    ) : null;
-
   if (legacyView) {
     return (
       <WorkcenterShell>
@@ -189,7 +165,6 @@ export default function AttendWorkcenter({
             onChange={setTab}
             label="근태 워크센터 탭"
           />
-          {scheduleBanner}
         </>
       }
     >

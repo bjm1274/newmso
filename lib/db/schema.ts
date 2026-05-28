@@ -1404,6 +1404,7 @@ export const org_teams = sqliteTable("org_teams", {
 	team_name: text().notNull(),
 	sort_order: integer().default(0),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	applicable_shifts: text(),
 });
 
 export const payroll = sqliteTable("payroll", {

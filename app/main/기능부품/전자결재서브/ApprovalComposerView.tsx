@@ -74,7 +74,7 @@ type FormOption = {
   requiresPermission: boolean;
 };
 
-const LEAVE_KEYWORDS = ['연차/휴가', '연차계획서', '연장근무', '출결정정', '연차촉진'];
+const LEAVE_KEYWORDS = ['연차/휴가', '연차계획서', '연장근무', '출결정정', '연차촉진', '근무표'];
 const WORK_KEYWORDS = ['물품', '수리', '보고', '업무', '공문'];
 const PERMISSION_KEYWORDS = ['공문발송'];
 

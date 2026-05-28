@@ -180,14 +180,6 @@ export default function PostTableView({
     return sorted;
   }, [posts, searchKeyword, activeTag, readFilter, sortKey, favorites, isUnread, noticeVisibilityTick]);
 
-  // 통계
-  const stats = useMemo(() => {
-    const total = posts.filter((p) => !isScheduledNoticePending(p, noticeVisibilityTick)).length;
-    const unreadCount = posts.filter((p) => !isScheduledNoticePending(p, noticeVisibilityTick) && isUnread(p)).length;
-    const favoriteCount = posts.filter((p) => favorites.has(String(p.id ?? '').trim())).length;
-    return { total, unread: unreadCount, favorite: favoriteCount };
-  }, [posts, favorites, isUnread, noticeVisibilityTick]);
-
   const handleSortKeyDown = (event: KeyboardEvent<HTMLButtonElement>, key: ReadFilter) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -197,52 +189,8 @@ export default function PostTableView({
 
   return (
     <div className="space-y-3">
-      {/* ── 헤더 ── */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-lg md:text-xl font-bold text-[var(--foreground)] truncate">{boardLabel}</h2>
-          <p className="mt-1 text-[12px] font-semibold text-[var(--toss-gray-3)]">
-            전체 {stats.total}건 · 안 읽음 {stats.unread}건 · 즐겨찾기 {stats.favorite}건
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {/* 검색 — 내부 좌측 search icon (결정 32번) */}
-          <div className="relative">
-            <span
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
-              aria-hidden="true"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="제목·작성자·태그 검색"
-              aria-label="게시물 검색"
-              className="h-9 w-56 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-8 pr-3 text-[12px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
-            />
-          </div>
-
-          {canCreatePost && (
-            <button
-              type="button"
-              data-testid="board-toggle-new-post"
-              onClick={onToggleNewPost}
-              className="h-9 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-[12px] font-bold text-white shadow-sm hover:opacity-95"
-            >
-              {showNewPost ? '취소' : '+ 새 게시물'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── 툴바 ── */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      {/* ── 상단 툴바 (일렬 정리) ── */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between pb-2 border-b border-[var(--border)]">
         {/* 좌: 태그 chip row */}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
@@ -277,19 +225,9 @@ export default function PostTableView({
           })}
         </div>
 
-        {/* 우: 정렬 + segmented */}
-        <div className="flex items-center gap-2">
-          <label className="sr-only" htmlFor="board-sort-select">정렬</label>
-          <select
-            id="board-sort-select"
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-          >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-              <option key={k} value={k}>{SORT_LABELS[k]}</option>
-            ))}
-          </select>
+        {/* 우: 읽음 필터 + 정렬 + 검색 + 새 게시물 */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 읽음 필터 segmented */}
           <div
             role="tablist"
             aria-label="읽음 필터"
@@ -314,6 +252,52 @@ export default function PostTableView({
               );
             })}
           </div>
+
+          {/* 정렬 select */}
+          <label className="sr-only" htmlFor="board-sort-select">정렬</label>
+          <select
+            id="board-sort-select"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+          >
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <option key={k} value={k}>{SORT_LABELS[k]}</option>
+            ))}
+          </select>
+
+          {/* 검색 */}
+          <div className="relative">
+            <span
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+              aria-hidden="true"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              placeholder="제목·작성자·태그 검색"
+              aria-label="게시물 검색"
+              className="h-8 w-44 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-8 pr-3 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
+            />
+          </div>
+
+          {/* 새 게시물 버튼 */}
+          {canCreatePost && (
+            <button
+              type="button"
+              data-testid="board-toggle-new-post"
+              onClick={onToggleNewPost}
+              className="h-8 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-[11px] font-bold text-white shadow-sm hover:opacity-95"
+            >
+              {showNewPost ? '취소' : '+ 새 게시물'}
+            </button>
+          )}
         </div>
       </div>
 

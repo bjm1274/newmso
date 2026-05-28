@@ -12,6 +12,20 @@ export type GuideMetaPayload = {
   divisionName?: string;
   companyName?: string;
   keywords?: string[];
+  collaborativeDepartments?: string[];
+  mobileSummary?: string;
+  workflowDependencies?: Array<{
+    from: string;
+    to: string;
+    taskTemplateId?: string;
+  }>;
+  linkedTaskTemplates?: Array<{
+    id: string;
+    title: string;
+    checked?: boolean;
+    priority?: GuideTaskPriority;
+    dueDate?: string;
+  }>;
 };
 
 export type GuideTaskMetaPayload = {
@@ -42,6 +56,20 @@ export type GuideResource = GuideRow & {
   divisionName: string;
   companyName: string;
   keywords: string[];
+  collaborativeDepartments?: string[];
+  mobileSummary?: string;
+  workflowDependencies?: Array<{
+    from: string;
+    to: string;
+    taskTemplateId?: string;
+  }>;
+  linkedTaskTemplates?: Array<{
+    id: string;
+    title: string;
+    checked?: boolean;
+    priority?: GuideTaskPriority;
+    dueDate?: string;
+  }>;
 };
 
 export type GuideTask = GuideRow & {

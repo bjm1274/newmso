@@ -150,6 +150,32 @@ async function withOptionalQueryFallback<T>(
   };
 }
 
+function mergeChecklistItems(existingItems: ChecklistItemDraft[], nextItems: ChecklistItemDraft[]): ChecklistItemDraft[] {
+  const existingMap = new Map(
+    existingItems.map((item) => [normalizeLookupValue(item.name), item] as const)
+  );
+  const nextKeys = new Set(nextItems.map((item) => normalizeLookupValue(item.name)).filter(Boolean));
+
+  const mergedItems = nextItems.map((item) => {
+    const matched = existingMap.get(normalizeLookupValue(item.name));
+    if (!matched) return item;
+    return {
+      ...item,
+      checked: Boolean(matched.checked),
+      quantity: matched.quantity || item.quantity || '',
+      unit: matched.unit || item.unit || '',
+      note: matched.note || item.note || '',
+    };
+  });
+
+  const customItems = existingItems.filter((item) => {
+    const key = normalizeLookupValue(item.name);
+    return key && !nextKeys.has(key);
+  });
+
+  return dedupeChecklistItems([...mergedItems, ...customItems]);
+}
+
 export default function OperationCheckView({
   user,
   staffs,
@@ -185,6 +211,7 @@ export default function OperationCheckView({
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [hasLoadedInitialDate, setHasLoadedInitialDate] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
@@ -729,14 +756,23 @@ export default function OperationCheckView({
 
   useEffect(() => {
     if (schedulePosts.length === 0) return;
-    if (selectedDate && schedulePosts.some((post) => post.schedule_date === selectedDate)) return;
+    if (hasLoadedInitialDate) return;
+
+    if (selectedDate && schedulePosts.some((post) => post.schedule_date === selectedDate)) {
+      setHasLoadedInitialDate(true);
+      return;
+    }
 
     const preferredDate = findPreferredScheduleDate(schedulePosts);
-    if (!preferredDate) return;
+    if (!preferredDate) {
+      setHasLoadedInitialDate(true);
+      return;
+    }
 
     setSelectedDate(preferredDate);
     setCalendarMonth(new Date(`${preferredDate}T00:00:00`));
-  }, [schedulePosts, selectedDate]);
+    setHasLoadedInitialDate(true);
+  }, [schedulePosts, selectedDate, hasLoadedInitialDate]);
 
   const selectedSchedule = useMemo(
     () => schedulePosts.find((post) => post.id === selectedScheduleId) || null,
@@ -871,6 +907,19 @@ export default function OperationCheckView({
       );
 
       if (existingCheck) {
+        const existingPrep = normalizeChecklistItems(existingCheck.prep_items, 'patient-prep');
+        const existingConsumables = normalizeChecklistItems(existingCheck.consumable_items, 'patient-consumable');
+
+        const existingPrepFiltered = prepItems.length
+          ? existingPrep.filter((item) => String(item.name || '').trim() !== '')
+          : existingPrep;
+        const existingConsumablesFiltered = consumableItems.length
+          ? existingConsumables.filter((item) => String(item.name || '').trim() !== '')
+          : existingConsumables;
+
+        const mergedPrep = mergeChecklistItems(existingPrepFiltered, prepItems);
+        const mergedConsumables = mergeChecklistItems(existingConsumablesFiltered, consumableItems);
+
         return {
           id: String(existingCheck.id || ''),
           schedule_post_id: schedule.id,
@@ -882,8 +931,8 @@ export default function OperationCheckView({
           schedule_date: schedule.schedule_date,
           schedule_time: schedule.schedule_time,
           schedule_room: schedule.schedule_room,
-          prep_items: normalizeChecklistItems(existingCheck.prep_items, 'patient-prep'),
-          consumable_items: normalizeChecklistItems(existingCheck.consumable_items, 'patient-consumable'),
+          prep_items: mergedPrep.length ? mergedPrep : [createChecklistItem('patient-prep')],
+          consumable_items: mergedConsumables.length ? mergedConsumables : [createChecklistItem('patient-consumable')],
           notes: String(existingCheck.notes || '').trim(),
           status: String(existingCheck.status || '준비중').trim() || '준비중',
           applied_template_ids: Array.isArray(existingCheck.applied_template_ids)
@@ -1352,38 +1401,12 @@ export default function OperationCheckView({
         )
       );
 
-      const mergeItems = (existingItems: ChecklistItemDraft[], nextItems: ChecklistItemDraft[]) => {
-        const existingMap = new Map(
-          existingItems.map((item) => [normalizeLookupValue(item.name), item] as const)
-        );
-        const nextKeys = new Set(nextItems.map((item) => normalizeLookupValue(item.name)).filter(Boolean));
-
-        const mergedItems = nextItems.map((item) => {
-          const matched = existingMap.get(normalizeLookupValue(item.name));
-          if (!matched) return item;
-          return {
-            ...item,
-            checked: Boolean(matched.checked),
-            quantity: matched.quantity || item.quantity || '',
-            unit: matched.unit || item.unit || '',
-            note: matched.note || item.note || '',
-          };
-        });
-
-        const customItems = existingItems.filter((item) => {
-          const key = normalizeLookupValue(item.name);
-          return key && !nextKeys.has(key);
-        });
-
-        return dedupeChecklistItems([...mergedItems, ...customItems]);
-      };
-
       return {
         ...prev,
         anesthesia_type: targetAnesthesiaType,
         surgery_template_id: String(matchedSurgeryTemplate?.id || prev.surgery_template_id || '').trim(),
-        prep_items: mergeItems(prev.prep_items, templatePrepItems.length ? templatePrepItems : [createChecklistItem('patient-prep')]),
-        consumable_items: mergeItems(
+        prep_items: mergeChecklistItems(prev.prep_items, templatePrepItems.length ? templatePrepItems : [createChecklistItem('patient-prep')]),
+        consumable_items: mergeChecklistItems(
           prev.consumable_items,
           templateConsumableItems.length ? templateConsumableItems : [createChecklistItem('patient-consumable')]
         ),
@@ -2153,11 +2176,11 @@ export default function OperationCheckView({
       kind: 'prep' | 'consumable',
       onChange: (next: ChecklistItemDraft[]) => void
     ) => (
-      <div className="space-y-2">
+      <div className="space-y-1">
         {items.map((item, index) => (
           <div
             key={item.id}
-            className="grid gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 md:grid-cols-[1.5fr,0.7fr,0.7fr,1fr,auto]"
+            className="flex items-center gap-1.5 py-0.5 w-full"
           >
             <input
               value={item.name}
@@ -2167,8 +2190,8 @@ export default function OperationCheckView({
                 next[index] = { ...item, name: event.target.value };
                 onChange(next);
               }}
-              placeholder={kind === 'prep' ? '기본 준비 물품명' : '기본 소모품명'}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
+              placeholder={kind === 'prep' ? '준비 물품명' : '소모품명'}
+              className="flex-[2.5] min-w-[100px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-semibold outline-none"
             />
             <input
               value={item.quantity || ''}
@@ -2177,8 +2200,8 @@ export default function OperationCheckView({
                 next[index] = { ...item, quantity: event.target.value };
                 onChange(next);
               }}
-              placeholder="기본 수량"
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+              placeholder="수량"
+              className="w-[56px] text-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 py-1.5 text-xs font-semibold outline-none"
             />
             <input
               value={item.unit || ''}
@@ -2188,7 +2211,7 @@ export default function OperationCheckView({
                 onChange(next);
               }}
               placeholder="단위"
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+              className="w-[56px] text-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 py-1.5 text-xs font-semibold outline-none"
             />
             <input
               value={item.note || ''}
@@ -2198,7 +2221,7 @@ export default function OperationCheckView({
                 onChange(next);
               }}
               placeholder="기본 메모"
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+              className="flex-[2] min-w-[80px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-xs font-semibold outline-none"
             />
             <button
               type="button"
@@ -2206,7 +2229,7 @@ export default function OperationCheckView({
                 const next = items.filter((row) => row.id !== item.id);
                 onChange(next.length ? next : [createChecklistItem(kind === 'prep' ? 'template-prep' : 'template-consumable')]);
               }}
-              className="rounded-full border border-[var(--border)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              className="shrink-0 rounded-[var(--radius-md)] border border-red-200 bg-red-50/40 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50 transition-colors"
             >
               삭제
             </button>
@@ -3051,15 +3074,15 @@ export default function OperationCheckView({
           data-testid="op-check-template-layout"
           className="grid gap-4 xl:grid-cols-[1fr,0.95fr]"
         >
-          <section className="space-y-4">
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+          <section className="space-y-2.5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() =>
                     setTemplateEditor((prev) => ({ ...prev, template_scope: 'surgery', anesthesia_type: '' }))
                   }
-                  className={`rounded-full px-4 py-2 text-sm font-bold ${
+                  className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold ${
                     templateEditor.template_scope === 'surgery'
                       ? 'bg-[var(--accent)] text-white'
                       : 'border border-[var(--border)] text-[var(--toss-gray-4)]'
@@ -3077,7 +3100,7 @@ export default function OperationCheckView({
                       surgery_name: '',
                     }))
                   }
-                  className={`rounded-full px-4 py-2 text-sm font-bold ${
+                  className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold ${
                     templateEditor.template_scope === 'anesthesia'
                       ? 'bg-[var(--accent)] text-white'
                       : 'border border-[var(--border)] text-[var(--toss-gray-4)]'
@@ -3088,7 +3111,7 @@ export default function OperationCheckView({
                 <button
                   type="button"
                   onClick={() => setTemplateEditor(emptyTemplateEditor())}
-                  className="ml-auto rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                  className="ml-auto rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                 >
                   새 템플릿
                 </button>
@@ -3135,8 +3158,7 @@ export default function OperationCheckView({
                 ) : (
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                     마취 유형
-                    <input
-                      list="op-check-anesthesia-options"
+                    <select
                       value={templateEditor.anesthesia_type}
                       onChange={(event) =>
                         setTemplateEditor((prev) => ({
@@ -3145,9 +3167,15 @@ export default function OperationCheckView({
                           template_name: prev.template_name || event.target.value,
                         }))
                       }
-                      placeholder="예: 전신마취"
-                      className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
-                    />
+                      className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none cursor-pointer"
+                    >
+                      <option value="">선택 안 함</option>
+                      {ANESTHESIA_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 )}
               </div>
@@ -3166,9 +3194,9 @@ export default function OperationCheckView({
                 </label>
               ) : null}
 
-              <div className="mt-4 rounded-[var(--radius-lg)] bg-[var(--muted)]/45 p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-[var(--foreground)]">기본 준비사항</h4>
+              <div className="mt-2.5 rounded-[var(--radius-md)] bg-[var(--muted)]/30 p-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[var(--foreground)]">기본 준비사항</h4>
                   <button
                     type="button"
                     onClick={() =>
@@ -3177,7 +3205,7 @@ export default function OperationCheckView({
                         createChecklistItem('template-prep'),
                       ])
                     }
-                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--card)]"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--card)]"
                   >
                     준비항목 추가
                   </button>
@@ -3187,9 +3215,9 @@ export default function OperationCheckView({
                 )}
               </div>
 
-              <div className="mt-4 rounded-[var(--radius-lg)] bg-[var(--muted)]/45 p-3">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-[var(--foreground)]">기본 의료소모품</h4>
+              <div className="mt-2.5 rounded-[var(--radius-md)] bg-[var(--muted)]/30 p-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-[var(--foreground)]">기본 의료소모품</h4>
                   <button
                     type="button"
                     onClick={() =>
@@ -3198,7 +3226,7 @@ export default function OperationCheckView({
                         createChecklistItem('template-consumable'),
                       ])
                     }
-                    className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--card)]"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--card)]"
                   >
                     소모품 추가
                   </button>
@@ -3208,7 +3236,7 @@ export default function OperationCheckView({
                 )}
               </div>
 
-              <label className="mt-4 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              <label className="mt-2.5 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
                 템플릿 메모
                 <textarea
                   value={templateEditor.notes}
@@ -3216,36 +3244,36 @@ export default function OperationCheckView({
                     setTemplateEditor((prev) => ({ ...prev, notes: event.target.value }))
                   }
                   placeholder="수술팀 공통 지침, 마취 준비 참고사항 등을 메모해 주세요."
-                  className="mt-1 min-h-[100px] w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-medium"
+                  className="mt-1 min-h-[56px] w-full rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold"
                 />
               </label>
 
-              <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+              <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-[var(--foreground)]">
                 <input
                   type="checkbox"
                   checked={templateEditor.is_active}
                   onChange={(event) =>
                     setTemplateEditor((prev) => ({ ...prev, is_active: event.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-[var(--border)] text-[var(--accent)]"
+                  className="h-3.5 w-3.5 rounded border-[var(--border)] text-[var(--accent)]"
                 />
                 활성 템플릿으로 사용
               </label>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   data-testid="op-check-template-save"
                   onClick={() => void saveTemplate()}
                   disabled={savingTemplate}
-                  className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                  className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                 >
                   {savingTemplate ? '저장 중...' : '템플릿 저장'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setTemplateEditor(emptyTemplateEditor())}
-                  className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3.5 py-1.5 text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                 >
                   입력 초기화
                 </button>

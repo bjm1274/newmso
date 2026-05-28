@@ -42,7 +42,8 @@ function getShiftSearchText(shift: RosterShiftLike) {
 }
 
 function isOffShift(shift: RosterShiftLike) {
-  return includesKeyword(getShiftSearchText(shift), OFF_SHIFT_KEYWORDS);
+  const normalizedName = normalizeText(shift.name || '');
+  return includesKeyword(normalizedName, OFF_SHIFT_KEYWORDS);
 }
 
 function resolveShiftBand(shift: RosterShiftLike) {
@@ -120,7 +121,10 @@ function getShiftCategory(shift: RosterShiftLike): TeamCategory {
   const searchText = getShiftSearchText(shift);
 
   if (!searchText) return 'general';
-  if (includesKeyword(searchText, OFF_SHIFT_KEYWORDS)) return 'off';
+  
+  const normalizedName = normalizeText(shift.name || '');
+  if (includesKeyword(normalizedName, OFF_SHIFT_KEYWORDS)) return 'off';
+  
   if (includesKeyword(searchText, SURGERY_KEYWORDS)) return 'surgery';
   if (includesKeyword(searchText, WARD_KEYWORDS)) return 'ward';
   if (includesKeyword(searchText, OUTPATIENT_KEYWORDS)) return 'outpatient';
