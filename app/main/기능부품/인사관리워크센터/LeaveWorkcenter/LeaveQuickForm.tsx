@@ -135,7 +135,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
   return (
     <section className="app-card flex flex-col gap-3 p-3 md:p-4">
       <header className="flex items-center justify-between">
-        <h3 className="text-[13px] font-bold text-[var(--foreground)]">빠른 연차 신청</h3>
+        <h3 className="text-[13px] font-bold text-[var(--foreground)]">연차 사용기록</h3>
         <span className="badge badge-blue">{targetName}</span>
       </header>
 
