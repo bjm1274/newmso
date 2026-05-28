@@ -58,7 +58,8 @@ function log(message, type = 'info') {
 
 function runCmd(cmd, stdio = 'pipe') {
   try {
-    return execSync(cmd, { encoding: 'utf8', stdio }).trim();
+    const result = execSync(cmd, { encoding: 'utf8', stdio });
+    return result ? result.trim() : '';
   } catch (error) {
     const errorMsg = error.stderr ? error.stderr.trim() : error.message;
     throw new Error(`[Command Failed: "${cmd}"] ${errorMsg}`);
