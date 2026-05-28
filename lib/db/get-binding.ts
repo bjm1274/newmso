@@ -17,6 +17,115 @@ declare global {
   }
 }
 
+let cachedLocalD1: D1Database | undefined = undefined;
+
+function getLocalD1Mock(): D1Database | undefined {
+  if (cachedLocalD1) return cachedLocalD1;
+
+  try {
+    const fs = eval("require('fs')");
+    const path = eval("require('path')");
+    const Database = eval("require('better-sqlite3')");
+
+    const dir = path.join(process.cwd(), '.wrangler', 'state', 'v3', 'd1', 'miniflare-D1DatabaseObject');
+    if (!fs.existsSync(dir)) {
+      console.warn('[getLocalD1Mock] wrangler local D1 state directory not found at:', dir);
+      return undefined;
+    }
+
+    const files = fs.readdirSync(dir);
+    const sqliteFile = files.find((f) => f.endsWith('.sqlite') && f !== 'metadata.sqlite');
+    if (!sqliteFile) {
+      console.warn('[getLocalD1Mock] No .sqlite file found in:', dir);
+      return undefined;
+    }
+
+    const dbPath = path.join(dir, sqliteFile);
+    console.log('[getLocalD1Mock] Connecting to local D1 SQLite database:', dbPath);
+
+    class MockD1Database {
+      private db: any;
+
+      constructor(dbPath: string) {
+        this.db = new Database(dbPath);
+        this.db.pragma('foreign_keys = ON');
+      }
+
+      prepare(query: string) {
+        return new MockD1PreparedStatement(this.db, query);
+      }
+
+      async batch(statements: any[]) {
+        const results = [];
+        for (const stmt of statements) {
+          results.push(await stmt.all());
+        }
+        return results;
+      }
+
+      async exec(query: string) {
+        this.db.exec(query);
+        return { count: 0, duration: 0 };
+      }
+    }
+
+    class MockD1PreparedStatement {
+      private db: any;
+      private query: string;
+      private params: any[] = [];
+
+      constructor(db: any, query: string) {
+        this.db = db;
+        this.query = query;
+      }
+
+      bind(...params: any[]) {
+        this.params = params.map((p) => {
+          if (typeof p === 'boolean') return p ? 1 : 0;
+          return p;
+        });
+        return this;
+      }
+
+      async all() {
+        const stmt = this.db.prepare(this.query);
+        const results = stmt.all(...this.params);
+        return {
+          results,
+          success: true,
+          meta: { duration: 0, changes: 0, rows_read: results.length, rows_written: 0 },
+        };
+      }
+
+      async run() {
+        const stmt = this.db.prepare(this.query);
+        const info = stmt.run(...this.params);
+        return {
+          success: true,
+          meta: { duration: 0, changes: info.changes, rows_read: 0, rows_written: info.changes },
+        };
+      }
+
+      async first() {
+        const stmt = this.db.prepare(this.query);
+        const row = stmt.get(...this.params);
+        return row || null;
+      }
+
+      async raw() {
+        const stmt = this.db.prepare(this.query);
+        return stmt.raw().all(...this.params);
+      }
+    }
+
+    cachedLocalD1 = new MockD1Database(dbPath) as unknown as D1Database;
+    return cachedLocalD1;
+  } catch (err) {
+    console.error('[getLocalD1Mock] Failed to initialize mock D1 database:', err);
+    return undefined;
+  }
+}
+
 /**
  * D1 binding을 가져옴. Workers 외 환경이거나 binding이 없으면 undefined.
  *
@@ -28,10 +137,16 @@ export async function getD1Binding(): Promise<D1Database | undefined> {
   try {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');
     const { env } = await getCloudflareContext({ async: true });
-    return env.DB;
+    if (env.DB) return env.DB;
   } catch {
-    return undefined;
+    // ignore
   }
+
+  if (process.env.NODE_ENV === 'development') {
+    return getLocalD1Mock();
+  }
+
+  return undefined;
 }
 
 /**

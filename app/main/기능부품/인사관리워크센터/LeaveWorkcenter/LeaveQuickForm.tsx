@@ -48,8 +48,9 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
   }, [picked, user, staffs]);
 
   const [staffId, setStaffId] = useState<string>(defaultStaffId);
-  const [startDate, setStartDate] = useState<string>(todayIso());
-  const [endDate, setEndDate] = useState<string>(todayIso());
+  const [dateRanges, setDateRanges] = useState<{ id: number; startDate: string; endDate: string }[]>([
+    { id: Date.now(), startDate: todayIso(), endDate: todayIso() },
+  ]);
   const [leaveType, setLeaveType] = useState<LeaveTypeOption>('연차');
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -61,14 +62,34 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
     }
   }, [picked]);
 
-  const days = useMemo(() => computeDays(startDate, endDate, leaveType), [startDate, endDate, leaveType]);
+  const addDateRange = () => {
+    setDateRanges((prev) => [
+      ...prev,
+      { id: Date.now() + Math.random(), startDate: todayIso(), endDate: todayIso() },
+    ]);
+  };
+
+  const removeDateRange = (id: number) => {
+    setDateRanges((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const updateDateRange = (id: number, key: 'startDate' | 'endDate', value: string) => {
+    setDateRanges((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [key]: value } : r))
+    );
+  };
+
+  const totalDays = useMemo(() => {
+    return dateRanges.reduce((sum, range) => sum + computeDays(range.startDate, range.endDate, leaveType), 0);
+  }, [dateRanges, leaveType]);
+
   const remaining = picked?.remaining ?? 0;
   const remainingAfter = useMemo(() => {
     if (leaveType === '연차(부여)') {
-      return remaining + days;
+      return remaining + totalDays;
     }
-    return Math.max(0, remaining - days);
-  }, [remaining, days, leaveType]);
+    return Math.max(0, remaining - totalDays);
+  }, [remaining, totalDays, leaveType]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -77,22 +98,28 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
       toast('직원을 선택해 주세요.', 'error');
       return;
     }
-    if (!startDate) {
-      toast('시작일을 선택해 주세요.', 'error');
+    const invalidRange = dateRanges.find((r) => !r.startDate);
+    if (invalidRange) {
+      toast('모든 시작일을 올바르게 선택해 주세요.', 'error');
       return;
     }
     setSubmitting(true);
     try {
-      await submitLeaveRequest({
-        staffId,
-        leaveType,
-        startDate,
-        endDate: endDate || startDate,
-        days,
-        reason,
-      });
-      toast('휴가 신청을 상신했습니다.', 'success');
+      await Promise.all(
+        dateRanges.map((range) =>
+          submitLeaveRequest({
+            staffId,
+            leaveType,
+            startDate: range.startDate,
+            endDate: range.endDate || range.startDate,
+            days: computeDays(range.startDate, range.endDate, leaveType),
+            reason,
+          })
+        )
+      );
+      toast(`${dateRanges.length}건의 연차/휴가 신청을 상신했습니다.`, 'success');
       setReason('');
+      setDateRanges([{ id: Date.now(), startDate: todayIso(), endDate: todayIso() }]);
       onSubmitted();
     } catch (error) {
       console.error('휴가 신청 실패:', error);
@@ -128,30 +155,57 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
           </select>
         </label>
 
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">시작일</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[12px]"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">종료일</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[12px]"
-            />
-          </label>
+        {/* Dynamic date ranges */}
+        <div className="flex flex-col gap-2">
+          {dateRanges.map((range, index) => (
+            <div key={range.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+              <label className="flex flex-col gap-1 text-left w-full min-w-0">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-4)] truncate">
+                  시작일 {dateRanges.length > 1 ? `#${index + 1}` : ''}
+                </span>
+                <input
+                  type="date"
+                  value={range.startDate}
+                  onChange={(e) => updateDateRange(range.id, 'startDate', e.target.value)}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[12px]"
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-left w-full min-w-0">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-4)] truncate">
+                  종료일 {dateRanges.length > 1 ? `#${index + 1}` : ''}
+                </span>
+                <input
+                  type="date"
+                  value={range.endDate}
+                  onChange={(e) => updateDateRange(range.id, 'endDate', e.target.value)}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[12px]"
+                  required
+                />
+              </label>
+              {dateRanges.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDateRange(range.id)}
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-600 font-bold px-2 py-1.5 text-[10px] rounded-[var(--radius-md)] transition shadow-sm h-[32px] flex items-center justify-center border border-red-500/20 shrink-0"
+                  title="날짜 제거"
+                >
+                  삭제
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addDateRange}
+            className="w-full bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-[var(--accent)] border border-dashed border-[var(--accent)]/30 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all mt-1 cursor-pointer"
+          >
+            + 날짜 범위 추가
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-left">
             <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">유형</span>
             <select
               value={leaveType}
@@ -171,18 +225,18 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
               })}
             </select>
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">일수</span>
+          <label className="flex flex-col gap-1 text-left">
+            <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">총 일수</span>
             <input
-              value={days}
+              value={totalDays}
               readOnly
               className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-2 py-1.5 text-right text-[12px] tnum font-bold"
-              aria-label="자동 계산된 일수"
+              aria-label="자동 계산된 총 일수"
             />
           </label>
         </div>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex flex-col gap-1 text-left">
           <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">사유</span>
           <textarea
             rows={2}
@@ -207,7 +261,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
           type="submit"
           disabled={submitting}
           aria-label="휴가 신청 상신"
-          className="rounded-[var(--radius-md)] bg-[var(--accent)] py-2 text-[12px] font-bold text-white transition-colors hover:opacity-90 disabled:opacity-50"
+          className="rounded-[var(--radius-md)] bg-[var(--accent)] py-2 text-[12px] font-bold text-white transition-colors hover:opacity-90 disabled:opacity-50 cursor-pointer"
         >
           {submitting ? '상신 중...' : '신청 상신'}
         </button>
