@@ -853,24 +853,12 @@ function MessengerTimelineComponent({
                               }}
                               className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors ${
                                 isMine
-                                  ? 'self-end border-white/30 bg-white/10 text-white hover:bg-white/15'
+                                  ? 'self-end border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-400 shadow-sm'
                                   : 'border-[var(--accent)]/20 bg-[var(--toss-blue-light)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]/80'
                               }`}
                             >
                               {threadBadgeLabel}
                             </button>
-                          ) : null}
-                          {showThreadAttention ? (
-                            <span
-                              data-testid={`chat-thread-needs-attention-${msg.id}`}
-                              className={`mt-1 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                                isMine
-                                  ? 'self-end bg-amber-400/20 text-amber-100'
-                                  : 'bg-amber-500/10 text-amber-700'
-                              }`}
-                            >
-                              답변 필요
-                            </span>
                           ) : null}
                         </div>
                       </div>

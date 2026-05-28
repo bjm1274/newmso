@@ -54,6 +54,7 @@ export interface TemplateItem {
   version: string;
   used: number;
   lastDate: string;
+  companyName: string;
 }
 
 export interface HolidayItem {

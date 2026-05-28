@@ -27,8 +27,9 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 환자명
+  // 환자명 및 차트번호
   const [patientName, setPatientName] = useState('');
+  const [chartNumber, setChartNumber] = useState('');
 
   // 분석
   const [analyzing, setAnalyzing] = useState(false);
@@ -52,12 +53,13 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     } catch { /* ignore */ }
   }, []);
 
-  const saveRecord = useCallback((filename: string, res: ConsultationResult, name: string) => {
-    const rec: SavedRecord = {
+  const saveRecord = useCallback((filename: string, res: ConsultationResult, name: string, chartNo: string) => {
+    const rec: SavedRecord & { chartNumber?: string } = {
       id: Date.now().toString(36),
       created_at: new Date().toISOString(),
       filename,
       patientName: name.trim() || '미지정',
+      chartNumber: chartNo.trim() || '미지정',
       result: res,
     };
     setRecords((prev) => {
@@ -86,6 +88,28 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
 
   // ─── 녹음 시작 ──────────────────────────────────────────────────────────────
   const startRecording = async () => {
+    // 1. 모바일 기기 여부 판별
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // 2. PC 환경일 때만 물리 마이크 장치 탑재 여부 체크
+    if (!isMobile) {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          toast('마이크 장치 탐색을 지원하지 않는 브라우저이거나 보안 연결(HTTPS) 환경이 아닙니다.', 'error');
+          return;
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasMicrophone = devices.some((device) => device.kind === 'audioinput');
+        if (!hasMicrophone) {
+          toast('연결된 마이크 장치를 찾을 수 없습니다. PC에 마이크가 올바르게 연결되어 있는지 확인해주세요.', 'error');
+          return;
+        }
+      } catch (err) {
+        console.error('마이크 장치 탐색 실패:', err);
+      }
+    }
+
+    // 3. 실제 녹음 기동
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       chunksRef.current = [];
@@ -151,7 +175,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   };
 
   // ─── 분석 실행 ──────────────────────────────────────────────────────────────
-  const analyze = useCallback(async (blob: Blob, filename: string, name: string) => {
+  const analyze = useCallback(async (blob: Blob, filename: string, name: string, chartNo: string) => {
     setAnalyzing(true);
     setResult(null);
     try {
@@ -178,7 +202,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
 
       setResult(data.result);
       setSourceLabel(filename);
-      saveRecord(filename, data.result, name);
+      saveRecord(filename, data.result, name, chartNo);
       toast('상담 내용 분석이 완료되었습니다.', 'success');
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -200,16 +224,17 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     if (!audioBlob) return toast('먼저 음성을 녹음해주세요.', 'warning');
     const nameLabel = patientName.trim() || '미지정';
     const filename = `상담_${nameLabel}_${buildTimestamp()}.webm`;
-    analyze(audioBlob, filename, patientName);
+    analyze(audioBlob, filename, patientName, chartNumber);
   };
 
   const handleAnalyzeUpload = () => {
     if (!uploadFile) return toast('파일을 먼저 선택해주세요.', 'warning');
-    analyze(uploadFile, uploadFile.name, patientName);
+    analyze(uploadFile, uploadFile.name, patientName, chartNumber);
   };
 
   // ─── "새 상담" 초기화 ────────────────────────────────────────────────────────
   const handleNewConsult = () => {
+    setSelectedPatientKey('__new__');
     setSelectedRecord(null);
     setResult(null);
     setAudioBlob(null);
@@ -218,6 +243,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     setElapsed(0);
     setInputMode('record');
     setPatientName('');
+    setChartNumber('');
   };
 
   // ─── 파생 데이터 ─────────────────────────────────────────────────────────────
@@ -251,7 +277,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
           {/* 새 상담 버튼 */}
           <button
             type="button"
-            onClick={() => { setSelectedPatientKey(null); handleNewConsult(); }}
+            onClick={handleNewConsult}
             className="flex items-center gap-2 px-3 py-2.5 rounded-[var(--radius-md)] border border-[var(--accent)]/40 bg-[var(--accent)]/5 hover:bg-[var(--accent)]/10 text-[12px] font-bold text-[var(--accent)] transition-colors w-full"
             data-testid="new-consult-btn"
           >
@@ -320,7 +346,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
         >
           {/* 헤더 */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] shrink-0">
-            {selectedPatientKey ? (
+            {selectedPatientKey && selectedPatientKey !== '__new__' ? (
               <>
                 <span className="text-[13px] font-black text-[var(--foreground)] truncate">
                   {selectedPatientKey}
@@ -348,19 +374,30 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-            {/* 빈 상태: 환자 미선택 + 이력 없음 */}
-            {!selectedPatientKey && records.length === 0 && (
+            {/* A. 초기 빈 상태 (아무것도 선택 안 함) */}
+            {selectedPatientKey === null && (
               <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-3 text-center">
                 <span className="text-5xl opacity-20">🎤</span>
-                <p className="text-sm font-bold text-[var(--toss-gray-3)]">
-                  좌측 &quot;새 상담&quot;을 눌러 음성을 녹음하거나
-                </p>
-                <p className="text-sm text-[var(--toss-gray-3)]">파일을 업로드해 AI 분석을 시작하세요.</p>
+                {records.length === 0 ? (
+                  <>
+                    <p className="text-sm font-bold text-[var(--toss-gray-3)]">
+                      좌측 &quot;새 상담&quot;을 눌러 음성을 녹음하거나
+                    </p>
+                    <p className="text-sm text-[var(--toss-gray-3)]">파일을 업로드해 AI 분석을 시작하세요.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-bold text-[var(--toss-gray-3)]">
+                      상담 이력에서 환자를 선택하거나
+                    </p>
+                    <p className="text-sm text-[var(--toss-gray-3)]">좌측 상단의 &quot;새 상담&quot; 버튼을 눌러 새로운 상담을 시작하세요.</p>
+                  </>
+                )}
               </div>
             )}
 
-            {/* 환자 선택됨: 이력 목록 */}
-            {selectedPatientKey && selectedGroup && !selectedRecord && (
+            {/* B. 환자 선택됨: 이력 목록 */}
+            {selectedPatientKey && selectedPatientKey !== '__new__' && selectedGroup && !selectedRecord && (
               <div className="space-y-2" data-testid="patient-history-list">
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">상담 이력</p>
                 {selectedGroup.records.map((rec) => (
@@ -438,34 +475,56 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
             )}
 
             {/* 새 상담 입력 영역 */}
-            {!selectedRecord && (selectedPatientKey === null) && (
+            {selectedPatientKey === '__new__' && !selectedRecord && (
               <div className="space-y-4" data-testid="new-consult-panel">
 
-                {/* 환자명 입력 */}
-                <div className="space-y-1" data-testid="patient-name-field">
-                  <label
-                    htmlFor="patient-name-input"
-                    className="block text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide"
-                  >
-                    환자명
-                  </label>
-                  <input
-                    id="patient-name-input"
-                    type="text"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="홍길동 (비워두면 미지정으로 저장)"
-                    maxLength={30}
-                    aria-label="환자명 입력"
-                    className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[13px] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] transition-colors"
-                    data-testid="patient-name-input"
-                  />
-                  {!patientName.trim() && (
-                    <p className="text-[10px] text-[var(--toss-gray-3)]" role="note">
-                      환자명을 입력하면 상담 이력을 환자별로 묶어 볼 수 있습니다.
-                    </p>
-                  )}
+                {/* 환자명 및 차트번호 입력 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="patient-info-fields">
+                  {/* 환자명 */}
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="patient-name-input"
+                      className="block text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide"
+                    >
+                      환자명
+                    </label>
+                    <input
+                      id="patient-name-input"
+                      type="text"
+                      value={patientName}
+                      onChange={(e) => setPatientName(e.target.value)}
+                      placeholder="홍길동 (비워두면 미지정으로 저장)"
+                      maxLength={30}
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[13px] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] transition-colors"
+                      data-testid="patient-name-input"
+                    />
+                  </div>
+
+                  {/* 차트번호 */}
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="chart-number-input"
+                      className="block text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide"
+                    >
+                      차트번호
+                    </label>
+                    <input
+                      id="chart-number-input"
+                      type="text"
+                      value={chartNumber}
+                      onChange={(e) => setChartNumber(e.target.value)}
+                      placeholder="차트번호 입력 (예: 123456)"
+                      maxLength={20}
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[13px] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)] transition-colors"
+                      data-testid="chart-number-input"
+                    />
+                  </div>
                 </div>
+                {!patientName.trim() && !chartNumber.trim() && (
+                  <p className="text-[10px] text-[var(--toss-gray-3)]" role="note">
+                    환자명과 차트번호를 입력하면 상담 이력을 체계적으로 관리하고 환자별로 묶어 볼 수 있습니다.
+                  </p>
+                )}
 
                 {/* 입력 모드 탭 */}
                 <div className="flex gap-1 bg-[var(--muted)] rounded-[var(--radius-lg)] p-1 w-fit">

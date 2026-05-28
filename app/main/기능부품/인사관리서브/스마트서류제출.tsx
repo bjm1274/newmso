@@ -433,7 +433,7 @@ function CameraScanner({ doc, onCapture, onClose }: CameraScannerProps) {
         <div className="fixed inset-0 z-[300] bg-black md:bg-black/90 flex flex-col items-center justify-center animate-in fade-in">
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
                 <h3 className="text-white font-bold">{doc.label} 스캔</h3>
-                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/100/10 rounded-[var(--radius-md)] w-fit">
+                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/10 rounded-[var(--radius-md)] w-fit">
                     현재 {capturedBlobs.length}페이지 수집됨
                 </span>
             </div>

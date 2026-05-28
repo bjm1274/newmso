@@ -16,24 +16,4 @@ export type ProfileCardProps = {
   setIsEditing?: (nextValue: boolean) => void;
 };
 
-export type AnnualLeaveStaffRow = {
-  id?: string;
-  annual_leave_total?: number | null;
-  annual_leave_used?: number | null;
-};
 
-export type ApprovedLeaveRow = {
-  leave_type?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-  status?: string | null;
-};
-
-export type CommuteStatusRow = {
-  date?: string | null;
-  status?: string | null;
-};
-
-export type TodayAttendanceStatusRow = {
-  status?: string | null;
-};

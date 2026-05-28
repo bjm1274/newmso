@@ -836,9 +836,11 @@ export default function OperationCheckView({
         if (template.is_active === false) return false;
 
         if (template.template_scope === 'anesthesia') {
+          const normTemplateAnes = normalizeLookupValue(template.anesthesia_type);
+          const normExistingAnes = normalizeLookupValue(existingAnesthesiaType);
           return (
-            !!existingAnesthesiaType &&
-            normalizeLookupValue(template.anesthesia_type) === normalizeLookupValue(existingAnesthesiaType)
+            !!normExistingAnes &&
+            (normTemplateAnes.includes(normExistingAnes) || normExistingAnes.includes(normTemplateAnes))
           );
         }
 
@@ -847,9 +849,13 @@ export default function OperationCheckView({
           matchedSurgeryTemplate?.id &&
           String(template.surgery_template_id) === String(matchedSurgeryTemplate.id);
 
+        const normTemplateSurg = normalizeLookupValue(template.surgery_name);
+        const normScheduleSurg = normalizeLookupValue(schedule.surgery_name);
+
         return (
           matchesTemplateId ||
-          normalizeLookupValue(template.surgery_name) === normalizeLookupValue(schedule.surgery_name)
+          (!!normTemplateSurg && !!normScheduleSurg &&
+            (normScheduleSurg.includes(normTemplateSurg) || normTemplateSurg.includes(normScheduleSurg)))
         );
       });
 
@@ -944,10 +950,10 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(post.schedule_date, post, {
-        openWorkspace: openWorkspace || dayWorkspaceOpen,
+        openWorkspace: false,
       });
     },
-    [applyDateAndScheduleSelection, confirmWorkspaceTransition, dayWorkspaceOpen, selectedScheduleId]
+    [applyDateAndScheduleSelection, confirmWorkspaceTransition, selectedScheduleId]
   );
 
   const handleCalendarDaySelection = useCallback(
@@ -963,7 +969,7 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(dateKey, nextSchedule, {
-        openWorkspace: Boolean(nextSchedule),
+        openWorkspace: false,
       });
     },
     [applyDateAndScheduleSelection, confirmWorkspaceTransition, getPreferredScheduleForDate, selectedDate, selectedSchedule]
@@ -1209,7 +1215,7 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(nextDate, nextSchedule, {
-        openWorkspace: dayWorkspaceOpen,
+        openWorkspace: false,
       });
     },
     [
@@ -1303,43 +1309,48 @@ export default function OperationCheckView({
     return Array.from(names).sort();
   }, [inventoryItems, opTemplates]);
 
-  const mergeTemplateItemsIntoForm = useCallback(() => {
-    if (!selectedSchedule || !checkForm) return;
+  const applyTemplatesToFormState = useCallback(
+    (prev: PatientCheckState, anesthesiaTypeOverride?: string) => {
+      if (!selectedSchedule) return prev;
+      const targetAnesthesiaType = (typeof anesthesiaTypeOverride === 'string' ? anesthesiaTypeOverride : prev.anesthesia_type || '').trim();
 
-    const matchedSurgeryTemplate = findMatchingSurgeryTemplate(surgeryTemplates, selectedSchedule.surgery_name);
-    const applicableTemplates = opTemplates.filter((template) => {
-      if (template.is_active === false) return false;
-      if (template.template_scope === 'anesthesia') {
+      const matchedSurgeryTemplate = findMatchingSurgeryTemplate(surgeryTemplates, selectedSchedule.surgery_name);
+      const applicableTemplates = opTemplates.filter((template) => {
+        if (template.is_active === false) return false;
+        if (template.template_scope === 'anesthesia') {
+          const normTemplateAnes = normalizeLookupValue(template.anesthesia_type);
+          const normTargetAnes = normalizeLookupValue(targetAnesthesiaType);
+          return (
+            !!normTargetAnes &&
+            (normTemplateAnes.includes(normTargetAnes) || normTargetAnes.includes(normTemplateAnes))
+          );
+        }
+
+        const matchesTemplateId =
+          template.surgery_template_id &&
+          matchedSurgeryTemplate?.id &&
+          String(template.surgery_template_id) === String(matchedSurgeryTemplate.id);
+
+        const normTemplateSurg = normalizeLookupValue(template.surgery_name);
+        const normScheduleSurg = normalizeLookupValue(selectedSchedule.surgery_name);
+
         return (
-          !!checkForm.anesthesia_type &&
-          normalizeLookupValue(template.anesthesia_type) === normalizeLookupValue(checkForm.anesthesia_type)
+          matchesTemplateId ||
+          (!!normTemplateSurg && !!normScheduleSurg &&
+            (normScheduleSurg.includes(normTemplateSurg) || normTemplateSurg.includes(normScheduleSurg)))
         );
-      }
+      });
 
-      const matchesTemplateId =
-        template.surgery_template_id &&
-        matchedSurgeryTemplate?.id &&
-        String(template.surgery_template_id) === String(matchedSurgeryTemplate.id);
-
-      return (
-        matchesTemplateId ||
-        normalizeLookupValue(template.surgery_name) === normalizeLookupValue(selectedSchedule.surgery_name)
+      const templatePrepItems = dedupeChecklistItems(
+        applicableTemplates.flatMap((template) =>
+          normalizeChecklistItems(template.prep_items, 'merged-prep', buildTemplateLabel(template))
+        )
       );
-    });
-
-    const templatePrepItems = dedupeChecklistItems(
-      applicableTemplates.flatMap((template) =>
-        normalizeChecklistItems(template.prep_items, 'merged-prep', buildTemplateLabel(template))
-      )
-    );
-    const templateConsumableItems = dedupeChecklistItems(
-      applicableTemplates.flatMap((template) =>
-        normalizeChecklistItems(template.consumable_items, 'merged-consumable', buildTemplateLabel(template))
-      )
-    );
-
-    setCheckForm((prev) => {
-      if (!prev) return prev;
+      const templateConsumableItems = dedupeChecklistItems(
+        applicableTemplates.flatMap((template) =>
+          normalizeChecklistItems(template.consumable_items, 'merged-consumable', buildTemplateLabel(template))
+        )
+      );
 
       const mergeItems = (existingItems: ChecklistItemDraft[], nextItems: ChecklistItemDraft[]) => {
         const existingMap = new Map(
@@ -1369,6 +1380,7 @@ export default function OperationCheckView({
 
       return {
         ...prev,
+        anesthesia_type: targetAnesthesiaType,
         surgery_template_id: String(matchedSurgeryTemplate?.id || prev.surgery_template_id || '').trim(),
         prep_items: mergeItems(prev.prep_items, templatePrepItems.length ? templatePrepItems : [createChecklistItem('patient-prep')]),
         consumable_items: mergeItems(
@@ -1377,10 +1389,15 @@ export default function OperationCheckView({
         ),
         applied_template_ids: applicableTemplates.map((template) => String(template.id)),
       };
-    });
+    },
+    [opTemplates, selectedSchedule, surgeryTemplates]
+  );
 
+  const mergeTemplateItemsIntoForm = useCallback(() => {
+    if (!selectedSchedule || !checkForm) return;
+    setCheckForm((prev) => (prev ? applyTemplatesToFormState(prev) : prev));
     toast('수술/마취 템플릿 기준으로 OP체크 항목을 반영했습니다.', 'success');
-  }, [checkForm, opTemplates, selectedSchedule, surgeryTemplates]);
+  }, [applyTemplatesToFormState, checkForm, selectedSchedule]);
 
   const updateCheckFormList = useCallback(
     (
@@ -1587,6 +1604,28 @@ export default function OperationCheckView({
 
     // #1 준비완료 전 미체크 항목 경고
     if (newStatus === '준비완료') {
+      const confirmPatient = await openConfirm({
+        title: '안전 확인',
+        description: '환자이름과 차트번호는 확인했나요?',
+        confirmText: '확인',
+        cancelText: '취소',
+        tone: 'danger',
+        centerText: true,
+        largeText: true,
+      });
+      if (!confirmPatient) return;
+
+      const confirmSite = await openConfirm({
+        title: '안전 확인',
+        description: '수술 부위 및 방향은 확인했나요?',
+        confirmText: '확인',
+        cancelText: '취소',
+        tone: 'danger',
+        centerText: true,
+        largeText: true,
+      });
+      if (!confirmSite) return;
+
       const unchecked = checkForm.prep_items.filter((item) => item.name && !item.checked);
       if (unchecked.length > 0) {
         const proceed = await openConfirm({
@@ -1594,6 +1633,8 @@ export default function OperationCheckView({
           description: `준비 체크 미완료 항목이 ${unchecked.length}개 있습니다.\n\n미완료 항목:\n${unchecked.map((i) => `  · ${i.name}`).join('\n')}\n\n그래도 준비완료로 변경하시겠습니까?`,
           confirmText: '준비완료',
           tone: 'danger',
+          centerText: true,
+          largeText: true,
         });
         if (!proceed) return;
       }
@@ -2276,7 +2317,7 @@ export default function OperationCheckView({
           wardMessageSentAt={checkForm.ward_message_sent_at}
           deductingInventory={deductingInventory}
           onAnesthesiaTypeChange={(value) =>
-            setCheckForm((prev) => (prev ? { ...prev, anesthesia_type: value } : prev))
+            setCheckForm((prev) => (prev ? applyTemplatesToFormState(prev, value) : prev))
           }
           onApplyTemplate={mergeTemplateItemsIntoForm}
         />
@@ -2322,13 +2363,7 @@ export default function OperationCheckView({
 
       </div>
 
-      <OpCheckWorkspaceNotesSection
-        expanded={workspaceSections.notes}
-        summary={notesSummaryText}
-        value={checkForm.notes}
-        onToggle={() => toggleWorkspaceSection('notes')}
-        onChange={(value) => setCheckForm((prev) => (prev ? { ...prev, notes: value } : prev))}
-      />
+
     </>
   );
 
@@ -2755,79 +2790,53 @@ export default function OperationCheckView({
   return (
     <div data-testid="op-check-view" className="space-y-4">
       {dialog}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div
-          className={
-            allowEmbeddedTemplateSettings
-              ? 'flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(220px,320px)] xl:items-center'
-              : 'flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between'
-          }
-        >
-          {/* §4-10, §13.15 OP체크: PageHeader 제목/서브 + 상단 4 상태 stat 박스 사용 안 함. 우측 모드 스위처와 검색만 유지. */}
-          <div aria-hidden="true" className="hidden xl:block min-w-0" />
-          {allowEmbeddedTemplateSettings ? (
-            <div
-              data-testid="op-check-mode-switcher"
-              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/35 px-3 py-2 shadow-sm xl:justify-self-center"
+      {activeTab === 'templates' && (
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveTab('patients')}
+              className="text-[12px] font-black text-[var(--accent)] hover:underline flex items-center gap-1"
             >
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  data-testid="op-check-mode-patients"
-                  onClick={() => setActiveTab('patients')}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
-                    activeTab === 'patients'
-                      ? 'bg-[var(--accent)] text-white shadow-sm'
-                      : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
-                  }`}
-                >
-                  환자 체크
-                </button>
-                <button
-                  type="button"
-                  data-testid="op-check-mode-templates"
-                  onClick={() => setActiveTab('templates')}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
-                    activeTab === 'templates'
-                      ? 'bg-[var(--accent)] text-white shadow-sm'
-                      : 'text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
-                  }`}
-                >
-                  템플릿 설정
-                </button>
-              </div>
-              <p className="mt-1 text-center text-[10px] font-medium text-[var(--toss-gray-3)]">
-                직원이 OP체크 템플릿을 직접 관리할 수 있어요.
-              </p>
-            </div>
-          ) : null}
-          {activeTab === 'patients' ? (
-            <div
-              data-testid="op-check-patient-search-card"
-              className="w-full min-w-[220px] max-w-[320px]"
-            >
-              <input
-                data-testid="op-check-search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="환자명, 수술명, 차트번호"
-                className="w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-medium"
-              />
-            </div>
-          ) : allowEmbeddedTemplateSettings ? (
-            <div aria-hidden="true" className="hidden xl:block" />
-          ) : null}
+              ← 환자 체크 화면으로 돌아가기
+            </button>
+            <p className="text-xs font-semibold text-[var(--toss-gray-3)]">
+              직원이 OP체크 템플릿을 직접 관리할 수 있어요.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {activeTab === 'patients' ? (
-        /* ── 2-col split 레이아웃 (§11) ── */
+        /* ── 2-col split 레이아웃 (좌: 환자 상세 워크스페이스, 우: 달력 및 환자 리스트) ── */
         <div
           data-testid="op-check-patient-top-grid"
-          className="grid gap-3 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]"
+          className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]"
         >
-          {/* ── 좌측 컬럼: 날짜 선택 + 상태 현황 + 환자 리스트 ── */}
+          {/* ── 좌측 컬럼: 선택 환자 상세 (인라인 워크스페이스) ── */}
           <div className="flex flex-col gap-3">
+            {/* 환자 헤더 (이름/차트/수술명/저장/이전·다음) */}
+            {patientWorkspaceTopPanel}
+            {/* 상세 콘텐츠 (진행 스텝·메타·체크리스트·메모) */}
+            <div className="space-y-3">
+              {patientWorkspaceDetailContent}
+            </div>
+          </div>
+
+          {/* ── 우측 컬럼: 날짜 선택 + 상태 현황 + 환자 리스트 (달력) ── */}
+          <div className="flex flex-col gap-3">
+            {allowEmbeddedTemplateSettings && (
+              <div className="flex justify-between items-center px-1 shrink-0">
+                <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wide">일정 및 환자</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('templates')}
+                  className="text-[10px] font-black text-[var(--toss-gray-4)] hover:text-[var(--accent)] transition-colors flex items-center gap-1"
+                >
+                  ⚙️ 템플릿 설정
+                </button>
+              </div>
+            )}
 
             {/* 날짜 선택 컨트롤 (컴팩트 달력 + 날짜 페이저) */}
             <div
@@ -2976,24 +2985,6 @@ export default function OperationCheckView({
               </div>
             </div>
 
-            {/* 작업 현황 요약 */}
-            <div
-              data-testid="op-check-patient-summary-card"
-              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
-            >
-              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">작업 현황</p>
-              <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">
-                전체 {selectedDateSchedules.length}명
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-1.5">
-                {workspaceStatusSummaryCards.map((card) => (
-                  <div key={card.value} className={`rounded-[var(--radius-md)] px-2.5 py-1.5 ${card.idleClass}`}>
-                    <p className={`text-[10px] font-semibold ${card.labelClass}`}>{card.label}</p>
-                    <p className="text-sm font-bold">{card.count}명</p>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* 환자 리스트 (상태 필터 칩 + 카드) */}
             <div
@@ -3020,6 +3011,15 @@ export default function OperationCheckView({
                   <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{filteredSchedules.length}명</span>
                 </div>
               </div>
+              <div className="mb-2.5">
+                <input
+                  data-testid="op-check-search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="환자명, 수술명, 차트번호 검색"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/20 px-3 py-1.5 text-xs font-medium focus:bg-[var(--card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all"
+                />
+              </div>
               {renderStatusFilterTabs()}
               {renderFilteredScheduleList({
                 containerClassName: 'max-h-[calc(100vh-420px)] min-h-[120px] space-y-2 overflow-y-auto pr-1 custom-scrollbar',
@@ -3029,18 +3029,20 @@ export default function OperationCheckView({
               })}
             </div>
 
-          </div>
+            {checkForm && (
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+                <p className="text-[11px] font-extrabold text-[var(--toss-gray-3)] uppercase tracking-wide px-1 mb-1.5 flex items-center gap-1">
+                  <span>📝</span> 환자별 메모
+                </p>
+                <textarea
+                  value={checkForm.notes}
+                  onChange={(event) => setCheckForm((prev) => (prev ? { ...prev, notes: event.target.value } : prev))}
+                  placeholder="특이사항, 추가 준비 요청, 소모품 메모 등..."
+                  className="w-full min-h-[90px] max-h-[140px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/20 px-2.5 py-1.5 text-xs font-medium focus:bg-[var(--card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-all custom-scrollbar resize-y"
+                />
+              </div>
+            )}
 
-          {/* ── 우측 컬럼: 선택 환자 상세 (인라인 워크스페이스) ── */}
-          <div className="flex flex-col gap-3">
-            {/* 환자 헤더 (이름/차트/수술명/저장/이전·다음) */}
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-              {patientWorkspaceTopPanel}
-            </div>
-            {/* 상세 콘텐츠 (진행 스텝·메타·체크리스트·메모) */}
-            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-              <div className="space-y-4">{patientWorkspaceDetailContent}</div>
-            </div>
           </div>
 
         </div>
@@ -3260,37 +3262,44 @@ export default function OperationCheckView({
                 </span>
               </div>
 
-              <div className="space-y-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 {(['surgery', 'anesthesia'] as const).map((scope) => (
-                  <div key={scope}>
-                    <p className="mb-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                      {scope === 'surgery' ? '수술 템플릿' : '마취 템플릿'}
-                    </p>
-                    <div className="space-y-2">
+                  <div key={scope} className="rounded-[var(--radius-lg)] bg-[var(--muted)]/20 p-3 border border-[var(--border)]/40 flex flex-col min-w-0">
+                    <div className="mb-2.5 flex items-center justify-between border-b border-[var(--border)]/60 pb-1.5 shrink-0">
+                      <p className="text-[11px] font-extrabold text-[var(--accent)] flex items-center gap-1">
+                        <span>{scope === 'surgery' ? '🏥' : '💉'}</span>
+                        {scope === 'surgery' ? '수술 템플릿' : '마취 템플릿'}
+                      </p>
+                      <span className="rounded-full bg-[var(--card)] px-1.5 py-0.5 text-[8px] font-black text-[var(--toss-gray-4)] border border-[var(--border)]/45">
+                        {templatesByScope[scope].length}개
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-0.5 custom-scrollbar flex-1 min-h-[120px]">
                       {templatesByScope[scope].length === 0 ? (
                         <EmptyState
-                          title="아직 등록된 템플릿이 없습니다"
-                          description={`${scope === 'surgery' ? '수술' : '마취'} 템플릿을 저장하면 반복 준비 항목을 빠르게 불러올 수 있습니다.`}
+                          title="등록된 템플릿 없음"
+                          description={`${scope === 'surgery' ? '수술' : '마취'} 템플릿이 비어 있습니다.`}
                           compact
                         />
                       ) : (
                         templatesByScope[scope].map((template) => (
                           <div
                             key={template.id}
-                            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-2xs hover:border-[var(--accent)]/45 transition-colors"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-[var(--foreground)]">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[12px] font-bold text-[var(--foreground)]" title={buildTemplateLabel(template)}>
                                   {buildTemplateLabel(template)}
                                 </p>
-                                <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">
+                                <p className="mt-0.5 text-[10px] font-medium text-[var(--toss-gray-3)]">
                                   준비 {normalizeChecklistItems(template.prep_items, 'list').length}개 · 소모품{' '}
                                   {normalizeChecklistItems(template.consumable_items, 'list').length}개
                                 </p>
                               </div>
                               <span
-                                className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                                className={`rounded-full px-1.5 py-0.5 text-[8px] font-black shrink-0 ${
                                   template.is_active === false
                                     ? 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                                     : 'bg-emerald-50 text-emerald-700'
@@ -3300,22 +3309,22 @@ export default function OperationCheckView({
                               </span>
                             </div>
                             {template.notes ? (
-                              <p className="mt-2 line-clamp-2 text-[12px] font-medium text-[var(--toss-gray-3)]">
+                              <p className="mt-1.5 line-clamp-2 text-[10px] font-medium text-[var(--toss-gray-3)] leading-relaxed bg-[var(--muted)]/30 p-1.5 rounded">
                                 {template.notes}
                               </p>
                             ) : null}
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-2.5 flex flex-wrap gap-1.5 justify-end border-t border-[var(--border)]/40 pt-2 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => loadTemplateIntoEditor(template)}
-                                className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
+                                className="rounded-full border border-[var(--border)] px-2 py-1 text-[9px] font-black text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
                               >
                                 수정
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void removeTemplate(String(template.id || ''))}
-                                className="rounded-full border border-red-500/20 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
+                                className="rounded-full border border-red-500/20 px-2 py-1 text-[9px] font-black text-red-600 hover:bg-red-500/10"
                               >
                                 삭제
                               </button>
@@ -3332,137 +3341,6 @@ export default function OperationCheckView({
         </div>
       )}
 
-      {dayWorkspaceOpen && activeTab === 'patients' && (
-        <div
-          className="fixed inset-0 z-[320] flex items-center justify-center bg-black/45 p-0 md:p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              handleWorkspaceClose();
-            }
-          }}
-        >
-          <div
-            data-testid="op-check-workspace-modal"
-            className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border border-[var(--border)] bg-[var(--card)] shadow-2xl md:h-[94vh] md:max-w-[1760px] md:rounded-[var(--radius-xl)]"
-          >
-            {/* 헤더 행 1: 제목 + 날짜 + 검색 + 닫기 */}
-            <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--card)]/96 px-4 py-2.5 backdrop-blur">
-              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">OP체크</p>
-              <h3 className="text-sm font-bold text-[var(--foreground)]">{formatDateLabel(selectedDate)}</h3>
-              <span className="rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                {workspaceSelectedOrderLabel}
-              </span>
-              <div className="flex-1" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="환자명 / 수술명 / 차트번호"
-                className="hidden w-48 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-xs font-medium md:block"
-              />
-              <select
-                data-testid="op-check-workspace-sort-modal"
-                value={workspaceSort}
-                onChange={(event) => setWorkspaceSort(event.target.value as WorkspaceSortKey)}
-                className="hidden rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-xs font-bold text-[var(--toss-gray-4)] md:block"
-              >
-                <option value="time">시간순</option>
-                <option value="status">상태순</option>
-                <option value="room">수술실순</option>
-                <option value="name">이름순</option>
-              </select>
-              <button
-                type="button"
-                onClick={handleWorkspaceClose}
-                data-testid="op-check-workspace-close"
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-1.5 text-sm font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-              >
-                닫기
-              </button>
-            </div>
-
-            {/* 헤더 행 2: 상태 필터 탭 (pill 형태) */}
-            <div
-              data-testid="op-check-workspace-header-summary"
-              className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--muted)]/25 px-4 py-2"
-            >
-              <button
-                type="button"
-                data-testid="op-check-workspace-status-filter-reset"
-                onClick={() => setStatusFilterTab('전체')}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
-                  statusFilterTab === '전체'
-                    ? 'bg-[var(--foreground)] text-white'
-                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
-                }`}
-              >
-                전체 {workspaceVisibleScheduleCount}
-              </button>
-              {workspaceStatusSummaryCards.map((card) => {
-                const isSelected = statusFilterTab === card.value;
-                return (
-                  <button
-                    key={card.value}
-                    type="button"
-                    data-testid={`op-check-workspace-status-filter-${card.testId}`}
-                    onClick={() => handleWorkspaceStatusSummaryClick(card.value)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
-                      isSelected ? card.activeClass : `${card.idleClass} hover:opacity-80`
-                    }`}
-                  >
-                    {card.label} {card.count}
-                  </button>
-                );
-              })}
-              <div className="flex-1" />
-              {/* 모바일: 검색/정렬 */}
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="검색"
-                className="w-28 rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-xs font-medium md:hidden"
-              />
-              <select
-                value={workspaceSort}
-                onChange={(event) => setWorkspaceSort(event.target.value as WorkspaceSortKey)}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-xs font-bold text-[var(--toss-gray-4)] md:hidden"
-              >
-                <option value="time">시간순</option>
-                <option value="status">상태순</option>
-                <option value="room">수술실순</option>
-                <option value="name">이름순</option>
-              </select>
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="grid gap-3 border-b border-[var(--border)] bg-[var(--muted)]/20 px-4 py-3 xl:items-start xl:grid-cols-[minmax(0,1fr)_minmax(312px,336px)]">
-                <aside className="min-w-0">
-                  <div className="mb-2 flex items-center justify-between gap-2 px-1">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                      {statusFilterTab !== '전체' ? `${statusFilterTab} 환자` : '수술 환자 목록'}
-                    </p>
-                    <span className="text-[11px] font-bold text-[var(--foreground)]">{workspaceVisibleScheduleCount}명</span>
-                  </div>
-                  {renderFilteredScheduleList({
-                    containerClassName: 'flex snap-x snap-mandatory gap-2 overflow-x-auto overflow-y-hidden pb-1 pr-1 scroll-smooth custom-scrollbar',
-                    emptyMessage: statusFilterTab !== '전체'
-                      ? '현재 조건에 맞는 수술 환자가 없습니다.'
-                      : '선택한 날짜에 연결할 수술 환자가 없습니다.',
-                    openWorkspaceOnSelect: false,
-                    layout: 'row',
-                    testIdPrefix: 'op-check-workspace-schedule-card',
-                    schedules: workspaceSchedules,
-                  })}
-                </aside>
-                {patientWorkspaceTopPanel}
-              </div>
-
-              <section className="min-h-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-4 md:p-5">
-                <div className="space-y-4">{patientWorkspaceDetailContent}</div>
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* #4 청구내역 출력 모달 */}
       {printModalOpen && checkForm && (

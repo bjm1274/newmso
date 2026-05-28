@@ -231,7 +231,7 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
                   isRowLayout ? 'mt-2 text-[10px]' : 'mt-1.5 text-[11px]'
                 }`}
               >
-                <span>{displayScheduleRoom || '방 미정'}</span>
+                <span>{displayScheduleRoom ? `수술실 ${displayScheduleRoom}` : '수술실 미정'}</span>
                 {displayChartNo ? <span>· 차트 {displayChartNo}</span> : null}
                 {item.surgery_fasting ? (
                   <span
@@ -284,16 +284,13 @@ export function OpCheckWorkspaceHeader({
   return (
     <div
       data-testid="op-check-workspace-detail-header"
-      className="self-start rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-sm"
+      className="self-start rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm w-full"
     >
       <div className="flex flex-col gap-2.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <h3 className="text-[17px] font-bold text-[var(--foreground)]">{patientName}</h3>
             <span className={`rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${statusClass}`}>{status}</span>
-            <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
-              작업 순서 {orderLabel}
-            </span>
             {isDirty ? (
               <span
                 data-testid="op-check-workspace-dirty-indicator"
@@ -311,48 +308,26 @@ export function OpCheckWorkspaceHeader({
           <p className="mt-1 truncate text-[12px] font-medium text-[var(--toss-gray-3)]">{surgeryName}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-1">
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-1.5">
             <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술 시간</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{scheduleTime}</p>
+            <p className="mt-0.5 text-[12px] font-bold text-[var(--foreground)]">{scheduleTime}</p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-1.5">
             <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">수술실</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--foreground)]">{scheduleRoom}</p>
+            <p className="mt-0.5 text-[12px] font-bold text-[var(--foreground)]">{scheduleRoom}</p>
           </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2 py-1.5">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)]/35 px-2.5 py-1.5">
             <p className="text-[9px] font-semibold text-[var(--toss-gray-3)]">차트번호</p>
-            <p className="mt-0.5 truncate text-[13px] font-bold text-[var(--foreground)]">{chartNo || '-'}</p>
-          </div>
-          <div className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)]/70 px-2 py-1.5">
-            <p className="text-[9px] font-semibold text-[var(--accent)]">당일 현황</p>
-            <p className="mt-0.5 text-[13px] font-bold text-[var(--accent)]">{orderLabel}</p>
+            <p className="mt-0.5 truncate text-[12px] font-bold text-[var(--foreground)]">{chartNo || '-'}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-1">
-          <button
-            type="button"
-            data-testid="op-check-workspace-prev"
-            onClick={onPrev}
-            disabled={prevDisabled}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-          >
-            ← 이전
-          </button>
-          <button
-            type="button"
-            data-testid="op-check-workspace-next"
-            onClick={onNext}
-            disabled={nextDisabled}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] disabled:opacity-40"
-          >
-            다음 →
-          </button>
+        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-[var(--border)]/40 pt-2 shrink-0">
           <button
             type="button"
             onClick={onPrint}
-            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
           >
             출력
           </button>
@@ -361,7 +336,7 @@ export function OpCheckWorkspaceHeader({
             data-testid="op-check-record-save"
             onClick={onSave}
             disabled={saving}
-            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-1.5 text-[11px] font-bold text-white disabled:opacity-60"
           >
             {saving ? '저장 중...' : '저장'}
           </button>

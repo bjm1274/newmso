@@ -9,27 +9,12 @@ import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { FEATURE_PERMISSION_GROUPS } from '@/lib/feature-permissions';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 
-import type { ApprovalReferenceSettingUser, PermissionReview } from './직원권한통합/types';
+import type { PermissionReview } from './직원권한통합/types';
 import { getToneClasses, getToggleClasses, compareKoreanLabels, getStaffCompanyLabel, getStaffTeamLabel, sortStaffRows } from './직원권한통합/style-utils';
-import { buildPermissionReview, normalizeApprovalReferenceDefaults } from './직원권한통합/permission-review';
+import { buildPermissionReview } from './직원권한통합/permission-review';
 import { PermissionDiffPanel } from './직원권한통합/PermissionDiffPanel';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
-
-const STAFF_LIST_SELECT =
-  'id, employee_no, name, company, department, position, role, permissions, status';
-
-const APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY = 'approval_reference_defaults';
-const APPROVAL_DELEGATE_ID_PERMISSION_KEY = 'approval_delegate_id';
-const APPROVAL_DELEGATE_START_PERMISSION_KEY = 'approval_delegate_start';
-const APPROVAL_DELEGATE_END_PERMISSION_KEY = 'approval_delegate_end';
-const APPROVAL_DELAY_HOURS_PERMISSION_KEY = 'approval_delay_hours';
-const APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY = 'approval_delay_repeat_hours';
-const APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY = 'approval_delay_max_notifications';
-const APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY = 'approval_doc_number_prefix';
-const APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY = 'approval_doc_number_include_department';
-const APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY = 'approval_doc_number_date_mode';
-const APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY = 'approval_doc_number_sequence_padding';
 /**
  * permissions JSON 안에 함께 저장되지만 권한이 아닌 개인 고유 데이터 키 목록.
  * 권한 복사 시 이 키들은 원본에서 가져오지 않고 대상자의 값을 그대로 유지한다.
@@ -92,20 +77,6 @@ function buildPermissionsForCopy(
   return result;
 }
 
-const APPROVAL_REFERENCE_TARGETS = [
-  { key: 'all', label: '모든 문서' },
-  { key: 'leave', label: '연차/휴가' },
-  { key: 'annual_plan', label: '연차계획서' },
-  { key: 'overtime', label: '연장근무' },
-  { key: 'purchase', label: '물품신청' },
-  { key: 'repair_request', label: '수리요청' },
-  { key: 'draft_business', label: '업무기안' },
-  { key: 'cooperation', label: '업무협조' },
-  { key: 'generic', label: '증명서발급' },
-  { key: 'attendance_fix', label: '출결정정' },
-  { key: 'personnel_order', label: '인사명령' },
-] as const;
-
 export default function StaffPermissionManager(props: { onRefresh?: () => void }) {
   const isMobile = useIsMobile();
   if (isMobile) {
@@ -124,7 +95,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
   const [copySourceId, setCopySourceId] = useState<string>('');
   const [copyRoleToo, setCopyRoleToo] = useState(true);
   const [copying, setCopying] = useState(false);
-  const [selectedApprovalReferenceFormKey, setSelectedApprovalReferenceFormKey] = useState<string>('all');
+  const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [permissionReview, setPermissionReview] = useState<PermissionReview | null>(null);
 
   // STAFF_LIST_SELECT 모든 컬럼이 STAFF_BOOTSTRAP_COLUMNS에 포함되므로 Context로 대체.
@@ -434,60 +405,12 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       }));
   }, [staffs]);
 
+  const companies = useMemo(() => {
+    return groupedStaffSections.map((s) => s.company);
+  }, [groupedStaffSections]);
+
   const selectedPermissions: Record<string, unknown> = (selectedStaff?.permissions as Record<string, unknown>) || {};
-  const selectedApprovalReferenceDefaults = useMemo(
-    () =>
-      normalizeApprovalReferenceDefaults(
-        selectedPermissions[APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY],
-        staffs
-      ),
-    [selectedPermissions, staffs]
-  );
-  const currentApprovalReferenceUsers = useMemo(
-    () => selectedApprovalReferenceDefaults[selectedApprovalReferenceFormKey] || [],
-    [selectedApprovalReferenceDefaults, selectedApprovalReferenceFormKey]
-  );
-  const approvalReferenceCandidateStaffs = useMemo(
-    () =>
-      staffs.filter((staff) => {
-        if (String(staff?.id) === String(selectedStaff?.id || '')) return false;
-        return !currentApprovalReferenceUsers.some((referenceUser) => String(referenceUser.id) === String(staff?.id));
-      }),
-    [currentApprovalReferenceUsers, selectedStaff?.id, staffs]
-  );
-  const approvalDelegateCandidateStaffs = useMemo(
-    () => staffs.filter((staff) => String(staff?.id) !== String(selectedStaff?.id || '')),
-    [selectedStaff?.id, staffs]
-  );
-  const selectedApprovalDelegateId = String(selectedPermissions[APPROVAL_DELEGATE_ID_PERMISSION_KEY] || '');
-  const selectedApprovalDelegateStart = String(selectedPermissions[APPROVAL_DELEGATE_START_PERMISSION_KEY] || '');
-  const selectedApprovalDelegateEnd = String(selectedPermissions[APPROVAL_DELEGATE_END_PERMISSION_KEY] || '');
-  const selectedApprovalDelayHours = Math.min(
-    168,
-    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_HOURS_PERMISSION_KEY] || 24) || 24)
-  );
-  const selectedApprovalDelayRepeatHours = Math.min(
-    168,
-    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY] || 24) || 24)
-  );
-  const selectedApprovalDelayMaxNotifications = Math.min(
-    10,
-    Math.max(1, Number(selectedPermissions[APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY] || 3) || 3)
-  );
-  const selectedApprovalDocNumberPrefix = String(selectedPermissions[APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY] || '');
-  const selectedApprovalDocNumberIncludeDepartment = selectedPermissions[APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY] === true;
-  const selectedApprovalDocNumberDateMode = ['full', 'month', 'year'].includes(String(selectedPermissions[APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY] || ''))
-    ? String(selectedPermissions[APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY])
-    : 'full';
-  const selectedApprovalDocNumberSequencePadding = Math.min(
-    6,
-    Math.max(2, Number(selectedPermissions[APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY] || 3) || 3)
-  );
-  const selectedApprovalDelegateStaff = useMemo(
-    () =>
-      approvalDelegateCandidateStaffs.find((staff) => String(staff.id) === selectedApprovalDelegateId) || null,
-    [approvalDelegateCandidateStaffs, selectedApprovalDelegateId]
-  );
+
   const permissionStats = useMemo(() => {
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
@@ -530,88 +453,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
     return review;
   }, [copyRoleToo, copySourceId, selectedStaff?.id, staffs]);
 
-  const updateApprovalReferenceDefaults = useCallback(
-    async (formKey: string, nextUsers: ApprovalReferenceSettingUser[]) => {
-      if (!selectedStaff?.id) return false;
-      const nextReferenceDefaults = { ...selectedApprovalReferenceDefaults };
-      if (nextUsers.length > 0) {
-        nextReferenceDefaults[formKey] = nextUsers.map((staff) => ({
-          id: String(staff.id),
-          name: staff.name,
-          position: staff.position ?? null,
-          department: staff.department ?? null,
-          company: staff.company ?? null,
-        }));
-      } else {
-        delete nextReferenceDefaults[formKey];
-      }
 
-      const nextPermissions = {
-        ...selectedPermissions,
-        [APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY]: nextReferenceDefaults,
-      };
-
-      return setPermissions(String(selectedStaff.id), nextPermissions);
-    },
-    [selectedApprovalReferenceDefaults, selectedPermissions, selectedStaff?.id, setPermissions]
-  );
-
-  const addApprovalReferenceRecipient = useCallback(
-    async (staffId: string) => {
-      if (!staffId) return;
-      const matched = staffs.find((staff) => String(staff.id) === String(staffId));
-      if (!matched) return;
-      if (currentApprovalReferenceUsers.some((staff) => String(staff.id) === String(matched.id))) return;
-
-      await updateApprovalReferenceDefaults(selectedApprovalReferenceFormKey, [
-        ...currentApprovalReferenceUsers,
-        {
-          id: String(matched.id),
-          name: String(matched.name || '이름 없음'),
-          position: matched.position ?? null,
-          department: matched.department ?? null,
-          company: matched.company ?? null,
-        },
-      ]);
-    },
-    [currentApprovalReferenceUsers, selectedApprovalReferenceFormKey, staffs, updateApprovalReferenceDefaults]
-  );
-
-  const removeApprovalReferenceRecipient = useCallback(
-    async (staffId: string) => {
-      await updateApprovalReferenceDefaults(
-        selectedApprovalReferenceFormKey,
-        currentApprovalReferenceUsers.filter((staff) => String(staff.id) !== String(staffId))
-      );
-    },
-    [currentApprovalReferenceUsers, selectedApprovalReferenceFormKey, updateApprovalReferenceDefaults]
-  );
-  const updateApprovalAutomationSettings = useCallback(
-    async (partial: Record<string, unknown>) => {
-      if (!selectedStaff?.id) return false;
-      const nextPermissions = {
-        ...selectedPermissions,
-        ...partial,
-      };
-      return setPermissions(String(selectedStaff.id), nextPermissions);
-    },
-    [selectedPermissions, selectedStaff?.id, setPermissions]
-  );
-  const clearApprovalDelegate = useCallback(async () => {
-    await updateApprovalAutomationSettings({
-      [APPROVAL_DELEGATE_ID_PERMISSION_KEY]: null,
-      [APPROVAL_DELEGATE_START_PERMISSION_KEY]: null,
-      [APPROVAL_DELEGATE_END_PERMISSION_KEY]: null,
-    });
-  }, [updateApprovalAutomationSettings]);
-  const clearApprovalDocNumberRule = useCallback(async () => {
-    await updateApprovalAutomationSettings({
-      [APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY]: null,
-      [APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY]: false,
-      [APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY]: 'full',
-      [APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY]: 3,
-    });
-  }, [updateApprovalAutomationSettings]);
 
   if (loading) {
     return <div className="p-5 text-center text-[var(--toss-gray-3)] font-bold">로딩 중...</div>;
@@ -624,179 +466,174 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
     >
       {dialog}
       <div className="flex w-full max-h-[34vh] shrink-0 flex-col border-[var(--border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[200px] md:self-start md:w-[200px] md:border-r lg:w-[216px]">
-        <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
+        <div className="p-3 border-b border-[var(--border)] bg-[var(--muted)]">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">직원 명단</h3>
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="w-full px-2.5 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--card)] text-[var(--foreground)]"
+          >
+            <option value="all">전체 회사</option>
+            {companies.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
         <div className="flex-1 overflow-y-auto bg-[var(--muted)]/40">
           <div className="space-y-2 p-2">
-            {groupedStaffSections.map((companySection) => (
-              <section key={companySection.company} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]/90 shadow-sm">
-                <div className="border-b border-[var(--border)] bg-[var(--muted)] px-3 py-2">
-                  <p className="text-[11px] font-bold text-[var(--foreground)]">{companySection.company}</p>
-                </div>
-                <div className="divide-y divide-[var(--border)]">
-                  {companySection.teams.map((teamSection) => (
-                    <div key={`${companySection.company}-${teamSection.team}`} className="px-2 py-1.5">
-                      <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--toss-gray-3)]">
-                        {teamSection.team}
-                      </p>
-                      <div className="space-y-1">
-                        {teamSection.members.map((staff) => (
-                          <button
-                            key={staff.id}
-                            type="button"
-                            data-testid={`staff-permission-row-${staff.id}`}
-                            onClick={() => {
-                              setSelectedStaff(staff);
-                              setPermissionReview(null);
-                            }}
-                            className={`w-full rounded-[var(--radius-md)] px-2 py-1.5 text-left transition-all ${
-                              selectedStaff?.id === staff.id
-                                ? 'bg-[var(--toss-blue-light)] ring-1 ring-[var(--accent)]'
-                                : 'hover:bg-[var(--muted)]'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="truncate text-[11px] font-bold text-[var(--foreground)]">{staff.name}</span>
-                              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-3)]">#{staff.employee_no}</span>
-                            </div>
-                            <p className="truncate text-[9px] font-medium text-[var(--toss-gray-3)]">
-                              {staff.position || '-'}
-                            </p>
-                          </button>
-                        ))}
+            {groupedStaffSections
+              .filter((section) => selectedCompany === 'all' || section.company === selectedCompany)
+              .map((companySection) => (
+                <section key={companySection.company} className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]/90 shadow-sm">
+                  <div className="border-b border-[var(--border)] bg-[var(--muted)] px-3 py-2">
+                    <p className="text-[11px] font-bold text-[var(--foreground)]">{companySection.company}</p>
+                  </div>
+                  <div className="divide-y divide-[var(--border)]">
+                    {companySection.teams.map((teamSection) => (
+                      <div key={`${companySection.company}-${teamSection.team}`} className="px-2 py-1.5">
+                        <p className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--toss-gray-3)]">
+                          {teamSection.team}
+                        </p>
+                        <div className="space-y-1">
+                          {teamSection.members.map((staff) => (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              data-testid={`staff-permission-row-${staff.id}`}
+                              onClick={() => {
+                                setSelectedStaff(staff);
+                                setPermissionReview(null);
+                              }}
+                              className={`w-full rounded-[var(--radius-md)] px-2 py-1.5 text-left transition-all ${
+                                selectedStaff?.id === staff.id
+                                  ? 'bg-[var(--toss-blue-light)] ring-1 ring-[var(--accent)]'
+                                  : 'hover:bg-[var(--muted)]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="truncate text-[11px] font-bold text-[var(--foreground)]">{staff.name}</span>
+                                <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-3)]">#{staff.employee_no}</span>
+                              </div>
+                              <p className="truncate text-[9px] font-medium text-[var(--toss-gray-3)]">
+                                {staff.position || '-'}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+                    ))}
+                  </div>
+                </section>
+              ))}
           </div>
         </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-visible bg-[var(--muted)]/50">
-        <div className="shrink-0 mx-2 mt-2 rounded-[var(--radius-md)] border border-[var(--border)] border-l-4 border-l-[var(--accent)] bg-[var(--card)] p-2.5 shadow-sm md:mx-4 md:mt-4 md:p-3">
-          <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">권한 빠른 복사 (A → B)</p>
-          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">권한 가져올 직원</label>
-              <select
-                data-testid="staff-permission-copy-source"
-                value={copySourceId}
-                onChange={(e) => setCopySourceId(e.target.value)}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
-              >
-                <option value="">직원 선택</option>
-                {groupedStaffSections.map((companySection) =>
-                  companySection.teams.map((teamSection) => (
-                    <optgroup
-                      key={`${companySection.company}-${teamSection.team}`}
-                      label={`${companySection.company} / ${teamSection.team}`}
-                    >
-                      {teamSection.members.map((staff) => (
-                        <option key={staff.id} value={staff.id} disabled={staff.id === selectedStaff?.id}>
-                          {staff.name} #{staff.employee_no}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                )}
-              </select>
-            </div>
-            <div className="min-w-[180px] flex-1">
-              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">적용할 직원</label>
-              <select
-                data-testid="staff-permission-copy-target"
-                value={(selectedStaff?.id as string) || ''}
-                onChange={(e) => {
-                  setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null);
-                  setPermissionReview(null);
-                }}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
-              >
-                <option value="">직원 선택</option>
-                {groupedStaffSections.map((companySection) =>
-                  companySection.teams.map((teamSection) => (
-                    <optgroup
-                      key={`target-${companySection.company}-${teamSection.team}`}
-                      label={`${companySection.company} / ${teamSection.team}`}
-                    >
-                      {teamSection.members.map((staff) => (
-                        <option key={staff.id} value={staff.id} disabled={staff.id === copySourceId}>
-                          {staff.name} #{staff.employee_no}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                )}
-              </select>
-            </div>
-            <label className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-[10px] font-bold text-[var(--toss-gray-4)]">
-              <input
-                data-testid="staff-permission-copy-role"
-                type="checkbox"
-                checked={copyRoleToo}
-                onChange={(e) => setCopyRoleToo(e.target.checked)}
-                className="rounded border-[var(--border)]"
-              />
-              역할까지 함께 복사
-            </label>
-            <button
-              type="button"
-              data-testid="staff-permission-copy-apply"
-              onClick={copyPermissionsToStaff}
-              disabled={copying || !copySourceId || !selectedStaff?.id || copySourceId === selectedStaff?.id}
-              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[10px] font-bold text-white hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {copying ? '적용 중...' : '현재 직원에 복사'}
-            </button>
-          </div>
-        </div>
-
-        {copyPreviewReview ? (
-          <div className="mx-2 mt-2 md:mx-4">
-            <PermissionDiffPanel review={copyPreviewReview} mode="preview" />
-          </div>
-        ) : null}
-
         {selectedStaff ? (
           <div className="px-2 pb-32 pt-1 md:px-4 md:pb-40 md:pt-1.5" data-testid="staff-permission-detail">
             <div className="max-w-6xl space-y-3">
-              <div className="border-b border-[var(--border)] pb-3">
-                <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">
-                  [{selectedStaff.name as string}] 직원 권한 설정
-                </h3>
-                <p className="mt-1 text-[11px] font-bold text-[var(--accent)]">
-                  사번 {selectedStaff.employee_no as string} | {selectedStaff.department as string} {selectedStaff.position as string}
-                </p>
-              </div>
+              {copyPreviewReview && <PermissionDiffPanel review={copyPreviewReview} mode="preview" />}
 
-              {permissionReview ? (
+              {permissionReview && (
                 <PermissionDiffPanel review={permissionReview} mode="saved" />
-              ) : (
-                <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                  권한을 변경하면 이 영역에 변경 전후 차이, 영향 그룹, 고위험 권한 수가 표시됩니다.
-                </div>
               )}
 
               <div className="grid gap-3 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
-              <div className="space-y-3">
-                <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)]">
-                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할</p>
-                  <select
-                    data-testid={`staff-role-select`}
-                    value={(selectedStaff.role as string) || 'staff'}
-                    onChange={(e) => handleRoleChange(selectedStaff.id as string, e.target.value)}
-                    className={`w-full px-2.5 py-2 border rounded-[var(--radius-md)] text-[11px] font-bold ${
-                      selectedStaff.role === 'admin' ? 'border-danger/20 text-danger bg-danger/10' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <option value="staff">일반 직원 (기본)</option>
-                    <option value="manager">부서장</option>
-                    <option value="admin">시스템 관리자</option>
-                  </select>
-                </div>
+                <div className="space-y-3">
+                  <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)]">
+                    <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할</p>
+                    <select
+                      data-testid={`staff-role-select`}
+                      value={(selectedStaff.role as string) || 'staff'}
+                      onChange={(e) => handleRoleChange(selectedStaff.id as string, e.target.value)}
+                      className={`w-full px-2.5 py-2 border rounded-[var(--radius-md)] text-[11px] font-bold ${
+                        selectedStaff.role === 'admin' ? 'border-danger/20 text-danger bg-danger/10' : 'border-[var(--border)]'
+                      }`}
+                    >
+                      <option value="staff">일반 직원 (기본)</option>
+                      <option value="manager">부서장</option>
+                      <option value="admin">시스템 관리자</option>
+                    </select>
+                  </div>
+
+                  <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-2.5">
+                    <p className="text-[13px] font-semibold text-[var(--foreground)]">권한 빠른 복사 (A → B)</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">권한 가져올 직원</label>
+                        <select
+                          data-testid="staff-permission-copy-source"
+                          value={copySourceId}
+                          onChange={(e) => setCopySourceId(e.target.value)}
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-[11px] font-bold"
+                        >
+                          <option value="">직원 선택</option>
+                          {groupedStaffSections.map((companySection) =>
+                            companySection.teams.map((teamSection) => (
+                              <optgroup
+                                key={`${companySection.company}-${teamSection.team}`}
+                                label={`${companySection.company} / ${teamSection.team}`}
+                              >
+                                {teamSection.members.map((staff) => (
+                                  <option key={staff.id} value={staff.id} disabled={staff.id === selectedStaff?.id}>
+                                    {staff.name} #{staff.employee_no}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">적용할 직원</label>
+                        <select
+                          data-testid="staff-permission-copy-target"
+                          value={(selectedStaff?.id as string) || ''}
+                          onChange={(e) => {
+                            setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null);
+                            setPermissionReview(null);
+                          }}
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-1.5 text-[11px] font-bold"
+                        >
+                          <option value="">직원 선택</option>
+                          {groupedStaffSections.map((companySection) =>
+                            companySection.teams.map((teamSection) => (
+                              <optgroup
+                                key={`target-${companySection.company}-${teamSection.team}`}
+                                label={`${companySection.company} / ${teamSection.team}`}
+                              >
+                                {teamSection.members.map((staff) => (
+                                  <option key={staff.id} value={staff.id} disabled={staff.id === copySourceId}>
+                                    {staff.name} #{staff.employee_no}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                      <label className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                        <input
+                          data-testid="staff-permission-copy-role"
+                          type="checkbox"
+                          checked={copyRoleToo}
+                          onChange={(e) => setCopyRoleToo(e.target.checked)}
+                          className="rounded border-[var(--border)]"
+                        />
+                        역할까지 함께 복사
+                      </label>
+                      <button
+                        type="button"
+                        data-testid="staff-permission-copy-apply"
+                        onClick={copyPermissionsToStaff}
+                        disabled={copying || !copySourceId || !selectedStaff?.id || copySourceId === selectedStaff?.id}
+                        className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2 text-[10px] font-bold text-white hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        {copying ? '적용 중...' : '현재 직원에 복사'}
+                      </button>
+                    </div>
+                  </div>
 
                 <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)]">
                   <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">비밀번호 초기화</p>
@@ -813,292 +650,6 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
                       {passwordSaving ? '초기화 중...' : '초기화'}
                     </button>
                   </div>
-                </div>
-                <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-3">
-                  <div>
-                    <p className="text-[13px] font-semibold text-[var(--foreground)]">문서별 기본 참조자</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                      전자결재 문서 작성 시 이 직원에게 자동으로 들어갈 참조자를 문서 종류별로 설정합니다.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <select
-                      data-testid="staff-approval-default-form-select"
-                      value={selectedApprovalReferenceFormKey}
-                      onChange={(e) => setSelectedApprovalReferenceFormKey(e.target.value)}
-                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                    >
-                      {APPROVAL_REFERENCE_TARGETS.map((target) => (
-                        <option key={target.key} value={target.key}>{target.label}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      data-testid="staff-approval-default-recipient-select"
-                      defaultValue=""
-                      onChange={(e) => {
-                        void addApprovalReferenceRecipient(e.target.value);
-                        e.currentTarget.value = '';
-                      }}
-                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                    >
-                      <option value="">참조자 추가...</option>
-                      {approvalReferenceCandidateStaffs.map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? ` · ${staff.company}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {currentApprovalReferenceUsers.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {currentApprovalReferenceUsers.map((staff) => (
-                        <span
-                          key={`${selectedApprovalReferenceFormKey}-${staff.id}`}
-                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-2.5 py-1.5 text-[10px] font-bold text-[var(--foreground)]"
-                        >
-                          {staff.name}
-                          {staff.position ? ` ${staff.position}` : ''}
-                          <button
-                            type="button"
-                            data-testid={`staff-approval-default-recipient-remove-${staff.id}`}
-                            onClick={() => void removeApprovalReferenceRecipient(staff.id)}
-                            className="text-[var(--toss-gray-4)] hover:text-red-500"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                      <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                        현재 선택한 문서 종류에 자동 참조자가 없습니다.
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-3">
-                  <div>
-                    <p className="text-[13px] font-semibold text-[var(--foreground)]">전자결재 자동화</p>
-                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                      부재중일 때 대신 결재할 대결자, 결재 지연 알림 세부 기준, 문서번호 규칙을 설정합니다.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <select
-                      data-testid="staff-approval-delegate-select"
-                      value={selectedApprovalDelegateId}
-                      onChange={(e) => {
-                        void updateApprovalAutomationSettings({
-                          [APPROVAL_DELEGATE_ID_PERMISSION_KEY]: e.target.value || null,
-                        });
-                      }}
-                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                    >
-                      <option value="">자동 대결자 없음</option>
-                      {approvalDelegateCandidateStaffs.map((staff) => (
-                        <option key={`approval-delegate-${staff.id}`} value={String(staff.id)}>
-                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? ` · ${staff.company}` : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        data-testid="staff-approval-delegate-start"
-                        type="date"
-                        value={selectedApprovalDelegateStart}
-                        onChange={(e) => {
-                          void updateApprovalAutomationSettings({
-                            [APPROVAL_DELEGATE_START_PERMISSION_KEY]: e.target.value || null,
-                          });
-                        }}
-                        className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                      />
-                      <input
-                        data-testid="staff-approval-delegate-end"
-                        type="date"
-                        value={selectedApprovalDelegateEnd}
-                        onChange={(e) => {
-                          void updateApprovalAutomationSettings({
-                            [APPROVAL_DELEGATE_END_PERMISSION_KEY]: e.target.value || null,
-                          });
-                        }}
-                        className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                      />
-                    </div>
-
-                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                      <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                        첫 지연 알림 기준 시간
-                      </label>
-                      <input
-                        data-testid="staff-approval-delay-hours"
-                        type="number"
-                        min={1}
-                        max={168}
-                        value={selectedApprovalDelayHours}
-                        onChange={(e) => {
-                          void updateApprovalAutomationSettings({
-                            [APPROVAL_DELAY_HOURS_PERMISSION_KEY]: Math.min(168, Math.max(1, Number(e.target.value) || 24)),
-                          });
-                        }}
-                        className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                      />
-                    </div>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                        <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                          재알림 간격 시간
-                        </label>
-                        <input
-                          data-testid="staff-approval-delay-repeat-hours"
-                          type="number"
-                          min={1}
-                          max={168}
-                          value={selectedApprovalDelayRepeatHours}
-                          onChange={(e) => {
-                            void updateApprovalAutomationSettings({
-                              [APPROVAL_DELAY_REPEAT_HOURS_PERMISSION_KEY]: Math.min(168, Math.max(1, Number(e.target.value) || 24)),
-                            });
-                          }}
-                          className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                        />
-                      </div>
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                        <label className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                          최대 알림 횟수
-                        </label>
-                        <input
-                          data-testid="staff-approval-delay-max-notifications"
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={selectedApprovalDelayMaxNotifications}
-                          onChange={(e) => {
-                            void updateApprovalAutomationSettings({
-                              [APPROVAL_DELAY_MAX_NOTIFICATIONS_PERMISSION_KEY]: Math.min(10, Math.max(1, Number(e.target.value) || 3)),
-                            });
-                          }}
-                          className="w-full md:w-24 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/40 px-3 py-3">
-                      <div>
-                        <p className="text-[11px] font-bold text-[var(--foreground)]">문서번호 규칙</p>
-                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                          접두사, 날짜 형식, 부서 포함 여부, 일련번호 자릿수를 조정합니다.
-                        </p>
-                      </div>
-
-                      <div className="grid gap-2 md:grid-cols-2">
-                        <input
-                          data-testid="staff-approval-doc-prefix"
-                          type="text"
-                          placeholder="접두사 (예: SYHQ)"
-                          value={selectedApprovalDocNumberPrefix}
-                          onChange={(e) => {
-                            void updateApprovalAutomationSettings({
-                              [APPROVAL_DOC_NUMBER_PREFIX_PERMISSION_KEY]: e.target.value.trim() || null,
-                            });
-                          }}
-                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                        />
-                        <select
-                          data-testid="staff-approval-doc-date-mode"
-                          value={selectedApprovalDocNumberDateMode}
-                          onChange={(e) => {
-                            void updateApprovalAutomationSettings({
-                              [APPROVAL_DOC_NUMBER_DATE_MODE_PERMISSION_KEY]: e.target.value,
-                            });
-                          }}
-                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                        >
-                          <option value="full">날짜 8자리 (YYYYMMDD)</option>
-                          <option value="month">월 6자리 (YYYYMM)</option>
-                          <option value="year">연도 4자리 (YYYY)</option>
-                        </select>
-                      </div>
-
-                      <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,120px)] md:items-center">
-                        <label className="flex items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                          <input
-                            data-testid="staff-approval-doc-include-department"
-                            type="checkbox"
-                            checked={selectedApprovalDocNumberIncludeDepartment}
-                            onChange={(e) => {
-                              void updateApprovalAutomationSettings({
-                                [APPROVAL_DOC_NUMBER_INCLUDE_DEPARTMENT_PERMISSION_KEY]: e.target.checked,
-                              });
-                            }}
-                            className="rounded border-[var(--border)]"
-                          />
-                          부서 코드 포함
-                        </label>
-                        <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                          예시: {selectedApprovalDocNumberPrefix || '회사코드'}-{selectedApprovalDocNumberIncludeDepartment ? '부서-' : ''}LEV-{selectedApprovalDocNumberDateMode === 'year' ? '2026' : selectedApprovalDocNumberDateMode === 'month' ? '202603' : '20260329'}-{String(1).padStart(selectedApprovalDocNumberSequencePadding, '0')}
-                        </p>
-                        <input
-                          data-testid="staff-approval-doc-sequence-padding"
-                          type="number"
-                          min={2}
-                          max={6}
-                          value={selectedApprovalDocNumberSequencePadding}
-                          onChange={(e) => {
-                            void updateApprovalAutomationSettings({
-                              [APPROVAL_DOC_NUMBER_SEQUENCE_PADDING_PERMISSION_KEY]: Math.min(6, Math.max(2, Number(e.target.value) || 3)),
-                            });
-                          }}
-                          className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        data-testid="staff-approval-doc-rule-clear"
-                        onClick={() => void clearApprovalDocNumberRule()}
-                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                      >
-                        문서번호 규칙 초기화
-                      </button>
-                    </div>
-                  </div>
-
-                  {(selectedApprovalDelegateId || selectedApprovalDelegateStart || selectedApprovalDelegateEnd || selectedApprovalDelayHours !== 24 || selectedApprovalDelayRepeatHours !== 24 || selectedApprovalDelayMaxNotifications !== 3 || selectedApprovalDocNumberPrefix || selectedApprovalDocNumberIncludeDepartment || selectedApprovalDocNumberDateMode !== 'full' || selectedApprovalDocNumberSequencePadding !== 3) && (
-                    <div className="space-y-2">
-                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                        <p>
-                          현재 대결자:{' '}
-                          {selectedApprovalDelegateStaff
-                            ? `${selectedApprovalDelegateStaff.name}${selectedApprovalDelegateStaff.position ? ` (${selectedApprovalDelegateStaff.position})` : ''}`
-                            : '미설정'}
-                        </p>
-                        <p className="mt-1">
-                          대결 기간: {selectedApprovalDelegateStart || '상시'} ~ {selectedApprovalDelegateEnd || '미지정'}
-                        </p>
-                        <p className="mt-1">지연 알림: {selectedApprovalDelayHours}시간 후 시작 · {selectedApprovalDelayRepeatHours}시간마다 · 최대 {selectedApprovalDelayMaxNotifications}회</p>
-                        <p className="mt-1">
-                          문서번호 규칙: {(selectedApprovalDocNumberPrefix || '회사코드')}
-                          {selectedApprovalDocNumberIncludeDepartment ? ' · 부서 포함' : ' · 부서 미포함'}
-                          {selectedApprovalDocNumberDateMode === 'month' ? ' · 월 단위 날짜' : selectedApprovalDocNumberDateMode === 'year' ? ' · 연 단위 날짜' : ' · 전체 날짜'}
-                          {' · '}일련번호 {selectedApprovalDocNumberSequencePadding}자리
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        data-testid="staff-approval-delegate-clear"
-                        onClick={() => void clearApprovalDelegate()}
-                        className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                      >
-                        대결 설정 초기화
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 <div className="bg-danger/10 p-3 rounded-[var(--radius-md)] shadow-sm border border-danger/20">

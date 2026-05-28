@@ -2414,3 +2414,29 @@ export const rate_limit_attempts = sqliteTable("rate_limit_attempts", {
 	index("idx_rate_limit_attempts_window_start").on(table.window_start),
 ]);
 
+export const company_welfare_policies = sqliteTable("company_welfare_policies", {
+	id: text().primaryKey().notNull(),
+	company_name: text().default("전체").notNull(),
+	rule_name: text().notNull(),
+	rule_value: text().notNull(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_company_welfare_policies_unique").on(table.company_name, table.rule_name),
+]);
+
+export const company_payroll_policies = sqliteTable("company_payroll_policies", {
+	id: text().primaryKey().notNull(),
+	company_name: text().default("전체").notNull(),
+	rule_label: text().notNull(),
+	rule_value: text().notNull(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_company_payroll_policies_unique").on(table.company_name, table.rule_label),
+]);
+
+
+

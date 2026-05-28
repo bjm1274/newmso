@@ -30,7 +30,12 @@ export function buildPlainText(result: ConsultationResult): string {
  * 2순위: filename 기반 폴백 (레거시 기록 하위 호환)
  *   "녹음_" / "분석_" / "상담_" 접두어와 확장자를 제거한다.
  */
-export function extractPatientKey(record: SavedRecord): string {
+export function extractPatientKey(record: SavedRecord & { chartNumber?: string }): string {
+  const name = record.patientName?.trim() || '미지정';
+  const chart = record.chartNumber?.trim();
+  if (chart && chart !== '미지정') {
+    return `${name} (${chart})`;
+  }
   if (record.patientName && record.patientName.trim()) {
     return record.patientName.trim();
   }

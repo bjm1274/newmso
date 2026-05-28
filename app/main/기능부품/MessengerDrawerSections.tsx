@@ -240,14 +240,6 @@ export function MessengerDrawerSections({
                         <span className="rounded-full bg-[var(--toss-blue-light)] px-2 py-1 text-[9px] font-bold text-[var(--accent)]">
                           답글 {thread.replyCount}
                         </span>
-                        {thread.needsAttention ? (
-                          <span
-                            data-testid={`chat-drawer-thread-attention-${thread.rootId}`}
-                            className="rounded-[var(--radius-md)] bg-[var(--warning-light)] px-2 py-1 text-[9px] font-bold text-[var(--warning)]"
-                          >
-                            답변 필요
-                          </span>
-                        ) : null}
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-bold">

@@ -11,18 +11,30 @@ import {
 } from '@/lib/contract-template-defaults';
 import type { ContractClosingData } from '@/lib/contract-template-closing';
 import ContractStandardPreview from '@/app/main/기능부품/인사관리서브/계약문서/계약서표준미리보기';
+import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
 
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
-export default function ContractManager() {
+interface ContractManagerProps {
+  initialCompany?: string;
+  onBack?: () => void;
+}
+
+export default function ContractManager({ initialCompany, onBack }: ContractManagerProps = {}) {
   const { dialog, openConfirm } = useActionDialog();
-  const [selectedCo, setSelectedCo] = useState('박철홍정형외과');
+  const [selectedCo, setSelectedCo] = useState(initialCompany || '박철홍정형외과');
   const { companies } = useCompaniesCache();
   const [template, setTemplate] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sealUrl, setSealUrl] = useState<string | null>(null);
   const [uploadingSeal, setUploadingSeal] = useState(false);
+
+  useEffect(() => {
+    if (initialCompany) {
+      setSelectedCo(initialCompany);
+    }
+  }, [initialCompany]);
   const [companyInfo, setCompanyInfo] = useState<{
     business_no?: string;
     address?: string;
@@ -108,19 +120,30 @@ export default function ContractManager() {
       {dialog}
       {/* 상단 액션바: 회사 선택 및 저장 */}
       <div className="mb-4 flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex max-w-full overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-1 no-scrollbar xl:max-w-[70%]">
-          {companies.map(co => (
+        <div className="flex items-center gap-2.5 max-w-full overflow-x-auto no-scrollbar xl:max-w-[75%]">
+          {onBack && (
             <button
-              key={co.id}
-              onClick={() => setSelectedCo(co.name)}
-              className={`px-5 py-1.5 text-[12px] font-bold rounded-[var(--radius-md)] transition-all whitespace-nowrap ${selectedCo === co.name
-                ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-                }`}
+              type="button"
+              onClick={onBack}
+              className="px-3.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--card)] hover:bg-[var(--border)] border border-[var(--border)] text-[12px] font-bold text-[var(--toss-gray-4)] transition-all flex items-center gap-1 shrink-0 shadow-sm cursor-pointer"
             >
-              {co.name}
+              ← 목록
             </button>
-          ))}
+          )}
+          <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-1 no-scrollbar overflow-x-auto">
+            {companies.map(co => (
+              <button
+                key={co.id}
+                onClick={() => setSelectedCo(co.name)}
+                className={`px-5 py-1.5 text-[12px] font-bold rounded-[var(--radius-md)] transition-all whitespace-nowrap ${selectedCo === co.name
+                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+                  }`}
+              >
+                {co.name}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 xl:justify-end">
           <button
@@ -248,7 +271,33 @@ export default function ContractManager() {
             <div className="w-full max-w-[680px] bg-[var(--card)] shadow-sm rounded-sm border border-[var(--border)] min-h-[900px] flex flex-col p-[44px]">
               {template ? (
                 <ContractStandardPreview
-                  templateText={template}
+                  templateText={fillEmploymentContractTemplate(
+                    template,
+                    {
+                      name: '홍길동',
+                      joined_at: new Date().toISOString().slice(0, 10),
+                      employment_type: '정규직',
+                      probation_months: 3,
+                      probation_percent: 90,
+                      base_salary: 2500000,
+                      meal_allowance: 100000,
+                      resident_no: '950101-1234567',
+                    },
+                    {
+                      contract_start_date: new Date().toISOString().slice(0, 10),
+                      probation_months: 3,
+                      probation_percent: 90,
+                    },
+                    null,
+                    {
+                      name: selectedCo,
+                      ceo_name: companyInfo?.ceo_name || '대표자',
+                      business_no: companyInfo?.business_no || '123-45-67890',
+                      address: companyInfo?.address || '서울특별시 강남구',
+                      phone: companyInfo?.phone || '02-123-4567',
+                      payment_day: '10',
+                    }
+                  )}
                   closingData={{
                     companyName: selectedCo,
                     companyBusinessNo: companyInfo?.business_no || '자동 연동',
@@ -256,7 +305,7 @@ export default function ContractManager() {
                     companyPhone: companyInfo?.phone || '자동 연동',
                     companyCeo: companyInfo?.ceo_name || '자동 연동',
                     sealUrl: sealUrl || undefined,
-                    employeeName: '근로자 성명',
+                    employeeName: '홍길동',
                     employeeAddress: '자동 연동',
                     employeePhone: '자동 연동',
                     contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`,

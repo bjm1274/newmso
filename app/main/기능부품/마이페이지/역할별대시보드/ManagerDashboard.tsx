@@ -98,7 +98,7 @@ export function ManagerDashboard({
           type="button"
           className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
             pendingApprovals > 0
-              ? 'border-orange-500/20 bg-orange-500/100/10 hover:bg-orange-500/100/20'
+              ? 'border-orange-500/20 bg-orange-500/10 hover:bg-orange-500/20'
               : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
           }`}
           onClick={openApprovalInbox}
@@ -120,7 +120,7 @@ export function ManagerDashboard({
           type="button"
           className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
             lowStockCount > 0
-              ? 'border-red-500/20 bg-red-500/100/10 hover:bg-red-500/100/20'
+              ? 'border-red-500/20 bg-red-500/10 hover:bg-red-500/20'
               : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
           }`}
           onClick={() => setMainMenu?.('재고관리')}
@@ -134,7 +134,7 @@ export function ManagerDashboard({
       {expiringCount > 0 && (
         <button
           type="button"
-          className="w-full rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/100/10 px-4 py-3 text-left transition-all hover:bg-red-500/100/20"
+          className="w-full rounded-[var(--radius-lg)] border border-red-500/20 bg-red-500/10 px-4 py-3 text-left transition-all hover:bg-red-500/20"
           onClick={() => setMainMenu?.('재고관리')}
         >
           <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">유통기한 임박</p>

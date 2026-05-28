@@ -22,10 +22,10 @@ interface StatItemProps {
 
 export function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) {
   return (
-    <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-lg)] text-center shadow-sm">
-      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
+    <div className="bg-[var(--card)] border border-[var(--border)] py-1.5 px-2 rounded-[var(--radius-md)] text-center shadow-sm">
+      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-0.5 uppercase leading-tight">{label}</p>
       <p
-        className="text-2xl font-semibold"
+        className="text-base font-bold leading-tight"
         style={{
           color: isWarning
             ? 'var(--warning)'
@@ -62,6 +62,13 @@ export function TimeBox({ label, time }: TimeBoxProps) {
 // AttendanceCalendar
 // ──────────────────────────────────────────────
 
+function formatHHmm(isoString: string | null | undefined) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; currentMonth: Date }) {
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -84,15 +91,15 @@ export function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[];
     const log = logByDate.get(dateKey);
     if (log) {
       const status = getDisplayStatus(log);
-      if (status === '결근') return 'bg-red-500/100/15 text-red-500 font-semibold';
-      if (status === '지각') return 'bg-orange-500/100/15 text-orange-600 font-semibold';
-      if (status === '연차' || status === '반차') return 'bg-purple-500/100/15 text-purple-600 font-semibold';
-      if (status === '병가') return 'bg-blue-500/100/15 text-blue-600 font-semibold';
-      return 'bg-green-500/100/15 text-green-700 font-semibold';
+      if (status === '결근') return 'text-red-500 font-bold';
+      if (status === '지각') return 'text-orange-500 font-bold';
+      if (status === '연차' || status === '반차') return 'text-purple-500 font-bold';
+      if (status === '병가') return 'text-blue-500 font-bold';
+      return 'text-green-600 font-bold';
     }
     const dayOfWeek = new Date(year, month, day).getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-[var(--toss-gray-3)]'; // weekend - no attendance OK
-    if (new Date(year, month, day) < today) return 'bg-red-500/100/10 text-red-400'; // past weekday no record
+    if (new Date(year, month, day) < today) return 'text-red-400 font-semibold'; // past weekday no record
     return 'text-[var(--toss-gray-4)]';
   };
 
@@ -104,22 +111,47 @@ export function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[];
         ))}
       </div>
       <div className="grid grid-cols-7 gap-0.5">
-        {cells.map((day, idx) => (
-          <div
-            key={idx}
-            className={`aspect-square flex items-center justify-center rounded-[var(--radius-md)] text-[11px] ${
-              day ? getDayCellStyle(day) : ''
-            }`}
-          >
-            {day || ''}
-          </div>
-        ))}
+        {cells.map((day, idx) => {
+          const dateKey = day ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : '';
+          const log = day ? logByDate.get(dateKey) : null;
+          return (
+            <div
+              key={idx}
+              className={`min-h-[46px] py-1 px-0.5 flex flex-col justify-between items-center rounded-[var(--radius-md)] text-[11px] ${
+                day ? getDayCellStyle(day) : ''
+              }`}
+            >
+              {day ? (
+                <>
+                  <span className="font-bold text-[12px] leading-none">{day}</span>
+                  {log && (log.check_in || log.check_out) && (
+                    <div className="flex flex-row justify-center items-center gap-1 leading-none w-full mt-1.5 flex-wrap">
+                      {log.check_in && (
+                        <span className="text-[12px] font-black text-emerald-800 tracking-tighter">
+                          {formatHHmm(log.check_in)}
+                        </span>
+                      )}
+                      {log.check_in && log.check_out && <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">~</span>}
+                      {log.check_out && (
+                        <span className="text-[12px] font-black text-rose-800 tracking-tighter">
+                          {formatHHmm(log.check_out)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                ''
+              )}
+            </div>
+          );
+        })}
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-[var(--toss-gray-3)]">
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-green-500/100/30" />정상</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-orange-500/100/30" />지각</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-purple-500/100/30" />연차/반차</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-red-500/100/20" />결근</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-600" />정상</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-500" />지각</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-purple-500" />연차/반차</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />결근</span>
       </div>
     </div>
   );

@@ -52,6 +52,7 @@
     "_*.tsx",
     "analysis_artifacts",
     "board",
-    "scripts"
+    "scripts",
+    ".claude"
   ]
 }

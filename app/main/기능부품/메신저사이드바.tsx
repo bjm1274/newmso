@@ -142,7 +142,7 @@ export function MessengerSidebar({
 
   return (
     <aside
-      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} chat-side w-full md:w-[var(--submenu-width,220px)] border-r border-[var(--border)] bg-[var(--card)] shrink-0 z-50 transition-all`}
+      className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} chat-side w-full md:w-[290px] border-r border-[var(--border)] bg-[var(--card)] shrink-0 z-50 transition-all`}
     >
       {/* 상단 헤더: 채팅/조직도 탭 + 검색 (라이브 §2-1 .chat-side-head) */}
       <div className="chat-side-head">
@@ -176,7 +176,8 @@ export function MessengerSidebar({
             placeholder="이름·메시지 검색"
             onClick={onOpenGlobalSearch}
             onFocus={onOpenGlobalSearch}
-            className="w-full h-7 pl-7 pr-2 text-[11px] bg-[var(--muted)] border border-transparent rounded-[var(--radius-md)] text-[var(--toss-gray-5)] placeholder:text-[var(--toss-gray-3)] cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-colors"
+            style={{ paddingLeft: '28px' }}
+            className="w-full h-7 pr-2 text-[11px] bg-[var(--muted)] border border-transparent rounded-[var(--radius-md)] text-[var(--toss-gray-5)] placeholder:text-[var(--toss-gray-3)] cursor-pointer focus:outline-none focus:border-[var(--accent)] transition-colors"
           />
         </div>
       </div>

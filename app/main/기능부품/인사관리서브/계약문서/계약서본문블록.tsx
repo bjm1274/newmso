@@ -99,6 +99,30 @@ export default function ContractBodyBlock({ templateText }: Props) {
                                         </div>
                                     );
                                 }
+                                if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
+                                    return (
+                                        <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-[var(--muted)]/50 rounded-xl border border-[var(--border-subtle)] shrink-0">
+                                            <label className="flex items-center gap-2 select-none opacity-60">
+                                                <input
+                                                    type="radio"
+                                                    disabled
+                                                    checked={false}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300"
+                                                />
+                                                <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의 (서명 시 선택 가능)</span>
+                                            </label>
+                                            <label className="flex items-center gap-2 select-none opacity-60">
+                                                <input
+                                                    type="radio"
+                                                    disabled
+                                                    checked={false}
+                                                    className="w-4 h-4 text-blue-600 border-gray-300"
+                                                />
+                                                <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
+                                            </label>
+                                        </div>
+                                    );
+                                }
                                 return (
                                     <p key={li} className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8]">
                                         {t}

@@ -19,17 +19,33 @@ interface Evaluation {
 }
 
 export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any; staffs?: any[] }) {
+    const isAdmin = user?.role === 'admin' || user?.role === '관리자' || user?.permissions?.admin === true || user?.permissions?.mso === true;
     const { dialog, openConfirm } = useActionDialog();
     const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
+    // 부서 및 이름 검색 상태
+    const [selectedDept, setSelectedDept] = useState('전체');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeSearchQuery, setActiveSearchQuery] = useState('');
+
     // 입력 폼 상태
     const [category, setCategory] = useState('성과');
     const [content, setContent] = useState('');
     const [score, setScore] = useState<number>(3);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // 부서 목록 추출
+    const departments = Array.from(new Set(staffs.map((s: any) => s.department).filter(Boolean))) as string[];
+
+    // 필터링된 직원 목록 (부서는 변경 즉시 자동 필터링, 이름은 검색 버튼 클릭 시 필터링)
+    const filteredStaffs = staffs.filter((s: any) => {
+        const matchDept = selectedDept === '전체' || s.department === selectedDept;
+        const matchName = !activeSearchQuery.trim() || s.name?.toLowerCase().includes(activeSearchQuery.toLowerCase().trim());
+        return matchDept && matchName;
+    });
 
     const fetchEvaluations = useCallback(async (staffId: string) => {
         setLoading(true);
@@ -123,6 +139,10 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
     };
 
     const deleteEvaluation = async (id: string) => {
+        if (!isAdmin) {
+            toast('삭제 권한이 없습니다. 관리자 등급 이상만 삭제할 수 있습니다.', 'error');
+            return;
+        }
         const confirmed = await openConfirm({
             title: '직원 평가 기록 삭제',
             description: '선택한 직원 평가 기록을 삭제합니다.\n삭제 후에는 평가 목록에서 복구할 수 없습니다.',
@@ -140,15 +160,45 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-full gap-4 animate-in fade-in duration-500" data-testid="staff-evaluation-view">
+        <div className="flex flex-col lg:flex-row h-full lg:h-[calc(100vh-220px)] min-h-[500px] gap-4 animate-in fade-in duration-500 overflow-hidden" data-testid="staff-evaluation-view">
             {dialog}
             {/* 1. 직원 목록 (좌측) */}
-            <aside className="w-full lg:w-[280px] flex flex-col bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-[var(--border)] bg-[var(--muted)]/30">
-                    <h3 className="text-sm font-bold text-[var(--foreground)]">평가 대상 직원</h3>
+            <aside className="w-full lg:w-[280px] h-full flex flex-col bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
+                <div className="p-3 border-b border-[var(--border)] bg-[var(--muted)]/30">
+                    <div className="flex gap-2 w-full">
+                        {/* 부서 선택 드롭다운 (반절 크기 w-1/2, 즉시 필터링) */}
+                        <div className="w-1/2">
+                            <select
+                                value={selectedDept}
+                                onChange={(e) => setSelectedDept(e.target.value)}
+                                className="w-full h-8.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-all"
+                            >
+                                <option value="전체">부서 전체</option>
+                                {departments.map((dept) => (
+                                    <option key={dept} value={dept}>{dept}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 이름 검색 입력창 (반절 크기 w-1/2, 엔터 시 검색) */}
+                        <div className="w-1/2">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        setActiveSearchQuery(searchQuery);
+                                    }
+                                }}
+                                placeholder="이름 입력 (Enter)"
+                                className="w-full h-8.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 text-[11px] font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)] transition-all placeholder:text-[var(--toss-gray-3)]"
+                            />
+                        </div>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto no-scrollbar p-2 space-y-1">
-                    {staffs.map((s) => (
+                    {filteredStaffs.map((s) => (
                         <button
                             key={s.id}
                             data-testid={`staff-evaluation-select-${s.id}`}
@@ -158,8 +208,26 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                     : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
                                 }`}
                         >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${selectedStaff?.id === s.id ? 'bg-[var(--card)]/20' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)]'
-                                }`}>
+                            {s.photo_url || s.avatar_url || s.profile_photo_url ? (
+                                <img
+                                    src={s.photo_url || s.avatar_url || s.profile_photo_url}
+                                    alt={s.name}
+                                    className="w-10 h-10 rounded-full object-cover border border-[var(--border)]/30 shadow-inner shrink-0"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                        const fallbackEl = e.currentTarget.nextElementSibling as HTMLElement;
+                                        if (fallbackEl) {
+                                            fallbackEl.style.display = 'flex';
+                                        }
+                                    }}
+                                />
+                            ) : null}
+                            <div
+                                style={{ display: (s.photo_url || s.avatar_url || s.profile_photo_url) ? 'none' : 'flex' }}
+                                className={`w-10 h-10 rounded-full items-center justify-center font-bold text-sm shrink-0 ${
+                                    selectedStaff?.id === s.id ? 'bg-[var(--card)]/20 text-white' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)]'
+                                }`}
+                            >
                                 {s.name?.slice(0, 1)}
                             </div>
                             <div className="min-w-0">
@@ -184,7 +252,24 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                         <section className="bg-[var(--card)] p-4 rounded-[var(--radius-xl)] border border-[var(--border)] shadow-sm">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-full flex items-center justify-center text-xl font-black">
+                                    {selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url ? (
+                                        <img
+                                            src={(selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url) as string}
+                                            alt={selectedStaff.name as string}
+                                            className="w-12 h-12 rounded-full object-cover border border-[var(--border)]/30 shadow-sm shrink-0"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                const fallbackEl = e.currentTarget.nextElementSibling as HTMLElement;
+                                                if (fallbackEl) {
+                                                    fallbackEl.style.display = 'flex';
+                                                }
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div
+                                        style={{ display: (selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url) ? 'none' : 'flex' }}
+                                        className="w-12 h-12 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-full items-center justify-center text-xl font-black shrink-0"
+                                    >
                                         {(selectedStaff.name as string)?.slice(0, 1)}
                                     </div>
                                     <div>
@@ -342,13 +427,15 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                                                 {new Date(ev.created_at).toLocaleString()}
                                                             </span>
                                                         </div>
-                                                        <button
-                                                            onClick={() => deleteEvaluation(ev.id)}
-                                                            className="opacity-0 group-hover:opacity-100 p-1 text-[var(--danger)] hover:opacity-80 transition-all"
-                                                            aria-label="평가 기록 삭제"
-                                                        >
-                                                            ✕
-                                                        </button>
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={() => deleteEvaluation(ev.id)}
+                                                                className="opacity-0 group-hover:opacity-100 p-1 text-[var(--danger)] hover:opacity-80 transition-all"
+                                                                aria-label="평가 기록 삭제"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        )}
                                                     </div>
 
                                                     <div className="bg-[var(--muted)]/50 p-4 rounded-[var(--radius-lg)] border border-[var(--border)]/50">

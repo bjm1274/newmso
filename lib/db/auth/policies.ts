@@ -446,6 +446,8 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
 
   // company aux
   'company_expenses',
+  'company_welfare_policies',
+  'company_payroll_policies',
   'approval_form_types',
   'approval_history',
   'approval_templates',

@@ -52,12 +52,12 @@ export const FALLBACK_CARDS: CorpCardRow[] = [
 ];
 
 export const FALLBACK_TEMPLATES: TemplateItem[] = [
-  { name: '근로계약서 (정규직)', version: 'v2.3', used: 18, lastDate: '2026.04.12' },
-  { name: '개별근로계약서', version: 'v2.1', used: 15, lastDate: '2026.04.13' },
-  { name: '수습계약서', version: 'v1.4', used: 12, lastDate: '2026.04.14' },
-  { name: '보안서약서 (NDA)', version: 'v1.2', used: 9, lastDate: '2026.04.15' },
-  { name: '지적재산동의서', version: 'v1.1', used: 6, lastDate: '2026.04.16' },
-  { name: '원격의료기관 계약', version: 'v1.0', used: 3, lastDate: '2026.04.17' },
+  { name: '근로계약서 (정규직)', version: 'v2.3', used: 18, lastDate: '2026.04.12', companyName: '전체' },
+  { name: '개별근로계약서', version: 'v2.1', used: 15, lastDate: '2026.04.13', companyName: '전체' },
+  { name: '수습계약서', version: 'v1.4', used: 12, lastDate: '2026.04.14', companyName: '전체' },
+  { name: '보안서약서 (NDA)', version: 'v1.2', used: 9, lastDate: '2026.04.15', companyName: '전체' },
+  { name: '지적재산동의서', version: 'v1.1', used: 6, lastDate: '2026.04.16', companyName: '전체' },
+  { name: '원격의료기관 계약', version: 'v1.0', used: 3, lastDate: '2026.04.17', companyName: '전체' },
 ];
 
 export const FALLBACK_HOLIDAYS: HolidayItem[] = [

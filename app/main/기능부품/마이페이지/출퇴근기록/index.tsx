@@ -1116,15 +1116,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       {logs.length > 0 && <WorkHoursChart logs={logs} />}
 
       {/* 리스트 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-        <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+      <div className="overflow-y-auto custom-scrollbar pr-2">
+        <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
+            <h3 className="text-[13px] font-bold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
-            <span className="font-semibold px-1 text-sm">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[10px]">◀</button>
+            <span className="font-bold px-0.5 text-xs text-[var(--foreground)]">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[10px]">▶</button>
           </div>
         </div>
 

@@ -36,7 +36,7 @@ async function matchesConfiguredPassword(
     }
   }
 
-  return normalizedConfiguredPassword === normalizedInputPassword;
+  return false;
 }
 
 function collectUserIdentifiers(user: any) {

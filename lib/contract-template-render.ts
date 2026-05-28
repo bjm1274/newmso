@@ -11,6 +11,7 @@ import {
   getStaffLicenseDate,
   getStaffLicenseNo,
   getStaffProbationMonths,
+  getStaffProbationPercent,
 } from '@/lib/staff-meta';
 
 const OPTIONAL_ALLOWANCE_FIELDS = [
@@ -309,6 +310,16 @@ export function fillEmploymentContractTemplate(
   const workingDaysText = buildWorkDayText(workingDaysPerWeek, shift, safeContract, safeUser);
   const weeklyHolidayText = buildWeeklyHolidayText(workingDaysPerWeek, shift, safeContract, safeUser);
   const contractEndDate = formatDate(safeContract.contract_end_date);
+  const contractType = firstText(
+    salarySource.contract_type,
+    getStaffEmploymentType(safeUser),
+    safeUser['고용형태'],
+    '정규직',
+  );
+  const isFixedTerm =
+    String(contractType).includes('계약직') ||
+    !!safeContract.contract_end_date ||
+    !!safeUser.contract_end_date;
 
   const vars: Record<string, string> = {
     staff_name: String(safeUser.name || ''),
@@ -362,24 +373,92 @@ export function fillEmploymentContractTemplate(
     work_days: workingDaysText,
     weekly_holiday: weeklyHolidayText,
     holiday: weeklyHolidayText,
-    contract_type: firstText(salarySource.contract_type, getStaffEmploymentType(safeUser), safeUser['고용형태'], '정규직'),
+    contract_type: contractType,
     probation_months: String(
       getStaffProbationMonths(
         { probation_months: safeContract.probation_months },
-        getStaffProbationMonths(safeUser, 3),
+        getStaffProbationMonths(safeUser, 0),
       ),
     ),
-    probation_percent: String(safeContract.probation_percent || '90'),
+    probation_percent: String(
+      safeContract.probation_percent ||
+      getStaffProbationPercent(safeUser, 90)
+    ),
     payment_day: paymentDay,
     payday: paymentDay,
     contract_start: formatDate(safeContract.contract_start_date || safeUser.joined_at || salarySource.join_date),
-    contract_end: contractEndDate || '정년도달시',
+    contract_end: contractEndDate || (isFixedTerm ? '계약만료일' : '정년도달시'),
     conditions_applied_at: formatDate(safeContract.conditions_applied_at || salarySource.effective_date),
     today: formatDate(new Date()),
   };
 
+  const probationMonthsNum = getStaffProbationMonths(
+    { probation_months: safeContract.probation_months },
+    getStaffProbationMonths(safeUser, 0),
+  );
+
+  const probationPercentNum = Number(
+    safeContract.probation_percent ||
+    getStaffProbationPercent(safeUser, 90)
+  );
+
+  let probationStart = '';
+  let probationEnd = '';
+  if (probationMonthsNum > 0) {
+    const startDateStr = safeContract.contract_start_date || safeUser.joined_at || salarySource.join_date;
+    if (startDateStr) {
+      const startD = new Date(String(startDateStr));
+      if (!isNaN(startD.getTime())) {
+        probationStart = formatDate(startD);
+        const endD = new Date(startD);
+        endD.setMonth(endD.getMonth() + probationMonthsNum);
+        probationEnd = formatDate(endD);
+      }
+    }
+  }
+
+  // Add the computed probation dates to the variables map
+  vars.probation_start = probationStart;
+  vars.probation_end = probationEnd;
+
+  let transformedTemplate = template;
+
+  if (isFixedTerm) {
+    // 계약직인 경우: 기간의 정함이 없는 -> 지정된 계약종료일까지 계약
+    transformedTemplate = transformedTemplate.replace(
+      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다\.?/g,
+      '① 근로자는 {{join_date}}부터 {{contract_end}}까지 근로계약을 체결한 것으로 한다.'
+    );
+  } else {
+    // 정규직인 경우: 기간의 정함이 없는 -> 정년까지로 한다
+    transformedTemplate = transformedTemplate.replace(
+      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다\.?/g,
+      '① 근로자는 {{join_date}}부터 정년까지로 한다.'
+    );
+  }
+
+  if (probationMonthsNum > 0) {
+    // 수습기간이 존재하는 경우: 수습기간 범위와 임금 비율을 명시하는 문구로 치환
+    const probationText = `② 신규 입사자의 경우 입사일로부터 ${probationMonthsNum}개월간(${probationStart} ~ ${probationEnd})을 수습기간으로 하며, 수습기간 중 급여는 기본급의 ${probationPercentNum}%를 지급한다. 사용자는 수습기간 중 근무태도, 업무수행능력, 자질, 건강상태, 조직 적응도 등을 종합적으로 평가할 수 있다.`;
+    
+    transformedTemplate = transformedTemplate.replace(
+      /②\s*신규\s*입사자의\s*경우\s*입사일로부터\s*(?:3개월간을\s*수습기간으로\s*둘\s*수\s*있다|수습기간을\s*둘\s*수\s*있다)\s*\.?\s*사용자는\s*수습기간\s*중\s*근무태도\s*,\s*업무수행능력\s*,\s*자질\s*,\s*건강상태\s*,\s*조직\s*적응도\s*등을\s*종합적으로\s*평가할\s*수\s*있다\.?/g,
+      probationText
+    );
+  } else {
+    // 수습기간이 없는 경우: 수습 미적용 문구로 단순화하고 관련 조항 해지 문구(③)를 제거
+    transformedTemplate = transformedTemplate.replace(
+      /②\s*신규\s*입사자의\s*경우\s*입사일로부터\s*(?:3개월간을\s*수습기간으로\s*둘\s*수\s*있다|수습기간을\s*둘\s*수\s*있다)\s*\.?\s*사용자는\s*수습기간\s*중\s*근무태도\s*,\s*업무수행능력\s*,\s*자질\s*,\s*건강상태\s*,\s*조직\s*적응도\s*등을\s*종합적으로\s*평가할\s*수\s*있다\.?/g,
+      '② 본 계약은 별도의 수습기간을 두지 아니한다.'
+    );
+    transformedTemplate = transformedTemplate.replace(
+      /③\s*수습기간\s*중\s*또는\s*수습기간\s*만료\s*시\s*근로자가\s*담당업무\s*수행에\s*부적합하다고\s*객관적으로\s*판단되는\s*경우\s*,\s*사용자는\s*관계\s*법령\s*및\s*취업규칙에\s*따라\s*본채용을\s*거부하거나\s*근로계약을\s*종료할\s*수\s*있다\.?\n?/g,
+      ''
+    );
+  }
+
   let result = removeAllowanceLinesWithoutAmounts(
-    template.replace(/\[\s*수습\s*기간\s*\]/g, ''),
+    transformedTemplate.replace(/\[\s*수습\s*기간\s*\]/g, ''),
     allowanceValues,
   );
 

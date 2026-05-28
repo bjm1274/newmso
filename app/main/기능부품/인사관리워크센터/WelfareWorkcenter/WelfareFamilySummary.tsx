@@ -23,14 +23,6 @@ interface FamilyEvent {
   tone: 'success' | 'muted' | 'warn';
 }
 
-const FAMILY_RULES: Array<{ name: string; rule: string }> = [
-  { name: '본인 결혼', rule: '편도 5일 · 경조금 500,000원' },
-  { name: '자녀 결혼', rule: '편도 1일 · 경조금 200,000원' },
-  { name: '부모·조부모 상', rule: '편도 3일 · 조의금 300,000원' },
-  { name: '배우자·자녀 상', rule: '편도 5일 · 조의금 500,000원' },
-  { name: '출산', rule: '편도 3일 · 축하금 100,000원' },
-];
-
 function pickTone(kind: string): 'success' | 'muted' | 'warn' {
   if (!kind) return 'muted';
   if (kind.includes('결혼') || kind.includes('출산')) return 'success';
@@ -97,7 +89,7 @@ export default function WelfareFamilySummary() {
   const hasEvents = useMemo(() => events.length > 0, [events]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+    <div className="w-full">
       <section className="app-card flex flex-col p-3 md:p-4" aria-labelledby="welfare-family-recent-title">
         <header className="mb-2 flex items-center justify-between">
           <h3 id="welfare-family-recent-title" className="text-[13px] font-bold text-[var(--foreground)]">
@@ -129,22 +121,7 @@ export default function WelfareFamilySummary() {
           </ul>
         )}
       </section>
-
-      <section className="app-card flex flex-col p-3 md:p-4" aria-labelledby="welfare-family-rules-title">
-        <header className="mb-2 flex items-center justify-between">
-          <h3 id="welfare-family-rules-title" className="text-[13px] font-bold text-[var(--foreground)]">
-            경조사 규정
-          </h3>
-        </header>
-        <ul className="flex flex-col gap-1">
-          {FAMILY_RULES.map((rule) => (
-            <li key={rule.name} className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle,var(--border))] py-1.5 last:border-b-0">
-              <span className="text-[12px] font-semibold text-[var(--foreground)]">{rule.name}</span>
-              <span className="text-[11px] font-medium text-[var(--toss-gray-4)]">{rule.rule}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   );
 }
+

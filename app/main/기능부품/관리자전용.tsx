@@ -236,7 +236,7 @@ export default function AdminView(props: Record<string, unknown>) {
         data-testid="admin-view"
       >
         <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 pb-20 md:p-4">
-          <Workcenter />
+          <Workcenter user={user} />
         </main>
       </div>
     );

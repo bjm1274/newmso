@@ -22,7 +22,7 @@ import type { ComponentType } from 'react';
 
 const ADMIN_WC_LOADING = () => null;
 
-const dyn = (loader: () => Promise<{ default: ComponentType<unknown> }>) =>
+const dyn = (loader: () => Promise<{ default: ComponentType<any> }>) =>
   dynamic(loader, { ssr: false, loading: ADMIN_WC_LOADING });
 
 const ExecDashboard = dyn(() => import('./ExecDashboard'));
@@ -43,7 +43,7 @@ export const ADMIN_WORKCENTER_IDS = [
 
 export type AdminWorkcenterId = (typeof ADMIN_WORKCENTER_IDS)[number];
 
-const ADMIN_WORKCENTER_MAP: Record<AdminWorkcenterId, ComponentType<unknown>> = {
+const ADMIN_WORKCENTER_MAP: Record<AdminWorkcenterId, ComponentType<any>> = {
   exec: ExecDashboard,
   company: CompanyWorkcenter,
   roles: RolesWorkcenter,
@@ -64,6 +64,6 @@ export function isAdminWorkcenterId(id: unknown): id is AdminWorkcenterId {
  * id에 매핑된 워크센터 컴포넌트를 반환.
  * 호출 전 isAdminWorkcenterId로 검증된 id만 전달할 것.
  */
-export function getAdminWorkcenter(id: AdminWorkcenterId): ComponentType<unknown> {
+export function getAdminWorkcenter(id: AdminWorkcenterId): ComponentType<any> {
   return ADMIN_WORKCENTER_MAP[id];
 }

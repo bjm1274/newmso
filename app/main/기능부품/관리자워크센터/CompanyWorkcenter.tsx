@@ -29,7 +29,7 @@ const TABS: { id: CompanyTabId; label: string }[] = [
   { id: 'shift', label: '근무 형태' },
   { id: 'card', label: '법인카드' },
   { id: 'ctpl', label: '계약 템플릿' },
-  { id: 'hol', label: '휴가·공휴일' },
+  { id: 'hol', label: '휴가·경조사·공휴일' },
   { id: 'pay', label: '급여 기준' },
   { id: 'docs', label: '문서 보관' },
 ];

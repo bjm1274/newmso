@@ -25,6 +25,8 @@ export type ActionDialogState = {
   maxLength?: number;
   helperText?: string;
   busy?: boolean;
+  centerText?: boolean;
+  largeText?: boolean;
 };
 
 type Props = ActionDialogState & {
@@ -54,6 +56,8 @@ export default function ActionDialog({
   maxLength,
   helperText,
   busy = false,
+  centerText = false,
+  largeText = false,
   onCancel,
   onConfirm,
   mobileVariant = 'sheet',
@@ -198,7 +202,7 @@ export default function ActionDialog({
         {description ? (
           <p
             id={descriptionId}
-            className="whitespace-pre-line text-sm leading-relaxed text-[var(--toss-gray-4)]"
+            className={`whitespace-pre-line leading-relaxed text-[var(--toss-gray-4)] ${largeText ? 'text-2xl font-bold' : 'text-sm'} ${centerText ? 'text-center' : ''}`}
           >
             {description}
           </p>
@@ -223,13 +227,13 @@ export default function ActionDialog({
         className="w-full max-w-md overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--card)] shadow-sm"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="space-y-3 px-5 py-5">
-          <div className="space-y-1.5">
-            <h2 id={titleId} className="text-lg font-black tracking-tight text-[var(--foreground)]">
+        <div className={`space-y-3 px-5 py-5 ${centerText ? 'text-center' : ''}`}>
+          <div className={`space-y-1.5 ${centerText ? 'flex flex-col items-center justify-center' : ''}`}>
+            <h2 id={titleId} className={`font-black tracking-tight text-[var(--foreground)] ${largeText ? 'text-3xl sm:text-4xl leading-tight' : 'text-lg'} ${centerText ? 'text-center w-full' : ''}`}>
               {title}
             </h2>
             {description ? (
-              <p id={descriptionId} className="whitespace-pre-line text-sm leading-relaxed text-[var(--toss-gray-4)]">
+              <p id={descriptionId} className={`whitespace-pre-line leading-relaxed text-[var(--toss-gray-4)] ${largeText ? 'text-xl sm:text-2xl font-bold' : 'text-sm'} ${centerText ? 'text-center w-full' : ''}`}>
                 {description}
               </p>
             ) : null}

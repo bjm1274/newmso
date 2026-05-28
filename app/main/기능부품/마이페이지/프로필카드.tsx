@@ -4,7 +4,6 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { performClientLogout } from '@/lib/client-logout';
 import { buildAuditDiff } from '@/lib/audit';
 import {
   getProfilePhotoUrl,
@@ -15,8 +14,6 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import type { ProfileCardUser, ProfileCardProps } from './프로필카드/types';
 import { toSafeText } from './프로필카드/format-utils';
 import { InfoItem, EditableItem } from './프로필카드/InfoItems';
-import { ProfileChangeRequestHistory } from './프로필카드/ProfileChangeRequestHistory';
-import { LeaveAndCommuteSummary } from './프로필카드/LeaveAndCommuteSummary';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -124,19 +121,7 @@ export default function MyProfileCard({
     }
   };
 
-  const handleLogout = async () => {
-    const shouldLogout = await openConfirm({
-      title: '로그아웃',
-      description: '현재 계정에서 로그아웃합니다. 계속할까요?',
-      confirmText: '로그아웃',
-      cancelText: '취소',
-      tone: 'danger',
-    });
-    if (!shouldLogout) return;
 
-    await performClientLogout();
-    window.location.replace('/');
-  };
 
   const verifyPassword = async () => {
     try {
@@ -337,7 +322,7 @@ export default function MyProfileCard({
   );
 
   return (
-    <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] p-3 sm:p-4 lg:p-5 flex flex-col">
+    <div className={(!isEditing && hideHeader) ? "flex flex-col gap-4" : "bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] p-3 sm:p-4 lg:p-5 flex flex-col"}>
       {dialog}
 
       {/* 프로필 헤더 */}
@@ -386,8 +371,8 @@ export default function MyProfileCard({
       )}
 
       {/* 상세 정보 + 나의 근태/연차 요약 */}
-        <div className={hideHeader ? '' : 'pt-3 sm:pt-4'}>
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-5">
+      <div className={hideHeader ? '' : 'pt-3 sm:pt-4'}>
+        <div className={isEditing ? "grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-5" : "block"}>
           {/* 인사 관리 정보 (수정 모드일 때만 정보 수정창 노출, 평상시에는 완전 삭제) */}
           {isEditing ? (
             <div className="space-y-3">
@@ -451,26 +436,16 @@ export default function MyProfileCard({
                 </div>
               </div>
             </div>
-          ) : (
-            // 평상시에는 인사 정보 렌더링을 완전히 생략합니다
-            <div className="hidden xl:block"></div>
-          )}
+          ) : null}
 
-          {/* 나의 근태 · 연차 */}
-          <div className="space-y-2.5">
-            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
-              나의 근태 · 연차
-            </h3>
-            <LeaveAndCommuteSummary user={user} onOpenApproval={onOpenApproval} />
-            <ProfileChangeRequestHistory user={user} />
-          </div>
+
         </div>
 
       </div>
 
-      {/* 로그아웃 버튼 */}
-      <div className="mt-3 flex shrink-0 flex-col-reverse gap-2.5 border-t border-[var(--border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
-        {isEditing && (
+      {/* 내 정보 저장 버튼 */}
+      {isEditing && (
+        <div className="mt-3 flex shrink-0 border-t border-[var(--border)] pt-3 justify-start">
           <button
             type="button"
             onClick={handleSaveProfile}
@@ -480,15 +455,8 @@ export default function MyProfileCard({
             <span className="text-sm">💾</span>
             <span className="tracking-tight">내 정보 저장</span>
           </button>
-        )}
-        <button
-          onClick={handleLogout}
-          className="w-full sm:w-auto py-2.5 rounded-[var(--radius-lg)] bg-[var(--accent)] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[var(--accent)] transition-all shadow-sm flex items-center justify-center gap-2"
-        >
-          <span className="text-sm">🚪</span>
-          <span className="tracking-tight">로그아웃</span>
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

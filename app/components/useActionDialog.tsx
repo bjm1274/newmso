@@ -9,6 +9,8 @@ type ConfirmOptions = {
   confirmText?: string;
   cancelText?: string;
   tone?: ActionDialogTone;
+  centerText?: boolean;
+  largeText?: boolean;
 };
 
 type PromptOptions = ConfirmOptions & {
@@ -68,6 +70,8 @@ export function useActionDialog() {
         confirmText: options.confirmText,
         cancelText: options.cancelText,
         tone: options.tone,
+        centerText: options.centerText,
+        largeText: options.largeText,
       });
     });
   }, []);
@@ -89,6 +93,8 @@ export function useActionDialog() {
         required: options.required,
         maxLength: options.maxLength,
         helperText: options.helperText,
+        centerText: options.centerText,
+        largeText: options.largeText,
       });
     });
   }, []);

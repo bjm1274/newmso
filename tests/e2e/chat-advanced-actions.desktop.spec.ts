@@ -166,7 +166,7 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
 
   await expect(page.getByTestId('chat-view')).toBeVisible();
   await expect(page.getByTestId('chat-thread-inbox-notif-thread-1')).toBeVisible();
-  await expect(page.getByTestId('chat-thread-attention-msg-root')).toBeVisible();
+
 
   await page.getByTestId('chat-message-msg-root').click();
   await page.getByTestId('chat-message-action-bookmark').click();
@@ -187,11 +187,11 @@ test('chat advanced actions can bookmark, inspect reads, view thread, and forwar
   await expect(page.getByTestId('chat-read-status-modal')).toContainText('Chat Peer Two');
   await page.getByTestId('chat-read-status-modal').locator('button').first().click();
 
-  await expect(page.getByTestId('chat-thread-needs-attention-msg-root')).toContainText('답변 필요');
+
 
   await page.getByTestId('chat-open-drawer').click();
   await expect(page.getByTestId('chat-drawer-thread-msg-root')).toBeVisible();
-  await expect(page.getByTestId('chat-drawer-thread-attention-msg-root')).toContainText('답변 필요');
+
   await page.getByTestId('chat-drawer-thread-open-msg-root').click();
   await expect(page.getByTestId('chat-room-drawer')).toBeHidden();
   await expect(page.getByTestId('chat-thread-panel')).toBeVisible();

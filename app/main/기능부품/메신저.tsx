@@ -173,6 +173,7 @@ export default function ChatView({
 }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
+  const lastScrolledMsgIdRef = useRef<string | null>(null);
   const directMessageLoadTargetRef = useRef<string | null>(null);
   const pendingThreadRootIdRef = useRef<string | null>(null);
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
@@ -647,7 +648,7 @@ export default function ChatView({
     setShowScrollToLatest(false);
     schedulePendingBottomAlignRelease(normalizedRoomId);
   }, [clearPendingBottomAlignReleaseTimer, schedulePendingBottomAlignRelease]);
-  const scrollToMessage = useCallback((messageId: string) => {
+  const scrollToMessage = useCallback((messageId: string, remainingAttempts = 30) => {
     const normalizedMessageId = String(messageId || '').trim();
     if (!normalizedMessageId) return;
 
@@ -665,6 +666,14 @@ export default function ChatView({
       setTimeout(() => {
         el.className = origClass;
       }, 2000);
+      lastScrolledMsgIdRef.current = normalizedMessageId;
+      pendingScrollMsgIdRef.current = null;
+    } else if (remainingAttempts > 0) {
+      setTimeout(() => {
+        scrollToMessage(normalizedMessageId, remainingAttempts - 1);
+      }, 100);
+    } else {
+      pendingScrollMsgIdRef.current = null;
     }
   }, [clearPendingBottomAlignReleaseTimer]);
   const persistRoomReadCursors = useCallback(async (
@@ -729,7 +738,6 @@ export default function ChatView({
     if (String(selectedRoomIdRef.current || '') !== normalizedRoomId) return false;
     if (!messages.some((message) => String(message.id) === normalizedMessageId)) return false;
 
-    pendingScrollMsgIdRef.current = null;
     clearPendingMessageScrollTimer();
     pendingMessageScrollTimerRef.current = setTimeout(() => {
       pendingMessageScrollTimerRef.current = null;
@@ -1796,7 +1804,6 @@ export default function ChatView({
         pendingMessageScrollTimerRef.current = setTimeout(() => {
           pendingMessageScrollTimerRef.current = null;
           scrollToMessage(targetMsgId);
-          pendingScrollMsgIdRef.current = null;
         }, 500);
       }
     }
@@ -2108,7 +2115,17 @@ export default function ChatView({
 
   const handleTimelineMediaLoad = useCallback(() => {
     const activeRoomId = String(selectedRoomIdRef.current || selectedRoomId || '').trim();
-    if (!activeRoomId || !shouldKeepBottomAligned()) return;
+    if (!activeRoomId) return;
+
+    if (suppressBottomAlignmentUntilRef.current > Date.now()) {
+      const lastScrolledMsgId = lastScrolledMsgIdRef.current;
+      if (lastScrolledMsgId && msgRefs.current[lastScrolledMsgId]) {
+        msgRefs.current[lastScrolledMsgId]?.scrollIntoView({ behavior: 'auto', block: 'center' });
+        return;
+      }
+    }
+
+    if (!shouldKeepBottomAligned()) return;
     if (timelineMediaLoadFrameRef.current !== null) return;
 
     timelineMediaLoadFrameRef.current = window.requestAnimationFrame(() => {
@@ -2117,7 +2134,7 @@ export default function ChatView({
       if (!shouldKeepBottomAligned()) return;
       scrollToBottom('auto');
     });
-  }, [scrollToBottom, selectedRoomId, shouldKeepBottomAligned]);
+  }, [scrollToBottom, selectedRoomId, shouldKeepBottomAligned, lastScrolledMsgIdRef, msgRefs]);
 
   useEffect(() => {
     return () => {

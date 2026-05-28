@@ -131,7 +131,7 @@ function GeneralTab() {
   );
 }
 
-export default function OpsWorkcenter() {
+export default function OpsWorkcenter({ user }: { user?: any }) {
   const meta = ADMIN_WORKCENTERS.ops;
   const [tab, setTab] = useState<OpsTabId>('general');
 
@@ -149,9 +149,9 @@ export default function OpsWorkcenter() {
 
       {tab === 'general' && <GeneralTab />}
       {tab === 'msg' && <MessageTemplatesTab />}
-      {tab === 'notify' && <NotificationAutomation user={null} />}
+      {tab === 'notify' && <NotificationAutomation user={user} />}
       {tab === 'popup' && <PopupManager />}
-      {tab === 'template' && <SurgeryExamTemplateManager user={null} />}
+      {tab === 'template' && <SurgeryExamTemplateManager user={user} />}
       {tab === 'int' && <IntegrationsTab />}
     </>
   );

@@ -36,6 +36,8 @@ export interface MessageTemplate {
   lastSentLabel?: string;
   /** 상태 (활성/초안/보류) */
   status?: '활성' | '초안' | '보류';
+  /** 템플릿 상세 문구 */
+  content?: string;
 }
 
 /** 채널 → 칩 색조 매핑 (reference 명세 준수) */

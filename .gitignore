@@ -108,3 +108,7 @@ __pycache__/
 scripts/**/산출물/
 scripts/backfill-d1/.backfill-progress.json
 .open-next-yesterday-46bdac3f/
+
+# Local agent scratch & helper scripts
+/scratch/
+/scripts/check_msg_tmpl_cols.js

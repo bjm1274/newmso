@@ -371,7 +371,7 @@ export function ExtraFeatureSubview({
 
   if (subView === 'OP체크') {
     return (
-      <FeatureShell onBack={onBack} maxWidth="max-w-7xl">
+      <FeatureShell onBack={onBack} maxWidth="max-w-none">
         <OperationCheckView
           user={user || {}}
           staffs={staffs}

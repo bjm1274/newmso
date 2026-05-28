@@ -1,0 +1,11 @@
+# Antigravity & Cursor Project Rules - Cloudflare D1 Stack
+
+## 1. Architecture & Database Rules
+- **Stack Definition**: This project is built entirely on **Cloudflare (D1/SQLite/Workers)**. Supabase is NOT used as a database or runtime environment.
+- **Client Queries**: The client-side code imports `supabase` from `@/lib/supabase` or `@/lib/d1-supabase-compat`. This is a custom **d1Client Proxy** that mimics Supabase syntax but routes all operations to Cloudflare D1 backend APIs (`/api/d1/*`).
+- **Database Schema**: All table schemas must be defined in `lib/db/schema.ts` using Drizzle ORM's SQLite core.
+- **Migrations & Scripts**: All database migrations must target **Cloudflare D1 / SQLite**. Do not write or reference "Supabase migrations" or Supabase-specific SQL features. Any SQL changes must be in standard SQLite dialect.
+
+## 2. Communication & Terminology Guidelines
+- **Terminology**: Never refer to the database as "Supabase". Always describe migrations, tables, and configurations as **Cloudflare D1**, **D1**, or **SQLite**.
+- **No Supabase Migrations**: If creating database setup scripts or SQL schemas, save them under `scripts/migrate-d1/` or standard schema files, treating them as Cloudflare D1 SQLite operations.

@@ -23,6 +23,7 @@ import {
   getStaffEmploymentType,
   getStaffExtension,
   getStaffProbationMonths,
+  getStaffProbationPercent,
   toIntegerOrFallback,
 } from '@/lib/staff-meta';
 import {
@@ -49,6 +50,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '', 근무형태IDs: [] as string[],
     고용형태: '정규직' as string, 계약종료일: '' as string,
     probation_months: 0,
+    probation_percent: 90,
     base_salary: 0,
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
@@ -929,6 +931,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             duru_nuri_end: dateOrNull(신규직원.duru_nuri_end)
           },
           probation_months: toIntegerOrFallback(신규직원.probation_months, 0),
+          probation_percent: toIntegerOrFallback(신규직원.probation_percent, 90),
           is_basic_living: 신규직원.is_basic_living,
           is_medical_benefit: 신규직원.is_medical_benefit,
           other_welfare: 신규직원.other_welfare,
@@ -1204,6 +1207,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       고용형태: getStaffEmploymentType(직원),
       계약종료일: getStaffContractEndDate(직원),
       probation_months: getStaffProbationMonths(직원, 0),
+      probation_percent: getStaffProbationPercent(직원, 90),
       ins_national: ins.national !== false,
       ins_health: ins.health !== false,
       ins_employment: ins.employment !== false,
@@ -1885,7 +1889,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="text-[11px] font-bold text-blue-600 ml-1">수습 기간 설정</label>
                           <select
                             value={신규직원.probation_months}
-                            onChange={e => 신규직원설정({ ...신규직원, probation_months: Number(e.target.value) })}
+                            onChange={e => 신규직원설정({ ...신규직원, probation_months: Number(e.target.value), ...(Number(e.target.value) === 0 ? { probation_percent: 100 } : {}) })}
                             className="w-full p-4 bg-blue-500/10 rounded-[var(--radius-lg)] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
                           >
                             <option value={0}>수습 없음</option>
@@ -1895,6 +1899,22 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             <option value={6}>6개월</option>
                           </select>
                         </div>
+                        {Number(신규직원.probation_months) > 0 && (
+                          <div className="space-y-2 animate-in fade-in duration-300">
+                            <label className="text-[11px] font-bold text-blue-600 ml-1">수습 급여 적용률</label>
+                            <select
+                              value={신규직원.probation_percent || 90}
+                              onChange={e => 신규직원설정({ ...신규직원, probation_percent: Number(e.target.value) })}
+                              className="w-full p-4 bg-blue-500/10 rounded-[var(--radius-lg)] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
+                            >
+                              <option value={100}>100% (지급액 동일)</option>
+                              <option value={95}>95%</option>
+                              <option value={90}>90% (일반적)</option>
+                              <option value={85}>85%</option>
+                              <option value={80}>80%</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
                       <div className="p-5 bg-purple-500/10 rounded-[var(--radius-xl)] border border-purple-100 space-y-4">
                         <h5 className="text-[11px] font-extrabold text-purple-800 flex items-center gap-1.5">⏱️ 상세 근로 시간 설정</h5>

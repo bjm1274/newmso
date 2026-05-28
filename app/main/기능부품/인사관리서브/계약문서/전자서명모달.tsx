@@ -40,6 +40,7 @@ const REQUIRED_AGREEMENTS = [
 
 export default function ContractSignatureModal({ contract, user, templateText, onClose, onSuccess }: Props) {
     const [step, setStep] = useState<number>(1);
+    const [privacyConsent, setPrivacyConsent] = useState<boolean | null>(null);
     const [agreements, setAgreements] = useState<Record<string, boolean>>({});
     const sigCanvas = useRef<SignatureCanvas>(null);
     const submitLockRef = useRef(false);
@@ -238,7 +239,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     };
 
     const handleNext = () => {
-        if (step === 1) setStep(2);
+        if (step === 1) {
+            if (privacyConsent === null) {
+                return toast('제11조 개인정보의 수집·이용 동의 여부를 선택해 주세요.');
+            }
+            setStep(2);
+        }
         else if (step === 2) {
             if (!allAgreed) return toast('모든 필수 항목에 동의해야 합니다.');
             setStep(3);
@@ -376,7 +382,16 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 signatureDataUrl: signatureData,
             });
 
-            const bodyHTML = buildContractBodyPrintHTML(bodyText);
+            let resolvedBodyText = bodyText;
+            if (privacyConsent === true) {
+                resolvedBodyText = resolvedBodyText.replace('□ 동의    □ 동의하지 않음', '☑ 동의    □ 동의하지 않음');
+                resolvedBodyText = resolvedBodyText.replace('□ 동의 □ 동의하지 않음', '☑ 동의 □ 동의하지 않음');
+            } else if (privacyConsent === false) {
+                resolvedBodyText = resolvedBodyText.replace('□ 동의    □ 동의하지 않음', '□ 동의    ☑ 동의하지 않음');
+                resolvedBodyText = resolvedBodyText.replace('□ 동의 □ 동의하지 않음', '□ 동의 ☑ 동의하지 않음');
+            }
+
+            const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
 
             const fullContractHTML = `
                 <div class="contract-wrapper">
@@ -497,6 +512,32 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                                                 <div key={li} className="flex gap-2 pl-5 mt-0.5">
                                                                     <span className="text-[var(--toss-gray-3)] shrink-0">•</span>
                                                                     <span className="text-[13px] text-[var(--toss-gray-4)] leading-[1.8]">{t.replace(/^[-·•]\s*/, '')}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
+                                                            return (
+                                                                <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 shrink-0">
+                                                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name="privacy-consent-active"
+                                                                            checked={privacyConsent === true}
+                                                                            onChange={() => setPrivacyConsent(true)}
+                                                                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                                        <input
+                                                                            type="radio"
+                                                                            name="privacy-consent-active"
+                                                                            checked={privacyConsent === false}
+                                                                            onChange={() => setPrivacyConsent(false)}
+                                                                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
+                                                                    </label>
                                                                 </div>
                                                             );
                                                         }

@@ -257,12 +257,7 @@ export function useThreadSummaries(messages: ChatMessage[], currentUserId?: stri
       const userParticipated = normalizedCurrentUserId
         ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
         : false;
-      const needsAttention = Boolean(
-        normalizedCurrentUserId &&
-        latestReplySenderId &&
-        latestReplySenderId !== normalizedCurrentUserId &&
-        (rootSenderId === normalizedCurrentUserId || userParticipated),
-      );
+      const needsAttention = false;
 
       acc[String(message.id)] = {
         rootId,
@@ -297,12 +292,7 @@ export function useThreadOverviews(messages: ChatMessage[], currentUserId?: stri
         const userParticipated = normalizedCurrentUserId
           ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
           : false;
-        const needsAttention = Boolean(
-          normalizedCurrentUserId &&
-          latestReplySenderId &&
-          latestReplySenderId !== normalizedCurrentUserId &&
-          (rootSenderId === normalizedCurrentUserId || userParticipated),
-        );
+        const needsAttention = false;
 
         return {
           rootId: thread.rootId,

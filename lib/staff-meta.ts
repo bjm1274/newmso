@@ -83,3 +83,9 @@ export function getStaffProbationMonths(source: unknown, fallback = 0) {
   const permissions = getStaffPermissions(source);
   return toIntegerOrFallback(source.probation_months ?? permissions.probation_months, fallback);
 }
+
+export function getStaffProbationPercent(source: unknown, fallback = 90) {
+  if (!isPlainRecord(source)) return fallback;
+  const permissions = getStaffPermissions(source);
+  return toIntegerOrFallback(source.probation_percent ?? permissions.probation_percent, fallback);
+}

@@ -62,9 +62,9 @@ function calcDday(dateStr: string | null | undefined): { label: string; tone: st
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   const diffDays = Math.round((targetDay.getTime() - today.getTime()) / 86400000);
-  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)} 지연`, tone: 'bg-red-500/100/10 text-red-600' };
-  if (diffDays === 0) return { label: 'D-day 오늘', tone: 'bg-orange-500/100/10 text-orange-600' };
-  if (diffDays <= 3) return { label: `D-${diffDays} 임박`, tone: 'bg-orange-500/100/10 text-orange-500' };
+  if (diffDays < 0) return { label: `D+${Math.abs(diffDays)} 지연`, tone: 'bg-red-500/10 text-red-600' };
+  if (diffDays === 0) return { label: 'D-day 오늘', tone: 'bg-orange-500/10 text-orange-600' };
+  if (diffDays <= 3) return { label: `D-${diffDays} 임박`, tone: 'bg-orange-500/10 text-orange-500' };
   return { label: `D-${diffDays}`, tone: 'bg-[var(--muted)] text-[var(--toss-gray-3)]' };
 }
 
