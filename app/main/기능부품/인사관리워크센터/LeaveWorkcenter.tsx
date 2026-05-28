@@ -333,7 +333,7 @@ export default function LeaveWorkcenter({
     const matched = data.rows.find((r) => String(r.staff.id) === String(item.staff.id));
     if (matched) {
       setPicked(matched);
-      toast(`${item.staff.name ?? '직원'}에게 사용 권유 — 빠른 신청 폼에 채웠습니다.`, 'success');
+      toast(`${item.staff.name ?? '직원'}에게 사용 권유 — 연차 사용기록 폼에 채웠습니다.`, 'success');
     } else {
       toast('해당 직원 정보를 찾을 수 없습니다.', 'error');
     }

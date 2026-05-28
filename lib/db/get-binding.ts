@@ -34,7 +34,7 @@ function getLocalD1Mock(): D1Database | undefined {
     }
 
     const files = fs.readdirSync(dir);
-    const sqliteFile = files.find((f) => f.endsWith('.sqlite') && f !== 'metadata.sqlite');
+    const sqliteFile = files.find((f: string) => f.endsWith('.sqlite') && f !== 'metadata.sqlite');
     if (!sqliteFile) {
       console.warn('[getLocalD1Mock] No .sqlite file found in:', dir);
       return undefined;
