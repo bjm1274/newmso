@@ -145,7 +145,8 @@ export default function InventoryStatusView({
   searchKeyword, setSearchKeyword, statusFilter, setStatusFilter,
   companiesInInventory, departmentsByViewCompany,
   loading, onRefresh,
-  onReorder,
+  onStockIn, onStockOut,
+  onReorder, onDelete,
   isOpsUser, pendingApprovals, completedApprovals,
   workflowActionKey, highlightedApprovalId,
   onSupplyIssue, onSupplyIssueCancel, onSupplyOrder, onSupplyOrderCancel, onOpenLinkedOrder,
@@ -676,6 +677,9 @@ export default function InventoryStatusView({
               toggleBatchAll={toggleBatchAll}
               onOpenDetail={openEditModal}
               onReorder={onReorder}
+              onStockIn={onStockIn}
+              onStockOut={onStockOut}
+              onDelete={onDelete}
             />
           </div>
         )}

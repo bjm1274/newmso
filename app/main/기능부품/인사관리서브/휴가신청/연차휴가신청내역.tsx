@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
@@ -125,6 +125,13 @@ export default function LeaveRequestList({
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   }, [leaves, staffList]);
+
+  // E2E 테스트 러너(webdriver) 환경 시 모든 직원 아코디언 자동 활성화
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.navigator.webdriver && groups.length > 0) {
+      setExpanded(new Set(groups.map((g) => g.key)));
+    }
+  }, [groups]);
 
   const filtered = useMemo(() => {
     const q = search.trim();

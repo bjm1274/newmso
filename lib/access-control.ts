@@ -120,6 +120,10 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   내부서재고: 'inventory_내부서재고',
   명세서: 'inventory_거래처',
   유통기한: 'inventory_현황',
+  status: 'inventory_현황',
+  io: 'inventory_등록',
+  item: 'inventory_자산',
+  analyze: 'inventory_월마감',
 };
 
 const ADMIN_PERMISSION_KEYS: Record<string, string> = {

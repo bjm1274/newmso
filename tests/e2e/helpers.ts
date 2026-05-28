@@ -6,6 +6,7 @@ import {
   createSessionToken,
   getSessionCookieOptions,
   SESSION_COOKIE_NAME,
+  verifySessionToken,
 } from '../../lib/server-session';
 
 function hydrateEnvFromLocalFile() {
@@ -449,6 +450,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           record_type: 'regular',
           net_pay: 2800000,
           gross_pay: 3200000,
+          status: '확정',
           created_at: '2026-03-08T09:00:00.000Z',
         },
       ],
@@ -748,7 +750,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let handoverNotes = [...fixtures.handoverNotes];
   let dischargeTemplates = [...fixtures.dischargeTemplates];
   let dischargeReviews = [...fixtures.dischargeReviews];
-  const surgeryTemplates = [...fixtures.surgeryTemplates];
+  let surgeryTemplates = [...fixtures.surgeryTemplates];
   let opCheckTemplates = [...fixtures.opCheckTemplates];
   let opPatientChecks = [...fixtures.opPatientChecks];
   const missingSurgeryTemplatesSchema = fixtures.missingSurgeryTemplatesSchema;
@@ -763,8 +765,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let staffEvaluations = [...fixtures.staffEvaluations];
   let attendanceCorrections = [...fixtures.attendanceCorrections];
   let leaveRequests = [...(fixtures.leaveRequests ?? [])];
-  const attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
-  const taxInsuranceRates = [...fixtures.taxInsuranceRates];
+  let attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
+  let taxInsuranceRates = [...fixtures.taxInsuranceRates];
   const legacyAttendanceCorrectionsSchema = fixtures.legacyAttendanceCorrectionsSchema;
   const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
@@ -807,6 +809,246 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     if (!rows.length) return;
     notifications = [...rows, ...notifications];
     await dispatchMockNotificationInsert(rows);
+  };
+
+  const evalFilterNode = (row: any, node: any): boolean => {
+    if (node.kind === 'and') {
+      return node.children.every((c: any) => evalFilterNode(row, c));
+    }
+    if (node.kind === 'or') {
+      return node.children.some((c: any) => evalFilterNode(row, c));
+    }
+    
+    const { field, op, value } = node;
+    const val = row[field];
+    if (op === 'eq') {
+      if (value === true || value === false) {
+        const normVal = typeof val === 'boolean' ? val : (val === 1 || val === '1');
+        const normExpected = value === true;
+        return normVal === normExpected;
+      }
+      return String(val ?? '') === String(value ?? '');
+    }
+    if (op === 'neq') {
+      if (value === true || value === false) {
+        const normVal = typeof val === 'boolean' ? val : (val === 1 || val === '1');
+        const normExpected = value === true;
+        return normVal !== normExpected;
+      }
+      return String(val ?? '') !== String(value ?? '');
+    }
+    if (op === 'lt') return val < value;
+    if (op === 'gt') return val > value;
+    if (op === 'lte') return val <= value;
+    if (op === 'gte') return val >= value;
+    if (op === 'is') {
+      if (value === null) return val === null || val === undefined;
+      return val === value;
+    }
+    if (op === 'isNot') {
+      if (value === null) return val !== null && val !== undefined;
+      return val !== value;
+    }
+    if (op === 'like' || op === 'ilike') {
+      const strVal = String(val ?? '').toLowerCase();
+      const strPattern = String(value ?? '').toLowerCase().replace(/%/g, '');
+      return strVal.includes(strPattern);
+    }
+    if (op === 'in') {
+      const arr = Array.isArray(value) ? value : [];
+      return arr.map(String).includes(String(val ?? ''));
+    }
+    return true;
+  };
+
+  const applyD1Filters = (rows: any[], where: any[] | undefined, orFilters: any[] | undefined): any[] => {
+    let filtered = [...rows];
+    if (where) {
+      for (const cond of where) {
+        const { field, op, value } = cond;
+        filtered = filtered.filter(row => {
+          const val = row[field];
+          if (op === 'eq') {
+            if (value === true || value === false) {
+              const normVal = typeof val === 'boolean' ? val : (val === 1 || val === '1');
+              const normExpected = value === true;
+              return normVal === normExpected;
+            }
+            return String(val ?? '') === String(value ?? '');
+          }
+          if (op === 'neq') {
+            if (value === true || value === false) {
+              const normVal = typeof val === 'boolean' ? val : (val === 1 || val === '1');
+              const normExpected = value === true;
+              return normVal !== normExpected;
+            }
+            return String(val ?? '') !== String(value ?? '');
+          }
+          if (op === 'lt') return val < value;
+          if (op === 'gt') return val > value;
+          if (op === 'lte') return val <= value;
+          if (op === 'gte') return val >= value;
+          if (op === 'is') {
+            if (value === null) return val === null || val === undefined;
+            return val === value;
+          }
+          if (op === 'isNot') {
+            if (value === null) return val !== null && val !== undefined;
+            return val !== value;
+          }
+          if (op === 'like' || op === 'ilike') {
+            const strVal = String(val ?? '').toLowerCase();
+            const strPattern = String(value ?? '').toLowerCase().replace(/%/g, '');
+            return strVal.includes(strPattern);
+          }
+          if (op === 'in') {
+            const arr = Array.isArray(value) ? value : [];
+            return arr.map(String).includes(String(val ?? ''));
+          }
+          return true;
+        });
+      }
+    }
+    
+    if (orFilters && orFilters.length > 0) {
+      for (const node of orFilters) {
+        filtered = filtered.filter(row => evalFilterNode(row, node));
+      }
+    }
+    return filtered;
+  };
+
+  const getTableArray = (tableName: string): any[] => {
+    switch (tableName) {
+      case 'staff_members': return staffMembers;
+      case 'notifications': return notifications;
+      case 'email_queue': return emailQueue;
+      case 'tax_reports': return taxReports;
+      case 'todos': return todos;
+      case 'chat_rooms': return chatRooms;
+      case 'messages': return messages;
+      case 'pinned_messages': return pinnedMessages;
+      case 'polls': return polls;
+      case 'poll_votes': return pollVotes;
+      case 'message_reactions': return messageReactions;
+      case 'message_reads': return messageReads;
+      case 'room_read_cursors': return roomReadCursors;
+      case 'message_bookmarks': return messageBookmarks;
+      case 'audit_logs': return auditLogs;
+      case 'approvals': return approvals;
+      case 'payroll_records': return payrollRecords;
+      case 'payroll_locks': return payrollLocks;
+      case 'board_posts': return boardPosts;
+      case 'board_post_comments': return boardPostComments;
+      case 'board_post_reads': return boardPostReads;
+      case 'board_post_likes': return boardPostLikes;
+      case 'companies': return companies;
+      case 'inventory':
+      case 'inventory_items': return inventoryItems;
+      case 'inventory_logs': return inventoryLogs;
+      case 'inventory_transfers': return inventoryTransfers;
+      case 'suppliers': return suppliers;
+      case 'inventory_categories': return inventoryCategories;
+      case 'purchase_orders': return purchaseOrders;
+      case 'as_repair_records': return asRepairRecords;
+      case 'return_records': return returnRecords;
+      case 'incident_reports': return incidentReports;
+      case 'work_schedules': return workSchedules;
+      case 'work_shifts': return workShifts;
+      case 'org_teams': return orgTeams;
+      case 'generated_contracts': return generatedContracts;
+      case 'employment_contracts': return employmentContracts;
+      case 'onboarding_checklists': return onboardingChecklists;
+      case 'insurance_records': return insuranceRecords;
+      case 'document_repository': return documentRepository;
+      case 'certificate_issuances': return certificateIssuances;
+      case 'attendance': return attendance;
+      case 'attendances': return attendances;
+      case 'attendance_records': return attendanceRecords;
+      case 'early_leave_records': return earlyLeaveRecords;
+      case 'shift_assignments': return shiftAssignments;
+      case 'handover_notes': return handoverNotes;
+      case 'discharge_templates': return dischargeTemplates;
+      case 'discharge_reviews': return dischargeReviews;
+      case 'surgery_templates': return surgeryTemplates;
+      case 'op_check_templates': return opCheckTemplates;
+      case 'op_patient_checks': return opPatientChecks;
+      case 'daily_closures': return dailyClosures;
+      case 'daily_closure_items': return dailyClosureItems;
+      case 'daily_checks': return dailyChecks;
+      case 'staff_evaluations': return staffEvaluations;
+      case 'attendance_corrections': return attendanceCorrections;
+      case 'leave_requests': return leaveRequests;
+      case 'attendance_deduction_rules': return attendanceDeductionRules;
+      case 'tax_insurance_rates': return taxInsuranceRates;
+      default: return [];
+    }
+  };
+
+  const setTableArray = (tableName: string, newRows: any[]) => {
+    switch (tableName) {
+      case 'staff_members': staffMembers = newRows; break;
+      case 'notifications': notifications = newRows; break;
+      case 'email_queue': emailQueue = newRows; break;
+      case 'tax_reports': taxReports = newRows; break;
+      case 'todos': todos = newRows; break;
+      case 'chat_rooms': chatRooms = newRows; break;
+      case 'messages': messages = newRows; break;
+      case 'pinned_messages': pinnedMessages = newRows; break;
+      case 'polls': polls = newRows; break;
+      case 'poll_votes': pollVotes = newRows; break;
+      case 'message_reactions': messageReactions = newRows; break;
+      case 'message_reads': messageReads = newRows; break;
+      case 'room_read_cursors': roomReadCursors = newRows; break;
+      case 'message_bookmarks': messageBookmarks = newRows; break;
+      case 'audit_logs': auditLogs = newRows; break;
+      case 'approvals': approvals = newRows; break;
+      case 'payroll_records': payrollRecords = newRows; break;
+      case 'payroll_locks': payrollLocks = newRows; break;
+      case 'board_posts': boardPosts = newRows; break;
+      case 'board_post_comments': boardPostComments = newRows; break;
+      case 'board_post_reads': boardPostReads = newRows; break;
+      case 'board_post_likes': boardPostLikes = newRows; break;
+      case 'companies': companies = newRows; break;
+      case 'inventory':
+      case 'inventory_items': inventoryItems = newRows; break;
+      case 'inventory_logs': inventoryLogs = newRows; break;
+      case 'inventory_transfers': inventoryTransfers = newRows; break;
+      case 'suppliers': suppliers = newRows; break;
+      case 'inventory_categories': inventoryCategories = newRows; break;
+      case 'purchase_orders': purchaseOrders = newRows; break;
+      case 'as_repair_records': asRepairRecords = newRows; break;
+      case 'return_records': returnRecords = newRows; break;
+      case 'incident_reports': incidentReports = newRows; break;
+      case 'work_schedules': workSchedules = newRows; break;
+      case 'work_shifts': workShifts = newRows; break;
+      case 'org_teams': orgTeams = newRows; break;
+      case 'generated_contracts': generatedContracts = newRows; break;
+      case 'employment_contracts': employmentContracts = newRows; break;
+      case 'onboarding_checklists': onboardingChecklists = newRows; break;
+      case 'insurance_records': insuranceRecords = newRows; break;
+      case 'document_repository': documentRepository = newRows; break;
+      case 'certificate_issuances': certificateIssuances = newRows; break;
+      case 'attendance': attendance = newRows; break;
+      case 'attendances': attendances = newRows; break;
+      case 'attendance_records': attendanceRecords = newRows; break;
+      case 'early_leave_records': earlyLeaveRecords = newRows; break;
+      case 'shift_assignments': shiftAssignments = newRows; break;
+      case 'handover_notes': handoverNotes = newRows; break;
+      case 'discharge_templates': dischargeTemplates = newRows; break;
+      case 'discharge_reviews': dischargeReviews = newRows; break;
+      case 'surgery_templates': surgeryTemplates = newRows; break;
+      case 'op_check_templates': opCheckTemplates = newRows; break;
+      case 'op_patient_checks': opPatientChecks = newRows; break;
+      case 'daily_closures': dailyClosures = newRows; break;
+      case 'daily_closure_items': dailyClosureItems = newRows; break;
+      case 'daily_checks': dailyChecks = newRows; break;
+      case 'staff_evaluations': staffEvaluations = newRows; break;
+      case 'attendance_corrections': attendanceCorrections = newRows; break;
+      case 'leave_requests': leaveRequests = newRows; break;
+      case 'attendance_deduction_rules': attendanceDeductionRules = newRows; break;
+      case 'tax_insurance_rates': taxInsuranceRates = newRows; break;
+    }
   };
 
   const approvalStatus = {
@@ -1378,6 +1620,264 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     });
   });
 
+  await page.route('**/api/d1/query', async (route) => {
+    const body = route.request().postDataJSON() || {};
+    const { table, where, orFilters, order, limit, range, single, maybeSingle, count } = body;
+    let rows = [...getTableArray(table)];
+
+    rows = applyD1Filters(rows, where, orFilters);
+
+    if (order && order.length > 0) {
+      for (const ord of order) {
+        const { field, ascending } = ord;
+        rows.sort((a, b) => {
+          const aVal = a[field];
+          const bVal = b[field];
+          if (aVal == null && bVal == null) return 0;
+          if (aVal == null) return ascending ? -1 : 1;
+          if (bVal == null) return ascending ? 1 : -1;
+          if (aVal < bVal) return ascending ? -1 : 1;
+          if (aVal > bVal) return ascending ? 1 : -1;
+          return 0;
+        });
+      }
+    }
+
+    const totalCount = rows.length;
+    if (limit !== undefined) {
+      rows = rows.slice(0, limit);
+    } else if (range !== undefined) {
+      rows = rows.slice(range.from, range.to + 1);
+    }
+
+    let data: any = rows;
+    if (single) {
+      data = rows[0] || null;
+      if (data === null) {
+        return route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: 'Not found' }),
+        });
+      }
+    } else if (maybeSingle) {
+      data = rows[0] || null;
+    }
+
+    const payload: any = { ok: true, data };
+    if (count) {
+      payload.count = totalCount;
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route('**/api/d1/mutate', async (route) => {
+    const body = route.request().postDataJSON() || {};
+    const { op, table, values, set, where, returning, conflict, onConflict } = body;
+
+    if (op === 'insert' && table === 'messages') {
+      const payloads = Array.isArray(values) ? values : [values];
+      const isRetryTarget = payloads.some(p => String(p?.content || '').includes('retry smoke message'));
+      if (isRetryTarget && messageInsertFailures > 0) {
+        messageInsertFailures -= 1;
+        return route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: false, error: 'insert failed' }),
+        });
+      }
+    }
+
+    let currentRows = [...getTableArray(table)];
+    let affectedRows: any[] = [];
+
+    if (op === 'insert') {
+      const payloads = Array.isArray(values) ? values : [values];
+      const tablePrefixMap: Record<string, string> = {
+        work_shifts: 'shift',
+        shift_assignments: 'shift-assignment',
+        org_teams: 'org-team',
+        companies: 'company',
+        inventory: 'inventory',
+        inventory_items: 'inventory',
+        notifications: 'notification',
+        audit_logs: 'audit-log',
+        approvals: 'approval',
+        payroll_records: 'payroll-record',
+        board_posts: 'board-post',
+        messages: 'message',
+      };
+      const prefix = tablePrefixMap[table] || table;
+      const inserted = payloads.map((payload: any, index: number) => {
+        const nextId = payload.id || `${prefix}-${currentRows.length + index + 1}`;
+        return {
+          id: nextId,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        };
+      });
+
+      if (conflict || onConflict === 'replace') {
+        const conflictCols = conflict?.columns || (onConflict === 'replace' ? ['id'] : []);
+        if (conflictCols.length > 0) {
+          const action = conflict?.action || 'update';
+          for (const row of inserted) {
+            const matchIndex = currentRows.findIndex(r =>
+              conflictCols.every((col: string) => String(r[col] ?? '') === String(row[col] ?? ''))
+            );
+            if (matchIndex >= 0) {
+              if (action === 'update') {
+                currentRows[matchIndex] = { ...currentRows[matchIndex], ...row };
+                affectedRows.push(currentRows[matchIndex]);
+              }
+            } else {
+              currentRows.push(row);
+              affectedRows.push(row);
+            }
+          }
+        } else {
+          currentRows = [...currentRows, ...inserted];
+          affectedRows = [...inserted];
+        }
+      } else {
+        currentRows = [...currentRows, ...inserted];
+        affectedRows = [...inserted];
+      }
+      setTableArray(table, currentRows);
+    } else if (op === 'update') {
+      const matched: number[] = [];
+      currentRows = currentRows.map((row, idx) => {
+        const match = applyD1Filters([row], where, undefined).length > 0;
+        if (match) {
+          matched.push(idx);
+          return { ...row, ...set };
+        }
+        return row;
+      });
+      affectedRows = matched.map(idx => currentRows[idx]);
+      setTableArray(table, currentRows);
+    } else if (op === 'delete') {
+      const deleting = applyD1Filters(currentRows, where, undefined);
+      const deleteIds = new Set(deleting.map(row => String(row.id)));
+      currentRows = currentRows.filter(row => !deleteIds.has(String(row.id)));
+      affectedRows = deleting;
+      setTableArray(table, currentRows);
+    }
+
+    const resData = (returning && returning.length > 0) ? affectedRows : null;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: resData }),
+    });
+  });
+
+  await page.route('**/api/work-shifts/bulk-deactivate', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() || {};
+      const ids = new Set((body.ids || []).map((id: any) => String(id)));
+      
+      let currentShifts = [...getTableArray('work_shifts')];
+      currentShifts = currentShifts.map(s => {
+        if (ids.has(String(s.id))) {
+          return { ...s, is_active: 0 };
+        }
+        return s;
+      });
+      setTableArray('work_shifts', currentShifts);
+      
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+      });
+    }
+    await route.fallback();
+  });
+
+  await page.route('**/api/work-shifts', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() || {};
+      let currentShifts = [...getTableArray('work_shifts')];
+      const id = body.id || `shift-${currentShifts.length + 1}`;
+      
+      const newShift = {
+        id,
+        name: body.name,
+        start_time: body.start_time,
+        end_time: body.end_time,
+        break_start_time: body.break_start_time || null,
+        break_end_time: body.break_end_time || null,
+        description: body.description || null,
+        company_name: body.company_name,
+        shift_type: body.shift_type || null,
+        weekly_work_days: body.weekly_work_days ?? 5,
+        is_weekend_work: body.is_weekend_work ? 1 : 0,
+        is_shift: body.is_shift ? 1 : 0,
+        is_active: 1,
+        created_at: new Date().toISOString(),
+      };
+      
+      const existIndex = currentShifts.findIndex(s => s.id === id);
+      if (existIndex >= 0) {
+        currentShifts[existIndex] = { ...currentShifts[existIndex], ...newShift };
+      } else {
+        currentShifts.push(newShift);
+      }
+      setTableArray('work_shifts', currentShifts);
+      
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, id }),
+      });
+    }
+    await route.fallback();
+  });
+
+  await page.route('**/api/auth/session', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    }
+    const cookieHeader = route.request().headers()['cookie'] || '';
+    const parts = cookieHeader.split(';');
+    let token = '';
+    for (const part of parts) {
+      const [name, ...val] = part.trim().split('=');
+      if (name === SESSION_COOKIE_NAME) {
+        token = val.join('=');
+        break;
+      }
+    }
+    const session = await verifySessionToken(token);
+    if (!session) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ authenticated: false, error: '세션이 없습니다.' }),
+      });
+    }
+    const user = session.user || staffMembers[0] || fakeUser;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        authenticated: true,
+        user,
+        expiresAt: session.exp,
+      }),
+    });
+  });
+
   await page.route('**/rest/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -1880,11 +2380,12 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, firstOrList(updated, wantsObject));
       }
       if (method === 'POST') {
-        if (messageInsertFailures > 0) {
-          messageInsertFailures -= 1;
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const isRetryTarget = payloads.some(p => String(p?.content || '').includes('retry smoke message'));
+        if (isRetryTarget && messageInsertFailures > 0) {
           return json(route, { message: 'insert failed' }, 500);
         }
-        const body = request.postDataJSON();
         const payload = Array.isArray(body) ? body[0] : body;
         const inserted = {
           id: `msg-${messages.length + 1}`,

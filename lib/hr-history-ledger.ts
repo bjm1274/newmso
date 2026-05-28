@@ -98,7 +98,7 @@ function formatSalaryDescription(record: Record<string, unknown>) {
 }
 
 function formatWorkTypeDescription(record: Record<string, unknown>) {
-  const prevType = asTrimmedString(record.prev_type);
+  const prevType = asTrimmedString(record.previous_type || record.prev_type);
   const nextType = asTrimmedString(record.new_type);
   const reason = asTrimmedString(record.reason);
   const pieces = [`${prevType || '이전 근무형태 미설정'} -> ${nextType || '미설정'}`];
@@ -116,7 +116,7 @@ function formatLeaveDescription(record: Record<string, unknown>) {
 }
 
 export async function fetchHrHistoryLedger(staffId: string) {
-  const [appointments, contracts, salaryChanges, workTypeChanges, leaveRequests, audits] =
+  const [appointments, contracts, salaryChanges, workTypeChanges, leaveRequests] =
     await Promise.all([
       safeQuery<Record<string, unknown>>(
         'personnel_appointments',
@@ -160,15 +160,6 @@ export async function fetchHrHistoryLedger(staffId: string) {
           .from('leave_requests')
           .select('id, leave_type, start_date, end_date, created_at, staff_id, status')
           .eq('staff_id', staffId)
-          .order('created_at', { ascending: false })
-          .limit(20),
-      ),
-      safeQuery<Record<string, unknown>>(
-        'audit_logs',
-        supabase
-          .from('audit_logs')
-          .select('id, action, created_at, target_id, user_name, details')
-          .eq('target_id', staffId)
           .order('created_at', { ascending: false })
           .limit(20),
       ),
@@ -262,24 +253,6 @@ export async function fetchHrHistoryLedger(staffId: string) {
       badge: '휴가',
       status: status || null,
       accentClass: 'bg-sky-50 text-sky-700 border-sky-200',
-    });
-  });
-
-  audits.forEach((record) => {
-    const action = asTrimmedString(record.action) || '감사 로그';
-    const details =
-      record.details && typeof record.details === 'object'
-        ? JSON.stringify(record.details).slice(0, 120)
-        : '';
-    events.push({
-      id: `audit-${record.id}`,
-      type: 'audit',
-      occurredAt: normalizeDate(record.created_at as string),
-      title: action,
-      description: details || '감사 로그가 기록되었습니다.',
-      badge: '감사',
-      status: null,
-      accentClass: 'bg-slate-100 text-slate-700 border-slate-200',
     });
   });
 

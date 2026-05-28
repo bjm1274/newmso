@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
@@ -8,6 +8,7 @@ import {
   ADMIN_AUDIT_TABS,
   ADMIN_OPERATIONS_TABS,
   ADMIN_OUTER_TABS,
+  ADMIN_SIDEBAR_ITEMS,
   normalizeAdminEntry,
   type AdminAnalysisTabId,
   type AdminAuditTabId,
@@ -151,27 +152,38 @@ export default function AdminView(props: Record<string, unknown>) {
   }, [isSystemMaster, user]);
   const fallbackAdminTab = visibleAdminTabs[0] || null;
 
+  const isValidAdminTab = useCallback(
+    (tabId: AdminOuterTabId) => {
+      return (
+        visibleAdminTabs.includes(tabId) ||
+        (ADMIN_SIDEBAR_ITEMS.some((item) => item.id === tabId) &&
+          canAccessAdminTab(user, tabId))
+      );
+    },
+    [user, visibleAdminTabs],
+  );
+
   useEffect(() => {
     const nextState = normalizeAdminEntry(initialTab);
     const requestedTab =
       nextState.activeTab === '시스템마스터센터' && !isSystemMaster
         ? '감사센터'
         : nextState.activeTab;
-    const nextActiveTab = visibleAdminTabs.includes(requestedTab)
+    const nextActiveTab = isValidAdminTab(requestedTab)
       ? requestedTab
       : (fallbackAdminTab ?? requestedTab);
     setActiveTab(nextActiveTab);
     setAnalysisTab(nextState.analysisTab);
     setOperationsTab(nextState.operationsTab);
     setAuditTab(nextState.auditTab);
-  }, [fallbackAdminTab, initialTab, isSystemMaster, visibleAdminTabs]);
+  }, [fallbackAdminTab, initialTab, isSystemMaster, isValidAdminTab]);
 
   useEffect(() => {
-    if (activeTab && visibleAdminTabs.includes(activeTab)) return;
+    if (activeTab && isValidAdminTab(activeTab)) return;
     if (fallbackAdminTab) {
       setActiveTab(fallbackAdminTab);
     }
-  }, [activeTab, fallbackAdminTab, visibleAdminTabs]);
+  }, [activeTab, fallbackAdminTab, isValidAdminTab]);
 
   useEffect(() => {
     if (visibleOperationsTabs.length === 0) return;

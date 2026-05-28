@@ -96,14 +96,14 @@ export function PayrollAndCertificatesHub({
   user,
   activeView,
   onBack,
+  onChangeView,
 }: {
   user: Record<string, unknown> | null | undefined;
   activeView: 'salary' | 'certificates';
   onBack?: () => void;
+  onChangeView?: (view: 'salary' | 'certificates') => void;
 }) {
   const [summary, setSummary] = useState({ salaryCount: 0, certificateCount: 0 });
-  const activeTitle = activeView === 'salary' ? '급여명세서' : '증명서';
-  const activeCount = activeView === 'salary' ? summary.salaryCount : summary.certificateCount;
 
   useEffect(() => {
     if (!user?.id) {
@@ -152,24 +152,65 @@ export function PayrollAndCertificatesHub({
 
   return (
     <div className="space-y-4 p-3 md:p-4">
-      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <h2 className="truncate text-xl font-bold tracking-tight text-[var(--foreground)]">{activeTitle}</h2>
-            <span className="rounded-[var(--radius-md)] bg-[var(--accent-light)] px-3 py-1 text-sm font-black text-[var(--accent)]">
-              {activeCount}건
-            </span>
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm animate-premium-fade">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <h2 className="truncate text-xl font-bold tracking-tight text-[var(--foreground)]">급여·증명서</h2>
+            </div>
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                <LucideIcon name="ArrowLeft" size={14} />
+                내 정보
+              </button>
+            )}
           </div>
-          {onBack && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <button
               type="button"
-              onClick={onBack}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+              aria-label="월별 정산 카드"
+              onClick={() => onChangeView?.('salary')}
+              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
+                activeView === 'salary'
+                  ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+              }`}
             >
-              <LucideIcon name="ArrowLeft" size={14} />
-              내 정보
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
+                  <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">월별 명세서 및 정산 내역</p>
+                </div>
+                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
+                  {summary.salaryCount}건
+                </span>
+              </div>
             </button>
-          )}
+            <button
+              type="button"
+              aria-label="발급 문서 카드"
+              onClick={() => onChangeView?.('certificates')}
+              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
+                activeView === 'certificates'
+                  ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">발급된 증명서</p>
+                  <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">발급 완료 및 승인 문서 확인</p>
+                </div>
+                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
+                  {summary.certificateCount}건
+                </span>
+              </div>
+            </button>
+          </div>
         </div>
       </section>
 

@@ -38,6 +38,9 @@ export type InventoryStatusGridProps = {
   toggleBatchAll: (allIds: string[]) => void;
   onOpenDetail: (item: InventoryItem) => void;
   onReorder: (item: InventoryItem) => void;
+  onStockIn?: (item: InventoryItem) => void;
+  onStockOut?: (item: InventoryItem) => void;
+  onDelete?: (item: InventoryItem) => void;
 };
 
 /**
@@ -56,6 +59,9 @@ export default function InventoryStatusGrid({
   toggleBatchAll,
   onOpenDetail,
   onReorder,
+  onStockIn,
+  onStockOut,
+  onDelete,
 }: InventoryStatusGridProps) {
   const selectedSet = useMemo(
     () => new Set(batchSelectedIds),
@@ -148,7 +154,7 @@ export default function InventoryStatusGrid({
       // 모바일 카드는 자체가 <button> 이라 내부 액션 버튼이 nested-button 이 됨.
       // 모바일에서는 카드 탭 → 상세 모달에서 추가 작업하도록 숨김.
       showOnMobile: false,
-      render: (item) => renderActionsCell(item, onOpenDetail, onReorder),
+      render: (item) => renderActionsCell(item, onOpenDetail, onReorder, onStockIn, onStockOut, onDelete),
     },
   ];
 
@@ -244,6 +250,9 @@ function renderActionsCell(
   item: InventoryItem,
   onOpenDetail: (item: InventoryItem) => void,
   onReorder: (item: InventoryItem) => void,
+  onStockIn?: (item: InventoryItem) => void,
+  onStockOut?: (item: InventoryItem) => void,
+  onDelete?: (item: InventoryItem) => void,
 ): ReactNode {
   const q = qty(item);
   const mq = minQty(item);
@@ -256,8 +265,29 @@ function renderActionsCell(
     <span
       className="inline-flex items-center justify-end gap-1"
       onClick={(e) => e.stopPropagation()}
-      onClickCapture={(e) => e.stopPropagation()}
     >
+      <button
+        type="button"
+        data-testid={`inventory-stock-in-${item.id}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onStockIn?.(item);
+        }}
+        className="rounded-[var(--radius-md)] border border-transparent bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:opacity-90"
+      >
+        입고
+      </button>
+      <button
+        type="button"
+        data-testid={`inventory-stock-out-${item.id}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onStockOut?.(item);
+        }}
+        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--muted)]"
+      >
+        출고
+      </button>
       <button
         type="button"
         onClick={(e) => {
@@ -271,6 +301,7 @@ function renderActionsCell(
       {(isLow || isOos) && (
         <button
           type="button"
+          data-testid={`inventory-reorder-${item.id}`}
           onClick={(e) => {
             e.stopPropagation();
             onReorder(item);
@@ -280,6 +311,17 @@ function renderActionsCell(
           발주
         </button>
       )}
+      <button
+        type="button"
+        data-testid={`inventory-delete-${item.id}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete?.(item);
+        }}
+        className="rounded-[var(--radius-md)] border border-transparent bg-red-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:opacity-90"
+      >
+        삭제
+      </button>
     </span>
   );
 }

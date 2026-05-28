@@ -56,17 +56,27 @@ function AuditLogViewerDesktop() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [searchKeyword, setSearchKeyword] = useState('');
   const requestIdRef = useRef(0);
 
-  const fetchLogs = useCallback(async (offset = 0) => {
+  const fetchLogs = useCallback(async (offset = 0, keyword = searchKeyword) => {
     const myId = ++requestIdRef.current;
     setLoading(true);
-    const { data } = await supabase
+    
+    let query = supabase
       .from('audit_logs')
       .select('*')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (myId !== requestIdRef.current) return; // stale response — 다음 요청이 이미 시작됨
+      .order('created_at', { ascending: false });
+
+    if (keyword.trim()) {
+      query = query.or(
+        `user_name.ilike.%${keyword.trim()}%,action.ilike.%${keyword.trim()}%,target_id.ilike.%${keyword.trim()}%,details.ilike.%${keyword.trim()}%`
+      );
+    }
+
+    const { data } = await query.range(offset, offset + PAGE_SIZE - 1);
+    
+    if (myId !== requestIdRef.current) return; // stale response
     const rows = data || [];
     if (offset === 0) {
       setLogs(rows);
@@ -75,30 +85,56 @@ function AuditLogViewerDesktop() {
     }
     setHasMore(rows.length === PAGE_SIZE);
     setLoading(false);
-  }, []);
+  }, [searchKeyword]);
 
   useEffect(() => {
-    fetchLogs(0);
+    fetchLogs(0, '');
     return () => {
       requestIdRef.current = -1; // unmount 후 응답은 모두 무효화
     };
-  }, [fetchLogs]);
+  }, []);
 
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden shadow-sm" data-testid="admin-audit-general">
-      <div className="p-4 border-b border-[var(--border)] flex items-center justify-between gap-3">
+      <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[var(--card)]">
         <div>
           <h3 className="text-base font-semibold text-[var(--foreground)]">감사 로그</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">급여·결재·인사 등 주요 변경 이력 ({logs.length}건)</p>
         </div>
-        <button
-          type="button"
-          onClick={() => fetchLogs(0)}
-          disabled={loading}
-          className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
-        >
-          새로고침
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                fetchLogs(0, searchKeyword);
+              }
+            }}
+            placeholder="직원명·사번·작업 검색"
+            aria-label="감사로그 검색"
+            className="px-3 py-1.5 text-xs rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] placeholder-[var(--toss-gray-3)] outline-none min-w-[200px]"
+          />
+          <button
+            type="button"
+            onClick={() => fetchLogs(0, searchKeyword)}
+            disabled={loading}
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] text-white px-3 py-1.5 text-[11px] font-bold shadow-sm hover:opacity-90 disabled:opacity-50"
+          >
+            검색
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchKeyword('');
+              fetchLogs(0, '');
+            }}
+            disabled={loading}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50"
+          >
+            새로고침
+          </button>
+        </div>
       </div>
       <div>
         {loading && logs.length === 0 ? (

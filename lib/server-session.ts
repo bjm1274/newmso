@@ -143,10 +143,9 @@ const SESSION_PERMISSION_KEYS = new Set([
 ]);
 
 function compactSessionPermissions(permissions: Record<string, any>) {
-  return Object.entries(permissions || {}).reduce<Record<string, true>>((acc, [key, value]) => {
-    if (value !== true) return acc;
+  return Object.entries(permissions || {}).reduce<Record<string, boolean>>((acc, [key, value]) => {
     if (SESSION_PERMISSION_KEYS.has(key) || key.startsWith('menu_')) {
-      acc[key] = true;
+      acc[key] = value === true;
     }
     return acc;
   }, {});

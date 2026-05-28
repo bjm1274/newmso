@@ -45,6 +45,12 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: 'io', label: '입출고·발주', group: '재고관리', icon: 'inventory-flow' },
     { id: 'item', label: '물품·자산', group: '재고관리', icon: 'asset' },
     { id: 'analyze', label: '분석·마감', group: '재고관리', icon: 'analytics' },
+    { id: '등록', label: '등록', group: '이관·이동', icon: 'plus' },
+    { id: '이관', label: '이관', group: '이관·이동', icon: 'refresh' },
+    { id: '발주', label: '발주', group: '이관·이동', icon: 'purchase' },
+    { id: '자산', label: '자산', group: '이관·이동', icon: 'asset' },
+    { id: '월마감', label: '월마감', group: '이관·이동', icon: 'check' },
+    { id: '거래처', label: '거래처', group: '이관·이동', icon: 'briefcase' },
   ],
   게시판: [
     { id: '공지사항', label: '공지사항', group: '게시판', icon: 'bell' },

@@ -126,7 +126,7 @@ const DEFAULT_ADMIN_ENTRY: AdminEntryState = {
 const ADMIN_ANALYSIS_TAB_ID_SET = new Set<string>(ADMIN_ANALYSIS_TABS.map((tab) => tab.id));
 const ADMIN_OPERATIONS_TAB_ID_SET = new Set<string>(ADMIN_OPERATIONS_TABS.map((tab) => tab.id));
 const ADMIN_AUDIT_TAB_ID_SET = new Set<string>(ADMIN_AUDIT_TABS.map((tab) => tab.id));
-const ADMIN_OUTER_TAB_ID_SET = new Set<string>(ADMIN_OUTER_TABS);
+const ADMIN_OUTER_TAB_ID_SET = new Set<string>(ADMIN_SIDEBAR_ITEMS.map((item) => item.id));
 
 export function isAdminAnalysisTabId(tabId?: string | null): tabId is AdminAnalysisTabId {
   return Boolean(tabId && ADMIN_ANALYSIS_TAB_ID_SET.has(tabId));

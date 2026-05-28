@@ -154,6 +154,24 @@ function ApiCounterBadgeInner(): React.ReactElement {
 // ─────────────────────────────────────────────
 
 export default function ApiCounterBadge(): React.ReactElement | null {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (!isDev) return null;
+  if (!mounted) return null;
+
+  // E2E 테스트(Playwright 등) 환경에서는 UI를 가려 클릭 방해하는 것을 막기 위해 비활성화
+  const isE2E =
+    typeof window !== 'undefined' &&
+    (window.navigator.webdriver ||
+      (window as any).__playwright ||
+      (window as any).__setMockNow ||
+      (typeof window.location !== 'undefined' && window.location.search.includes('e2e=true')));
+
+  if (isE2E) return null;
+
   return <ApiCounterBadgeInner />;
 }

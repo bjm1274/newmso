@@ -252,9 +252,10 @@ interface StaffListManagerProps {
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
   canRegisterNewStaff?: boolean;
   onOpenNewStaff?: () => void;
+  initialEditStaff?: StaffMember | null;
 }
 
-export default function StaffListManager({ 직원목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, canRegisterNewStaff = false, onOpenNewStaff }: StaffListManagerProps) {
+export default function StaffListManager({ 직원목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, canRegisterNewStaff = false, onOpenNewStaff, initialEditStaff }: StaffListManagerProps) {
   const { dialog, openConfirm } = useActionDialog();
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
@@ -1384,6 +1385,12 @@ export default function StaffListManager({ 직원목록 = [], 선택사업체, �
       logger.warn('수정 모달 서브 테이블 로드 실패:', err);
     });
   };
+
+  useEffect(() => {
+    if (initialEditStaff) {
+      수정시작(initialEditStaff);
+    }
+  }, [initialEditStaff]);
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);

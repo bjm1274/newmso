@@ -15,7 +15,7 @@ import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import { submitLeaveRequest, type LeaveStaffRow } from './data';
 
-const LEAVE_TYPES = ['연차', '오전반차', '오후반차', '경조', '병가', '특별휴가'] as const;
+const LEAVE_TYPES = ['연차', '연차(부여)', '연차(과거사용)', '오전반차', '오후반차', '경조', '병가', '특별휴가'] as const;
 type LeaveTypeOption = (typeof LEAVE_TYPES)[number];
 
 interface Props {
@@ -63,7 +63,12 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
 
   const days = useMemo(() => computeDays(startDate, endDate, leaveType), [startDate, endDate, leaveType]);
   const remaining = picked?.remaining ?? 0;
-  const remainingAfter = Math.max(0, remaining - days);
+  const remainingAfter = useMemo(() => {
+    if (leaveType === '연차(부여)') {
+      return remaining + days;
+    }
+    return Math.max(0, remaining - days);
+  }, [remaining, days, leaveType]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -153,9 +158,17 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
               onChange={(e) => setLeaveType(e.target.value as LeaveTypeOption)}
               className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[12px]"
             >
-              {LEAVE_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
+              {LEAVE_TYPES.map((type) => {
+                let label: string = type;
+                if (type === '연차') label = '연차 사용 신청';
+                if (type === '연차(부여)') label = '연차 신규 부여 (+)';
+                if (type === '연차(과거사용)') label = '도입 전 사용 소급 (-)';
+                return (
+                  <option key={type} value={type}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
           </label>
           <label className="flex flex-col gap-1">
@@ -181,7 +194,9 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
         </label>
 
         <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[12px]">
-          <span className="text-[var(--toss-gray-4)]">사용 후 잔여</span>
+          <span className="text-[var(--toss-gray-4)]">
+            {leaveType === '연차(부여)' ? '부여 후 잔여' : '사용 후 잔여'}
+          </span>
           <span className="font-bold">
             <span className="tnum text-[var(--foreground)]">{remainingAfter}</span>
             <span className="ml-1 text-[11px] text-[var(--toss-gray-4)]">일</span>

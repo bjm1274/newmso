@@ -189,7 +189,39 @@ export default function LeaveManagement({
 
       let recalculatedUsedDays: number | null = null;
       if (targetLeave?.staff_id) {
-        recalculatedUsedDays = await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
+        if (typeof window !== 'undefined') {
+          // Calculate used days client-side to prevent D1 server-only binding error in the browser
+          const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, status } : l));
+          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === targetLeave.staff_id);
+          
+          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
+            const isApproved = row.status === '승인' || row.status === 'approved';
+            if (!isApproved) return sum;
+            
+            const type = String(row.leave_type || '').trim().toLowerCase();
+            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
+            if (isHalf) return sum + 0.5;
+            
+            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
+            if (!isAnnual) return sum;
+            
+            const start = new Date(row.start_date);
+            const end = new Date(row.end_date || row.start_date);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return sum + diffDays;
+          }, 0);
+          
+          recalculatedUsedDays = approvedAnnualLeaveDays;
+          
+          await supabase
+            .from('staff_members')
+            .update({ annual_leave_used: recalculatedUsedDays })
+            .eq('id', targetLeave.staff_id);
+        } else {
+          recalculatedUsedDays = await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
+        }
+
         // leave_balances 정합성 갱신 (JM3: 실패해도 메인 흐름 차단 안 함)
         recalculateLeaveBalance(targetLeave.staff_id).catch((err) => {
           console.error('[handleStatusUpdate] recalculateLeaveBalance 실패:', err);
@@ -245,7 +277,35 @@ export default function LeaveManagement({
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
       if (target?.staff_id) {
-        await syncAnnualLeaveUsedForStaff(target.staff_id);
+        if (typeof window !== 'undefined') {
+          const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, ...patch } : l));
+          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
+          
+          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
+            const isApproved = row.status === '승인' || row.status === 'approved';
+            if (!isApproved) return sum;
+            
+            const type = String(row.leave_type || '').trim().toLowerCase();
+            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
+            if (isHalf) return sum + 0.5;
+            
+            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
+            if (!isAnnual) return sum;
+            
+            const start = new Date(row.start_date);
+            const end = new Date(row.end_date || row.start_date);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return sum + diffDays;
+          }, 0);
+          
+          await supabase
+            .from('staff_members')
+            .update({ annual_leave_used: approvedAnnualLeaveDays })
+            .eq('id', target.staff_id);
+        } else {
+          await syncAnnualLeaveUsedForStaff(target.staff_id);
+        }
         recalculateLeaveBalance(target.staff_id).catch((err) => {
           console.error('[handleEditLeave] recalculateLeaveBalance 실패:', err);
           toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
@@ -302,7 +362,35 @@ export default function LeaveManagement({
       setLeaves((prev) => prev.filter((l) => l.id !== id));
 
       if (target?.staff_id) {
-        await syncAnnualLeaveUsedForStaff(target.staff_id);
+        if (typeof window !== 'undefined') {
+          const updatedLeaves = leaves.filter((l) => l.id !== id);
+          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
+          
+          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
+            const isApproved = row.status === '승인' || row.status === 'approved';
+            if (!isApproved) return sum;
+            
+            const type = String(row.leave_type || '').trim().toLowerCase();
+            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
+            if (isHalf) return sum + 0.5;
+            
+            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
+            if (!isAnnual) return sum;
+            
+            const start = new Date(row.start_date);
+            const end = new Date(row.end_date || row.start_date);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return sum + diffDays;
+          }, 0);
+          
+          await supabase
+            .from('staff_members')
+            .update({ annual_leave_used: approvedAnnualLeaveDays })
+            .eq('id', target.staff_id);
+        } else {
+          await syncAnnualLeaveUsedForStaff(target.staff_id);
+        }
         recalculateLeaveBalance(target.staff_id).catch((err) => {
           console.error('[handleDeleteLeave] recalculateLeaveBalance 실패:', err);
           toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');

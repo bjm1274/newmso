@@ -50,12 +50,24 @@ const EMPTY_DATA = (yearMonth: string, selectedCo: string): PayrollWorkcenterDat
   errors: [],
 });
 
-export function PayrollProvider({ children }: { children: ReactNode }) {
+export function PayrollProvider({
+  children,
+  selectedCo: propSelectedCo,
+}: {
+  children: ReactNode;
+  selectedCo?: string;
+}) {
   const [yearMonth, setYearMonth] = useState<string>(initialDate);
   const [selectedCo, setSelectedCo] = useState<string>('전체');
   const [reloadNonce, setReloadNonce] = useState(0);
   const [data, setData] = useState<PayrollWorkcenterData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (propSelectedCo) {
+      setSelectedCo(propSelectedCo);
+    }
+  }, [propSelectedCo]);
 
   useEffect(() => {
     const controller = new AbortController();

@@ -30,7 +30,7 @@ function PayrollModuleCardImpl({ meta, onPick }: Props) {
     <button
       type="button"
       onClick={() => onPick(meta.id)}
-      aria-label={ariaLabel}
+      aria-label={meta.name}
       className="
         group flex flex-col gap-1.5
         text-left p-3.5

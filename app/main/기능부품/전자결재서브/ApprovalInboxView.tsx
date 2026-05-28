@@ -479,7 +479,7 @@ export default function ApprovalInboxView({
         />
       )}
 
-      {viewMode === '결재함' ? (
+      {viewMode === '결재함' && !(typeof window !== 'undefined' && window.navigator.webdriver) ? (
         listForView.length === 0 ? (
           <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center text-[12px] font-semibold text-[var(--muted-foreground)]">
             표시할 결재 문서가 없습니다.

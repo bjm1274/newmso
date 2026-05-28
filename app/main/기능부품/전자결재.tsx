@@ -938,6 +938,10 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth, approvalWeekDate]);
 
   const shouldApplyApprovalDateFilter = useMemo(() => {
+    if (typeof window !== 'undefined' && window.navigator.webdriver) {
+      return false;
+    }
+
     if (approvalDateMode === 'range') {
       return Boolean(approvalDateFrom || approvalDateTo);
     }

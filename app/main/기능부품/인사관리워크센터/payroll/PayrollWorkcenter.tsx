@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PayrollDashboard from './PayrollDashboard';
 import { PAYROLL_MODULES } from './payroll-data';
 import type { PayrollModuleId, PayrollModuleMeta } from './payroll-types';
@@ -53,16 +53,42 @@ function moduleTone(meta: PayrollModuleMeta | undefined): string {
   return 'bg-[var(--accent-light)] text-[var(--accent)]';
 }
 
-export default function PayrollWorkcenter() {
+export default function PayrollWorkcenter({
+  selectedCo,
+  user,
+  initialModule,
+}: {
+  selectedCo?: string;
+  user?: any;
+  initialModule?: string | null;
+} = {}) {
   return (
-    <PayrollProvider>
-      <PayrollWorkcenterInner />
+    <PayrollProvider selectedCo={selectedCo}>
+      <PayrollWorkcenterInner initialModule={initialModule} />
     </PayrollProvider>
   );
 }
 
-function PayrollWorkcenterInner() {
-  const [current, setCurrent] = useState<PayrollModuleId | null>(null);
+function PayrollWorkcenterInner({ initialModule }: { initialModule?: string | null }) {
+  const [current, setCurrent] = useState<PayrollModuleId | null>(() => {
+    if (initialModule === '원천징수파일') return 'withholding';
+    return null;
+  });
+
+  useEffect(() => {
+    if (initialModule === '원천징수파일') {
+      setCurrent('withholding');
+      return;
+    }
+    try {
+      const savedSub = window.localStorage.getItem('erp_last_subview');
+      if (savedSub === '원천징수파일') {
+        setCurrent('withholding');
+      }
+    } catch {
+      // ignore
+    }
+  }, [initialModule]);
   const { yearMonth, setYearMonth, loading } = usePayroll();
 
   const handlePick = useCallback((id: PayrollModuleId) => {
@@ -81,7 +107,7 @@ function PayrollWorkcenterInner() {
   // ── 대시보드 ───────────────────────────────────────────
   if (!current) {
     return (
-      <div className="app-page p-4">
+      <div className="app-page p-4" data-testid="payroll-view">
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-[20px] font-extrabold text-[var(--foreground)]">급여 워크센터</h1>
@@ -116,7 +142,7 @@ function PayrollWorkcenterInner() {
   const Module = MODULE_COMPONENTS[current];
 
   return (
-    <div className="app-page p-4">
+    <div className="app-page p-4" data-testid="payroll-view">
       <header className="mb-3">
         <button
           type="button"

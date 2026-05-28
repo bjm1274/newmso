@@ -18,6 +18,7 @@ export function isAnnualLeaveType(value: unknown): boolean {
   // '연차(이력)': 만료된 이전 사이클의 사용 이력 — 근태 화면엔 표시하되
   // 현재 잔여 계산(annual_leave_used)에는 합산하지 않는다.
   if (normalized.includes('이력')) return false;
+  if (normalized.includes('부여')) return false;
 
   return (
     normalized === 'annual_leave' ||

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 // 2026-05-27 회귀 방지: 일부 chunk가 isMobile 변수를 참조하는 stale 컴파일 잔재 — 안전 정의 유지
@@ -12,6 +12,7 @@ import {
 import MyTodoList from './나의할일';
 import CommuteRecord from './출퇴근기록';
 import MyDocuments from './서류제출';
+import MyProfileCard from './프로필카드';
 import {
   buildProfileSummary,
   PayrollAndCertificatesHub,
@@ -29,6 +30,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { performClientLogout } from '@/lib/client-logout';
 import { LucideIcon } from '../조직도서브/조직도측면창';
+import { canAccessMyPageTab } from '@/lib/access-control';
 import {
   FAVORITES_KEY,
   buildMenuEntry,
@@ -137,6 +139,7 @@ function MyPageMain({
   const [pickerInnerTab, setPickerInnerTab] = useState('');
   const [profileSummary, setProfileSummary] = useState(() => buildProfileSummary(user));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
 
   const [pendingContract, setPendingContract] = useState<EmploymentContractRecord | null>(null);
   const [latestContract, setLatestContract] = useState<EmploymentContractRecord | null>(null);
@@ -837,6 +840,14 @@ function MyPageMain({
                 icon="Upload"
               />
             )}
+            {(canAccessMyPageTab(user, 'salary') || canAccessMyPageTab(user, 'certificates')) && (
+              <TabButton
+                isActive={activeTab === 'records'}
+                onClick={() => setActiveTab('records')}
+                label="급여·증명서"
+                icon="FileCheck"
+              />
+            )}
             <TabButton
               isActive={activeTab === 'notifications'}
               onClick={() => setActiveTab('notifications')}
@@ -1024,8 +1035,19 @@ function MyPageMain({
                 kpis={homeKpis}
               />
 
+              <MyProfileCard
+                user={user}
+                onOpenApproval={onOpenApproval}
+                hideHeader
+                hideActionBar
+                showSecret={showSecret}
+                setShowSecret={setShowSecret}
+                isEditing={isEditingProfile}
+                setIsEditing={setIsEditingProfile}
+              />
+
               {isEditingProfile && (
-                <section data-testid="mypage-profile-edit-panel" className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] p-4 shadow-sm">
+                <section data-testid="mypage-profile-edit-panel" className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--card)] p-4 shadow-sm animate-premium-fade">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">정보 수정</p>
@@ -1053,6 +1075,21 @@ function MyPageMain({
                 >
                   <LucideIcon name="LogOut" size={15} />
                   로그아웃
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (showSecret) {
+                      setShowSecret(false);
+                    } else {
+                      const verified = await verifyProfilePassword();
+                      if (verified) setShowSecret(true);
+                    }
+                  }}
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
+                >
+                  <LucideIcon name={showSecret ? "EyeOff" : "Eye"} size={15} />
+                  {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
                 </button>
                 <button
                   type="button"
@@ -1088,6 +1125,7 @@ function MyPageMain({
                 user={user}
                 activeView={recordsView}
                 onBack={() => setActiveTab('profile')}
+                onChangeView={setRecordsView}
               />
             </div>
           )}

@@ -42,18 +42,18 @@ export default function ModWithholding() {
       return [s?.name ?? r.staff_id, '-', r.total_taxable, r.income_tax, r.local_tax].join(',');
     });
     const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\n')], {
-      type: 'text/csv;charset=utf-8;',
+      type: 'text/plain;charset=utf-8;',
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `원천징수_${yearMonth}.csv`;
+    a.download = `원천징수_${yearMonth}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-testid="payroll-utility-tax-file">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div className="app-card p-3">
           <div className="text-[11px] text-[var(--toss-gray-4)]">정산 인원</div>
@@ -117,6 +117,7 @@ export default function ModWithholding() {
           </label>
           <button
             type="submit"
+            data-testid="payroll-tax-download-button"
             className="mt-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[13px] font-bold hover:bg-[var(--accent-hover)]"
           >
             CSV 파일 다운로드

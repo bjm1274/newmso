@@ -45,12 +45,16 @@ interface StaffDrawerProps {
   staff: StaffMember | null;
   onClose?: () => void;
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
+  onEditStaff?: (staff: StaffMember) => void;
+  canRegisterNewStaff?: boolean;
 }
 
 export default function StaffDrawer({
   staff,
   onClose,
   onOpenDocumentRepoForStaff,
+  onEditStaff,
+  canRegisterNewStaff = false,
 }: StaffDrawerProps) {
   if (!staff) {
     return (
@@ -59,14 +63,30 @@ export default function StaffDrawer({
       </aside>
     );
   }
-  return <StaffDrawerInner staff={staff} onClose={onClose} onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff} />;
+  return (
+    <StaffDrawerInner
+      staff={staff}
+      onClose={onClose}
+      onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
+      onEditStaff={onEditStaff}
+      canRegisterNewStaff={canRegisterNewStaff}
+    />
+  );
 }
 
 function StaffDrawerInner({
   staff,
   onClose,
   onOpenDocumentRepoForStaff,
-}: { staff: StaffMember; onClose?: () => void; onOpenDocumentRepoForStaff?: (staff: StaffMember) => void }) {
+  onEditStaff,
+  canRegisterNewStaff,
+}: {
+  staff: StaffMember;
+  onClose?: () => void;
+  onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
+  onEditStaff?: (staff: StaffMember) => void;
+  canRegisterNewStaff?: boolean;
+}) {
   const tone = pickToneForStaff(staff.name ?? '');
   const hire = pickHireDate(staff);
   const initial = (staff.name ?? '?').charAt(0);
@@ -139,16 +159,29 @@ function StaffDrawerInner({
           <StaffHistoryTimeline staffId={String(staff.id)} staffName={staff.name ?? ''} />
         </section>
 
-        {onOpenDocumentRepoForStaff && (
+        {(onOpenDocumentRepoForStaff || (canRegisterNewStaff && onEditStaff)) && (
           <section>
             <div className="section-title mb-2">빠른 액션</div>
-            <button
-              type="button"
-              onClick={() => onOpenDocumentRepoForStaff(staff)}
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-            >
-              서류보관함 열기 →
-            </button>
+            <div className="flex flex-col gap-2">
+              {canRegisterNewStaff && onEditStaff && (
+                <button
+                  type="button"
+                  onClick={() => onEditStaff(staff)}
+                  className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[12px] font-bold text-white transition-all hover:bg-[var(--accent-hover)] shadow-sm"
+                >
+                  ✏️ 정보 수정하기
+                </button>
+              )}
+              {onOpenDocumentRepoForStaff && (
+                <button
+                  type="button"
+                  onClick={() => onOpenDocumentRepoForStaff(staff)}
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+                >
+                  서류보관함 열기 →
+                </button>
+              )}
+            </div>
           </section>
         )}
       </div>

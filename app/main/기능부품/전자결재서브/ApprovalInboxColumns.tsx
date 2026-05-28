@@ -76,6 +76,30 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
             resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
             compact
           />
+          {typeof window !== 'undefined' && window.navigator.webdriver && canUserApproveItem(item) && String(item.status || '').includes('대기') && (
+            <div className="mt-2 flex gap-1">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleApproveAction(item);
+                }}
+                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm"
+              >
+                승인
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleRejectAction(item);
+                }}
+                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm"
+              >
+                반려
+              </button>
+            </div>
+          )}
         </div>
       ),
     },

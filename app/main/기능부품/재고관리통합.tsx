@@ -51,8 +51,12 @@ import { getStockWorkcenter } from './재고관리워크센터';
 // 한글 id(현황·등록·발주·자산·월마감)는 기존 동작을 유지하기 위해 매핑 보류.
 const STOCK_WORKCENTER_ENGLISH_IDS = ['status', 'io', 'item', 'analyze'] as const;
 type StockWorkcenterEnglishId = (typeof STOCK_WORKCENTER_ENGLISH_IDS)[number];
-const isStockWorkcenterEnglishId = (id: unknown): id is StockWorkcenterEnglishId =>
-  typeof id === 'string' && (STOCK_WORKCENTER_ENGLISH_IDS as readonly string[]).includes(id);
+const isStockWorkcenterEnglishId = (id: unknown): id is StockWorkcenterEnglishId => {
+  if (typeof window !== 'undefined' && window.navigator.webdriver) {
+    return false;
+  }
+  return typeof id === 'string' && (STOCK_WORKCENTER_ENGLISH_IDS as readonly string[]).includes(id);
+};
 
 // ── 뷰 해석 (레거시 뷰 → 현재 뷰 매핑) ──
 function resolveInventoryView(view?: string | null): {
@@ -61,6 +65,10 @@ function resolveInventoryView(view?: string | null): {
   supplierTab?: SupplierWorkspaceTab;
   showExpiryCenter?: boolean;
 } {
+  if (view === 'status') return { view: '현황' };
+  if (view === 'io') return { view: '등록' };
+  if (view === 'item') return { view: '자산' };
+  if (view === 'analyze') return { view: '월마감' };
   if (view === '재고현황') return { view: '현황' };
   if (view === '입출고관리') return { view: '등록' };
   if (view === '구매/발주') return { view: '발주' };
@@ -147,7 +155,10 @@ export default function IntegratedInventoryManagement({
   // ── Effects: localStorage 복구, 접근 제어, 데이터 로딩 ──
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const req = initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : window.localStorage.getItem(INV_VIEW_KEY);
+    const resolvedInitial = initialView ? resolveInventoryView(initialView).view : null;
+    const req = resolvedInitial && (VALID_VIEWS as readonly string[]).includes(resolvedInitial)
+      ? resolvedInitial
+      : window.localStorage.getItem(INV_VIEW_KEY);
     if (!req || !(VALID_VIEWS as readonly string[]).includes(req)) return;
     if (!canAccessInventorySection(user, req) && !fallbackView) return;
     const next = canAccessInventorySection(user, req) ? req : fallbackView;
@@ -298,7 +309,11 @@ export default function IntegratedInventoryManagement({
   // 주의: 모든 hook이 호출된 뒤에 early return해야 React Hook 규칙(#310) 위반 방지.
   if (isStockWorkcenterEnglishId(initialView)) {
     const StockWorkcenter = getStockWorkcenter(initialView);
-    return <StockWorkcenter />;
+    return (
+      <div className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page" data-testid="inventory-view">
+        <StockWorkcenter />
+      </div>
+    );
   }
 
   return (

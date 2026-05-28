@@ -85,6 +85,7 @@ function StaffTableBase({
           {canRegisterNewStaff && onOpenNewStaff && (
             <button
               type="button"
+              data-testid="new-staff-button"
               onClick={onOpenNewStaff}
               className="inline-flex items-center gap-1 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:bg-[var(--accent-hover)]"
               aria-label="신규 직원 등록"

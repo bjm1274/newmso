@@ -21,7 +21,7 @@
  * JM6: tablist · aria-selected · dialog 패턴은 자식 컴포넌트가 처리
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterEmbed,
@@ -35,13 +35,16 @@ import StaffTable from './MemberWorkcenter/StaffTable';
 import StaffDrawer from './MemberWorkcenter/StaffDrawer';
 import AppointmentBoard from './MemberWorkcenter/AppointmentBoard';
 import EducationBoard from './MemberWorkcenter/EducationBoard';
+import OffboardingView from '../인사관리서브/오프보딩';
+import StaffListManager from '../인사관리서브/구성원현황';
 
-type MemberTabId = 'list' | 'appointment' | 'education';
+type MemberTabId = 'list' | 'appointment' | 'education' | 'offboarding';
 
 const MEMBER_TABS: WorkcenterTab<MemberTabId>[] = [
   { id: 'list', label: '구성원' },
   { id: 'appointment', label: '인사발령' },
   { id: 'education', label: '교육·자격' },
+  { id: 'offboarding', label: '오프보딩' },
 ];
 
 interface MemberWorkcenterProps {
@@ -61,14 +64,34 @@ export default function MemberWorkcenter({
   canRegisterNewStaff = false,
   onOpenNewStaff,
   onOpenDocumentRepoForStaff,
+  onRefresh,
 }: MemberWorkcenterProps) {
   const [tab, setTab] = useState<MemberTabId>('list');
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedTab = window.localStorage.getItem('erp_hr_tab');
+      if (savedTab === 'offboarding') {
+        setTab('offboarding');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const kpis = useMemo(
     () => computeMemberKpis({ staffs, selectedCo }),
     [staffs, selectedCo],
-  );
+  );  const [isEditing, setIsEditing] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  const handleEditStaff = (staff: StaffMember) => {
+    setEditingStaff(staff);
+    setIsEditing(true);
+  };
 
   return (
     <WorkcenterShell
@@ -92,13 +115,15 @@ export default function MemberWorkcenter({
                 staffs={staffs}
                 selectedId={selectedStaff ? String(selectedStaff.id) : null}
                 onSelect={setSelectedStaff}
-                onOpenNewStaff={onOpenNewStaff}
+                onOpenNewStaff={() => setIsRegistering(true)}
                 canRegisterNewStaff={canRegisterNewStaff}
               />
               <StaffDrawer
                 staff={selectedStaff}
                 onClose={() => setSelectedStaff(null)}
                 onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
+                onEditStaff={handleEditStaff}
+                canRegisterNewStaff={canRegisterNewStaff}
               />
             </div>
           </WorkcenterEmbed>
@@ -115,7 +140,48 @@ export default function MemberWorkcenter({
             <EducationBoard staffs={staffs} selectedCo={selectedCo} />
           </WorkcenterEmbed>
         )}
+
+        {tab === 'offboarding' && (
+          <WorkcenterEmbed label="오프보딩">
+            <OffboardingView staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+          </WorkcenterEmbed>
+        )}
       </div>
+      {isEditing && (
+        <StaffListManager
+          직원목록={staffs}
+          선택사업체={selectedCo}
+          보기상태="재직"
+          새로고침={() => {
+            onRefresh?.();
+            setIsEditing(false);
+            setEditingStaff(null);
+          }}
+          창상태="edit"
+          창닫기={() => {
+            setIsEditing(false);
+            setEditingStaff(null);
+          }}
+          canRegisterNewStaff={canRegisterNewStaff}
+          initialEditStaff={editingStaff}
+        />
+      )}
+      {isRegistering && (
+        <StaffListManager
+          직원목록={staffs}
+          선택사업체={selectedCo}
+          보기상태="재직"
+          새로고침={() => {
+            onRefresh?.();
+            setIsRegistering(false);
+          }}
+          창상태="new"
+          창닫기={() => {
+            setIsRegistering(false);
+          }}
+          canRegisterNewStaff={canRegisterNewStaff}
+        />
+      )}
     </WorkcenterShell>
   );
 }

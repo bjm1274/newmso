@@ -101,6 +101,11 @@ export function getSavedSubViewForMenu(targetMenu?: string | null) {
   }
 
   const genericSubView = readLocalStorage(LAST_SUBVIEW_KEY);
+
+  if (genericSubView === '원천징수파일' || genericSubView === '계약서생성기') {
+    return genericSubView;
+  }
+
   const scopedKey = SUBVIEW_STORAGE_KEY_BY_MENU[targetMenu as SupportedMenuId];
 
   if (!scopedKey) {

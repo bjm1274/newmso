@@ -78,6 +78,7 @@ interface HrWorkcenterRouterProps {
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
   linkedTarget?: { id?: string; name?: string };
   canManageDocuments?: boolean;
+  initialMenu?: string | null;
 }
 
 /**
@@ -96,6 +97,7 @@ export default function HrWorkcenterRouter({
   onOpenDocumentRepoForStaff,
   linkedTarget,
   canManageDocuments = false,
+  initialMenu,
 }: HrWorkcenterRouterProps) {
   const view = useMemo(() => {
     switch (workcenterId) {
@@ -138,7 +140,13 @@ export default function HrWorkcenterRouter({
           />
         );
       case 'payroll':
-        return <PayrollWorkcenter />;
+        return (
+          <PayrollWorkcenter
+            selectedCo={selectedCo}
+            user={user}
+            initialModule={initialMenu}
+          />
+        );
       case 'welfare':
         return (
           <WelfareWorkcenter
