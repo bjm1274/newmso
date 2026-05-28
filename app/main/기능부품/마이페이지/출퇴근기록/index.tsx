@@ -161,7 +161,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const [staffShifts, setStaffShifts] = useState<StaffShiftEntry[]>([]);
   const [staffShiftNames, setStaffShiftNames] = useState<Map<string, string>>(new Map());
-  const [historyView, setHistoryView] = useState<'list' | 'calendar'>('list');
+  const [historyView, setHistoryView] = useState<'list' | 'calendar'>('calendar');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
@@ -961,45 +961,45 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const normalCount = logs.filter((log) => getDisplayStatus(log) === '정상').length;
 
   return (
-    <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-4 py-4 sm:p-5 h-full flex flex-col space-y-5">
+    <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-3.5 py-3.5 sm:p-4 h-full flex flex-col space-y-4">
 
       {/* 실시간 상태 카드 */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2.5 bg-[var(--foreground)] px-3.5 py-3.5 sm:px-4 sm:py-4 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--card)] opacity-5 rounded-[var(--radius-lg)] blur-3xl"></div>
 
-        <div className="space-y-1.5 z-10 min-w-0">
-          <p className="text-[12px] font-semibold text-white/55">
+        <div className="space-y-1 z-10 min-w-0">
+          <p className="text-[11px] font-semibold text-white/55">
             {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
-          <h2 className="text-[44px] font-bold tabular-nums whitespace-nowrap leading-none">
+          <h2 className="text-3xl sm:text-[34px] font-bold tabular-nums whitespace-nowrap leading-none">
             {currentTime.toLocaleTimeString('ko-KR')}
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full animate-pulse ${activeTodayLog ? (activeTodayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-400') : 'bg-red-400'}`}></span>
-            <span className="text-sm font-bold mr-1">
+            <span className="text-xs font-bold mr-1">
               {activeTodayLog ? (activeTodayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
             {distance !== null && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2.5 h-2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
                 GPS 인증 · {distance}m {distance <= ALLOWED_RADIUS_METER ? '확인' : '제한'}
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 z-10 shrink-0">
-          <div className="flex gap-3">
+        <div className="flex flex-col gap-2 z-10 shrink-0">
+          <div className="flex gap-2">
             {!activeTodayLog && (
               <button
                 data-testid="commute-check-in-button"
                 onClick={() => handleCommute('in')}
                 disabled={isProcessing}
-                className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 sm:px-6 sm:py-3.5 w-full sm:w-auto bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-sm sm:text-base shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기'}</span>
-                <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
+                <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
               </button>
             )}
             {((activeTodayLog && !activeTodayLog.check_out) || staleOpenLog) && (
@@ -1007,10 +1007,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                 data-testid="commute-check-out-button"
                 onClick={() => handleCommute('out')}
                 disabled={isProcessing}
-                className="px-5 py-3 sm:px-10 sm:py-5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-base sm:text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 sm:px-6 sm:py-3.5 w-full sm:w-auto bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-sm sm:text-base shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기'}</span>
-                <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
+                <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
               </button>
             )}
           </div>
@@ -1019,7 +1019,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             <div
               role="group"
               aria-label="근무 상태 선택"
-              className="flex rounded-[var(--radius-md)] bg-white/10 p-0.5 gap-0.5"
+              className="flex rounded-[var(--radius-md)] bg-white/10 p-0.5 gap-0.5 justify-center"
             >
               {WORK_STATUS_LABELS.map((label) => {
                 const isActive = currentWorkStatus === label;
@@ -1042,7 +1042,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
                     data-testid={`work-status-toggle-${label}`}
                     aria-pressed={isActive}
                     onClick={() => { void handleStatusChange(label); }}
-                    className={`rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-bold transition-all ${colorClass}`}
+                    className={`rounded-[var(--radius-md)] px-2 py-1 text-[10px] font-bold transition-all ${colorClass}`}
                   >
                     {label}
                   </button>
@@ -1106,7 +1106,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       )}
 
       {/* 통계 */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatItem label="이번 달 근무" value={`${workedDaysCount}일`} />
         <StatItem label="지각" value={`${lateCount}회`} isWarning />
         <StatItem label="정상 출근" value={`${normalCount}회`} isSuccess />
@@ -1122,86 +1122,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden text-[11px] font-semibold">
-              <button
-                onClick={() => setHistoryView('list')}
-                className={`px-3 py-2 transition-colors ${historyView === 'list' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
-              >목록</button>
-              <button
-                onClick={() => setHistoryView('calendar')}
-                className={`px-3 py-2 transition-colors ${historyView === 'calendar' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
-              >달력</button>
-            </div>
             <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
             <span className="font-semibold px-1 text-sm">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
             <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
         </div>
 
-        {historyView === 'calendar' ? (
-          <AttendanceCalendar logs={logs} currentMonth={currentMonth} />
-        ) : null}
-
-        <div className={`space-y-4 ${historyView === 'calendar' ? 'hidden' : ''}`}>
-          {logs.map((log) => {
-            const workDate = new Date(log.date || '');
-            const displayStatus = getDisplayStatus(log);
-            return (
-              <div
-                key={log.id}
-                data-testid={`commute-history-row-${String(log.date || '').slice(0, 10)}`}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-4 p-3 sm:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] border border-transparent hover:border-[var(--border)] transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${
-                      displayStatus === '결근'
-                        ? 'bg-[var(--danger-light)] text-[var(--danger)]'
-                        : displayStatus === '지각' || displayStatus === '조퇴'
-                        ? 'bg-[var(--warning-light)] text-[var(--warning)]'
-                        : displayStatus === '정상' || displayStatus === 'present'
-                        ? 'bg-[var(--success-light)] text-[var(--success)]'
-                        : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                    }`}
-                  >
-                    <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
-                    <span className="text-lg leading-tight">{workDate.getDate()}일</span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-[var(--toss-gray-3)]">
-                      {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
-                    </p>
-                    <p
-                      data-testid={`commute-history-status-${String(log.date || '').slice(0, 10)}`}
-                      className="font-semibold text-[var(--foreground)]"
-                    >
-                      {displayStatus || '-'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 md:gap-5 justify-between md:justify-end w-full">
-                  <div className="flex gap-4">
-                    <TimeBox label="출근" time={formatTime(log.check_in as string)} />
-                    <TimeBox label="퇴근" time={formatTime(log.check_out as string)} />
-                  </div>
-                  {onRequestCorrection && !(
-                    (displayStatus === '정상' || displayStatus === 'present') &&
-                    log.check_in &&
-                    log.check_out
-                  ) && (
-                    <button
-                      type="button"
-                      onClick={() => onRequestCorrection(log)}
-                      className="px-3 py-2 rounded-[var(--radius-lg)] text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--accent)] bg-[var(--card)] hover:bg-[var(--toss-blue-light)] shrink-0"
-                    >
-                      정정 요청
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <AttendanceCalendar logs={logs} currentMonth={currentMonth} />
       </div>
     </div>
   );

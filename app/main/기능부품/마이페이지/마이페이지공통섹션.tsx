@@ -69,13 +69,6 @@ export function ProfileHeaderSummary({
         <div className="flex shrink-0 flex-col gap-1.5">
           <button
             type="button"
-            onClick={onToggleSecret}
-            className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
-          >
-            {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
-          </button>
-          <button
-            type="button"
             onClick={onToggleEdit}
             data-testid="mypage-profile-edit-toggle"
             className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-all ${

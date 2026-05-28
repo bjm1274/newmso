@@ -139,7 +139,7 @@ function MyPageMain({
   const [pickerInnerTab, setPickerInnerTab] = useState('');
   const [profileSummary, setProfileSummary] = useState(() => buildProfileSummary(user));
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [showSecret, setShowSecret] = useState(false);
+  const [showSecret, setShowSecret] = useState(true);
 
   const [pendingContract, setPendingContract] = useState<EmploymentContractRecord | null>(null);
   const [latestContract, setLatestContract] = useState<EmploymentContractRecord | null>(null);
@@ -1075,21 +1075,6 @@ function MyPageMain({
                 >
                   <LucideIcon name="LogOut" size={15} />
                   로그아웃
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (showSecret) {
-                      setShowSecret(false);
-                    } else {
-                      const verified = await verifyProfilePassword();
-                      if (verified) setShowSecret(true);
-                    }
-                  }}
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)]"
-                >
-                  <LucideIcon name={showSecret ? "EyeOff" : "Eye"} size={15} />
-                  {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
                 </button>
                 <button
                   type="button"

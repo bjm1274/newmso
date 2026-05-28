@@ -33,7 +33,7 @@ export default function MyProfileCard({
   const _iu = normalizeStaffLike((initialUser ?? {}) as ProfileCardUser);
   const [user, setUser] = useState<ProfileCardUser>(normalizeProfileUser(_iu as ProfileCardUser));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
-  const [internalShowSecret, setInternalShowSecret] = useState(false);
+  const [internalShowSecret, setInternalShowSecret] = useState(true);
   const [internalIsEditing, setInternalIsEditing] = useState(false);
   const effectiveUserId = getStaffLikeId(user);
   const [editForm, setEditForm] = useState<{ email: string; phone: string; extension: string; address: string; bank_name: string; bank_account: string }>({
@@ -322,13 +322,6 @@ export default function MyProfileCard({
 
   const actionButtons = (
     <>
-      <button
-        type="button"
-        onClick={() => { if (showSecret) applyShowSecret(false); else verifyPasswordAndRun(() => applyShowSecret(true)); }}
-        className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
-      >
-        {showSecret ? '민감 정보 숨기기' : '민감 정보 확인'}
-      </button>
       <button
         type="button"
         onClick={() => { if (isEditing) applyIsEditing(false); else verifyPasswordAndRun(() => applyIsEditing(true)); }}
