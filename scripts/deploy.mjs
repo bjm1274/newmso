@@ -11,6 +11,8 @@ import { execSync } from 'node:child_process';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import process from 'node:process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ANSI 컬러 코드 정의
 const COLORS = {
@@ -67,6 +69,21 @@ async function main() {
   const rl = readline.createInterface({ input, output });
 
   try {
+    // 0. .env.local에서 CLOUDFLARE_API_TOKEN 로드
+    try {
+      const envPath = path.join(process.cwd(), '.env.local');
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const match = envContent.match(/^CLOUDFLARE_API_TOKEN\s*=\s*(.*)$/m);
+        if (match && match[1]) {
+          process.env.CLOUDFLARE_API_TOKEN = match[1].trim().replace(/['"]/g, '');
+          log('로컬 .env.local에서 CLOUDFLARE_API_TOKEN을 성공적으로 로드하여 연동했습니다.', 'success');
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
     // 1. Git 상태 점검 및 브랜치 가져오기
     runCmd('git rev-parse --is-inside-work-tree');
     const branch = runCmd('git branch --show-current');
