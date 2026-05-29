@@ -340,43 +340,50 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
         {items.length === 0 ? (
           <div className="grid h-32 place-items-center text-[12px] text-[var(--toss-gray-4)]">결과 없음</div>
         ) : (
-          <div className="grid grid-cols-8 gap-0.5">
-            {items.map((entry, idx) => {
-              const focused = idx === focusIdx;
-              return (
-                <button
-                  key={`${entry.e}-${idx}`}
-                  type="button"
-                  onClick={() => {
-                    onPick(entry.e);
-                    onClose();
-                  }}
-                  onMouseEnter={() => setFocusIdx(idx)}
-                  aria-label={`${entry.name} 선택`}
-                  className={`aspect-square w-full rounded-md text-lg transition-colors flex items-center justify-center p-0.5 overflow-hidden ${
-                    focused ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--muted)]'
-                  }`}
-                >
-                  {entry.e.startsWith('[emo:') ? (
-                    (() => {
-                      const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-                      const def = id ? getEmoticonDef(id) : null;
-                      if (def) {
-                        return (
-                          <div 
-                            className={`w-6 h-6 emo ${def.anim}`}
-                            dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
-                          />
-                        );
-                      }
-                      return entry.e;
-                    })()
-                  ) : (
-                    entry.e
-                  )}
-                </button>
-              );
-            })}
+          <div className="max-h-[240px] overflow-y-auto pr-1">
+            <div className={!query && category === 'emoticons' ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
+              {items.map((entry, idx) => {
+                const focused = idx === focusIdx;
+                const isEmoticonCat = !query && category === 'emoticons';
+                const isCustomEmo = entry.e.startsWith('[emo:');
+                
+                return (
+                  <button
+                    key={`${entry.e}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      onPick(entry.e);
+                      onClose();
+                    }}
+                    onMouseEnter={() => setFocusIdx(idx)}
+                    aria-label={`${entry.name} 선택`}
+                    className={`aspect-square w-full rounded-lg transition-all flex items-center justify-center overflow-hidden ${
+                      isEmoticonCat 
+                        ? 'p-1.5 bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--muted)] hover:scale-105 active:scale-95' 
+                        : 'p-0.5 text-lg hover:bg-[var(--muted)]'
+                    } ${focused ? 'bg-[var(--accent)]/10 border-[var(--accent)]' : ''}`}
+                  >
+                    {isCustomEmo ? (
+                      (() => {
+                        const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
+                        const def = id ? getEmoticonDef(id) : null;
+                        if (def) {
+                          return (
+                            <div 
+                              className={`${isEmoticonCat ? 'w-14 h-14' : 'w-6 h-6'} emo ${def.anim}`}
+                              dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
+                            />
+                          );
+                        }
+                        return entry.e;
+                      })()
+                    ) : (
+                      entry.e
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
