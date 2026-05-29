@@ -104,6 +104,30 @@ export function renderMessageContent(content: string, isMine = false, highlightQ
     }
   }
 
+  // 정적 스티커 이모티콘 렌더링
+  const staticMatch = visibleContent.match(/^\[stat:([a-z0-9-]+)\]$/);
+  if (staticMatch) {
+    const statId = staticMatch[1]; // e.g. worker-1 or hospital-1
+    const isHospital = statId.startsWith('hospital-');
+    const label = isHospital ? `병원 ${statId.slice(9)}` : `직장인 ${statId.slice(7)}`;
+    return (
+      <div 
+        className="flex flex-col items-center p-2 rounded-2xl bg-white border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:bg-[var(--card)]"
+        style={{ width: '132px', height: '132px' }}
+      >
+        <img 
+          src={`/emoticon/static/${statId}.png`}
+          alt={label}
+          className="w-[100px] h-[100px] object-contain hover:scale-105 transition-transform"
+          loading="lazy"
+        />
+        <span className="text-[12.5px] font-bold text-[var(--foreground)] mt-1.5 opacity-90" style={{ fontFamily: 'Gaegu, sans-serif' }}>
+          {label}
+        </span>
+      </div>
+    );
+  }
+
   return renderFormattedSegments(visibleContent, isMine, highlightQuery);
 }
 

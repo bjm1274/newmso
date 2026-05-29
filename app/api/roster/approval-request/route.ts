@@ -14,7 +14,7 @@ import {
 } from '@/lib/db';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
-const ROSTER_APPROVER_POSITIONS = ['\uCD1D\uBB34\uBD80\uC7A5', '\uC774\uC0AC'];
+const ROSTER_APPROVER_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uBCD1\uC6D0\uC7A5'];
 const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
 const DIRECTOR_POSITION = '\uC774\uC0AC';
 const ROSTER_APPROVAL_TYPE = '\uADFC\uBB34\uD45C'; // '근무표'
@@ -25,6 +25,16 @@ type ApprovalAssignment = {
   staff_id?: string;
   work_date?: string;
   shift_id?: string;
+  staff_name?: string;
+  shift_name?: string;
+};
+
+type NormalizedAssignment = {
+  staff_id: string;
+  work_date: string;
+  shift_id: string;
+  staff_name: string | undefined;
+  shift_name: string | undefined;
 };
 
 type ApprovalRequestPayload = {
@@ -84,6 +94,8 @@ function normalizeAssignments(assignments: ApprovalAssignment[] = []) {
       const staffId = String(item?.staff_id || '').trim();
       const workDate = String(item?.work_date || '').trim().slice(0, 10);
       const shiftId = String(item?.shift_id || '').trim();
+      const staffName = String(item?.staff_name || '').trim();
+      const shiftName = String(item?.shift_name || '').trim();
 
       if (!staffId || !shiftId || !/^\d{4}-\d{2}-\d{2}$/.test(workDate)) {
         return null;
@@ -93,14 +105,16 @@ function normalizeAssignments(assignments: ApprovalAssignment[] = []) {
         staff_id: staffId,
         work_date: workDate,
         shift_id: shiftId,
+        staff_name: staffName || undefined,
+        shift_name: shiftName || undefined,
       };
     })
-    .filter((item): item is Required<ApprovalAssignment> => item !== null);
+    .filter((item): item is NormalizedAssignment => item !== null);
 
   return Array.from(
     normalized.reduce(
       (map, item) => map.set(`${item.staff_id}:${item.work_date}`, item),
-      new Map<string, Required<ApprovalAssignment>>(),
+      new Map<string, NormalizedAssignment>(),
     ).values(),
   );
 }
@@ -138,8 +152,19 @@ function resolveApprovers(rows: ApproverRow[], requesterId: string, companyName:
         return ['admin', 'master'].includes(role) || ROSTER_APPROVER_POSITIONS.includes(position);
       });
 
+  const getPriority = (row: ApproverRow) => {
+    const pos = String(row.position || '').trim();
+    const role = String(row.role || '').trim().toLowerCase();
+    if (pos === '\uAC04\uD638\uACFC\uC7A5') return 1; // 간호과장
+    if (pos === '\uBCD1\uC6D0\uC7A5') return 2; // 병원장
+    if (['admin', 'master'].includes(role)) return 3;
+    return 4;
+  };
+
+  const sortedCandidates = [...fallbackCandidates].sort((a, b) => getPriority(a) - getPriority(b));
+
   const uniqueApprovers = new Map<string, ApproverRow>();
-  fallbackCandidates.forEach((row) => {
+  sortedCandidates.forEach((row) => {
     const id = String(row?.id || '').trim();
     if (!id || uniqueApprovers.has(id)) return;
     uniqueApprovers.set(id, row);

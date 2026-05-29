@@ -23,6 +23,19 @@ const EMOTICONS_ENTRIES: EmojiEntry[] = ALL_EMOTICONS.map(e => ({
   keywords: [e.label, e.group, '이모티콘', '움직이는 이모티콘', 'emoticon', 'custom']
 }));
 
+const STICKERS_ENTRIES: EmojiEntry[] = [
+  ...Array.from({ length: 18 }, (_, i) => ({
+    e: `[stat:worker-${i + 1}]`,
+    name: `:worker-${i + 1}:`,
+    keywords: [`직장인 ${i + 1}`, '직장인', '회사원', '정적', 'static', 'sticker', 'worker']
+  })),
+  ...Array.from({ length: 20 }, (_, i) => ({
+    e: `[stat:hospital-${i + 1}]`,
+    name: `:hospital-${i + 1}:`,
+    keywords: [`병원 ${i + 1}`, '병원', '의사', '간호사', '의료진', '정적', 'static', 'sticker', 'hospital']
+  }))
+];
+
 const PICKER_WIDTH = 320;
 const PICKER_HEIGHT_APPROX = 360;
 const COLS = 8;
@@ -171,7 +184,8 @@ const CELEBRATE: EmojiEntry[] = [
 ];
 
 const CATEGORIES = [
-  { id: 'emoticons', label: '이모티콘', icon: '✨', list: EMOTICONS_ENTRIES },
+  { id: 'emoticons', label: '움직이는 이모티콘', icon: '⚡', list: EMOTICONS_ENTRIES },
+  { id: 'stickers', label: '스티커 이모티콘', icon: '🎨', list: STICKERS_ENTRIES },
   { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
   { id: 'faces', label: '표정', icon: '😀', list: FACES },
   { id: 'animals', label: '동물', icon: '🐶', list: ANIMALS },
@@ -237,6 +251,16 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           return def.group === 'office' || def.group === 'developer';
         }
         return def.group === 'hospital';
+      });
+    }
+    if (category === 'stickers' && subGroup !== 'all') {
+      return cat.list.filter((entry) => {
+        const id = entry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
+        if (!id) return false;
+        if (subGroup === 'worker') {
+          return id.startsWith('worker-');
+        }
+        return id.startsWith('hospital-');
       });
     }
     return cat.list;
@@ -337,7 +361,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 aria-label={cat.label}
                 onClick={() => {
                   setCategory(cat.id);
-                  if (cat.id !== 'emoticons') setSubGroup('all'); // Reset subGroup on other tabs
+                  if (cat.id !== 'emoticons' && cat.id !== 'stickers') setSubGroup('all'); // Reset subGroup on other tabs
                 }}
                 className={`flex-1 h-7 rounded-md text-sm transition-colors ${
                   active ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
@@ -350,7 +374,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           })}
         </div>
       )}
-      {!query && category === 'emoticons' && (
+      {!query && (category === 'emoticons' || category === 'stickers') && (
         <div className="flex gap-1 px-1 py-0.5 bg-[var(--muted)]/60 rounded-lg border border-[var(--border)] text-[10.5px] font-semibold text-[var(--toss-gray-3)] shrink-0 shadow-inner">
           {[
             { id: 'all', label: '전체' },
@@ -383,11 +407,12 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           <div className="grid h-32 place-items-center text-[12px] text-[var(--toss-gray-4)]">결과 없음</div>
         ) : (
           <div className="max-h-[240px] overflow-y-auto pr-1">
-            <div className={!query && category === 'emoticons' ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
+            <div className={!query && (category === 'emoticons' || category === 'stickers') ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
               {items.map((entry, idx) => {
                 const focused = idx === focusIdx;
-                const isEmoticonCat = !query && category === 'emoticons';
+                const isEmoticonCat = !query && (category === 'emoticons' || category === 'stickers');
                 const isCustomEmo = entry.e.startsWith('[emo:');
+                const isSticker = entry.e.startsWith('[stat:');
                 
                 return (
                   <button
@@ -414,6 +439,21 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                             <div 
                               className={`${isEmoticonCat ? 'w-14 h-14' : 'w-6 h-6'} emo ${def.anim}`}
                               dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
+                            />
+                          );
+                        }
+                        return entry.e;
+                      })()
+                    ) : isSticker ? (
+                      (() => {
+                        const id = entry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
+                        if (id) {
+                          return (
+                            <img 
+                              src={`/emoticon/static/${id}.png`}
+                              alt={id}
+                              className={`${isEmoticonCat ? 'w-14 h-14' : 'w-6 h-6'} object-contain`}
+                              loading="lazy"
                             />
                           );
                         }
@@ -449,6 +489,26 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                   );
                 }
                 return <span>이모티콘</span>;
+              })()
+            ) : focusedEntry.e.startsWith('[stat:') ? (
+              (() => {
+                const id = focusedEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
+                if (id) {
+                  const isHospital = id.startsWith('hospital-');
+                  const label = isHospital ? `병원 ${id.slice(9)}` : `직장인 ${id.slice(7)}`;
+                  return (
+                    <>
+                      <img 
+                        src={`/emoticon/static/${id}.png`}
+                        alt={label}
+                        className="w-6 h-6 object-contain shrink-0" 
+                      />
+                      <span className="font-bold text-[var(--foreground)]">{label}</span>
+                      <span className="font-mono text-[9px] opacity-60">({id})</span>
+                    </>
+                  );
+                }
+                return <span>스티커</span>;
               })()
             ) : (
               <>

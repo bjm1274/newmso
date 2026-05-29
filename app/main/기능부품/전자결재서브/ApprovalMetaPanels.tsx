@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
+import { useMemo, useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import {
@@ -12,6 +12,7 @@ import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { normalizeInventoryText, normalizeSupplyRequestItems } from '@/app/main/inventory-utils';
 import { handleManagedDownloadClick } from '../공통/managed-download';
 import { escapeHtml } from '../전자결재-utils';
+import { supabase } from '@/lib/supabase';
 
 export type ApprovalMetaData = Record<string, unknown> | null | undefined;
 
@@ -555,6 +556,52 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
   }
   const yearMonth = String(metaData.year_month || '').trim();
   const assignments = Array.isArray(metaData.assignments) ? metaData.assignments : [];
+
+  const [loadedStaff, setLoadedStaff] = useState<Record<string, string>>({});
+  const [loadedShifts, setLoadedShifts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const needsStaffLoad = assignments.some((a: any) => !a.staff_name);
+    const needsShiftLoad = assignments.some((a: any) => !a.shift_name);
+
+    if (!needsStaffLoad && !needsShiftLoad) return;
+
+    let active = true;
+    const fetchLookups = async () => {
+      try {
+        const [staffRes, shiftRes] = await Promise.all([
+          needsStaffLoad ? supabase.from('staff_members').select('id, name') : Promise.resolve({ data: [] }),
+          needsShiftLoad ? supabase.from('work_shifts').select('id, name') : Promise.resolve({ data: [] }),
+        ]);
+
+        if (!active) return;
+
+        if (staffRes.data) {
+          const staffMapObj: Record<string, string> = {};
+          staffRes.data.forEach((s: any) => {
+            staffMapObj[s.id] = s.name;
+          });
+          setLoadedStaff(staffMapObj);
+        }
+
+        if (shiftRes.data) {
+          const shiftMapObj: Record<string, string> = {};
+          shiftRes.data.forEach((s: any) => {
+            shiftMapObj[s.id] = s.name;
+          });
+          setLoadedShifts(shiftMapObj);
+        }
+      } catch (err) {
+        console.error('Failed to load lookups for roster approval panel:', err);
+      }
+    };
+
+    void fetchLookups();
+    return () => {
+      active = false;
+    };
+  }, [assignments]);
+
   if (!yearMonth || assignments.length === 0) return null;
 
   const [year, month] = yearMonth.split('-').map(Number);
@@ -566,10 +613,10 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
   const staffRowMap = new Map<string, { staffName: string; cells: Record<number, string> }>();
   assignments.forEach((a: any) => {
     const staffId = String(a.staff_id || '').trim();
-    const staffName = String(a.staff_name || '').trim() || staffId;
+    const staffName = String(a.staff_name || loadedStaff[staffId] || '').trim() || staffId;
     const dateStr = String(a.work_date || '').trim();
     const day = Number(dateStr.slice(8, 10));
-    const shiftName = String(a.shift_name || '').trim();
+    const shiftName = String(a.shift_name || loadedShifts[a.shift_id] || '').trim();
 
     if (!staffId || !day) return;
     if (!staffRowMap.has(staffId)) {
@@ -583,10 +630,10 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
 
   const resolveBand = (shift: string) => {
     const s = String(shift || '').toLowerCase();
-    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd') return 'day';
-    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e') return 'evening';
-    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n') return 'night';
-    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o') return 'off';
+    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd' || s === 'd · 데이') return 'day';
+    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e' || s === 'e · 이브닝') return 'evening';
+    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n' || s === 'n · 나이트') return 'night';
+    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o' || s === 'off · 휴무') return 'off';
     return 'day';
   };
 
