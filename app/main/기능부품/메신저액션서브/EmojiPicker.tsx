@@ -23,16 +23,62 @@ const EMOTICONS_ENTRIES: EmojiEntry[] = ALL_EMOTICONS.map(e => ({
   keywords: [e.label, e.group, '이모티콘', '움직이는 이모티콘', 'emoticon', 'custom']
 }));
 
+export const STATIC_WORKER_LABELS = [
+  "출근 완료",
+  "모닝 커피",
+  "넵!",
+  "회의 중",
+  "월루 중",
+  "멘탈 붕괴",
+  "분노",
+  "눈물",
+  "점심시간!",
+  "월급날",
+  "퇴근",
+  "종이비행기",
+  "퇴사 마렵다",
+  "감사합니다",
+  "멘붕",
+  "체력 방전",
+  "주말 언제 와?",
+  "질문 있습니다",
+  "최고",
+  "주말 시작"
+];
+
+export const STATIC_HOSPITAL_LABELS = [
+  "인계 중",
+  "Full Bed",
+  "정시 퇴근 기원",
+  "CPR",
+  "EHR 로딩 중",
+  "당직 후",
+  "믹스 중",
+  "환자 컴플레인",
+  "폭풍 흡입",
+  "수술 완료",
+  "스테이션 지킴이",
+  "멘탈 바사삭",
+  "오더 확인",
+  "처치 중",
+  "바이탈 정상",
+  "출근 전",
+  "선생님!",
+  "칼퇴 성공",
+  "커피 수혈",
+  "오늘도 무사히"
+];
+
 const STICKERS_ENTRIES: EmojiEntry[] = [
-  ...Array.from({ length: 18 }, (_, i) => ({
+  ...STATIC_WORKER_LABELS.map((label, i) => ({
     e: `[stat:worker-${i + 1}]`,
     name: `:worker-${i + 1}:`,
-    keywords: [`직장인 ${i + 1}`, '직장인', '회사원', '정적', 'static', 'sticker', 'worker']
+    keywords: [label, '직장인', '회사원', '정적', 'static', 'sticker', 'worker']
   })),
-  ...Array.from({ length: 20 }, (_, i) => ({
+  ...STATIC_HOSPITAL_LABELS.map((label, i) => ({
     e: `[stat:hospital-${i + 1}]`,
     name: `:hospital-${i + 1}:`,
-    keywords: [`병원 ${i + 1}`, '병원', '의사', '간호사', '의료진', '정적', 'static', 'sticker', 'hospital']
+    keywords: [label, '병원', '의사', '간호사', '의료진', '정적', 'static', 'sticker', 'hospital']
   }))
 ];
 
@@ -495,7 +541,10 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 const id = focusedEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
                 if (id) {
                   const isHospital = id.startsWith('hospital-');
-                  const label = isHospital ? `병원 ${id.slice(9)}` : `직장인 ${id.slice(7)}`;
+                  const num = parseInt(id.split('-')[1], 10);
+                  const label = isHospital 
+                    ? STATIC_HOSPITAL_LABELS[num - 1] || id 
+                    : STATIC_WORKER_LABELS[num - 1] || id;
                   return (
                     <>
                       <img 

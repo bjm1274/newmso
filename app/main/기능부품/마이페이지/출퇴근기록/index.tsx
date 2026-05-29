@@ -137,7 +137,9 @@ function shouldTreatAsAbsent(log: CommuteLog, currentDateKey: string) {
     return false;
   }
 
-  return !log.check_in || !log.check_out;
+  // 출근 기록(check_in)이 아예 없는 경우만 결근으로 처리합니다.
+  // 출근은 하였으나 퇴근 기록이 없는 경우는 미퇴근 상태이므로 결근이 아닙니다.
+  return !log.check_in;
 }
 
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { stripHiddenMessageMetaBlocks } from './메신저첨부';
 import { parseMarkdownSegments } from './메신저포매팅';
 import { getEmoticonDef, buildEmoticonSVG } from './메신저액션서브/emoticon-engine';
+import { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS } from './메신저액션서브/EmojiPicker';
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -109,7 +110,10 @@ export function renderMessageContent(content: string, isMine = false, highlightQ
   if (staticMatch) {
     const statId = staticMatch[1]; // e.g. worker-1 or hospital-1
     const isHospital = statId.startsWith('hospital-');
-    const label = isHospital ? `병원 ${statId.slice(9)}` : `직장인 ${statId.slice(7)}`;
+    const num = parseInt(statId.split('-')[1], 10);
+    const label = isHospital 
+      ? STATIC_HOSPITAL_LABELS[num - 1] || statId 
+      : STATIC_WORKER_LABELS[num - 1] || statId;
     return (
       <div 
         className="flex flex-col items-center p-2 rounded-2xl bg-white border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:bg-[var(--card)]"
