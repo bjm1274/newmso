@@ -77,6 +77,9 @@ type Payload = z.infer<typeof PayloadSchema>;
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
+  if (user.is_system_master === true || user.login_id === '9999' || user.employee_no === '9999') {
+    return '9999';
+  }
   const candidate = (user.id ?? user.user_id ?? '') as string;
   const trimmed = String(candidate).trim();
   return trimmed || null;
