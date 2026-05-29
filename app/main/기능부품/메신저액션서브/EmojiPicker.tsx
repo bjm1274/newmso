@@ -171,8 +171,8 @@ const CELEBRATE: EmojiEntry[] = [
 ];
 
 const CATEGORIES = [
-  { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
   { id: 'emoticons', label: '이모티콘', icon: '✨', list: EMOTICONS_ENTRIES },
+  { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
   { id: 'faces', label: '표정', icon: '😀', list: FACES },
   { id: 'animals', label: '동물', icon: '🐶', list: ANIMALS },
   { id: 'food', label: '음식', icon: '🍕', list: FOOD },
@@ -194,7 +194,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryId>('frequent');
+  const [category, setCategory] = useState<CategoryId>('emoticons');
   const [focusIdx, setFocusIdx] = useState(0);
 
   const pos = useMemo(() => {
