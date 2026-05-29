@@ -99,13 +99,22 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
     setHistoryLoading(true);
     try {
       const { data, error } = await supabase
-        .from('document_submissions')
-        .select('id, submission_type, reason, file_url, status, submitted_at, processed_at')
-        .eq('staff_id', staffId)
-        .order('submitted_at', { ascending: false })
+        .from('document_repository')
+        .select('id, category, file_url, created_at')
+        .eq('created_by', staffId)
+        .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      setHistory((data as SubmissionRow[]) ?? []);
+      const historyRows: SubmissionRow[] = ((data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        submission_type: r.category ?? '서류',
+        reason: null,
+        file_url: r.file_url,
+        status: '발급완료',
+        submitted_at: r.created_at,
+        processed_at: r.created_at,
+      }));
+      setHistory(historyRows);
     } catch (err) {
       console.error('[SDocs] history fetch failed', err);
     } finally {
@@ -170,14 +179,14 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
           planParams: { submissionType: selectedType },
           onSuccessAction: {
             kind: 'insert',
-            table: 'document_submissions',
+            table: 'document_repository',
             payloadTemplate: {
-              staff_id: staffId,
-              submission_type: selectedType,
-              reason: reason.trim() || null,
+              created_by: staffId,
+              category: selectedType,
+              title: `모바일 제출 - ${selectedType}`,
               file_url: '{fileUrl}',
-              status: '대기',
-              submitted_at: new Date().toISOString(),
+              version: 1,
+              created_at: new Date().toISOString(),
             },
           },
         });

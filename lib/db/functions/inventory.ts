@@ -16,7 +16,7 @@
 
 import { sql, eq, inArray } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
-import { inventory } from '../schema';
+import { inventory, inventory_logs } from '../schema';
 
 export interface StockUpdateResult {
   prev_qty: number;
@@ -162,3 +162,58 @@ export function syncInventoryNameStock<T extends {
   }
   return next;
 }
+
+export async function atomicStockConsumeWithLog(
+  db: D1Client,
+  itemId: string,
+  consumeAmount: number,
+  logRow: {
+    actor_name: string | null;
+    company: string | null;
+    company_id?: string | null;
+    department: string | null;
+    notes: string | null;
+  }
+): Promise<StockUpdateResult> {
+  const found = await db
+    .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
+    .from(inventory)
+    .where(eq(inventory.id, itemId));
+  if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
+  const prev = Number(found[0].prev ?? 0);
+  if (prev - consumeAmount < 0) {
+    throw new StockError(
+      'INSUFFICIENT_STOCK',
+      `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
+    );
+  }
+  const next = prev - consumeAmount;
+
+  const logId = crypto.randomUUID();
+  await db.batch([
+    db
+      .update(inventory)
+      .set({ quantity: next, stock: next })
+      .where(eq(inventory.id, itemId)),
+    db
+      .insert(inventory_logs)
+      .values({
+        id: logId,
+        item_id: itemId,
+        inventory_id: itemId,
+        type: '소모',
+        change_type: '사용',
+        quantity: consumeAmount,
+        prev_quantity: prev,
+        next_quantity: next,
+        actor_name: logRow.actor_name,
+        company: logRow.company,
+        company_id: logRow.company_id ?? null,
+        department: logRow.department,
+        notes: logRow.notes,
+      })
+  ]);
+
+  return { prev_qty: prev, next_qty: next };
+}
+

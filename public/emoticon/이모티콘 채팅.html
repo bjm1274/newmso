@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>이모티콘 채팅 프로토타입</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="chat-ui.css">
+</head>
+<body>
+  <div class="app" data-screen-label="이모티콘 채팅">
+    <!-- 헤더 -->
+    <div class="chat-head office" id="chat-head">
+      <div class="head-av" id="head-av"></div>
+      <div class="head-info">
+        <div id="room-name">회사 단톡방</div>
+        <div id="room-sub">팀원 4</div>
+      </div>
+      <a href="이모티콘 스튜디오.html" class="gal-btn" style="margin-right: 6px; background: var(--me-bub); text-decoration: none;">🎨 스튜디오</a>
+      <button class="gal-btn" id="gal-open">전체보기</button>
+    </div>
+
+    <!-- 방 전환 -->
+    <div class="room-switch">
+      <button class="room-pill active" data-room="office"><span class="dot"></span>직장인</button>
+      <button class="room-pill" data-room="hospital"><span class="dot"></span>의료진</button>
+      <button class="room-pill" data-room="developer"><span class="dot" style="background:#5cb89f"></span>개발자</button>
+    </div>
+
+    <!-- 메시지 -->
+    <div class="messages" id="messages"></div>
+
+    <!-- 트레이 -->
+    <div class="tray-tab office" id="tray-tab">
+      <div class="tray-head">이모티콘 · 눌러서 보내보세요 👇</div>
+      <div class="tray" id="tray"></div>
+    </div>
+
+    <!-- 갤러리 오버레이 -->
+    <div class="gallery" id="gallery">
+      <div class="gal-bar">
+        <h2>이모티콘 전체 60종</h2>
+        <button id="gal-close">×</button>
+      </div>
+      <div id="gallery-grid"></div>
+    </div>
+  </div>
+
+  <script src="emoticon-face.js"></script>
+  <script src="data-office.js"></script>
+  <script src="data-hospital.js"></script>
+  <script src="data-developer.js"></script>
+  <script src="chat-app.js"></script>
+  <script>
+    // 헤더 아바타에 대표 이모티콘
+    window.addEventListener('DOMContentLoaded', function () {
+      var av = document.getElementById('head-av');
+      var d = window.EMO_OFFICE[0];
+      var e = document.createElement('div');
+      e.className = 'emo ' + d.anim;
+      e.innerHTML = window.buildEmoticonSVG(d);
+      av.appendChild(e);
+    });
+  </script>
+</body>
+</html>

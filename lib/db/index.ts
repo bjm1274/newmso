@@ -47,6 +47,7 @@ export {
 export {
   atomicStockUpdate,
   atomicStockTransfer,
+  atomicStockConsumeWithLog,
   syncInventoryNameStock,
   StockError,
   type StockUpdateResult,

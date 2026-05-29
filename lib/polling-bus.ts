@@ -57,28 +57,44 @@ type ChannelEntry = {
 
 const channelRegistry = new Map<string, ChannelEntry>();
 let visibilityHandlerInstalled = false;
+let isWindowFocused = true;
 
 function isHidden(): boolean {
   if (typeof document === 'undefined') return false;
   return document.visibilityState === 'hidden';
 }
 
+function shouldSkipPolling(): boolean {
+  return isHidden() || !isWindowFocused;
+}
+
 function ensureVisibilityHandler(): void {
   if (visibilityHandlerInstalled) return;
-  if (typeof document === 'undefined') return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
   visibilityHandlerInstalled = true;
+
   document.addEventListener('visibilitychange', () => {
-    // visibility 복귀 시 한 번 즉시 poll → 누락된 변경 빠르게 캐치
-    if (isHidden()) return;
+    if (shouldSkipPolling()) return;
     for (const entry of channelRegistry.values()) {
       void pollOnce(entry);
     }
+  });
+
+  window.addEventListener('focus', () => {
+    isWindowFocused = true;
+    for (const entry of channelRegistry.values()) {
+      void pollOnce(entry);
+    }
+  });
+
+  window.addEventListener('blur', () => {
+    isWindowFocused = false;
   });
 }
 
 async function pollOnce(entry: ChannelEntry): Promise<void> {
   if (entry.inFlight) return;
-  if (isHidden()) return;
+  if (shouldSkipPolling()) return;
   entry.inFlight = true;
   try {
     const tables = entry.tables.map((t) => t.table).join(',');

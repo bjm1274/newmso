@@ -43,6 +43,25 @@ function pickTone(days: number): SubmRow['tone'] {
   return 'muted';
 }
 
+const REQUIRED_DOCS = [
+  { id: '가족관계', label: '가족관계증명서' },
+  { id: '개인정보보호', label: '개인정보 보호교육' },
+  { id: '면허자격', label: '면허(자격)증 사본' },
+  { id: '보건증', label: '보건선결과(보건증)' },
+  { id: '안전보건', label: '산업안전 보건교육' },
+  { id: '성희롱예방', label: '성희롱 예방교육' },
+  { id: '신분증', label: '신분증 사본' },
+  { id: '일반검진', label: '일반 건강검진' },
+  { id: '잠복결핵', label: '잠복결핵 검진결과' },
+  { id: '장애인인식', label: '장애인 인식개선교육' },
+  { id: '등본', label: '주민등록등본' },
+  { id: '초본', label: '주민등록초본' },
+  { id: '괴롭힘예방', label: '직장내 괴롭힘 예방교육' },
+  { id: '통장', label: '통장사본' },
+  { id: '퇴직연금', label: '퇴직연금교육' },
+  { id: '특수검진', label: '특수 건강검진' },
+];
+
 export default function DocsSubmSummary() {
   const [rows, setRows] = useState<SubmRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,29 +73,63 @@ export default function DocsSubmSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
-          .from('required_document_submissions')
-          .select('id, staff_name, document_name, due_date')
-          .eq('status', '미제출')
-          .order('due_date', { ascending: true, nullsFirst: false })
-          .limit(20);
+        const [staffRes, repoRes] = await Promise.all([
+          supabase
+            .from('staff_members')
+            .select('id, name, status, join_date, joined_at')
+            .eq('status', '재직'),
+          supabase
+            .from('document_repository')
+            .select('created_by, category'),
+        ]);
+
         if (cancelled) return;
-        if (error) throw error;
-        const list = (data as Array<Record<string, unknown>> | null) ?? [];
+        if (staffRes.error) throw staffRes.error;
+        if (repoRes.error) throw repoRes.error;
+
+        const staffList = staffRes.data ?? [];
+        const repoDocs = repoRes.data ?? [];
+
         const items: SubmRow[] = [];
-        for (const r of list) {
-          const dueRaw = r.due_date ? String(r.due_date) : null;
-          const d = daysUntil(dueRaw);
+        for (const s of staffList) {
+          const staffDocs = repoDocs.filter((d) => String(d.created_by) === String(s.id));
+          const hireDate = s.join_date || s.joined_at;
+
+          // Calculate due date (join_date + 7 days)
+          let dueDate: Date;
+          if (hireDate) {
+            dueDate = new Date(hireDate);
+            dueDate.setDate(dueDate.getDate() + 7);
+          } else {
+            dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 7);
+          }
+
+          const formattedDueStr = dueDate.toISOString().slice(0, 10);
+          const d = daysUntil(formattedDueStr);
           if (d === null) continue;
-          items.push({
-            id: String(r.id ?? ''),
-            staffName: String(r.staff_name ?? '직원'),
-            doc: String(r.document_name ?? '서류'),
-            due: `D-${d}`,
-            days: d,
-            tone: pickTone(d),
-          });
+
+          for (const doc of REQUIRED_DOCS) {
+            const isSubmitted = staffDocs.some(
+              (d) => d.category === doc.id || d.category === doc.label
+            );
+
+            if (!isSubmitted) {
+              items.push({
+                id: `${s.id}-${doc.id}`,
+                staffName: String(s.name ?? '직원'),
+                doc: doc.label,
+                due: d < 0 ? `D+${Math.abs(d)}` : d === 0 ? 'D-Day' : `D-${d}`,
+                days: d,
+                tone: pickTone(d),
+              });
+            }
+          }
         }
+
+        // Sort: overdue first (lowest days first)
+        items.sort((a, b) => a.days - b.days);
+
         setRows(items.slice(0, 5));
       } catch (error) {
         if (cancelled) return;

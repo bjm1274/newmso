@@ -14,6 +14,13 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { ALL_EMOTICONS, getEmoticonDef, buildEmoticonSVG } from './emoticon-engine';
+
+const EMOTICONS_ENTRIES: EmojiEntry[] = ALL_EMOTICONS.map(e => ({
+  e: `[emo:${e.id}]`,
+  name: `:${e.id}:`,
+  keywords: [e.label, e.group, '이모티콘', '움직이는 이모티콘', 'emoticon', 'custom']
+}));
 
 const PICKER_WIDTH = 320;
 const PICKER_HEIGHT_APPROX = 360;
@@ -164,6 +171,7 @@ const CELEBRATE: EmojiEntry[] = [
 
 const CATEGORIES = [
   { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
+  { id: 'emoticons', label: '이모티콘', icon: '✨', list: EMOTICONS_ENTRIES },
   { id: 'faces', label: '표정', icon: '😀', list: FACES },
   { id: 'animals', label: '동물', icon: '🐶', list: ANIMALS },
   { id: 'food', label: '음식', icon: '🍕', list: FOOD },
@@ -337,11 +345,27 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                   }}
                   onMouseEnter={() => setFocusIdx(idx)}
                   aria-label={`${entry.name} 선택`}
-                  className={`aspect-square w-full rounded-md text-lg transition-colors ${
+                  className={`aspect-square w-full rounded-md text-lg transition-colors flex items-center justify-center p-0.5 overflow-hidden ${
                     focused ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--muted)]'
                   }`}
                 >
-                  {entry.e}
+                  {entry.e.startsWith('[emo:') ? (
+                    (() => {
+                      const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
+                      const def = id ? getEmoticonDef(id) : null;
+                      if (def) {
+                        return (
+                          <div 
+                            className={`w-6 h-6 emo ${def.anim}`}
+                            dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
+                          />
+                        );
+                      }
+                      return entry.e;
+                    })()
+                  ) : (
+                    entry.e
+                  )}
                 </button>
               );
             })}
@@ -351,8 +375,30 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
       <div className="flex items-center gap-2 border-t border-[var(--border)] pt-2 text-[11px] text-[var(--toss-gray-4)]">
         {focusedEntry ? (
           <>
-            <span className="text-lg" aria-hidden="true">{focusedEntry.e}</span>
-            <span className="font-mono">{focusedEntry.name}</span>
+            {focusedEntry.e.startsWith('[emo:') ? (
+              (() => {
+                const id = focusedEntry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
+                const def = id ? getEmoticonDef(id) : null;
+                if (def) {
+                  return (
+                    <>
+                      <div 
+                        className="w-6 h-6 emo shrink-0" 
+                        dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
+                      />
+                      <span className="font-bold text-[var(--foreground)]">{def.label}</span>
+                      <span className="font-mono text-[9px] opacity-60">({def.id})</span>
+                    </>
+                  );
+                }
+                return <span>이모티콘</span>;
+              })()
+            ) : (
+              <>
+                <span className="text-lg" aria-hidden="true">{focusedEntry.e}</span>
+                <span className="font-mono">{focusedEntry.name}</span>
+              </>
+            )}
             <span className="ml-auto">
               <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[10px] font-bold">⏎</kbd>
               <span className="ml-1">추가</span>

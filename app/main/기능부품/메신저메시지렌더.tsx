@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { stripHiddenMessageMetaBlocks } from './메신저첨부';
 import { parseMarkdownSegments } from './메신저포매팅';
+import { getEmoticonDef, buildEmoticonSVG } from './메신저액션서브/emoticon-engine';
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -78,6 +79,30 @@ function renderFormattedSegments(content: string, isMine: boolean, highlightQuer
 export function renderMessageContent(content: string, isMine = false, highlightQuery = ''): ReactNode {
   const visibleContent = stripHiddenMessageMetaBlocks(content);
   if (!visibleContent) return null;
+
+  // 이모티콘 태그가 메시지 전체인 경우 커스텀 이모티콘 렌더링
+  const match = visibleContent.match(/^\[emo:([a-z0-9-]+)\]$/);
+  if (match) {
+    const emoId = match[1];
+    const def = getEmoticonDef(emoId);
+    if (def) {
+      const svg = buildEmoticonSVG(def);
+      return (
+        <div 
+          className="flex flex-col items-center p-2 rounded-2xl bg-white border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:bg-[var(--card)]"
+          style={{ width: '132px', height: '132px' }}
+        >
+          <div 
+            className={`w-[100px] h-[100px] emo ${def.anim}`}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+          <span className="text-[12.5px] font-bold text-[var(--foreground)] mt-1.5 opacity-90" style={{ fontFamily: 'Gaegu, sans-serif' }}>
+            {def.label}
+          </span>
+        </div>
+      );
+    }
+  }
 
   return renderFormattedSegments(visibleContent, isMine, highlightQuery);
 }

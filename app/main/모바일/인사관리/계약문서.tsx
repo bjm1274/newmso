@@ -276,10 +276,10 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('document_submissions')
-          .select('id, title, status, due_date, submitted_at')
-          .eq('staff_id', staffId)
-          .order('due_date', { ascending: true })
+          .from('document_repository')
+          .select('id, title, category, created_at')
+          .eq('created_by', staffId)
+          .order('created_at', { ascending: false })
           .limit(30);
         if (error) throw error;
         if (cancelled) return;
@@ -287,10 +287,10 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
           ((data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             title:
-              typeof r.title === 'string' && r.title.length > 0 ? r.title : '서류',
-            status: typeof r.status === 'string' ? r.status : null,
-            due_date: typeof r.due_date === 'string' ? r.due_date : null,
-            submitted_at: typeof r.submitted_at === 'string' ? r.submitted_at : null,
+              typeof r.title === 'string' && r.title.length > 0 ? r.title : String(r.category ?? '서류'),
+            status: '완료',
+            due_date: null,
+            submitted_at: typeof r.created_at === 'string' ? r.created_at : null,
           })),
         );
       } catch (err) {

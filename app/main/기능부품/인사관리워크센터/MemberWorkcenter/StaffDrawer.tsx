@@ -260,16 +260,16 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
         ),
         safeQuery(
           supabase
-            .from('staff_documents')
-            .select('document_type, status, submitted_at, updated_at')
-            .eq('staff_id', staffId)
+            .from('document_repository')
+            .select('category, file_url, created_at, updated_at')
+            .eq('created_by', staffId)
             .order('updated_at', { ascending: false })
             .limit(1)
             .maybeSingle() as unknown as PromiseLike<{
               data: {
-                document_type?: string;
-                status?: string;
-                submitted_at?: string;
+                category?: string;
+                file_url?: string;
+                created_at?: string;
                 updated_at?: string;
               } | null;
               error: unknown;
@@ -303,9 +303,9 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
         ? {
             label: '서류',
             meta:
-              `${doc.document_type || '문서'} · ${formatDateShort(doc.submitted_at ?? doc.updated_at)}` +
-              (doc.status ? ` · ${doc.status}` : ''),
-            tone: (doc.status === '완료' || doc.status === '제출' ? 'success' : 'muted') as ChipTone,
+              `${doc.category || '문서'} · ${formatDateShort(doc.updated_at ?? doc.created_at)}` +
+              (doc.file_url ? ' · 제출완료' : ' · 미제출'),
+            tone: (doc.file_url ? 'success' : 'muted') as ChipTone,
           }
         : null;
 

@@ -54,26 +54,41 @@ export default function DocsStoreSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
-          .from('staff_documents')
-          .select('id, document_name, staff_name, category, stored_at, retention, security_level')
-          .order('stored_at', { ascending: false })
-          .limit(50);
+        const [repoRes, staffRes] = await Promise.all([
+          supabase
+            .from('document_repository')
+            .select('id, title, category, created_at, created_by')
+            .order('created_at', { ascending: false })
+            .limit(50),
+          supabase
+            .from('staff_members')
+            .select('id, name'),
+        ]);
+
         if (cancelled) return;
-        if (error) throw error;
-        const list = (data as Array<Record<string, unknown>> | null) ?? [];
+        if (repoRes.error) throw repoRes.error;
+        if (staffRes.error) throw staffRes.error;
+
+        const repoList = repoRes.data ?? [];
+        const staffList = staffRes.data ?? [];
+
+        const staffMap: Record<string, string> = {};
+        for (const s of staffList) {
+          staffMap[String(s.id)] = String(s.name ?? '');
+        }
+
         setRows(
-          list.map((r) => {
+          repoList.map((r) => {
             const cat = String(r.category ?? '기타');
-            const sec = String(r.security_level ?? '일반');
+            const sec = cat === '근로계약서' ? '대외비' : '일반';
             return {
               id: String(r.id ?? ''),
-              name: String(r.document_name ?? '문서'),
-              who: String(r.staff_name ?? '-'),
+              name: String(r.title ?? '문서'),
+              who: String(r.created_by ? (staffMap[String(r.created_by)] ?? '-') : '-'),
               category: cat,
               categoryKey: pickCategoryKey(cat),
-              from: formatDate(r.stored_at),
-              period: String(r.retention ?? '영구'),
+              from: formatDate(r.created_at),
+              period: '영구',
               security: sec,
               securityTone: sec === '대외비' ? 'warn' : 'success',
             };

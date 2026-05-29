@@ -300,8 +300,8 @@ export function useMyContractDocs(staffId: string | null) {
       try {
         const { data, error } = await supabase
           .from('document_repository')
-          .select('id, title, doc_type, file_url, file_size, created_at')
-          .eq('staff_id', staffId)
+          .select('id, title, category, file_url, created_at')
+          .eq('created_by', staffId)
           .order('created_at', { ascending: false })
           .limit(50);
         if (error) throw error;
@@ -310,12 +310,9 @@ export function useMyContractDocs(staffId: string | null) {
           ((data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             title: String(r.title ?? '제목 없음'),
-            doc_type: typeof r.doc_type === 'string' ? r.doc_type : null,
+            doc_type: typeof r.category === 'string' ? r.category : null,
             file_url: typeof r.file_url === 'string' ? r.file_url : null,
-            file_size:
-              typeof r.file_size === 'number' && Number.isFinite(r.file_size)
-                ? r.file_size
-                : null,
+            file_size: null,
             created_at: typeof r.created_at === 'string' ? r.created_at : null,
           })),
         );

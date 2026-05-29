@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이모티콘 커스텀 스튜디오 · 이모티콘 메이커</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 10% 20%, rgba(254, 241, 230, 0.9) 0%, rgba(240, 245, 241, 0.9) 100%), #f8edd7;
+  }
+  .studio-wrap {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 32px;
+    max-width: 1240px;
+    width: 100%;
+    margin: 40px auto 60px;
+    padding: 0 24px;
+    box-sizing: border-box;
+  }
+  @media (max-width: 1024px) {
+    .studio-wrap { grid-template-columns: 1fr; }
+  }
+
+  /* 왼쪽: 커스텀 패널 */
+  .custom-panel {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 32px;
+    padding: 32px;
+    box-shadow: 0 20px 50px rgba(120, 100, 80, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* 상단 헤더 */
+  .header {
+    text-align: left;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 {
+    font-family: var(--font-round);
+    font-size: 30px;
+    color: var(--ink);
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header p {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: 0;
+  }
+  .nav-btn {
+    text-decoration: none;
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    color: var(--ink);
+    background: #fff;
+    border: 1.5px solid var(--line);
+    padding: 8px 16px;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    transition: all 0.2s;
+  }
+  .nav-btn:hover {
+    background: var(--bg);
+    transform: translateY(-1px);
+  }
+
+  /* 프리셋 칩 */
+  .presets-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .presets-title {
+    font-family: var(--font-round);
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .preset-chip {
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-size: 12.5px;
+    color: var(--ink);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    transition: all 0.15s;
+  }
+  .preset-chip:hover {
+    background: var(--office-bub);
+    border-color: var(--office);
+  }
+
+  /* 캔버스 + 조작 양대 구도 */
+  .studio-main {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 768px) {
+    .studio-main { grid-template-columns: 1fr; }
+  }
+
+  /* 라이브 캐릭터 뷰포트 */
+  .viewport-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    box-shadow: 0 8px 24px rgba(120, 100, 80, 0.04);
+    height: fit-content;
+    position: sticky;
+    top: 24px;
+  }
+  .live-emo-container {
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, #fff 40%, rgba(251, 243, 236, 0.5) 100%);
+    border-radius: 24px;
+    border: 1.5px dashed var(--line);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+  }
+  .live-emo-container .emo {
+    width: 160px;
+    height: 160px;
+  }
+  .export-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .btn {
+    border: none;
+    font-family: var(--font-ui);
+    font-weight: bold;
+    font-size: 13.5px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  }
+  .btn-primary {
+    background: var(--office-deep);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: #5681c4;
+    transform: translateY(-1px);
+  }
+  .btn-success {
+    background: var(--hospital-deep);
+    color: #fff;
+  }
+  .btn-success:hover {
+    background: #49a38a;
+    transform: translateY(-1px);
+  }
+  .btn-secondary {
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .btn-secondary:hover {
+    background: var(--bg);
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  /* 옵션 스크롤 그리드 */
+  .options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+  .options-grid::-webkit-scrollbar { width: 6px; }
+  .options-grid::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 9px; }
+
+  .opt-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-bottom: 1.5px solid rgba(236, 227, 218, 0.6);
+    padding-bottom: 18px;
+  }
+  .opt-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .opt-label {
+    font-family: var(--font-round);
+    font-size: 15px;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .opt-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 피부색 라디오 */
+  .color-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px var(--line);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .color-badge.active {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px var(--ink);
+  }
+
+  /* 옵션 실버 셀렉트 */
+  .select-box {
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-family: var(--font-ui);
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
+    background: #fff;
+    cursor: pointer;
+    flex: 1;
+    min-width: 140px;
+  }
+  .select-box:focus {
+    border-color: var(--office-deep);
+  }
+
+  /* 토글 스위치 */
+  .toggle-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    background: #fff;
+    padding: 6px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    user-select: none;
+    transition: all 0.15s;
+  }
+  .toggle-lbl:hover {
+    background: var(--bg);
+  }
+  .toggle-lbl.active {
+    background: var(--office-bub);
+    border-color: var(--office);
+  }
+  .toggle-lbl input { display: none; }
+
+  /* 우측: 샌드박스 채팅방 */
+  .sandbox-chat {
+    align-self: flex-start;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 헤더 타이틀 바 -->
+  <div style="width:100%; background:rgba(255,255,255,0.4); border-bottom:1px solid rgba(0,0,0,0.05); padding:12px 0;">
+    <div style="max-width:1240px; margin:0 auto; padding:0 24px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-family:var(--font-round); font-size:18px; color:var(--ink); display:flex; align-items:center; gap:8px;">
+        ✨ Parametric Emoticon Studio
+      </span>
+      <a class="nav-btn" href="이모티콘 채팅.html">이모티콘 채팅방 가기 →</a>
+    </div>
+  </div>
+
+  <div class="studio-wrap">
+
+    <!-- 1. 왼쪽: 커스터마이저 카드 -->
+    <div class="custom-panel">
+      
+      <div class="header">
+        <div>
+          <h1>나만의 Parametric 이모티콘 만들기</h1>
+          <p>피부색, 표정, 머리, 의상, 소품, 움직임을 실시간 조합하여 유니크한 이모티콘을 만들어보세요.</p>
+        </div>
+      </div>
+
+      <!-- 프리셋 바 -->
+      <div class="presets-bar">
+        <span class="presets-title">💡 추천 스타일 프리셋:</span>
+        <button class="preset-chip" onclick="loadPreset('developer-coding')">🔥 폭풍 코딩 개발자</button>
+        <button class="preset-chip" onclick="loadPreset('hospital-nurse')">💉 주사 장인 수간호사</button>
+        <button class="preset-chip" onclick="loadPreset('office-lunch')">🥪 점심 고민 대리</button>
+        <button class="preset-chip" onclick="loadPreset('hospital-surgery')">😷 수술 집도의</button>
+        <button class="preset-chip" onclick="loadPreset('office-ceo')">💼 월급 터지는 사장님</button>
+      </div>
+
+      <!-- 캔버스 + 옵션 그리드 -->
+      <div class="studio-main">
+        
+        <!-- 실시간 프리뷰 캔버스 -->
+        <div class="viewport-card">
+          <span style="font-family:var(--font-round); font-size:14px; color:var(--ink-soft)">LIVE PREVIEW</span>
+          
+          <div class="live-emo-container">
+            <div id="live-emo" class="emo a-bounce"></div>
+          </div>
+          
+          <div class="export-btns">
+            <button class="btn btn-primary" onclick="sendToChat()">💬 채팅방에 전송하기</button>
+            <button class="btn btn-success" onclick="downloadPNG()">💾 PNG 이미지 저장 (360x360)</button>
+            <button class="btn btn-secondary" onclick="downloadSVG()">📐 SVG 파일 저장</button>
+          </div>
+        </div>
+
+        <!-- 파라메트릭 세부 옵션 -->
+        <div class="options-grid">
+          
+          <!-- 피부색 -->
+          <div class="opt-section">
+            <span class="opt-label">🎨 피부색 (Skin Color)</span>
+            <div class="opt-row" id="skin-container">
+              <!-- JS에서 자동 주입 -->
+            </div>
+          </div>
+
+          <!-- 눈 & 입 & 눈썹 -->
+          <div class="opt-section">
+            <span class="opt-label">👀 표정 (Face Expression)</span>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">눈 (Eyes)</div>
+                <select id="sel-eyes" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">입 (Mouth)</div>
+                <select id="sel-mouth" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">눈썹 (Brow)</div>
+                <select id="sel-brow" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+            </div>
+            
+            <div class="opt-row" style="margin-top:6px;">
+              <label class="toggle-lbl" id="lbl-glasses">
+                <input type="checkbox" id="chk-glasses" onchange="toggleClassActive('lbl-glasses','chk-glasses'); updateLiveEmo();"> 안경 착용
+              </label>
+              <label class="toggle-lbl" id="lbl-blush">
+                <input type="checkbox" id="chk-blush" onchange="toggleClassActive('lbl-blush','chk-blush'); updateLiveEmo();"> 볼터치 뿜뿜
+              </label>
+            </div>
+          </div>
+
+          <!-- 헤어 스타일 -->
+          <div class="opt-section">
+            <span class="opt-label">💇 헤어 스타일 (Hair Style)</span>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">헤어 타입 (Style)</div>
+                <select id="sel-hair" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">머리 색상 (Color)</div>
+                <select id="sel-hairColor" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 의상 유니폼 -->
+          <div class="opt-section">
+            <span class="opt-label">👔 유니폼 (Outfit Uniform)</span>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">직업/의상군 (Type)</div>
+                <select id="sel-uniform" class="select-box" onchange="updateLiveEmo()"></select>
+              </div>
+              <div>
+                <div style="font-size:11.5px; color:var(--ink-soft); margin-bottom:4px">넥타이 / 액센트 색상</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <input type="color" id="col-tie" value="#d96b7c" style="width:40px; height:34px; border:1px solid var(--line); border-radius:8px; cursor:pointer;" onchange="updateLiveEmo()">
+                  <span style="font-size:11.5px; font-family:monospace;" id="tie-val">#d96b7c</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 들고있는 소품 -->
+          <div class="opt-section">
+            <span class="opt-label">🎒 소품 (Props Accessory)</span>
+            <select id="sel-front" class="select-box" onchange="updateLiveEmo()"></select>
+          </div>
+
+          <!-- 특수효과 -->
+          <div class="opt-section">
+            <span class="opt-label">⚡ 특수 효과 (Special FX)</span>
+            <select id="sel-fx" class="select-box" onchange="updateLiveEmo()"></select>
+          </div>
+
+          <!-- 애니메이션 -->
+          <div class="opt-section">
+            <span class="opt-label">🏃 텐션 / 애니메이션 (Motion)</span>
+            <select id="sel-anim" class="select-box" onchange="updateLiveEmo()"></select>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 2. 오른쪽: 샌드박스 채팅방 시뮬레이터 -->
+    <div class="sandbox-chat">
+      <div class="app" data-screen-label="샌드박스 채팅">
+        <!-- 헤더 -->
+        <div class="chat-head office" id="chat-head">
+          <div class="head-av" id="head-av"></div>
+          <div class="head-info">
+            <div id="room-name">IT 개발실 단톡방</div>
+            <div id="room-sub">팀원 5</div>
+          </div>
+          <button class="gal-btn" onclick="alert('이 샌드박스는 커스텀 테스트 룸입니다. 실시간 전송을 체험해보세요!')">샌드박스</button>
+        </div>
+
+        <!-- 방 전환 -->
+        <div class="room-switch">
+          <button class="room-pill active" data-room="developer"><span class="dot" style="background:#5cb89f"></span>개발실</button>
+          <button class="room-pill" data-room="office"><span class="dot" style="background:#a9c6f0"></span>인사팀</button>
+          <button class="room-pill" data-room="hospital"><span class="dot" style="background:#a3e0cf"></span>병동</button>
+        </div>
+
+        <!-- 메시지 -->
+        <div class="messages" id="messages"></div>
+
+        <!-- 트레이 안내 문구 -->
+        <div class="tray-tab office" id="tray-tab" style="padding:14px; text-align:center; font-size:12.5px; color:var(--ink-soft); line-height:1.4">
+          👈 왼쪽 패널에서 커스텀 이모티콘을 조립한 후,<br>
+          <strong style="color:var(--office-deep)">[채팅방에 전송하기]</strong> 버튼을 누르면 실시간 전송됩니다!
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="emoticon-face.js"></script>
+  <script src="data-office.js"></script>
+  <script src="data-hospital.js"></script>
+  <script src="data-developer.js"></script>
+  <script>
+    // 옵션 리스트 정의 (엔진이 제공하는 옵션과 동기화)
+    const eyesList = ["dot", "shine", "happy", "smile", "sleepy", "wide", "x", "dizzy", "star", "heart", "money", "wink", "cry", "angry", "side", "blank"];
+    const mouthList = ["smile", "none", "small", "bigsmile", "grin", "open", "gasp", "frown", "flat", "wavy", "smallo", "cat", "tongue", "yawn", "gritted", "smirk"];
+    const browList = ["none", "angry", "worried", "raised", "flat"];
+    const hairList = ["short", "sidepart", "bob", "ponytail", "bun", "quiff", "buzz", "baldsides", "none"];
+    const hairColorList = ["dark", "brown", "lbrown", "auburn", "gray", "soft"];
+    const uniformList = ["hoodie", "checkshirt", "suit", "shirt", "scrubs", "coat"];
+    const frontList = ["none", "laptop", "mug", "energy", "bug", "headphones", "coffee", "clipboard", "syringe", "pills", "doc", "phone", "fist", "mask", "capdoc", "capnurse", "clock", "lanyard"];
+    const fxList = ["none", "matrix", "error", "fire", "sweat", "sweat2", "tears", "tearjoy", "anger", "steamhead", "zzz", "sparkles", "moon", "heartup", "note", "question", "exclaim", "alarm", "bubble", "lines", "flypaper"];
+    const animList = ["a-bounce", "a-jump", "a-shake", "a-wobble", "a-spin", "a-pulse", "a-float", "a-nod", "a-vibrate", "a-tilt", "a-droop", "a-swing"];
+
+    const skinColors = {
+      "#ffe0c2": "피부 A",
+      "#f7c9a3": "피부 B",
+      "#e8b389": "피부 C",
+      "#ffd2b0": "피부 D"
+    };
+
+    let currentSkin = "#ffe0c2";
+    let activeRoom = "developer";
+
+    // 샌드박스 채팅 대화 히스토리
+    const chatRooms = {
+      developer: {
+        name: "IT 개발실 단톡방",
+        color: "hospital",
+        botName: "수석아키텍트",
+        botInit: "아",
+        botColor: "#5cb89f",
+        seed: [
+          { who: "bot", text: "신규 모듈 체크 다들 하셨나요?" },
+          { who: "bot", emo: "d-compile" }
+        ],
+        replies: [
+          "와 진짜 이모티콘 퀄리티 대박인데요?",
+          "폭풍코딩 들어갑니다 ㅋㅋㅋ",
+          "서버 롤백하고 올게요 ㅜㅜ",
+          "LGTM!! 바로 머지하겠습니다.",
+          "커스텀이라니 신선하네요!"
+        ]
+      },
+      office: {
+        name: "인사기획팀 단톡방",
+        color: "office",
+        botName: "강부장",
+        botInit: "강",
+        botColor: "#6d96da",
+        seed: [
+          { who: "bot", text: "오늘 기획안 컨펌 일정 있습니다." },
+          { who: "bot", emo: "o-deadline" }
+        ],
+        replies: [
+          "결재 부탁드립니다!!",
+          "오늘 야근 각인데요...?",
+          "이모티콘 엄청 귀엽네요 사원님",
+          "화이팅입니다!",
+          "커피 수혈이 시급합니다."
+        ]
+      },
+      hospital: {
+        name: "병동 단톡방",
+        color: "hospital",
+        botName: "수간호사쌤",
+        botInit: "수",
+        botColor: "#5cb89f",
+        seed: [
+          { who: "bot", text: "인계사항 확인하고 서명해주세요." },
+          { who: "bot", emo: "h-rounds" }
+        ],
+        replies: [
+          "교대 완료했습니다!!",
+          "환자 차트 공유 감사합니다.",
+          "오 대박 귀여운 캐릭터 ㅋㅋㅋ",
+          "주사 안내 바로 갈게요~",
+          "식사 다들 챙겨드세요!"
+        ]
+      }
+    };
+
+    const chatHistory = { developer: [], office: [], hospital: [] };
+
+    // 초기화 함수
+    window.addEventListener("DOMContentLoaded", () => {
+      // 컴포넌트 채우기
+      buildSelect("sel-eyes", eyesList);
+      buildSelect("sel-mouth", mouthList);
+      buildSelect("sel-brow", browList);
+      buildSelect("sel-hair", hairList);
+      buildSelect("sel-hairColor", hairColorList);
+      buildSelect("sel-uniform", uniformList);
+      buildSelect("sel-front", frontList);
+      buildSelect("sel-fx", fxList);
+      buildSelect("sel-anim", animList);
+
+      // 피부색 채우기
+      const skinCont = document.getElementById("skin-container");
+      Object.keys(skinColors).forEach((col, idx) => {
+        const badge = document.createElement("div");
+        badge.className = "color-badge" + (idx === 0 ? " active" : "");
+        badge.style.backgroundColor = col;
+        badge.title = skinColors[col];
+        badge.onclick = () => {
+          document.querySelectorAll(".color-badge").forEach(b => b.classList.remove("active"));
+          badge.classList.add("active");
+          currentSkin = col;
+          updateLiveEmo();
+        };
+        skinCont.appendChild(badge);
+      });
+
+      // 프리셋 첫 로드
+      loadPreset("developer-coding");
+
+      // 샌드박스 채팅방 초기화
+      initSandboxChat();
+
+      // 방전환 바인딩
+      document.querySelectorAll(".room-pill").forEach(p => {
+        p.addEventListener("click", () => {
+          document.querySelectorAll(".room-pill").forEach(rp => rp.classList.remove("active"));
+          p.classList.add("active");
+          activeRoom = p.dataset.room;
+          renderRoom();
+        });
+      });
+    });
+
+    function buildSelect(id, list) {
+      const sel = document.getElementById(id);
+      list.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        sel.appendChild(opt);
+      });
+    }
+
+    function toggleClassActive(lblId, chkId) {
+      const lbl = document.getElementById(lblId);
+      const chk = document.getElementById(chkId);
+      lbl.classList.toggle("active", chk.checked);
+    }
+
+    // 프리셋 로딩
+    function loadPreset(key) {
+      if (key === "developer-coding") {
+        currentSkin = "#ffe0c2";
+        setSelectValue("sel-eyes", "shine");
+        setSelectValue("sel-mouth", "grin");
+        setSelectValue("sel-brow", "none");
+        setSelectValue("sel-hair", "short");
+        setSelectValue("sel-hairColor", "dark");
+        setSelectValue("sel-uniform", "hoodie");
+        setSelectValue("sel-front", "laptop");
+        setSelectValue("sel-fx", "matrix");
+        setSelectValue("sel-anim", "a-vibrate");
+        setCheckValue("chk-glasses", false, "lbl-glasses");
+        setCheckValue("chk-blush", true, "lbl-blush");
+        document.getElementById("col-tie").value = "#7c8cb3";
+      } else if (key === "hospital-nurse") {
+        currentSkin = "#ffe0c2";
+        setSelectValue("sel-eyes", "wink");
+        setSelectValue("sel-mouth", "smile");
+        setSelectValue("sel-brow", "none");
+        setSelectValue("sel-hair", "bun");
+        setSelectValue("sel-hairColor", "auburn");
+        setSelectValue("sel-uniform", "scrubs");
+        setSelectValue("sel-front", "syringe");
+        setSelectValue("sel-fx", "sparkles");
+        setSelectValue("sel-anim", "a-tilt");
+        setCheckValue("chk-glasses", false, "lbl-glasses");
+        setCheckValue("chk-blush", true, "lbl-blush");
+        document.getElementById("col-tie").value = "#d96b7c";
+      } else if (key === "office-lunch") {
+        currentSkin = "#ffe0c2";
+        setSelectValue("sel-eyes", "dot");
+        setSelectValue("sel-mouth", "smirk");
+        setSelectValue("sel-brow", "none");
+        setSelectValue("sel-hair", "short");
+        setSelectValue("sel-hairColor", "brown");
+        setSelectValue("sel-uniform", "shirt");
+        setSelectValue("sel-front", "none");
+        setSelectValue("sel-fx", "question");
+        setSelectValue("sel-anim", "a-tilt");
+        setCheckValue("chk-glasses", true, "lbl-glasses");
+        setCheckValue("chk-blush", false, "lbl-blush");
+        document.getElementById("col-tie").value = "#6f9bd1";
+      } else if (key === "hospital-surgery") {
+        currentSkin = "#f7c9a3";
+        setSelectValue("sel-eyes", "wide");
+        setSelectValue("sel-mouth", "none");
+        setSelectValue("sel-brow", "flat");
+        setSelectValue("sel-hair", "short");
+        setSelectValue("sel-hairColor", "dark");
+        setSelectValue("sel-uniform", "scrubs");
+        setSelectValue("sel-front", "mask");
+        setSelectValue("sel-fx", "sweat");
+        setSelectValue("sel-anim", "a-vibrate");
+        setCheckValue("chk-glasses", false, "lbl-glasses");
+        setCheckValue("chk-blush", false, "lbl-blush");
+        document.getElementById("col-tie").value = "#ff7a7a";
+      } else if (key === "office-ceo") {
+        currentSkin = "#ffd2b0";
+        setSelectValue("sel-eyes", "money");
+        setSelectValue("sel-mouth", "bigsmile");
+        setSelectValue("sel-brow", "raised");
+        setSelectValue("sel-hair", "sidepart");
+        setSelectValue("sel-hairColor", "gray");
+        setSelectValue("sel-uniform", "suit");
+        setSelectValue("sel-front", "lanyard");
+        setSelectValue("sel-fx", "sparkles");
+        setSelectValue("sel-anim", "a-jump");
+        setCheckValue("chk-glasses", false, "lbl-glasses");
+        setCheckValue("chk-blush", true, "lbl-blush");
+        document.getElementById("col-tie").value = "#c9a14a";
+      }
+
+      // 피부색 배지 상태 업데이트
+      document.querySelectorAll(".color-badge").forEach(b => {
+        b.classList.toggle("active", b.style.backgroundColor === currentSkin);
+      });
+
+      updateLiveEmo();
+    }
+
+    function setSelectValue(id, val) {
+      const sel = document.getElementById(id);
+      if (sel) sel.value = val;
+    }
+
+    function setCheckValue(id, val, lblId) {
+      const chk = document.getElementById(id);
+      if (chk) chk.checked = val;
+      const lbl = document.getElementById(lblId);
+      if (lbl) lbl.classList.toggle("active", val);
+    }
+
+    // 커스텀 객체 빌드
+    function buildCurrentDef() {
+      const frontVal = document.getElementById("sel-front").value;
+      const fxVal = document.getElementById("sel-fx").value;
+      const tieVal = document.getElementById("col-tie").value;
+      document.getElementById("tie-val").textContent = tieVal.toUpperCase();
+
+      const def = {
+        id: "custom-emo",
+        label: "커스텀 이모지",
+        group: "custom",
+        anim: document.getElementById("sel-anim").value,
+        uniform: document.getElementById("sel-uniform").value,
+        front: frontVal === "none" ? [] : [frontVal],
+        face: {
+          skin: currentSkin,
+          hair: document.getElementById("sel-hair").value,
+          hairColor: document.getElementById("sel-hairColor").value,
+          tieColor: tieVal,
+          glasses: document.getElementById("chk-glasses").checked,
+          eyes: document.getElementById("sel-eyes").value,
+          mouth: document.getElementById("sel-mouth").value,
+          brow: document.getElementById("sel-brow").value,
+          blush: document.getElementById("chk-blush").checked,
+          fx: fxVal === "none" ? [] : [fxVal]
+        }
+      };
+      return def;
+    }
+
+    // 프리뷰 업데이트
+    function updateLiveEmo() {
+      const def = buildCurrentDef();
+      const cont = document.getElementById("live-emo");
+      cont.className = "emo " + def.anim;
+      cont.innerHTML = window.buildEmoticonSVG(def);
+    }
+
+    // SVG 다운로드
+    function downloadSVG() {
+      const def = buildCurrentDef();
+      const svgStr = window.buildEmoticonSVG(def);
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "custom-emoticon.svg";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // PNG 내보내기 (HTML5 Canvas 사용)
+    function downloadPNG() {
+      const def = buildCurrentDef();
+      const svgStr = window.buildEmoticonSVG(def);
+      const canvas = document.createElement("canvas");
+      canvas.width = 360;
+      canvas.height = 360;
+      const ctx = canvas.getContext("2d");
+
+      const img = new Image();
+      const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      img.onload = () => {
+        ctx.clearRect(0, 0, 360, 360);
+        ctx.drawImage(img, 0, 0, 360, 360);
+        
+        canvas.toBlob((pngBlob) => {
+          const pngUrl = URL.createObjectURL(pngBlob);
+          const a = document.createElement("a");
+          a.href = pngUrl;
+          a.download = "custom-emoticon.png";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(pngUrl);
+        }, "image/png");
+
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+
+    // ----------------- 샌드박스 채팅 연동 -----------------
+    function initSandboxChat() {
+      const av = document.getElementById("head-av");
+      av.innerHTML = "";
+      const d = window.EMO_DEVELOPER[0];
+      const e = document.createElement("div");
+      e.className = "emo " + d.anim;
+      e.style.width = "34px";
+      e.style.height = "34px";
+      e.innerHTML = window.buildEmoticonSVG(d);
+      av.appendChild(e);
+
+      renderRoom();
+    }
+
+    function renderRoom() {
+      const room = chatRooms[activeRoom];
+      document.getElementById("room-name").textContent = room.name;
+      document.getElementById("room-sub").textContent = "팀원 " + (activeRoom === "developer" ? "5" : "4");
+      
+      const head = document.getElementById("chat-head");
+      head.className = "chat-head " + room.color;
+
+      const area = document.getElementById("messages");
+      area.innerHTML = "";
+
+      if (!chatHistory[activeRoom].length) {
+        room.seed.forEach(s => {
+          chatHistory[activeRoom].push({ ...s, time: nowTime() });
+        });
+      }
+
+      chatHistory[activeRoom].forEach(m => {
+        appendSandboxMessage(m);
+      });
+      scrollSandboxBottom();
+    }
+
+    function nowTime() {
+      const d = new Date();
+      let h = d.getHours();
+      const ap = h < 12 ? "오전" : "오후";
+      h = h % 12 || 12;
+      return ap + " " + h + ":" + String(d.getMinutes()).padStart(2, "0");
+    }
+
+    function scrollSandboxBottom() {
+      const a = document.getElementById("messages");
+      a.scrollTop = a.scrollHeight + 300;
+    }
+
+    function appendSandboxMessage(m, animate) {
+      const room = chatRooms[activeRoom];
+      const row = document.createElement("div");
+      row.className = "msg-row " + (m.who === "me" ? "mine" : "theirs");
+
+      if (m.who === "bot") {
+        const av = document.createElement("div");
+        av.className = "avatar";
+        av.style.background = room.botColor;
+        av.textContent = room.botInit;
+        row.appendChild(av);
+      }
+
+      const col = document.createElement("div");
+      col.className = "msg-col";
+
+      if (m.who === "bot") {
+        const nm = document.createElement("div");
+        nm.className = "sender";
+        nm.textContent = room.botName;
+        col.appendChild(nm);
+      }
+
+      if (m.customSvg) {
+        const bub = document.createElement("div");
+        bub.className = "emo-bubble" + (animate ? " pop-in" : "");
+        const wrap = document.createElement("div");
+        wrap.className = "emo " + (m.anim || "a-bounce");
+        wrap.style.width = "100px";
+        wrap.style.height = "100px";
+        wrap.innerHTML = m.customSvg;
+        bub.appendChild(wrap);
+        
+        const lab = document.createElement("div");
+        lab.className = "emo-label";
+        lab.textContent = m.label || "나만의 이모지";
+        bub.appendChild(lab);
+        col.appendChild(bub);
+      } else if (m.emo) {
+        // 기존 정의된 이모지
+        let def;
+        [...window.EMO_OFFICE, ...window.EMO_HOSPITAL, ...window.EMO_DEVELOPER].forEach(d => {
+          if (d.id === m.emo) def = d;
+        });
+        if (def) {
+          const bub = document.createElement("div");
+          bub.className = "emo-bubble" + (animate ? " pop-in" : "");
+          const wrap = document.createElement("div");
+          wrap.className = "emo " + def.anim;
+          wrap.style.width = "100px";
+          wrap.style.height = "100px";
+          wrap.innerHTML = window.buildEmoticonSVG(def);
+          bub.appendChild(wrap);
+          
+          const lab = document.createElement("div");
+          lab.className = "emo-label";
+          lab.textContent = def.label;
+          bub.appendChild(lab);
+          col.appendChild(bub);
+        }
+      } else {
+        const bub = document.createElement("div");
+        bub.className = "text-bubble " + room.color + (animate ? " pop-in" : "");
+        bub.textContent = m.text;
+        col.appendChild(bub);
+      }
+
+      const time = document.createElement("div");
+      time.className = "time";
+      time.textContent = m.time || nowTime();
+      col.appendChild(time);
+
+      row.appendChild(col);
+      document.getElementById("messages").appendChild(row);
+      scrollSandboxBottom();
+    }
+
+    // 채팅방 전송
+    function sendToChat() {
+      const def = buildCurrentDef();
+      const svgStr = window.buildEmoticonSVG(def);
+
+      const m = {
+        who: "me",
+        customSvg: svgStr,
+        anim: def.anim,
+        label: "커스텀 이모지",
+        time: nowTime()
+      };
+
+      chatHistory[activeRoom].push(m);
+      appendSandboxMessage(m, true);
+
+      // 자동 답장 반응
+      const room = chatRooms[activeRoom];
+      setTimeout(() => {
+        // 타이핑 인디케이터
+        const row = document.createElement("div");
+        row.className = "msg-row theirs typing-row";
+        row.id = "sandbox-typing";
+        row.innerHTML = `<div class="avatar" style="background:${room.botColor}">${room.botInit}</div>` +
+          `<div class="msg-col"><div class="typing"><span></span><span></span><span></span></div></div>`;
+        document.getElementById("messages").appendChild(row);
+        scrollSandboxBottom();
+
+        setTimeout(() => {
+          const t = document.getElementById("sandbox-typing");
+          if (t) t.remove();
+
+          const replyText = room.replies[Math.floor(Math.random() * room.replies.length)];
+          const reply = {
+            who: "bot",
+            text: replyText,
+            time: nowTime()
+          };
+          chatHistory[activeRoom].push(reply);
+          appendSandboxMessage(reply, true);
+        }, 1000 + Math.random() * 600);
+      }, 500);
+    }
+  </script>
+</body>
+</html>

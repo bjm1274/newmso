@@ -134,6 +134,10 @@ function getLocalD1Mock(): D1Database | undefined {
  *   if (d1) { ... use d1 ... }
  */
 export async function getD1Binding(): Promise<D1Database | undefined> {
+  if (typeof window !== 'undefined') {
+    return undefined;
+  }
+
   try {
     const { getCloudflareContext } = await import('@opennextjs/cloudflare');
     const { env } = await getCloudflareContext({ async: true });

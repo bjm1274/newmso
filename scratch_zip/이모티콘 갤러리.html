@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이모티콘 갤러리 · 40종</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { display: block; padding: 0; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 28px 70px; }
+  .top { text-align: center; margin-bottom: 36px; }
+  .top h1 { font-family: var(--font-round); font-size: 34px; color: var(--ink); margin: 0 0 8px; }
+  .top p { color: var(--ink-soft); font-size: 15px; margin: 0; }
+  .top .back { display:inline-block; margin-top:16px; text-decoration:none; font-family:var(--font-ui);
+    font-size:14px; color:var(--ink); background:#fff; border:1px solid var(--line);
+    padding:9px 18px; border-radius:999px; box-shadow:var(--shadow); white-space:nowrap; }
+  .sec-head { display:flex; align-items:center; gap:12px; margin: 38px 0 18px; }
+  .sec-head .chip { font-family:var(--font-round); font-size:20px; color:var(--ink);
+    padding:8px 20px; border-radius:999px; white-space:nowrap; }
+  .sec-head .chip.office { background: var(--office-bub); }
+  .sec-head .chip.hospital { background: var(--hospital-bub); }
+  .sec-head .ln { flex:1; height:1px; background:var(--line); }
+  .grid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:22px;
+    padding:16px 8px 12px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    box-shadow:0 4px 16px rgba(120,100,80,.07); }
+  .card .emo { width:96px; height:96px; }
+  .card .nm { font-family:var(--font-hand); font-weight:700; font-size:16px; color:var(--ink);
+    text-align:center; word-break:keep-all; line-height:1.15; }
+  @media (max-width:820px){ .grid{ grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:520px){ .grid{ grid-template-columns:repeat(2,1fr);} .top h1{font-size:26px;} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>애니메이션 이모티콘 40종</h1>
+      <p>직장인 컨셉 20 · 의료진 컨셉 20 — 마우스를 올리지 않아도 계속 움직여요</p>
+      <a class="back" href="이모티콘 채팅.html">← 채팅방에서 써보기</a>
+    </div>
+    <div id="root"></div>
+  </div>
+
+  <script src="emoticon-face.js"></script>
+  <script src="data-office.js"></script>
+  <script src="data-hospital.js"></script>
+  <script>
+    function section(title, color, set) {
+      var sec = document.createElement('div');
+      var h = document.createElement('div');
+      h.className = 'sec-head';
+      h.innerHTML = '<span class="chip ' + color + '">' + title + ' · ' + set.length + '</span><span class="ln"></span>';
+      sec.appendChild(h);
+      var g = document.createElement('div');
+      g.className = 'grid';
+      set.forEach(function (d) {
+        var card = document.createElement('div');
+        card.className = 'card';
+        var e = document.createElement('div');
+        e.className = 'emo ' + d.anim;
+        e.innerHTML = window.buildEmoticonSVG(d);
+        card.appendChild(e);
+        var nm = document.createElement('div');
+        nm.className = 'nm';
+        nm.textContent = d.label;
+        card.appendChild(nm);
+        g.appendChild(card);
+      });
+      sec.appendChild(g);
+      return sec;
+    }
+    var root = document.getElementById('root');
+    root.appendChild(section('직장인', 'office', window.EMO_OFFICE));
+    root.appendChild(section('의료진', 'hospital', window.EMO_HOSPITAL));
+  </script>
+</body>
+</html>

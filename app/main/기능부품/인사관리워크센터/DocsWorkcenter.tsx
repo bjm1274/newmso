@@ -143,6 +143,25 @@ interface DocsWorkcenterProps {
   canManageDocuments?: boolean;
 }
 
+const REQUIRED_DOCS_KPI = [
+  { id: '가족관계', label: '가족관계증명서' },
+  { id: '개인정보보호', label: '개인정보 보호교육' },
+  { id: '면허자격', label: '면허(자격)증 사본' },
+  { id: '보건증', label: '보건선결과(보건증)' },
+  { id: '안전보건', label: '산업안전 보건교육' },
+  { id: '성희롱예방', label: '성희롱 예방교육' },
+  { id: '신분증', label: '신분증 사본' },
+  { id: '일반검진', label: '일반 건강검진' },
+  { id: '잠복결핵', label: '잠복결핵 검진결과' },
+  { id: '장애인인식', label: '장애인 인식개선교육' },
+  { id: '등본', label: '주민등록등본' },
+  { id: '초본', label: '주민등록초본' },
+  { id: '괴롭힘예방', label: '직장내 괴롭힘 예방교육' },
+  { id: '통장', label: '통장사본' },
+  { id: '퇴직연금', label: '퇴직연금교육' },
+  { id: '특수검진', label: '특수 건강검진' },
+];
+
 export default function DocsWorkcenter({
   staffs = [],
   selectedCo,
@@ -162,24 +181,27 @@ export default function DocsWorkcenter({
 
     const fetchCounts = async () => {
       try {
-        // 계약·증명서·서류 제출 fetch 병렬
-        const [contractRes, certRes, submitRes] = await Promise.all([
+        // 계약·결재(증명서대기용)·직원·서류 제출 fetch 병렬
+        const [contractRes, approvalsRes, staffRes, repoRes] = await Promise.all([
           supabase
             .from('employment_contracts')
             .select('end_date, contract_end_date, status'),
-          // certificate_issuances는 발급 요청·결재 상태 컬럼이 있을 수 있음.
-          // 'status' 또는 'state' 컬럼이 없으면 폴백으로 빈 배열.
           supabase
-            .from('certificate_issuances')
-            .select('status'),
-          // 서류 제출 현황 (document_submissions 또는 document_repository 별도).
-          // 안전하게 status 컬럼만 select.
+            .from('approvals')
+            .select('status, form_type'),
           supabase
-            .from('document_submissions')
-            .select('status'),
+            .from('staff_members')
+            .select('id, status'),
+          supabase
+            .from('document_repository')
+            .select('created_by, category'),
         ]);
 
         if (cancelled) return;
+        if (contractRes.error) throw contractRes.error;
+        if (approvalsRes.error) throw approvalsRes.error;
+        if (staffRes.error) throw staffRes.error;
+        if (repoRes.error) throw repoRes.error;
 
         // 계약: 활성/만료임박 집계
         const contractRows = (contractRes.data as ContractLite[] | null) ?? [];
@@ -199,19 +221,32 @@ export default function DocsWorkcenter({
           if (d <= 90) expiringContracts += 1;
         }
 
-        // 증명서: 대기 상태
-        const certRows = (certRes.data as CertificateLite[] | null) ?? [];
-        const pendingCertificates = certRows.filter((r) => {
-          const s = (r.status ?? '').toString();
-          return s === '대기' || s === 'pending' || s === '요청' || s === '결재중';
+        // 증명서: approvals 테이블에서 대기중/진행중인 증명서결재 건수 합산
+        const approvalRows = (approvalsRes.data || []) as Array<{ status: string | null; form_type: string | null }>;
+        const pendingCertificates = approvalRows.filter((r) => {
+          const isCert = String(r.form_type || '').includes('증명서') || String(r.form_type || '').includes('certificate');
+          const isPending = r.status === '대기' || r.status === 'pending' || r.status === '진행중' || r.status === '결재중';
+          return isCert && isPending;
         }).length;
 
-        // 서류: 미제출 상태 (submissions 테이블 없으면 0)
-        const submitRows = (submitRes.data as SubmissionLite[] | null) ?? [];
-        const pendingSubmissions = submitRows.filter((r) => {
-          const s = (r.status ?? '').toString();
-          return s === '미제출' || s === 'pending' || s === '요청';
-        }).length;
+        // 서류: 직원별 미제출 서류 합산
+        const staffRows = (staffRes.data || []) as Array<{ id: string; status: string | null }>;
+        const repoRows = (repoRes.data || []) as Array<{ created_by: string | null; category: string | null }>;
+
+        const activeStaff = staffRows.filter((s) => s.status === '재직');
+        let pendingSubmissions = 0;
+
+        for (const staff of activeStaff) {
+          const staffDocs = repoRows.filter((d) => String(d.created_by) === String(staff.id));
+          for (const doc of REQUIRED_DOCS_KPI) {
+            const hasDoc = staffDocs.some(
+              (d) => d.category === doc.id || d.category === doc.label
+            );
+            if (!hasDoc) {
+              pendingSubmissions += 1;
+            }
+          }
+        }
 
         setCounts({
           activeContracts,

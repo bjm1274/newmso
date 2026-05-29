@@ -99,35 +99,24 @@ export default function DepartmentConsumption({
 
     setIsProcessing(true);
     try {
-      // 재고 차감
-      const newQty = currentQty - consumeAmount;
-      const { error: updateErr } = await supabase
-        .from('inventory')
-        .update({ quantity: newQty, stock: newQty })
-        .eq('id', item.id);
-      if (updateErr) throw updateErr;
-
-      // 로그 기록
-      const logRow: Record<string, unknown> = {
-        item_id: item.id,
-        inventory_id: item.id,
-        type: '소모',
-        change_type: '사용',
-        quantity: consumeAmount,
-        prev_quantity: currentQty,
-        next_quantity: newQty,
-        actor_name: userDept ? `${user?.name} (${userDept})` : user?.name,
-        company: userCompany,
-        notes: consumeNote || `${getItemName(item)} ${consumeAmount}개 사용`,
-      };
-      await withMissingColumnsFallback(
-        (omitted) => {
-          const row = { ...logRow };
-          if (omitted.has('company_id')) delete row.company_id;
-          return supabase.from('inventory_logs').insert([row]);
-        },
-        ['company_id'],
-      );
+      // 서버사이드 트랜잭션 API 호출 (수량 차감 + 로그 기록 원자적 처리)
+      const res = await fetch('/api/inventory/stock-consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemId: item.id,
+          consumeAmount,
+          company: userCompany,
+          companyId: user?.company_id ?? null,
+          department: userDept,
+          notes: consumeNote || `${getItemName(item)} ${consumeAmount}개 사용`,
+        }),
+        credentials: 'same-origin',
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
 
       toast(`${getItemName(item)} ${consumeAmount}개 소모 기록 완료`, 'success');
       setConsumeModal(null);
