@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { ALL_EMOTICONS, getEmoticonDef, buildEmoticonSVG } from './emoticon-engine';
 
 const EMOTICONS_ENTRIES: EmojiEntry[] = ALL_EMOTICONS.map(e => ({
@@ -280,7 +281,14 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
 
   const stop = (event: MouseEvent) => event.stopPropagation();
 
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       ref={ref}
       onKeyDown={handleKey}
@@ -408,6 +416,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           <span>이모지를 선택하세요</span>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
