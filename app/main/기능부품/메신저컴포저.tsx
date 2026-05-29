@@ -18,6 +18,7 @@ import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
 import { isMobileChatViewport, NOTICE_ROOM_ID } from './메신저유틸';
 import type { AttachmentRetryQueueEntry } from './메신저첨부재시도큐';
+import EmojiPicker from './메신저액션서브/EmojiPicker';
 
 const QUICK_EMOJIS = ['👍', '😊', '😂', '❤️', '🔥', '✅', '👏', '🎉', '🙏', '😅', '💪', '😄'] as const;
 
@@ -102,6 +103,14 @@ function MessengerComposerImpl({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleEmojiButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPickerAnchor({ x: rect.left, y: rect.top - 8 });
+    setShowEmojiPicker((prev) => !prev);
+  };
 
   // 컴포저 내부에서 value를 관리. 부모 메신저.tsx가 직접 state로 들고 있던
   // 시절엔 모든 키 입력이 3,448줄짜리 부모 함수 전체를 리렌더시켜 입력 지연
@@ -446,7 +455,7 @@ function MessengerComposerImpl({
             <button
               type="button"
               data-testid="chat-emoji-button"
-              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              onClick={handleEmojiButtonClick}
               aria-label="이모지 삽입"
               aria-expanded={showEmojiPicker}
               title="이모지"
@@ -460,23 +469,12 @@ function MessengerComposerImpl({
               </svg>
             </button>
             {showEmojiPicker && (
-              <div
-                role="dialog"
-                aria-label="이모지 선택"
-                className="absolute bottom-full left-0 z-30 mb-1 grid grid-cols-6 gap-1.5 w-max rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-md"
-              >
-                {QUICK_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => handleInsertEmoji(emoji)}
-                    aria-label={`이모지 ${emoji} 삽입`}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-base hover:bg-[var(--muted)] transition-colors"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+              <EmojiPicker
+                x={pickerAnchor.x}
+                y={pickerAnchor.y}
+                onPick={handleInsertEmoji}
+                onClose={() => setShowEmojiPicker(false)}
+              />
             )}
           </div>
         </div>
