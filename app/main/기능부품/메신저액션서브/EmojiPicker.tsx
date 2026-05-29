@@ -195,6 +195,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryId>('emoticons');
+  const [subGroup, setSubGroup] = useState<'all' | 'office' | 'hospital' | 'developer'>('all');
   const [focusIdx, setFocusIdx] = useState(0);
 
   const pos = useMemo(() => {
@@ -225,8 +226,17 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
       return filtered;
     }
     const cat = CATEGORIES.find((c) => c.id === category);
-    return cat ? cat.list : FREQUENT;
-  }, [query, category]);
+    if (!cat) return FREQUENT;
+
+    if (category === 'emoticons' && subGroup !== 'all') {
+      return cat.list.filter((entry) => {
+        const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
+        const def = id ? getEmoticonDef(id) : null;
+        return def?.group === subGroup;
+      });
+    }
+    return cat.list;
+  }, [query, category, subGroup]);
 
   useEffect(() => {
     setFocusIdx(0);
@@ -321,13 +331,42 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 role="tab"
                 aria-selected={active}
                 aria-label={cat.label}
-                onClick={() => setCategory(cat.id)}
+                onClick={() => {
+                  setCategory(cat.id);
+                  if (cat.id !== 'emoticons') setSubGroup('all'); // Reset subGroup on other tabs
+                }}
                 className={`flex-1 h-7 rounded-md text-sm transition-colors ${
                   active ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
                 }`}
                 title={cat.label}
               >
                 {cat.icon}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {!query && category === 'emoticons' && (
+        <div className="flex gap-1 px-1 py-0.5 bg-[var(--muted)]/60 rounded-lg border border-[var(--border)] text-[10.5px] font-semibold text-[var(--toss-gray-3)] shrink-0 shadow-inner">
+          {[
+            { id: 'all', label: '전체' },
+            { id: 'office', label: '사무' },
+            { id: 'hospital', label: '의료' },
+            { id: 'developer', label: '개발' }
+          ].map((sub) => {
+            const active = subGroup === sub.id;
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => setSubGroup(sub.id as any)}
+                className={`flex-1 py-1 rounded-md text-center transition-all ${
+                  active 
+                    ? 'bg-[var(--card)] text-[var(--accent)] font-extrabold shadow-sm' 
+                    : 'hover:text-[var(--foreground)]'
+                }`}
+              >
+                {sub.label}
               </button>
             );
           })}

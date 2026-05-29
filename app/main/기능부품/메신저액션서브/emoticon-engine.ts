@@ -216,6 +216,19 @@ const EMBEDDED_ANIMATIONS_CSS = `
   .emo-pop { animation: emo-pop 1.2s ease-out infinite; transform-box: fill-box; transform-origin:center; }
   .emo-tick { animation: emo-tick 1s steps(2) infinite; }
   .emo-fly { animation: emo-fly 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin:center; }
+
+  .a-bounce  { animation: emo-bounce 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-jump    { animation: emo-jump 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-shake   { animation: emo-shake 1.0s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-wobble  { animation: emo-wobble 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-spin    { animation: emo-spin 2s linear infinite; transform-box: fill-box; transform-origin: center; }
+  .a-pulse   { animation: emo-pulse 1.3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .a-float   { animation: emo-float 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .a-nod     { animation: emo-nod 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-vibrate { animation: emo-vibrate 0.3s linear infinite; }
+  .a-tilt    { animation: emo-tilt 1.5s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-droop   { animation: emo-droop 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+  .a-swing   { animation: emo-swing 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
 `;
 
 function heart(cx: number, cy: number, s: number, fill: string) {
@@ -582,6 +595,9 @@ export function buildEmoticonSVG(def: EmoticonDef): string {
   // Inject the animation styles block inside a <defs> style tag
   parts.push(`<defs><style>${EMBEDDED_ANIMATIONS_CSS}</style></defs>`);
   
+  // Start the animated group for the core body
+  parts.push(`<g class="${def.anim}">`);
+
   // 목
   parts.push(`<path d="M44 56 Q44 66 50 70 Q56 66 56 56 Z" fill="${skin}" stroke="${ST}" stroke-width="2" stroke-linejoin="round"/>`);
   // 상반신 유니폼
@@ -601,6 +617,10 @@ export function buildEmoticonSVG(def: EmoticonDef): string {
   parts.push(mouth(f.mouth));
   // 앞 소품
   (def.front || []).forEach((p) => parts.push(prop(p)));
+
+  // End the animated group
+  parts.push(`</g>`);
+
   // 효과
   parts.push(fx(f.fx));
 
