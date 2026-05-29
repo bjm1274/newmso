@@ -30,6 +30,7 @@ export type SessionUser = Record<string, unknown> & {
   phone?: string | null;
   auth_user_id?: string | null;
   is_system_master?: boolean;
+  login_id?: string | null;
   permissions: Record<string, any>;
 };
 
@@ -174,6 +175,7 @@ export function normalizeSessionUser(input: any): SessionUser {
     phone: normalizedProfile?.phone ?? null,
     auth_user_id: normalizedProfile?.auth_user_id ?? null,
     is_system_master: normalizedProfile?.is_system_master === true,
+    login_id: normalizedProfile?.login_id ?? rest.login_id ?? null,
     permissions:
       normalizedProfile?.permissions &&
       typeof normalizedProfile.permissions === 'object' &&
