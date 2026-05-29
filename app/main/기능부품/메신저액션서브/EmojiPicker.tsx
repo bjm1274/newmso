@@ -195,7 +195,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryId>('emoticons');
-  const [subGroup, setSubGroup] = useState<'all' | 'office' | 'hospital' | 'developer'>('all');
+  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital'>('all');
   const [focusIdx, setFocusIdx] = useState(0);
 
   const pos = useMemo(() => {
@@ -232,7 +232,11 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
       return cat.list.filter((entry) => {
         const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
         const def = id ? getEmoticonDef(id) : null;
-        return def?.group === subGroup;
+        if (!def) return false;
+        if (subGroup === 'worker') {
+          return def.group === 'office' || def.group === 'developer';
+        }
+        return def.group === 'hospital';
       });
     }
     return cat.list;
@@ -350,9 +354,8 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
         <div className="flex gap-1 px-1 py-0.5 bg-[var(--muted)]/60 rounded-lg border border-[var(--border)] text-[10.5px] font-semibold text-[var(--toss-gray-3)] shrink-0 shadow-inner">
           {[
             { id: 'all', label: '전체' },
-            { id: 'office', label: '사무' },
-            { id: 'hospital', label: '의료' },
-            { id: 'developer', label: '개발' }
+            { id: 'worker', label: '직장인' },
+            { id: 'hospital', label: '병원' }
           ].map((sub) => {
             const active = subGroup === sub.id;
             return (
