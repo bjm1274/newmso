@@ -262,7 +262,7 @@ export async function POST(request: Request) {
     // 5. staff_members / leave_balances 갱신
     for (const update of updates) {
       const staff = staffMap.get(update.staffId)!;
-      const usedDays = computeUsedDays(leaveByStaff.get(update.staffId) || []);
+      const usedDays = update.used;
       const totalDays = update.total;
 
       const company = staff.company_id ? companyMap.get(staff.company_id) : undefined;
