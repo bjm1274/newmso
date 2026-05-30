@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -19,668 +19,32 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
+import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
-import {
-  calculateHourlyRateFromMonthlySalary,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
 import RiskActionDialog from '../RiskActionDialog';
-
-interface SettlementEntry {
-  base_salary: number;
-  meal_allowance: number;
-  night_duty_allowance: number;
-  vehicle_allowance: number;
-  childcare_allowance: number;
-  research_allowance: number;
-  other_taxfree: number;
-  extra_allowance: number;
-  overtime_pay: number;
-  bonus: number;
-  apply_tax: boolean;
-  apply_insurance: boolean;
-  attendance_deduction: number;
-  attendance_deduction_detail: Record<string, unknown>;
-  custom_deduction: number;
-  dependent_count: number;
-  child_count_8_20: number;
-  withholding_rate_percent: 80 | 100 | 120;
-  advance_pay: number;
-  salary_change_proration?: SalaryChangeProrationSummary[];
-  saved_status?: string;
-  taxable_allowance_breakdown: TaxableAllowanceBreakdown;
-}
-
-interface TaxableAllowanceBreakdown {
-  position_allowance: number;
-  overtime_allowance: number;
-  night_work_allowance: number;
-  holiday_work_allowance: number;
-  annual_leave_pay: number;
-  manual_extra_allowance: number;
-}
-
-interface SavedPayrollRecord {
-  staff_id: string;
-  year_month?: string | null;
-  base_salary?: number | null;
-  meal_allowance?: number | null;
-  night_duty_allowance?: number | null;
-  vehicle_allowance?: number | null;
-  childcare_allowance?: number | null;
-  research_allowance?: number | null;
-  other_taxfree?: number | null;
-  extra_allowance?: number | null;
-  overtime_pay?: number | null;
-  bonus?: number | null;
-  attendance_deduction?: number | null;
-  attendance_deduction_detail?: Record<string, unknown> | null;
-  deduction_detail?: Record<string, unknown> | null;
-  advance_pay?: number | null;
-  status?: string | null;
-  record_type?: string | null;
-}
-
-type SalaryAmountField =
-  | 'base_salary'
-  | 'meal_allowance'
-  | 'night_duty_allowance'
-  | 'vehicle_allowance'
-  | 'childcare_allowance'
-  | 'research_allowance'
-  | 'other_taxfree'
-  | keyof TaxableAllowanceBreakdown;
-
-type SalaryChangeHistoryRow = {
-  id?: string;
-  staff_id: string;
-  change_type: string;
-  before_value: number | null;
-  after_value: number | null;
-  effective_date: string;
-  reason?: string | null;
-  created_at?: string | null;
-};
-
-type SalaryChangeProrationSegment = {
-  period_start: string;
-  period_end: string;
-  days: number;
-  monthly_amount: number;
-  prorated_amount: number;
-};
-
-type SalaryChangeProrationSummary = {
-  field: SalaryAmountField;
-  label: string;
-  effective_dates: string[];
-  before_value: number;
-  after_value: number;
-  reason: string;
-  amount: number;
-  segments: SalaryChangeProrationSegment[];
-};
-
-const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
-  'meal_allowance',
-  'night_duty_allowance',
-  'vehicle_allowance',
-  'childcare_allowance',
-  'research_allowance',
-  'other_taxfree',
-] as const;
-
-const PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS = [
-  ...PAYROLL_RECORD_OPTIONAL_COLUMNS,
-  'attendance_deduction',
-  'attendance_deduction_detail',
-  'deduction_detail',
-  'advance_pay',
-  'status',
-  'record_type',
-] as const;
-
-const EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN: TaxableAllowanceBreakdown = {
-  position_allowance: 0,
-  overtime_allowance: 0,
-  night_work_allowance: 0,
-  holiday_work_allowance: 0,
-  annual_leave_pay: 0,
-  manual_extra_allowance: 0,
-};
-
-const PAYROLL_TIME_STEP_MINUTES = 10;
-const HOLD_TO_UNIT_INPUT_MS = 450;
-const PAYROLL_DAY_MS = 24 * 60 * 60 * 1000;
-
-const SALARY_CHANGE_FIELD_BY_TYPE: Record<string, SalaryAmountField> = {
-  base_salary: 'base_salary',
-  meal: 'meal_allowance',
-  meal_allowance: 'meal_allowance',
-  night_duty_allowance: 'night_duty_allowance',
-  vehicle: 'vehicle_allowance',
-  vehicle_allowance: 'vehicle_allowance',
-  childcare: 'childcare_allowance',
-  childcare_allowance: 'childcare_allowance',
-  research: 'research_allowance',
-  research_allowance: 'research_allowance',
-  other: 'other_taxfree',
-  other_taxfree: 'other_taxfree',
-  position_allowance: 'position_allowance',
-  overtime_allowance: 'overtime_allowance',
-  night_work_allowance: 'night_work_allowance',
-  holiday_work_allowance: 'holiday_work_allowance',
-  annual_leave_pay: 'annual_leave_pay',
-};
-
-const SALARY_CHANGE_FIELD_LABELS: Record<SalaryAmountField, string> = {
-  base_salary: '기본급',
-  meal_allowance: '식대',
-  night_duty_allowance: '야간/당직수당',
-  vehicle_allowance: '자가운전보조금',
-  childcare_allowance: '보육수당',
-  research_allowance: '연구활동비',
-  other_taxfree: '기타 비과세',
-  position_allowance: '직책수당',
-  overtime_allowance: '연장근로수당',
-  night_work_allowance: '야간근로수당',
-  holiday_work_allowance: '휴일근로수당',
-  annual_leave_pay: '연차휴가수당',
-  manual_extra_allowance: '기타 과세수당',
-};
-
-function parsePayrollWonInput(value: unknown) {
-  const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
-  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
-}
-
-function getRegularHourlyRate(staff: StaffMember, data: Partial<SettlementEntry>) {
-  const fixedMonthlyPay = [
-    data.base_salary,
-    data.extra_allowance,
-    data.meal_allowance,
-    data.night_duty_allowance,
-    data.vehicle_allowance,
-    data.childcare_allowance,
-    data.research_allowance,
-    data.other_taxfree,
-  ].reduce<number>((sum, value) => sum + parsePayrollWonInput(value), 0);
-
-  return calculateHourlyRateFromMonthlySalary(
-    fixedMonthlyPay,
-    resolveWeeklyWorkingHours(staff, 40),
-    'ceil',
-  );
-}
-
-function TenMinuteUnitAmountField({
-  label,
-  value,
-  hourlyRate,
-  onChange,
-  dataTestId,
-  labelClassName,
-  inputClassName,
-  allowManualAmountInput = false,
-}: {
-  label: string;
-  value: number;
-  hourlyRate: number;
-  onChange: (nextValue: number) => void;
-  dataTestId: string;
-  labelClassName: string;
-  inputClassName: string;
-  allowManualAmountInput?: boolean;
-}) {
-  const amount = parsePayrollWonInput(value);
-  const quickInputRef = useRef<HTMLInputElement>(null);
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openedByHoldRef = useRef(false);
-  const [unitInputOpen, setUnitInputOpen] = useState(false);
-  const [unitInputValue, setUnitInputValue] = useState('');
-  const stepAmount = Math.round(parsePayrollWonInput(hourlyRate) * (PAYROLL_TIME_STEP_MINUTES / 60));
-  const stepLabel = `${PAYROLL_TIME_STEP_MINUTES}분`;
-
-  const clearHoldTimer = () => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-  };
-  const getUnitCountText = () => {
-    if (amount <= 0 || stepAmount <= 0) return '';
-    return String(Math.round(amount / stepAmount));
-  };
-  const openUnitInput = () => {
-    openedByHoldRef.current = true;
-    setUnitInputValue(getUnitCountText());
-    setUnitInputOpen(true);
-    window.setTimeout(() => {
-      quickInputRef.current?.focus();
-      quickInputRef.current?.select();
-    }, 0);
-  };
-  const startHoldToUnitInput = () => {
-    clearHoldTimer();
-    openedByHoldRef.current = false;
-    holdTimerRef.current = setTimeout(openUnitInput, HOLD_TO_UNIT_INPUT_MS);
-  };
-  const applyStep = (direction: -1 | 1) => {
-    if (openedByHoldRef.current) {
-      openedByHoldRef.current = false;
-      return;
-    }
-    onChange(Math.max(0, amount + stepAmount * direction));
-  };
-  const handleAmountChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(parsePayrollWonInput(event.target.value));
-  };
-  const handleUnitInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setUnitInputValue(event.target.value.replace(/[^\d]/g, ''));
-  };
-  const applyUnitInput = () => {
-    const unitCount = parsePayrollWonInput(unitInputValue);
-    onChange(unitCount * stepAmount);
-    setUnitInputOpen(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    };
-  }, []);
-
-  return (
-    <div className="relative space-y-1">
-      <div className="flex items-center justify-between gap-2">
-        <label className={`text-[10px] font-bold ml-1 ${labelClassName}`}>{label}</label>
-        <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">
-          {stepLabel} 단위 1 = {stepAmount.toLocaleString()}원
-        </span>
-      </div>
-      <div className="flex h-8 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--card)]">
-        <button
-          type="button"
-          data-testid={`${dataTestId}-decrease`}
-          onPointerDown={startHoldToUnitInput}
-          onPointerUp={clearHoldTimer}
-          onPointerLeave={clearHoldTimer}
-          onPointerCancel={clearHoldTimer}
-          onClick={() => applyStep(-1)}
-          disabled={stepAmount <= 0 || amount <= 0}
-          className="w-9 shrink-0 border-r border-[var(--border)] text-sm font-black text-[var(--toss-gray-4)] disabled:opacity-40"
-          aria-label={`${label} ${stepLabel} 차감`}
-        >
-          -
-        </button>
-        <input
-          data-testid={dataTestId}
-          type="text"
-          inputMode="numeric"
-          value={amount.toLocaleString()}
-          readOnly={!allowManualAmountInput}
-          onChange={allowManualAmountInput ? handleAmountChange : undefined}
-          className={`min-w-0 flex-1 border-0 bg-transparent px-3 text-xs font-bold outline-none ${inputClassName}`}
-        />
-        <button
-          type="button"
-          data-testid={`${dataTestId}-increase`}
-          onPointerDown={startHoldToUnitInput}
-          onPointerUp={clearHoldTimer}
-          onPointerLeave={clearHoldTimer}
-          onPointerCancel={clearHoldTimer}
-          onClick={() => applyStep(1)}
-          disabled={stepAmount <= 0}
-          className="w-9 shrink-0 border-l border-[var(--border)] text-sm font-black text-[var(--accent)] disabled:opacity-40"
-          aria-label={`${label} ${stepLabel} 추가`}
-        >
-          +
-        </button>
-      </div>
-      {unitInputOpen && (
-        <div
-          data-testid={`${dataTestId}-quick-input-panel`}
-          className="absolute left-0 right-0 top-full z-30 mt-1 rounded-lg border border-[var(--border)] bg-[var(--card)] p-2 shadow-lg"
-        >
-          <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-4)]">
-            {label} {stepLabel} 단위 입력
-          </label>
-          <div className="flex gap-2">
-            <input
-              ref={quickInputRef}
-              data-testid={`${dataTestId}-quick-input`}
-              type="text"
-              inputMode="numeric"
-              value={unitInputValue}
-              onChange={handleUnitInputChange}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') applyUnitInput();
-                if (event.key === 'Escape') setUnitInputOpen(false);
-              }}
-              placeholder="개수"
-              className="min-w-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-            />
-            <button
-              type="button"
-              data-testid={`${dataTestId}-quick-apply`}
-              onClick={applyUnitInput}
-              className="rounded-md bg-[var(--accent)] px-3 py-2 text-xs font-bold text-white"
-            >
-              적용
-            </button>
-            <button
-              type="button"
-              data-testid={`${dataTestId}-quick-close`}
-              onClick={() => setUnitInputOpen(false)}
-              className="rounded-md border border-[var(--border)] px-3 py-2 text-xs font-bold text-[var(--toss-gray-4)]"
-            >
-              닫기
-            </button>
-          </div>
-          <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-            1 = {stepLabel} = {stepAmount.toLocaleString()}원
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function getTaxableAllowanceBreakdownTotal(value?: Partial<TaxableAllowanceBreakdown> | null) {
-  if (!value) return 0;
-  return (
-    Number(value.position_allowance || 0) +
-    Number(value.overtime_allowance || 0) +
-    Number(value.night_work_allowance || 0) +
-    Number(value.holiday_work_allowance || 0) +
-    Number(value.annual_leave_pay || 0) +
-    Number(value.manual_extra_allowance || 0)
-  );
-}
-
-function getStaffTaxableAllowanceBreakdown(staff: StaffMember): TaxableAllowanceBreakdown {
-  return {
-    position_allowance: Number(staff.position_allowance || 0),
-    overtime_allowance: Number(staff.overtime_allowance || 0),
-    night_work_allowance: Number(staff.night_work_allowance || 0),
-    holiday_work_allowance: Number(staff.holiday_work_allowance || 0),
-    annual_leave_pay: Number(staff.annual_leave_pay || 0),
-    manual_extra_allowance: 0,
-  };
-}
-
-function normalizeTaxableAllowanceBreakdown(value: unknown): TaxableAllowanceBreakdown {
-  const source = value && typeof value === 'object'
-    ? (value as Record<string, unknown>)
-    : {};
-  return {
-    position_allowance: Number(source.position_allowance || 0),
-    overtime_allowance: Number(source.overtime_allowance || 0),
-    night_work_allowance: Number(source.night_work_allowance || 0),
-    holiday_work_allowance: Number(source.holiday_work_allowance || 0),
-    annual_leave_pay: Number(source.annual_leave_pay || 0),
-    manual_extra_allowance: Number(source.manual_extra_allowance || 0),
-  };
-}
-
-function parsePayrollDate(value: unknown): Date | null {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-  }
-
-  const rawText = String(value ?? '').trim();
-  const text = rawText.slice(0, 10);
-  const compactText = rawText.replace(/[^0-9]/g, '');
-  const match =
-    /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/.exec(text) ||
-    (/^\d{8}$/.test(compactText) ? /^(\d{4})(\d{2})(\d{2})$/.exec(compactText) : null);
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-    return null;
-  }
-  return date;
-}
-
-function formatPayrollDateKey(date: Date | null) {
-  if (!date) return '';
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
-}
-
-function getPayrollMonthBounds(yearMonth: string) {
-  const match = /^(\d{4})-(\d{2})$/.exec(String(yearMonth || '').trim());
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const lastDay = new Date(year, month, 0).getDate();
-  return {
-    start: new Date(year, month - 1, 1),
-    end: new Date(year, month - 1, lastDay),
-    lastDay,
-  };
-}
-
-function shiftPayrollDate(date: Date, days: number) {
-  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function maxPayrollDate(a: Date, b: Date) {
-  return a.getTime() >= b.getTime() ? a : b;
-}
-
-function minPayrollDate(a: Date, b: Date) {
-  return a.getTime() <= b.getTime() ? a : b;
-}
-
-function getInclusivePayrollDays(start: Date, end: Date) {
-  return Math.floor((end.getTime() - start.getTime()) / PAYROLL_DAY_MS) + 1;
-}
-
-function getSalaryChangeField(changeType: unknown): SalaryAmountField | null {
-  return SALARY_CHANGE_FIELD_BY_TYPE[String(changeType || '').trim()] || null;
-}
-
-function normalizeNonNegativePayrollAmount(value: unknown) {
-  const amount = Number(value);
-  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
-}
-
-function getSalaryChangesForField(
-  changes: SalaryChangeHistoryRow[] | undefined,
-  field: SalaryAmountField,
-  yearMonth: string,
-) {
-  const bounds = getPayrollMonthBounds(yearMonth);
-  if (!bounds) return [];
-
-  return (changes || [])
-    .map((change) => ({
-      change,
-      field: getSalaryChangeField(change.change_type),
-      effectiveDate: parsePayrollDate(change.effective_date),
-    }))
-    .filter(
-      (entry): entry is {
-        change: SalaryChangeHistoryRow;
-        field: SalaryAmountField;
-        effectiveDate: Date;
-      } => {
-        if (entry.field !== field || !entry.effectiveDate) return false;
-        return (
-          entry.effectiveDate.getTime() >= bounds.start.getTime() &&
-          entry.effectiveDate.getTime() <= bounds.end.getTime()
-        );
-      },
-    )
-    .sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime());
-}
-
-function calculateSalaryAmountWithChanges({
-  fallback,
-  field,
-  yearMonth,
-  salaryChanges,
-}: {
-  fallback: unknown;
-  field: SalaryAmountField;
-  yearMonth: string;
-  salaryChanges?: SalaryChangeHistoryRow[];
-}) {
-  const bounds = getPayrollMonthBounds(yearMonth);
-  const defaultAmount = Math.round(normalizeNonNegativePayrollAmount(fallback));
-  if (!bounds) return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
-
-  const orderedChanges = getSalaryChangesForField(salaryChanges, field, yearMonth);
-  if (orderedChanges.length === 0) {
-    return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
-  }
-
-  let rawTotal = 0;
-  const segments: SalaryChangeProrationSegment[] = [];
-  const addSegment = (start: Date, end: Date, monthlyAmount: unknown) => {
-    const periodStart = maxPayrollDate(start, bounds.start);
-    const periodEnd = minPayrollDate(end, bounds.end);
-    if (periodStart.getTime() > periodEnd.getTime()) return;
-
-    const days = getInclusivePayrollDays(periodStart, periodEnd);
-    const normalizedMonthlyAmount = Math.round(normalizeNonNegativePayrollAmount(monthlyAmount));
-    const rawProratedAmount = (normalizedMonthlyAmount * days) / bounds.lastDay;
-    const proratedAmount = Math.floor(rawProratedAmount);
-    rawTotal += rawProratedAmount;
-    segments.push({
-      period_start: formatPayrollDateKey(periodStart),
-      period_end: formatPayrollDateKey(periodEnd),
-      days,
-      monthly_amount: normalizedMonthlyAmount,
-      prorated_amount: proratedAmount,
-    });
-  };
-
-  const firstChange = orderedChanges[0];
-  addSegment(bounds.start, shiftPayrollDate(firstChange.effectiveDate, -1), firstChange.change.before_value ?? fallback);
-  orderedChanges.forEach((entry, index) => {
-    const nextChange = orderedChanges[index + 1];
-    addSegment(
-      entry.effectiveDate,
-      nextChange ? shiftPayrollDate(nextChange.effectiveDate, -1) : bounds.end,
-      entry.change.after_value ?? fallback,
-    );
-  });
-
-  if (segments.length === 0) {
-    return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
-  }
-
-  const amount = Math.floor(rawTotal);
-  const reason = orderedChanges
-    .map(({ change }) => String(change.reason || '').trim())
-    .filter(Boolean)
-    .join(' / ');
-
-  return {
-    amount,
-    summary: {
-      field,
-      label: SALARY_CHANGE_FIELD_LABELS[field] || String(field),
-      effective_dates: [...new Set(orderedChanges.map(({ change }) => String(change.effective_date).slice(0, 10)))],
-      before_value: Math.round(normalizeNonNegativePayrollAmount(firstChange.change.before_value ?? fallback)),
-      after_value: Math.round(
-        normalizeNonNegativePayrollAmount(orderedChanges[orderedChanges.length - 1].change.after_value ?? fallback),
-      ),
-      reason: reason || '사유 미입력',
-      amount,
-      segments,
-    },
-  };
-}
-
-function resolveSavedOrCalculatedAmount({
-  savedValue,
-  fallback,
-  calculation,
-}: {
-  savedValue: unknown;
-  fallback: unknown;
-  calculation: ReturnType<typeof calculateSalaryAmountWithChanges>;
-}) {
-  if (savedValue !== null && savedValue !== undefined) {
-    const normalizedSavedValue = Math.round(normalizeNonNegativePayrollAmount(savedValue));
-    const refreshCandidates = [
-      normalizeNonNegativePayrollAmount(fallback),
-      calculation.summary?.before_value,
-      calculation.summary?.after_value,
-    ]
-      .filter((value): value is number => typeof value === 'number')
-      .map((value) => Math.round(value));
-
-    if (
-      normalizedSavedValue !== Math.round(calculation.amount) &&
-      refreshCandidates.some((value) => normalizedSavedValue === value)
-    ) {
-      return calculation.amount;
-    }
-    return Number(savedValue) || 0;
-  }
-
-  return calculation.amount;
-}
-
-function resolveSalaryAmountForSettlement({
-  savedValue,
-  fallback,
-  field,
-  yearMonth,
-  salaryChanges,
-}: {
-  savedValue: unknown;
-  fallback: unknown;
-  field: SalaryAmountField;
-  yearMonth: string;
-  salaryChanges?: SalaryChangeHistoryRow[];
-}) {
-  const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges });
-  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation });
-  return {
-    amount,
-    summary: calculation.summary ? { ...calculation.summary, amount } : null,
-  };
-}
-
-async function fetchSalaryChangeHistoryForMonth(yearMonth: string, staffIds: string[]) {
-  const bounds = getPayrollMonthBounds(yearMonth);
-  if (!bounds || staffIds.length === 0) return {};
-
-  const { data, error } = await supabase
-    .from('salary_change_history')
-    .select('id, staff_id, change_type, before_value, after_value, effective_date, reason, created_at')
-    .in('staff_id', staffIds)
-    .gte('effective_date', formatPayrollDateKey(bounds.start))
-    .lte('effective_date', formatPayrollDateKey(bounds.end))
-    .order('effective_date', { ascending: true });
-
-  if (error) throw error;
-
-  return ((data || []) as SalaryChangeHistoryRow[]).reduce<Record<string, SalaryChangeHistoryRow[]>>(
-    (acc, row) => {
-      const staffId = String(row.staff_id);
-      if (!acc[staffId]) acc[staffId] = [];
-      acc[staffId].push(row);
-      return acc;
-    },
-    {},
-  );
-}
+import type {
+  SettlementEntry,
+  TaxableAllowanceBreakdown,
+  SalaryAmountField,
+  SalaryChangeHistoryRow,
+  SalaryChangeProrationSummary,
+  SavedPayrollRecord,
+} from './급여정산-types';
+import {
+  PAYROLL_RECORD_OPTIONAL_COLUMNS,
+  PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS,
+  EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN,
+  getRegularHourlyRate,
+  getTaxableAllowanceBreakdownTotal,
+  getStaffTaxableAllowanceBreakdown,
+  normalizeTaxableAllowanceBreakdown,
+  resolveSalaryAmountForSettlement,
+  fetchSalaryChangeHistoryForMonth,
+} from './급여정산-utils';
+import { Step1TargetSelection } from './급여정산-Step1TargetSelection';
+import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
+import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
+import { Step3Complete } from './급여정산-Step3Complete';
 
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
@@ -1295,19 +659,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         };
       });
 
-      const { error: payrollSaveError } = await withMissingColumnsFallback(
-        (omittedColumns) => {
-          const normalizedRecords = records.map((record) => {
-            const nextRecord = { ...record } as Record<string, unknown>;
-            omittedColumns.forEach((columnName) => {
-              delete nextRecord[columnName];
-            });
-            return nextRecord;
-          });
-          return supabase.from('payroll_records').upsert(normalizedRecords, { onConflict: 'staff_id,year_month' });
-        },
-        [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
-      );
+      const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
+        records: records as Record<string, unknown>[],
+        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+      });
       if (payrollSaveError) throw payrollSaveError;
 
       setSavedRecordsByStaff((prev) => ({
@@ -1400,19 +755,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         };
       });
 
-      const { error: payrollSaveError } = await withMissingColumnsFallback(
-        (omittedColumns) => {
-          const normalizedRecords = records.map((record) => {
-            const nextRecord = { ...record } as Record<string, unknown>;
-            omittedColumns.forEach((columnName) => {
-              delete nextRecord[columnName];
-            });
-            return nextRecord;
-          });
-          return supabase.from('payroll_records').upsert(normalizedRecords, { onConflict: 'staff_id,year_month' });
-        },
-        [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
-      );
+      const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
+        records: records as Record<string, unknown>[],
+        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+      });
       if (payrollSaveError) throw payrollSaveError;
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
@@ -1583,53 +929,18 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
       <div className="p-4">
         {step === 1 && (
-          <div className="space-y-5">
-            {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
-              <div data-testid="salary-settlement-missing-tax-warning" className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-4 py-3">
-                <p className="text-sm font-bold text-amber-800">주의: 근로소득세 간이세액표가 설정되지 않았습니다.</p>
-                <p className="mt-1 text-xs font-medium text-amber-700">
-                  보험요율은 반영되지만, 소득세는 운영 확정에 사용할 수 없습니다. 정확한 세액표를 먼저 입력해야 합니다.
-                </p>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-[var(--toss-gray-4)]">정산 월</label>
-                <input data-testid="salary-settlement-month-input" type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium" />
-              </div>
-              <p className="text-sm text-[var(--toss-gray-3)]">정산 대상을 선택하세요. (근태 자동 반영)</p>
-              <button data-testid="salary-settlement-select-all" onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--accent)] hover:underline">전체 선택</button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
-              {filteredStaffs.map((s: StaffMember) => (
-                <div
-                  key={s.id}
-                  data-testid={`salary-settlement-staff-${s.id}`}
-                  onClick={() => toggleStaff(s)}
-                  className={`p-4 rounded-[var(--radius-md)] border cursor-pointer transition-colors flex items-center gap-3 ${selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
-                    }`}
-                >
-                  <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--accent)]">{s.name[0]}</div>
-                  <div>
-                    <p className="text-sm font-medium text-[var(--foreground)]">{s.name}</p>
-                    {savedRecordsByStaff[String(s.id)]?.status && (
-                      <span
-                        className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          savedRecordsByStaff[String(s.id)]?.status === '확정'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {savedRecordsByStaff[String(s.id)]?.status}
-                      </span>
-                    )}
-                    <p className="text-xs text-[var(--toss-gray-3)]">기본급 ₩{(s.base_salary || 0).toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button data-testid="salary-settlement-next-button" onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
-          </div>
+          <Step1TargetSelection
+            hasExactTaxTable={hasExactIncomeTaxBracket(taxInsuranceRates)}
+            yearMonth={yearMonth}
+            onYearMonthChange={setYearMonth}
+            filteredStaffs={filteredStaffs}
+            selectedStaffs={selectedStaffs}
+            savedRecordsByStaff={savedRecordsByStaff}
+            onSelectAll={() => setSelectedStaffs(filteredStaffs)}
+            onToggleStaff={toggleStaff}
+            onNext={handleNextStep}
+            loading={loading}
+          />
         )}
 
         {step === 2 && (
@@ -1646,225 +957,22 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
               {selectedStaffs.map((s: StaffMember) => {
                 const staffId = String(s.id);
                 const data = settlementData[staffId] || buildSettlementEntry(s, 0, {});
-                const advancePay = Number(data?.advance_pay) || 0;
-                const hasAdvanceDeduction = advancePay > 0;
                 const res = calculateSalary(staffId);
-                const deductionTotal = Math.round(Number(res?.deduction || 0));
-                const deductionDetail = (res?.deductionDetail || {}) as Record<string, unknown>;
-                const deductionBreakdownItems = [
-                  { label: '국민연금', value: Number(deductionDetail.national_pension || 0) },
-                  { label: '건강보험', value: Number(deductionDetail.health_insurance || 0) },
-                  { label: '장기요양', value: Number(deductionDetail.long_term_care || 0) },
-                  { label: '고용보험', value: Number(deductionDetail.employment_insurance || 0) },
-                  { label: '소득세', value: Number(deductionDetail.income_tax || 0) },
-                  { label: '지방소득세', value: Number(deductionDetail.local_tax || 0) },
-                  { label: '기타 공제', value: Number(deductionDetail.custom_deduction || 0) },
-                ].filter((item) => item.value > 0);
-                const expectedNet = getAdvanceAdjustedNet(Number(res?.net || 0), advancePay);
                 const hourlyRate = getRegularHourlyRate(s, data);
                 return (
-                  <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-4 hover:border-[var(--accent)] transition-all">
-                    <div className="flex flex-col gap-3 border-b border-[var(--muted)] pb-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">{s.name[0]}</div>
-                        <div>
-                          <p className="text-sm font-bold text-[var(--foreground)] leading-none">{s.name}</p>
-                          {data.saved_status && (
-                            <span
-                              className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                data.saved_status === '확정'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}
-                            >
-                              {data.saved_status}
-                            </span>
-                          )}
-                          <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{s.company} · {s.department}</p>
-                        </div>
-                        {hasAdvanceDeduction && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급 차감</span>}
-                      </div>
-                      <div className="grid w-full grid-cols-2 gap-5 text-right sm:w-auto">
-                        <div>
-                          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">공제 합계</p>
-                          <p data-testid={`salary-settlement-total-deduction-${s.id}`} className="text-base font-black text-red-600">₩ {deductionTotal.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
-                          <p data-testid={`salary-settlement-expected-net-${s.id}`} className="text-lg font-black text-[var(--accent)]">₩ {expectedNet.toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(data.salary_change_proration || []).length > 0 && (
-                      <div className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800">
-                        <span>급여 변동 일할 계산: </span>
-                        {(data.salary_change_proration || [])
-                          .slice(0, 3)
-                          .map((item) => `${item.label} ${item.effective_dates.join(', ')} · ₩${item.amount.toLocaleString()}`)
-                          .join(' / ')}
-                        {(data.salary_change_proration || []).length > 3
-                          ? ` 외 ${(data.salary_change_proration || []).length - 3}건`
-                          : ''}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">과세·기본급</label>
-                        <input type="text" value={Number(data.base_salary).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--muted)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[var(--accent)] ml-1">수당 합계(고정포함)</label>
-                        <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20 outline-none" />
-                      </div>
-                      <TenMinuteUnitAmountField
-                        label="야간/당직 (비과세)"
-                        value={Number(data.night_duty_allowance) || 0}
-                        hourlyRate={hourlyRate}
-                        onChange={(nextValue) => updateData(s.id, 'night_duty_allowance', nextValue)}
-                        dataTestId={`salary-settlement-night-duty-${s.id}`}
-                        labelClassName="text-[var(--toss-gray-4)]"
-                        inputClassName="text-[var(--foreground)]"
-                      />
-                      <TenMinuteUnitAmountField
-                        label="연장/상여"
-                        value={Number(data.overtime_pay) + Number(data.bonus)}
-                        hourlyRate={hourlyRate}
-                        onChange={(nextValue) => updateData(s.id, 'overtime_pay', nextValue)}
-                        dataTestId={`salary-settlement-overtime-total-${s.id}`}
-                        labelClassName="text-[var(--toss-gray-4)]"
-                        inputClassName="text-[var(--foreground)]"
-                        allowManualAmountInput
-                      />
-                      <TenMinuteUnitAmountField
-                        label="근태/기타차감"
-                        value={Number(data.attendance_deduction) || 0}
-                        hourlyRate={hourlyRate}
-                        onChange={(nextValue) => updateData(s.id, 'attendance_deduction', nextValue)}
-                        dataTestId={`salary-settlement-attendance-deduction-${s.id}`}
-                        labelClassName="text-orange-600"
-                        inputClassName="text-orange-700"
-                      />
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
-                        <input data-testid={`salary-settlement-advance-pay-${s.id}`} type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-emerald-700 ml-1">부양가족/인적공제</label>
-                        <input
-                          data-testid={`salary-settlement-dependent-count-${s.id}`}
-                          type="number"
-                          min={0}
-                          max={10}
-                          value={Number(data.dependent_count) || 0}
-                          onChange={(e) => updateData(s.id, 'dependent_count', Math.max(0, parseInt(e.target.value, 10) || 0))}
-                          className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-emerald-700 ml-1">8~20세 자녀수</label>
-                        <input
-                          data-testid={`salary-settlement-child-count-${s.id}`}
-                          type="number"
-                          min={0}
-                          max={Number(data.dependent_count) || 0}
-                          value={Number(data.child_count_8_20) || 0}
-                          onChange={(e) => updateData(s.id, 'child_count_8_20', e.target.value)}
-                          className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-sky-700 ml-1">원천징수 비율</label>
-                        <select
-                          data-testid={`salary-settlement-withholding-rate-${s.id}`}
-                          value={Number(data.withholding_rate_percent) || 80}
-                          onChange={(e) => updateData(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 80)}
-                          className="w-full h-8 px-3 border border-sky-200 bg-sky-50/30 rounded-lg text-xs font-bold text-sky-700 outline-none"
-                        >
-                          <option value={80}>80%</option>
-                          <option value={100}>100%</option>
-                          <option value={120}>120%</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-orange-600 ml-1">기타 추가차감</label>
-                        <input
-                          data-testid={`salary-settlement-custom-deduction-${s.id}`}
-                          type="text"
-                          value={Number(data.custom_deduction).toLocaleString()}
-                          onChange={(e) => updateData(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)}
-                          className="w-full h-8 px-3 border border-orange-500/20 bg-orange-500/10/30 rounded-lg text-xs font-bold text-orange-700 outline-none"
-                        />
-                      </div>
-                      <div className="col-span-2 flex items-center justify-between bg-[var(--muted)] px-4 py-2 rounded-xl mt-1">
-                        <div className="flex flex-wrap gap-x-4 gap-y-1">
-                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">과세: ₩{res.taxable.toLocaleString()}</span>
-                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">비과세: ₩{res.taxfree.toLocaleString()}</span>
-                          <span className="text-[10px] font-bold text-red-600 uppercase">공제합계: ₩{deductionTotal.toLocaleString()}</span>
-                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">자동 근태차감: ₩{Number(data.attendance_deduction || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          {data.attendance_deduction > 0 && (
-                            <button onClick={() => updateData(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-[var(--card)] px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="col-span-2 lg:col-span-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-2">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                          <span className="text-[10px] font-black text-red-700 uppercase">공제 내역</span>
-                          {deductionBreakdownItems.length > 0 ? (
-                            deductionBreakdownItems.map((item) => (
-                              <span key={item.label} className="text-[10px] font-bold text-red-700">
-                                {item.label} ₩{item.value.toLocaleString()}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] font-bold text-red-700">공제 없음</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <SettlementStaffCard
+                    key={s.id}
+                    staff={s}
+                    data={data}
+                    res={res}
+                    hourlyRate={hourlyRate}
+                    getAdvanceAdjustedNet={getAdvanceAdjustedNet}
+                    onUpdate={updateData}
+                  />
                 );
               })}
             </div>
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">검산 리포트</p>
-                  <p className="text-xs text-[var(--toss-gray-3)]">
-                    오류 {verificationReport.errorCount}건 · 경고 {verificationReport.warningCount}건 · 참고 {verificationReport.infoCount}건
-                  </p>
-                </div>
-                <div className="text-right text-xs text-[var(--toss-gray-3)]">
-                  <p>실지급 합계 ₩{verificationReport.netTotal.toLocaleString()}</p>
-                  <p>총 공제 ₩{verificationReport.deductionTotal.toLocaleString()}</p>
-                </div>
-              </div>
-              {verificationReport.issues.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {verificationReport.issues.slice(0, 6).map((issue, index) => (
-                    <div
-                      key={`${issue.code}-${issue.staffId || 'common'}-${index}`}
-                      className={`rounded-lg px-3 py-2 text-xs ${
-                        issue.level === 'error'
-                          ? 'border border-rose-200 bg-rose-50 text-rose-700'
-                          : issue.level === 'warning'
-                            ? 'border border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border border-sky-200 bg-sky-50 text-sky-700'
-                      }`}
-                    >
-                      {issue.message}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                  검산 결과 치명적인 오류 없이 정산을 진행할 수 있습니다.
-                </p>
-              )}
-            </div>
+            <VerificationReportPanel report={verificationReport} />
             <div className="flex gap-3 pt-2">
               <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--card)] border border-[var(--border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[var(--radius-md)] hover:bg-[var(--muted)]">이전</button>
               <button
@@ -1882,14 +990,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           </div>
         )}
 
-        {step === 3 && (
-          <div data-testid="salary-settlement-complete-step" className="py-10 text-center space-y-5 animate-in fade-in duration-300">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto">✓</div>
-            <h3 className="text-xl font-bold text-[var(--foreground)]">정산이 완료되었습니다</h3>
-            <p className="text-sm text-[var(--toss-gray-3)]">명세서가 생성되었습니다. 대장에서 확인하세요.</p>
-            <button onClick={() => setStep(1)} className="px-4 py-2.5 bg-[var(--accent)] text-white text-sm font-medium rounded-[var(--radius-md)] hover:opacity-90">다시 정산하기</button>
-          </div>
-        )}
+        {step === 3 && <Step3Complete onRestart={() => setStep(1)} />}
       </div>
 
       <RiskActionDialog

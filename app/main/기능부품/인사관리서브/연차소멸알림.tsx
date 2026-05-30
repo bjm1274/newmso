@@ -53,12 +53,14 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
         const now = new Date();
         const result: LeaveInfo[] = filteredStaffs.map((staff: any) => {
           const balance = (leaveBalances || []).find((row: any) => String(row.staff_id) === String(staff.id));
-          const remaining = Number(balance?.remaining_days ?? balance?.balance ?? 0);
+          // leave_balances 정본 컬럼은 remaining_days (balance 컬럼 없음)
+          const remaining = Number(balance?.remaining_days ?? 0);
           const expiryDate = balance?.expiry_date
             ? new Date(balance.expiry_date)
             : new Date(now.getFullYear(), 11, 31);
           const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 3600 * 1000));
-          const dailyWage = Number(staff.base_salary || staff.base || 2_000_000) / 30;
+          // staff_members 정본 컬럼은 base_salary (base 컬럼 없음)
+          const dailyWage = Number(staff.base_salary || 2_000_000) / 30;
 
           return {
             staff,

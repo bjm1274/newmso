@@ -115,6 +115,7 @@ export default function PurchaseOrderModal({
 
         const { error } = await supabase.from('purchase_orders').insert([
           {
+            supplier_id: group.supplierId ?? null,
             supplier_name: group.supplierName,
             items,
             status: '대기',

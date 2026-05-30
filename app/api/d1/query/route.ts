@@ -135,10 +135,13 @@ function buildWhereSql(where: Payload['where']): SQL[] {
       if (value === null) out.push(sql`${col} IS NOT NULL`);
       else out.push(sql`${col} IS NOT ${value}`);
     } else if (cond.op === 'like') {
-      out.push(sql`${col} LIKE ${value}`);
+      // ESCAPE '\' 선언 — 클라이언트가 사용자 입력의 %/_/\ 를 백슬래시로
+      // 이스케이프(\%, \_, \\)해 보내면 리터럴로 매칭된다. 기존 패턴(이스케이프
+      // 없는 %...%)은 동작 불변(무회귀).
+      out.push(sql`${col} LIKE ${value} ESCAPE '\\'`);
     } else if (cond.op === 'ilike') {
       // SQLite는 LIKE 기본 case-insensitive
-      out.push(sql`${col} LIKE ${value}`);
+      out.push(sql`${col} LIKE ${value} ESCAPE '\\'`);
     } else if (cond.op === 'in') {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) {
@@ -174,8 +177,8 @@ function buildFilterNodeSql(node: FilterNode): SQL {
       if (value === null) return sql`(${col} IS NOT NULL)`;
       return sql`(${col} IS NOT ${value})`;
     }
-    if (op === 'like') return sql`(${col} LIKE ${value})`;
-    if (op === 'ilike') return sql`(${col} LIKE ${value})`; // SQLite LIKE는 기본 CI
+    if (op === 'like') return sql`(${col} LIKE ${value} ESCAPE '\\')`;
+    if (op === 'ilike') return sql`(${col} LIKE ${value} ESCAPE '\\')`; // SQLite LIKE는 기본 CI
     if (op === 'in') {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) return sql`(1 = 0)`;

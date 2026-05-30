@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * 인사관리 (HR) 메인 뷰 — B(4그룹) 7워크센터 구조
+ * 인사관리 (HR) 메인 뷰 — B(4그룹) 6워크센터 구조
  *
  * - 사이드바: 4그룹 (인력 / 근태·휴가 / 보상 / 복지·문서)
- * - 7개 영문 워크센터 id: member · attend · leave · abnormal · payroll · welfare · docs
+ * - 6개 영문 워크센터 id: member · attend · leave · payroll · welfare · docs
+ *   (근태이상 감지(abnormal)는 근태(attend) 내부 탭으로 통합)
  * - 급여(payroll)만 primary ★ 표시
  * - 본문은 HrWorkcenterRouter 로 일원화 (옛 한글 본문 분기 제거)
  *
@@ -12,7 +13,7 @@
  *
  * JM: 파일당 단일 책임 — 사이드바 + 워크센터 라우팅
  * JM3: 옛 localStorage(HR_TAB_KEY) 한글 값은 REMOVED_MENU_FALLBACKS 로 흡수
- * JM4: HrMenuId = WorkcenterId union (영문 7개)
+ * JM4: HrMenuId = WorkcenterId union (영문 6개)
  */
 
 import { useEffect, useMemo, useState } from 'react';

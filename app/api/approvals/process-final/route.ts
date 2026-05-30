@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import { normalizeApprovalLineIds as normalizeApprovalLineIdsShared } from '@/lib/approval-shared';
 import {
   approvals as approvalsTable,
   eq,
@@ -8,23 +9,12 @@ import {
   getD1Drizzle,
 } from '@/lib/db';
 
+// 공용 정규화(lib/approval-shared)로 통일하되, 이 라우트는 권한 검증에서
+// trim된 sessionUserId와 비교하므로 기존 trim 동작을 보존하기 위해 출력만 trim/재dedup한다.
+// (공용 함수 자체는 trim 없음 — server-approval-transition 등 다른 호출부 동작 불변)
 function normalizeApprovalLineIds(line: unknown): string[] {
-  if (!Array.isArray(line)) return [];
-  return Array.from(
-    new Set(
-      line
-        .map((entry) => {
-          if (entry == null) return null;
-          if (typeof entry === 'string' || typeof entry === 'number') return String(entry).trim();
-          if (typeof entry === 'object' && 'id' in (entry as Record<string, unknown>)) {
-            const value = (entry as Record<string, unknown>).id;
-            return value != null ? String(value).trim() : null;
-          }
-          return null;
-        })
-        .filter(Boolean) as string[]
-    )
-  );
+  const ids = normalizeApprovalLineIdsShared(line).map((id) => id.trim()).filter(Boolean);
+  return Array.from(new Set(ids));
 }
 
 function normalizeApprovalCcUserIds(ccUsers: unknown): string[] {

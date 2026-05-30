@@ -49,24 +49,35 @@ export function IORecordForm({
     const qty = Number(v.qty);
     if (!Number.isFinite(qty) || qty <= 0) { toast('수량은 1 이상이어야 합니다.', 'error'); return; }
 
-    // StockMutateUser에 id/company 없으므로 unknown 경유로 안전하게 읽기
+    // StockMutateUser에 id/company/name 없으므로 unknown 경유로 안전하게 읽기
     const u = user as unknown as Record<string, unknown>;
+    const actorName =
+      typeof u?.name === 'string'
+        ? u.name
+        : typeof u?.staff_name === 'string'
+          ? (u.staff_name as string)
+          : null;
+    const reason = v.reason.trim();
 
     setSaving(true);
     try {
+      // 정본 입출고 이력 테이블은 inventory_logs.
+      // (inventory_transactions 테이블/transaction_type·staff_id·reason 컬럼은 정본에 없음)
+      // 자유입력 품목명은 inventory_id 연결이 없으므로 notes에 품목명/사유를 기록한다.
       const payload: Record<string, unknown> = {
-        item_name: item,
-        transaction_type: v.kind === '입고' ? 'in' : 'out',
+        type: v.kind,
+        change_type: v.kind,
         quantity: qty,
-        reason: v.reason.trim() || null,
-        staff_id: typeof u?.id === 'string' ? u.id : null,
+        actor_name: actorName,
+        actor_id: typeof u?.id === 'string' ? u.id : null,
         company: typeof u?.company === 'string' ? u.company : null,
+        notes: reason ? `${item} / ${reason}` : item,
         created_at: new Date().toISOString(),
       };
 
       const { queued, error } = await enqueueSupabaseMutation({
         kind: 'insert',
-        table: 'inventory_transactions',
+        table: 'inventory_logs',
         payload,
         retryable: true,
       });

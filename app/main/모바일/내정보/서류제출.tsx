@@ -8,7 +8,7 @@
  *  - 발급 사유 입력 (선택)
  *  - "사진 촬영" (capture=environment) / "파일 선택" 업로드
  *    → 즉시 enqueueUpload (planRequester: 'submission')
- *    → onSuccessAction: document_submissions insert
+ *    → onSuccessAction: document_repository insert
  *  - 제출 이력: SubmissionHistory 컴포넌트에 위임
  *  - 오프라인 큐 시 "오프라인 — 제출 대기 중" 토스트 + 폼 reset
  *
@@ -24,51 +24,26 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { enqueueUpload } from '@/lib/offline-upload-queue';
+import {
+  DOC_ALLOWED_FORMATS_LABEL,
+  DOC_MAX_FILE_SIZE_LABEL,
+  MOBILE_SUBMISSION_TYPES,
+  type MobileSubmissionType,
+  mapRepositoryRowToSubmission,
+  validateDocUpload,
+} from '@/lib/document-submission-shared';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import SubmissionHistory, { type SubmissionRow } from './서류제출이력';
 
 // ─────────────────────────────────────────────────────────────
-// 상수
+// 상수 — 검증 정책/유형은 공통 모듈(document-submission-shared)에서 공유
 // ─────────────────────────────────────────────────────────────
 
-const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
-const ALLOWED_MIMES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-  'image/heif',
-  'image/gif',
-  'application/pdf',
-]);
+const SUBMISSION_TYPES = MOBILE_SUBMISSION_TYPES;
 
-const SUBMISSION_TYPES = [
-  '재직증명서',
-  '경력증명서',
-  '근로계약서',
-  '급여명세서',
-  '재직확인서',
-  '기타',
-] as const;
-
-type SubmissionType = (typeof SUBMISSION_TYPES)[number];
+type SubmissionType = MobileSubmissionType;
 type UploadMode = 'camera' | 'file';
-
-// ─────────────────────────────────────────────────────────────
-// 헬퍼
-// ─────────────────────────────────────────────────────────────
-
-function normalizeMime(raw: string): string {
-  if (raw === 'image/jpg' || raw === 'image/pjpeg') return 'image/jpeg';
-  if (raw === 'image/x-png') return 'image/png';
-  return raw || 'application/octet-stream';
-}
-
-function mimeErrorMsg(mime: string): string {
-  if (!mime) return '파일 형식을 확인할 수 없습니다. JPEG·PNG·PDF 파일을 사용하세요.';
-  return `허용되지 않는 파일 형식입니다 (${mime}). JPEG·PNG·WEBP·HEIC·PDF만 가능합니다.`;
-}
 
 // ─────────────────────────────────────────────────────────────
 // 컴포넌트
@@ -105,15 +80,10 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
         .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      const historyRows: SubmissionRow[] = ((data ?? []) as any[]).map((r) => ({
-        id: r.id,
-        submission_type: r.category ?? '서류',
-        reason: null,
-        file_url: r.file_url,
-        status: '발급완료',
-        submitted_at: r.created_at,
-        processed_at: r.created_at,
-      }));
+      type RepoRow = { id: string; category: string | null; file_url: string | null; created_at: string | null };
+      // 공통 매핑: document_repository 단순 업로드 행은 status '제출'로 정규화
+      // (이전엔 '발급완료'로 강제 표기 — 실제 의미와 불일치하던 정합 문제 정정).
+      const historyRows: SubmissionRow[] = ((data ?? []) as RepoRow[]).map(mapRepositoryRowToSubmission);
       setHistory(historyRows);
     } catch (err) {
       console.error('[SDocs] history fetch failed', err);
@@ -151,22 +121,14 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
         clearInput();
         return;
       }
-      // 파일 크기 검증 (JM3)
-      if (file.size > MAX_FILE_SIZE) {
-        toast(
-          `파일 크기는 30MB 이하여야 합니다. 현재: ${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-          'error',
-        );
+      // 업로드 검증 (JM3) — 공통 단일 정책(MIME 화이트리스트 + 크기 한도)
+      const validation = validateDocUpload(file);
+      if (!validation.ok) {
+        toast(validation.message, 'error');
         clearInput();
         return;
       }
-      // MIME 검증 (JM3)
-      const mime = normalizeMime(file.type || '');
-      if (!ALLOWED_MIMES.has(mime)) {
-        toast(mimeErrorMsg(file.type), 'error');
-        clearInput();
-        return;
-      }
+      const mime = validation.mime;
 
       setSubmitting(true);
       try {
@@ -184,6 +146,8 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
               created_by: staffId,
               category: selectedType,
               title: `모바일 제출 - ${selectedType}`,
+              // 발급 사유(reason)를 content 에 저장 — 이전에는 입력만 받고 버려졌음(DC-09)
+              content: reason.trim() || null,
               file_url: '{fileUrl}',
               version: 1,
               created_at: new Date().toISOString(),
@@ -390,7 +354,7 @@ export default function SDocs({ staffId, onBack }: SDocsProps) {
             </label>
 
             <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.6 }}>
-              허용 형식: JPEG·PNG·WEBP·HEIC·PDF · 최대 30MB
+              허용 형식: {DOC_ALLOWED_FORMATS_LABEL} · 최대 {DOC_MAX_FILE_SIZE_LABEL}
               <br />
               파일 선택 즉시 업로드가 시작됩니다.
             </div>

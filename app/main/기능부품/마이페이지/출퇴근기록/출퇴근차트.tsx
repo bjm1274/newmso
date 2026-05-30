@@ -41,24 +41,6 @@ export function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) 
 }
 
 // ──────────────────────────────────────────────
-// TimeBox
-// ──────────────────────────────────────────────
-
-interface TimeBoxProps {
-  label: string;
-  time: string;
-}
-
-export function TimeBox({ label, time }: TimeBoxProps) {
-  return (
-    <div className="text-right">
-      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">{label}</p>
-      <p className="text-base font-semibold text-[var(--foreground)]">{time}</p>
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────
 // AttendanceCalendar
 // ──────────────────────────────────────────────
 

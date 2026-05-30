@@ -20,13 +20,21 @@
 import 'server-only';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { sendFcmBatch } from '@/lib/fcm-http';
+import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
+import {
+  toStringRecord,
+  selectLatestFcmToken,
+  dedupeWebPushSubscriptions,
+  invalidateExpiredFcmTokens,
+  deleteExpiredWebPushSubscriptions,
+} from '@/lib/notification-shared';
 import {
   getD1Binding,
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
   inArray,
-  eq,
 } from '@/lib/db';
+import type { D1Database } from '@cloudflare/workers-types';
 
 export type NotificationPushRow = {
   user_id: string;
@@ -53,6 +61,8 @@ export type DispatchPushResult = {
   fcmExpired: number;
   webPushExpired: number;
   webPushDisabled: boolean;
+  // 야간 방해금지(22~08시) 구간이라 발송을 건너뛴 경우 true.
+  quietHoursSkipped: boolean;
   errors: string[];
 };
 
@@ -64,18 +74,9 @@ function emptyResult(): DispatchPushResult {
     fcmExpired: 0,
     webPushExpired: 0,
     webPushDisabled: false,
+    quietHoursSkipped: false,
     errors: [],
   };
-}
-
-function toStringRecord(value: Record<string, unknown> | null | undefined): Record<string, string> {
-  if (!value) return {};
-  const out: Record<string, string> = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (entry === null || entry === undefined) continue;
-    out[key] = typeof entry === 'string' ? entry : JSON.stringify(entry);
-  }
-  return out;
 }
 
 function buildTagFor(row: NotificationPushRow): string {
@@ -94,11 +95,10 @@ function buildTagFor(row: NotificationPushRow): string {
 }
 
 async function loadSubscriptionsForUsers(
+  d1: D1Database,
   userIds: string[],
 ): Promise<PushSubscriptionRow[]> {
   if (userIds.length === 0) return [];
-  const d1 = await getD1Binding();
-  if (!d1) return [];
   const db = getD1Drizzle(d1);
 
   const rows: PushSubscriptionRow[] = [];
@@ -133,57 +133,8 @@ async function loadSubscriptionsForUsers(
   return rows;
 }
 
-/**
- * staff_id별로 최신 fcm_token 1개만 사용해 잔재 토큰 이중 발송을 차단.
- */
-function buildLatestFcmTokenByStaffId(
-  subscriptions: PushSubscriptionRow[],
-): Map<string, string> {
-  const latest = new Map<string, { token: string; createdAt: number }>();
-  for (const row of subscriptions) {
-    const staffId = String(row.staff_id || '').trim();
-    const token = String(row.fcm_token || '').trim();
-    if (!staffId || !token) continue;
-    const createdAt = row.created_at ? Date.parse(String(row.created_at)) : 0;
-    const numericCreatedAt = Number.isFinite(createdAt) ? createdAt : 0;
-    const prev = latest.get(staffId);
-    if (!prev || numericCreatedAt > prev.createdAt) {
-      latest.set(staffId, { token, createdAt: numericCreatedAt });
-    }
-  }
-  return new Map(Array.from(latest.entries()).map(([id, v]) => [id, v.token]));
-}
-
-async function invalidateExpiredFcmTokens(tokens: string[]): Promise<void> {
-  if (tokens.length === 0) return;
-  const d1 = await getD1Binding();
-  if (!d1) return;
-  const db = getD1Drizzle(d1);
-  for (const token of tokens) {
-    try {
-      await db
-        .update(pushSubscriptionsTable)
-        .set({ fcm_token: null })
-        .where(eq(pushSubscriptionsTable.fcm_token, token));
-    } catch (err) {
-      console.error('[notification-push-dispatch] FCM token invalidate failed:', err);
-    }
-  }
-}
-
-async function deleteExpiredWebPushSubscriptions(ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  const d1 = await getD1Binding();
-  if (!d1) return;
-  const db = getD1Drizzle(d1);
-  try {
-    await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, ids));
-  } catch (err) {
-    console.error('[notification-push-dispatch] WebPush subscription delete failed:', err);
-  }
-}
-
 type DispatchForUserParams = {
+  d1: D1Database;
   row: NotificationPushRow;
   subscriptions: PushSubscriptionRow[];
   webPushEnabled: boolean;
@@ -193,12 +144,11 @@ async function dispatchSingleUser(
   params: DispatchForUserParams,
   result: DispatchPushResult,
 ): Promise<void> {
-  const { row, subscriptions, webPushEnabled } = params;
+  const { d1, row, subscriptions, webPushEnabled } = params;
   const userSubs = subscriptions.filter((s) => String(s.staff_id || '') === row.user_id);
   if (userSubs.length === 0) return;
 
-  const latestFcm = buildLatestFcmTokenByStaffId(userSubs);
-  const fcmToken = latestFcm.get(row.user_id) ?? '';
+  const fcmToken = selectLatestFcmToken(userSubs) ?? '';
   const tag = buildTagFor(row);
   const data = toStringRecord({
     ...(row.metadata ?? {}),
@@ -216,7 +166,7 @@ async function dispatchSingleUser(
       result.fcmSent += fcmResult.success.length;
       if (fcmResult.expired.length > 0) {
         result.fcmExpired += fcmResult.expired.length;
-        await invalidateExpiredFcmTokens(fcmResult.expired);
+        await invalidateExpiredFcmTokens(d1, fcmResult.expired);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -237,15 +187,7 @@ async function dispatchSingleUser(
   });
 
   // endpoint dedupe (같은 사용자의 잔재 구독 중복 발송 방지)
-  const uniqueEndpoints = new Map<string, PushSubscriptionRow>();
-  for (const sub of userSubs) {
-    const endpoint = String(sub.endpoint || '').trim();
-    if (!endpoint || !/^https?:\/\//i.test(endpoint)) continue;
-    if (!sub.p256dh || !sub.auth) continue;
-    if (!uniqueEndpoints.has(endpoint)) uniqueEndpoints.set(endpoint, sub);
-  }
-
-  const targets = Array.from(uniqueEndpoints.values());
+  const targets = dedupeWebPushSubscriptions(userSubs);
   if (targets.length === 0) return;
 
   const expiredIds: string[] = [];
@@ -276,7 +218,7 @@ async function dispatchSingleUser(
     }
   }
 
-  if (expiredIds.length > 0) await deleteExpiredWebPushSubscriptions(expiredIds);
+  if (expiredIds.length > 0) await deleteExpiredWebPushSubscriptions(d1, expiredIds);
 }
 
 /**
@@ -289,15 +231,25 @@ export async function dispatchPushForNotificationRows(
   const result = emptyResult();
   if (rows.length === 0) return result;
 
+  // 야간 방해금지(기본 22~08시 KST) — repush와 동일 함수로 발송을 건너뛴다.
+  // 설정(ERP_PUSH_QUIET_HOURS_*) 및 사용자 야간 시간대를 존중.
+  if (isWithinPushQuietHours()) {
+    result.quietHoursSkipped = true;
+    return result;
+  }
+
   const userIds = Array.from(
     new Set(rows.map((r) => String(r.user_id || '').trim()).filter(Boolean)),
   );
   if (userIds.length === 0) return result;
   result.targets = userIds.length;
 
+  const d1 = await getD1Binding();
+  if (!d1) return result;
+
   let subscriptions: PushSubscriptionRow[] = [];
   try {
-    subscriptions = await loadSubscriptionsForUsers(userIds);
+    subscriptions = await loadSubscriptionsForUsers(d1, userIds);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`load-subscriptions:${msg}`);
@@ -319,7 +271,7 @@ export async function dispatchPushForNotificationRows(
   // 한 사용자 실패가 다른 사용자에게 전파되지 않도록 try/catch 격리(JM3).
   for (const row of rows) {
     try {
-      await dispatchSingleUser({ row, subscriptions, webPushEnabled }, result);
+      await dispatchSingleUser({ d1, row, subscriptions, webPushEnabled }, result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       result.errors.push(`row:${row.user_id}:${msg}`);

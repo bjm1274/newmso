@@ -162,7 +162,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     [visibleApprovalViews]
   );
 
-  const BUILTIN_FORM_TYPES: string[] = Array.from(BUILTIN_FORM_TYPE_NAMES);
+  const BUILTIN_FORM_TYPES: string[] = useMemo(() => Array.from(BUILTIN_FORM_TYPE_NAMES), []);
   const hasLegacyOfficialDocumentAccess = useMemo(
     () => hasPermission(user, 'admin_공문서대장'),
     [user]
@@ -765,7 +765,6 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   });
 
   const {
-    processFinalApprovalOnServer,
     transitionApprovalsOnServer,
     handleBulkApprove,
     handleBulkReject,
@@ -811,7 +810,6 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     fetchApprovals,
     markApprovalNotificationsAsRead,
     transitionApprovalsOnServer,
-    processFinalApprovalOnServer,
     resolveStoredCurrentApproverId,
     resolveEffectiveApproverId,
     syncDelegatedApprovalRouting,

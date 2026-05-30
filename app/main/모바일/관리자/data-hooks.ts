@@ -112,9 +112,15 @@ export interface AuditLogItem {
 
 const FALLBACK_AUDIT_LOGS: AuditLogItem[] = [];
 
-function pickSeverity(value: unknown): AuditSeverity {
-  if (value === '심각' || value === 'critical' || value === 'error') return '심각';
-  if (value === '경고' || value === 'warning' || value === 'warn') return '경고';
+// audit_logs 정본에는 severity 컬럼이 없어 action 문자열로 심각도를 추론한다.
+function inferSeverity(action: string): AuditSeverity {
+  const a = action.toLowerCase();
+  if (a.includes('delete') || a.includes('reset') || a.includes('삭제') || a.includes('초기화') || a.includes('force')) {
+    return '심각';
+  }
+  if (a.includes('update') || a.includes('permission') || a.includes('role') || a.includes('권한') || a.includes('변경')) {
+    return '경고';
+  }
   return '정보';
 }
 
@@ -137,12 +143,12 @@ export function useAuditLogs(company: string | undefined, limit = 30): {
     let alive = true;
     (async () => {
       try {
-        let q = supabase
+        // audit_logs 정본 컬럼만 조회 (severity/title/target/company 컬럼은 미존재).
+        const q = supabase
           .from('audit_logs')
-          .select('id, severity, title, actor_name, target, created_at, company')
+          .select('id, action, target_type, target_id, details, user_name, actor_name, created_at')
           .order('created_at', { ascending: false })
           .limit(limit);
-        if (company && company !== '전체') q = q.eq('company', company);
         const { data, error } = await q;
         if (!alive) return;
         if (error || !Array.isArray(data) || data.length === 0) {
@@ -153,10 +159,18 @@ export function useAuditLogs(company: string | undefined, limit = 30): {
             const r = row as Record<string, unknown>;
             const id = typeof r.id === 'string' ? r.id : typeof r.id === 'number' ? String(r.id) : null;
             if (!id) return null;
-            const severity = pickSeverity(r.severity);
-            const title = typeof r.title === 'string' ? r.title : '(제목 없음)';
-            const actor = typeof r.actor_name === 'string' ? r.actor_name : '시스템';
-            const target = typeof r.target === 'string' ? r.target : '';
+            const action = typeof r.action === 'string' ? r.action : '';
+            const severity = inferSeverity(action);
+            const title = action || '(작업 미상)';
+            const actor =
+              typeof r.actor_name === 'string' && r.actor_name
+                ? r.actor_name
+                : typeof r.user_name === 'string' && r.user_name
+                  ? r.user_name
+                  : '시스템';
+            const targetType = typeof r.target_type === 'string' ? r.target_type : '';
+            const targetId = typeof r.target_id === 'string' ? r.target_id : '';
+            const target = [targetType, targetId].filter(Boolean).join(' / ');
             const at = typeof r.created_at === 'string' ? r.created_at : '';
             return { id, severity, title, actor, target, at, tone: severityTone(severity) };
           }).filter((l): l is AuditLogItem => l !== null);
@@ -268,11 +282,11 @@ export function useApprovalCustomForms(companyName: string | undefined): {
     let alive = true;
     (async () => {
       try {
-        let q = supabase
+        // approval_form_types 정본에는 company_name 컬럼이 없어 회사 스코프 없이 전체 조회한다.
+        const q = supabase
           .from('approval_form_types')
-          .select('id, name, slug, is_active, updated_at, company_name')
+          .select('id, name, slug, is_active, updated_at')
           .order('sort_order', { ascending: true });
-        if (companyName && companyName !== '전체') q = q.eq('company_name', companyName);
         const { data, error } = await q;
         if (!alive) return;
         if (!error && Array.isArray(data)) {

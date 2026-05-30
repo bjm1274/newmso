@@ -180,7 +180,7 @@ export async function sendMobileFileMessage(
       planParams: { roomId: input.roomId },
       onSuccessAction: {
         kind: 'insert',
-        table: 'chat_messages',
+        table: 'messages',
         payloadTemplate: insertPayloadTemplate,
       },
     });
@@ -225,7 +225,7 @@ export async function sendMobileFileMessage(
           planParams: { roomId: input.roomId },
           onSuccessAction: {
             kind: 'insert',
-            table: 'chat_messages',
+            table: 'messages',
             payloadTemplate: insertPayloadTemplate,
           },
         });

@@ -257,12 +257,12 @@ function EduTab({ company }: { company?: string }) {
     const run = async () => {
       setLoading(true);
       try {
-        let q = supabase
-          .from('licenses')
-          .select('id, staff_id, staff_name, license_name, expiry_date, status, company')
+        // 정본 테이블은 staff_licenses 이며 staff_name/status/company 컬럼이 없다.
+        const q = supabase
+          .from('staff_licenses')
+          .select('id, staff_id, license_name, expiry_date')
           .order('expiry_date', { ascending: true })
           .limit(30);
-        if (company && company !== '전체') q = q.eq('company', company);
         const { data, error } = await q;
         if (error) throw error;
         if (cancelled) return;

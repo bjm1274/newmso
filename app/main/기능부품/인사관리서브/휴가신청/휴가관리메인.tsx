@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { syncAnnualLeaveUsedForStaff, calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
@@ -190,30 +190,13 @@ export default function LeaveManagement({
       let recalculatedUsedDays: number | null = null;
       if (targetLeave?.staff_id) {
         if (typeof window !== 'undefined') {
-          // Calculate used days client-side to prevent D1 server-only binding error in the browser
+          // 브라우저에서는 D1 server-only 바인딩을 피하기 위해 정본 헬퍼로 클라이언트 계산.
+          // calculateApprovedAnnualLeaveUsage 는 연도 클리핑 포함(연말~연초 휴가 과다계산 방지).
           const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, status } : l));
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === targetLeave.staff_id);
-          
-          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
-            if (!isApproved) return sum;
-            
-            const type = String(row.leave_type || '').trim().toLowerCase();
-            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
-            if (isHalf) return sum + 0.5;
-            
-            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
-            if (!isAnnual) return sum;
-            
-            const start = new Date(row.start_date);
-            const end = new Date(row.end_date || row.start_date);
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            return sum + diffDays;
-          }, 0);
-          
-          recalculatedUsedDays = approvedAnnualLeaveDays;
-          
+
+          recalculatedUsedDays = calculateApprovedAnnualLeaveUsage(staffLeaves as Record<string, unknown>[]);
+
           await supabase
             .from('staff_members')
             .update({ annual_leave_used: recalculatedUsedDays })
@@ -280,25 +263,11 @@ export default function LeaveManagement({
         if (typeof window !== 'undefined') {
           const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, ...patch } : l));
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
-          
-          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
-            if (!isApproved) return sum;
-            
-            const type = String(row.leave_type || '').trim().toLowerCase();
-            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
-            if (isHalf) return sum + 0.5;
-            
-            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
-            if (!isAnnual) return sum;
-            
-            const start = new Date(row.start_date);
-            const end = new Date(row.end_date || row.start_date);
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            return sum + diffDays;
-          }, 0);
-          
+
+          const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
+            staffLeaves as Record<string, unknown>[],
+          );
+
           await supabase
             .from('staff_members')
             .update({ annual_leave_used: approvedAnnualLeaveDays })
@@ -365,25 +334,11 @@ export default function LeaveManagement({
         if (typeof window !== 'undefined') {
           const updatedLeaves = leaves.filter((l) => l.id !== id);
           const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
-          
-          const approvedAnnualLeaveDays = staffLeaves.reduce((sum, row) => {
-            const isApproved = (row.status as any) === '승인' || (row.status as any) === 'approved';
-            if (!isApproved) return sum;
-            
-            const type = String(row.leave_type || '').trim().toLowerCase();
-            const isHalf = type === 'half_leave' || type === 'half-day' || type === '반차' || type === '오전반차' || type === '오후반차';
-            if (isHalf) return sum + 0.5;
-            
-            const isAnnual = type === 'annual_leave' || type === 'annual' || type === '연차' || type === '연차/휴가' || type.includes('연차');
-            if (!isAnnual) return sum;
-            
-            const start = new Date(row.start_date);
-            const end = new Date(row.end_date || row.start_date);
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-            return sum + diffDays;
-          }, 0);
-          
+
+          const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
+            staffLeaves as Record<string, unknown>[],
+          );
+
           await supabase
             .from('staff_members')
             .update({ annual_leave_used: approvedAnnualLeaveDays })

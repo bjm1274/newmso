@@ -66,6 +66,14 @@ function parseGlobalSearchQuery(rawQuery: string): ParsedGlobalSearchQuery {
 function getGlobalSearchHighlightQuery(rawQuery: string) {
   return parseGlobalSearchQuery(rawQuery).textQuery.trim();
 }
+
+// 사용자 입력의 LIKE 와일드카드(%, _)와 이스케이프 문자(\)를 리터럴로 처리.
+// d1/query 라우트가 `ESCAPE '\'`로 emit하므로 백슬래시 접두로 이스케이프한다.
+// `\`를 먼저 치환해야 이후 추가되는 백슬래시가 이중 이스케이프되지 않는다.
+// 와일드카드는 호출부에서 %term% 형태로 감싸므로 부분일치는 유지된다.
+function escapeLikePattern(input: string): string {
+  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
 // ────────────────────────────────────────────────────────────────────────────
 import type { GlobalSearchRoomResult, MessengerGlobalSearchTab } from './메신저전역검색';
 import {
@@ -158,10 +166,10 @@ async function fetchAllGlobalSearchMessages(params: {
         .range(offset, offset + CHAT_GLOBAL_SEARCH_PAGE_SIZE - 1);
 
       if (parsedQuery.textQuery && searchColumn) {
-        searchQuery = searchQuery.ilike(searchColumn, `%${parsedQuery.textQuery}%`);
+        searchQuery = searchQuery.ilike(searchColumn, `%${escapeLikePattern(parsedQuery.textQuery)}%`);
       }
       if (parsedQuery.fromQuery && !omittedColumns.has('sender_name')) {
-        searchQuery = searchQuery.ilike('sender_name', `%${parsedQuery.fromQuery}%`);
+        searchQuery = searchQuery.ilike('sender_name', `%${escapeLikePattern(parsedQuery.fromQuery)}%`);
       }
 
       if (!omittedColumns.has('is_deleted')) {

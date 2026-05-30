@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -12,6 +13,11 @@ import {
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+
+// 자가진단은 실제 푸시를 모든 구독에 발송하는 비싼 작업 — 남용 방지를 위해
+// 사용자당 5분 내 최대 10회로 보수적으로 제한.
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
 type SubRow = {
   id: string;
@@ -28,6 +34,17 @@ export async function POST(request: NextRequest) {
   }
 
   const staffId = String(session.user.id);
+
+  const rateKey = `push-self-test:${staffId}`;
+  const rate = await checkRateLimit(rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { ok: false, error: '자가진단 요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 300) } },
+    );
+  }
+  await recordFailedAttempt(rateKey, RATE_LIMIT_WINDOW_MS);
+
   const diagnostics: Record<string, unknown> = {};
 
   // ── 1. 환경변수 확인 ──

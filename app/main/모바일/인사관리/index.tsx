@@ -96,7 +96,7 @@ export default function 인사관리({
     case 'docs':
       return <계약문서 staffId={staffId} onBack={onExit} />;
     case 'form-member':
-      return <구성원등록 onBack={goBack} />;
+      return <구성원등록 onBack={goBack} user={user} company={company} />;
     case 'form-leave':
       return (
         <연차신청 staffId={staffId} staffName={staffName} onBack={goBack} />

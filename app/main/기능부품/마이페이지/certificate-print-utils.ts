@@ -13,6 +13,7 @@
  */
 
 import { toast } from '@/lib/toast';
+import { escapeHtml } from '@/lib/escape-html';
 import { buildApprovalPrintHtml, openApprovalPrintView } from '../전자결재서브/approval-print-utils';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from '../전자결재서브/approval-constants';
 import { BUILTIN_TEMPLATE_DEFAULTS } from '../관리자전용서브/전자결재양식관리/design-utils';
@@ -20,15 +21,6 @@ import { BUILTIN_TEMPLATE_DEFAULTS } from '../관리자전용서브/전자결재
 // ─────────────────────────────────────────────
 // 공용 유틸
 // ─────────────────────────────────────────────
-
-function escapeHtml(value: unknown) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 export function sanitizeFilename(value: string) {
   return (value || 'certificate')

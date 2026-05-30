@@ -2,7 +2,7 @@
 
 /**
  * OP체크 상세 — 시술 1건 카드(환자·체크리스트·소모품) + sticky 액션.
- * 체크리스트는 op_patient_checks.checklist(jsonb)에서.
+ * 체크리스트는 op_patient_checks.prep_items(JSON)에서.
  * 카드 클릭 시 진입(보드의 onOpenDetail).
  * 핸드오프 m-screens-addon-details §AD2 (SOpCheckDetail) 이식.
  * JM: ~230줄.
@@ -73,8 +73,9 @@ export default function OP체크상세({
       ] as const;
       const [{ data: check }, { data: post }] = await Promise.all(queries);
 
-      const rawChecklist = Array.isArray((check as Record<string, unknown> | null)?.checklist)
-        ? ((check as Record<string, unknown>).checklist as unknown[])
+      // 정본 컬럼은 prep_items (과거 코드의 checklist 는 미존재 컬럼)
+      const rawChecklist = Array.isArray((check as Record<string, unknown> | null)?.prep_items)
+        ? ((check as Record<string, unknown>).prep_items as unknown[])
         : [];
       const nextChecklist: CheckItem[] = rawChecklist.length > 0
         ? rawChecklist.map((it, idx) => {
@@ -121,15 +122,25 @@ export default function OP체크상세({
 
   const persistChecklist = useCallback(
     async (next: CheckItem[]): Promise<{ queued: boolean }> => {
+      // 정본 스키마: prep_items(JSON)·updated_by·updated_at. 과거 코드의
+      // checklist·last_updated_* 는 미존재 컬럼이라 저장이 무음 실패했다.
+      // prep_items 항목은 데스크톱과 호환되도록 name 키도 함께 저장한다.
+      const prepItems = next.map((c) => ({
+        id: c.id,
+        name: c.label,
+        label: c.label,
+        checked: c.checked,
+      }));
       const { queued, error } = await enqueueSupabaseMutation({
         kind: 'upsert',
         table: 'op_patient_checks',
         payload: {
           schedule_post_id: card.scheduleId,
           schedule_date: new Date().toISOString().slice(0, 10),
-          checklist: next as unknown as Record<string, unknown>[],
-          last_updated_by: user.id,
-          last_updated_at: new Date().toISOString(),
+          prep_items: prepItems as unknown as Record<string, unknown>[],
+          updated_by: user.id,
+          updated_by_name: user.name ?? null,
+          updated_at: new Date().toISOString(),
         },
       });
       if (error) {

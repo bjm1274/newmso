@@ -13,16 +13,13 @@ import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import { useDischargeReviews } from './data-hooks';
+import {
+  DISCHARGE_STATUS,
+  dischargeStatusMeta,
+  normalizeDischargeStatus,
+} from '../../기능부품/퇴원심사/공통';
 
 type Filter = 'mine' | 'request' | 'all' | 'done';
-
-function statusMeta(status: string): { label: string; tone: '' | 'accent' | 'warning' | 'success' | 'danger' } {
-  if (status === 'approved') return { label: '승인 완료', tone: 'success' };
-  if (status === 'rejected') return { label: '반려', tone: 'danger' };
-  if (status === 'review_requested' || status === 'request') return { label: '보완요청', tone: 'warning' };
-  if (status === 'in_progress' || status === '2nd') return { label: '심사중', tone: 'accent' };
-  return { label: '대기', tone: '' };
-}
 
 export default function 퇴원심사목록({
   user,
@@ -36,21 +33,26 @@ export default function 퇴원심사목록({
   const { rows, loading } = useDischargeReviews({ selfId: user.id });
   const [filter, setFilter] = useState<Filter>('mine');
 
+  const isPending = (s: string) => normalizeDischargeStatus(s) === DISCHARGE_STATUS.pending;
+  const isReviewRequested = (s: string) =>
+    normalizeDischargeStatus(s) === DISCHARGE_STATUS.reviewRequested;
+  const isApproved = (s: string) => normalizeDischargeStatus(s) === DISCHARGE_STATUS.approved;
+
   const counts = useMemo(
     () => ({
-      mine: rows.filter((r) => r.reviewer_id === user.id || r.status === 'pending').length,
-      request: rows.filter((r) => r.status === 'review_requested' || r.status === 'request').length,
+      mine: rows.filter((r) => r.reviewer_id === user.id || isPending(r.status)).length,
+      request: rows.filter((r) => isReviewRequested(r.status)).length,
       all: rows.length,
-      done: rows.filter((r) => r.status === 'approved').length,
+      done: rows.filter((r) => isApproved(r.status)).length,
     }),
     [rows, user.id],
   );
 
   const filtered = useMemo(() => {
     if (filter === 'all') return rows;
-    if (filter === 'request') return rows.filter((r) => r.status === 'review_requested' || r.status === 'request');
-    if (filter === 'done') return rows.filter((r) => r.status === 'approved');
-    return rows.filter((r) => r.reviewer_id === user.id || r.status === 'pending');
+    if (filter === 'request') return rows.filter((r) => isReviewRequested(r.status));
+    if (filter === 'done') return rows.filter((r) => isApproved(r.status));
+    return rows.filter((r) => r.reviewer_id === user.id || isPending(r.status));
   }, [rows, filter, user.id]);
 
   return (
@@ -94,7 +96,7 @@ export default function 퇴원심사목록({
             </div>
           )}
           {filtered.map((it) => {
-            const meta = statusMeta(it.status);
+            const meta = dischargeStatusMeta(it.status);
             const mine = it.reviewer_id === user.id;
             return (
               <button

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { DischargeRuleAnalysis } from '@/lib/discharge-review-rules';
 import 보완요청시트, { type CompareResult } from './보완요청시트';
+import { stayDays, isDischargeApproved } from './공통';
 
 export type CheckItem = {
   id: string;
@@ -52,12 +53,6 @@ export type 퇴원심사모바일상세Props = {
   onRequestAi: () => void;
 };
 
-function stayDays(a: string, d: string): number {
-  if (!a || !d) return 0;
-  const v = Math.ceil((new Date(d).getTime() - new Date(a).getTime()) / 86400000);
-  return v > 0 ? v : 0;
-}
-
 /**
  * 퇴원심사 모바일 상세 화면.
  * - 헤더: 뒤로 가기 + 승인 상태 + 삭제.
@@ -85,7 +80,7 @@ export default function 퇴원심사모바일상세({
   const total = review.items.length;
   const checked = review.items.filter((i) => i.checked).length;
   const ratio = total > 0 ? Math.round((checked / total) * 100) : 0;
-  const isApproved = review.status === 'approved';
+  const isApproved = isDischargeApproved(review.status);
   const criticalCount = ruleAnalysis?.summary.critical ?? 0;
   const warningCount = ruleAnalysis?.summary.warning ?? 0;
   const issueBadge = criticalCount + warningCount;

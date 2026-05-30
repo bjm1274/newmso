@@ -113,7 +113,7 @@ function OverviewTab({ onGoManage }: { onGoManage: () => void }) {
   );
 }
 
-export default function FormsWorkcenter() {
+export default function FormsWorkcenter({ user }: { user?: unknown }) {
   const meta = ADMIN_WORKCENTERS.forms;
   const [tab, setTab] = useState<FormsTabId>('overview');
 
@@ -130,7 +130,7 @@ export default function FormsWorkcenter() {
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       {tab === 'overview' && <OverviewTab onGoManage={() => setTab('manage')} />}
-      {tab === 'manage' && <ApprovalFormTypesManager user={null} />}
+      {tab === 'manage' && <ApprovalFormTypesManager user={user} />}
     </>
   );
 }

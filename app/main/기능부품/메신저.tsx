@@ -2,6 +2,7 @@
 import { logger } from '@/lib/logger';
 
 import { toast } from '@/lib/toast';
+import { toDateKey } from '@/lib/date-utils';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/lib/supabase';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
@@ -16,7 +17,6 @@ import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { POLL_SELECT } from '@/lib/chat-query-columns';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
-import SmartDatePicker from './공통/SmartDatePicker';
 import {
   AttachmentListCard,
   getMessageDisplayText,
@@ -24,7 +24,6 @@ import {
 } from './메신저첨부';
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
 import { MessengerComposer, type MessengerComposerHandle } from './메신저컴포저';
-import { MenuIcon } from './조직도서브/조직도측면창';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
 import { MessengerDrawer } from './메신저드로어';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
@@ -64,7 +63,6 @@ import { useChatUploads } from './메신저업로드훅';
 import { MediaArchivePanel } from './메신저미디어아카이브';
 import { GlobalSearchModal } from './메신저전역검색';
 import { MessengerSidebar, type MessengerMentionInboxItem, type MessengerThreadInboxItem } from './메신저사이드바';
-import { MessengerAvatar } from './메신저공통';
 import { GroupChatModal } from './메신저그룹생성모달';
 import { AddMemberModal, ForwardMessageModal } from './메신저멤버관리모달';
 import { MessageEditModal, MessageEditHistoryModal } from './메신저수정모달';
@@ -78,8 +76,11 @@ import {
   readChatRetryQueue,
 } from './메신저재시도큐';
 import { MessengerTimeline, type MessengerTimelineItem } from './메신저타임라인';
-import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
-import { toSafeText, getStaffExtensionText } from './조직도서브/org-chart-types';
+import { StaffDetailModal, getPresenceMeta, type PresenceMeta, type AttendanceSnapshot } from './메신저섹션/StaffDetailModal';
+import { ChatRoomHeader } from './메신저섹션/ChatRoomHeader';
+import { DateJumpModal } from './메신저섹션/DateJumpModal';
+import { RetryQueueBanner } from './메신저섹션/RetryQueueBanner';
+import { TypingNotice } from './메신저섹션/TypingNotice';
 import {
   CAN_WRITE_NOTICE_POSITIONS,
   NOTICE_ROOM_ID,
@@ -3078,115 +3079,20 @@ export default function ChatView({
 
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--muted)] relative`}>
         {selectedRoomId && selectedRoom && (
-          <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
-            <div className="flex items-center gap-3 min-w-0">
-              <button type="button" onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
-              <div data-testid="chat-room-header-avatar" className="flex h-9 w-9 shrink-0 items-center justify-center">
-                {selectedRoom.id === NOTICE_ROOM_ID ? (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent-light)] text-[var(--accent)]">
-                    <MenuIcon name="bell" className="h-5 w-5" />
-                  </div>
-                ) : selectedPeer ? (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenStaffProfile(selectedPeer)}
-                    className="focus-visible:outline-none shrink-0 hover:opacity-85 transition-opacity"
-                    title={selectedPeer.name || selectedRoomLabel || ''}
-                  >
-                    <MessengerAvatar
-                      name={selectedPeer.name || selectedRoomLabel}
-                      photoUrl={selectedPeerPhotoUrl}
-                      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
-                      decorative
-                    />
-                  </button>
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)] dark:bg-zinc-800">
-                    <MenuIcon name="chat" className="h-5 w-5" />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <h3 className={`text-[13px] font-bold text-foreground ${selectedRoom.type === 'group' ? 'line-clamp-2 break-words whitespace-normal leading-4' : 'truncate'}`}>
-                  {selectedRoomLabel}
-                </h3>
-                <div className="flex items-center gap-1.5 text-[10px] font-medium">
-                  {!selectedPeer ? (
-                    <>
-                      <p className="text-[var(--toss-gray-4)]">{roomMembers.length || 0}명 참여중</p>
-                      <span className="text-[var(--toss-gray-4)]">·</span>
-                    </>
-                  ) : null}
-                  <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${realtimeConnectionMeta.dotClassName}`} />
-                    <span>{realtimeConnectionMeta.label}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              {/* 투표 */}
-              <button
-                type="button"
-                data-testid="chat-header-poll"
-                onClick={handleOpenPollModalFromHeader}
-                aria-label="투표 만들기"
-                title="투표 만들기"
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] dark:hover:bg-zinc-800"
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="13" width="3" height="4" rx="0.5" />
-                  <rect x="8.5" y="9" width="3" height="8" rx="0.5" />
-                  <rect x="14" y="5" width="3" height="12" rx="0.5" />
-                </svg>
-              </button>
-              {/* 결재 초안 */}
-              <button
-                type="button"
-                data-testid="chat-header-approval-draft"
-                onClick={handleOpenApprovalDraftFromHeader}
-                aria-label="결재 초안 작성"
-                title="결재 초안 작성"
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] dark:hover:bg-zinc-800"
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="4" y="3" width="12" height="14" rx="1.5" />
-                  <path d="M7 7h6M7 10h6M7 13h4" />
-                </svg>
-              </button>
-              {/* 미디어 아카이브 */}
-              <button
-                type="button"
-                data-testid="chat-header-archive"
-                onClick={() => openMediaArchive('media')}
-                aria-label="미디어 아카이브"
-                title="미디어 아카이브"
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] dark:hover:bg-zinc-800"
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="5" width="16" height="3" rx="1" />
-                  <path d="M3 8v8a1 1 0 001 1h12a1 1 0 001-1V8" />
-                  <path d="M8 12h4" />
-                </svg>
-              </button>
-              {/* 드로어 토글 */}
-              <button
-                type="button"
-                data-testid="chat-open-drawer"
-                onClick={() => setShowDrawer(true)}
-                aria-label="채팅방 정보 및 참여자 보기"
-                title="채팅방 정보 및 참여자 보기"
-                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-all hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] dark:hover:bg-zinc-800"
-              >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M4 5.5H16" />
-                  <path d="M4 10H16" />
-                  <path d="M4 14.5H16" />
-                </svg>
-              </button>
-            </div>
-          </header>
+          <ChatRoomHeader
+            selectedRoom={selectedRoom}
+            selectedPeer={selectedPeer}
+            selectedRoomLabel={selectedRoomLabel}
+            selectedPeerPhotoUrl={selectedPeerPhotoUrl}
+            roomMembers={roomMembers}
+            realtimeConnectionMeta={realtimeConnectionMeta}
+            onBack={() => setRoom(null)}
+            onOpenStaffProfile={handleOpenStaffProfile}
+            onOpenPollModal={handleOpenPollModalFromHeader}
+            onOpenApprovalDraft={handleOpenApprovalDraftFromHeader}
+            onOpenMediaArchive={openMediaArchive}
+            onOpenDrawer={() => setShowDrawer(true)}
+          />
         )}
 
         <MessengerTimeline
@@ -3246,44 +3152,14 @@ export default function ChatView({
           onOpenDateJump={openDateJumpPicker}
         />
 
-        {typingNoticeText ? (
-          <div
-            aria-live="polite"
-            className="pointer-events-none relative z-20 flex h-0 justify-center px-3"
-          >
-            <span className="-translate-y-[calc(100%+6px)] rounded-full border border-[var(--border)] bg-[var(--card)]/95 px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-4)] shadow-sm backdrop-blur">
-              {typingNoticeText}
-            </span>
-          </div>
-        ) : null}
+        <TypingNotice text={typingNoticeText} />
 
         {selectedRoomId && selectedRoom ? (
           <>
-            {failedMessageIdsInSelectedRoom.length > 0 ? (
-              <div
-                data-testid="chat-retry-queue-banner"
-                className="mx-3 mb-2 rounded-2xl border border-red-200 bg-red-500/5 px-4 py-3 md:mx-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-red-600">
-                      전송 실패 메시지 {failedMessageIdsInSelectedRoom.length}건
-                    </p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">
-                      새로고침 후에도 보관되며, 네트워크가 복구되면 자동으로 다시 시도합니다.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    data-testid="chat-retry-all-failed"
-                    onClick={() => { void retryAllFailedMessages(failedMessageIdsInSelectedRoom); }}
-                    className="shrink-0 rounded-[var(--radius-md)] bg-red-500/10 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-500/20"
-                  >
-                    모두 재시도
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <RetryQueueBanner
+              failedCount={failedMessageIdsInSelectedRoom.length}
+              onRetryAll={() => { void retryAllFailedMessages(failedMessageIdsInSelectedRoom); }}
+            />
             <MessengerComposer
               ref={composerControlRef}
               replyTo={replyTo}
@@ -3525,315 +3401,28 @@ export default function ChatView({
         onPreviewAttachment={openAttachmentPreview}
       />
 
-      {dateJumpPickerOpen ? (
-        <div
-          data-testid="chat-date-jump-modal"
-          className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={closeDateJumpPicker}
-        >
-          <form
-            className="w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
-            onClick={(event) => event.stopPropagation()}
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleDateJumpSubmit(dateJumpValue);
-            }}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-bold text-[var(--foreground)]">날짜로 이동</h3>
-              <button
-                type="button"
-                onClick={closeDateJumpPicker}
-                className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                aria-label="닫기"
-              >
-                ×
-              </button>
-            </div>
-            <SmartDatePicker
-              data-testid="chat-date-jump-input"
-              value={dateJumpValue}
-              onChange={(value) => {
-                setDateJumpValue(value);
-                setDateJumpError('');
-              }}
-              className="w-full"
-              inputClassName="h-11 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-bold text-[var(--foreground)] focus:border-[var(--accent)]"
-            />
-            {dateJumpError ? (
-              <p className="mt-2 text-[11px] font-semibold text-red-500">{dateJumpError}</p>
-            ) : null}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeDateJumpPicker}
-                className="h-9 rounded-[var(--radius-md)] border border-[var(--border)] px-3 text-xs font-bold text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
-              >
-                취소
-              </button>
-              <button
-                type="submit"
-                className="h-9 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-xs font-bold text-white transition-opacity hover:opacity-90"
-              >
-                이동
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <DateJumpModal
+        open={dateJumpPickerOpen}
+        value={dateJumpValue}
+        error={dateJumpError}
+        onValueChange={(value) => {
+          setDateJumpValue(value);
+          setDateJumpError('');
+        }}
+        onClose={closeDateJumpPicker}
+        onSubmit={handleDateJumpSubmit}
+      />
 
       {/* 첨부 미리보기 모달 */}
       <ChatAttachmentPreviewModal controller={attachmentPreviewController} />
 
       {/* 상세 팝업 - 모바일 최적화 */}
-      {selectedStaffForModal && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/45 backdrop-blur-sm md:items-center md:p-6"
-          onClick={() => setSelectedStaffForModal(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-t-[32px] bg-[var(--card)] p-6 shadow-2xl md:rounded-[32px] animate-in slide-in-from-bottom md:zoom-in-95 duration-300"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-4">
-              <ModalAvatar staff={selectedStaffForModal} size="lg" presenceState={selectedStaffPresence?.state} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2.5">
-                  <p className="truncate text-[22px] font-black text-[var(--foreground)] tracking-tight leading-none">{normalizeText(selectedStaffForModal.name)}</p>
-                  {selectedStaffPresence ? (
-                    <ModalPresenceBadge
-                      presence={selectedStaffPresence}
-                      testId="org-staff-modal-presence"
-                    />
-                  ) : isLoadingPresence ? (
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">로딩 중…</span>
-                  ) : null}
-                </div>
-                <p className="mt-1.5 truncate text-[14px] font-bold text-[var(--toss-gray-3)]">{normalizeText(selectedStaffForModal.position) || '직급 미지정'}</p>
-              </div>
-            </div>
-            
-            <div className="mt-5 divide-y divide-[var(--border)]/60 rounded-[24px] border border-[var(--border)] bg-[var(--page-bg)] px-5 py-2.5">
-              {selectedStaffPresence ? (
-                <ModalInfoRow
-                  testId="org-staff-modal-presence-row"
-                  label="근무 상태"
-                  value={[
-                    selectedStaffPresence.label,
-                    selectedStaffPresence.checkInLabel ? `출근 ${selectedStaffPresence.checkInLabel}` : null,
-                    selectedStaffPresence.checkOutLabel ? `퇴근 ${selectedStaffPresence.checkOutLabel}` : null,
-                  ].filter(Boolean).join(' · ')}
-                />
-              ) : (
-                <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
-                  <span className="font-semibold text-[var(--toss-gray-3)]">근무 상태</span>
-                  <span className="font-bold text-[var(--foreground)]">{isLoadingPresence ? '확인 중…' : '출근 전'}</span>
-                </div>
-              )}
-              <ModalInfoRow label="회사" value={getCompanyName(selectedStaffForModal)} />
-              <ModalInfoRow label="부서" value={getDepartmentName(selectedStaffForModal)} />
-              <ModalInfoRow label="사번" value={normalizeText(selectedStaffForModal.employee_no) || '-'} />
-              <ModalInfoRow label="내선" value={getStaffExtensionText(selectedStaffForModal) || normalizeText(selectedStaffForModal.extension) || '-'} />
-            </div>
-            
-            <button
-              type="button"
-              onClick={() => setSelectedStaffForModal(null)}
-              className="mt-6 w-full rounded-[18px] bg-[#1B64F2] py-4 text-base font-bold text-white transition hover:bg-[#1557b0] active:scale-[0.98] duration-150 shadow-sm"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── 구성원 상세 정보 연동용 헬퍼 및 컴포넌트 ───────────────────
-
-type PresenceState = 'working' | 'checked_out' | 'before_work';
-
-type PresenceMeta = {
-  state: PresenceState;
-  label: string;
-  toneClass: string;
-  dotClass: string;
-  checkInLabel: string | null;
-  checkOutLabel: string | null;
-};
-
-interface AttendanceSnapshot {
-  staff_id: string;
-  date?: string | null;
-  work_date?: string | null;
-  check_in?: string | null;
-  check_out?: string | null;
-  check_in_time?: string | null;
-  check_out_time?: string | null;
-  status?: string | null;
-}
-
-function normalizeText(value: unknown) {
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'bigint') {
-    return String(value).trim();
-  }
-  return '';
-}
-
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatClockLabel(value: unknown) {
-  const text = normalizeText(value);
-  if (!text) return null;
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(text)) return text.slice(0, 5);
-  const parsed = Date.parse(text);
-  if (Number.isFinite(parsed)) {
-    return new Intl.DateTimeFormat('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Seoul',
-    }).format(new Date(parsed));
-  }
-  return text.length >= 16 && text[10] === 'T' ? text.slice(11, 16) : text.slice(0, 5);
-}
-
-function getAttendanceCheckIn(attendance?: AttendanceSnapshot | null) {
-  return normalizeText(attendance?.check_in) || normalizeText(attendance?.check_in_time) || null;
-}
-
-function getAttendanceCheckOut(attendance?: AttendanceSnapshot | null) {
-  return normalizeText(attendance?.check_out) || normalizeText(attendance?.check_out_time) || null;
-}
-
-function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
-  const checkInLabel = formatClockLabel(getAttendanceCheckIn(attendance));
-  const checkOutLabel = formatClockLabel(getAttendanceCheckOut(attendance));
-
-  if (checkInLabel && !checkOutLabel) {
-    return {
-      state: 'working',
-      label: '근무중',
-      toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      dotClass: 'bg-emerald-500',
-      checkInLabel,
-      checkOutLabel: null,
-    };
-  }
-
-  if (checkInLabel && checkOutLabel) {
-    return {
-      state: 'checked_out',
-      label: '퇴근 완료',
-      toneClass: 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)]',
-      dotClass: 'bg-[var(--toss-gray-3)]',
-      checkInLabel,
-      checkOutLabel,
-    };
-  }
-
-  return {
-    state: 'before_work',
-    label: '출근 전',
-    toneClass: 'border-amber-200 bg-amber-50 text-amber-700',
-    dotClass: 'bg-amber-400',
-    checkInLabel: null,
-    checkOutLabel: null,
-  };
-}
-
-function getCompanyName(staff: StaffMember) {
-  return normalizeText(staff.company) || '회사 미지정';
-}
-
-function getDepartmentName(staff: StaffMember) {
-  return normalizeText(staff.department) || '부서 미지정';
-}
-
-function ModalAvatar({
-  staff,
-  size = 'md',
-  presenceState,
-}: {
-  staff: StaffMember;
-  size?: 'sm' | 'md' | 'lg';
-  presenceState?: PresenceState;
-}) {
-  const sizeClass =
-    size === 'lg' ? 'h-14 w-14 text-lg' : size === 'sm' ? 'h-6 w-6 text-[10px]' : 'h-7 w-7 text-[11px]';
-  const palette = [
-    'bg-sky-100 text-sky-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-violet-100 text-violet-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-cyan-100 text-cyan-700',
-  ];
-  const name = normalizeText(staff.name) || '?';
-  const color = palette[(name.charCodeAt(0) || 0) % palette.length];
-  const photoUrl = getProfilePhotoUrl(staff);
-
-  const dotMeta =
-    presenceState === 'working'
-      ? { cls: 'bg-[#10B981]', label: '현재 근무중' }
-      : presenceState === 'before_work'
-        ? { cls: 'bg-[#FFC72C]', label: '출근 전' }
-        : presenceState === 'checked_out'
-          ? { cls: 'bg-slate-400', label: '퇴근 완료' }
-          : null;
-
-  return (
-    <div className="relative shrink-0">
-      <div
-        className={`${sizeClass} ${photoUrl ? 'overflow-hidden bg-[var(--tab-bg)]' : color} flex items-center justify-center rounded-full font-bold`}
-      >
-        {photoUrl ? (
-          <ProfilePhotoThumbnail
-            src={photoUrl}
-            alt={`${name} 프로필 사진`}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          name[0]
-        )}
-      </div>
-      {dotMeta ? (
-        <span
-          className={`absolute -bottom-0.5 -right-0.5 ${size === 'lg' ? 'h-3.5 w-3.5 border-[2px]' : 'h-2.5 w-2.5 border-2'} rounded-full border-white shadow-sm ${dotMeta.cls}`}
-          aria-label={dotMeta.label}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ModalPresenceBadge({ presence, compact = false, testId }: { presence: PresenceMeta; compact?: boolean; testId?: string }) {
-  return (
-    <span
-      data-testid={testId}
-      className={`inline-flex items-center gap-1 rounded-full border font-bold ${presence.toneClass} ${
-        compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
-      }`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${presence.dotClass}`} />
-      {presence.label}
-    </span>
-  );
-}
-
-function ModalInfoRow({ label, value, testId }: { label: string; value: string; testId?: string }) {
-  return (
-    <div data-testid={testId} className="flex items-center justify-between gap-4 py-2.5">
-      <span className="text-sm font-semibold text-[var(--toss-gray-3)]">{label}</span>
-      <span className="text-right text-sm font-bold text-[var(--foreground)]">{value}</span>
+      <StaffDetailModal
+        staff={selectedStaffForModal}
+        presence={selectedStaffPresence}
+        isLoadingPresence={isLoadingPresence}
+        onClose={() => setSelectedStaffForModal(null)}
+      />
     </div>
   );
 }

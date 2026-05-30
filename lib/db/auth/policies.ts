@@ -29,7 +29,9 @@
 // Phase 4 — 미등록 테이블은 erpIsAdmin only로 default-deny 유지.
 // ============================================================
 
+import { eq } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
+import { messages } from '../schema';
 import {
   type ErpClaims,
   erpIsAdmin,
@@ -94,6 +96,78 @@ export interface TablePolicy {
     sender?: string;
     approver?: string;
   };
+  /**
+   * 컬럼 단위/행 단위 추가 가드. 패턴(PUBLIC 등) 통과 후 op별로 한 번 더 호출되어
+   * row 내용에 따라 거부할 수 있다. true=허용, false=거부.
+   * (예: staff_members의 권한 컬럼 변경은 admin claim 필수)
+   */
+  guards?: Partial<Record<Op, (claims: ErpClaims, row: Record<string, unknown>) => boolean>>;
+  /**
+   * 비동기 행 단위 가드. 동기 guards 통과 후 op별로 호출되며, row만으로는 판정할 수
+   * 없어 DB 조회가 필요한 경우(예: where에 id만 있는 soft-delete에서 소유자 확인)에
+   * 사용. true=허용, false=거부. 동기 guards와 함께 정의되면 둘 다 통과해야 한다.
+   */
+  asyncGuards?: Partial<
+    Record<Op, (db: D1Client, claims: ErpClaims, row: Record<string, unknown>) => Promise<boolean>>
+  >;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 컬럼 단위 가드 헬퍼
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * staff_members 권한 상승 차단.
+ * role / permissions / password 컬럼을 쓰려는 시도는 admin claim일 때만 허용.
+ * (프로필 자기수정·구성원 등록 등 비권한 컬럼 쓰기는 그대로 통과)
+ */
+const PRIVILEGED_STAFF_COLUMNS = ['role', 'permissions', 'password'] as const;
+
+function staffPrivilegeGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+  const touchesPrivileged = PRIVILEGED_STAFF_COLUMNS.some(
+    (col) => Object.prototype.hasOwnProperty.call(row, col),
+  );
+  if (!touchesPrivileged) return true;
+  return erpIsAdmin(claims);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 채팅 메시지(messages) soft-delete 소유자 가드
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 채팅 메시지 삭제는 soft-delete(`is_deleted` UPDATE)로 동작하며, 클라이언트는
+ * `update({is_deleted:true}).eq('id', …)` 형태로 호출한다. where에 id만 있어
+ * row(=where eq + set)에는 sender_id가 없으므로 동기 가드로 소유자를 판정할 수
+ * 없다. → id로 messages.sender_id를 1건 조회해 작성자 본인(또는 admin)만 허용.
+ *
+ * 비-삭제 컬럼(content 등)을 함께 변경하려 해도 동일 규칙(작성자 본인/admin)을
+ * 적용한다. id가 없으면(전체 row 대상 등) 보수적으로 admin만 허용.
+ */
+async function messagesSelfDeleteGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims)) return true;
+  const me = erpStaffId(claims);
+  if (me === null) return false;
+
+  // row에 sender_id가 직접 들어온 경우(클라가 where/set에 포함) 우선 사용.
+  const inlineSender = getField<string>(row, 'sender_id');
+  if (inlineSender !== null) return inlineSender === me;
+
+  // 그 외에는 id로 작성자를 조회해 본인 여부 확인.
+  const id = getField<string | number>(row, 'id');
+  if (id === null) return false;
+  const rows = await db
+    .select({ sender_id: messages.sender_id })
+    .from(messages)
+    .where(eq(messages.id, String(id)))
+    .limit(1);
+  const target = rows[0];
+  if (!target) return false;
+  return target.sender_id !== null && target.sender_id === me;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -112,7 +186,16 @@ const PUBLIC_ALL = (table: string): TablePolicy => ({
 
 export const POLICY_REGISTRY: Registry = {
   // ── PUBLIC: FOR ALL USING (true) — 인증 무관 또는 to authenticated USING true
-  staff_members: PUBLIC_ALL('staff_members'),
+  // staff_members: 비권한 컬럼(프로필 자기수정·구성원 등록 등)은 PUBLIC 유지하되,
+  // role/permissions/password 같은 권한 컬럼 쓰기는 guard로 admin claim 강제.
+  // (권한 상승 차단 — 일반 직원의 self-admin 승격 방지)
+  staff_members: {
+    ...PUBLIC_ALL('staff_members'),
+    guards: {
+      insert: staffPrivilegeGuard,
+      update: staffPrivilegeGuard,
+    },
+  },
   companies: PUBLIC_ALL('companies'),
   board_posts: PUBLIC_ALL('board_posts'),
   daily_closures: PUBLIC_ALL('daily_closures'),
@@ -128,7 +211,19 @@ export const POLICY_REGISTRY: Registry = {
   board_post_reads: PUBLIC_ALL('board_post_reads'),
   license_continuing_education: PUBLIC_ALL('license_continuing_education'),
   popups: PUBLIC_ALL('popups'),
-  messages: PUBLIC_ALL('messages'),
+  // 채팅 메시지: 전송(insert)·조회(select)는 PUBLIC 유지하되, UPDATE(soft-delete)는
+  // 작성자 본인 또는 admin만 허용(asyncGuards로 sender_id 확인). 임의 사용자가 남의
+  // 메시지를 is_deleted=1로 지우는 권한상승을 차단. hard DELETE는 별도(아래 주석).
+  messages: {
+    table: 'messages',
+    select: 'PUBLIC',
+    insert: 'PUBLIC',
+    update: 'PUBLIC',
+    delete: 'PUBLIC',
+    asyncGuards: {
+      update: messagesSelfDeleteGuard,
+    },
+  },
 
   // ── STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY / SELF_ONLY (직원 단위)
   push_subscriptions: {
@@ -507,26 +602,36 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'official_doc_log',        // 공문서 발송 로그
   'system_settings',         // 시스템 설정(전자결재 양식 등) — key-value
 
-  // ── 2026-05-20 확인 — 아래 16개는 클라이언트 코드가 supabase.from()으로
+  // ── 2026-05-30 무음 실패 복구 — migration 0007로 D1에 신설된 기능 테이블 9종.
+  //    소비처가 supabase.from()/enqueueSupabaseMutation으로 호출하던 기능을
+  //    실테이블 신설과 함께 복구. 형제 테이블(board_*, inventory aux, 관리자 설정)과
+  //    동일하게 PUBLIC_ALL(로그인 사용자 접근). PII(상담/계약/경조) 포함이나 기존
+  //    컨벤션(staff_*, board_*가 PUBLIC_ALL)을 따라 앱 동작 유지 우선.
+  'op_consultations',            // 수술상담
+  'congratulations_condolences', // 경조사관리
+  'early_leave_records',         // 조기퇴근감지
+  'generated_contracts',         // 계약서자동생성
+  'board_post_stars',            // 게시판 별표(즐겨찾기)
+  'as_repair_records',           // AS 수리 접수
+  'return_records',              // 반품
+  'message_templates',           // 관리자 메시지 템플릿
+  'external_integrations',       // 관리자 외부 연동
+
+  // ── 2026-05-20 확인 — 아래는 클라이언트 코드가 supabase.from()으로
   //    호출하지만 Supabase에 테이블이 실제로 존재하지 않음(probe 결과 PGRST205
   //    + information_schema 부재). 즉 현재도 동작하지 않는 미완성/사장된 기능
   //    참조이며 D1 이관 대상이 아님. whitelist 등록 자체는 무해하고, 향후 해당
   //    기능을 살릴 때 테이블 생성과 함께 정책을 재정비해야 함.
   'org_chart_nodes',
-  'as_repair_records',
-  'return_records',
   'education_completions',
   'nurse_schedules',
   'profiles',
   'email_queue',
-  'congratulations_condolences',
   'work_type_change_history',
   'patient_prescriptions',
-  'early_leave_records',
   'inventory_items',
   'attendance_records',
   'document_submissions',
-  'generated_contracts',
   'work_schedules',
 ];
 
@@ -686,7 +791,15 @@ export async function canAccess(args: PolicyCheckArgs): Promise<boolean> {
   if (!cfg) return erpIsAdmin(args.claims);
   const pattern = cfg[args.op];
   if (!pattern) return erpIsAdmin(args.claims);
-  return evalPattern(pattern, args.db, args.claims, args.row, cfg);
+  const ok = await evalPattern(pattern, args.db, args.claims, args.row, cfg);
+  if (!ok) return false;
+  // 패턴 통과 후 컬럼 단위 가드 적용 (예: 권한 컬럼 변경 차단)
+  const guard = cfg.guards?.[args.op];
+  if (guard && !guard(args.claims, args.row)) return false;
+  // 비동기 행 단위 가드 (예: messages soft-delete 소유자 확인 — DB 조회 필요)
+  const asyncGuard = cfg.asyncGuards?.[args.op];
+  if (asyncGuard && !(await asyncGuard(args.db, args.claims, args.row))) return false;
+  return true;
 }
 
 /**

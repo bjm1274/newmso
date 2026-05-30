@@ -170,9 +170,12 @@ export default function DocumentRepository({
     } catch (e) { toast('저장 중 오류가 발생했습니다.', 'error'); } finally { setSaving(false); }
   };
 
-  const handleEdit = (d: Record<string, unknown>) => {
+  const handleEdit = async (d: Record<string, unknown>) => {
     setSelected(d);
-    setForm({ title: String(d.title || ''), category: String(d.category || '규정'), content: String(d.content || '') });
+    // 계약서 등 암호화된 content 는 표시 직전 복호화(평문 레코드는 그대로 통과)
+    const { decryptContract } = await import('@/lib/contract-crypto');
+    const decrypted = await decryptContract(String(d.content || ''));
+    setForm({ title: String(d.title || ''), category: String(d.category || '규정'), content: decrypted });
   };
 
   const handleDelete = async (doc: Record<string, unknown>) => {
@@ -214,7 +217,10 @@ export default function DocumentRepository({
   const handleOpenPdf = async () => {
     if (!selected) return;
     if (selected.content) {
-      openDocumentPrintView(selected, selectedCo);
+      // 인쇄 직전 복호화(평문 레코드는 그대로 통과)
+      const { decryptContract } = await import('@/lib/contract-crypto');
+      const decryptedContent = await decryptContract(String(selected.content || ''));
+      openDocumentPrintView({ ...selected, content: decryptedContent }, selectedCo);
       return;
     }
 
@@ -295,6 +301,7 @@ export default function DocumentRepository({
         <IssuedCertificateSection
           selectedCo={selectedCo}
           staffFilterName={staffFilterName}
+          user={user}
         />
       )}
 

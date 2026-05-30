@@ -19,6 +19,7 @@ import DischargeRuleBuilder from './퇴원심사규정빌더';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import 퇴원심사모바일목록 from './퇴원심사/모바일목록';
 import 퇴원심사모바일상세 from './퇴원심사/모바일상세';
+import { stayDays, isDischargeApproved, DISCHARGE_STATUS } from './퇴원심사/공통';
 
 interface ChartLine {
     code: string;
@@ -278,7 +279,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             disease_codes: diseaseCodes,
             admission_route: admissionRoute, discharge_type: dischargeType, drg_code: drgCode,
             items, chart_data: newChartData,
-            status: 'pending',
+            status: DISCHARGE_STATUS.pending,
             reviewer_name: user?.name || '알 수 없음', reviewer_id: user?.id || 'unknown',
             ai_analysis: '', created_at: new Date().toISOString(),
         };
@@ -286,16 +287,25 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         try {
             const { data, error } = await supabase.from('discharge_reviews').insert([review]).select();
             if (error) {
-                review.id = crypto.randomUUID();
-                setReviews([review as DischargeReview, ...reviews]);
-            } else if (data) {
+                // 저장 실패 시 가짜 id 로 로컬에만 추가하면 새로고침 시 소실되어
+                // 사용자가 저장 성공으로 오인한다. 에러를 알리고 폼을 유지한다.
+                console.error('퇴원심사 저장 실패:', error);
+                toast('퇴원심사 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
+                return;
+            }
+            if (data && data[0]) {
                 const created = data[0] as DischargeReview;
                 setReviews([created, ...reviews]);
                 setSelectedReview(created);
                 if (selectedTemplate) { runAutoCompare(created, selectedTemplate); }
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            toast('퇴원심사 저장 중 오류가 발생했습니다.', 'error');
+            return;
+        }
 
+        // 성공 시에만 폼 초기화
         setPatientName(''); setBirthDate(''); setGender(''); setDepartment('');
         setAdmissionDate(''); setNewChartData(''); setSelectedTemplateId('');
         setInsuranceType(''); setSurgeryName(''); setSurgeryDate('');
@@ -393,10 +403,10 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             });
             if (!allowCriticalApproval) return;
         }
-        setSelectedReview({ ...selectedReview, status: 'approved' });
-        setReviews(reviews.map(r => r.id === id ? { ...r, status: 'approved' } : r));
+        setSelectedReview({ ...selectedReview, status: DISCHARGE_STATUS.approved });
+        setReviews(reviews.map(r => r.id === id ? { ...r, status: DISCHARGE_STATUS.approved } : r));
         try {
-            await supabase.from('discharge_reviews').update({ status: 'approved' }).eq('id', id);
+            await supabase.from('discharge_reviews').update({ status: DISCHARGE_STATUS.approved }).eq('id', id);
         } catch (e) {
             toast(`승인 처리 실패: ${String((e as Error)?.message || e)}`, 'error');
             setSelectedReview(selectedReview);
@@ -531,8 +541,6 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             setAiResult('AI 분석 실패: ' + (err instanceof Error ? err.message : String(err)));
         } finally { setAiLoading(false); }
     };
-
-    const stayDays = (a: string, d: string) => { const v = Math.ceil((new Date(d).getTime() - new Date(a).getTime()) / 86400000); return v > 0 ? v : 0; };
 
     const isMobile = useIsMobile();
 
@@ -886,8 +894,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         {/* KPI 카드 4개 — reviews state 파생, 새 state 없음 */}
                         {!loading && reviews.length > 0 && (() => {
                             const today = new Date().toISOString().split('T')[0];
-                            const inProgress = reviews.filter(r => r.status !== 'approved').length;
-                            const approved = reviews.filter(r => r.status === 'approved').length;
+                            const inProgress = reviews.filter(r => !isDischargeApproved(r.status)).length;
+                            const approved = reviews.filter(r => isDischargeApproved(r.status)).length;
                             const avgProgress = reviews.length > 0
                                 ? Math.round(reviews.reduce((sum, r) => sum + (r.items.length > 0 ? (r.items.filter(i => i.checked).length / r.items.length) * 100 : 0), 0) / reviews.length)
                                 : 0;
@@ -928,8 +936,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${r.status === 'approved' ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
-                                                {r.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
+                                            <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDischargeApproved(r.status) ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
+                                                {isDischargeApproved(r.status) ? '✅ 승인' : '⏳ 심사 중'}
                                             </span>
                                             <span className="text-sm font-bold text-[var(--foreground)]">{r.patient_name}</span>
                                             {r.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{r.diagnosis}</span>}
@@ -942,7 +950,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </div>
                                 </div>
                                 <div className="mt-3 h-1.5 bg-[var(--tab-bg)] rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all ${r.status === 'approved' ? 'bg-green-500/100' : 'bg-[var(--accent)]'}`}
+                                    <div className={`h-full rounded-full transition-all ${isDischargeApproved(r.status) ? 'bg-green-500/100' : 'bg-[var(--accent)]'}`}
                                         style={{ width: `${r.items.length > 0 ? (r.items.filter(i => i.checked).length / r.items.length) * 100 : 0}%` }} />
                                 </div>
                             </button>
@@ -955,7 +963,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                     <div className="max-w-4xl mx-auto space-y-4" data-testid="discharge-review-detail">
                         <div className="flex justify-between items-center">
                             <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--accent)] hover:underline">← 목록으로</button>
-                            {!isEditing && selectedReview.status !== 'approved' && (
+                            {!isEditing && !isDischargeApproved(selectedReview.status) && (
                                 <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-500/10 rounded-lg hover:bg-blue-500/20">✏️ 정보 수정</button>
                             )}
                         </div>
@@ -965,8 +973,8 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${selectedReview.status === 'approved' ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
-                                            {selectedReview.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
+                                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${isDischargeApproved(selectedReview.status) ? 'bg-green-500/20 text-green-700' : 'bg-orange-500/20 text-orange-700'}`}>
+                                            {isDischargeApproved(selectedReview.status) ? '✅ 승인' : '⏳ 심사 중'}
                                         </span>
                                         {isEditing ? (
                                             <select value={editForm.template_id} onChange={e => {
@@ -1162,7 +1170,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <h3 className="text-sm font-bold text-[var(--foreground)]">체크리스트 ({selectedReview.items.filter(i => i.checked).length}/{selectedReview.items.length})</h3>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-[var(--accent)]">{selectedReview.items.length > 0 ? Math.round((selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100) : 0}%</span>
-                                    {selectedReview.status !== 'approved' && (
+                                    {!isDischargeApproved(selectedReview.status) && (
                                         <div className="flex gap-1">
                                             <button data-testid="discharge-review-toggle-all" onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-500/10 rounded hover:bg-green-500/20">전체✓</button>
                                             <button onClick={() => toggleAll(false)} className="px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] bg-[var(--tab-bg)] rounded hover:bg-[var(--tab-bg)]">해제</button>
@@ -1176,9 +1184,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             </div>
                             <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar">
                                 {selectedReview.items.map(item => (
-                                    <button key={item.id} onClick={() => selectedReview.status !== 'approved' && toggleItem(selectedReview.id, item.id)}
-                                        disabled={selectedReview.status === 'approved'}
-                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-500/10 border border-green-500/20' : 'bg-[var(--tab-bg)] border border-transparent hover:border-[var(--border)]'} ${selectedReview.status === 'approved' ? 'cursor-default' : 'cursor-pointer'}`}>
+                                    <button key={item.id} onClick={() => !isDischargeApproved(selectedReview.status) && toggleItem(selectedReview.id, item.id)}
+                                        disabled={isDischargeApproved(selectedReview.status)}
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-500/10 border border-green-500/20' : 'bg-[var(--tab-bg)] border border-transparent hover:border-[var(--border)]'} ${isDischargeApproved(selectedReview.status) ? 'cursor-default' : 'cursor-pointer'}`}>
                                         <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 shrink-0 text-[10px] ${item.checked ? 'bg-green-500/100 border-green-500 text-white' : 'border-[var(--border)]'}`}>{item.checked && '✓'}</div>
                                         {item.code && <span className="font-mono text-[10px] text-[var(--toss-gray-3)] w-20 shrink-0 truncate">{item.code}</span>}
                                         <span className={`text-xs font-medium flex-1 ${item.checked ? 'text-green-700 line-through' : 'text-[var(--toss-gray-5)]'}`}>{item.label}</span>
@@ -1241,14 +1249,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         {/* AI 분석 */}
                         <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">Gemini 3</span></h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">Gemini 2.5</span></h3>
                                 <button onClick={requestAiAnalysis} disabled={aiLoading}
                                     className="px-4 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-all flex items-center gap-1.5">
                                     {aiLoading ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 분석 중...</> : '✨ AI 분석'}
                                 </button>
                             </div>
                             {(aiResult || aiLoading) && (
-                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-500/10/50 border-purple-100' : 'bg-[var(--tab-bg)] border-[var(--border)]'}`}>
+                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-500/10 border-purple-100' : 'bg-[var(--tab-bg)] border-[var(--border)]'}`}>
                                     {aiLoading ? (
                                         <div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-purple-500/20 border-t-purple-600 rounded-full animate-spin" /><p className="text-sm text-purple-600 font-medium">심사 분석 중...</p></div>
                                     ) : <div className="text-sm text-[var(--toss-gray-5)] font-medium leading-relaxed whitespace-pre-wrap">{aiResult}</div>}
@@ -1257,7 +1265,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             {!aiResult && !aiLoading && <p className="text-xs text-[var(--toss-gray-3)] font-medium text-center py-4">AI 분석으로 누락/과잉 청구를 확인하세요.</p>}
                         </div>
 
-                        {selectedReview.status !== 'approved' && (
+                        {!isDischargeApproved(selectedReview.status) && (
                             <button data-testid="discharge-review-approve" onClick={() => approveReview(selectedReview.id)}
                                 className="w-full py-4 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.99] shadow-sm shadow-green-600/20">✅ 퇴원 승인</button>
                         )}

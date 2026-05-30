@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { bindChannelHealthcheck, bindPageRefresh } from '@/lib/realtime-maintenance';
@@ -15,9 +14,7 @@ import {
 } from '@/lib/notification-metadata';
 import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
 import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { toNotificationText, getInitials, timeAgo } from '@/lib/notification-utils';
-import { NOTICE_ROOM_ID } from '@/lib/constants';
 
 // ─── 서브모듈 re-exports (외부 import 호환성 유지) ───
 export type { NotifSettings } from './알림시스템/settings';
@@ -1578,7 +1575,6 @@ export default function NotificationSystem({
     // polling 1개로 통합 — notifications row가 도착하면 emitIncomingNotification.
     // payload 기반 즉시 분석(예: 결재 차례 / 재고 부족 / 단어 필터)은 사라짐.
     // 향후 phase: 서버 cron이 notifications insert로 보강.
-    void insertNoti; // 미사용 변수 경고 회피 (다른 곳에서 호출되는 helper)
 
     if (!didPrimeNotificationsRef.current) {
       didPrimeNotificationsRef.current = true;
@@ -1589,11 +1585,14 @@ export default function NotificationSystem({
         .lt('created_at', mountedAt)
         .order('created_at', { ascending: false })
         .limit(50)
-        .then(({ data: rows }) => {
-          rows?.forEach((row: Record<string, unknown>) => {
-            if (row?.id) shownIdsRef.current.add(getNotificationDisplayKey(row));
-          });
-        });
+        .then(
+          ({ data: rows }) => {
+            rows?.forEach((row: Record<string, unknown>) => {
+              if (row?.id) shownIdsRef.current.add(getNotificationDisplayKey(row));
+            });
+          },
+          () => { /* prime 실패는 다음 polling/visibility에서 보강 */ },
+        );
     }
 
     // 초기 렌더와 realtime 구독 사이에 들어온 unread 알림을 놓치지 않도록 한 번 더 보강 조회합니다.
@@ -1769,16 +1768,19 @@ export default function NotificationSystem({
       if (!effectiveUserId || Date.now() - lastHiddenRef.current < 2000) return;
       const since = new Date(Date.now() - 90 * 1000).toISOString();
       supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', effectiveUserId).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
-        .then(({ data: rows }) => {
-          rows?.forEach((row: Record<string, unknown>) => {
-            emitIncomingNotification(row);
-          });
-          void syncBadge();
-          // 다른 알림 컴포넌트도 즉시 갱신되도록 broadcast 트리거
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
-          }
-        });
+        .then(
+          ({ data: rows }) => {
+            rows?.forEach((row: Record<string, unknown>) => {
+              emitIncomingNotification(row);
+            });
+            void syncBadge();
+            // 다른 알림 컴포넌트도 즉시 갱신되도록 broadcast 트리거
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
+            }
+          },
+          () => { /* 복귀 재조회 실패는 다음 visibility/polling에서 보강 */ },
+        );
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);

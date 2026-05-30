@@ -5,6 +5,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { toDateKey } from '@/lib/date-utils';
 import {
   buildBedKey,
   buildHandoverSearchText,
@@ -82,13 +83,6 @@ const DEFAULT_SHIFT = 'Day';
 const DEFAULT_PRIORITY = 'Normal';
 const DEFAULT_SCOPE: HandoverNoteScope = 'general';
 
-function pad(value: number) {
-  return String(value).padStart(2, '0');
-}
-
-function toDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 function fromDateKey(value: string) {
   const [year, month, day] = value.split('-').map(Number);

@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { InventoryItem } from '@/types';
 import { formatWon } from '@/lib/date-formatter';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import ExpirationAlert from './유효기간알림';
 import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
@@ -190,24 +191,33 @@ export default function InventoryStatusView({
     if (!editItem) return;
     setEditSaving(true);
     try {
-      const { error } = await supabase.from('inventory').update({
-        item_name: editForm.item_name.trim() || undefined,
-        name: editForm.item_name.trim() || undefined,
-        category: editForm.category.trim() || null,
-        unit: editForm.unit.trim() || 'EA',
-        quantity: Math.max(0, Number(editForm.quantity) || 0),
-        stock: Math.max(0, Number(editForm.quantity) || 0),
-        unit_price: Number(editForm.unit_price) || 0,
-        min_quantity: Number(editForm.min_quantity) || 0,
-        min_stock: Number(editForm.min_quantity) || 0,
-        company: editForm.company.trim() || null,
-        department: editForm.department.trim() || null,
-        spec: editForm.spec.trim() || null,
-        lot_number: editForm.lot_number.trim() || null,
-        expiry_date: editForm.expiry_date.trim() || null,
-        insurance_code: editForm.insurance_code.trim() || null,
-        location: editForm.location.trim() || null,
-      }).eq('id', editItem.id);
+      // inventory 테이블에 unit 컬럼이 없어 무음 실패할 수 있으므로
+      // withMissingColumnsFallback로 'unit'을 안전하게 드롭(재고이관.tsx와 동일 패턴).
+      const { error } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const payload: Record<string, unknown> = {
+            item_name: editForm.item_name.trim() || undefined,
+            name: editForm.item_name.trim() || undefined,
+            category: editForm.category.trim() || null,
+            unit: editForm.unit.trim() || 'EA',
+            quantity: Math.max(0, Number(editForm.quantity) || 0),
+            stock: Math.max(0, Number(editForm.quantity) || 0),
+            unit_price: Number(editForm.unit_price) || 0,
+            min_quantity: Number(editForm.min_quantity) || 0,
+            min_stock: Number(editForm.min_quantity) || 0,
+            company: editForm.company.trim() || null,
+            department: editForm.department.trim() || null,
+            spec: editForm.spec.trim() || null,
+            lot_number: editForm.lot_number.trim() || null,
+            expiry_date: editForm.expiry_date.trim() || null,
+            insurance_code: editForm.insurance_code.trim() || null,
+            location: editForm.location.trim() || null,
+          };
+          if (omittedColumns.has('unit')) delete payload.unit;
+          return supabase.from('inventory').update(payload).eq('id', editItem.id);
+        },
+        ['unit'],
+      );
 
       if (error) {
         toast(`수정 실패: ${error.message}`, 'error');

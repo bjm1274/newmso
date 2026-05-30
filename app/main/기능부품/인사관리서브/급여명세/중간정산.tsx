@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-upsert';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import {
   calculateDcRetirementBenefitFromMonthlyWage,
@@ -24,6 +24,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
+import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
 const INTERIM_TIME_STEP_MINUTES = 10;
@@ -433,7 +434,9 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     let localTax = 0;
 
     if (applyInsurance) {
-      const fullNationalPension = Math.floor(totalTaxable * taxInsuranceRates.national_pension_rate);
+      // 국민연금 - 기준소득월액 상·하한 적용(정본 tax-free-limits 상수). 정규 급여정산과 동일 기준.
+      const npBase = Math.min(Math.max(totalTaxable, NP_INCOME_FLOOR), NP_INCOME_CEILING);
+      const fullNationalPension = Math.floor(npBase * taxInsuranceRates.national_pension_rate);
       nationalPension = isDuruNuriActive ? Math.floor(fullNationalPension * 0.2) : fullNationalPension;
 
       if (!isMedicalBenefit) {
@@ -581,7 +584,25 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         severance_pay: calc.severance,
       };
 
-      const { error: payrollSaveError } = await supabase.from('payroll_records').upsert(record, { onConflict: 'staff_id,year_month' });
+      const { error: payrollSaveError } = await upsertPayrollRecordWithFallback({
+        record: record as Record<string, unknown>,
+        optionalColumns: [
+          'meal_allowance',
+          'night_duty_allowance',
+          'vehicle_allowance',
+          'childcare_allowance',
+          'research_allowance',
+          'other_taxfree',
+          'attendance_deduction',
+          'attendance_deduction_detail',
+          'advance_pay',
+          'status',
+          'record_type',
+          'settlement_reason',
+          'settlement_date',
+          'severance_pay',
+        ],
+      });
       if (payrollSaveError) throw payrollSaveError;
 
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};

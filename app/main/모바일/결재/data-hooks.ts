@@ -273,23 +273,6 @@ export async function postTransition(params: {
 }
 
 // ─────────────────────────────────────────────
-// 알림 읽음 처리
-// ─────────────────────────────────────────────
-
-export async function markApprovalNotificationsRead(staffId: string, approvalIds: string[]) {
-  if (!staffId || approvalIds.length === 0) return;
-  try {
-    await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('staff_id', staffId)
-      .in('approval_id', approvalIds);
-  } catch {
-    // silent — 알림 누락은 치명적 아님
-  }
-}
-
-// ─────────────────────────────────────────────
 // 메모 헬퍼
 // ─────────────────────────────────────────────
 

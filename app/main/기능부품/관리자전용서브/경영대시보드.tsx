@@ -38,8 +38,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
   const stats = [
     {
       label: '이번 달 매출',
-      value: 'WOM',
-      detail: '전월 대비 +8.2%',
+      value: '집계 준비중',
+      detail: '매출 연동 예정',
       icon: 'analytics',
       tone: 'text-[var(--success)] bg-[var(--success-light)]',
     },

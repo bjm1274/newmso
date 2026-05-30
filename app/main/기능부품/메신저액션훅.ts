@@ -194,7 +194,7 @@ export function useChatMessageActions({
 
   const deleteMessage = useCallback(async (message: ChatMessage) => {
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
-      toast('공지 채널 메시지는 삭제할 수 없습니다.', 'success');
+      toast('공지 채널 메시지는 삭제할 수 없습니다.', 'warning');
       return;
     }
     if (String(message.sender_id) !== String(actorId) && !isMso) return;
@@ -234,10 +234,10 @@ export function useChatMessageActions({
           action: 'message_delete',
           target_type: 'message',
           target_id: message.id,
-          details: {
+          details: JSON.stringify({
             room_id: selectedRoomId,
             content: message.content,
-          },
+          }),
         },
       ]);
     } catch {

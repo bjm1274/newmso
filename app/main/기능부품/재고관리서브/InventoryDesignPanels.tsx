@@ -28,14 +28,6 @@ const stepClass: Record<NonNullable<StepItem['state']>, string> = {
   warning: 'border-orange-200 bg-orange-500/10 text-orange-700',
 };
 
-export function InventoryInfoBanner(_props: {
-  title: string;
-  description: string;
-  chips?: string[];
-}) {
-  return null;
-}
-
 export function InventorySummaryStrip({ items }: { items: SummaryItem[] }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">

@@ -24,7 +24,6 @@ import {
   type NotificationDeliveryLogEntry,
   type PushConnectionStatus,
 } from './알림시스템';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { timeAgo } from '@/lib/notification-utils';
 
 // ─── 타입 설정 ───
@@ -750,7 +749,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-[var(--foreground)] truncate">{entry.title}</p>
                       <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
-                        {entry.type} 쨌 {entry.stage}
+                        {entry.type} · {entry.stage}
                       </p>
                     </div>
                     <span className="text-[10px] text-[var(--toss-gray-3)] shrink-0">{timeAgo(entry.at)}</span>

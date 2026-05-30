@@ -277,7 +277,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
       const { data: attData } = await supabase
         .from('attendances')
         .select('*')
-        .eq('date', today)
+        .eq('work_date', today)
         .limit(500);
       const byStaff = new Map<string, Record<string, unknown>>();
       for (const row of (attData ?? []) as Record<string, unknown>[]) {
@@ -363,12 +363,14 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
 
   const load = useCallback(async () => {
     try {
-      let q = supabase
+      // handover_notes 에는 회사 컬럼이 없다(정본 스키마). 회사 격리는
+      // content 마커 파싱 방식으로만 가능하므로 여기서는 필터하지 않는다.
+      void company;
+      const q = supabase
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
-      if (company) q = q.eq('company', company);
       const { data, error } = await q;
       if (error) throw error;
       const mapped: HandoffRow[] = ((data ?? []) as Record<string, unknown>[]).map((r) => {
@@ -438,12 +440,15 @@ export function useStaffEvaluations(opts: { company?: string; selfId?: string | 
     let cancelled = false;
     void (async () => {
       try {
-        let q = supabase
+        // staff_evaluations 에는 회사 컬럼이 없다(정본 스키마: staff_id·
+        // evaluator_id·category·content·score). 회사 필터를 걸면 SQL 에러로
+        // 전체 조회가 무음 실패하므로 필터하지 않는다.
+        void company;
+        const q = supabase
           .from('staff_evaluations')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(200);
-        if (company) q = q.eq('company', company);
         const { data, error } = await q;
         if (error) throw error;
         if (cancelled) return;
@@ -455,7 +460,7 @@ export function useStaffEvaluations(opts: { company?: string; selfId?: string | 
           target_name: pickText(r, 'target_name', 'staff_name'),
           target_department: pickText(r, 'target_department', 'department'),
           score: pickNumber(r, 'score', 'overall_score', 'total_score'),
-          comment: pickText(r, 'comment', 'feedback', 'note'),
+          comment: pickText(r, 'content', 'comment', 'feedback', 'note'),
           created_at: pickText(r, 'created_at'),
         }));
         setRows(list);
@@ -847,8 +852,9 @@ export async function setOpCardState(
   const now = new Date().toISOString();
   const payload: Record<string, unknown> = {
     status: nextState,
-    last_updated_at: now,
-    last_updated_by: user?.id ?? null,
+    updated_at: now,
+    updated_by: user?.id ?? null,
+    updated_by_name: user?.name ?? null,
   };
   if (card.checkId) {
     const { error } = await supabase
@@ -863,10 +869,10 @@ export async function setOpCardState(
         {
           schedule_post_id: card.scheduleId,
           schedule_date: todayISO(),
-          status: nextState,
           patient_name: card.patient,
-          company: user?.company ?? null,
+          company_name: user?.company ?? '전체',
           created_by: user?.id ?? null,
+          created_by_name: user?.name ?? null,
           ...payload,
         },
       ]);
@@ -898,23 +904,28 @@ export function useDeposits(opts: { company?: string; date?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        let q = supabase
+        // 정본 컬럼은 company_id(이름 아님)이며 회사 격리는 서버 /api 경유가
+        // 정석이다. 모바일은 회사 '이름'만 알아 client-side id 필터가 불가하므로
+        // 회사 필터는 생략한다(서버 격리는 별도 과제). 실제 입금 완료(deposited)
+        // 건만 집계해 발행(issued)·취소(cancelled)가 합산되지 않도록 한다.
+        void company;
+        const q = supabase
           .from('virtual_account_deposits')
           .select('*')
+          .eq('deposit_status', 'deposited')
           .gte('created_at', `${date}T00:00:00`)
           .order('created_at', { ascending: false })
           .limit(50);
-        if (company) q = q.eq('company', company);
         const { data, error } = await q;
         if (error) throw error;
         if (cancelled) return;
         const list: DepositRow[] = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
           id: pickText(r, 'id'),
-          patient: pickText(r, 'patient_name') || '입금자 미상',
+          patient: pickText(r, 'patient_name', 'depositor_name', 'customer_name') || '입금자 미상',
           amount: pickNumber(r, 'amount', 'deposit_amount'),
           method: pickText(r, 'method', 'transaction_label') || '계좌이체',
-          time: pickText(r, 'created_at', 'transacted_at'),
-          status: pickText(r, 'status', 'deposit_status') || 'deposited',
+          time: pickText(r, 'deposited_at', 'created_at'),
+          status: pickText(r, 'deposit_status') || 'deposited',
           matched: pickText(r, 'match_status') === 'matched',
         }));
         setRows(list);
@@ -951,6 +962,7 @@ export type ClosingDay = {
   total: number;
   items: ClosingItem[];
   submitted: boolean;
+  closureId: string | null;
 };
 
 export function useClosingToday(opts: { company?: string; date?: string }) {
@@ -963,45 +975,54 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        let q = supabase
-          .from('daily_checks')
+        // 정본 모델: daily_closures(회사·일자별 마감 1건) ← daily_closure_items·
+        // daily_checks(closure_id 링크). 과거 코드는 존재하지 않는
+        // daily_checks.date/company/title/checked 를 조회해 항상 무음 실패했다.
+        // 회사 격리는 company_id 기준이나 모바일은 회사 '이름'만 알아 client
+        // 필터가 불가하므로 일자 기준으로만 조회한다.
+        void company;
+        const { data: closureData, error } = await supabase
+          .from('daily_closures')
           .select('*')
           .eq('date', date)
-          .limit(50);
-        if (company) q = q.eq('company', company);
-        const { data, error } = await q;
+          .order('created_at', { ascending: false })
+          .limit(1);
         if (error) throw error;
         if (cancelled) return;
 
-        const items: ClosingItem[] = ((data ?? []) as Record<string, unknown>[]).map((r) => {
-          const checked = Boolean(r.checked) || pickText(r, 'status') === 'done';
-          return {
-            id: pickText(r, 'id'),
-            title: pickText(r, 'title', 'name', 'label') || '마감 항목',
-            status: checked ? '완료' : '대기',
-            tone: checked ? 'success' : 'warning',
-          };
-        });
-
-        let total = 0;
-        try {
-          let totalQ = supabase
-            .from('daily_closure_items')
-            .select('amount')
-            .eq('date', date)
-            .limit(200);
-          if (company) totalQ = totalQ.eq('company', company);
-          const { data: totalData } = await totalQ;
-          total = ((totalData ?? []) as Record<string, unknown>[]).reduce(
-            (s, r) => s + pickNumber(r, 'amount'),
-            0,
-          );
-        } catch {
-          total = 0;
+        const closure = ((closureData ?? []) as Record<string, unknown>[])[0] ?? null;
+        if (!closure) {
+          setDay({ date, total: 0, items: [], submitted: false, closureId: null });
+          return;
         }
 
-        const submitted = items.length > 0 && items.every((i) => i.status === '완료');
-        setDay({ date, total, items, submitted });
+        const closureId = pickText(closure, 'id');
+        const total = pickNumber(closure, 'total_amount');
+        const statusText = pickText(closure, 'status');
+        const submitted = statusText === 'submitted' || statusText === 'completed' || statusText === '제출';
+
+        // 마감 항목(진료비 입금 내역)을 closure_id 로 조회해 요약 리스트 구성
+        let items: ClosingItem[] = [];
+        try {
+          const { data: itemData } = await supabase
+            .from('daily_closure_items')
+            .select('*')
+            .eq('closure_id', closureId)
+            .limit(200);
+          items = ((itemData ?? []) as Record<string, unknown>[]).map((r) => ({
+            id: pickText(r, 'id'),
+            title:
+              pickText(r, 'patient_name') ||
+              pickText(r, 'memo', 'payment_method') ||
+              '마감 항목',
+            status: submitted ? '완료' : '대기',
+            tone: submitted ? 'success' : 'warning',
+          }));
+        } catch {
+          items = [];
+        }
+
+        setDay({ date, total, items, submitted, closureId });
       } catch (err) {
         console.warn('[mobile-addon] closing load failed', err);
         if (!cancelled) setDay(null);

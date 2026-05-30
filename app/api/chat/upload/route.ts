@@ -5,10 +5,15 @@ import {
   uploadToR2,
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+// 첨부 업로드는 R2 PUT/서명 발급이 비싸다 — 사용자당 1분 내 최대 30회로 제한.
+const UPLOAD_RATE_LIMIT_MAX = 30;
+const UPLOAD_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 
@@ -160,6 +165,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const rateKey = `chat-upload:${String(session.user.id)}`;
+    const rate = await checkRateLimit(rateKey, UPLOAD_RATE_LIMIT_MAX, UPLOAD_RATE_LIMIT_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: '업로드 요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
+      );
+    }
+    await recordFailedAttempt(rateKey, UPLOAD_RATE_LIMIT_WINDOW_MS);
 
     const contentType = request.headers.get('content-type') || '';
 

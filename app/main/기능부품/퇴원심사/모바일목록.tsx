@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { stayDays, isDischargeApproved } from './공통';
 
 export type DischargeReviewSummary = {
   id: string;
@@ -21,12 +22,6 @@ export type 퇴원심사모바일목록Props = {
   onCreateNew: () => void;
   onOpenTemplate: () => void;
 };
-
-function stayDays(a: string, d: string): number {
-  if (!a || !d) return 0;
-  const v = Math.ceil((new Date(d).getTime() - new Date(a).getTime()) / 86400000);
-  return v > 0 ? v : 0;
-}
 
 type StatusFilter = 'all' | 'pending' | 'approved';
 
@@ -49,8 +44,8 @@ export default function 퇴원심사모바일목록({
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return reviews.filter((r) => {
-      if (statusFilter === 'pending' && r.status === 'approved') return false;
-      if (statusFilter === 'approved' && r.status !== 'approved') return false;
+      if (statusFilter === 'pending' && isDischargeApproved(r.status)) return false;
+      if (statusFilter === 'approved' && !isDischargeApproved(r.status)) return false;
       if (!normalized) return true;
       const haystack = `${r.patient_name} ${r.diagnosis} ${r.department}`.toLowerCase();
       return haystack.includes(normalized);
@@ -136,7 +131,7 @@ export default function 퇴원심사모바일목록({
             const total = r.items.length;
             const checked = r.items.filter((i) => i.checked).length;
             const ratio = total > 0 ? Math.round((checked / total) * 100) : 0;
-            const isApproved = r.status === 'approved';
+            const isApproved = isDischargeApproved(r.status);
             return (
               <li key={r.id}>
                 <button

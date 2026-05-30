@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
+import { isAnnualLeaveType } from '@/lib/annual-leave-ledger';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Leave = {
@@ -32,9 +33,8 @@ type LeaveGroup = {
   items: Leave[];
 };
 
-function isAnnualType(t: string) {
-  return typeof t === 'string' && t.includes('연차');
-}
+// 정본 isAnnualLeaveType 으로 통일 ('연차(이력)'·'연차(부여)'는 연차 통계에서 제외)
+const isAnnualType = (t: string) => isAnnualLeaveType(t);
 
 const LEAVE_TYPE_OPTIONS = ['연차', '반차', '병가', '경조', '특별휴가', '기타', '연차(이력)'];
 const STATUS_OPTIONS: Array<'대기' | '승인' | '반려'> = ['대기', '승인', '반려'];

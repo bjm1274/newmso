@@ -415,12 +415,12 @@ export function useWelfareBundle(company: string | undefined) {
           .limit(30);
         if (useCompany) checkupQ = checkupQ.eq('company', company!);
 
-        let licenseQ = supabase
-          .from('licenses')
-          .select('id, staff_id, staff_name, license_name, expiry_date, status, company')
+        // 정본 테이블은 staff_licenses 이며 staff_name/status/company 컬럼이 없다.
+        const licenseQ = supabase
+          .from('staff_licenses')
+          .select('id, staff_id, license_name, expiry_date')
           .order('expiry_date', { ascending: true })
           .limit(30);
-        if (useCompany) licenseQ = licenseQ.eq('company', company!);
 
         let deviceQ = supabase
           .from('medical_devices')
@@ -549,7 +549,7 @@ export function usePayrollSlips(staffId: string | null) {
           supabase
             .from('notifications')
             .select('title, body')
-            .eq('staff_id', staffId)
+            .eq('user_id', staffId)
             .ilike('title', '%급여명세%'),
         ]);
         if (cancelled) return;
@@ -930,21 +930,15 @@ export async function resolveTeamAbnormalForStaff(input: {
       .in('date', dates);
     if (updErr) throw updErr;
 
-    // 3) attendances(복수) — PC 워크센터가 보는 테이블. 컬럼 없을 수 있어 폴백.
+    // 3) attendances(복수) — PC 워크센터가 보는 테이블.
+    //    정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없으므로 status 만 갱신한다.
     const { error: updAttendancesErr } = await supabase
       .from('attendances')
-      .update({ status: 'present', late_minutes: 0, early_leave_minutes: 0 })
+      .update({ status: 'present' })
       .eq('staff_id', targetStaffId)
       .in('work_date', dates);
     if (updAttendancesErr) {
-      const { error: fallbackErr } = await supabase
-        .from('attendances')
-        .update({ status: 'present' })
-        .eq('staff_id', targetStaffId)
-        .in('work_date', dates);
-      if (fallbackErr) {
-        console.warn('[mobile-hr] attendances 보정 실패 — attendance(단수)만 갱신됨', fallbackErr);
-      }
+      console.warn('[mobile-hr] attendances 보정 실패 — attendance(단수)만 갱신됨', updAttendancesErr);
     }
 
     // 4) 마이페이지 KPI 재집계용 broadcast
@@ -1045,12 +1039,11 @@ export function useTeamAbnormalByDay(
           return;
         }
 
-        // 분 단위는 attendances(복수)에 — PC AbnormalWorkcenter와 동일 컬럼
+        // 정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없다.
+        // 지각/조퇴는 status 와 check_in/out 누락 여부로 판정한다.
         const { data: attRows, error: attErr } = await supabase
           .from('attendances')
-          .select(
-            'staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes',
-          )
+          .select('staff_id, work_date, status, check_in_time, check_out_time')
           .in('staff_id', staffIds)
           .gte('work_date', sinceStr);
         if (attErr) throw attErr;
@@ -1174,8 +1167,8 @@ export async function requestAttendanceClarificationDaily(input: {
  * 단일 (staff, date) 정상 처리.
  *
  * - attendance(단수): date == card.date 인 row 만 status='정상'
- * - attendances(복수): work_date == card.date 인 row 만 status='present',
- *   late_minutes=0, early_leave_minutes=0 (컬럼 없으면 폴백)
+ * - attendances(복수): work_date == card.date 인 row 만 status='present'
+ *   (late_minutes/early_leave_minutes 컬럼은 정본에 없음)
  * - 'erp-attendance-updated' broadcast
  */
 export async function resolveTeamAbnormalForStaffOnDate(input: {
@@ -1201,21 +1194,14 @@ export async function resolveTeamAbnormalForStaffOnDate(input: {
       console.warn('[mobile-hr] attendance(단수) 단일일 보정 실패', updErr);
     }
 
-    // attendances(복수)
+    // attendances(복수) — late_minutes/early_leave_minutes 컬럼 부재로 status 만 갱신
     const { error: updAttErr } = await supabase
       .from('attendances')
-      .update({ status: 'present', late_minutes: 0, early_leave_minutes: 0 })
+      .update({ status: 'present' })
       .eq('staff_id', targetStaffId)
       .eq('work_date', date);
     if (updAttErr) {
-      const { error: fallbackErr } = await supabase
-        .from('attendances')
-        .update({ status: 'present' })
-        .eq('staff_id', targetStaffId)
-        .eq('work_date', date);
-      if (fallbackErr) {
-        console.warn('[mobile-hr] attendances 단일일 보정 실패', fallbackErr);
-      }
+      console.warn('[mobile-hr] attendances 단일일 보정 실패', updAttErr);
     }
 
     if (typeof window !== 'undefined') {

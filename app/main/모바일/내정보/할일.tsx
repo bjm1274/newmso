@@ -29,9 +29,10 @@ type Todo = {
 };
 
 function getTodayKr() {
-  const now = new Date();
-  const kr = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kr.toISOString().slice(0, 10);
+  // 로컬 시간대 기준 오늘 날짜(YYYY-MM-DD). 'en-CA' 로캘은 ISO 형식을 보장한다.
+  // (이전 구현은 now+9h 후 toISOString 으로, 런타임이 이미 KST면 이중 가산되어
+  //  자정 부근에서 날짜가 하루 밀리는 위험이 있었다)
+  return new Date().toLocaleDateString('en-CA');
 }
 
 const FILTER_LABEL: Record<TodoFilter, string> = {
@@ -41,7 +42,7 @@ const FILTER_LABEL: Record<TodoFilter, string> = {
   all: '전체',
 };
 
-const PRIORITY_TONE: Record<NonNullable<Todo['priority']>, 'danger' | 'warning' | '' | ''> = {
+const PRIORITY_TONE: Record<NonNullable<Todo['priority']>, 'danger' | 'warning' | ''> = {
   urgent: 'danger',
   high: 'warning',
   medium: '',

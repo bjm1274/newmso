@@ -2,6 +2,10 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  REQUIRED_DOC_CATEGORIES,
+  validateDocUpload,
+} from '@/lib/document-submission-shared';
 import LicenseCESubmit from './면허보수교육제출';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
@@ -28,6 +32,17 @@ function formatDate(value?: string | null) {
     return parsed.toLocaleDateString('ko-KR');
 }
 
+// SEC: 미리보기 창에 document.write 로 주입되는 사용자 제어 값(title/content)을
+// 이스케이프해 저장형 XSS 를 차단한다. (lib 공통 유틸을 건드리지 않기 위한 지역 함수)
+function escapeHtml(value: unknown): string {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export default function MyDocuments(props: MyDocumentsProps) {
     const user = props.user as { id?: string; name?: string; company?: string } | undefined;
     const [documents, setDocuments] = useState<any[]>([]);
@@ -38,25 +53,8 @@ export default function MyDocuments(props: MyDocumentsProps) {
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // 필수 제출 서류 목록
-    const REQUIRED_DOCS = [
-        { id: '가족관계', label: '가족관계증명서' },
-        { id: '개인정보보호', label: '개인정보 보호교육' },
-        { id: '면허자격', label: '면허(자격)증 사본' },
-        { id: '보건증', label: '보건선결과(보건증)' },
-        { id: '안전보건', label: '산업안전 보건교육' },
-        { id: '성희롱예방', label: '성희롱 예방교육' },
-        { id: '신분증', label: '신분증 사본' },
-        { id: '일반검진', label: '일반 건강검진' },
-        { id: '잠복결핵', label: '잠복결핵 검진결과' },
-        { id: '장애인인식', label: '장애인 인식개선교육' },
-        { id: '등본', label: '주민등록등본' },
-        { id: '초본', label: '주민등록초본' },
-        { id: '괴롭힘예방', label: '직장내 괴롭힘 예방교육' },
-        { id: '통장', label: '통장사본' },
-        { id: '퇴직연금', label: '퇴직연금교육' },
-        { id: '특수검진', label: '특수 건강검진' },
-    ];
+    // 필수 제출 서류 목록 (공통 모듈에서 공유 — 데스크톱 16종)
+    const REQUIRED_DOCS = REQUIRED_DOC_CATEGORIES;
 
     useEffect(() => {
         fetchDocuments();
@@ -65,21 +63,29 @@ export default function MyDocuments(props: MyDocumentsProps) {
     const fetchDocuments = async () => {
         if (!user?.id) return;
         setIsLoading(true);
-        const [{ data: nextDocuments }, { data: nextContracts }] = await Promise.all([
-            supabase
-                .from('document_repository')
-                .select('*')
-                .eq('created_by', user.id)
-                .order('created_at', { ascending: false }),
-            supabase
-                .from('employment_contracts')
-                .select('id, contract_type, status, requested_at, signed_at, signature_data')
-                .eq('staff_id', user.id)
-                .order('created_at', { ascending: false }),
-        ]);
-        setDocuments(nextDocuments || []);
-        setContracts((nextContracts as ContractRecord[]) || []);
-        setIsLoading(false);
+        try {
+            const [docResult, contractResult] = await Promise.all([
+                supabase
+                    .from('document_repository')
+                    .select('*')
+                    .eq('created_by', user.id)
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('employment_contracts')
+                    .select('id, contract_type, status, requested_at, signed_at, signature_data')
+                    .eq('staff_id', user.id)
+                    .order('created_at', { ascending: false }),
+            ]);
+            if (docResult.error) throw docResult.error;
+            if (contractResult.error) throw contractResult.error;
+            setDocuments(docResult.data || []);
+            setContracts((contractResult.data as ContractRecord[]) || []);
+        } catch (error) {
+            console.error('[서류제출] 문서/계약서 조회 실패:', error);
+            toast('서류 정보를 불러오지 못했습니다.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // JM2: 부모에서 매번 새 객체 참조로 latestContract를 내려보내도 실질적인 값이
@@ -132,10 +138,10 @@ export default function MyDocuments(props: MyDocumentsProps) {
             preview.document.write(`
               <html>
                 <head>
-                  <title>${document.title || '문서 보기'}</title>
-                  <style>body{font-family:'Noto Sans KR',sans-serif;line-height:1.6;padding:24px;color:#111827} img{max-width:100%;height:auto}</style>
+                  <title>${escapeHtml(document.title || '문서 보기')}</title>
+                  <style>body{font-family:'Noto Sans KR',sans-serif;line-height:1.6;padding:24px;color:#111827;white-space:pre-wrap} img{max-width:100%;height:auto}</style>
                 </head>
-                <body>${document.content}</body>
+                <body>${escapeHtml(document.content)}</body>
               </html>
             `);
             preview.document.close();
@@ -232,6 +238,15 @@ export default function MyDocuments(props: MyDocumentsProps) {
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
+        // 공통 단일 업로드 정책(MIME 화이트리스트 + 크기 한도)으로 사용자 선택 파일 검증.
+        // 카메라 촬영본(로컬 생성 JPEG)은 항상 정책 내라 검증 흐름에 회귀 없음.
+        for (const file of files) {
+            const validation = validateDocUpload(file);
+            if (!validation.ok) {
+                toast(validation.message, 'error');
+                return;
+            }
+        }
         handleUploadSuccess(files, docType);
     };
 

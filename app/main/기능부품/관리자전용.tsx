@@ -19,7 +19,19 @@ import {
 import dynamic from 'next/dynamic';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 import { MenuIcon } from './조직도서브/조직도측면창';
-import { isAdminWorkcenterId, getAdminWorkcenter } from './관리자워크센터';
+import { isAdminWorkcenterId, getAdminWorkcenter, type AdminWorkcenterId } from './관리자워크센터';
+
+// 영문 워크센터 id → 세부 권한 검증에 사용할 한글 관리자 섹션 id 매핑.
+// 한글 흐름(visibleOperationsTabs/visibleAuditTabs 등)과 동일한 세부 권한 게이팅을
+// 워크센터 경로에도 적용하기 위함. (canAccessAdminSection은 한글 섹션 id를 받는다)
+const ADMIN_WORKCENTER_SECTION: Record<AdminWorkcenterId, AdminOuterTabId> = {
+  exec: '경영분석',
+  company: '회사관리',
+  roles: '직원권한',
+  ops: '운영설정',
+  forms: '문서양식',
+  audit: '감사센터',
+};
 
 // ── 서브뷰 lazy 로드 (관리자 메뉴 번들 최소화) ──
 const AdminSubViewLoading = () => (
@@ -227,8 +239,21 @@ export default function AdminView(props: Record<string, unknown>) {
 
   // 사이드바2 옵트인: 영문 id(`exec`, `company`, `roles`, `ops`, `forms`, `audit`)가
   // 전달되면 새 통합 워크센터로 라우팅. 기존 한글 id는 아래 기존 흐름 그대로 동작.
-  // 권한 검증(hasAdminMenuAccess)은 이미 통과한 뒤이므로 안전.
+  // hasAdminMenuAccess(메뉴 진입권)만으로 통과시키지 않고, 한글 흐름과 동일하게
+  // canAccessAdminSection(세부 권한)으로 워크센터 단위 게이팅을 적용한다.
   if (isAdminWorkcenterId(initialTab)) {
+    const sectionTab = ADMIN_WORKCENTER_SECTION[initialTab];
+    if (!canAccessAdminTab(user, sectionTab)) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
+          <div className="mb-4 text-6xl">🔒</div>
+          <h2 className="text-xl font-bold text-[var(--foreground)]">이 관리자 워크센터에 접근할 권한이 없습니다.</h2>
+          <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
+            관리자 세부 권한을 확인해 주세요.
+          </p>
+        </div>
+      );
+    }
     const Workcenter = getAdminWorkcenter(initialTab);
     return (
       <div

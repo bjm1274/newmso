@@ -35,3 +35,15 @@ export function getKoreanTodayString(): string {
   const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   return koreaNow.toISOString().split('T')[0];
 }
+
+/**
+ * Date → 로컬 타임존 기준 'YYYY-MM-DD' 키 문자열.
+ * UTC 변환을 쓰지 않으므로 로컬 날짜 경계와 일치 — 캘린더(근태/인계/메신저/조직도) 날짜 키로 사용.
+ * (근무현황/인계노트/메신저/조직도서브 OrgChart 에 중복 정의되던 것을 통합)
+ */
+export function toDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

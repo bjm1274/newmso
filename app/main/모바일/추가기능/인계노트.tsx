@@ -58,7 +58,6 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
     return (
       <HandoverNoteForm
         user={user}
-        company={company}
         onClose={() => { setShowForm(false); void refresh(); }}
       />
     );
@@ -260,11 +259,9 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
 // ─── 인계노트 작성 폼 ─────────────────────────────────────────
 function HandoverNoteForm({
   user,
-  company,
   onClose,
 }: {
   user: ErpUser;
-  company: string | undefined;
   onClose: () => void;
 }) {
   const [v, setV] = useState<HandoverFormState>(HANDOVER_INITIAL);
@@ -285,15 +282,16 @@ function HandoverNoteForm({
         typeof (user as Record<string, unknown>).name === 'string'
           ? (user as Record<string, unknown>).name as string
           : '';
+      // 정본 스키마(handover_notes): content·author_id·author_name·shift·
+      // priority·is_completed·created_at. note_scope·company 컬럼은 존재하지
+      // 않아(데스크톱은 옵셔널 폴백으로 처리) insert 시 제거한다.
       const payload: Record<string, unknown> = {
         content: v.body.trim() ? `${title}\n${v.body.trim()}` : title,
         author_name: authorName,
         author_id: user.id,
         shift: v.shift,
         priority: v.priority,
-        note_scope: 'general',
-        company: company ?? null,
-        is_completed: false,
+        is_completed: 0,
         created_at: new Date().toISOString(),
       };
 

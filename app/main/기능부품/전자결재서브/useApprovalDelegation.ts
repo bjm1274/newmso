@@ -5,9 +5,9 @@ import {
   getApprovalRevision,
   isApprovalOverdue,
   markDelayNotification,
-  resolveApprovalDelegateConfig,
   shouldSendDelayNotification,
 } from '@/lib/approval-workflow';
+import { resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
@@ -41,13 +41,10 @@ export function useApprovalDelegation({
   const resolveEffectiveApproverId = useCallback((approverId: string | null | undefined) => {
     if (!approverId) return null;
     const matchedStaff = approvalStaffMap.get(String(approverId));
-    const delegateConfig = resolveApprovalDelegateConfig(
+    return resolveEffectiveApproverIdCore(
+      approverId,
       matchedStaff && typeof matchedStaff === 'object' ? (matchedStaff as unknown as ApprovalRecord) : null
     );
-    if (delegateConfig.active && delegateConfig.delegateId) {
-      return String(delegateConfig.delegateId);
-    }
-    return String(approverId);
   }, [approvalStaffMap]);
 
   const resolveApprovalDelegateSnapshot = useCallback((item: ApprovalRecord) => {

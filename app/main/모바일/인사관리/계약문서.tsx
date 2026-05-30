@@ -187,24 +187,28 @@ function ContractTab({ staffId }: { staffId: string | null }) {
       }
       setLoading(true);
       try {
+        // 정본 employment_contracts 에는 title/end_date 컬럼이 없다.
         const { data, error } = await supabase
           .from('employment_contracts')
-          .select('id, title, start_date, end_date, contract_type, status')
+          .select('id, start_date, contract_type, status')
           .eq('staff_id', staffId)
           .order('start_date', { ascending: false })
           .limit(20);
         if (error) throw error;
         if (cancelled) return;
         setRows(
-          ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-            id: String(r.id ?? ''),
-            title:
-              typeof r.title === 'string' && r.title.length > 0 ? r.title : '계약서',
-            start_date: typeof r.start_date === 'string' ? r.start_date : null,
-            end_date: typeof r.end_date === 'string' ? r.end_date : null,
-            contract_type: typeof r.contract_type === 'string' ? r.contract_type : null,
-            status: typeof r.status === 'string' ? r.status : null,
-          })),
+          ((data ?? []) as Record<string, unknown>[]).map((r) => {
+            const contractType =
+              typeof r.contract_type === 'string' ? r.contract_type : null;
+            return {
+              id: String(r.id ?? ''),
+              title: contractType && contractType.length > 0 ? contractType : '계약서',
+              start_date: typeof r.start_date === 'string' ? r.start_date : null,
+              end_date: null,
+              contract_type: contractType,
+              status: typeof r.status === 'string' ? r.status : null,
+            };
+          }),
         );
       } catch (err) {
         if (!cancelled) {

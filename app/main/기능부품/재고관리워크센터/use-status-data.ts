@@ -82,7 +82,7 @@ export function useStatusData(userCompany?: string): StatusWorkcenterData {
           supabase.from('inventory').select('*').limit(500),
           supabase
             .from('inventory_logs')
-            .select('actor_name,department,amount,change_type,created_at')
+            .select('actor_name,department,quantity,change_type,created_at')
             .in('change_type', ['사용', '소모', '출고'])
             .order('created_at', { ascending: false })
             .limit(500),

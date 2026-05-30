@@ -19,6 +19,7 @@ import MBtn from '../공통/MBtn';
 import MIcon from '../공통/MIcon';
 import { toast } from '@/lib/toast';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { canAccessHrSection } from '@/lib/access-control';
 import {
   MFormHeader,
   MField,
@@ -32,6 +33,10 @@ export type SFormMemberProps = {
   /** 등록 완료 후 콜백 (새 직원 id 전달). 미전달 시 onBack 호출. */
   onCreated?: (id: string) => void;
   onBack: () => void;
+  /** 현재 사용자 — 인사 권한 검증용. 미전달/권한 없음 시 등록 차단. */
+  user?: Record<string, unknown> | null;
+  /** 등록 대상 회사. undefined/'전체' 면 회사 특정 불가로 차단. */
+  company?: string;
 };
 
 type AuthLevel = 'employee' | 'team' | 'manager' | 'admin';
@@ -54,9 +59,16 @@ const DEPT_OPTIONS = ['경영지원팀', '영상의학팀', '간호부', '외래
 
 const STEP_TITLES = ['기본 정보', '계약·근무', '권한 설정'];
 
-export default function 구성원등록({ onBack, onCreated }: SFormMemberProps) {
+export default function 구성원등록({ onBack, onCreated, user, company }: SFormMemberProps) {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  // 직원 등록은 인사 권한(hr_구성원) 보유자/관리자만 가능.
+  const canRegister = canAccessHrSection(user, 'hr_구성원');
+  // 회사 특정 불가('전체'/미지정) 시 타 회사 PII 혼입 위험 → 차단.
+  const resolvedCompany = (company ?? '').trim();
+  const hasValidCompany = resolvedCompany !== '' && resolvedCompany !== '전체';
+  const canSubmit = canRegister && hasValidCompany;
   const [form, setForm] = useState<FormState>({
     name: '',
     emp: '',
@@ -80,6 +92,16 @@ export default function 구성원등록({ onBack, onCreated }: SFormMemberProps)
       return;
     }
 
+    // 권한 가드: 인사 권한 미보유 또는 회사 미특정 시 등록 차단.
+    if (!canRegister) {
+      toast('직원 등록 권한이 없습니다. 관리자에게 문의하세요.', 'error');
+      return;
+    }
+    if (!hasValidCompany) {
+      toast('등록할 회사를 특정할 수 없습니다. PC에서 회사를 선택해 등록하세요.', 'error');
+      return;
+    }
+
     // 마지막 단계: staff_members insert (JM5: 주민번호 등 민감 정보 제외, 오프라인 큐 적용)
     if (!form.name.trim()) {
       toast('이름을 입력해주세요.', 'warning');
@@ -94,6 +116,7 @@ export default function 구성원등록({ onBack, onCreated }: SFormMemberProps)
 
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
+      company: resolvedCompany,
       department: form.dept,
       position: form.role,
       employment_type: form.type,
@@ -140,9 +163,37 @@ export default function 구성원등록({ onBack, onCreated }: SFormMemberProps)
         sub={`${step + 1}/3 · ${STEP_TITLES[step] ?? ''}`}
         saveLabel={submitting ? '등록 중...' : step < 2 ? '다음' : '등록'}
         onSave={() => void handleSave()}
-        saveDisabled={(step === 0 && form.name.trim() === '') || submitting}
+        saveDisabled={
+          (step === 0 && form.name.trim() === '') ||
+          submitting ||
+          (step === 2 && !canSubmit)
+        }
       />
       <MStepDots total={3} cur={step} />
+      {!canSubmit && (
+        <div
+          role="alert"
+          style={{
+            margin: '12px 16px 0',
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'var(--m-warning-soft)',
+            color: 'var(--m-warning)',
+            fontSize: 12,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <MIcon name="alertTri" size={18} color="var(--m-warning)" />
+          <span style={{ flex: 1 }}>
+            {!canRegister
+              ? '직원 등록 권한이 없습니다. 등록은 인사 권한 보유자만 가능합니다.'
+              : '회사가 특정되지 않아 등록할 수 없습니다. PC에서 회사를 선택해 등록하세요.'}
+          </span>
+        </div>
+      )}
       <div className="m-scroll" aria-busy={submitting}>
         {step === 0 && <Step0 form={form} update={update} fieldId={fieldId} />}
         {step === 1 && <Step1 form={form} update={update} fieldId={fieldId} />}
@@ -153,7 +204,12 @@ export default function 구성원등록({ onBack, onCreated }: SFormMemberProps)
           <MBtn block onClick={() => setStep(step - 1)} disabled={submitting}>
             이전
           </MBtn>
-          <MBtn block variant="primary" onClick={() => void handleSave()} disabled={submitting}>
+          <MBtn
+            block
+            variant="primary"
+            onClick={() => void handleSave()}
+            disabled={submitting || (step === 2 && !canSubmit)}
+          >
             {submitting ? '등록 중...' : step < 2 ? '다음' : '등록 완료'}
           </MBtn>
         </div>

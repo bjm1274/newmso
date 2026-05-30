@@ -29,7 +29,12 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
   '0 0 * * *': [
     '/api/cron/unread-notification-repush',
     '/api/cron/leave-notice-announcements',
-    '/api/cron/birthday-announcements'
+    '/api/cron/birthday-announcements',
+    // 연차 자동화 (KST 09:00 매일):
+    '/api/cron/annual-leave-accrual',     // 1년미만 월 만근 +1 / 만N년 연차 자동부여
+    '/api/cron/annual-leave-promotion',   // 1차·2차 연차사용촉진 자동 발송
+    '/api/cron/annual-leave-expiry',      // 촉진 2회 완료 후 미사용 연차 자동소멸 (★기존 미등록 버그 수정)
+    '/api/cron/substitute-holiday'        // 공휴일 근무 → 대체휴무 자동지급
   ],
 };
 

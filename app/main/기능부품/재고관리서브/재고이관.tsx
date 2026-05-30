@@ -2,7 +2,6 @@
 import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import type { StaffMember, InventoryItem } from '@/types';
 import {
   getItemName,
@@ -260,30 +259,31 @@ export default function InventoryTransfer({
 
     setSaving(true);
     try {
-      const { error: sourceUpdateError } = await supabase
-        .from('inventory')
-        .update({ quantity: sourceNextQty, stock: sourceNextQty })
-        .eq('id', form.item_id);
-      if (sourceUpdateError) {
-        throw sourceUpdateError;
-      }
-
-      let destinationInventoryId = destinationItem?.id ?? null;
+      // 출발지 차감 + 목적지 증가/생성 + 이력 + 로그를 서버에서 단일
+      // D1 batch(all-or-nothing)로 처리한다. 중간 실패 시 재고가 증발하던
+      // 기존 다단계 클라 쓰기를 제거하고 원자성을 보장한다.
+      const requestBody: Record<string, unknown> = {
+        sourceId: form.item_id,
+        quantity: transferQuantity,
+        meta: {
+          item_name: getItemName(selectedItem),
+          from_company: sourceCompany || null,
+          from_department: sourceDept || null,
+          to_company: form.to_company || null,
+          to_department: form.to_dept || null,
+          reason: form.reason || null,
+          serial_number: selectedItem?.serial_number || null,
+          source_notes: sourceNotes,
+          dest_notes: destinationNotes,
+        },
+      };
 
       if (destinationItem) {
-        const { error: destinationUpdateError } = await supabase
-          .from('inventory')
-          .update({ quantity: destinationNextQty, stock: destinationNextQty })
-          .eq('id', destinationItem.id);
-        if (destinationUpdateError) {
-          throw destinationUpdateError;
-        }
+        requestBody.destId = String(destinationItem.id);
       } else {
-        const baseDestinationPayload: Record<string, any> = {
+        const newDest: Record<string, unknown> = {
           item_name: getItemName(selectedItem),
           category: selectedItem?.category || null,
-          quantity: transferQuantity,
-          stock: transferQuantity,
           min_quantity: selectedItem?.min_quantity ?? selectedItem?.min_stock ?? 0,
           unit_price: selectedItem?.unit_price ?? selectedItem?.price ?? 0,
           expiry_date: selectedItem?.expiry_date || null,
@@ -291,128 +291,41 @@ export default function InventoryTransfer({
           serial_number: selectedItem?.serial_number || null,
           is_udi: Boolean(selectedItem?.is_udi),
           company: form.to_company,
+          company_id: destinationCompanyId || null,
           department: form.to_dept || '',
           location: selectedItem?.location || null,
+          spec: selectedItem?.spec || null,
+          insurance_code: selectedItem?.insurance_code || null,
+          udi_code: selectedItem?.udi_code || null,
+          supplier_name: selectedItem?.supplier_name || null,
+          supplier: selectedItem?.supplier || null,
         };
-
-        if (selectedItem?.spec) baseDestinationPayload.spec = selectedItem.spec;
-        if (selectedItem?.insurance_code) baseDestinationPayload.insurance_code = selectedItem.insurance_code;
-        if (selectedItem?.udi_code) baseDestinationPayload.udi_code = selectedItem.udi_code;
-        if (selectedItem?.supplier_name) baseDestinationPayload.supplier_name = selectedItem.supplier_name;
-        if (selectedItem?.supplier) baseDestinationPayload.supplier = selectedItem.supplier;
-
-        const { data: insertedDestination, error: destinationInsertError } =
-          await withMissingColumnsFallback<Record<string, any>>(
-            (omittedColumns) => {
-              const destinationPayload: Record<string, any> = { ...baseDestinationPayload };
-
-              if (destinationCompanyId && !omittedColumns.has('company_id')) {
-                destinationPayload.company_id = destinationCompanyId;
-              }
-
-              if (omittedColumns.has('department')) {
-                delete destinationPayload.department;
-              }
-
-              return supabase
-                .from('inventory')
-                .insert([destinationPayload])
-                .select('*')
-                .single();
-            },
-            ['company_id', 'department'],
-          );
-        if (destinationInsertError) {
-          throw destinationInsertError;
-        }
-
-        destinationInventoryId = insertedDestination?.id ?? null;
+        requestBody.newDest = newDest;
       }
 
-      const transferPayload: Record<string, unknown> = {
-        item_id: form.item_id,
-        item_name: getItemName(selectedItem),
-        quantity: transferQuantity,
-        from_company: sourceCompany,
-        from_department: sourceDept,
-        to_company: form.to_company,
-        to_department: form.to_dept,
-        reason: form.reason,
-        serial_number: selectedItem?.serial_number || null,
-        transferred_by: user?.name,
-        transferred_by_id: user?.id,
-        status: '완료',
-      };
+      const response = await fetch('/api/inventory/stock-transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
+      });
 
-      const { error: transferError } = await withMissingColumnsFallback(
-        (omittedColumns) => {
-          const nextPayload = { ...transferPayload };
-          if (omittedColumns.has('serial_number')) {
-            delete nextPayload.serial_number;
-          }
-          return supabase.from('inventory_transfers').insert([nextPayload]);
-        },
-        ['serial_number'],
-      );
-      if (transferError) {
-        throw transferError;
-      }
-
-      const logRows = [
-        {
-          item_id: form.item_id,
-          inventory_id: form.item_id,
-          type: '이관',
-          change_type: '이관출고',
-          quantity: transferQuantity,
-          prev_quantity: maxQty,
-          next_quantity: sourceNextQty,
-          serial_number: selectedItem?.serial_number || null,
-          actor_name: user?.name,
-          company: sourceCompany,
-          notes: sourceNotes,
-        },
-      ];
-
-      if (destinationInventoryId) {
-        logRows.push({
-          item_id: destinationInventoryId,
-          inventory_id: destinationInventoryId,
-          type: '이관',
-          change_type: '이관입고',
-          quantity: transferQuantity,
-          prev_quantity: destinationPrevQty,
-          next_quantity: destinationNextQty,
-          serial_number: selectedItem?.serial_number || null,
-          actor_name: user?.name,
-          company: form.to_company,
-          notes: destinationNotes,
-        });
-      }
-
-      const { error: logError } = await withMissingColumnsFallback(
-        (omittedColumns) => {
-          const nextRows = logRows.map((row) => {
-            const nextRow: Record<string, unknown> = { ...row };
-            if (omittedColumns.has('serial_number')) {
-              delete nextRow.serial_number;
-            }
-            return nextRow;
-          });
-          return supabase.from('inventory_logs').insert(nextRows);
-        },
-        ['serial_number'],
-      );
-      if (logError) {
-        throw logError;
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) {
+        const code = result?.code;
+        let message = '이관 처리 실패';
+        if (code === 'INSUFFICIENT_STOCK') message = '출발지 재고가 부족합니다.';
+        else if (code === 'SOURCE_NOT_FOUND') message = '출발지 품목을 찾을 수 없습니다.';
+        else if (code === 'DEST_NOT_FOUND') message = '목적지 품목을 찾을 수 없습니다.';
+        throw new Error(message);
       }
 
       resetForm();
       setActiveTab('history');
       await Promise.all([Promise.resolve(fetchInventory()), fetchTransfers()]);
       toast('이관이 완료되었습니다.', 'success');
-    } catch {
-      toast('이관 처리 실패', 'error');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : '이관 처리 실패', 'error');
     } finally {
       setSaving(false);
     }

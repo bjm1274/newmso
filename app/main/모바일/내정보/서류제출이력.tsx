@@ -9,35 +9,20 @@
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import type { MChipTone } from '../공통/MChip';
+import {
+  type DocSubmissionRow,
+  docStatusIconName,
+  docStatusLabel,
+  docStatusTone,
+} from '@/lib/document-submission-shared';
 
-export type SubmissionRow = {
-  id: string;
-  submission_type: string;
-  reason: string | null;
-  file_url: string | null;
-  status: string;
-  submitted_at: string | null;
-  processed_at: string | null;
-};
+// 모바일 이력 행 타입은 공통 shape 재노출 (외부 import 호환 유지).
+export type SubmissionRow = DocSubmissionRow;
 
-function statusLabel(status: string): string {
-  if (status === '대기') return '검토 대기';
-  if (status === '발급완료') return '발급 완료';
-  if (status === '반려') return '반려됨';
-  return status;
-}
-
+const statusLabel = docStatusLabel;
+const iconName = docStatusIconName;
 function statusTone(status: string): MChipTone {
-  if (status === '발급완료') return 'success';
-  if (status === '대기') return 'warning';
-  if (status === '반려') return 'danger';
-  return '';
-}
-
-function iconName(status: string): string {
-  if (status === '발급완료') return 'checkCircle';
-  if (status === '반려') return 'fileWarning';
-  return 'fileText';
+  return docStatusTone(status) as MChipTone;
 }
 
 export type SubmissionHistoryProps = {
@@ -99,15 +84,15 @@ export default function SubmissionHistory({ rows, loading, onRefresh }: Submissi
                   placeItems: 'center',
                   borderRadius: 9,
                   background:
-                    row.status === '발급완료'
+                    statusTone(row.status) === 'success'
                       ? 'var(--m-success-soft)'
-                      : row.status === '반려'
+                      : statusTone(row.status) === 'danger'
                         ? 'var(--m-danger-soft)'
                         : 'var(--m-warning-soft)',
                   color:
-                    row.status === '발급완료'
+                    statusTone(row.status) === 'success'
                       ? 'var(--m-success)'
-                      : row.status === '반려'
+                      : statusTone(row.status) === 'danger'
                         ? 'var(--m-danger)'
                         : 'var(--m-warning)',
                 }}

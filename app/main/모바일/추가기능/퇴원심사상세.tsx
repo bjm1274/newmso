@@ -17,6 +17,7 @@ import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import { pickText, type DischargeRow } from './data-hooks';
+import { DISCHARGE_STATUS, type DischargeStatus } from '../../기능부품/퇴원심사/공통';
 
 type Tab = 'summary' | 'record' | 'comment';
 
@@ -59,7 +60,7 @@ export default function 퇴원심사상세({
         admission_date: pickText(row, 'admission_date'),
         discharge_date: pickText(row, 'discharge_date'),
         diagnosis: pickText(row, 'diagnosis'),
-        status: pickText(row, 'status') || 'pending',
+        status: pickText(row, 'status') || DISCHARGE_STATUS.pending,
         reviewer_id: pickText(row, 'reviewer_id'),
         reviewer_name: pickText(row, 'reviewer_name'),
         created_at: pickText(row, 'created_at'),
@@ -78,7 +79,9 @@ export default function 퇴원심사상세({
     void load();
   }, [load]);
 
-  const performAction = async (next: 'approved' | 'rejected' | 'review_requested') => {
+  const performAction = async (
+    next: Extract<DischargeStatus, 'approved' | 'rejected' | 'review_requested'>,
+  ) => {
     if (!detail || acting) return;
     setActing(true);
     const prevStatus = detail.status;
@@ -274,13 +277,13 @@ export default function 퇴원심사상세({
       </div>
 
       <div className="m-sticky-foot">
-        <MBtn block onClick={() => void performAction('review_requested')} disabled={acting}>
+        <MBtn block onClick={() => void performAction(DISCHARGE_STATUS.reviewRequested)} disabled={acting}>
           보완요청
         </MBtn>
-        <MBtn block variant="danger" onClick={() => void performAction('rejected')} disabled={acting}>
+        <MBtn block variant="danger" onClick={() => void performAction(DISCHARGE_STATUS.rejected)} disabled={acting}>
           반려
         </MBtn>
-        <MBtn block variant="primary" onClick={() => void performAction('approved')} disabled={acting}>
+        <MBtn block variant="primary" onClick={() => void performAction(DISCHARGE_STATUS.approved)} disabled={acting}>
           승인
         </MBtn>
       </div>

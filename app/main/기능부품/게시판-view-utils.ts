@@ -269,6 +269,9 @@ export function extractScheduleMetaFromContent(value: unknown) {
   }
 }
 
+// 일정 글의 content 직렬화 단일 소스(canonical).
+// chartNo는 가시 콘텐츠로, 일정 메타(date/time/room/...)는 [[SCHEDULE_META]] 블록으로 저장한다.
+// 읽기 경로(normalizeBoardPost → extractScheduleMetaFromContent)가 이 포맷을 기대한다.
 export function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
   const visibleContent = chartNo.trim();
   return `${visibleContent}${visibleContent ? '\n' : ''}${SCHEDULE_META_PREFIX}${JSON.stringify(meta)}${SCHEDULE_META_SUFFIX}`;

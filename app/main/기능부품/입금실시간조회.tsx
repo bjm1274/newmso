@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import {
   buildCompanyWebhookUrl,
@@ -97,15 +97,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
   const [webhookTesting, setWebhookTesting] = useState(false);
   const [webhookTestResult, setWebhookTestResult] = useState<{ok: boolean; msg: string} | null>(null);
 
-  // 엑셀 가져오기 상태
-  type ParsedRow = { date: string; amount: number; depositor: string; note: string; raw: string[] };
-  const [importRows, setImportRows] = useState<ParsedRow[]>([]);
-  const [importPreviewing, setImportPreviewing] = useState(false);
-  const [importSaving, setImportSaving] = useState(false);
-  const [importDone, setImportDone] = useState(0);
-  const [importError, setImportError] = useState('');
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const fileImportRef = useRef<HTMLInputElement>(null);
   const [matchStatus, setMatchStatus] = useState('all');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
@@ -178,36 +169,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     [origin, user?.company_id],
   );
 
-  const stats = useMemo(() => {
-    const todayKey = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Asia/Seoul',
-    }).format(new Date());
-
-    let todayAmount = 0;
-    let unmatchedCount = 0;
-    let issuedCount = 0;
-
-    rows.forEach((row) => {
-      const depositedDay = row.deposited_at ? row.deposited_at.slice(0, 10) : '';
-      if (depositedDay === todayKey && row.deposit_status === 'deposited') {
-        todayAmount += toAmountNumber(row.amount);
-      }
-      if (row.match_status !== 'matched') {
-        unmatchedCount += 1;
-      }
-      if (row.deposit_status === 'issued') {
-        issuedCount += 1;
-      }
-    });
-
-    return {
-      totalCount: rows.length,
-      unmatchedCount,
-      todayAmount,
-      issuedCount,
-    };
-  }, [rows]);
-
   // 수동 입금 등록
   const handleManualSubmit = async () => {
     setManualError('');
@@ -249,122 +210,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     const res = await fetch(`/api/payments/virtual-account-deposits?id=${id}`, { method: 'DELETE' });
     if (res.ok) await loadDeposits({ silent: true });
   };
-
-  // ── 엑셀/CSV 파싱 ────────────────────────────────────────────────
-  const parseExcelFile = useCallback(async (file: File) => {
-    setImportError('');
-    setImportRows([]);
-    setImportDone(0);
-    setImportPreviewing(true);
-    try {
-      const xlsx = await import('xlsx');
-      const buffer = await file.arrayBuffer();
-      const wb = xlsx.read(buffer, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw: string[][] = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][];
-
-      if (raw.length < 2) { setImportError('데이터가 없습니다.'); setImportPreviewing(false); return; }
-
-      // 헤더 행 찾기 (거래일, 금액, 입금자 등의 컬럼이 있는 행)
-      let headerIdx = 0;
-      for (let i = 0; i < Math.min(raw.length, 10); i++) {
-        const rowStr = raw[i].join('').toLowerCase();
-        if (rowStr.includes('거래') || rowStr.includes('금액') || rowStr.includes('날짜') || rowStr.includes('일시')) {
-          headerIdx = i;
-          break;
-        }
-      }
-      const headers = raw[headerIdx].map(h => String(h).trim().toLowerCase());
-
-      // 컬럼 인덱스 추측
-      const findCol = (...candidates: string[]) => {
-        for (const c of candidates) {
-          const idx = headers.findIndex(h => h.includes(c));
-          if (idx >= 0) return idx;
-        }
-        return -1;
-      };
-
-      const colDate    = findCol('거래일', '날짜', '일시', 'date');
-      const colAmount  = findCol('입금', '금액', '거래금액', 'amount');
-      const colDepositor = findCol('내용', '적요', '거래내용', '입금자', 'remark', 'memo');
-      const colNote    = findCol('메모', '비고', '특이', 'note');
-
-      const parsed: ParsedRow[] = [];
-      for (let i = headerIdx + 1; i < raw.length; i++) {
-        const row = raw[i];
-        if (!row || row.every(c => !String(c).trim())) continue;
-
-        const rawDate = colDate >= 0 ? String(row[colDate] || '') : '';
-        const rawAmount = colAmount >= 0 ? String(row[colAmount] || '').replace(/,/g, '') : '';
-        const amount = Number(rawAmount);
-
-        // 입금 건만 (양수 금액만)
-        if (!amount || amount <= 0) continue;
-
-        // 날짜 파싱 시도
-        let dateStr = '';
-        if (rawDate) {
-          const d = new Date(rawDate);
-          dateStr = isNaN(d.getTime())
-            ? rawDate  // 파싱 실패 시 원문
-            : d.toISOString();
-        }
-
-        const depositor = colDepositor >= 0 ? String(row[colDepositor] || '').trim() : '';
-        const note = colNote >= 0 ? String(row[colNote] || '').trim() : '';
-
-        parsed.push({
-          date: dateStr || new Date().toISOString(),
-          amount,
-          depositor: depositor || '(내용없음)',
-          note,
-          raw: row.map(String),
-        });
-      }
-
-      if (parsed.length === 0) {
-        setImportError('입금 내역을 찾지 못했습니다. 토스뱅크 거래내역 엑셀 파일이 맞는지 확인해주세요.');
-        setImportPreviewing(false);
-        return;
-      }
-
-      setImportRows(parsed);
-    } catch (e: any) {
-      setImportError(e.message || '파일을 읽을 수 없습니다.');
-      setImportPreviewing(false);
-    }
-  }, []);
-
-  // 엑셀에서 파싱된 데이터 일괄 등록
-  const handleImportSave = useCallback(async () => {
-    if (importRows.length === 0) return;
-    setImportSaving(true);
-    setImportError('');
-    let done = 0;
-    for (const row of importRows) {
-      try {
-        const res = await fetch('/api/payments/virtual-account-deposits', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            depositor_name: row.depositor,
-            amount: row.amount,
-            deposited_at: row.date,
-            matched_note: row.note || undefined,
-            transaction_label: row.depositor,
-          }),
-        });
-        if (res.ok) done++;
-      } catch { /* skip */ }
-    }
-    setImportDone(done);
-    setImportRows([]);
-    setImportPreviewing(false);
-    await loadDeposits({ silent: true });
-    setImportSaving(false);
-    setActiveTab('list');
-  }, [importRows, loadDeposits]);
 
   // 웹훅 테스트 발송
   const handleTestWebhook = async () => {
@@ -518,14 +363,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleImportSave}
-              disabled={importRows.length === 0}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              내보내기
-            </button>
-            <button
-              type="button"
               data-testid="realtime-deposit-refresh"
               onClick={() => loadDeposits({ silent: true })}
               className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)]/40 hover:bg-[var(--muted)]"
@@ -656,9 +493,9 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                     <p>개발자센터 → 내 상점 → 웹훅 → URL 추가</p>
                     <p className="font-mono bg-[var(--muted)] p-1.5 rounded text-[11px] break-all">{webhookUrl}</p>
                     <p>• 이벤트: <strong>DEPOSIT_CALLBACK</strong> 선택</p>
-                    <p>• 웹훅 시크릿 발급 시 아래 토큰과 동일하게 설정</p>
+                    <p>• 웹훅 시크릿 발급 시 환경변수와 동일한 값으로 설정</p>
                     <p className="font-mono bg-yellow-500/10 border border-yellow-500/20 p-1.5 rounded text-[11px] break-all">
-                      a382ddced410e85277f311353a8eb8d930f8a78a28135b5000673320ae3e1b02
+                      발급받은 웹훅 시크릿을 환경변수 VIRTUAL_ACCOUNT_WEBHOOK_TOKEN에 설정하세요
                     </p>
                   </div>
                 ),
@@ -672,7 +509,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                     <p>Cloudflare Workers → Settings → Variables</p>
                     <div className="bg-[var(--muted)] p-2 rounded space-y-1 font-mono text-[11px]">
                       <p><strong>VIRTUAL_ACCOUNT_WEBHOOK_TOKEN</strong></p>
-                      <p className="text-[var(--toss-gray-3)]">= a382ddced...b02 (위 토큰)</p>
+                      <p className="text-[var(--toss-gray-3)]">= 발급받은 웹훅 시크릿 값</p>
                       <p className="mt-1"><strong>TOSS_PAYMENTS_SECRET_KEY</strong></p>
                       <p className="text-[var(--toss-gray-3)]">= 가맹점 가입 후 발급받은 시크릿 키</p>
                     </div>
@@ -737,7 +574,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
 
       {/* 필터 */}
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm space-y-3">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr]">
+        <div className="grid gap-3 lg:grid-cols-[1.6fr_0.8fr_0.8fr]">
           <label className="space-y-1 text-sm">
             <span className="font-semibold text-[var(--foreground)]">검색</span>
             <input
@@ -747,17 +584,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
               placeholder="환자명, 거래건, 주문ID, 계좌번호"
               className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
             />
-          </label>
-          <label className="space-y-1 text-sm">
-            <span className="font-semibold text-[var(--foreground)]">결제수단</span>
-            <select
-              className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-            >
-              <option value="all">전체</option>
-              <option value="virtual">가상계좌</option>
-              <option value="card">카드</option>
-              <option value="cash">현금</option>
-            </select>
           </label>
           <label className="space-y-1 text-sm">
             <span className="font-semibold text-[var(--foreground)]">입금 상태</span>

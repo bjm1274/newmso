@@ -25,7 +25,9 @@ const StaffPermissionManager = dynamic(
   { ssr: false, loading: Loading }
 );
 
-export default function RolesWorkcenter() {
+// StaffPermissionManager(직원권한통합)는 user prop을 받지 않으므로 user를 전달하지 않는다.
+// 워크센터 시그니처 일관성을 위해 prop만 수용한다.
+export default function RolesWorkcenter(_props: { user?: unknown }) {
   const meta = ADMIN_WORKCENTERS.roles;
 
   return (

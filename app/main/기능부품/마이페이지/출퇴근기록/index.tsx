@@ -33,7 +33,7 @@ type ShiftBoundary,
 type WeatherData,
 } from './commute-types';
 import { CheckInSuccessModal,CheckOutSuccessModal } from './출퇴근모달';
-import { AttendanceCalendar,StatItem,TimeBox,WorkHoursChart } from './출퇴근차트';
+import { AttendanceCalendar,StatItem,WorkHoursChart } from './출퇴근차트';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
@@ -150,7 +150,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [distance, setDistance] = useState<number | null>(null); // 병원과의 거리
-  const [, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const effectiveUserId = getStaffLikeId(resolvedUser);
   const currentDateKey = formatLocalDateKey(currentTime);
@@ -163,7 +162,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const [staffShifts, setStaffShifts] = useState<StaffShiftEntry[]>([]);
   const [staffShiftNames, setStaffShiftNames] = useState<Map<string, string>>(new Map());
-  const [historyView, setHistoryView] = useState<'list' | 'calendar'>('calendar');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [showCheckInSuccess, setShowCheckInSuccess] = useState(false);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
@@ -350,10 +348,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveUserId]);
 
-  useEffect(() => {
-    if (!effectiveUserId) return;
-    void fetchTodayLog(currentDateKey);
-  }, [effectiveUserId, currentDateKey]);
+  // NOTE: 별도의 fetchTodayLog 호출 effect는 제거됨 — 위 initCommuteData effect가
+  //       동일 deps([effectiveUserId, currentMonth, currentDateKey])로 fetchTodayLog 를
+  //       이미 호출하므로 마운트/날짜변경 시 중복 호출이 발생했었다.
 
   // activeTodayLog의 current_status로 로컬 상태 초기화
   useEffect(() => {
@@ -370,9 +367,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   ]);
 
   const initCommuteData = async () => {
-    setLoading(true);
     await Promise.all([fetchTodayLog(currentDateKey), fetchMonthlyLogs()]);
-    setLoading(false);
   };
 
   const fetchTodayLog = async (targetDate = formatLocalDateKey(new Date())) => {
@@ -686,14 +681,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         );
       }
       return false;
-    } catch (error: any) {
-      logger.warn('위치 확인 실패:', error?.message ?? error);
+    } catch (error: unknown) {
+      const geoError = error as { message?: string; code?: number } | null;
+      logger.warn('위치 확인 실패:', geoError?.message ?? error);
       if (!showErrors) {
         return false;
       }
-      if (error?.code === 1) {
+      if (geoError?.code === 1) {
         toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
-      } else if (error?.code === 3) {
+      } else if (geoError?.code === 3) {
         toast('위치 확인 시간이 초과되었습니다. 야외에서 다시 시도하거나 GPS를 켜 주세요.', 'error');
       } else {
         toast('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.', 'error');
@@ -744,14 +740,17 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const now = new Date().toISOString();
 
       try {
+        // 근무상태 복원은 fetchTodayLog 가 읽는 `attendance` 테이블(date 컬럼)의
+        // current_status 를 기준으로 하므로, 쓰기도 동일 테이블로 일치시킨다.
+        // (이전에는 `attendances`/work_date 에 써서 새로고침 시 항상 '근무중'으로 리셋됐음)
         const { error } = await supabase
-          .from('attendances')
+          .from('attendance')
           .update({
             current_status: newCode,
             current_status_at: now,
           })
           .eq('staff_id', userId)
-          .eq('work_date', workDate);
+          .eq('date', workDate);
 
         if (error) {
           if (isMissingColumnError(error, 'current_status')) {

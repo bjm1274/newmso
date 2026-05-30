@@ -7,9 +7,9 @@ import {
   lockApprovalMeta,
 } from '@/lib/approval-workflow';
 import { supabase } from '@/lib/supabase';
+import { buildApprovalHistoryEntryCore } from '@/lib/approval-shared';
 import type { StaffMember } from '@/types';
 import type {
-  ProcessFinalApprovalOnServer,
   TransitionApprovalsOnServer,
 } from './useApprovalBulkActions';
 
@@ -23,7 +23,6 @@ type UseApprovalActionsParams = {
   fetchApprovals: () => void | Promise<void>;
   markApprovalNotificationsAsRead: (approvalIds: string[]) => void | Promise<void>;
   transitionApprovalsOnServer: TransitionApprovalsOnServer;
-  processFinalApprovalOnServer: ProcessFinalApprovalOnServer;
   resolveStoredCurrentApproverId: (item: ApprovalRecord) => string | null;
   resolveEffectiveApproverId: (approverId: string | null | undefined) => string | null;
   syncDelegatedApprovalRouting: (item: ApprovalRecord, currentApproverId: string | null) => Promise<unknown>;
@@ -69,12 +68,16 @@ export function useApprovalActions({
     return isApprovalLocked(metaData);
   }, []);
 
-  const buildApprovalHistoryEntry = useCallback((action: ApprovalHistoryEntry['action'], note?: string | null) => ({
-    action,
-    actor_id: user?.id ? String(user.id) : null,
-    actor_name: user?.name ? String(user.name) : null,
-    note: note ?? null,
-  }), [user?.id, user?.name]);
+  const buildApprovalHistoryEntry = useCallback(
+    (action: ApprovalHistoryEntry['action'], note?: string | null) =>
+      buildApprovalHistoryEntryCore(
+        user?.id ? String(user.id) : null,
+        user?.name ? String(user.name) : null,
+        action,
+        note
+      ),
+    [user?.id, user?.name]
+  );
 
   const buildNextApprovalMetaData = useCallback(
     (

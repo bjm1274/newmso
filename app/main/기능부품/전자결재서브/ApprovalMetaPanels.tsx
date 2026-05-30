@@ -481,10 +481,10 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
 
   const resolveBand = (shift: string) => {
     const s = String(shift || '').toLowerCase();
-    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd') return 'day';
-    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e') return 'evening';
-    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n') return 'night';
-    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o') return 'off';
+    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd' || s === 'd · 데이' || s.includes('조기') || s.includes('오전') || s.includes('조식') || s.includes('중식') || s.includes('상근')) return 'day';
+    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e' || s === 'e · 이브닝' || s.includes('석식') || s.includes('오후')) return 'evening';
+    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n' || s === 'n · 나이트' || s.includes('야간') || s.includes('심야')) return 'night';
+    if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o' || s === 'off · 휴무') return 'off';
     return 'day';
   };
 
@@ -630,9 +630,9 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
 
   const resolveBand = (shift: string) => {
     const s = String(shift || '').toLowerCase();
-    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd' || s === 'd · 데이') return 'day';
-    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e' || s === 'e · 이브닝') return 'evening';
-    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n' || s === 'n · 나이트') return 'night';
+    if (s.includes('데이') || s.includes('day') || s.includes('d/') || s === 'd' || s === 'd · 데이' || s.includes('조기') || s.includes('오전') || s.includes('조식') || s.includes('중식') || s.includes('상근')) return 'day';
+    if (s.includes('이브') || s.includes('eve') || s.includes('e/') || s === 'e' || s === 'e · 이브닝' || s.includes('석식') || s.includes('오후')) return 'evening';
+    if (s.includes('나이') || s.includes('night') || s.includes('n/') || s === 'n' || s === 'n · 나이트' || s.includes('야간') || s.includes('심야')) return 'night';
     if (s.includes('오프') || s.includes('off') || s.includes('휴무') || s.includes('비번') || s === 'o' || s === 'off · 휴무') return 'off';
     return 'day';
   };

@@ -244,7 +244,6 @@ export function useThreadSummaries(messages: ChatMessage[], currentUserId?: stri
   return useMemo(() => {
     const messageMap = buildChatMessageMap(messages);
     const groupedThreads = buildThreadGroups(messages);
-    const normalizedCurrentUserId = String(currentUserId || '').trim();
 
     return messages.reduce<Record<string, ThreadSummary>>((acc, message) => {
       const rootId = resolveThreadRootIdFromMap(message, messageMap);
@@ -254,9 +253,6 @@ export function useThreadSummaries(messages: ChatMessage[], currentUserId?: stri
       const hasRootMessage = thread.messages.some((item) => String(item.id) === rootId);
       const rootSenderId = String(thread.rootMessage.sender_id || '').trim() || null;
       const latestReplySenderId = thread.latestReplySenderId || null;
-      const userParticipated = normalizedCurrentUserId
-        ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
-        : false;
       const needsAttention = false;
 
       acc[String(message.id)] = {
@@ -277,7 +273,6 @@ export function useThreadSummaries(messages: ChatMessage[], currentUserId?: stri
 export function useThreadOverviews(messages: ChatMessage[], currentUserId?: string | null) {
   return useMemo(() => {
     const groupedThreads = buildThreadGroups(messages);
-    const normalizedCurrentUserId = String(currentUserId || '').trim();
 
     return Array.from(groupedThreads.values())
       .map((thread): ThreadOverview | null => {
@@ -289,9 +284,6 @@ export function useThreadOverviews(messages: ChatMessage[], currentUserId?: stri
 
         const rootSenderId = String(thread.rootMessage.sender_id || '').trim() || null;
         const latestReplySenderId = thread.latestReplySenderId || null;
-        const userParticipated = normalizedCurrentUserId
-          ? thread.messages.some((item) => String(item.sender_id || '').trim() === normalizedCurrentUserId)
-          : false;
         const needsAttention = false;
 
         return {

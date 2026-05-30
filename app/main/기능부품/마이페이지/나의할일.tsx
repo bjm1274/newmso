@@ -61,9 +61,10 @@ const ASSIGNEE_OPTIONS: Array<{ value: TodoAssigneeKind; label: string }> = [
 ];
 
 function getToday() {
-  const now = new Date();
-  const krTime = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-  return krTime.toISOString().split('T')[0];
+  // 로컬 시간대 기준 오늘 날짜(YYYY-MM-DD). 'en-CA' 로캘은 ISO 형식을 보장한다.
+  // (이전 구현은 now+9h 후 toISOString 으로, 런타임이 이미 KST면 이중 가산되어
+  //  자정 부근에서 날짜가 하루 밀리는 위험이 있었다 → 같은 파일 내 다른 곳과 통일)
+  return new Date().toLocaleDateString('en-CA');
 }
 
 function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
@@ -498,7 +499,9 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           }
         }
       }
-    } catch {
+    } catch (error) {
+      console.error('[나의할일] 상태 변경 실패:', error);
+      toast('할일 상태 변경에 실패했습니다. 다시 시도해 주세요.', 'error');
       if (effectiveUserId) {
         void fetchTasks(effectiveUserId);
       }
@@ -519,7 +522,9 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     try {
       const { error } = await supabase.from('todos').delete().eq('id', taskId);
       if (error) throw error;
-    } catch {
+    } catch (error) {
+      console.error('[나의할일] 삭제 실패:', error);
+      toast('할일 삭제에 실패했습니다. 다시 시도해 주세요.', 'error');
       if (effectiveUserId) {
         void fetchTasks(effectiveUserId);
       }
@@ -554,12 +559,6 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       ),
     [priorityFilter, tasks]
   );
-
-  const inProgressTasks = filteredTasks.filter((task) => !task.is_complete);
-  const completedTasks =
-    viewRange === 'day'
-      ? filteredTasks.filter((task) => task.is_complete && task.task_date === selectedDate)
-      : filteredTasks.filter((task) => task.is_complete);
 
   const priorityCounts = useMemo(
     () =>

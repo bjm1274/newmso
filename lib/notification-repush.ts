@@ -3,6 +3,14 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
+  toStringRecord,
+  toMetadataRecord,
+  selectLatestFcmToken,
+  dedupeWebPushSubscriptions,
+  invalidateExpiredFcmTokens,
+  deleteExpiredWebPushSubscriptions,
+} from '@/lib/notification-shared';
+import {
   getD1Binding,
   getD1Drizzle,
   notifications as notificationsTable,
@@ -40,14 +48,14 @@ const REPUSH_ELIGIBLE_TYPES = new Set(['approval', 'notice', 'announcement']);
 const CHAT_NOTIFICATION_TYPES = new Set(['message', 'mention', 'chat']);
 
 function getNormalizedTypeCandidates(row: NotificationRow): string[] {
-  const metadata = toMetadata(row.metadata);
+  const metadata = toMetadataRecord(row.metadata);
   return [row.type, metadata.type, metadata.notification_type]
     .map((value) => String(value || '').trim().toLowerCase())
     .filter(Boolean);
 }
 
 function isNoticeRoomMessage(row: NotificationRow): boolean {
-  const metadata = toMetadata(row.metadata);
+  const metadata = toMetadataRecord(row.metadata);
   const roomId = String(metadata.room_id || '').trim();
   return Boolean(roomId) && roomId === NOTICE_ROOM_ID;
 }
@@ -64,7 +72,7 @@ function isRepushEligible(row: NotificationRow): boolean {
 function isChatNotification(row: NotificationRow): boolean {
   const typeCandidates = getNormalizedTypeCandidates(row);
   if (typeCandidates.some((value) => CHAT_NOTIFICATION_TYPES.has(value))) return true;
-  const metadata = toMetadata(row.metadata);
+  const metadata = toMetadataRecord(row.metadata);
   // metadata.room_id가 있고 공지방이 아니면 일반 채팅 → 재알림 제외
   if (metadata.room_id && !isNoticeRoomMessage(row)) return true;
   return false;
@@ -94,20 +102,8 @@ function normalizeScopedUserIds(userIds?: string[] | null) {
   return Array.from(new Set(userIds.map((id) => String(id || '').trim()).filter(Boolean)));
 }
 
-function toMetadata(value: unknown) {
-  return value && typeof value === 'object' ? { ...(value as Record<string, unknown>) } : {};
-}
-
-function toStringRecord(value: Record<string, unknown>) {
-  return Object.entries(value).reduce<Record<string, string>>((acc, [key, entry]) => {
-    if (entry === null || entry === undefined) return acc;
-    acc[key] = typeof entry === 'string' ? entry : JSON.stringify(entry);
-    return acc;
-  }, {});
-}
-
 function buildRepushPayload(row: NotificationRow) {
-  const metadata = toMetadata(row.metadata);
+  const metadata = toMetadataRecord(row.metadata);
   const type = String(row.type || metadata.type || 'notification');
   const title = String(row.title || '알림');
   const body = String(row.body || '').trim();
@@ -130,7 +126,7 @@ async function patchNotificationMetadata(
   row: NotificationRow,
   metadataPatch: Record<string, unknown>,
 ) {
-  const metadata = toMetadata(row.metadata);
+  const metadata = toMetadataRecord(row.metadata);
   const merged = { ...metadata, ...metadataPatch };
 
   const d1 = await getD1Binding();
@@ -272,7 +268,7 @@ export async function processUnreadNotificationRepushServer(
       continue;
     }
 
-    const metadata = toMetadata(row.metadata);
+    const metadata = toMetadataRecord(row.metadata);
     const repushAttempts = Number(metadata.repush_attempt_count || 0);
 
     if (repushAttempts >= DEFAULT_MAX_ATTEMPTS) {
@@ -284,34 +280,14 @@ export async function processUnreadNotificationRepushServer(
 
     // 같은 사용자의 잔재 fcm_token이 여러 개 남아있을 수 있으므로
     // 가장 최신(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
-    let latestFcmToken: string | null = null;
-    let latestFcmCreatedAt = -Infinity;
-    for (const subscription of userSubscriptions) {
-      const token = String(subscription.fcm_token || '').trim();
-      if (!token) continue;
-      const parsed = subscription.created_at ? Date.parse(String(subscription.created_at)) : 0;
-      const createdAt = Number.isFinite(parsed) ? parsed : 0;
-      if (createdAt > latestFcmCreatedAt) {
-        latestFcmCreatedAt = createdAt;
-        latestFcmToken = token;
-      }
-    }
+    const latestFcmToken = selectLatestFcmToken(userSubscriptions);
     const uniqueFcmTokens = latestFcmToken ? [latestFcmToken] : [];
     const hasFcmToken = uniqueFcmTokens.length > 0;
 
     // FCM 토큰이 있는 사용자는 Web Push 제외 — FCM·Web Push 이중 발송 방지
-    const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
-    if (!hasFcmToken) {
-      userSubscriptions.forEach((subscription) => {
-        if (!subscription.endpoint) return;
-        if (!subscription.p256dh || !subscription.auth || !/^https?:\/\//i.test(String(subscription.endpoint))) return;
-        if (!uniqueSubscriptions.has(subscription.endpoint)) {
-          uniqueSubscriptions.set(subscription.endpoint, subscription);
-        }
-      });
-    }
+    const webPushTargets = hasFcmToken ? [] : dedupeWebPushSubscriptions(userSubscriptions);
 
-    if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
+    if (webPushTargets.length === 0 && uniqueFcmTokens.length === 0) {
       skipped += 1;
       continue;
     }
@@ -336,22 +312,17 @@ export async function processUnreadNotificationRepushServer(
         // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
         rowFailed += fcmResult.success.length === 0 && fcmResult.expired.length === 0 && fcmResult.error.length > 0 ? 1 : 0;
         if (fcmResult.expired.length > 0) {
-          for (const expiredToken of fcmResult.expired) {
-            await db
-              .update(pushSubscriptionsTable)
-              .set({ fcm_token: null })
-              .where(eq(pushSubscriptionsTable.fcm_token, expiredToken));
-          }
+          await invalidateExpiredFcmTokens(d1, fcmResult.expired);
         }
       } catch (fcmError) {
         rowFailed += 1;
         errors.push(`${row.id}: ${String((fcmError as Error)?.message || fcmError)}`);
       }
-    } else if (pushDisabled && uniqueSubscriptions.size > 0) {
+    } else if (pushDisabled && webPushTargets.length > 0) {
       rowFailed += 1;
     }
 
-    const webTargets = Array.from(uniqueSubscriptions.values());
+    const webTargets = webPushTargets;
 
     if (!pushDisabled && webTargets.length > 0) {
       const webResults = await Promise.allSettled(
@@ -377,9 +348,7 @@ export async function processUnreadNotificationRepushServer(
     }
 
     if (expiredSubscriptionIds.length > 0) {
-      await db
-        .delete(pushSubscriptionsTable)
-        .where(inArray(pushSubscriptionsTable.id, expiredSubscriptionIds));
+      await deleteExpiredWebPushSubscriptions(d1, expiredSubscriptionIds);
     }
 
     try {

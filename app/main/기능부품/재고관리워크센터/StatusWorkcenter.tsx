@@ -79,15 +79,20 @@ export default function StatusWorkcenter() {
     [data.total, data.lowCount, data.zeroCount, data.expireCount, data.loading],
   );
 
+  // 'my' 칩 카운트는 filterByScope('my')와 동일 휴리스틱으로 산출해야
+  // 칩 숫자와 실제 필터 결과가 일치한다. (data.myCount는 userCompany
+  // 인자가 전달되지 않아 항상 0이므로 사용하지 않음)
+  const myCount = useMemo(() => filterByScope(data.rows, 'my').length, [data.rows]);
+
   const scopeCount = useMemo<Record<StatusScope, number>>(
     () => ({
       all: data.total,
-      my: data.myCount,
+      my: myCount,
       low: data.lowCount,
       zero: data.zeroCount,
       expire: data.expireCount,
     }),
-    [data],
+    [data, myCount],
   );
 
   const chips = useMemo<FilterChip<StatusScope>[]>(

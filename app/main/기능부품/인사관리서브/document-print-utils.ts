@@ -3,15 +3,9 @@
  */
 
 import { toast } from '@/lib/toast';
+import { escapeHtml } from '@/lib/escape-html';
 
-export function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+export { escapeHtml };
 
 export function formatDocumentDate(value: unknown): string {
   const date = value ? new Date(String(value)) : new Date();

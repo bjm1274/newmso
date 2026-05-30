@@ -68,7 +68,7 @@ export default function 발령탭({ company }: { company?: string }) {
       setLoading(true);
       try {
         let q = supabase
-          .from('staff_appointments')
+          .from('personnel_appointments')
           .select(
             'id, effective_date, order_type, staff_name, before_dept, after_dept, before_position, after_position, company',
           )

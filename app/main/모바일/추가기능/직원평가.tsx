@@ -45,7 +45,6 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
     return (
       <EvalWriteForm
         user={user}
-        company={company}
         target={evalTarget}
         onClose={() => setEvalTarget(null)}
       />
@@ -250,12 +249,10 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
 // ─── 평가 작성 폼 ─────────────────────────────────────────────
 function EvalWriteForm({
   user,
-  company,
   target,
   onClose,
 }: {
   user: ErpUser;
-  company: string | undefined;
   target: OrgMember;
   onClose: () => void;
 }) {
@@ -273,22 +270,18 @@ function EvalWriteForm({
       toast('점수는 1~5점이어야 합니다.', 'error');
       return;
     }
-    const evaluatorName =
-      typeof (user as Record<string, unknown>).name === 'string'
-        ? (user as Record<string, unknown>).name as string
-        : '';
-
     setSaving(true);
     try {
+      // 정본 스키마(staff_evaluations): staff_id·evaluator_id·category·content·
+      // score. 과거 payload 는 미존재 컬럼(evaluator_name·target_*·comment·
+      // company)을 넣고 필수 staff_id·category 를 누락해 NOT NULL 위반으로
+      // 무음 실패했다.
       const payload: Record<string, unknown> = {
+        staff_id: target.id,
         evaluator_id: user.id,
-        evaluator_name: evaluatorName,
-        target_id: target.id,
-        target_name: target.name,
-        target_department: target.department,
+        category: '종합',
+        content: v.comment.trim(),
         score,
-        comment: v.comment.trim() || null,
-        company: company ?? null,
         created_at: new Date().toISOString(),
       };
 

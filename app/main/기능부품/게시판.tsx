@@ -4,12 +4,11 @@ import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 import { EmptyState, PermissionState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import Image from 'next/image';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { supabase } from '@/lib/supabase';
-import { subscribeRealtime } from '@/lib/realtime-bus';
+import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   buildStorageInlineUrl,
@@ -21,6 +20,9 @@ import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
 import PostTableView from './게시판서브/PostTableView';
+import BoardBodyPickerModal from './게시판서브/BoardBodyPickerModal';
+import BoardScheduleCalendar from './게시판서브/BoardScheduleCalendar';
+import BoardMobilePostCard from './게시판서브/BoardMobilePostCard';
 import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 import { BOARD_MENU_ITEMS } from './게시판메뉴';
@@ -43,7 +45,6 @@ import {
   buildSelectColumns,
   formatScheduledPublishInputValue,
   getBoardPostAuthorSignal,
-  getBoardPostPreview,
   getBoardStatusTone,
   isMissingBoardReadStorageError,
   isScheduleBoardType,
@@ -62,7 +63,7 @@ import {
   type QueryResult,
   type StaffSummary,
 } from './게시판-view-utils';
-import { isAnonymousReadStatusPost, BODY_PARTS, VALID_BODY_IDS } from './게시판/post-helpers';
+import { isAnonymousReadStatusPost, VALID_BODY_IDS } from './게시판/post-helpers';
 import ReadStatusModal from './게시판/ReadStatusModal';
 import CommentComposerSticky from '@/app/components/CommentComposerSticky';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -94,7 +95,7 @@ type BoardCommentRow = {
   [key: string]: unknown;
 };
 
-export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, setMainMenu }: BoardViewProps) {
+export default function BoardView({ user, subView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, setMainMenu }: BoardViewProps) {
   const isMobile = useIsMobile();
   const { dialog, openConfirm } = useActionDialog();
   const defaultBoard =
@@ -153,7 +154,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [scheduleHour, setScheduleHour] = useState('');
   const [scheduleMinute, setScheduleMinute] = useState('');
   const [loading, setLoading] = useState(false);
-  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, BoardCommentRow[]>>({});
   const [newComment, setNewComment] = useState('');
   const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
@@ -238,8 +238,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       cancelled = true;
     };
   }, [user?.id, user?.employee_no, user?.name]);
-
-  // 근무형태별 오늘 근무 현황 및 교대근무 부분 삭제 처리됨
 
   const visibleBoards = useMemo(
     () => BOARD_MENU_ITEMS.filter((board) => canAccessBoard(user, board.id, 'read')),
@@ -484,17 +482,15 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
 
-    if (data) {
-      if (requestedBoard === '익명소리함') {
-        const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
-        if (!isAdmin) {
-          setPosts([]);
-        } else {
-          setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
-        }
+    if (requestedBoard === '익명소리함') {
+      const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
+      if (!isAdmin) {
+        setPosts([]);
       } else {
         setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
       }
+    } else {
+      setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
     }
     setLoading(false);
   };
@@ -635,33 +631,33 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     void loadBoardReadState();
   }, [loadBoardReadState]);
 
+  // board_posts·board_post_reads 두 테이블을 단일 채널(=단일 폴링 interval/단일
+  // /api/realtime/tail 요청)로 통합 구독한다. 배치 콜백이 변경된 테이블 목록을
+  // 전달하므로 테이블별로 기존과 동일한 핸들러(fetchPosts / loadBoardReadState)를
+  // 디스패치해 동작을 보존한다.
   useEffect(() => {
-    const unsubscribe = subscribeRealtime(
-      'board-post-reads-realtime',
-      [{ table: 'board_post_reads', event: '*' }],
-      () => { void loadBoardReadState(); },
-      { pollIntervalMs: 10000 },
-    );
-    return unsubscribe;
-  }, [loadBoardReadState]);
-
-  // 수술/검사 템플릿 필터링 로직 (유지)
-
-  useEffect(() => {
-    const unsubscribe = subscribeRealtime(
-      'board-posts-realtime',
-      [{ table: 'board_posts', event: '*' }],
-      () => {
-        // 좋아요 처리 중이면 realtime fetch 건너뜀 (로컬 state 덮어쓰기 방지)
-        if (likingRef.current) return;
-        fetchPosts();
+    const unsubscribe = subscribeRealtimeBatched(
+      'board-realtime',
+      [
+        { table: 'board_posts', event: '*' },
+        { table: 'board_post_reads', event: '*' },
+      ],
+      (payloads) => {
+        const changedTables = new Set(
+          payloads.map((payload) => (payload as { table?: string } | null)?.table),
+        );
+        if (changedTables.has('board_posts')) {
+          // 좋아요 처리 중이면 realtime fetch 건너뜀 (로컬 state 덮어쓰기 방지)
+          if (!likingRef.current) fetchPosts();
+        }
+        if (changedTables.has('board_post_reads')) {
+          void loadBoardReadState();
+        }
       },
       { pollIntervalMs: 10000 },
     );
     return unsubscribe;
-  }, [activeBoard, user?.id]);
-
-  // 근무현황 Effect 제거됨
+  }, [activeBoard, user?.id, loadBoardReadState]);
 
   const fetchComments = async (postId: string) => {
     const { data } = await supabase
@@ -845,11 +841,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       );
       return { ...prev, [postId]: postComments };
     });
-  };
-
-  const handleExpandPost = (postId: string) => {
-    setExpandedPostId((prev) => (prev === postId ? null : postId));
-    if (expandedPostId !== postId) fetchComments(postId);
   };
 
   const selectedPostFromList = useMemo(
@@ -1577,7 +1568,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                                 ? '수술명을 입력하거나 위에서 선택하세요.'
                                 : '검사명을 입력하거나 위에서 선택하세요.'
                             }
-                            className="flex-1 min-w-0 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                            className="flex-1 min-w-0 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
                           />
                           <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden bg-[var(--muted)] shrink-0 min-w-[120px]">
                             <button
@@ -1633,7 +1624,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                               setSchedulePeriod(v);
                               updateScheduleTime(v, scheduleHour, scheduleMinute);
                             }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
                           >
                             <option value="">오전/오후</option>
                             <option value="오전">오전</option>
@@ -1648,7 +1639,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                               setScheduleHour(v);
                               updateScheduleTime(schedulePeriod, v, scheduleMinute);
                             }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
                           >
                             <option value="">시간</option>
                             {Array.from({ length: 12 }).map((_, idx) => {
@@ -1668,7 +1659,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                               setScheduleMinute(v);
                               updateScheduleTime(schedulePeriod, scheduleHour, v);
                             }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
                           >
                             <option value="">분</option>
                             <option value="00">00분</option>
@@ -1680,15 +1671,15 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label htmlFor="board-schedule-room" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                        <input id="board-schedule-room" value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <input id="board-schedule-room" value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                       <div>
                         <label htmlFor="board-schedule-patient" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
-                        <input id="board-schedule-patient" value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <input id="board-schedule-patient" value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                       <div>
                         <label htmlFor="board-schedule-chart" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
-                        <input id="board-schedule-chart" value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
+                        <input id="board-schedule-chart" value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
                       </div>
                     </div>
                     {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
@@ -2018,11 +2009,6 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                               {pollOptions.length > 2 && (
                                 <button type="button" onClick={() => setPollOptions((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 text-xs font-bold hover:text-red-700">삭제</button>
                               )}
-                              {false && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
-                                  조영제
-                                </span>
-                              )}
                             </div>
                           ))}
                         </div>
@@ -2215,321 +2201,39 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
 
           {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
           {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-            <div
-              className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50 p-3 md:p-4"
-              onClick={() => {
+            <BoardBodyPickerModal
+              activeBoard={activeBoard}
+              resolvedBodyPart={resolvedBodyPart}
+              filteredTemplates={filteredTemplates}
+              onSelectBodyPart={(id) => setSelectedBodyPart(id)}
+              onSelectTemplate={(name) => {
+                setTitle(name);
+                setShowBodyPicker(false);
+              }}
+              onBackdropClose={() => {
                 setShowBodyPicker(false);
                 if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
               }}
-            >
-              <div
-                className="w-full max-w-[calc(100vw-24px)] md:max-w-7xl max-h-[94vh] bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm border border-[var(--border)] p-3 md:p-4 flex flex-col md:flex-row gap-3 md:gap-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
-                <div className="flex-1 flex items-center justify-center min-h-[280px] md:min-h-[400px] max-h-[50vh] md:max-h-[640px] bg-[#020617] rounded-[var(--radius-xl)] border border-slate-800 overflow-hidden p-2">
-                  <div className="relative w-full max-w-[280px] md:max-w-[400px] aspect-[2/3] max-h-[45vh] md:max-h-[600px] shrink-0 -translate-y-6">
-                    <Image
-                      src="/human-body-mri.png"
-                      alt="사람 전신 모형"
-                      width={400}
-                      height={600}
-                      className="w-full h-full object-contain object-center pointer-events-none select-none"
-                      priority={false}
-                    />
-                    {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
-                    <div className="absolute inset-0">
-                      {[
-                        { id: 'cervical', top: '12.5%', left: '50%', areaClass: 'w-11 h-11 md:w-12 md:h-12' }, // 목/경추
-                        { id: 'chest', top: '24.5%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 흉부
-                        { id: 'lumbar', top: '39%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 요추/허리
-                        { id: 'hip', top: '55%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 골반/고관절
-                        { id: 'shoulder', top: '20.5%', left: '34%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 어깨
-                        { id: 'shoulder', top: '20.5%', left: '66%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 어깨
-                        { id: 'upper_arm', top: '31.5%', left: '28%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 위팔
-                        { id: 'upper_arm', top: '31.5%', left: '72%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 위팔
-                        { id: 'forearm', top: '49%', left: '23%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 아래팔
-                        { id: 'forearm', top: '49%', left: '77%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 아래팔
-                        { id: 'knee', top: '78%', left: '50%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 무릎
-                        { id: 'ankle', top: '92.5%', left: '50%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 발목/발
-                      ].map((spot, idx) => {
-                        const isActive = resolvedBodyPart === spot.id;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setSelectedBodyPart(spot.id)}
-                            aria-label={`${spot.id} 선택`}
-                            style={{ top: spot.top, left: spot.left }}
-                            className={`
-                        group absolute -translate-x-1/2 -translate-y-1/2
-                        flex items-center justify-center
-                        ${spot.areaClass} rounded-full border-none bg-transparent
-                      `}
-                          >
-                            {/* 호버/선택 시에만 부위 전체가 은은하게 빛나는 하이라이트 (기본 상태에서는 사람 사진만 보임) */}
-                            <span
-                              className={`
-                          absolute inset-0 rounded-full bg-sky-400/30 blur-lg opacity-0
-                          transition-opacity duration-200
-                          group-hover:opacity-100
-                          ${isActive ? 'opacity-100' : ''}
-                        `}
-                            />
-                            <span
-                              className={`
-                          relative w-2.5 h-2.5 md:w-3 md:h-3 rounded-full
-                          border border-white/80 bg-sky-400/90
-                          shadow-[0_0_0_3px_rgba(14,165,233,0.22)]
-                          transition-transform duration-200
-                          group-hover:scale-110
-                          ${isActive ? 'scale-110' : ''}
-                        `}
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 오른쪽: 선택된 부위에 해당하는 수술/검사명 목록 */}
-                <div className="flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                        {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
-                      </p>
-                      <p className="text-xs font-bold text-[var(--toss-gray-4)] mt-1">
-                        {BODY_PARTS.find((b) => b.id === resolvedBodyPart)?.label || '전체'} 기준 추천 목록
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowBodyPicker(false)}
-                      className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                    >
-                      닫기
-                    </button>
-                  </div>
-                  <div className="flex-1 mt-2 bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] p-2 overflow-y-auto custom-scrollbar">
-                    {filteredTemplates.length === 0 ? (
-                      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
-                        선택한 부위에 해당하는 등록된 수술·검사명이 없습니다.<br />
-                        관리자 메뉴의 “수술·검사명”에서 템플릿을 추가해주세요.
-                      </p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {filteredTemplates.map((t) => (
-                          <li key={t.id}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTitle(t.name || '');
-                                setShowBodyPicker(false);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--card)] hover:shadow-sm flex items-center gap-2"
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                              <span className="flex-1 truncate">{t.name}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+              onClose={() => setShowBodyPicker(false)}
+            />
           )}
 
           {/* 수술일정·MRI일정용 달력 뷰 */}
           {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-            <div className="min-w-0 space-y-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:p-4">
-              <div className="flex min-w-0 flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-                <div className="flex min-w-0 items-center gap-4">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
-                      {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="flex w-full min-w-0 flex-col gap-2 text-xs font-bold md:w-auto md:flex-row md:items-center">
-                  <input
-                    value={searchKeyword}
-                    onChange={e => setSearchKeyword(e.target.value)}
-                    placeholder="환자명 또는 차트번호 검색"
-                    className="w-full min-w-0 px-3 py-1.5 font-semibold rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 md:w-48"
-                  />
-                  <div className="grid w-full grid-cols-3 gap-2 md:flex md:w-auto">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCalendarMonth(
-                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
-                        )
-                      }
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                    >
-                      이전달
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCalendarMonth(new Date())}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                    >
-                      오늘
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCalendarMonth(
-                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
-                        )
-                      }
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
-                    >
-                      다음달
-                    </button>
-                  </div>
-                  {canCreatePost && (
-                    <button
-                      type="button"
-                      data-testid="board-schedule-new"
-                      onClick={() => setShowNewPost((v) => !v)}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-                      aria-label={showNewPost ? '일정 등록 취소' : (activeBoard === '수술일정' ? '+ 새 수술일정 등록' : '+ 새 MRI일정 등록')}
-                    >
-                      {showNewPost ? '취소' : (activeBoard === '수술일정' ? '+ 새 수술일정' : '+ 새 MRI일정')}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {legacySchedulePosts.length > 0 && (
-                <div
-                  data-testid="board-legacy-schedule-warning"
-                  className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] text-amber-800"
-                >
-                  <p className="font-bold">일정 정보가 빠진 예전 게시물이 있어 달력에 표시되지 않습니다.</p>
-                  <p className="mt-1 font-semibold text-amber-700">
-                    아래 게시물은 날짜와 시간이 저장되지 않아 수정 후 다시 저장해야 합니다.
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {legacySchedulePosts.slice(0, 8).map((post) => (
-                      <button
-                        key={post.id}
-                        type="button"
-                        data-testid={`board-legacy-schedule-item-${post.id}`}
-                        onClick={() => setSelectedPostId(post.id)}
-                        className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
-                      >
-                        {post.title || '제목 없음'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(() => {
-                if (loading) {
-                  return (
-                    <div className="space-y-2">
-                      {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4">
-                          <div className="h-4 w-1/4 bg-[var(--border)] rounded animate-pulse mb-2" />
-                          <div className="h-3 w-1/2 bg-[var(--border)] rounded animate-pulse" />
-                        </div>
-                      ))}
-                    </div>
-                  );
-                }
-
-                const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
-
-                if (filteredPosts.length === 0) {
-                  return (
-                    <EmptyState
-                      title="등록된 일정이 없습니다"
-                      description="새 일정을 등록하면 캘린더에 날짜별로 표시됩니다."
-                      compact
-                    />
-                  );
-                }
-
-                return (
-                  <div className="border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
-                    <div className="grid grid-cols-7 bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                      {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
-                        <div key={d} className="px-2 py-2 text-center">
-                          {d}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 bg-[var(--card)] text-[11px]">
-                      {days.map((d, idx) => {
-                        const key = toKey(d);
-                        const inMonth = d.getMonth() === month;
-                        const events = eventsByDate[key] || [];
-                        return (
-                          <div
-                            key={key + idx}
-                            data-testid={`board-calendar-day-${key}`}
-                            className={`min-h-[80px] border border-[var(--border)] p-1.5 align-top ${inMonth ? 'bg-[var(--card)]' : 'bg-[var(--tab-bg)]'
-                              }`}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span
-                                className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
-                                  ? 'text-red-500'
-                                  : d.getDay() === 6
-                                    ? 'text-[var(--accent)]'
-                                    : 'text-[var(--foreground)]'
-                                  }`}
-                              >
-                                {d.getDate()}
-                              </span>
-                              {events.length > 0 && (
-                                <button
-                                  data-testid={`board-calendar-day-count-${key}`}
-                                  type="button"
-                                  onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                  className="text-[11px] font-semibold text-[var(--accent)] px-2 py-1 rounded-[var(--radius-md)] hover:bg-[var(--toss-blue-light)]"
-                                >
-                                  {events.length}건
-                                </button>
-                              )}
-                            </div>
-                            <div className="space-y-1">
-                              {events.slice(0, 4).map((ev: Record<string, unknown>) => (
-                                <button
-                                  key={ev.id as React.Key}
-                                  type="button"
-                                  onClick={() => setSelectedPostId(ev.id as string)}
-                                  className="w-full text-left px-1.5 py-1 rounded-md bg-[var(--toss-blue-light)]/50 text-[10px] md:text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)] flex flex-row items-center gap-1 leading-[1.2] overflow-hidden"
-                                >
-                                  <span className="text-[var(--accent)] shrink-0">{(ev.schedule_time as string) || ''}</span>
-                                  <span className="truncate opacity-80 flex-1 min-w-0">{ev.title as string}</span>
-                                  <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">
-                                    {(ev.patient_name as string) || '미지정'} {ev.content ? `(${ev.content as string})` : null}
-                                  </span>
-                                </button>
-                              ))}
-                              {events.length > 4 && (
-                                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold text-center mt-0.5">
-                                  + {events.length - 4}건 더보기
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+            <BoardScheduleCalendar
+              activeBoard={activeBoard}
+              calendarMonth={calendarMonth}
+              searchKeyword={searchKeyword}
+              canCreatePost={canCreatePost}
+              showNewPost={showNewPost}
+              legacySchedulePosts={legacySchedulePosts}
+              loading={loading}
+              scheduleCalendarData={scheduleCalendarData}
+              onSearchChange={setSearchKeyword}
+              onChangeMonth={setCalendarMonth}
+              onToggleNewPost={() => setShowNewPost((v) => !v)}
+              onSelectPost={(postId) => setSelectedPostId(postId)}
+            />
           )}
 
           {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
@@ -2593,176 +2297,19 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                   ))}
                 </div>
               ) : visiblePosts.length > 0 ? (
-                visiblePosts.map((post, idx) => {
-                  const rowNumber = visiblePosts.length - idx;
-                  const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
-                  const isPendingScheduledNotice = isScheduledNoticePending(post, noticeVisibilityTick);
-                  const hasAttachments = (Array.isArray(post.attachments) ? post.attachments : []).length > 0;
-                  const authorSignal = getBoardPostAuthorSignal(post);
-                  const normalizedPostStatus = normalizeBoardPostStatus(post.status);
-                  const isImportantPost = normalizedPostStatus === '중요';
-                  const postPreview = getBoardPostPreview(post);
-                  const postTitle = String(post.title || '').trim() || postPreview || '제목 없음';
-                  const shouldShowPreview = Boolean(postPreview && postPreview !== postTitle);
-                  const postDateLabel = isPendingScheduledNotice && post.scheduled_publish_at
-                    ? new Date(post.scheduled_publish_at).toLocaleDateString()
-                    : new Date(post.created_at ?? '').toLocaleDateString();
-                  return (
-                    <div
-                      key={post.id || idx}
-                      data-testid={`board-post-${post.id}`}
-                      className={`bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--accent)]/40 hover:shadow-md transition-all cursor-pointer`}
-                      onClick={() => setSelectedPostId(post.id)}
-                    >
-                      {isSchedule ? (
-                        <div className="space-y-2 md:space-y-1">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{postTitle}</h3>
-                              <p className="text-[11px] text-[var(--accent)] font-bold mt-1 uppercase tracking-widest">
-                                {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
-                              </p>
-                            </div>
-                            <span className={`px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-500/20 text-red-600' : 'bg-purple-500/20 text-purple-600'
-                              }`}>
-                              {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[var(--border)]">
-                            <div>
-                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
-                              <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_date}</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
-                              <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_time}</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
-                              <p className="text-[11px] font-semibold text-[var(--foreground)] line-clamp-1">{post.schedule_room}</p>
-                            </div>
-                          </div>
-                          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
-                            <div className="pt-2 flex flex-wrap gap-1 items-center">
-                              {post.surgery_fasting && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-600 text-[11px] font-semibold">
-                                  금식
-                                </span>
-                              )}
-                              {post.surgery_inpatient && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold">
-                                  입원
-                                </span>
-                              )}
-                              {post.surgery_guardian && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
-                                  보호자 동반
-                                </span>
-                              )}
-                              {post.surgery_caregiver && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-500/10 text-purple-600 text-[11px] font-semibold">
-                                  간병인
-                                </span>
-                              )}
-                              {post.surgery_transfusion && (
-                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-700 text-[11px] font-semibold ml-auto">
-                                  수혈
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-start gap-1.5 text-[11px] md:gap-2 md:text-xs">
-                          <div className="w-5 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:w-6">
-                            {rowNumber}
-                          </div>
-                          <div
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                              authorSignal.isAnonymous
-                                ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                                : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                            }`}
-                            title={`작성자 ${authorSignal.name}`}
-                            aria-label={`작성자 ${authorSignal.name}`}
-                          >
-                            {authorSignal.initials}
-                          </div>
-                          <div className="min-w-0 flex-1 space-y-0.5">
-                            <div className="flex min-w-0 items-start gap-1.5">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <p className="min-w-0 flex-1 truncate text-[13px] font-bold leading-5 text-[var(--foreground)] group-hover:text-[var(--accent)] md:text-xs md:leading-normal">
-                                    {postTitle}
-                                  </p>
-                                  {isImportantPost && (
-                                    <span className="shrink-0 rounded-[var(--radius-md)] bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
-                                      중요
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-[var(--toss-gray-3)] md:hidden">
-                                  <span className={`rounded-[var(--radius-md)] px-2 py-0.5 ${getBoardStatusTone(normalizedPostStatus)}`}>
-                                    {normalizedPostStatus}
-                                  </span>
-                                  <span>{postDateLabel}</span>
-                                  <span>조회 {(post.views as number) ?? 0}</span>
-                                  {hasAttachments && <span>첨부 있음</span>}
-                                </div>
-                              </div>
-                              <div className="shrink-0 flex items-center gap-1 whitespace-nowrap">
-                                {isPendingScheduledNotice && (
-                                  <span className="shrink-0 rounded-[var(--radius-md)] bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
-                                    예약
-                                  </span>
-                                )}
-                                {hasAttachments && (
-                                  <span
-                                    data-testid={`board-post-attachment-indicator-${post.id}`}
-                                    className="shrink-0 leading-none text-[var(--toss-gray-3)]"
-                                    title="첨부파일 있음"
-                                    aria-label="첨부파일 있음"
-                                  >
-                                    📎
-                                  </span>
-                                )}
-                                {false && (
-                                  <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
-                                    조영제 필요
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {shouldShowPreview && (
-                              <p
-                                data-testid={`board-post-preview-${post.id}`}
-                                className="line-clamp-2 text-[11px] leading-5 text-[var(--toss-gray-4)]"
-                              >
-                                {postPreview}
-                              </p>
-                            )}
-                          </div>
-                          <div
-                            data-testid={`board-post-date-${post.id}`}
-                            className="hidden w-20 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:block"
-                          >
-                            {postDateLabel}
-                          </div>
-                          <div className="hidden w-12 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:block">
-                            조회 {(post.views as number) ?? 0}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleLike(post); }}
-                            className={`w-10 shrink-0 pt-1 text-center text-[10px] font-bold transition md:w-12 md:text-[11px] ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
-                          >
-                            {myLikedPostIds.has(String(post.id ?? '').trim()) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
+                visiblePosts.map((post, idx) => (
+                  <BoardMobilePostCard
+                    key={post.id || idx}
+                    post={post}
+                    idx={idx}
+                    rowNumber={visiblePosts.length - idx}
+                    activeBoard={activeBoard}
+                    noticeVisibilityTick={noticeVisibilityTick}
+                    myLikedPostIds={myLikedPostIds}
+                    onSelectPost={(postId) => setSelectedPostId(postId)}
+                    onToggleLike={(p) => { void handleLike(p); }}
+                  />
+                ))
               ) : (
                 <EmptyState
                   title={activeBoard === '익명소리함' ? '아직 등록된 의견이 없습니다' : '게시물이 없습니다'}
@@ -2775,8 +2322,6 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
               )}
             </div>
           )}
-
-          {/* (근무현황 영역 제거됨) */}
 
           {/* 게시글 상세 보기 모달 */}
           {selectedPost && (

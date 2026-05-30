@@ -9,9 +9,14 @@ import {
   resolveApprovalDelayConfig,
   shouldSendDelayNotification,
 } from '@/lib/approval-workflow';
-import { isMissingColumnError } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
+import {
+  normalizeApprovalLineIds as normalizeApprovalLineIdsCore,
+  resolveApprovalLineIds as resolveApprovalLineIdsCore,
+  resolveStoredCurrentApproverId as resolveStoredCurrentApproverIdCore,
+  buildApprovalHistoryEntryCore,
+} from '@/lib/approval-shared';
 import type { StaffMember } from '@/types';
 import { APPROVER_POSITIONS } from './approval-constants';
 import { useApprovalDelegation } from './useApprovalDelegation';
@@ -39,26 +44,9 @@ export function useApprovalRouting({
       .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [approvalDirectoryStaffs]);
 
-  const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
-    if (!Array.isArray(line)) return [];
-    const ids = line
-      .map((entry: unknown) => {
-        if (entry == null) return null;
-        if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
-        if (typeof entry === 'object' && entry !== null && 'id' in entry && (entry as ApprovalRecord).id != null) return String((entry as ApprovalRecord).id);
-        return null;
-      })
-      .filter(Boolean) as string[];
-    return Array.from(new Set(ids));
-  }, []);
+  const normalizeApprovalLineIds = useCallback((line: unknown): string[] => normalizeApprovalLineIdsCore(line), []);
 
-  const resolveApprovalLineIds = useCallback((item: ApprovalRecord): string[] => {
-    const metaData = item?.meta_data as ApprovalRecord | null | undefined;
-    const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? metaData?.approver_line);
-    if (explicitLineIds.length > 0) return explicitLineIds;
-    if (item?.current_approver_id != null) return [String(item.current_approver_id)];
-    return [];
-  }, [normalizeApprovalLineIds]);
+  const resolveApprovalLineIds = useCallback((item: ApprovalRecord): string[] => resolveApprovalLineIdsCore(item), []);
 
   const approvalStaffMap = useMemo(
     () => new Map((Array.isArray(approvalDirectoryStaffs) ? approvalDirectoryStaffs : []).map((staff) => [String(staff.id), staff])),
@@ -77,27 +65,21 @@ export function useApprovalRouting({
     return resolveApprovalDelayConfigForStaff(staffId).thresholdHours;
   }, [resolveApprovalDelayConfigForStaff]);
 
-  const resolveStoredCurrentApproverId = useCallback((item: ApprovalRecord): string | null => {
-    const metaData = item?.meta_data as ApprovalRecord | null | undefined;
-    if (item?.current_approver_id != null) {
-      const currentApproverId = String(item.current_approver_id);
-      const delegatedToId = String(metaData?.delegated_to_id || '');
-      const delegatedFromId = String(metaData?.delegated_from_id || '');
-      if (delegatedToId && delegatedToId === currentApproverId && delegatedFromId) {
-        return delegatedFromId;
-      }
-      return currentApproverId;
-    }
-    const lineIds = resolveApprovalLineIds(item);
-    return lineIds[0] ?? null;
-  }, [resolveApprovalLineIds]);
+  const resolveStoredCurrentApproverId = useCallback(
+    (item: ApprovalRecord): string | null => resolveStoredCurrentApproverIdCore(item),
+    []
+  );
 
-  const buildApprovalHistoryEntry = useCallback((action: ApprovalHistoryEntry['action'], note?: string | null) => ({
-    action,
-    actor_id: user?.id ? String(user.id) : null,
-    actor_name: user?.name ? String(user.name) : null,
-    note: note ?? null,
-  }), [user?.id, user?.name]);
+  const buildApprovalHistoryEntry = useCallback(
+    (action: ApprovalHistoryEntry['action'], note?: string | null) =>
+      buildApprovalHistoryEntryCore(
+        user?.id ? String(user.id) : null,
+        user?.name ? String(user.name) : null,
+        action,
+        note
+      ),
+    [user?.id, user?.name]
+  );
 
   const {
     resolveEffectiveApproverId,
@@ -235,40 +217,6 @@ export function useApprovalRouting({
     }
   }, [buildApprovalHistoryEntry, resolveApprovalDelayConfigForStaff, resolveCurrentApproverId, resolveStoredCurrentApproverId]);
 
-  const syncApprovalRouting = useCallback(async (item: ApprovalRecord, currentApproverId: string | null) => {
-    if (!item?.id || !currentApproverId) return null;
-    const metaData = item?.meta_data as ApprovalRecord | null | undefined;
-    const storedLineIds = normalizeApprovalLineIds(item.approver_line ?? metaData?.approver_line);
-    const updates: ApprovalRecord = {};
-
-    if (!item.current_approver_id) {
-      updates.current_approver_id = currentApproverId;
-    }
-    if (storedLineIds.length === 0) {
-      updates.approver_line = [currentApproverId];
-    }
-    if (Object.keys(updates).length === 0) return null;
-
-    let effectiveUpdates = { ...updates };
-    while (true) {
-      if (Object.keys(effectiveUpdates).length === 0) return null;
-
-      const { error } = await supabase.from('approvals').update(effectiveUpdates).eq('id', item.id);
-      if (!isMissingColumnError(error, 'approver_line') || !('approver_line' in effectiveUpdates)) {
-        if (!error) {
-          setApprovals((prev) => prev.map((approval) => (
-            approval.id === item.id ? { ...approval, ...effectiveUpdates } : approval
-          )));
-        }
-        return error;
-      }
-
-      const { approver_line, ...legacyUpdates } = effectiveUpdates;
-      void approver_line;
-      effectiveUpdates = legacyUpdates;
-    }
-  }, [normalizeApprovalLineIds, setApprovals]);
-
   return {
     approvalStaffMap,
     approverCandidates,
@@ -283,7 +231,6 @@ export function useApprovalRouting({
     resolveApprovalDelaySnapshot,
     resolveApprovalLockSnapshot,
     syncApprovalDelayNotifications,
-    syncApprovalRouting,
     syncDelegatedApprovalDelayNotifications,
     syncDelegatedApprovalRouting,
   };

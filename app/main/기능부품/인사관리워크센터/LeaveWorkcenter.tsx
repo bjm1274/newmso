@@ -33,7 +33,7 @@ import {
   type WorkcenterKpi,
 } from './workcenter-common';
 import { supabase } from '@/lib/supabase';
-import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { syncAnnualLeaveUsedForStaff, calculateLeaveDays } from '@/lib/annual-leave-ledger';
 import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { LeaveBalanceTable } from './LeaveWorkcenter/LeaveBalanceTable';
@@ -102,13 +102,8 @@ export default function LeaveWorkcenter({
 
       // 만약 '연차(부여)' 유형이고 상태가 '승인'으로 되었거나 철회되는 경우
       if (targetLeave.leave_type === '연차(부여)') {
-        const start = new Date(targetLeave.start_date);
-        const end = new Date(targetLeave.end_date || targetLeave.start_date);
-        let days = 1;
-        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-          const diff = end.getTime() - start.getTime();
-          days = Math.max(1, Math.round(diff / (24 * 3600 * 1000)) + 1);
-        }
+        // 정본 calculateLeaveDays 로 통일 (Math.ceil + 음수 보정)
+        const days = calculateLeaveDays(targetLeave.start_date, targetLeave.end_date || targetLeave.start_date);
 
         const staff = staffs.find((s) => String(s.id) === String(targetLeave.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
@@ -166,13 +161,7 @@ export default function LeaveWorkcenter({
       if (error) throw error;
 
       if (target.status === '승인' && target.leave_type === '연차(부여)') {
-        const start = new Date(target.start_date);
-        const end = new Date(target.end_date || target.start_date);
-        let days = 1;
-        if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-          const diff = end.getTime() - start.getTime();
-          days = Math.max(1, Math.round(diff / (24 * 3600 * 1000)) + 1);
-        }
+        const days = calculateLeaveDays(target.start_date, target.end_date || target.start_date);
         const staff = staffs.find((s) => String(s.id) === String(target.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
         const newTotal = Math.max(0, currentTotal - days);
@@ -534,13 +523,10 @@ export default function LeaveWorkcenter({
                     typeBadgeColor = 'bg-purple-500/10 text-purple-600 border-purple-200';
                   }
 
-                  const start = new Date(req.start_date);
-                  const end = new Date(req.end_date || req.start_date);
-                  let calculatedDays = 1;
-                  if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-                    const diff = end.getTime() - start.getTime();
-                    calculatedDays = Math.max(1, Math.round(diff / (24 * 3600 * 1000)) + 1);
-                  }
+                  const calculatedDays = Math.max(
+                    1,
+                    calculateLeaveDays(req.start_date, req.end_date || req.start_date),
+                  );
 
                   return (
                     <div

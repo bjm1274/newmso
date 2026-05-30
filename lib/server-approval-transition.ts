@@ -2,10 +2,15 @@ import {
   appendApprovalHistory,
   getApprovalRevision,
   lockApprovalMeta,
-  resolveApprovalDelegateConfig,
 } from '@/lib/approval-workflow';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
+import {
+  normalizeApprovalLineIds,
+  resolveStoredCurrentApproverId,
+  resolveEffectiveApproverIdCore,
+  buildApprovalHistoryEntryCore,
+} from '@/lib/approval-shared';
 import {
   approvals as approvalsTable,
   staff_members as staffMembersTable,
@@ -53,44 +58,12 @@ export type ApprovalTransitionSummary = {
   warningCount: number;
 };
 
-function normalizeApprovalLineIds(line: unknown): string[] {
-  if (!Array.isArray(line)) return [];
-  const ids = line
-    .map((entry) => {
-      if (entry == null) return null;
-      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
-      if (typeof entry === 'object' && 'id' in (entry as Record<string, unknown>)) {
-        const record = entry as Record<string, unknown>;
-        return record.id != null ? String(record.id) : null;
-      }
-      return null;
-    })
-    .filter(Boolean) as string[];
-  return Array.from(new Set(ids));
-}
-
 function resolveApprovalLineIds(item: ApprovalRow): string[] {
   const metaData = item.meta_data as Record<string, unknown> | null | undefined;
   const explicitLineIds = normalizeApprovalLineIds(item.approver_line ?? metaData?.approver_line);
   if (explicitLineIds.length > 0) return explicitLineIds;
   if (item.current_approver_id != null) return [String(item.current_approver_id)];
   return [];
-}
-
-function resolveStoredCurrentApproverId(item: ApprovalRow): string | null {
-  const metaData = item.meta_data as Record<string, unknown> | null | undefined;
-  if (item.current_approver_id != null) {
-    const currentApproverId = String(item.current_approver_id);
-    const delegatedToId = String(metaData?.delegated_to_id || '');
-    const delegatedFromId = String(metaData?.delegated_from_id || '');
-    if (delegatedToId && delegatedToId === currentApproverId && delegatedFromId) {
-      return delegatedFromId;
-    }
-    return currentApproverId;
-  }
-
-  const lineIds = resolveApprovalLineIds(item);
-  return lineIds[0] ?? null;
 }
 
 async function fetchStaffMap(staffIds: string[]) {
@@ -131,13 +104,10 @@ function resolveEffectiveApproverId(
 ) {
   if (!approverId) return null;
   const matchedStaff = staffMap.get(String(approverId));
-  const delegateConfig = resolveApprovalDelegateConfig(
+  return resolveEffectiveApproverIdCore(
+    approverId,
     matchedStaff ? ({ permissions: matchedStaff.permissions || {} } as Record<string, unknown>) : null
   );
-  if (delegateConfig.active && delegateConfig.delegateId) {
-    return String(delegateConfig.delegateId);
-  }
-  return String(approverId);
 }
 
 function buildApprovalHistoryEntry(
@@ -145,12 +115,7 @@ function buildApprovalHistoryEntry(
   action: 'approved_step' | 'approved_final' | 'rejected' | 'delegated' | 'locked',
   note?: string | null
 ) {
-  return {
-    action,
-    actor_id: actor.id,
-    actor_name: actor.name,
-    note: note ?? null,
-  };
+  return buildApprovalHistoryEntryCore(actor.id, actor.name, action, note);
 }
 
 function buildNextApprovalMetaData(

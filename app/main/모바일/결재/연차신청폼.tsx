@@ -165,6 +165,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           leave_type: kind,
           start_date: start,
           end_date: end,
+          days,
           reason: reason || null,
           status: '대기',
         },
@@ -220,6 +221,21 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         leave_request_synced: leaveRequestInserted,
         client_origin: 'mobile',
       };
+
+      // 첨부 — PC와 동일하게 meta_data.attachments(정본 shape: name/url/mimeType/size)에 기록.
+      // 업로드 완료(done)된 항목만 저장. 오프라인 대기(queued)는 URL 미정이라 제외.
+      const uploadedAttachments = attachments
+        .filter((a) => a.state === 'done' && a.fileUrl)
+        .map((a) => ({
+          name: a.file.name,
+          url: a.fileUrl as string,
+          mimeType: a.file.type || null,
+          size: Number.isFinite(a.file.size) ? a.file.size : null,
+          uploadedAt: new Date().toISOString(),
+        }));
+      if (uploadedAttachments.length > 0) {
+        meta.attachments = uploadedAttachments;
+      }
       if (docNumber) {
         meta.doc_number = docNumber;
       }
@@ -277,7 +293,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     } finally {
       setSubmitting(false);
     }
-  }, [staffId, start, end, kind, reason, approverLine, approverManual, user, company, onSubmitted]);
+  }, [staffId, start, end, kind, days, reason, attachments, approverLine, approverManual, user, company, onSubmitted]);
 
   return (
     <div className="m-screen">

@@ -12,6 +12,7 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
+import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-upsert';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type SettlementRow = {
@@ -178,14 +179,17 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     const staff = staffList.find(s => String(s.id) === String(manualForm.staff_id));
     if (!staff) return;
 
-    const { error } = await supabase.from('payroll_records').upsert({
-      staff_id: staff.id,
-      year_month: `${selectedYear}-YE`,
-      record_type: 'yearend',
-      total_taxable: manualForm.total_salary,
-      total_deduction: manualForm.tax_paid,
-      status: '확정'
-    }, { onConflict: 'staff_id,year_month' });
+    const { error } = await upsertPayrollRecordWithFallback({
+      record: {
+        staff_id: staff.id,
+        year_month: `${selectedYear}-YE`,
+        record_type: 'yearend',
+        total_taxable: manualForm.total_salary,
+        total_deduction: manualForm.tax_paid,
+        status: '확정',
+      },
+      optionalColumns: ['record_type', 'status'],
+    });
 
     if (error) {
       toast("저장 중 오류가 발생했습니다: " + ((error as Error)?.message ?? String(error)), 'error');

@@ -159,7 +159,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
 // ─── 감사 로그 탭의 미리보기 표 (헤더 카드용) ─────────────────
 const PREVIEW_LOG_ROWS: (AuditLogRow & { tone: ChipTone })[] = [];
 
-function AccessLogTab() {
+function AccessLogTab({ user }: { user?: unknown }) {
   return (
     <div className="space-y-3">
       <Card title="오늘의 주요 로그 (미리보기)">
@@ -205,13 +205,13 @@ function AccessLogTab() {
         </div>
       </Card>
 
-      <AccessAuditLog user={null} />
+      <AccessAuditLog user={user} />
       <AuditLogViewer />
     </div>
   );
 }
 
-export default function AuditWorkcenter() {
+export default function AuditWorkcenter({ user }: { user?: unknown }) {
   const meta = ADMIN_WORKCENTERS.audit;
   const [tab, setTab] = useState<AuditTabId>('access');
   const [kpi, setKpi] = useState<AdminKpi[]>(FALLBACK_KPI);
@@ -267,7 +267,7 @@ export default function AuditWorkcenter() {
 
       <TabBar tabs={tabs} active={tab} onChange={setTab} />
 
-      {tab === 'access' && <AccessLogTab />}
+      {tab === 'access' && <AccessLogTab user={user} />}
       {tab === 'anomaly' && <AuditAnomalyTab />}
       {tab === 'salary' && <AuditPayrollOutlierTab />}
       {tab === 'backup' && <AuditBackupTab />}

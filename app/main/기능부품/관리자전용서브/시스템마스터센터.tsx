@@ -1,8 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import AnnualLeaveManualGrant from './연차수동부여';
 import {
   includesBannedWord,
   pickFirstFlaggedChatMessage,
@@ -11,8 +10,7 @@ import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/syste
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { formatWon } from '@/lib/date-formatter';
-import { loadBannedWords, highlightBanned } from '@/lib/banned-words';
+import { loadBannedWords } from '@/lib/banned-words';
 import { BannedWordModal } from './시스템마스터센터-modules/BannedWordModal';
 import { MASTER_TABS, CHAT_FETCH_LIMIT, CHAT_ROOM_FETCH_LIMIT } from './시스템마스터센터-modules/constants';
 import type {
@@ -31,77 +29,23 @@ import type {
   SystemMasterActionId,
   SystemMasterSensitiveStaff,
 } from './시스템마스터센터-modules/types';
-import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { type Column } from '@/app/components/ResponsiveTable';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
-
-const formatCurrency = (value: unknown) => formatWon(Number(value || 0));
-
-function maskResidentNo(value: string, reveal: boolean) {
-  if (!value) return '-';
-  if (reveal) return value;
-  const normalized = value.replace(/\s/g, '');
-  if (normalized.length <= 7) return `${normalized.slice(0, 1)}******`;
-  return `${normalized.slice(0, 7)}******`;
-}
-
-function maskAccount(value: string, reveal: boolean) {
-  if (!value) return '-';
-  if (reveal) return value;
-  const normalized = value.replace(/\s/g, '');
-  if (normalized.length <= 4) return `****${normalized.slice(-2)}`;
-  return `${'*'.repeat(Math.max(0, normalized.length - 4))}${normalized.slice(-4)}`;
-}
-
-function prettyJson(value: unknown) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function formatDateTime(value: unknown) {
-  const raw = String(value || '').trim();
-  if (!raw) return '-';
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('ko-KR');
-}
-
-function formatPushPlatformLabel(platform: unknown) {
-  const normalized = String(platform || '').trim();
-  if (!normalized || normalized === 'unknown') return '미분류';
-  if (normalized === 'ios-webapp') return 'iPhone 설치형';
-  if (normalized === 'ios-browser') return 'iPhone 브라우저';
-  if (normalized === 'android') return 'Android';
-  if (normalized === 'web') return 'Desktop Web';
-  return normalized;
-}
-
-async function readJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: 'no-store' });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error || '데이터를 불러오지 못했습니다.');
-  }
-  return payload as T;
-}
-
-function roomHasMessageHistory(room: SystemMasterChatRoom | null | undefined) {
-  if (!room) return false;
-  const loose = room as Record<string, unknown>;
-  if (typeof loose.has_message_history === 'boolean') {
-    return loose.has_message_history;
-  }
-  if (typeof loose.message_count === 'number') {
-    return loose.message_count > 0;
-  }
-  return Boolean(String(loose.last_message_at || loose.last_activity_at || '').trim());
-}
-
-function isEmptyChatRoom(room: SystemMasterChatRoom | null | undefined) {
-  return Boolean(room?.id) && !roomHasMessageHistory(room);
-}
+import {
+  formatCurrency,
+  maskResidentNo,
+  maskAccount,
+  readJson,
+  isEmptyChatRoom,
+} from './시스템마스터센터-modules/utils';
+import { OverviewPanel } from './시스템마스터센터-modules/OverviewPanel';
+import { OperationsPanel } from './시스템마스터센터-modules/OperationsPanel';
+import { AuditPanel } from './시스템마스터센터-modules/AuditPanel';
+import { PermissionDiffPanel } from './시스템마스터센터-modules/PermissionDiffPanel';
+import { ChatsPanel } from './시스템마스터센터-modules/ChatsPanel';
+import { IntegrityPanel } from './시스템마스터센터-modules/IntegrityPanel';
+import { RecoveryPanel, AnnualLeavePanel } from './시스템마스터센터-modules/RecoveryPanel';
 
 type SystemMasterCenterProps = {
   user?: unknown;
@@ -445,6 +389,26 @@ function SystemMasterCenterDesktop({
     }
   }, [chatRooms, openConfirm]);
 
+  const handleDeleteMessage = useCallback(async (message: SystemMasterChatMessage) => {
+    const confirmed = await openConfirm({
+      title: '채팅 메시지 삭제',
+      description: '선택한 메시지를 삭제합니다.\n전체 채팅 모니터링 목록에서도 제거됩니다.',
+      confirmText: '삭제',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setDeletingMsgId(message.id);
+    const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
+    if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
+    else {
+      setChatCatalogMessages((prev) => prev.filter((item) => item.id !== message.id));
+      setChatMessages((prev) => prev.filter((item) => item.id !== message.id));
+      setChatJumpTarget((prev) => (prev?.messageId === message.id ? null : prev));
+      toast('삭제 완료', 'success');
+    }
+    setDeletingMsgId(null);
+  }, [openConfirm]);
+
   const runOpsAction = useCallback(async (action: SystemMasterActionId) => {
     setOpsActionLoading(action);
     try {
@@ -696,454 +660,39 @@ function SystemMasterCenterDesktop({
       )}
 
       {activeTab === '개요' && overview && (
-        <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {summaryCards.map((card) => (
-              <article key={card.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{card.label}</p>
-                <p className="mt-3 text-3xl font-black tracking-tight text-[var(--foreground)]">{Number(card.value || 0).toLocaleString('ko-KR')}</p>
-              </article>
-            ))}
-          </section>
-
-          <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-[var(--foreground)]">최근 변경 이력</h3>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {(overview.recentAudits || []).slice(0, 8).map((log) => (
-                  <div key={log.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.action}</span>
-                      <span className="text-xs font-semibold text-[var(--foreground)]">{log.target_label}</span>
-                      <span className="text-[11px] text-[var(--toss-gray-3)]">{log.actor_label || '-'}</span>
-                      <span className="text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(log.created_at)}</span>
-                    </div>
-                    {(log.changed_fields?.length ?? 0) > 0 && (
-                      <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">
-                        변경 필드: {log.changed_fields?.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <h3 className="text-base font-bold text-[var(--foreground)]">최근 급여 반영</h3>
-              <div className="mt-4 space-y-3">
-                {(overview.recentPayrolls || []).slice(0, 8).map((record) => (
-                  <div key={record.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-bold text-[var(--foreground)]">{record.staff_name} #{record.employee_no || '-'}</p>
-                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{record.year_month} · {record.company || '-'} · {record.department || '-'}</p>
-                      </div>
-                      <p className="text-sm font-black text-[var(--accent)]">{formatCurrency(record.net_pay)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[var(--foreground)]">직원 민감정보 현황</h3>
-              </div>
-              <label className="inline-flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)]">
-                <input
-                  type="checkbox"
-                  checked={showSensitiveRaw}
-                  onChange={(event) => setShowSensitiveRaw(event.target.checked)}
-                  className="h-4 w-4 rounded border-[var(--border)]"
-                />
-                민감정보 원문 보기
-              </label>
-            </div>
-            <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)]">
-              <ResponsiveTable<SystemMasterSensitiveStaff>
-                columns={sensitiveStaffColumns}
-                rows={overview.sensitiveStaffs || []}
-                keyField="id"
-                emptyMessage="민감정보 대상 직원이 없습니다."
-              />
-            </div>
-          </section>
-        </>
+        <OverviewPanel
+          overview={overview}
+          summaryCards={summaryCards}
+          showSensitiveRaw={showSensitiveRaw}
+          setShowSensitiveRaw={setShowSensitiveRaw}
+          sensitiveStaffColumns={sensitiveStaffColumns}
+        />
       )}
 
       {activeTab === '운영대시보드' && operations && (
-        <section className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-            {[
-              { id: 'queue-pending', label: '대기 푸시 작업', value: operations.queue?.pending ?? 0 },
-              { id: 'queue-dead', label: 'Dead Letter', value: operations.queue?.deadLettered ?? 0 },
-              { id: 'push-total', label: '푸시 구독', value: operations.subscriptions?.total ?? 0 },
-              { id: 'backup-count', label: '최근 백업', value: (operations.recentBackups || []).length },
-              { id: 'restore-count', label: '복원 이력', value: (operations.restoreRuns || []).length },
-              { id: 'todo-due', label: '리마인더 대기', value: operations.todoAutomation?.dueReminders ?? 0 },
-              { id: 'wiki-version', label: '위키 버전', value: operations.wiki?.versions ?? 0 },
-            ].map((card) => (
-              <article key={card.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{card.label}</p>
-                <p className="mt-3 text-3xl font-black tracking-tight text-[var(--foreground)]">{Number(card.value || 0).toLocaleString('ko-KR')}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-[var(--foreground)]">실패/주의 작업 모니터</h3>
-                </div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                  마지막 갱신 {formatDateTime(operations.checkedAt)}
-                </p>
-              </div>
-              <div className="mt-4 space-y-3">
-                {(operations.failureItems || []).length === 0 && (
-                  <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
-                    현재 감지된 실패/주의 작업이 없습니다.
-                  </div>
-                )}
-                {(operations.failureItems || []).map((item) => (
-                  <div
-                    key={item.id}
-                    className={`rounded-[var(--radius-lg)] border px-4 py-3 ${
-                      item.severity === 'critical'
-                        ? 'border-red-500/20 bg-red-500/10'
-                        : item.severity === 'warning'
-                          ? 'border-warning/20 bg-warning/10'
-                          : 'border-[var(--border)] bg-[var(--page-bg)]'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-[var(--foreground)]">{item.label}</p>
-                      <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                        {Number(item.count || 0).toLocaleString('ko-KR')}건
-                      </span>
-                    </div>
-                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{item.detail}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <h3 className="text-base font-bold text-[var(--foreground)]">푸시 큐 / 백업 / 크론 상태</h3>
-              <div className="mt-4 space-y-4">
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">채팅 푸시 큐</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Ready <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.ready || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Retrying <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.retrying || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">In Flight <span className="font-bold text-[var(--foreground)]">{Number(operations.queue?.inFlight || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Migration Ready <span className="font-bold text-[var(--foreground)]">{operations.queue?.migrationReady ? '예' : '아니오'}</span></p>
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">푸시 구독 상태</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Null Staff <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.nullStaff || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Orphan <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.orphan || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">중복 그룹 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.duplicateEndpointGroups || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">중복 행 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.duplicateRows || 0).toLocaleString('ko-KR')}</span></p>
-                  </div>
-                </div>
-
-                <div
-                  data-testid="system-master-push-diagnostics"
-                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs font-bold text-[var(--foreground)]">푸시 진단</p>
-                    <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                      최근 실패 {Number(operations.pushFailures?.total || 0).toLocaleString('ko-KR')}건
-                    </span>
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">FCM 연결 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.fcmEnabled || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">Web Push 전용 <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.webPushOnly || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">가상 Endpoint <span className="font-bold text-[var(--foreground)]">{Number(operations.subscriptions?.placeholderEndpoints || 0).toLocaleString('ko-KR')}</span></p>
-                  </div>
-
-                  <div className="mt-4">
-                    <p className="text-[11px] font-bold text-[var(--foreground)]">플랫폼 분포</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {(operations.subscriptions?.platformSummary || []).length === 0 && (
-                        <span className="text-[11px] text-[var(--toss-gray-3)]">표시할 플랫폼 데이터가 없습니다.</span>
-                      )}
-                      {(operations.subscriptions?.platformSummary || []).map((entry) => (
-                        <span
-                          key={String(entry.platform)}
-                          className="rounded-full border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--foreground)]"
-                        >
-                          {formatPushPlatformLabel(entry.platform)} {Number(entry.count || 0).toLocaleString('ko-KR')}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] font-bold text-[var(--foreground)]">최근 실패 사유</p>
-                      <div className="mt-2 space-y-2">
-                        {(operations.pushFailures?.summary || []).length === 0 && (
-                          <p className="text-[11px] text-[var(--toss-gray-3)]">최근 실패 사유가 없습니다.</p>
-                        )}
-                        {(operations.pushFailures?.summary || []).slice(0, 4).map((entry) => (
-                          <div key={String(entry.error)} className="flex items-center justify-between gap-3 text-[11px]">
-                            <span className="font-semibold text-[var(--foreground)]">{String(entry.error || 'unknown')}</span>
-                            <span className="text-[var(--toss-gray-3)]">{Number(entry.count || 0).toLocaleString('ko-KR')}건</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-bold text-[var(--foreground)]">최근 구독 흐름</p>
-                      <div className="mt-2 space-y-2">
-                        {(operations.subscriptions?.recentSubscriptions || []).length === 0 && (
-                          <p className="text-[11px] text-[var(--toss-gray-3)]">최근 구독 데이터가 없습니다.</p>
-                        )}
-                        {(operations.subscriptions?.recentSubscriptions || []).slice(0, 4).map((entry) => (
-                          <div key={String(entry.id)} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2">
-                            <p className="text-[11px] font-semibold text-[var(--foreground)]">{formatPushPlatformLabel(entry.platform)} · {entry.has_fcm ? 'FCM 포함' : 'Web Push'}</p>
-                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{formatDateTime(entry.created_at)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">크론 스케줄</p>
-                  <div className="mt-3 space-y-2">
-                    {(operations.cronJobs || []).map((cron) => (
-                      <div key={cron.path} className="flex items-center justify-between gap-3 text-[11px]">
-                        <span className="font-semibold text-[var(--foreground)]">{cron.label}</span>
-                        <span className="text-[var(--toss-gray-3)]">{cron.schedule}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">할일 자동화 / 위키 버전</p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">리마인더 대기 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.dueReminders || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">반복 할일 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.repeatingOpenTodos || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">24시간 리마인더 <span className="font-bold text-[var(--foreground)]">{Number(operations.todoAutomation?.reminderLogs24h || 0).toLocaleString('ko-KR')}</span></p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">위키 문서/버전 <span className="font-bold text-[var(--foreground)]">{Number(operations.wiki?.documents || 0).toLocaleString('ko-KR')} / {Number(operations.wiki?.versions || 0).toLocaleString('ko-KR')}</span></p>
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                  <p className="text-xs font-bold text-[var(--foreground)]">실기기 QA 체크리스트</p>
-                  <div className="mt-3 space-y-2 text-[11px] text-[var(--toss-gray-3)]">
-                    <p>1. Android Chrome 또는 iPhone 설치형 앱에서 알림 권한이 허용된 상태인지 확인합니다.</p>
-                    <p>2. 앱을 완전히 내려놓은 뒤 다른 계정에서 채팅 메시지를 보내 상단 푸시가 오는지 확인합니다.</p>
-                    <p>3. 푸시를 눌렀을 때 채팅방, 결재 문서, 게시글이 정확한 대상까지 열리는지 확인합니다.</p>
-                    <p>4. 앱을 다시 열어 알림 설정의 푸시 상태가 연결됨으로 복구되는지 확인합니다.</p>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-[0.9fr_0.9fr_1.1fr]">
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <h3 className="text-base font-bold text-[var(--foreground)]">최근 백업</h3>
-              <div className="mt-4 space-y-3">
-                {(operations.recentBackups || []).map((backup) => (
-                  <div key={backup.name} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <p className="text-sm font-bold text-[var(--foreground)]">{backup.name}</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(backup.created_at)}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <h3 className="text-base font-bold text-[var(--foreground)]">최근 복원 / 위키 버전</h3>
-              <div className="mt-4 space-y-3">
-                {(operations.restoreRuns || []).slice(0, 3).map((run) => (
-                  <div key={run.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-[var(--foreground)]">{run.file_name}</p>
-                      <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${run.status === 'completed' ? 'bg-success/15 text-success' : run.status === 'failed' ? 'bg-danger/15 text-danger' : 'bg-warning/15 text-warning'}`}>
-                        {run.status === 'completed' ? '완료' : run.status === 'failed' ? '실패' : '진행'}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(run.started_at)}</p>
-                  </div>
-                ))}
-                {(operations.wiki?.recentVersions || []).slice(0, 2).map((version) => (
-                  <div key={version.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <p className="text-sm font-bold text-[var(--foreground)]">{version.title}</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">버전 {Number(version.version_no || 0).toLocaleString('ko-KR')} · {formatDateTime(version.created_at)}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-              <h3 className="text-base font-bold text-[var(--foreground)]">기능별 사용 로그</h3>
-              <div className="mt-4 space-y-3">
-                {(operations.usageSummary || []).map((entry) => (
-                  <div key={entry.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-bold text-[var(--foreground)]">{entry.label}</p>
-                      <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                        {Number(entry.count || 0).toLocaleString('ko-KR')}건
-                      </span>
-                    </div>
-                    <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">최근 액션 {entry.topAction || '-'} · {formatDateTime(entry.latestAt)}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </div>
-        </section>
+        <OperationsPanel operations={operations} />
       )}
 
       {activeTab === '변경이력' && (
-        <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
-            <select
-              value={auditCategory}
-              onChange={(event) => setAuditCategory(event.target.value)}
-              className="h-11 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-semibold text-[var(--foreground)]"
-            >
-              <option value="all">전체 카테고리</option>
-              <option value="staff">직원 / 민감정보</option>
-              <option value="payroll">급여 / 정산</option>
-              <option value="chat">채팅 / 메시지</option>
-              <option value="general">기타</option>
-            </select>
-            <input
-              value={auditKeyword}
-              onChange={(event) => setAuditKeyword(event.target.value)}
-              placeholder="직원명, 액션, 변경 필드로 검색"
-              className="h-11 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-            />
-            <button
-              type="button"
-              onClick={() => void loadAuditLogs()}
-              className="h-11 rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 text-sm font-bold text-white"
-            >
-              조회
-            </button>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {auditLogs.length === 0 && !loading && (
-              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
-                조회된 변경 이력이 없습니다.
-              </div>
-            )}
-
-            {auditLogs.map((log) => (
-              <article key={log.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.action}</span>
-                      <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{log.category}</span>
-                    </div>
-                    <h4 className="mt-3 text-sm font-bold text-[var(--foreground)]">{log.target_label}</h4>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                      실행자 {log.actor_label || '-'} · {formatDateTime(log.created_at)}
-                    </p>
-                    {(log.changed_fields?.length ?? 0) > 0 && (
-                      <p className="mt-2 text-[11px] font-semibold text-[var(--foreground)]">
-                        변경 필드: {log.changed_fields?.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                  <div className="max-w-full lg:max-w-[420px]">
-                    <details className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
-                      <summary className="cursor-pointer text-[11px] font-bold text-[var(--foreground)]">세부 내역 보기</summary>
-                      <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap break-all text-[11px] text-[var(--toss-gray-4)]">
-                        {prettyJson(log.details)}
-                      </pre>
-                    </details>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        <AuditPanel
+          auditCategory={auditCategory}
+          setAuditCategory={setAuditCategory}
+          auditKeyword={auditKeyword}
+          setAuditKeyword={setAuditKeyword}
+          onSearch={() => void loadAuditLogs()}
+          auditLogs={auditLogs}
+          loading={loading}
+        />
       )}
 
       {activeTab === '권한변경' && (
-        <section className="space-y-4">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-              <input
-                value={auditKeyword}
-                onChange={(event) => setAuditKeyword(event.target.value)}
-                placeholder="직원명, 역할, 권한 키로 검색"
-                className="h-11 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                type="button"
-                onClick={() => void loadPermissionDiffs()}
-                className="h-11 rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 text-sm font-bold text-white"
-              >
-                조회
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {permissionDiffLogs.length === 0 && !loading && (
-              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
-                조회된 권한 변경 이력이 없습니다.
-              </div>
-            )}
-
-            {permissionDiffLogs.map((log) => (
-              <article key={log.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.target_label}</span>
-                      <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">{log.actor_label || '-'}</span>
-                    </div>
-                    <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">{formatDateTime(log.created_at)}</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(log.permission_summary?.enabled || []).map((key: string) => (
-                        <span key={`on-${key}`} className="rounded-full bg-success/20 px-2.5 py-1 text-[10px] font-bold text-success">+ {key}</span>
-                      ))}
-                      {(log.permission_summary?.disabled || []).map((key: string) => (
-                        <span key={`off-${key}`} className="rounded-full bg-danger/20 px-2.5 py-1 text-[10px] font-bold text-danger">- {key}</span>
-                      ))}
-                    </div>
-                    {(log.permission_summary?.beforeRole || log.permission_summary?.afterRole) && (
-                      <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">
-                        역할: {log.permission_summary?.beforeRole || '-'} → {log.permission_summary?.afterRole || '-'}
-                      </p>
-                    )}
-                  </div>
-                  <details className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3 xl:max-w-[460px]">
-                    <summary className="cursor-pointer text-[11px] font-bold text-[var(--foreground)]">세부 diff 보기</summary>
-                    <pre className="mt-3 max-h-[260px] overflow-auto whitespace-pre-wrap break-all text-[11px] text-[var(--toss-gray-4)]">{prettyJson(log.details)}</pre>
-                  </details>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        <PermissionDiffPanel
+          auditKeyword={auditKeyword}
+          setAuditKeyword={setAuditKeyword}
+          onSearch={() => void loadPermissionDiffs()}
+          permissionDiffLogs={permissionDiffLogs}
+          loading={loading}
+        />
       )}
 
       {showBannedModal && (
@@ -1151,358 +700,56 @@ function SystemMasterCenterDesktop({
       )}
 
       {activeTab === '전체채팅' && (
-        <section className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-base font-bold text-[var(--foreground)]">채팅방 목록</h3>
-              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                {showFlaggedOnly || showEmptyRoomsOnly
-                  ? `${visibleChatRooms.length}/${chatRooms.length}개`
-                  : `${chatRooms.length}개`}
-              </span>
-            </div>
-            <div className="mt-4 space-y-2">
-              {visibleChatRooms.length === 0 ? (
-                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
-                  {showEmptyRoomsOnly
-                    ? '대화 내역이 없는 채팅방이 없습니다.'
-                    : showFlaggedOnly
-                      ? '필터 단어가 포함된 채팅방이 없습니다.'
-                      : '표시할 채팅방이 없습니다.'}
-                </div>
-              ) : (
-                visibleChatRooms.map((room) => (
-                  <button
-                    key={room.id}
-                    type="button"
-                    onClick={() => setSelectedRoomId(room.id)}
-                    className={`w-full rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-all ${
-                      selectedRoomId === room.id
-                        ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]'
-                        : 'border-[var(--border)] bg-[var(--page-bg)] hover:border-[var(--accent)]/40'
-                    }`}
-                  >
-                    <p className="text-sm font-bold text-[var(--foreground)]">{room.room_label}</p>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{room.member_labels?.join(', ') || '참여자 없음'}</p>
-                  </button>
-                ))
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-base font-bold text-[var(--foreground)]">전 직원 채팅 대화 열람</h3>
-                <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                  {selectedRoomId
-                    ? `${selectedChatRoom?.room_label || '선택 채팅방'} 대화`
-                    : '전체 최근 대화'}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                {selectedRoomId && (
-                  <button
-                    type="button"
-                    disabled={deletingRoomId === selectedRoomId}
-                    onClick={() => {
-                      const room = chatRooms.find((item) => item.id === selectedRoomId);
-                      if (room) void handleDeleteRoom(room);
-                    }}
-                    className="h-9 rounded-[var(--radius-md)] border border-danger/20 px-3 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {deletingRoomId === selectedRoomId
-                      ? '삭제 중...'
-                      : selectedRoomIsEmpty
-                        ? '대화 없는 방 삭제'
-                        : '선택 방 삭제'}
-                  </button>
-                )}
-                {(() => {
-                  return flaggedChatMessageCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={handleFocusFlaggedChats}
-                      className="text-[11px] font-bold text-danger bg-danger/10 border border-danger/20 px-2.5 py-1 rounded-full transition hover:bg-danger/15"
-                    >
-                      🔍 필터 단어 {flaggedChatMessageCount}건
-                    </button>
-                  ) : null;
-                })()}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEmptyRoomsOnly(false);
-                    setShowFlaggedOnly((v) => !v);
-                  }}
-                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-danger text-white border-danger' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
-                >
-                  선택검색
-                </button>
-                <button
-                  type="button"
-                  data-testid="system-master-empty-room-filter"
-                  onClick={() => {
-                    setShowFlaggedOnly(false);
-                    setShowEmptyRoomsOnly((v) => !v);
-                  }}
-                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showEmptyRoomsOnly ? 'bg-[var(--foreground)] text-white border-[var(--foreground)]' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
-                >
-                  대화 없는 방 ({emptyChatRooms.length})
-                </button>
-                {emptyChatRooms.length > 0 && (
-                  <button
-                    type="button"
-                    data-testid="system-master-bulk-delete-empty-rooms"
-                    disabled={deletingRoomId === '__bulk__'}
-                    onClick={() => void handleDeleteEmptyRooms()}
-                    className="h-9 rounded-[var(--radius-md)] border border-danger/30 px-3 text-xs font-bold text-danger transition hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {deletingRoomId === '__bulk__'
-                      ? '삭제 중...'
-                      : `빈 방 ${emptyChatRooms.length}개 일괄 삭제`}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowBannedModal(true)}
-                  className="h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] transition"
-                >
-                  단어 필터
-                </button>
-                <input
-                  value={chatKeyword}
-                  onChange={(event) => setChatKeyword(event.target.value)}
-                  placeholder="대화 내용 검색"
-                  className="h-9 min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  type="button"
-                  onClick={() => void loadChats()}
-                  className="h-9 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-4 text-sm font-bold text-white"
-                >
-                  조회
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-[1320px] w-full table-fixed text-left text-xs">
-                <thead className="bg-[var(--page-bg)] text-[11px] uppercase tracking-[0.14em] text-[var(--toss-gray-3)] [&_th]:whitespace-nowrap">
-                  <tr>
-                    <th className="w-[230px] px-4 py-3 text-left">시간</th>
-                    <th className="w-[180px] px-4 py-3 text-left">채팅방</th>
-                    <th className="w-[180px] px-4 py-3 text-left">발신자</th>
-                    <th className="px-4 py-3 text-left">내용</th>
-                    <th className="w-[120px] px-4 py-3 text-left">첨부</th>
-                    <th className="w-[96px] px-4 py-3 text-left">삭제</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleChatMessages
-                    .map((message) => {
-                      const flagged = includesBannedWord(message.content, bannedWords);
-                      const isJumpTarget = chatJumpTarget?.messageId === message.id;
-                      return (
-                        <tr
-                          key={message.id}
-                          ref={(element) => {
-                            chatMessageRowRefs.current[message.id] = element;
-                          }}
-                          className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-500/10' : ''} ${isJumpTarget ? 'bg-red-500/20' : ''}`}
-                        >
-                          <td className="w-[230px] px-4 py-4 align-top text-[var(--toss-gray-4)] whitespace-nowrap">{formatDateTime(message.created_at)}</td>
-                          <td className="w-[180px] px-4 py-4 align-top">
-                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.room_label || undefined}>{message.room_label}</p>
-                            {message.edited_at && <p className="mt-1 text-[11px] text-warning">수정됨</p>}
-                            {message.is_deleted && <p className="mt-1 text-[11px] text-danger">삭제 처리</p>}
-                          </td>
-                          <td className="w-[180px] px-4 py-4 align-top">
-                            <p className="truncate whitespace-nowrap break-keep font-semibold text-[var(--foreground)]" title={message.sender_name || undefined}>{message.sender_name}</p>
-                            <p className="mt-1 truncate whitespace-nowrap break-keep text-[11px] text-[var(--toss-gray-3)]" title={message.sender_company || '-'}>{message.sender_company || '-'}</p>
-                          </td>
-                          <td className="break-words px-4 py-4 align-top leading-6 text-[var(--foreground)]">
-                            {message.content
-                              ? (flagged ? <span>{highlightBanned(message.content, bannedWords)}</span> : message.content)
-                              : <span className="text-[var(--toss-gray-3)]">(내용 없음)</span>}
-                            {flagged && <span className="ml-1 text-danger font-bold text-[11px]">●</span>}
-                          </td>
-                          <td className="w-[120px] px-4 py-4 align-top whitespace-nowrap">
-                            {message.file_url ? (
-                              <a href={message.file_url} target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">첨부 보기</a>
-                            ) : (
-                              <span className="text-[var(--toss-gray-3)]">-</span>
-                            )}
-                          </td>
-                          <td className="w-[96px] px-4 py-4 align-top whitespace-nowrap">
-                            <button
-                              type="button"
-                              disabled={deletingMsgId === message.id}
-                              onClick={async () => {
-                                const confirmed = await openConfirm({
-                                  title: '채팅 메시지 삭제',
-                                  description: '선택한 메시지를 삭제합니다.\n전체 채팅 모니터링 목록에서도 제거됩니다.',
-                                  confirmText: '삭제',
-                                  tone: 'danger',
-                                });
-                                if (!confirmed) return;
-                                setDeletingMsgId(message.id);
-                                const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
-                                if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
-                                else {
-                                  setChatCatalogMessages((prev) => prev.filter((item) => item.id !== message.id));
-                                  setChatMessages((prev) => prev.filter((item) => item.id !== message.id));
-                                  setChatJumpTarget((prev) => (prev?.messageId === message.id ? null : prev));
-                                  toast('삭제 완료', 'success');
-                                }
-                                setDeletingMsgId(null);
-                              }}
-                              className={`px-2 py-1 text-[11px] font-bold rounded-[var(--radius-md)] transition ${
-                                flagged
-                                  ? 'bg-danger text-white hover:bg-[var(--danger-hover)]'
-                                  : 'border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-danger hover:text-white hover:border-danger'
-                              }`}
-                            >
-                              {deletingMsgId === message.id ? '…' : '삭제'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  {visibleChatMessages.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
-                        {showFlaggedOnly ? '필터 단어가 포함된 메시지가 없습니다.' : '조회된 메시지가 없습니다.'}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </article>
-        </section>
+        <ChatsPanel
+          chatRooms={chatRooms}
+          visibleChatRooms={visibleChatRooms}
+          visibleChatMessages={visibleChatMessages}
+          selectedRoomId={selectedRoomId}
+          setSelectedRoomId={setSelectedRoomId}
+          selectedChatRoom={selectedChatRoom}
+          selectedRoomIsEmpty={selectedRoomIsEmpty}
+          emptyChatRooms={emptyChatRooms}
+          flaggedChatMessageCount={flaggedChatMessageCount}
+          showFlaggedOnly={showFlaggedOnly}
+          setShowFlaggedOnly={setShowFlaggedOnly}
+          showEmptyRoomsOnly={showEmptyRoomsOnly}
+          setShowEmptyRoomsOnly={setShowEmptyRoomsOnly}
+          chatKeyword={chatKeyword}
+          setChatKeyword={setChatKeyword}
+          bannedWords={bannedWords}
+          deletingRoomId={deletingRoomId}
+          deletingMsgId={deletingMsgId}
+          chatJumpTarget={chatJumpTarget}
+          chatMessageRowRefs={chatMessageRowRefs}
+          onLoadChats={() => void loadChats()}
+          onOpenBannedModal={() => setShowBannedModal(true)}
+          onFocusFlaggedChats={handleFocusFlaggedChats}
+          onDeleteRoom={(room) => void handleDeleteRoom(room)}
+          onDeleteEmptyRooms={() => void handleDeleteEmptyRooms()}
+          onDeleteMessage={(message) => void handleDeleteMessage(message)}
+        />
       )}
 
       {activeTab === '정합성점검' && (
-        <section className="space-y-4">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-[var(--foreground)]">DB 정합성 점검 도구</h3>
-                <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-                  마지막 점검 시각: {formatDateTime(integrityReport?.checkedAt)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void loadIntegrityReport()}
-                className="rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
-              >
-                다시 점검
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {(integrityReport?.issues || []).map((issue) => (
-              <article
-                key={issue.id}
-                className={`rounded-[var(--radius-xl)] border p-5 shadow-sm ${
-                  issue.severity === 'critical'
-                    ? 'border-red-500/20 bg-red-500/10'
-                    : issue.severity === 'warning'
-                      ? 'border-warning/20 bg-warning/10'
-                      : 'border-[var(--border)] bg-[var(--card)]'
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-bold text-[var(--foreground)]">{issue.title}</h4>
-                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{issue.description}</p>
-                  </div>
-                  <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-2.5 py-1 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                    {Number(issue.count || 0).toLocaleString('ko-KR')}건
-                  </span>
-                </div>
-                {Array.isArray(issue.samples) && issue.samples.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {issue.samples.map((sample: string, index: number) => (
-                      <span key={`${issue.id}-${index}`} className="rounded-full bg-[var(--page-bg)] px-2.5 py-1 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                        {sample}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
+        <IntegrityPanel
+          integrityReport={integrityReport}
+          onReload={() => void loadIntegrityReport()}
+        />
       )}
 
       {activeTab === '복구센터' && (
-        <section className="space-y-4">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <h3 className="text-base font-bold text-[var(--foreground)]">운영자용 문제 복구 센터</h3>
-            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-              실패 작업 복구, 푸시 구독 정리, 수동 전체 백업을 운영자가 직접 실행할 수 있습니다.
-            </p>
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            {[
-              {
-                id: 'run_backup_full',
-                title: '정기 전체 백업 수동 실행',
-                description: '즉시 전체 백업을 만들어 최근 백업 목록을 갱신합니다.',
-                button: '전체 백업 실행',
-              },
-              {
-                id: 'run_chat_push_dispatch',
-                title: '채팅 푸시 큐 재처리',
-                description: '대기 중인 채팅 푸시 작업을 바로 다시 처리합니다.',
-                button: '푸시 큐 재처리',
-              },
-              {
-                id: 'run_todo_reminders',
-                title: '할일 리마인더 수동 실행',
-                description: '지금 시점까지 도달한 할일 리마인더를 즉시 발송합니다.',
-                button: '리마인더 실행',
-              },
-              {
-                id: 'cleanup_push_subscriptions',
-                title: '푸시 구독 정리',
-                description: 'null staff, orphan, 중복 endpoint 구독을 정리합니다.',
-                button: '푸시 구독 정리',
-              },
-            ].map((action) => (
-              <article key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-                <h4 className="text-sm font-bold text-[var(--foreground)]">{action.title}</h4>
-                <p className="mt-2 text-[11px] leading-5 text-[var(--toss-gray-3)]">{action.description}</p>
-                <button
-                  type="button"
-                  onClick={() => void runOpsAction(action.id as 'run_backup_full' | 'run_chat_push_dispatch' | 'run_todo_reminders' | 'cleanup_push_subscriptions')}
-                  disabled={opsActionLoading === action.id}
-                  className="mt-4 h-10 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {opsActionLoading === action.id ? '실행 중...' : action.button}
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
+        <RecoveryPanel
+          opsActionLoading={opsActionLoading}
+          runOpsAction={(action) => void runOpsAction(action)}
+        />
       )}
 
       {activeTab === '연차수동부여' && (
-        <section className="space-y-4">
-          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-            <h3 className="text-base font-bold text-[var(--foreground)]">연차 수동 부여</h3>
-            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-              <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
-              {' '}시스템마스터 계정 전용 기능입니다. 자동 부여 규칙과 별개로 직원별 연차 총량과 사용량을 직접 조정합니다.
-            </p>
-          </div>
-          <AnnualLeaveManualGrant user={systemMasterUser} staffs={staffs} onRefresh={onRefresh} />
-        </section>
+        <AnnualLeavePanel
+          systemMasterUser={systemMasterUser}
+          staffs={staffs}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

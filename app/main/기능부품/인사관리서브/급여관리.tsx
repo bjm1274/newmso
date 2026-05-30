@@ -10,7 +10,6 @@ import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { supabase } from '@/lib/supabase';
 import { hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
-import { calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import type { StaffMember } from '@/types';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
@@ -123,7 +122,7 @@ type PayrollMainProps = {
   selectedCo?: string;
   onRefresh?: () => void;
   showAdminPolicyTabs?: boolean;
-  user?: any;
+  user?: Record<string, unknown> | null;
   initialTab?: string;
 };
 
@@ -356,12 +355,7 @@ export default function PayrollMain({
     { id: '무급결근차감', label: '무급 결근 차감', icon: '📉' },
   ];
 
-  const adminOnlyPayrollTabIds = new Set<string>([
-    '통합설정',
-    '급여고도화',
-  ]);
   const hiddenAdminPayrollTabIds = new Set<string>(['통합설정', '급여고도화']);
-  adminOnlyPayrollTabIds.forEach((tabId) => hiddenAdminPayrollTabIds.add(tabId));
   const visibleTabs = showAdminPolicyTabs
     ? tabs
     : tabs.filter((tab) => !hiddenAdminPayrollTabIds.has(tab.id));
@@ -732,51 +726,6 @@ function RunPayrollWizard({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-
-// 복리후생 요약 (DEMO)
-function BenefitSummary({ staff }: { staff: Staff }) {
-  const base = staff.base ?? 3_000_000;
-  const welfare = Math.round(base * 0.05);
-  const insurance = calculateEmployeeInsuranceDeductions(base);
-
-  return (
-    <div className="app-card p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">복리후생 · 4대보험 (DEMO)</h3>
-      <div className="space-y-1.5 text-xs font-medium text-[var(--toss-gray-4)]">
-        <div className="flex justify-between"><span>복리후생 예산</span><span className="text-[var(--accent)]">{welfare.toLocaleString()}원/월</span></div>
-        <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{insurance.nationalPension.toLocaleString()}원</span></div>
-        <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{insurance.healthInsurance.toLocaleString()}원</span></div>
-      </div>
-      <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">* Supabase 연동 후 자동 반영 예정</p>
-    </div>
-  );
-}
-
-// 급여 시뮬레이션 (DEMO)
-function SalarySimulationSummary({ staff }: { staff: Staff }) {
-  const base = staff.base ?? 3_000_000;
-  const scenarios = [
-    { name: '기준안', total: base },
-    { name: '인상안 A (+5%)', total: Math.round(base * 1.05) },
-    { name: '인상안 B (+10%)', total: Math.round(base * 1.1) },
-  ];
-
-  return (
-    <div className="app-card p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">급여 시뮬레이션 (DEMO)</h3>
-      <div className="space-y-1.5 text-xs font-medium text-[var(--foreground)]">
-        {scenarios.map((s) => (
-          <div key={s.name} className="flex justify-between">
-            <span>{s.name}</span>
-            <span className="text-[var(--accent)]">{s.total.toLocaleString()}원</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">* 시나리오 저장/비교 연동 예정</p>
     </div>
   );
 }

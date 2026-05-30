@@ -16,7 +16,7 @@ import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
-import { useClosingToday, todayISO } from './data-hooks';
+import { useClosingToday } from './data-hooks';
 
 type Tab = 'today' | 'week' | 'month';
 
@@ -32,27 +32,20 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
 
   const handleSubmit = async () => {
     if (submitting || !day || day.submitted) return;
-    const staffName =
-      typeof (user as Record<string, unknown>).name === 'string'
-        ? (user as Record<string, unknown>).name as string
-        : '';
+    // 정본 모델: 일 마감은 daily_closures 1건. '제출'은 별도 daily_reports
+    // 테이블(미존재)에 insert 하던 것을 daily_closures.status 업데이트로 교정.
+    if (!day.closureId) {
+      toast('오늘 마감 데이터가 아직 없습니다. 데스크톱에서 마감을 먼저 생성해 주세요.', 'error');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
-        report_date: day.date ?? todayISO(),
-        total_amount: day.total,
-        submitted_by: user.id,
-        submitted_by_name: staffName,
-        company: company ?? null,
-        status: 'submitted',
-        created_at: new Date().toISOString(),
-      };
-
       const { queued, error } = await enqueueSupabaseMutation({
-        kind: 'insert',
-        table: 'daily_reports',
-        payload,
+        kind: 'update',
+        table: 'daily_closures',
+        match: { id: day.closureId },
+        payload: { status: 'submitted' },
         retryable: true,
       });
 

@@ -223,29 +223,37 @@ export default function PurchaseOrderManagement({
 
     setLoading(true);
     try {
-      const itemsBySupplier = lowStockItems.reduce((acc: any, item: any) => {
-        const supplierName =
-          String(item?.supplier_name || item?.supplier || '').trim() ||
-          supplierNames[0] ||
-          '미정';
-        if (!acc[supplierName]) acc[supplierName] = [];
-        acc[supplierName].push({
-          item_id: item.id,
-          name: getItemName(item),
-          qty: getRecommendedOrderQuantity(item),
-          unit_price: getItemUnitPrice(item),
-        });
-        return acc;
-      }, {});
+      const itemsBySupplier = lowStockItems.reduce(
+        (acc: Record<string, { supplierId: string | null; items: any[] }>, item: any) => {
+          const supplierName =
+            String(item?.supplier_name || item?.supplier || '').trim() ||
+            supplierNames[0] ||
+            '미정';
+          if (!acc[supplierName]) acc[supplierName] = { supplierId: null, items: [] };
+          // 그룹 내 supplier_id는 첫 유효 값 사용(FK 연결, schema.ts purchase_orders.supplier_id)
+          const sid = typeof item?.supplier_id === 'string' ? item.supplier_id.trim() : '';
+          if (sid && !acc[supplierName].supplierId) acc[supplierName].supplierId = sid;
+          acc[supplierName].items.push({
+            item_id: item.id,
+            name: getItemName(item),
+            qty: getRecommendedOrderQuantity(item),
+            unit_price: getItemUnitPrice(item),
+          });
+          return acc;
+        },
+        {},
+      );
 
-      for (const [supplierName, items] of Object.entries(itemsBySupplier)) {
-        const totalAmount = (items as any[]).reduce(
+      for (const [supplierName, group] of Object.entries(itemsBySupplier)) {
+        const { supplierId, items } = group;
+        const totalAmount = items.reduce(
           (sum, item) => sum + Number(item.qty || 0) * Number(item.unit_price || 0),
           0,
         );
 
         const { error } = await supabase.from('purchase_orders').insert([
           {
+            supplier_id: supplierId,
             supplier_name: supplierName,
             items,
             status: '대기',

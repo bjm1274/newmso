@@ -13,7 +13,7 @@ import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staf
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { ProfileCardUser, ProfileCardProps } from './프로필카드/types';
 import { toSafeText } from './프로필카드/format-utils';
-import { InfoItem, EditableItem } from './프로필카드/InfoItems';
+import { EditableItem } from './프로필카드/InfoItems';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -26,7 +26,6 @@ export default function MyProfileCard({
   setIsEditing: setControlledIsEditing,
 }: ProfileCardProps) {
   const { dialog, openConfirm, openPrompt } = useActionDialog();
-  const MASKED_TEXT = '********';
   const _iu = normalizeStaffLike((initialUser ?? {}) as ProfileCardUser);
   const [user, setUser] = useState<ProfileCardUser>(normalizeProfileUser(_iu as ProfileCardUser));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));

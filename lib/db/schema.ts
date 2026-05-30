@@ -1101,6 +1101,27 @@ export const leave_balances = sqliteTable("leave_balances", {
 	index("idx_leave_balances_expiry_date").on(table.expiry_date),
 ]);
 
+// 연차 자동발생/대체휴무 부여 원장 (멱등성 + 감사)
+// kind: 'monthly'(1년미만 월 만근 +1일) | 'annual'(만N년 연차 부여) | 'substitute'(공휴일근무 대체휴무)
+// period_key: monthly='YYYY-MM'(근무월 시작), annual='annual:N'(N년차), substitute='YYYY-MM-DD'(근무일)
+// UNIQUE(staff_id, kind, period_key) 로 동일 기간 중복 부여 차단 → 크론이 매일 돌아도 1회만 부여.
+export const leave_accruals = sqliteTable("leave_accruals", {
+	id: text().primaryKey().notNull(),
+	staff_id: text().notNull().references(() => staff_members.id, { onDelete: "cascade" } ),
+	company_id: text(),
+	kind: text().notNull(),
+	period_key: text().notNull(),
+	days: real().notNull(),
+	year: integer().notNull(),
+	source_date: text(),
+	note: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_leave_accruals_unique").on(table.staff_id, table.kind, table.period_key),
+	index("idx_leave_accruals_staff").on(table.staff_id),
+]);
+
 export const leave_requests = sqliteTable("leave_requests", {
 	id: text().primaryKey().notNull(),
 	staff_id: text().references(() => staff_members.id, { onDelete: "cascade" } ),
@@ -2437,6 +2458,175 @@ export const company_payroll_policies = sqliteTable("company_payroll_policies", 
 },
 (table) => [
 	uniqueIndex("idx_company_payroll_policies_unique").on(table.company_name, table.rule_label),
+]);
+
+// ─────────────────────────────────────────────────────────────
+// 무음 실패 복구 — 미존재 기능 테이블 8종 (2026-05-30)
+// 소비처가 supabase.from()/enqueueSupabaseMutation으로 호출하나 D1에
+// 실테이블이 없어 무음 실패하던 기능들을 신설. 컬럼은 각 소비처 코드의
+// insert/select/update 실제 사용 컬럼에서 추출.
+// ─────────────────────────────────────────────────────────────
+
+// 수술상담 (모바일/추가기능/수술상담.tsx)
+export const op_consultations = sqliteTable("op_consultations", {
+	id: text().primaryKey().notNull(),
+	patient_name: text().notNull(),
+	surgery_type: text(),
+	status: text(),
+	note: text(),
+	staff_id: text().references(() => staff_members.id),
+	staff_name: text(),
+	company: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_op_consultations_company_created").on(table.company, table.created_at),
+	index("idx_op_consultations_staff_id").on(table.staff_id),
+]);
+
+// 경조사관리 (기능부품/인사관리서브/경조사관리.tsx)
+export const congratulations_condolences = sqliteTable("congratulations_condolences", {
+	id: text().primaryKey().notNull(),
+	staff_id: text().references(() => staff_members.id),
+	staff_name: text(),
+	department: text(),
+	event_type: text(),
+	event_date: text(),
+	amount: integer().default(0),
+	relation: text(),
+	recipient: text(),
+	memo: text(),
+	wreath_sent: integer().default(0),
+	company: text(),
+	status: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_congrats_company_event_date").on(table.company, table.event_date),
+	index("idx_congrats_event_type").on(table.event_type),
+]);
+
+// 조기퇴근감지 (기능부품/인사관리서브/조기퇴근감지.tsx)
+export const early_leave_records = sqliteTable("early_leave_records", {
+	id: text().primaryKey().notNull(),
+	staff_id: text().references(() => staff_members.id),
+	staff_name: text(),
+	dept: text(),
+	work_date: text(),
+	scheduled_end: text(),
+	actual_end: text(),
+	early_minutes: integer().default(0),
+	is_approved: integer().default(0),
+	note: text(),
+	company: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_early_leave_work_date").on(table.work_date),
+	index("idx_early_leave_staff_id").on(table.staff_id),
+]);
+
+// 계약서자동생성 (기능부품/인사관리서브/계약서자동생성.tsx)
+export const generated_contracts = sqliteTable("generated_contracts", {
+	id: text().primaryKey().notNull(),
+	contract_type: text(),
+	staff_id: text().references(() => staff_members.id),
+	staff_name: text(),
+	position: text(),
+	department: text(),
+	salary: text(),
+	start_date: text(),
+	end_date: text(),
+	company_name: text(),
+	representative: text(),
+	work_location: text(),
+	work_hours: text(),
+	note: text(),
+	created_by: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_generated_contracts_company").on(table.company_name, table.created_at),
+	index("idx_generated_contracts_staff_id").on(table.staff_id),
+]);
+
+// 게시판 별표 (모바일/게시판/별표훅.ts) — post_id+user_id 복합 unique
+export const board_post_stars = sqliteTable("board_post_stars", {
+	id: text().primaryKey().notNull(),
+	post_id: text().notNull(),
+	user_id: text().notNull(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_board_post_stars_post_user").on(table.post_id, table.user_id),
+	index("idx_board_post_stars_user_id").on(table.user_id),
+]);
+
+// AS 수리 (기능부품/재고관리서브/AS반품관리.tsx)
+export const as_repair_records = sqliteTable("as_repair_records", {
+	id: text().primaryKey().notNull(),
+	device_name: text().notNull(),
+	model_name: text(),
+	received_date: text(),
+	problem_description: text(),
+	company_name: text(),
+	manager_name: text(),
+	status: text(),
+	created_by: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_as_repair_status_created").on(table.status, table.created_at),
+]);
+
+// 반품 (기능부품/재고관리서브/AS반품관리.tsx)
+export const return_records = sqliteTable("return_records", {
+	id: text().primaryKey().notNull(),
+	item_name: text().notNull(),
+	quantity: integer().default(1),
+	return_reason: text(),
+	company_name: text(),
+	return_date: text(),
+	status: text(),
+	created_by: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_return_records_status_created").on(table.status, table.created_at),
+]);
+
+// 메시지 템플릿 (관리자 운영설정 — 운영설정.tsx, MessageTemplatesTab.tsx, data-hooks.ts)
+export const message_templates = sqliteTable("message_templates", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	channel: text(),
+	send_count: integer().default(0),
+	last_sent_label: text(),
+	status: text().default("활성"),
+	content: text(),
+	template_group: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_message_templates_name").on(table.name),
+]);
+
+// 외부 연동 (관리자 운영설정 — IntegrationsTab.tsx, 운영설정.tsx)
+export const external_integrations = sqliteTable("external_integrations", {
+	id: text().primaryKey().notNull(),
+	vendor: text().notNull(),
+	name: text(),
+	sub: text(),
+	status: text().default("connected"),
+	last_synced_label: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_external_integrations_vendor").on(table.vendor),
 ]);
 
 

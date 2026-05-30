@@ -27,8 +27,7 @@ type NotificationRow = {
   title?: string | null;
   body?: string | null;
   message?: string | null;
-  read?: boolean | null;
-  is_read?: boolean | null;
+  read_at?: string | null;
   created_at?: string | null;
 };
 
@@ -95,7 +94,7 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
     try {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, type, title, body, message, read, is_read, created_at')
+        .select('id, user_id, type, title, body, message, read_at, created_at')
         .eq('user_id', staffId)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -128,17 +127,18 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
     return items.filter(n => categoryOf(n.type) === cat);
   }, [items, cat]);
 
-  const unreadCount = items.filter(n => !(n.read ?? n.is_read)).length;
+  const unreadCount = items.filter(n => !n.read_at).length;
 
   const markAllRead = async () => {
     if (!staffId || unreadCount === 0) return;
     try {
+      const readAt = new Date().toISOString();
       await supabase
         .from('notifications')
-        .update({ read: true, is_read: true })
+        .update({ read_at: readAt })
         .eq('user_id', staffId)
-        .or('read.is.null,read.eq.false');
-      setItems(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
+        .is('read_at', null);
+      setItems(prev => prev.map(n => (n.read_at ? n : { ...n, read_at: readAt })));
       toast('모두 읽음 처리했습니다.', 'success');
     } catch (err) {
       toast(`처리 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
@@ -193,7 +193,7 @@ export default function SAlert({ staffId, onBack }: SAlertProps) {
               {filtered.map((n) => {
                 const ncat = categoryOf(n.type);
                 const { ic, tone } = iconOf(ncat);
-                const isNew = !(n.read ?? n.is_read);
+                const isNew = !n.read_at;
                 const title = n.title || CATEGORY_LABEL[ncat];
                 const body = n.body || n.message || '';
                 return (

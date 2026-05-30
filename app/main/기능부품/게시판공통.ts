@@ -283,10 +283,11 @@ export function extractScheduleMetaFromContent(value: unknown) {
   }
 }
 
-export function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
-  const metaPayload = { chartNo, ...meta };
-  return `${SCHEDULE_META_PREFIX}${JSON.stringify(metaPayload)}${SCHEDULE_META_SUFFIX}`;
-}
+// NOTE: buildScheduleMetaContent는 게시판-view-utils.ts의 canonical 버전으로 단일화함.
+// 과거 이 파일에는 chartNo를 메타 JSON 내부에 넣어(가시 콘텐츠 없이) 저장하는
+// 레거시 변형이 있었으나, 현재 읽기 경로(normalizeBoardPost·extractScheduleMetaFromContent)는
+// chartNo를 가시 콘텐츠(post.content)로 기대하므로 호환되지 않아 제거했다.
+// 이 모듈을 쓰는 모바일 게시판은 일정 글을 작성하지 않아 영향 없음.
 
 export function extractBoardMetaFromContent(value: unknown) {
   const raw = String(value ?? '');

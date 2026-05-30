@@ -20,7 +20,7 @@ export function setAppBadge(count: number) {
   } catch { /* ignore */ }
 }
 
-export function vibrateIfSupported(pattern: number | number[] = [180]) {
+function vibrateIfSupported(pattern: number | number[] = [180]) {
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate(pattern);
@@ -28,7 +28,7 @@ export function vibrateIfSupported(pattern: number | number[] = [180]) {
   } catch { /* ignore */ }
 }
 
-export function getNotificationHapticPattern(type: string) {
+function getNotificationHapticPattern(type: string) {
   if (type === 'message' || type === 'mention') {
     return [90, 40, 120];
   }

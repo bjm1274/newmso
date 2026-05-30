@@ -265,21 +265,6 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
     }
   };
 
-  // 백그라운드 체크 스케줄링 (데모용)
-  useEffect(() => {
-    if (!annualLeaveEnabled && !payrollEnabled) return;
-    
-    const runCron = () => {
-      // 백그라운드 자동 실행 logic (조용히 수행)
-      if (annualLeaveEnabled) {
-        // 백그라운드 연차촉진 처리 루틴
-      }
-    };
-
-    const interval = setInterval(runCron, 24 * 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [annualLeaveEnabled, payrollEnabled]);
-
   // 발송 기록 필터링
   const filteredLogs = useMemo(() => {
     if (!searchQuery.trim()) return logs;

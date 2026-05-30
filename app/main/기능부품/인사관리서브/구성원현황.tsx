@@ -322,7 +322,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     };
   };
 
-  // 다중 근무형태(주간 로테이션) 헬퍼 — 신버전 구성원현황/index.tsx와 동일 로직(JM4)
+  // 다중 근무형태(주간 로테이션) 헬퍼 (JM4)
   const getShiftCompanyName = (shift: StaffMember) =>
     String(shift?.company_name || shift?.company || '').trim();
   const sortShiftOptions = (list: StaffMember[]) =>

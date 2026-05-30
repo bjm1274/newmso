@@ -114,23 +114,15 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
         }
 
         // 즉시 업로드 시도 (JM2: input.change 시점)
+        // 주의: 첨부 메타는 PC와 동일하게 approvals.meta_data.attachments 에 저장한다.
+        //       (정본 스키마에 approval_attachments 테이블이 없으므로 별도 insert 하지 않는다.)
+        //       업로드로 얻은 fileUrl 을 부모 폼이 onChange 로 받아 meta_data 에 기록.
         const result = await enqueueUpload({
           file,
           filename: file.name,
           mimeType: mime,
           planRequester: 'approval',
           planParams: approvalId ? { approvalId } : {},
-          onSuccessAction: {
-            kind: 'insert',
-            table: 'approval_attachments',
-            payloadTemplate: {
-              file_url: '{fileUrl}',
-              filename: file.name,
-              mime_type: mime,
-              size_bytes: file.size,
-              ...(approvalId ? { approval_id: approvalId } : {}),
-            },
-          },
         });
 
         if (result.uploaded) {

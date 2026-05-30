@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { TAX_FREE_LEGAL_LIMITS } from '@/lib/tax-free-limits';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface StaffRecord {
@@ -32,10 +33,13 @@ interface TaxFreeRow {
 
 type TaxFreeItemKey = keyof TaxFreeKey;
 
+// 비과세 한도 SSOT: 정본 lib/tax-free-limits 의 법정 한도를 사용한다.
+// childcare(출산·보육수당 10만원), night(야간근로수당 24만원), overseas(국외근로소득 100만원)는
+// 정본 TAX_FREE_LEGAL_LIMITS 가 커버하지 않는 항목이라 기존 값을 유지(임의 변경 금지). 보고 참조.
 const TAX_FREE_LIMITS: Record<TaxFreeItemKey, { label: string; limit: number }> = {
-  meal: { label: '식대', limit: 200000 },
-  car: { label: '자가운전보조금', limit: 200000 },
-  research: { label: '연구활동비', limit: 200000 },
+  meal: { label: '식대', limit: TAX_FREE_LEGAL_LIMITS.meal.limit },
+  car: { label: '자가운전보조금', limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit },
+  research: { label: '연구활동비', limit: TAX_FREE_LEGAL_LIMITS.research.limit },
   childcare: { label: '출산·보육수당', limit: 100000 },
   night: { label: '야간근로수당(생산직)', limit: 240000 },
   overseas: { label: '국외근로소득(비파견)', limit: 1000000 },

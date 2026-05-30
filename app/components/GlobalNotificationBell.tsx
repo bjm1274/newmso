@@ -57,7 +57,7 @@ type NotificationItem = {
   created_at?: string | null;
 };
 
-const NOTIFICATION_SELECT = 'id, user_id, type, title, body, is_read, read_at, metadata, created_at';
+const NOTIFICATION_SELECT = 'id, user_id, type, title, body, read_at, metadata, created_at';
 
 /** unknown payload를 NotificationItem으로 안전하게 정규화 (JM4)
  *  - is_read 컬럼이 없는 경우(read_at만 있는 경우) read_at 존재 여부로 파생.
@@ -251,7 +251,8 @@ export default function GlobalNotificationBell({
   }, []);
 
   const markRead = useCallback(async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    // D1 정본 스키마는 read_at 컬럼만 존재 (is_read 컬럼 없음)
+    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
     setList((prev) => prev.map((item) => (item.id === id ? { ...item, is_read: true } : item)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);

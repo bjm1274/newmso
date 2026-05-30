@@ -14,6 +14,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import {
+  DOC_ALLOWED_FORMATS_LABEL,
+  DOC_MAX_FILE_SIZE_LABEL,
+  validateDocUpload,
+} from '@/lib/document-submission-shared';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 const StaffLicenseSchema = z.object({
   id: z.string(),
@@ -48,6 +54,7 @@ type Props = {
 };
 
 export default function LicenseCESubmit({ user }: Props) {
+  const { dialog, openConfirm } = useActionDialog();
   const [licenses, setLicenses] = useState<StaffLicense[]>([]);
   const [submissions, setSubmissions] = useState<CESubmission[]>([]);
   const [selectedLicenseId, setSelectedLicenseId] = useState<string>('');
@@ -101,14 +108,10 @@ export default function LicenseCESubmit({ user }: Props) {
       return toast('어떤 면허에 대한 이수증인지 먼저 선택하세요.', 'warning');
     }
 
-    // 파일 검증
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
-    if (!isImage && !isPdf) {
-      return toast('이미지(jpg/png) 또는 PDF만 가능합니다.', 'warning');
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      return toast('15MB 이하의 파일만 업로드 가능합니다.', 'warning');
+    // 파일 검증 — 공통 단일 정책(MIME 화이트리스트 + 크기 한도)
+    const validation = validateDocUpload(file);
+    if (!validation.ok) {
+      return toast(validation.message, 'warning');
     }
 
     setBusy(true);
@@ -155,7 +158,14 @@ export default function LicenseCESubmit({ user }: Props) {
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm('이 제출 기록을 취소(삭제)하시겠습니까?')) return;
+    const confirmed = await openConfirm({
+      title: '제출 기록 취소',
+      description: '이 제출 기록을 취소(삭제)하시겠습니까?',
+      confirmText: '삭제',
+      cancelText: '취소',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/license-ce/${id}`, { method: 'DELETE' });
       const json = await res.json();
@@ -216,7 +226,7 @@ export default function LicenseCESubmit({ user }: Props) {
           >
             {busy ? '제출 중...' : '📎 이수증 업로드'}
           </button>
-          <p className="text-[9px] text-amber-700">JPG/PNG/PDF · 15MB 이하</p>
+          <p className="text-[9px] text-amber-700">{DOC_ALLOWED_FORMATS_LABEL} · {DOC_MAX_FILE_SIZE_LABEL} 이하</p>
         </div>
       </div>
 
@@ -302,6 +312,7 @@ export default function LicenseCESubmit({ user }: Props) {
           </ul>
         </div>
       )}
+      {dialog}
     </section>
   );
 }

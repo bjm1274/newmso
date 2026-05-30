@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 import SalarySlipContainer from './급여명세서';
 import MyCertificates from './증명서관리';
-import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { supabase } from '@/lib/supabase';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
@@ -30,61 +29,6 @@ export function buildProfileSummary(source: Record<string, unknown> | null | und
   };
 }
 
-export function ProfileHeaderSummary({
-  user,
-  showSecret,
-  isEditing,
-  onToggleSecret,
-  onToggleEdit,
-}: {
-  user: ProfileSummary;
-  showSecret: boolean;
-  isEditing: boolean;
-  onToggleSecret: () => void;
-  onToggleEdit: () => void;
-}) {
-  return (
-    <section className="h-[128px] w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm xl:max-w-[340px]">
-      <div className="flex h-full items-center justify-between gap-3">
-        <div className="relative shrink-0">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--muted)] shadow-sm">
-            <ProfilePhotoThumbnail
-              src={user.avatarUrl}
-              name={user.name}
-              alt="프로필 사진"
-              className="h-full w-full"
-              fallback={<span className="text-3xl text-[var(--toss-gray-3)]">👤</span>}
-              previewTitle={user.name ? `${user.name} 사진` : '프로필 사진'}
-            />
-          </div>
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="break-keep text-[28px] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-            {user.name} {user.position}
-          </p>
-          <p className="mt-2 truncate text-sm font-bold text-[var(--accent)]">
-            {user.department || '소속 정보 없음'}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col gap-1.5">
-          <button
-            type="button"
-            onClick={onToggleEdit}
-            data-testid="mypage-profile-edit-toggle"
-            className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-bold transition-all ${
-              isEditing
-                ? 'border-red-100 bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                : 'border-[var(--toss-blue-light)] bg-[var(--toss-blue-light)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]'
-            }`}
-          >
-            {isEditing ? '수정 취소' : '정보 수정'}
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function PayrollAndCertificatesHub({
   user,
   activeView,
@@ -105,39 +49,44 @@ export function PayrollAndCertificatesHub({
     }
 
     const fetchSummary = async () => {
-      const [salaryRecordsRes, salaryNotiRes, certRes, approvedDocsRes] = await Promise.all([
-        // 명세서 뷰어와 동일 기준으로 집계하도록 레코드와 발송 알림을 함께 조회한다.
-        supabase
-          .from('payroll_records')
-          .select('record_type, status, year_month')
-          .eq('staff_id', user.id),
-        supabase
-          .from('notifications')
-          .select('title, body')
-          .eq('user_id', user.id)
-          .eq('type', '급여명세'),
-        supabase
-          .from('certificate_issuances')
-          .select('id', { count: 'exact', head: true })
-          .eq('staff_id', user.id),
-        supabase
-          .from('approvals')
-          .select('id', { count: 'exact', head: true })
-          .eq('sender_id', user.id)
-          .eq('status', '승인')
-          // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
-          .in('type', ['양식신청', '증명서발급']),
-      ]);
+      try {
+        const [salaryRecordsRes, salaryNotiRes, certRes, approvedDocsRes] = await Promise.all([
+          // 명세서 뷰어와 동일 기준으로 집계하도록 레코드와 발송 알림을 함께 조회한다.
+          supabase
+            .from('payroll_records')
+            .select('record_type, status, year_month')
+            .eq('staff_id', user.id),
+          supabase
+            .from('notifications')
+            .select('title, body')
+            .eq('user_id', user.id)
+            .eq('type', '급여명세'),
+          supabase
+            .from('certificate_issuances')
+            .select('id', { count: 'exact', head: true })
+            .eq('staff_id', user.id),
+          supabase
+            .from('approvals')
+            .select('id', { count: 'exact', head: true })
+            .eq('sender_id', user.id)
+            .eq('status', '승인')
+            // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
+            .in('type', ['양식신청', '증명서발급']),
+        ]);
 
-      const issuedSalaryRecords = resolveIssuedPayrollRecords(
-        (salaryRecordsRes.data ?? []) as { record_type?: unknown; status?: unknown; year_month?: unknown }[],
-        (salaryNotiRes.data ?? []) as { title?: unknown; body?: unknown }[],
-      );
+        const issuedSalaryRecords = resolveIssuedPayrollRecords(
+          (salaryRecordsRes.data ?? []) as { record_type?: unknown; status?: unknown; year_month?: unknown }[],
+          (salaryNotiRes.data ?? []) as { title?: unknown; body?: unknown }[],
+        );
 
-      setSummary({
-        salaryCount: issuedSalaryRecords.length,
-        certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0),
-      });
+        setSummary({
+          salaryCount: issuedSalaryRecords.length,
+          certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0),
+        });
+      } catch (error) {
+        console.error('[마이페이지공통섹션] 급여·증명서 요약 조회 실패:', error);
+        setSummary({ salaryCount: 0, certificateCount: 0 });
+      }
     };
 
     void fetchSummary();

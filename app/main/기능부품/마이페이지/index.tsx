@@ -305,20 +305,25 @@ function MyPageMain({
       );
 
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
+      // 서명 이미지·주소·연락처 PII 가 포함되므로 저장 직전 암호화(키 미설정 시 평문 폴백)
+      const { encryptContract } = await import('@/lib/contract-crypto');
+      const encryptedContractText = await encryptContract(contractText);
       await supabase.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString()})`,
         category: '계약서',
-        content: contractText,
+        content: encryptedContractText,
         company_name: (user?.company as string) || '전체',
         created_by: currentUserId,
         version: 1
       });
 
       // HR에게 알림 전송
+      // NOTE: notifications.user_id 는 staff_members.id 를 참조하는 FK 입니다.
+      // 'system_admin' 은 실제 staff 행이 아닐 수 있어 FK 위반 가능 → 추후 실제 HR 담당자 id 로 교체 필요.
       await supabase.from('notifications').insert({
         user_id: 'system_admin',
         title: '계약서 서명 완료',
-        message: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
+        body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
         type: 'SUCCESS',
         read_at: null
       });
@@ -334,6 +339,7 @@ function MyPageMain({
       });
       setShowSignaturePad(false);
     } catch (e) {
+      console.error('[마이페이지] 근로계약서 서명 저장 실패:', e);
       toast('서명 저장 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -347,15 +353,15 @@ function MyPageMain({
     }
     if (typeof window === 'undefined') return;
     try {
-      const saved = window.localStorage.getItem(MYPAGE_TAB_KEY) as any;
-      const allowed = ['profile', 'records', 'salary', 'todo', 'commute', 'leave', 'certificates', 'documents', 'notifications'];
-      if (saved && allowed.includes(saved)) {
+      const saved = window.localStorage.getItem(MYPAGE_TAB_KEY);
+      const allowed = ['profile', 'records', 'salary', 'todo', 'commute', 'leave', 'certificates', 'documents', 'notifications'] as const;
+      if (saved && (allowed as readonly string[]).includes(saved)) {
         if (saved === 'salary' || saved === 'certificates') {
           setActiveTab('records');
           setRecordsView(saved);
           window.localStorage.setItem(MYPAGE_RECORDS_VIEW_KEY, saved);
         } else {
-          setActiveTab(saved);
+          setActiveTab(saved as Exclude<typeof allowed[number], 'salary' | 'certificates'>);
         }
       }
     } catch {
@@ -376,7 +382,7 @@ function MyPageMain({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const saved = window.localStorage.getItem(MYPAGE_RECORDS_VIEW_KEY) as any;
+      const saved = window.localStorage.getItem(MYPAGE_RECORDS_VIEW_KEY);
       if (saved === 'salary' || saved === 'certificates') {
         setRecordsView(saved);
       }

@@ -47,14 +47,6 @@ const CATEGORY_TO_DB: Record<ItemCat, string> = {
   사무용품: '사무용품',
 };
 
-// 모바일 단위 → DB 단위 (DB는 'EA' | 'BOX'만 지원)
-const UNIT_TO_DB: Record<ItemUnit, 'EA' | 'BOX'> = {
-  개: 'EA',
-  팩: 'EA',
-  박스: 'BOX',
-  EA: 'EA',
-};
-
 type FormState = {
   name: string;
   sku: string;
@@ -84,7 +76,6 @@ type InventoryInsertPayload = {
   stock: number;
   min_quantity: number;
   unit_price: number;
-  unit: 'EA' | 'BOX';
   supplier_name: string | null;
   insurance_code: string | null;
   company: string;
@@ -140,7 +131,8 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
         stock: 0,
         min_quantity: parsedSafety,
         unit_price: parsedPrice,
-        unit: UNIT_TO_DB[v.unit],
+        // inventory 테이블에 unit 컬럼이 없어 insert 시 500 발생 → 페이로드에서 제외.
+        // (단위 UI는 유지하되 DB에는 저장하지 않음 — 데스크톱 자산등록과 동일 정책)
         supplier_name: v.vendor.trim() || null,
         insurance_code: v.sku.trim() || null,
         company,

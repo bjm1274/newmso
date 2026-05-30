@@ -1,42 +1,29 @@
 /**
  * POST /api/approval/recall
- * 기안 회수 API — 서버 측 sender_id 검증 + history append + 알림 처리
+ * 기안 회수 API — 서버 측 sender_id 검증 + history append + 알림 읽음 처리
  *
  * Body: { approvalId: string; note?: string }
  * 성공: { ok: true; approvalId: string }
- * 실패: { ok: false; error: string }  (HTTP 400/403/500)
+ * 실패: { ok: false; error: string }  (HTTP 400/403/404/500)
  *
- * JM(단일 책임, ~120줄), JM3(에러 케이스 명시 분기), JM4(any 금지, Zod 대신 런타임 수동 검증),
- * JM5(Supabase 세션으로 sender 검증 + RLS 2중)
+ * JM(단일 책임), JM3(에러 케이스 명시 분기), JM4(any 금지),
+ * JM5(서버 세션으로 sender 검증 — D1 스택)
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
+import {
+  getD1Binding,
+  getD1Drizzle,
+  approvals as approvalsTable,
+  notifications as notificationsTable,
+  eq,
+  and,
+  isNull,
+} from '@/lib/db';
 
-// 서비스 롤 클라이언트 — 알림 테이블 숨김 처리에만 사용
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
-// anon key 클라이언트 — RLS 적용 (Authorization 헤더 전달)
-function buildUserClient(authHeader: string | null) {
-  const client = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false } }
-  );
-  if (authHeader) {
-    // supabase-js v2: 세션 토큰 직접 주입
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (token) {
-      client.auth.setSession({ access_token: token, refresh_token: '' }).catch(() => {});
-    }
-  }
-  return client;
-}
+export const dynamic = 'force-dynamic';
 
 type RecallBody = { approvalId?: unknown; note?: unknown };
 
@@ -52,33 +39,31 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. 인증 — 세션에서 actor 식별 ──
-    const authHeader = request.headers.get('Authorization');
-    const userClient = buildUserClient(authHeader);
-    const { data: sessionData, error: sessionError } = await userClient.auth.getUser();
-    const actorAuthId = sessionData?.user?.id ?? null;
+    const session = await readSessionFromRequest(request);
+    const actorStaffId = session?.user?.id ? String(session.user.id).trim() : '';
+    const actorName = session?.user?.name ? String(session.user.name).trim() : null;
 
-    if (sessionError || !actorAuthId) {
+    if (!actorStaffId) {
       return NextResponse.json({ ok: false, error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    // auth.users.id → staff_members.id 매핑 (user_id 컬럼 존재 시)
-    const { data: staffRow } = await adminClient
-      .from('staff_members')
-      .select('id, name')
-      .eq('user_id', actorAuthId)
-      .maybeSingle();
-
-    const actorStaffId: string | null = staffRow ? String(staffRow.id) : null;
-    const actorName: string | null = staffRow ? String(staffRow.name || '') : null;
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[api/approval/recall] D1 binding not available');
+    const db = getD1Drizzle(d1);
 
     // ── 3. 결재 문서 조회 ──
-    const { data: approvalRow, error: fetchError } = await adminClient
-      .from('approvals')
-      .select('id, status, sender_id, meta_data')
-      .eq('id', approvalId)
-      .maybeSingle();
+    const [approvalRow] = await db
+      .select({
+        id: approvalsTable.id,
+        status: approvalsTable.status,
+        sender_id: approvalsTable.sender_id,
+        meta_data: approvalsTable.meta_data,
+      })
+      .from(approvalsTable)
+      .where(eq(approvalsTable.id, approvalId))
+      .limit(1);
 
-    if (fetchError || !approvalRow) {
+    if (!approvalRow) {
       return NextResponse.json({ ok: false, error: '결재 문서를 찾을 수 없습니다.' }, { status: 404 });
     }
 
@@ -86,8 +71,7 @@ export async function POST(request: NextRequest) {
     const rowSenderId = String(approvalRow.sender_id || '');
 
     // ── 4. 권한 검증 — 기안자 본인 + 대기 상태 ──
-    const isOwner = actorStaffId && rowSenderId === actorStaffId;
-    if (!isOwner) {
+    if (!rowSenderId || rowSenderId !== actorStaffId) {
       return NextResponse.json({ ok: false, error: '기안자 본인만 회수할 수 있습니다.' }, { status: 403 });
     }
     if (rowStatus !== '대기') {
@@ -96,29 +80,68 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 5. meta_data 이력 append ──
+    let existingMeta: Record<string, unknown> | null = null;
+    if (typeof approvalRow.meta_data === 'string' && approvalRow.meta_data.length > 0) {
+      try {
+        const parsed = JSON.parse(approvalRow.meta_data) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existingMeta = parsed as Record<string, unknown>;
+        }
+      } catch {
+        existingMeta = null;
+      }
+    } else if (approvalRow.meta_data && typeof approvalRow.meta_data === 'object') {
+      existingMeta = approvalRow.meta_data as Record<string, unknown>;
+    }
+
     const nextMeta = appendApprovalHistory(
-      { ...(approvalRow.meta_data as Record<string, unknown> | null ?? {}), recalled_at: new Date().toISOString(), recalled_by: actorStaffId },
+      { ...(existingMeta ?? {}), recalled_at: new Date().toISOString(), recalled_by: actorStaffId },
       { action: 'recalled', actor_id: actorStaffId, actor_name: actorName, note: note || '회수' }
     );
 
-    // ── 6. status 업데이트 ──
-    const { error: updateError } = await adminClient
-      .from('approvals')
-      .update({ status: '회수', current_approver_id: null, meta_data: nextMeta })
-      .eq('id', approvalId)
-      .eq('sender_id', rowSenderId); // RLS 2중 보호
+    // ── 6. status 업데이트 (기안자 본인 조건 2중 보호) ──
+    await db
+      .update(approvalsTable)
+      .set({
+        status: '회수',
+        current_approver_id: null,
+        meta_data: JSON.stringify(nextMeta),
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(eq(approvalsTable.id, approvalId), eq(approvalsTable.sender_id, rowSenderId)));
 
-    if (updateError) {
-      return NextResponse.json({ ok: false, error: `회수 업데이트 실패: ${updateError.message}` }, { status: 500 });
-    }
-
-    // ── 7. 관련 알림 hidden 처리 (실패해도 메인 응답에 영향 없음) ──
+    // ── 7. 관련 알림 읽음 처리 (실패해도 메인 응답에 영향 없음) ──
+    // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
+    // metadata.approval_id === approvalId 인 미열람 알림을 읽음 처리한다.
     try {
-      await adminClient
-        .from('notifications')
-        .update({ hidden: true })
-        .eq('approval_id', approvalId)
-        .neq('staff_id', rowSenderId); // 기안자 본인 알림은 유지
+      const rows = await db
+        .select({ id: notificationsTable.id, metadata: notificationsTable.metadata })
+        .from(notificationsTable)
+        .where(and(eq(notificationsTable.type, 'approval'), isNull(notificationsTable.read_at)))
+        .limit(500);
+
+      const matchedIds = rows
+        .filter((row) => {
+          if (typeof row.metadata !== 'string' || row.metadata.length === 0) return false;
+          try {
+            const parsed = JSON.parse(row.metadata) as unknown;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              return String((parsed as Record<string, unknown>).approval_id || '') === approvalId;
+            }
+          } catch {
+            return false;
+          }
+          return false;
+        })
+        .map((row) => String(row.id));
+
+      const readAt = new Date().toISOString();
+      for (const id of matchedIds) {
+        await db
+          .update(notificationsTable)
+          .set({ read_at: readAt })
+          .where(eq(notificationsTable.id, id));
+      }
     } catch {
       // silent — 알림 처리 실패는 회수 성공에 영향 없음
     }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isActiveStaff } from '@/lib/active-staff';
+import { toDateKey } from '@/lib/date-utils';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
 import { getStaffShiftsBatch, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
@@ -80,13 +81,6 @@ const BAND_ORDER: Record<ShiftBand, number> = {
   NONE: 4,
 };
 
-function padDatePart(value: number) {
-  return String(value).padStart(2, '0');
-}
-
-function toDateKey(date: Date) {
-  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-}
 
 function shiftTimeLabel(value?: string | null) {
   if (!value) return '--:--';

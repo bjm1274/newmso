@@ -27,6 +27,7 @@ import {
 } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { toNotificationText, timeAgo } from '@/lib/notification-utils';
+import { NOTIFICATION_LIST_UPDATED_EVENT } from '@/app/main/기능부품/알림시스템';
 import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
 import { useIsMobile } from '@/app/components/useIsMobile';
 
@@ -104,42 +105,63 @@ export default function NotificationCenter({
   const fetchNotifications = useCallback(async () => {
     if (!effectiveUserId) return;
 
-    // unread count는 전체 기준으로 정확하게 계산
-    const { count: totalUnread } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', effectiveUserId)
-      .is('read_at', null);
+    try {
+      // unread count는 전체 기준으로 정확하게 계산
+      const { count: totalUnread } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', effectiveUserId)
+        .is('read_at', null);
 
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', effectiveUserId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-    const list = data || [];
-    setNotifications(list);
+      const list = data || [];
+      setNotifications(list);
 
-    const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
-    setUnreadCount(unread);
-    return unread;
+      const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
+      setUnreadCount(unread);
+      return unread;
+    } catch (err) {
+      // 조회 실패는 다음 이벤트/폴링에서 보강 — 호출부(handleNewNotification)가 reject되지 않도록 흡수 (JM3)
+      console.warn('[notification-center] fetch failed', err);
+      return undefined;
+    }
   }, [effectiveUserId]);
 
   useEffect(() => {
     if (!effectiveUserId) return;
 
+    // JM2: NotificationSystem이 단일 polling 진실원. 알림센터는 mount 시 1회 fetch한 뒤
+    // NOTIFICATION_LIST_UPDATED_EVENT로 broadcast된 전체 list를 받아 갱신한다.
+    // (독자 10초 setInterval 폴링 제거 — 알림시스템의 단일폴링 설계와 통일.)
     void fetchNotifications();
 
     let shakeTimer: ReturnType<typeof setTimeout> | null = null;
-    const handleNewNotification = async () => {
-      const unread = await fetchNotifications();
-      if (typeof unread === 'number' && unread > prevCountRef.current) {
-        setBellShaking(true);
-        if (shakeTimer) clearTimeout(shakeTimer);
-        shakeTimer = setTimeout(() => setBellShaking(false), 700);
-      }
-      prevCountRef.current = typeof unread === 'number' ? unread : prevCountRef.current;
+    const triggerShake = () => {
+      setBellShaking(true);
+      if (shakeTimer) clearTimeout(shakeTimer);
+      shakeTimer = setTimeout(() => setBellShaking(false), 700);
+    };
+
+    // 새 알림 도착: 알림시스템이 dispatch한 row를 받아 shake만 트리거.
+    // 실제 list/카운트 갱신은 뒤이어 오는 NOTIFICATION_LIST_UPDATED_EVENT가 담당.
+    const handleNewNotification = () => triggerShake();
+
+    // 알림시스템이 한 번 조회한 전체 list를 broadcast → 중복 fetch 없이 자기 상태 갱신.
+    const handleListUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ notifications?: unknown }>).detail;
+      const next = Array.isArray(detail?.notifications) ? (detail!.notifications as any[]) : null;
+      if (!next) return;
+      setNotifications(next);
+      const unread = next.filter((notification: any) => !notification.read_at).length;
+      if (unread > prevCountRef.current) triggerShake();
+      setUnreadCount(unread);
+      prevCountRef.current = unread;
     };
 
     const handleNotificationRead = () => void fetchNotifications();
@@ -151,22 +173,26 @@ export default function NotificationCenter({
     };
 
     window.addEventListener('erp-new-notification', handleNewNotification);
+    window.addEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
     window.addEventListener('erp-notification-read', handleNotificationRead);
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside, { passive: true });
 
-    const fallbackPoll = window.setInterval(() => {
-      if (document.hidden) return; // 비활성 탭이면 폴링 스킵
+    // visibility 복귀 시 1회 즉시 fetch — push/이벤트 누락 보완 (독자 폴링 대체).
+    const handleVisibility = () => {
+      if (document.hidden) return;
       void fetchNotifications();
-    }, 10000);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       if (shakeTimer) clearTimeout(shakeTimer);
       window.removeEventListener('erp-new-notification', handleNewNotification);
+      window.removeEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
       window.removeEventListener('erp-notification-read', handleNotificationRead);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
-      window.clearInterval(fallbackPoll);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [effectiveUserId, fetchNotifications]);
 

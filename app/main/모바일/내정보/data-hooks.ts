@@ -79,15 +79,15 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
       try {
         const [approvalRes, alertRes] = await Promise.all([
           supabase
-            .from('approval_documents')
+            .from('approvals')
             .select('id', { count: 'exact', head: true })
             .eq('current_approver_id', staffId)
-            .eq('status', 'pending'),
+            .eq('status', '대기'),
           supabase
             .from('notifications')
             .select('id', { count: 'exact', head: true })
-            .eq('staff_id', staffId)
-            .eq('read', false),
+            .eq('user_id', staffId)
+            .is('read_at', null),
         ]);
         if (cancelled) return;
         setCounts({

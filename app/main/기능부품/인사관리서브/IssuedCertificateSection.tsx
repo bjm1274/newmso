@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { canAccessHrSection } from '@/lib/access-control';
 import {
   buildIssuedCertificatePrintHtml,
   downloadHtmlFile,
@@ -53,6 +54,11 @@ type IssuedRow = IssuedCertificate & {
 type Props = {
   selectedCo: string;
   staffFilterName?: string | null;
+  /**
+   * 현재 사용자. 발급 증명서(급여증명 등 PII 포함)는 인사 권한 보유자/관리자만
+   * 전체 조회 가능하며, 일반 사용자는 본인 발급분만 노출한다.
+   */
+  user?: Record<string, unknown> | null;
 };
 
 // ─────────────────────────────────────────────
@@ -84,23 +90,44 @@ function buildContext(staff: StaffRow | null, sealUrl: string): IssuedCertificat
 // 컴포넌트
 // ─────────────────────────────────────────────
 
-export default function IssuedCertificateSection({ selectedCo, staffFilterName }: Props) {
+export default function IssuedCertificateSection({ selectedCo, staffFilterName, user }: Props) {
   const [issuedCerts, setIssuedCerts] = useState<IssuedRow[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, StaffRow>>({});
   const [sealMap, setSealMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [selectedCert, setSelectedCert] = useState<IssuedRow | null>(null);
 
+  // 발급 증명서는 급여증명 등 PII를 포함하므로 인사 증명서 권한 보유자/관리자만
+  // 전체 조회. 그 외 사용자는 본인 발급분만 노출하고, 본인 식별이 불가하면 차단.
+  const canViewAll = canAccessHrSection(user, 'hr_증명서');
+  const ownStaffId = user?.id != null ? String(user.id) : '';
+
   useEffect(() => {
     let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
       try {
-        const certQuery = supabase
+        // 전체 조회 권한이 없고 본인 식별도 불가하면 조회 자체를 건너뛴다.
+        if (!canViewAll && !ownStaffId) {
+          if (!cancelled) {
+            setIssuedCerts([]);
+            setStaffMap({});
+            setSealMap({});
+            setLoading(false);
+          }
+          return;
+        }
+
+        let certQuery = supabase
           .from('certificate_issuances')
           .select('*')
           .order('issued_at', { ascending: false })
           .limit(200);
+
+        // 권한 미보유 사용자는 본인 staff_id 발급분으로 서버측 제한.
+        if (!canViewAll) {
+          certQuery = certQuery.eq('staff_id', ownStaffId);
+        }
 
         const [certRes, staffRes, sealRes] = await Promise.all([
           certQuery,
@@ -161,7 +188,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName }
     return () => {
       cancelled = true;
     };
-  }, [selectedCo]);
+  }, [selectedCo, canViewAll, ownStaffId]);
 
   // 회사·이름 필터
   const visibleCerts = useMemo(() => {
@@ -217,12 +244,22 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName }
     );
   }
 
+  if (!canViewAll && !ownStaffId) {
+    return (
+      <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">
+        발급 증명서 전체 조회 권한이 없습니다.
+      </div>
+    );
+  }
+
   if (visibleCerts.length === 0) {
     return (
       <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">
-        {staffFilterName
-          ? `"${staffFilterName}" 직원의 발급 증명서가 없습니다.`
-          : '발급된 증명서가 없습니다.'}
+        {!canViewAll
+          ? '본인에게 발급된 증명서가 없습니다.'
+          : staffFilterName
+            ? `"${staffFilterName}" 직원의 발급 증명서가 없습니다.`
+            : '발급된 증명서가 없습니다.'}
       </div>
     );
   }

@@ -289,8 +289,6 @@ export function useBoardDetail(
 // 외부 호환을 위해 re-export 만 유지.
 // ─────────────────────────────────────────────
 export { toggleStarServer, loadStarSet, useStarSet } from './별표훅';
-// 게시판목록.tsx가 옛 이름 `toggleStar`로 import — 별칭 유지 (회귀 보호)
-export { toggleStarServer as toggleStar } from './별표훅';
 
 // ─────────────────────────────────────────────
 // 글 작성(insert)

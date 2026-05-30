@@ -65,6 +65,15 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
     const total = items.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
     const win = window.open('', '_blank');
     if (!win) return;
+    // 저장형 XSS 방지: document.write에 들어가는 모든 사용자 입력값을 HTML 이스케이프.
+    // (supplier_name·notes·item.name 등에 <script>/<img onerror> 저장 시 인쇄 시점 실행 차단)
+    const esc = (value: unknown): string =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>납품확인서</title><style>
       body{font-family:'Malgun Gothic',sans-serif;font-size:12px;padding:30px;max-width:800px;margin:0 auto}
       h1{text-align:center;font-size:20px;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}
@@ -80,22 +89,22 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
       @media print{button{display:none}}
     </style></head><body>
     <h1>납 품 확 인 서</h1>
-    <div style="text-align:right;margin-bottom:10px">문서번호: ${d.doc_number} &nbsp; 발행일: ${d.issue_date}</div>
+    <div style="text-align:right;margin-bottom:10px">문서번호: ${esc(d.doc_number)} &nbsp; 발행일: ${esc(d.issue_date)}</div>
     <div class="info-grid">
-      <div class="info-block"><p><strong>공급업체</strong></p><p>${d.supplier_name}</p><p>대표: ${d.supplier_rep || '-'}</p></div>
-      <div class="info-block"><p><strong>납품처</strong></p><p>${d.receiver_company}</p><p>담당: ${d.receiver_rep || '-'}</p><p>납품일: ${d.delivery_date || '-'}</p></div>
+      <div class="info-block"><p><strong>공급업체</strong></p><p>${esc(d.supplier_name)}</p><p>대표: ${esc(d.supplier_rep) || '-'}</p></div>
+      <div class="info-block"><p><strong>납품처</strong></p><p>${esc(d.receiver_company)}</p><p>담당: ${esc(d.receiver_rep) || '-'}</p><p>납품일: ${esc(d.delivery_date) || '-'}</p></div>
     </div>
     <table>
       <thead><tr><th>No</th><th>품목명</th><th>규격</th><th>단위</th><th>수량</th><th>단가</th><th>금액</th></tr></thead>
       <tbody>
-        ${items.map((item: any, i: number) => `<tr><td>${i + 1}</td><td>${item.name}</td><td>${item.spec || '-'}</td><td>${item.unit}</td><td>${item.quantity.toLocaleString()}</td><td>${item.unit_price.toLocaleString()}</td><td>${item.amount.toLocaleString()}</td></tr>`).join('')}
+        ${items.map((item: any, i: number) => `<tr><td>${i + 1}</td><td>${esc(item.name)}</td><td>${esc(item.spec) || '-'}</td><td>${esc(item.unit)}</td><td>${Number(item.quantity || 0).toLocaleString()}</td><td>${Number(item.unit_price || 0).toLocaleString()}</td><td>${Number(item.amount || 0).toLocaleString()}</td></tr>`).join('')}
         <tr class="total-row"><td colspan="6" style="text-align:right">합계</td><td>${total.toLocaleString()}원</td></tr>
       </tbody>
     </table>
-    ${d.notes ? `<p style="margin-top:15px"><strong>비고:</strong> ${d.notes}</p>` : ''}
+    ${d.notes ? `<p style="margin-top:15px"><strong>비고:</strong> ${esc(d.notes)}</p>` : ''}
     <div class="signature">
-      <div class="sig-box"><p>공급업체 확인</p><p style="margin-top:30px">${d.supplier_name}</p><p>대표: ${d.supplier_rep || ''} (인)</p></div>
-      <div class="sig-box"><p>납품처 확인</p><p style="margin-top:30px">${d.receiver_company}</p><p>담당: ${d.receiver_rep || ''} (인)</p></div>
+      <div class="sig-box"><p>공급업체 확인</p><p style="margin-top:30px">${esc(d.supplier_name)}</p><p>대표: ${esc(d.supplier_rep)} (인)</p></div>
+      <div class="sig-box"><p>납품처 확인</p><p style="margin-top:30px">${esc(d.receiver_company)}</p><p>담당: ${esc(d.receiver_rep)} (인)</p></div>
     </div>
     <script>window.onload=()=>window.print()</script></body></html>`);
     win.document.close();

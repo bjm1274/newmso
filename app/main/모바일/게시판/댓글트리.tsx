@@ -173,5 +173,3 @@ export default function BoardCommentTree({ comments, onReply }: BoardCommentTree
     </>
   );
 }
-
-export { buildTree as buildCommentTree };

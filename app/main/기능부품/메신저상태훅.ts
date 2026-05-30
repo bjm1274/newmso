@@ -214,14 +214,14 @@ export function useChatMessageEditing({
         action: 'message_edit',
         target_type: 'message',
         target_id: messageId,
-        details: {
+        details: JSON.stringify({
           room_id: targetMessage.room_id || selectedRoomId || null,
           previous_content: previousContent,
           next_content: nextContent,
           edited_at: editedAt,
           editor_name:
             auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null,
-        },
+        }),
       }]);
     } catch (auditError) {
       console.error('message edit audit log insert failed', auditError);

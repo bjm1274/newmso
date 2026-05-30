@@ -55,17 +55,33 @@ export default function SApprovalRef({
     const ids = rows.map((r) => String(r.id));
     (async () => {
       try {
+        // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
+        // approval_id 는 metadata JSON 안에 있고, 읽음 여부는 read_at 존재로 판별한다.
+        const idSet = new Set(ids);
         const { data, error } = await supabase
           .from('notifications')
-          .select('approval_id, read')
-          .eq('staff_id', staffId)
-          .in('approval_id', ids);
+          .select('metadata, read_at')
+          .eq('user_id', staffId)
+          .eq('type', 'approval');
         if (error || !data || cancelled) return;
         const map: Record<string, boolean> = {};
-        for (const n of data as Array<{ approval_id?: string | null; read?: boolean | null }>) {
-          const aid = String(n.approval_id || '');
-          if (!aid) continue;
-          map[aid] = Boolean(n.read);
+        for (const n of data as Array<{ metadata?: unknown; read_at?: string | null }>) {
+          let aid = '';
+          const rawMeta = n.metadata;
+          if (typeof rawMeta === 'string' && rawMeta.length > 0) {
+            try {
+              const parsed = JSON.parse(rawMeta) as unknown;
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                aid = String((parsed as Record<string, unknown>).approval_id || '');
+              }
+            } catch {
+              aid = '';
+            }
+          } else if (rawMeta && typeof rawMeta === 'object') {
+            aid = String((rawMeta as Record<string, unknown>).approval_id || '');
+          }
+          if (!aid || !idSet.has(aid)) continue;
+          map[aid] = Boolean(n.read_at);
         }
         setReadMap(map);
       } catch {

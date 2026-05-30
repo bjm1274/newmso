@@ -4,6 +4,7 @@
  */
 
 import { calculateAnnualLeaveExpiryDate } from './annual-leave-promotion';
+import { hasCompletedBothPromotions } from './annual-leave-promotion-dispatch';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
 import {
@@ -146,10 +147,12 @@ export async function recordUnusedLeaveCompensation(
 export async function batchProcessExpiredLeaves(): Promise<{
   processed: number;
   results: ExpiryResult[];
+  skippedNoPromotion: Array<{ staffId: string; staffName: string; expiryDate: string; remainingDays: number }>;
 }> {
   const today = new Date();
   const todayStr = formatKoreanDateKey(today);
   const results: ExpiryResult[] = [];
+  const skippedNoPromotion: Array<{ staffId: string; staffName: string; expiryDate: string; remainingDays: number }> = [];
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-expiry] D1 binding not available (batchProcessExpiredLeaves)');
@@ -174,18 +177,32 @@ export async function batchProcessExpiredLeaves(): Promise<{
     );
 
   if (balances.length === 0) {
-    return { processed: 0, results };
+    return { processed: 0, results, skippedNoPromotion };
   }
 
   for (const balance of balances) {
     const staffId = String(balance.staff_id);
     const staffName = String(balance.staff_name ?? '');
     const remaining = Number(balance.remaining_days) || 0;
+    const expiryDateKey = String(balance.expiry_date).slice(0, 10);
     const expiryDate = new Date(`${balance.expiry_date}T00:00:00`);
+
+    // 적법 요건: 1차·2차 촉진을 모두 이행한 경우에만 보상의무 소멸(자동소멸) 가능 (근로기준법 제61조).
+    // 촉진 미이행 시 소멸시키지 않고 건너뛴다 — 미사용 연차 보상의무가 살아있기 때문.
+    let promotionsDone = false;
+    try {
+      promotionsDone = await hasCompletedBothPromotions(staffId, expiryDateKey);
+    } catch (err) {
+      console.error('[annual-leave-expiry] 촉진 이행 확인 실패:', staffId, err);
+    }
+    if (!promotionsDone) {
+      skippedNoPromotion.push({ staffId, staffName, expiryDate: expiryDateKey, remainingDays: remaining });
+      continue;
+    }
 
     const result = await processStaffLeaveExpiry(staffId, staffName, remaining, expiryDate);
     if (result) results.push(result);
   }
 
-  return { processed: results.length, results };
+  return { processed: results.length, results, skippedNoPromotion };
 }

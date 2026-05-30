@@ -72,7 +72,18 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
     if (!isValidEmail(supplierForm.email)) return toast('이메일 형식이 올바르지 않습니다.', 'warning');
     setLoading(true);
     try {
-      const { error } = await supabase.from('suppliers').insert([supplierForm]);
+      // 정본 suppliers 컬럼명에 매핑: reg_num→business_number, ceo→contact_name
+      // (reg_num/ceo 컬럼은 정본 스키마에 없어 그대로 insert 시 무음 실패)
+      const insertPayload = {
+        name: supplierForm.name,
+        contact: supplierForm.contact,
+        address: supplierForm.address,
+        phone: supplierForm.phone,
+        email: supplierForm.email,
+        business_number: supplierForm.reg_num,
+        contact_name: supplierForm.ceo,
+      };
+      const { error } = await supabase.from('suppliers').insert([insertPayload]);
       if (error) {
         toast('거래처 등록에 실패했습니다.', 'error');
       } else {
@@ -96,8 +107,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       address: supplier.address || '',
       phone: supplier.phone || '',
       email: supplier.email || '',
-      reg_num: supplier.reg_num || '',
-      ceo: supplier.ceo || '',
+      reg_num: supplier.business_number || supplier.reg_num || '',
+      ceo: supplier.contact_name || supplier.ceo || '',
     });
   };
 
@@ -115,8 +126,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         address: editingSupplier.address,
         phone: editingSupplier.phone,
         email: editingSupplier.email,
-        reg_num: editingSupplier.reg_num,
-        ceo: editingSupplier.ceo,
+        // 정본 컬럼명 매핑: reg_num→business_number, ceo→contact_name
+        business_number: editingSupplier.reg_num,
+        contact_name: editingSupplier.ceo,
       };
       const { error } = await supabase.from('suppliers').update(payload).eq('id', editingSupplier.id);
       if (error) {
@@ -274,10 +286,10 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                 <p className="font-semibold text-[var(--foreground)] text-sm">{supplier.name as string}</p>
                 <div className="mt-2 space-y-0.5">
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
-                    🧾 사업자번호: {(supplier.reg_num as string) || '-'}
+                    🧾 사업자번호: {(supplier.business_number as string) || (supplier.reg_num as string) || '-'}
                   </p>
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
-                    👤 대표자: {(supplier.ceo as string) || (supplier.contact as string) || '-'}
+                    👤 대표자: {(supplier.contact_name as string) || (supplier.ceo as string) || (supplier.contact as string) || '-'}
                   </p>
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
                     📞 {(supplier.phone as string) || '-'}
@@ -429,9 +441,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                       const s = _suppliers.find((sup: AnyRecord) => String(sup.id) === value);
                       if (s)
                         applyPreset('supplier', {
-                          reg_num: s.reg_num || '',
+                          reg_num: s.business_number || s.reg_num || '',
                           sangho: s.name,
-                          ceo: s.ceo || s.contact || '',
+                          ceo: s.contact_name || s.ceo || s.contact || '',
                           addr: s.address,
                           phone: s.phone,
                           contact: s.contact || '',
@@ -471,9 +483,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                       const s = _suppliers.find((sup: AnyRecord) => String(sup.id) === value);
                       if (s)
                         applyPreset('receiver', {
-                          reg_num: s.reg_num || '',
+                          reg_num: s.business_number || s.reg_num || '',
                           sangho: s.name,
-                          ceo: s.ceo || s.contact || '',
+                          ceo: s.contact_name || s.ceo || s.contact || '',
                           addr: s.address,
                           phone: s.phone,
                           contact: s.contact || '',

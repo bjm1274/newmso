@@ -170,11 +170,7 @@ function BoardCard({
   const rejected = status.includes('반려');
   const approved = status.includes('승인') || status.includes('완료');
   const totalSteps = Math.max(summary.totalSteps, 1);
-  const currentIndex = approved
-    ? totalSteps
-    : rejected
-      ? Math.max(summary.currentStep - 1, 0)
-      : Math.max(summary.currentStep - 1, 0);
+  const currentIndex = approved ? totalSteps : Math.max(summary.currentStep - 1, 0);
   const urgent = isUrgent(item);
   const date = formatBoardDate(item.created_at);
 

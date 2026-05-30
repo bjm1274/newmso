@@ -209,12 +209,38 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
     }
   };
 
+  // 모든 파괴적 초기화 직전에 서버에서 관리자 세션 + 비밀번호를 재검증한다.
+  // isUnlocked 클라이언트 state만으로는 우회 가능하므로, 실제 삭제 직전마다
+  // /api/admin/verify-unlock(세션검사 + bcrypt + rate-limit)을 다시 통과해야 한다.
+  const verifyServerAuthorization = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/admin/verify-unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({ ok: false }));
+      return res.ok && data?.ok === true;
+    } catch {
+      return false;
+    }
+  };
+
   // 2. 통합 초기화 로직
   const runReset = async (type: ResetActionType) => {
     if (resetting) return;
 
     setResetting(type);
     try {
+      // staff 타입은 자체 전용 서버 라우트(/api/admin/reset-staff)에서 비밀번호를 재검증하므로
+      // 여기서 중복 검증하지 않고, 그 외 클라이언트 직접 삭제 타입은 서버 재검증을 강제한다.
+      if (type !== 'staff') {
+        const authorized = await verifyServerAuthorization();
+        if (!authorized) {
+          throw new Error('서버 권한 재검증에 실패했습니다. 보안 암호를 다시 확인해 주세요.');
+        }
+      }
+
       if (type === 'chat') {
         await supabase.from('messages').delete().neq('id', ZERO_UUID);
         await supabase.from('message_reads').delete().neq('id', ZERO_UUID);
@@ -253,7 +279,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         await supabase.from('employment_contracts').delete().eq('status', 'pending').lt('created_at', thirtyDaysAgo);
       }
       else if (type === 'expired_popups') {
-        await supabase.from('popups').delete().eq('is_active', false);
+        await supabase.from('popups').delete().eq('is_active', 0);
       }
       else if (type === 'force_logout') {
         const now = new Date().toISOString();

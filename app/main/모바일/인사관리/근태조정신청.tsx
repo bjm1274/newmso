@@ -50,18 +50,21 @@ export default function 근태조정신청({ staffId, targetDate, onBack }: SHrA
     }
     setSubmitting(true);
     try {
+      // 정본 테이블은 attendance_corrections (컬럼: attendance_date/original_date/correction_type/reason/status).
+      // note 전용 컬럼이 없어 reason 에 합쳐 보관한다.
+      const noteText = note.trim();
       const payload: Record<string, unknown> = {
         staff_id: staffId,
-        target_date: targetDate,
-        adjustment_type: kind,
-        reason: reason.trim(),
-        note: note.trim() || null,
+        attendance_date: targetDate,
+        original_date: targetDate,
+        correction_type: kind,
+        reason: noteText ? `${reason.trim()} (${noteText})` : reason.trim(),
         status: '대기',
       };
 
       const { queued, error } = await enqueueSupabaseMutation({
         kind: 'insert',
-        table: 'attendance_adjustments',
+        table: 'attendance_corrections',
         payload,
       });
 

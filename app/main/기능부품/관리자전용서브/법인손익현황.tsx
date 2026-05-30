@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
-import { getPayrollGrossPay } from '@/lib/payroll-records';
+import { getPayrollGrossPay, filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -52,13 +52,13 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       setLoading(true);
       try {
         const [payrollRes, expensesRes, prevPayrollRes] = await Promise.all([
-          supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree').eq('year_month', yearMonth),
+          supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', yearMonth),
           supabase.from('company_expenses').select('*').eq('year_month', yearMonth),
-          prevMonthYM ? supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree').eq('year_month', prevMonthYM) : Promise.resolve({ data: [] }),
+          prevMonthYM ? supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', prevMonthYM) : Promise.resolve({ data: [] }),
         ]);
-        setPayrollData(payrollRes.data || []);
+        setPayrollData(filterNonInterimPayrollRecords(payrollRes.data || []));
         setExpensesData(expensesRes.data || []);
-        setPrevPayroll((prevPayrollRes as any).data || []);
+        setPrevPayroll(filterNonInterimPayrollRecords((prevPayrollRes as any).data || []));
       } catch (err) {
         console.error('법인손익 데이터 로드 실패:', err);
         setPayrollData([]);

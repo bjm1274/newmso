@@ -8,37 +8,6 @@
 // ─── 6 워크센터 ID ────────────────────────────────────────
 export type AdminWorkcenterId = 'exec' | 'company' | 'roles' | 'ops' | 'forms' | 'audit';
 
-// ─── 한글 별칭 (admin-menu-config 의 기존 id 와 매핑) ────
-export const ADMIN_WORKCENTER_ALIAS: Record<string, AdminWorkcenterId> = {
-  exec: 'exec',
-  경영분석: 'exec',
-  경영대시보드: 'exec',
-  재무대시보드: 'exec',
-  예산관리: 'exec',
-  통합보고서: 'exec',
-  법인손익: 'exec',
-  커스텀대시보드: 'exec',
-  company: 'company',
-  회사관리: 'company',
-  roles: 'roles',
-  직원권한: 'roles',
-  ops: 'ops',
-  운영설정: 'ops',
-  알림자동화: 'ops',
-  팝업관리: 'ops',
-  수술검사템플릿: 'ops',
-  forms: 'forms',
-  문서양식: 'forms',
-  양식빌더: 'forms',
-  문서서식: 'forms',
-  audit: 'audit',
-  감사센터: 'audit',
-  감사로그: 'audit',
-  접근감사로그: 'audit',
-  급여이상치: 'audit',
-  데이터백업: 'audit',
-};
-
 export interface AdminWorkcenterMeta {
   id: AdminWorkcenterId;
   label: string;
