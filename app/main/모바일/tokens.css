@@ -331,3 +331,457 @@
 .mso-mobile .m-quick .ico.tone-success { background: var(--m-success-soft); color: var(--m-success); }
 .mso-mobile .m-quick .ico.tone-warning { background: var(--m-warning-soft); color: var(--m-warning); }
 .mso-mobile .m-quick .ico.tone-danger  { background: var(--m-danger-soft); color: var(--m-danger); }
+.mso-mobile .m-quick .ico.tone-muted   { background: var(--z-100); color: var(--z-500); }
+
+/* ─── 앱바 (eyebrow + title) ────────────────────────────────*/
+.mso-mobile .msm-appbar {
+  background: var(--m-card);
+  border-bottom: 1px solid var(--m-border);
+  flex-shrink: 0;
+}
+.mso-mobile .msm-appbar-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+}
+.mso-mobile .msm-appbar .eyebrow {
+  font-size: 10px; font-weight: 800; color: var(--m-accent);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.mso-mobile .msm-appbar .title {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.025em;
+  margin-top: 1px;
+}
+.mso-mobile .msm-appbar-actions {
+  display: flex; gap: 4px;
+}
+
+/* ─── 아이콘 버튼 ────────────────────────────────────────────*/
+.mso-mobile .msm-ibtn {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: grid; place-items: center; color: var(--z-700);
+}
+.mso-mobile .msm-ibtn:active { background: var(--z-100); }
+
+/* ─── 섹션 헤더 ──────────────────────────────────────────────*/
+.mso-mobile .msm-sec { padding: 18px 16px 6px; }
+.mso-mobile .msm-sec-t {
+  font-size: 12px; font-weight: 800; color: var(--z-500);
+  letter-spacing: 0.02em;
+}
+
+/* ─── 4열 퀵 그리드 ──────────────────────────────────────────*/
+.mso-mobile .msm-quick {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  padding: 6px 16px 0;
+}
+.mso-mobile .msm-quick-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 0; border-radius: 12px; cursor: pointer;
+}
+.mso-mobile .msm-quick-item:active { background: var(--z-50); }
+.mso-mobile .msm-quick-ic {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: grid; place-items: center;
+}
+.mso-mobile .msm-quick-ic.tone-accent  { background: var(--m-accent-soft); color: var(--m-accent); }
+.mso-mobile .msm-quick-ic.tone-success { background: var(--m-success-soft); color: var(--m-success); }
+.mso-mobile .msm-quick-ic.tone-warn    { background: var(--m-warning-soft); color: var(--m-warning); }
+.mso-mobile .msm-quick-ic.tone-muted   { background: var(--z-100); color: var(--z-500); }
+.mso-mobile .msm-quick-lbl {
+  font-size: 11px; font-weight: 700; color: var(--z-700);
+  text-align: center; white-space: nowrap;
+}
+
+/* ─── 읽지않음 배지 ──────────────────────────────────────────*/
+.mso-mobile .msm-unread {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--m-accent); color: #fff;
+  border-radius: 999px; font-size: 10px; font-weight: 800;
+  display: inline-grid; place-items: center;
+}
+
+/* ─── 리스트 (게시판 카테고리 등) ────────────────────────────*/
+.mso-mobile .msm-list {
+  background: var(--m-card);
+  border-radius: var(--m-radius-lg);
+  border: 1px solid var(--m-border);
+  overflow: hidden;
+  margin: 0 16px;
+}
+.mso-mobile .msm-list-row {
+  display: grid; grid-template-columns: 40px 1fr auto 20px;
+  align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--m-border);
+  width: 100%; text-align: left;
+}
+.mso-mobile .msm-list-row:last-child { border-bottom: 0; }
+.mso-mobile .msm-list-row:active { background: var(--z-50); }
+
+/* ─── 9탭 가로 스크롤 탭바 ─────────────────────────────────*/
+.mso-mobile .m-bottom-tab {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.mso-mobile .m-bottom-tab::-webkit-scrollbar { display: none; }
+.mso-mobile .m-bottom-tab > button {
+  flex: 0 0 auto;
+  min-width: 62px;
+}
+.mso-mobile .m-bottom-tab > button .badge {
+  position: absolute; top: 2px; right: 0;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: var(--m-danger); color: #fff;
+  font-size: 10px; font-weight: 800;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--m-card);
+}
+
+/* ─── 프로필 히어로 (내정보) ──────────────────────────────────*/
+.mso-mobile .msm-hero {
+  background: linear-gradient(135deg, #1D4ED8, #2563EB);
+  border-radius: 18px; padding: 18px; color: #fff;
+  position: relative; overflow: hidden;
+}
+.mso-mobile .msm-hero::after {
+  content: ""; position: absolute; right: -30px; top: -30px;
+  width: 130px; height: 130px; border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+}
+.mso-mobile .msm-hero-top { display: flex; align-items: center; gap: 13px; position: relative; z-index: 1; }
+.mso-mobile .msm-hero-av {
+  width: 54px; height: 54px; border-radius: 999px;
+  background: rgba(255,255,255,0.22); display: grid; place-items: center;
+  font-size: 21px; font-weight: 800; flex-shrink: 0;
+}
+.mso-mobile .msm-hero-nm { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+.mso-mobile .msm-hero-role { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 2px; }
+.mso-mobile .msm-hero-chips { display: flex; gap: 6px; margin-top: 8px; }
+.mso-mobile .msm-hero-chip {
+  padding: 3px 9px; border-radius: 999px;
+  background: rgba(255,255,255,0.18); font-size: 11px; font-weight: 700;
+}
+.mso-mobile .msm-hero-stats { display: flex; margin-top: 16px; position: relative; z-index: 1; }
+.mso-mobile .msm-hero-stat { flex: 1; text-align: center; }
+.mso-mobile .msm-hero-stat + .msm-hero-stat { border-left: 1px solid rgba(255,255,255,0.2); }
+.mso-mobile .msm-hero-stat .v { font-size: 19px; font-weight: 800; font-feature-settings: "tnum"; }
+.mso-mobile .msm-hero-stat .l { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.78); margin-top: 2px; }
+
+/* ─── 빠른 메뉴 그리드 (내정보) ──────────────────────────────*/
+.mso-mobile .msm-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 6px; }
+.mso-mobile .msm-quick-item {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  border: none; background: transparent; cursor: pointer; font-family: var(--m-font);
+}
+.mso-mobile .msm-quick-ic {
+  width: 52px; height: 52px; border-radius: 16px;
+  display: grid; place-items: center; position: relative;
+}
+.mso-mobile .msm-quick-lbl {
+  font-size: 11.5px; font-weight: 700; color: var(--z-700);
+  text-align: center; line-height: 1.2;
+}
+.mso-mobile .msm-quick-badge { position: relative; }
+.mso-mobile .msm-quick-badge::after {
+  content: attr(data-n); position: absolute; top: -4px; right: -8px;
+  min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+  background: var(--m-danger); color: #fff; font-size: 10px; font-weight: 800;
+  display: grid; place-items: center;
+}
+
+/* ─── 설정 목록 (내정보) ─────────────────────────────────────*/
+.mso-mobile .msm-setlist {
+  border-radius: 14px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.mso-mobile .msm-setrow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px; background: var(--m-card);
+  border: 1px solid var(--m-border); cursor: pointer;
+  text-align: left; width: 100%;
+}
+.mso-mobile .msm-setrow:active { background: var(--z-50); }
+.mso-mobile .msm-setlist .msm-setrow + .msm-setrow { border-top: none; }
+.mso-mobile .msm-setrow .si {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--z-100); color: var(--z-600);
+}
+.mso-mobile .msm-setrow .st {
+  flex: 1; font-size: 14.5px; font-weight: 700;
+  color: var(--z-800); letter-spacing: -0.01em;
+}
+.mso-mobile .msm-setrow .sv { font-size: 13px; font-weight: 600; color: var(--z-400); }
+
+/* ─── 비밀번호 확인 모달 (급여·증명서) ───────────────────────*/
+.mso-mobile .msm-pw-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(24,24,27,0.45); display: grid; place-items: center;
+  padding: 24px; transition: opacity 0.2s;
+}
+.mso-mobile .msm-pw-scrim:not(.on) { opacity: 0; pointer-events: none; visibility: hidden; }
+.mso-mobile .msm-pw {
+  width: 100%; max-width: 340px; background: var(--m-card);
+  border-radius: 20px; padding: 24px 20px 18px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.mso-mobile .msm-pw-ic {
+  width: 54px; height: 54px; border-radius: 16px;
+  background: var(--m-accent-soft); color: var(--m-accent);
+  display: grid; place-items: center; margin-bottom: 4px;
+}
+.mso-mobile .msm-pw-t { font-size: 17px; font-weight: 800; color: var(--z-900); letter-spacing: -0.02em; }
+.mso-mobile .msm-pw-s {
+  font-size: 12.5px; font-weight: 600; color: var(--z-500);
+  text-align: center; line-height: 1.5;
+}
+.mso-mobile .msm-pw-input {
+  width: 100%; height: 50px; margin-top: 12px;
+  border: 1px solid var(--m-border) !important; border-radius: 13px;
+  background: var(--z-50) !important; text-align: center;
+  font-family: var(--m-font); font-size: 20px; font-weight: 800;
+  letter-spacing: 0.3em; color: var(--z-900);
+}
+.mso-mobile .msm-pw-input:focus { border-color: var(--m-accent) !important; background: var(--m-card) !important; }
+.mso-mobile .msm-pw-input.invalid { border-color: var(--m-danger) !important; background: var(--m-danger-soft) !important; }
+.mso-mobile .msm-pw-err { font-size: 12px; font-weight: 700; color: var(--m-danger); margin-top: 8px; }
+.mso-mobile .msm-pw-actions { display: flex; gap: 10px; width: 100%; margin-top: 14px; }
+.mso-mobile .msm-pw-actions button {
+  flex: 1; height: 48px; border-radius: 13px;
+  font-size: 15px; font-weight: 800;
+  border: 1px solid var(--m-border) !important;
+  background: var(--m-card); color: var(--z-700);
+}
+.mso-mobile .msm-pw-actions button.primary {
+  background: var(--m-accent); border-color: var(--m-accent) !important; color: #fff;
+}
+.mso-mobile .msm-pw-actions button.primary:active { background: var(--m-accent-700); }
+
+/* ─── 큰 버튼 ────────────────────────────────────────────────*/
+.mso-mobile .msm-btn-lg {
+  width: 100%; height: 50px; border-radius: 14px;
+  border: 1px solid var(--m-border); background: var(--m-card);
+  color: var(--z-700); font-family: var(--m-font);
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.mso-mobile .msm-btn-lg:active { background: var(--z-50); }
+.mso-mobile .msm-btn-lg.accent {
+  background: var(--m-accent); border-color: var(--m-accent);
+  color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+}
+.mso-mobile .msm-btn-lg.accent:active { background: var(--m-accent-700); }
+.mso-mobile .msm-btn-lg.danger { color: var(--m-danger); }
+.mso-mobile .msm-btn-lg.danger:active { background: var(--m-danger-soft); }
+
+/* ─── 리스트 행 (프로토타입 패턴) ─────────────────────────────*/
+.mso-mobile .msm-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 14px; background: var(--m-card);
+  border: 1px solid var(--m-border); border-radius: 13px;
+  cursor: pointer; text-align: left; width: 100%;
+}
+.mso-mobile .msm-row:active { background: var(--z-50); }
+.mso-mobile .msm-row .lead {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.mso-mobile .msm-row .main { flex: 1; min-width: 0; }
+.mso-mobile .msm-row .nm {
+  font-size: 14px; font-weight: 700; color: var(--z-900);
+  letter-spacing: -0.01em; display: flex; align-items: center; gap: 6px;
+}
+.mso-mobile .msm-row .sub {
+  font-size: 12.5px; font-weight: 500; color: var(--z-500);
+  margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mso-mobile .msm-row .meta {
+  margin-left: auto; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 4px; flex-shrink: 0;
+}
+.mso-mobile .msm-row .time { font-size: 11px; font-weight: 600; color: var(--z-400); white-space: nowrap; }
+.mso-mobile .msm-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* ─── 배지 ────────────────────────────────────────────────────*/
+.mso-mobile .msm-badge {
+  padding: 3px 9px; border-radius: 6px;
+  font-size: 11px; font-weight: 800; white-space: nowrap;
+}
+.mso-mobile .msm-badge.accent { background: var(--m-accent-soft); color: var(--m-accent); }
+.mso-mobile .msm-badge.warn { background: var(--m-warning-soft); color: #B45309; }
+.mso-mobile .msm-badge.success { background: var(--m-success-soft); color: #047857; }
+.mso-mobile .msm-badge.danger { background: var(--m-danger-soft); color: var(--m-danger); }
+.mso-mobile .msm-badge.muted { background: var(--z-100); color: var(--z-600); }
+.mso-mobile .msm-unread {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--m-accent); color: #fff; font-size: 11px; font-weight: 800;
+  display: grid; place-items: center;
+}
+
+/* ─── 섹션 헤더 (프로토타입) ──────────────────────────────────*/
+.mso-mobile .msm-sec { display: flex; align-items: center; gap: 8px; padding: 2px 2px 0; }
+.mso-mobile .msm-sec-t { font-size: 14px; font-weight: 800; color: var(--z-800); letter-spacing: -0.02em; }
+.mso-mobile .msm-sec-more {
+  margin-left: auto; font-size: 12.5px; font-weight: 700;
+  color: var(--m-accent); background: none; border: none; cursor: pointer;
+}
+
+/* ─── 풀스크린 서브 화면 ─────────────────────────────────────*/
+.mso-mobile .msm-subscreen {
+  position: fixed; inset: 0; z-index: 40;
+  background: var(--m-bg);
+  transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  display: flex; flex-direction: column;
+}
+.mso-mobile .msm-subscreen.open { transform: translateX(0); }
+.mso-mobile .msm-subscreen-head {
+  padding: 14px 16px 12px; background: var(--m-card);
+  border-bottom: 1px solid var(--m-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.mso-mobile .msm-subscreen-back {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 14px; font-weight: 700; color: var(--m-accent);
+}
+.mso-mobile .msm-subscreen-title {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.025em;
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
+
+/* ─── 통계 카드 2열 ──────────────────────────────────────────*/
+.mso-mobile .msm-stat2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mso-mobile .msm-statcard {
+  background: var(--m-card); border: 1px solid var(--m-border);
+  border-radius: 14px; padding: 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.mso-mobile .msm-statcard .v { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; font-feature-settings: "tnum"; }
+.mso-mobile .msm-statcard .l { font-size: 12px; font-weight: 600; color: var(--z-500); }
+
+/* ─── 앱바 (프로토타입 패턴 — eyebrow + title) ───────────────*/
+.mso-mobile .msm-appbar {
+  background: var(--m-card); border-bottom: 1px solid var(--m-border);
+  flex-shrink: 0; position: relative; z-index: 5;
+}
+.mso-mobile .msm-appbar-inner {
+  padding: 14px 16px 12px; display: flex; align-items: center; gap: 10px; min-height: 40px;
+}
+.mso-mobile .msm-appbar .eyebrow { font-size: 11px; font-weight: 700; color: var(--z-400); }
+.mso-mobile .msm-appbar .title { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--z-900); }
+.mso-mobile .msm-appbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.mso-mobile .msm-ibtn {
+  width: 38px; height: 38px; border-radius: 11px;
+  border: none !important; background: var(--z-100); display: grid; place-items: center;
+  color: var(--z-700); cursor: pointer; flex-shrink: 0; position: relative;
+}
+.mso-mobile .msm-ibtn:active { background: var(--z-200); }
+
+/* ─── 채팅 대화창 ────────────────────────────────────────────*/
+.mso-mobile .msm-th-head {
+  background: var(--m-card); border-bottom: 1px solid var(--m-border);
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 8px 10px 12px;
+}
+.mso-mobile .msm-th-back {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: grid; place-items: center; color: var(--z-700);
+}
+.mso-mobile .msm-th-back:active { background: var(--z-100); }
+.mso-mobile .msm-th-av {
+  width: 36px; height: 36px; border-radius: 11px;
+  display: grid; place-items: center; color: #fff;
+  font-size: 13px; font-weight: 800; flex-shrink: 0;
+}
+.mso-mobile .msm-th-title { flex: 1; min-width: 0; }
+.mso-mobile .msm-th-nm {
+  font-size: 15px; font-weight: 800; color: var(--z-900);
+  letter-spacing: -0.02em; display: flex; align-items: center; gap: 6px;
+}
+.mso-mobile .msm-th-nm .cnt { font-size: 12px; font-weight: 700; color: var(--z-400); }
+.mso-mobile .msm-th-status {
+  font-size: 11.5px; font-weight: 600; color: var(--m-success);
+  margin-top: 1px; display: flex; align-items: center; gap: 5px;
+}
+.mso-mobile .msm-th-status .live {
+  width: 6px; height: 6px; border-radius: 999px; background: var(--m-success);
+}
+.mso-mobile .msm-th-scroll {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--z-50);
+}
+.mso-mobile .msm-th-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.mso-mobile .msm-th-date {
+  align-self: center; padding: 5px 12px; border-radius: 999px;
+  background: rgba(24,24,27,0.06); color: var(--z-500);
+  font-size: 11.5px; font-weight: 700;
+}
+.mso-mobile .msm-th-sys {
+  align-self: center; padding: 6px 14px; border-radius: 999px;
+  background: var(--z-100); color: var(--z-500);
+  font-size: 12px; font-weight: 600; text-align: center;
+}
+.mso-mobile .msm-msg { display: flex; gap: 8px; max-width: 84%; }
+.mso-mobile .msm-msg.in { align-self: flex-start; }
+.mso-mobile .msm-msg.out { align-self: flex-end; flex-direction: row-reverse; }
+.mso-mobile .msm-msg-av {
+  width: 32px; height: 32px; border-radius: 999px;
+  display: grid; place-items: center; color: #fff;
+  font-size: 12px; font-weight: 800; flex-shrink: 0; align-self: flex-start;
+}
+.mso-mobile .msm-msg-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mso-mobile .msm-msg.out .msm-msg-col { align-items: flex-end; }
+.mso-mobile .msm-msg-who { font-size: 11.5px; font-weight: 700; color: var(--z-500); padding: 0 4px; }
+.mso-mobile .msm-msg-rowline { display: flex; align-items: flex-end; gap: 6px; }
+.mso-mobile .msm-msg.out .msm-msg-rowline { flex-direction: row-reverse; }
+.mso-mobile .msm-bubble {
+  padding: 10px 13px; border-radius: 16px;
+  font-size: 14px; font-weight: 500; line-height: 1.5;
+  color: var(--z-800); white-space: pre-wrap; word-break: break-word;
+}
+.mso-mobile .msm-msg.in .msm-bubble {
+  background: var(--m-card); border: 1px solid var(--m-border); border-top-left-radius: 5px;
+}
+.mso-mobile .msm-msg.out .msm-bubble {
+  background: var(--m-accent); color: #fff; border-top-right-radius: 5px;
+}
+.mso-mobile .msm-msg-time { font-size: 10.5px; font-weight: 600; color: var(--z-400); white-space: nowrap; flex-shrink: 0; }
+.mso-mobile .msm-th-input {
+  flex-shrink: 0; background: var(--m-card);
+  border-top: 1px solid var(--m-border);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 8px;
+}
+.mso-mobile .msm-th-plus {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--z-100); display: grid; place-items: center;
+  color: var(--z-600); flex-shrink: 0;
+}
+.mso-mobile .msm-th-field {
+  flex: 1; height: 42px; border: 1px solid var(--m-border) !important;
+  border-radius: 21px; background: var(--z-50) !important;
+  padding: 0 16px; font-size: 14px; color: var(--z-800);
+}
+.mso-mobile .msm-th-field::placeholder { color: var(--z-400); }
+.mso-mobile .msm-th-send {
+  width: 42px; height: 42px; border-radius: 999px;
+  background: var(--m-accent); color: #fff;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.mso-mobile .msm-th-send:active { background: var(--m-accent-700); }
+
+/* ─── 입력 필드 (정보수정 등) ─────────────────────────────────*/
+.mso-mobile .msm-field { display: flex; flex-direction: column; gap: 6px; }
+.mso-mobile .msm-field .lbl { font-size: 12px; font-weight: 700; color: var(--z-500); }
+.mso-mobile .msm-field-input {
+  height: 48px; border: 1px solid var(--m-border) !important;
+  border-radius: 12px; background: var(--m-card) !important;
+  padding: 0 14px; font-size: 14px; font-weight: 600; color: var(--z-900);
+}
+.mso-mobile .msm-field-input:focus { border-color: var(--m-accent) !important; }
+.mso-mobile .msm-field-input::placeholder { color: var(--z-400); }
+
+/* ─── 스크롤 영역 ────────────────────────────────────────────*/
+.mso-mobile .msm-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.mso-mobile .msm-scroll::-webkit-scrollbar { width: 0; }
+.mso-mobile .msm-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }

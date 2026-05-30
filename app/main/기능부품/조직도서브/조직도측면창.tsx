@@ -261,6 +261,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   ),
   'chevron-up': <path d="m18 15-6-6-6 6" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
+  'chevron-right': <path d="m9 18 6-6-6-6" />,
   stethoscope: (
     <>
       <path d="M4.8 2.3v4.2a4 4 0 0 0 8 0V2.3" />
@@ -545,6 +546,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Check: 'check',
   CheckSquare: 'check',
   ChevronLeft: 'arrow-left',
+  ChevronRight: 'chevron-right',
   ChevronUp: 'chevron-up',
   ChevronDown: 'chevron-down',
   CircleParking: 'circle-parking',

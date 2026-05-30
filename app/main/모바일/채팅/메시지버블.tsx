@@ -9,8 +9,9 @@
  * 제약: JM(< 500줄, 단일 책임), JM4(any 금지), JM6(button + aria-label).
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ChatMessage } from '@/types';
+import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import MAvatar from '../공통/MAvatar';
 import MIcon from '../공통/MIcon';
 import {
@@ -18,7 +19,6 @@ import {
   pickAvatarTone,
   type StaffDirectoryEntry,
 } from './data-hooks';
-import ReactionMenu from './반응선택';
 
 export type MessageBubbleProps = {
   message: ChatMessage;
@@ -83,21 +83,11 @@ export default function MessageBubble({
       .filter((entry) => entry.users.length > 0);
   }, [message.reactions]);
 
-  const myEmojiSet = useMemo(() => {
-    const set = new Set<string>();
-    if (!myUserId) return set;
-    reactionEntries.forEach((entry) => {
-      if (entry.users.includes(String(myUserId))) set.add(entry.emoji);
-    });
-    return set;
-  }, [reactionEntries, myUserId]);
-
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const handlePick = (emoji: string) => {
-    onToggleReaction(String(message.id), emoji);
-    setMenuOpen(false);
-  };
+  const isEmoticonOrSticker = useMemo(() => {
+    if (hasFile) return false;
+    const trimmed = text.trim();
+    return /^\[emo:[a-z0-9-]+\]$/.test(trimmed) || /^\[stat:[a-z0-9-]+\]$/.test(trimmed);
+  }, [text, hasFile]);
 
   return (
     <div
@@ -109,9 +99,7 @@ export default function MessageBubble({
       }}
     >
       {!mine && (
-        <MAvatar tone={tone} size="sm">
-          {senderName.charAt(0) || '?'}
-        </MAvatar>
+        <div style={{ width: 4, flexShrink: 0 }} />
       )}
       <div
         style={{
@@ -155,29 +143,18 @@ export default function MessageBubble({
             </span>
           )}
 
-          {/* 반응 추가 버튼 — 내 메시지면 좌측, 상대 메시지면 우측 */}
-          {mine && (
-            <ReactionTrigger
-              align="end"
-              open={menuOpen}
-              onOpen={() => setMenuOpen(true)}
-              onClose={() => setMenuOpen(false)}
-              myEmojis={myEmojiSet}
-              onPick={handlePick}
-            />
-          )}
 
           <div
             style={{
-              padding: imageMode ? 4 : '10px 14px',
+              padding: (imageMode || isEmoticonOrSticker) ? 0 : '10px 14px',
               borderRadius: 16,
-              background: imageMode
+              background: (imageMode || isEmoticonOrSticker)
                 ? 'transparent'
                 : mine
                   ? 'var(--m-accent)'
                   : 'var(--m-card)',
-              color: mine && !imageMode ? '#fff' : 'var(--z-900)',
-              border: mine || imageMode ? 0 : '1px solid var(--m-border)',
+              color: mine && !(imageMode || isEmoticonOrSticker) ? '#fff' : 'var(--z-900)',
+              border: mine || imageMode || isEmoticonOrSticker ? 0 : '1px solid var(--m-border)',
               borderBottomRightRadius: mine ? 4 : 16,
               borderBottomLeftRadius: mine ? 16 : 4,
               fontSize: 14,
@@ -253,20 +230,10 @@ export default function MessageBubble({
                 <MIcon name="chevR" size={18} />
               </a>
             ) : (
-              text || <span style={{ opacity: 0.7 }}>(빈 메시지)</span>
+              text ? renderMessageContent(text, mine) : <span style={{ opacity: 0.7 }}>(빈 메시지)</span>
             )}
           </div>
 
-          {!mine && (
-            <ReactionTrigger
-              align="start"
-              open={menuOpen}
-              onOpen={() => setMenuOpen(true)}
-              onClose={() => setMenuOpen(false)}
-              myEmojis={myEmojiSet}
-              onPick={handlePick}
-            />
-          )}
 
           {!mine && (
             <span
@@ -327,55 +294,4 @@ export default function MessageBubble({
   );
 }
 
-// ─── "+ 반응" 트리거 + 미니 picker ────────────────────
 
-type ReactionTriggerProps = {
-  align: 'start' | 'end';
-  open: boolean;
-  myEmojis: ReadonlySet<string>;
-  onOpen: () => void;
-  onClose: () => void;
-  onPick: (emoji: string) => void;
-};
-
-function ReactionTrigger({
-  align,
-  open,
-  myEmojis,
-  onOpen,
-  onClose,
-  onPick,
-}: ReactionTriggerProps) {
-  return (
-    <div style={{ position: 'relative' }}>
-      <button
-        type="button"
-        aria-label="반응 추가"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={onOpen}
-        style={{
-          width: 22,
-          height: 22,
-          display: 'grid',
-          placeItems: 'center',
-          borderRadius: 999,
-          background: 'var(--m-card)',
-          border: '1px solid var(--m-border)',
-          color: 'var(--z-500)',
-          opacity: 0.7,
-          cursor: 'pointer',
-        }}
-      >
-        <MIcon name="smile" size={12} />
-      </button>
-      <ReactionMenu
-        open={open}
-        align={align}
-        myEmojis={myEmojis}
-        onPick={onPick}
-        onClose={onClose}
-      />
-    </div>
-  );
-}

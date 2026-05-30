@@ -16,6 +16,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -24,6 +25,7 @@ import type { ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
+import MSheet from '../공통/MSheet';
 import {
   getRoomTitle,
   pickAvatarTone,
@@ -31,8 +33,15 @@ import {
   useChatMessagesForRoom,
   useChatStaffDirectory,
   type MobileChatRoom,
+  type StaffDirectoryEntry,
 } from './data-hooks';
-import { normalizeMemberIds } from '@/app/main/기능부품/메신저유틸';
+import {
+  normalizeMemberIds,
+  isGroupChatRoom,
+  isSelfChatRoom,
+  getGroupChatRoomBadgeText,
+  NOTICE_ROOM_ID,
+} from '@/app/main/기능부품/메신저유틸';
 import EmojiPicker from './이모지피커';
 import BubbleList from './버블리스트';
 import {
@@ -41,7 +50,6 @@ import {
   validateMobileUploadTarget,
 } from './업로드';
 import { toggleMobileReaction } from './반응';
-import QuickSwitchBar from './퀵스위치바';
 
 export type SChatRoomProps = {
   user: ErpUser;
@@ -71,10 +79,34 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const headerTone = pickAvatarTone(String(room.id) + title);
   const memberCount = normalizeMemberIds(room.members).length;
 
+  const memberIds = useMemo(() => (Array.isArray(room.members) ? room.members.map((id) => String(id)) : []), [room.members]);
+  const selfRoom = useMemo(() => isSelfChatRoom(room, userId), [room, userId]);
+  const isGroup = useMemo(() => isGroupChatRoom(room), [room]);
+  const isNotice = String(room.id) === NOTICE_ROOM_ID;
+  const peer = useMemo(() => 
+    !isGroup && !isNotice && room.type === 'direct'
+      ? selfRoom
+        ? staffs.find((s) => String(s.id) === String(userId))
+        : memberIds
+            .map((memberId) => staffs.find((s) => String(s.id) === String(memberId)))
+            .find((staff) => Boolean(staff) && String(staff!.id) !== String(userId)) || null
+      : null
+  , [isGroup, isNotice, room.type, selfRoom, staffs, userId, memberIds]);
+
+  const peerPhotoUrl = peer ? peer.photo_url || peer.avatar_url : null;
+  const peerName = peer ? peer.name : '';
+
+  const memberProfiles = useMemo(() => {
+    return memberIds
+      .map((id) => staffs.find((s) => String(s.id) === String(id)))
+      .filter(Boolean) as StaffDirectoryEntry[];
+  }, [memberIds, staffs]);
+
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -229,7 +261,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     [refresh, room.id, userId],
   );
 
-  const placeholder = `#${title}에 메시지 보내기`;
+  const placeholder = '메시지를 입력하세요.';
   const composerDisabled = sending || uploading;
 
   return (
@@ -239,7 +271,24 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           <MIcon name="chevL" size={22} />
         </button>
         <MAvatar tone={headerTone} size="sm">
-          {title.charAt(0) || '방'}
+          {isNotice ? (
+            <MIcon name="bell" size={16} color="#fff" />
+          ) : peerPhotoUrl ? (
+            <img
+              src={peerPhotoUrl}
+              alt={peerName || title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 'inherit',
+              }}
+            />
+          ) : isGroup ? (
+            <span>{getGroupChatRoomBadgeText(title)}</span>
+          ) : (
+            <span>{title.charAt(0) || '방'}</span>
+          )}
         </MAvatar>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 4 }}>
           <div
@@ -264,28 +313,17 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               aria-hidden="true"
             />
             {memberCount > 0 ? `${memberCount}명` : '대화방'}
+            <span style={{ color: 'var(--z-400)' }}>·</span>
+            실시간 연결됨
           </div>
         </div>
         <div className="actions">
-          <button type="button" aria-label="채팅 검색" disabled>
-            <MIcon name="search" size={20} />
-          </button>
-          <button type="button" aria-label="더보기" disabled>
-            <MIcon name="moreV" size={20} />
+          <button type="button" aria-label="상세메뉴" onClick={() => setInfoOpen(true)}>
+            <MIcon name="menu" size={20} />
           </button>
         </div>
       </div>
 
-      {/* Quick Switch — 최근 방 5개 칩바 (채팅목록 데이터 재사용, 중복 fetch 없음) */}
-      {recentRooms && recentRooms.length > 0 && onSwitchRoom && (
-        <QuickSwitchBar
-          rooms={recentRooms}
-          activeRoomId={String(room.id)}
-          currentUserId={userId}
-          staffs={staffs}
-          onSwitch={onSwitchRoom}
-        />
-      )}
 
       <div
         ref={scrollRef}
@@ -478,6 +516,126 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           </button>
         </div>
       </div>
+
+      <MSheet open={infoOpen} onClose={() => setInfoOpen(false)} title="대화방 상세 정보">
+        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Section 1: 대화방 개요 */}
+          <div style={{ background: 'var(--m-bg)', padding: '14px', borderRadius: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)' }}>{title}</div>
+            <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 4, display: 'flex', gap: 8 }}>
+              <span>유형: {isGroup ? '그룹 대화방' : '1:1 대화방'}</span>
+              <span>·</span>
+              <span>참여자: {memberProfiles.length}명</span>
+            </div>
+          </div>
+
+          {/* Section 2: 알림 설정 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)' }}>대화방 알림 수신</div>
+              <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 2 }}>새 메시지 알림을 받습니다.</div>
+            </div>
+            <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+              <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
+              <span style={{
+                position: 'absolute', inset: 0, borderRadius: 24,
+                background: 'var(--m-accent)', transition: '0.2s',
+              }}>
+                <span style={{
+                  position: 'absolute', left: 4, bottom: 4, width: 16, height: 16,
+                  borderRadius: '50%', background: '#fff', transition: '0.2s',
+                  transform: 'translateX(20px)',
+                }} />
+              </span>
+            </label>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--m-border)' }} />
+
+          {/* Section 3: 상단 공지 */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+              <span style={{ fontSize: 11 }}>📌</span>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>상단 공지</div>
+            </div>
+            <div style={{ padding: '10px 12px', background: 'var(--m-bg)', borderRadius: 10, fontSize: 12, color: 'var(--z-500)', fontWeight: 600 }}>
+              등록된 대화방 공지가 없습니다.
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--m-border)' }} />
+
+          {/* Section 4: 참여자 목록 */}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>참여자 ({memberProfiles.length}명)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 180, overflowY: 'auto' }} className="custom-scrollbar">
+              {memberProfiles.map((member) => {
+                const tone = pickAvatarTone(String(member.id) + member.name);
+                const isMe = String(member.id) === String(userId);
+                const photoUrl = member.photo_url || member.avatar_url;
+                return (
+                  <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <MAvatar tone={tone} size="sm">
+                      {photoUrl ? (
+                        <img
+                          src={photoUrl}
+                          alt={member.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }}
+                        />
+                      ) : (
+                        <span>{member.name.charAt(0)}</span>
+                      )}
+                    </MAvatar>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)' }}>
+                        {member.name}
+                        {isMe && <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--m-accent-soft)', color: 'var(--m-accent)', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>나</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 2 }}>
+                        {member.department || '부서 없음'} · {member.position || '직급 없음'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--m-border)' }} />
+
+          {/* Section 5: 공유된 사진 및 파일 */}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>공유된 사진 및 파일</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
+              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
+              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--m-border)' }} />
+
+          {/* Section 6: 방 나가기 */}
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 10,
+              background: 'var(--m-accent-soft)',
+              color: 'var(--m-accent)',
+              fontSize: 13,
+              fontWeight: 800,
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'center',
+            }}
+          >
+            채팅방 나가기 (목록으로)
+          </button>
+        </div>
+      </MSheet>
     </div>
   );
 }

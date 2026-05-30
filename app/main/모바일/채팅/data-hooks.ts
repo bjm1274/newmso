@@ -33,8 +33,12 @@ import {
   isSelfChatRoom,
   normalizeMemberIds,
   sortChatRoomsWithNoticeFirst,
+  getRoomDisplayName,
+  isGroupChatRoom,
+  getGroupChatRoomBadgeText,
   type MessageRetryPayload,
 } from '@/app/main/기능부품/메신저유틸';
+import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { fetchReactionsForMessages, mergeReactionsIntoMessages } from './반응';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
@@ -44,7 +48,7 @@ import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 type StaffDirectoryEntry = Pick<
   StaffMember,
-  'id' | 'name' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status'
+  'id' | 'name' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
 >;
 
 export function useChatStaffDirectory() {
@@ -56,13 +60,14 @@ export function useChatStaffDirectory() {
       try {
         const { data, error } = await supabase
           .from('staff_members')
-          .select('id, name, department, position, photo_url, avatar_url, status');
+          .select('id, name, department, position, photo_url, avatar_url, status, permissions');
         if (!active) return;
         if (error || !Array.isArray(data)) {
           setStaffs([]);
           return;
         }
-        setStaffs(data as StaffDirectoryEntry[]);
+        const normalized = data.map((staff) => normalizeProfileUser(staff));
+        setStaffs(normalized as any);
       } catch {
         if (active) setStaffs([]);
       }
@@ -438,27 +443,17 @@ export function getRoomTitle(
   staffs: StaffDirectoryEntry[],
   currentUserId: string | null | undefined,
 ): string {
-  if (String(room.id) === NOTICE_ROOM_ID) return room.name || '공지사항';
-  if (isSelfChatRoom(room, currentUserId)) return '나와의 채팅';
-  if (room.type === 'direct') {
-    const memberIds = normalizeMemberIds(room.members);
-    const peerId = memberIds.find(
-      (id) => String(id) !== String(currentUserId || ''),
-    );
-    if (peerId) {
-      const peer = staffs.find((s) => String(s.id) === String(peerId));
-      if (peer?.name) return peer.name;
-    }
-  }
-  return room.name || '채팅방';
+  return getRoomDisplayName(room, staffs as any, currentUserId);
 }
 
 export function getRoomKind(room: ChatRoom): string {
   if (String(room.id) === NOTICE_ROOM_ID) return '공지';
-  if (room.type === 'direct') return '1:1';
   if (room.type === 'notice') return '채널';
-  const count = normalizeMemberIds(room.members).length;
-  return count > 0 ? `그룹 · ${count}명` : '그룹';
+  if (isGroupChatRoom(room)) {
+    const count = normalizeMemberIds(room.members).length;
+    return count > 0 ? `그룹 · ${count}명` : '그룹';
+  }
+  return '1:1';
 }
 
 export function formatChatTimestamp(value: string | null | undefined): string {

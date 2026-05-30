@@ -85,7 +85,7 @@ const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
 
 export type 추가기능Props = {
   user: ErpUser;
-  onBack: () => void;
+  onBack?: () => void;
 };
 
 export default function 추가기능({ user, onBack }: 추가기능Props) {

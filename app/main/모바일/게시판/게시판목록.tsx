@@ -1,9 +1,12 @@
 'use client';
 
 /**
- * SBoard — 게시판 목록.
- *   - MobileHeader + 카테고리 7 칩바 + 글 카드 리스트
- *   - pin / star / badge 표시
+ * SBoard — 게시판 목록 + 카테고리 홈.
+ *   - showHome=true  → 카테고리 목록 (BoardHomeScreen 패턴)
+ *   - showHome=false → 기존 칩바 + 글 카드 리스트
+ *
+ * Phase 6: 카테고리 홈 뷰 추가 — msm-appbar + msm-list 패턴.
+ *
  * JM(파일당 500줄), JM2(필요한 칼럼만 select·useMemo), JM3(toast), JM6(button 시맨틱)
  */
 
@@ -24,6 +27,37 @@ import { toggleStarServer } from './별표훅';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
+// ─── 카테고리 홈 정의 ─────────────────────────────────────
+type BoardCategory = {
+  id: BoardCatId;
+  label: string;
+  subtitle: string;
+  icon: string;
+  tone: 'accent' | 'success' | 'warn' | 'danger' | 'muted';
+};
+
+const HOME_CATEGORIES: BoardCategory[] = [
+  { id: 'notice', label: '공지사항',     subtitle: '병원 공지 · 전달사항',      icon: 'bell',     tone: 'warn' },
+  { id: 'free',   label: '자유게시판',   subtitle: '자유 토론 · 소통',           icon: 'chat',     tone: 'success' },
+  { id: 'event',  label: '경조사 소식',  subtitle: '경조사 안내',                icon: 'bookmark', tone: 'danger' },
+  { id: 'op',     label: '수술 일정',    subtitle: '수술 스케줄 공유',           icon: 'calendar', tone: 'danger' },
+  { id: 'mri',    label: 'MRI 일정',     subtitle: 'MRI 스케줄 · 판독 대기',    icon: 'calendar', tone: 'accent' },
+  { id: 'share',  label: '업무가이드',   subtitle: '응급 · 수술 · 접수 SOP',    icon: 'fileText', tone: 'accent' },
+];
+
+function countUnread(posts: BoardListPost[], catId: BoardCatId): number {
+  // 간이 집계: 최근 7일 내 작성된 글 수를 unread 대용으로 표시
+  const now = Date.now();
+  const week = 7 * 24 * 60 * 60 * 1000;
+  return posts.filter((p) => {
+    if (boardTypeToCat(p.board_type as string | null) !== catId && catId !== 'all') return false;
+    if (catId !== 'all' && boardTypeToCat(p.board_type as string | null) !== catId) return false;
+    const created = p.created_at ? new Date(String(p.created_at)).getTime() : 0;
+    return now - created < week;
+  }).length;
+}
+
+// ─── Props ────────────────────────────────────────────────
 export type SBoardProps = {
   posts: BoardListPost[];
   loading: boolean;
@@ -37,8 +71,13 @@ export type SBoardProps = {
   onStarChanged: (postId: string, starred: boolean) => void;
   /** PTR 콜백 — 부모 refetch */
   onRefresh?: () => Promise<void>;
+  /** Phase 6: true이면 카테고리 홈을 표시 */
+  showHome?: boolean;
+  /** Phase 6: 카테고리 클릭 시 호출 */
+  onOpenCategory?: (catId: BoardCatId) => void;
 };
 
+// ─── 필터 유틸 ────────────────────────────────────────────
 function filterByCat(posts: BoardListPost[], cat: BoardCatId): BoardListPost[] {
   if (cat === 'all') return posts;
   if (cat === 'meal') {
@@ -54,6 +93,87 @@ function countByCat(posts: BoardListPost[], cat: BoardCatId): number {
   return filterByCat(posts, cat).length;
 }
 
+// ─── 카테고리 홈 뷰 ──────────────────────────────────────
+function BoardHomeView({
+  posts,
+  onOpenCategory,
+}: {
+  posts: BoardListPost[];
+  onOpenCategory: (catId: BoardCatId) => void;
+}) {
+  return (
+    <div className="m-screen">
+      <div className="msm-appbar">
+        <div className="msm-appbar-inner">
+          <div>
+            <div className="eyebrow">협업</div>
+            <div className="title">게시판</div>
+          </div>
+          <div className="msm-appbar-actions">
+            <button className="msm-ibtn" type="button" aria-label="검색">
+              <MIcon name="search" size={19} />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="m-scroll">
+        <div className="msm-sec">
+          <div className="msm-sec-t">카테고리</div>
+        </div>
+        <div className="msm-list">
+          {HOME_CATEGORIES.map((c) => {
+            const unread = countUnread(posts, c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                className="msm-list-row"
+                onClick={() => onOpenCategory(c.id)}
+                aria-label={`${c.label}${unread > 0 ? ` ${unread}건 안 읽음` : ''}`}
+              >
+                <div className={`msm-quick-ic tone-${c.tone}`}>
+                  <MIcon name={c.icon} size={18} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.012em' }}>
+                    {c.label}
+                  </div>
+                </div>
+                {unread > 0 && (
+                  <span className="msm-unread">{unread}</span>
+                )}
+                <MIcon name="chevR" size={16} color="var(--z-400)" />
+              </button>
+            );
+          })}
+        </div>
+        {/* 전체 보기 링크 */}
+        <div style={{ padding: '12px 16px' }}>
+          <button
+            type="button"
+            onClick={() => onOpenCategory('all')}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              background: 'var(--m-card)',
+              border: '1px solid var(--m-border)',
+              borderRadius: 'var(--m-radius-lg)',
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--m-accent)',
+              textAlign: 'center',
+            }}
+          >
+            전체 글 보기
+          </button>
+        </div>
+        <div style={{ height: 24 }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── 게시글 카드 ──────────────────────────────────────────
 function PostCard({
   post,
   onOpen,
@@ -166,6 +286,7 @@ function PostCard({
 
 const PostCardMemo = memo(PostCard);
 
+// ─── 메인 컴포넌트 ───────────────────────────────────────
 function SBoardBase({
   posts,
   loading,
@@ -177,6 +298,8 @@ function SBoardBase({
   userId,
   onStarChanged,
   onRefresh,
+  showHome,
+  onOpenCategory,
 }: SBoardProps) {
   const filtered = useMemo(() => filterByCat(posts, cat), [posts, cat]);
 
@@ -184,6 +307,11 @@ function SBoardBase({
     onRefresh: onRefresh ?? (() => Promise.resolve()),
     enabled: !!onRefresh,
   });
+
+  // Phase 6: 카테고리 홈 뷰
+  if (showHome && onOpenCategory) {
+    return <BoardHomeView posts={posts} onOpenCategory={onOpenCategory} />;
+  }
 
   return (
     <div className="m-screen">

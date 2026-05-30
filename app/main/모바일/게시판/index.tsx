@@ -2,8 +2,11 @@
 
 /**
  * 게시판 모바일 — 라우터.
- *   view 상태로 list ↔ detail ↔ write 전환.
+ *   view 상태로 home → list ↔ detail ↔ write 전환.
  *   MobileShell이 tab === 'board' 일 때 마운트.
+ *
+ * Phase 6: 카테고리 홈('home') 뷰 추가 — 카테고리 목록에서 선택 후 필터된 리스트 진입.
+ *
  * JM(단일 책임 — 분기·상태), JM2(필요한 시점에만 fetch), JM6(button 시맨틱)
  *
  * export default 함수명: 게시판
@@ -28,7 +31,7 @@ export type 게시판Props = {
   onBack: () => void;
 };
 
-type View = 'list' | 'detail' | 'write';
+type View = 'home' | 'list' | 'detail' | 'write';
 
 export default function 게시판({ user, onBack }: 게시판Props) {
   const userId = typeof user.id === 'string' ? user.id : null;
@@ -36,7 +39,7 @@ export default function 게시판({ user, onBack }: 게시판Props) {
   const userCompany = typeof user.company === 'string' ? user.company : null;
   const userCompanyId = typeof user.company_id === 'string' ? user.company_id : null;
 
-  const [view, setView] = useState<View>('list');
+  const [view, setView] = useState<View>('home');
   const [cat, setCat] = useState<BoardCatId>('all');
   const [postId, setPostId] = useState<string | null>(null);
   const [overridePosts, setOverridePosts] = useState<BoardListPost[] | null>(null);
@@ -55,6 +58,11 @@ export default function 게시판({ user, onBack }: 게시판Props) {
     detailUser,
   );
 
+  const handleOpenCategory = useCallback((catId: BoardCatId) => {
+    setCat(catId);
+    setView('list');
+  }, []);
+
   const handleOpen = useCallback((id: string) => {
     setPostId(id);
     setView('detail');
@@ -62,6 +70,11 @@ export default function 게시판({ user, onBack }: 게시판Props) {
 
   const handleWrite = useCallback(() => {
     setView('write');
+  }, []);
+
+  const handleBackToHome = useCallback(() => {
+    setView('home');
+    setCat('all');
   }, []);
 
   const handleBackToList = useCallback(() => {
@@ -147,10 +160,12 @@ export default function 게시판({ user, onBack }: 게시판Props) {
       onCat={setCat}
       onOpen={handleOpen}
       onWrite={handleWrite}
-      onBack={onBack}
+      onBack={view === 'list' ? handleBackToHome : onBack}
       userId={userId}
       onStarChanged={handleStarChanged}
       onRefresh={refetch}
+      showHome={view === 'home'}
+      onOpenCategory={handleOpenCategory}
     />
   );
 }

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ErpUser } from '@/types';
-import MobileHeader from '../셸/MobileHeader';
+
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import {
@@ -22,7 +22,7 @@ import {
   useChatStaffDirectory,
   type MobileChatRoom,
 } from './data-hooks';
-import { NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
+import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
@@ -83,8 +83,8 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   const tabFiltered: MobileChatRoom[] = useMemo(() => {
     if (tab === 'chat') return rooms;
     if (tab === 'unread') return rooms.filter((r) => (r.unread_count || 0) > 0);
-    if (tab === 'group') return rooms.filter((r) => r.type === 'group' || (!!r.type && r.type !== 'direct' && r.type !== 'notice'));
-    if (tab === 'direct') return rooms.filter((r) => r.type === 'direct');
+    if (tab === 'group') return rooms.filter((r) => isGroupChatRoom(r));
+    if (tab === 'direct') return rooms.filter((r) => !isGroupChatRoom(r) && r.type === 'direct');
     if (tab === 'channel')
       return rooms.filter((r) => r.type === 'notice' || String(r.id) === NOTICE_ROOM_ID);
     // org 탭은 별도 placeholder — 필터 영향 없음
@@ -111,25 +111,6 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   return (
     <div className="m-screen">
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
-      <MobileHeader
-        title="채팅"
-        sub={loading ? '불러오는 중…' : '실시간 연결됨'}
-        actions={
-          <>
-            <button
-              type="button"
-              aria-label={searchOpen ? '채팅 검색 닫기' : '채팅 검색 열기'}
-              aria-pressed={searchOpen}
-              onClick={() => setSearchOpen((v) => !v)}
-            >
-              <MIcon name={searchOpen ? 'x' : 'search'} size={20} />
-            </button>
-            <button type="button" aria-label="새 대화 시작" onClick={onNew}>
-              <MIcon name="edit" size={20} />
-            </button>
-          </>
-        }
-      />
       {searchOpen && (
         <div
           style={{
@@ -194,17 +175,44 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
           </label>
         </div>
       )}
-      <div className="m-chip-bar" role="tablist" aria-label="채팅 필터">
-        <ChipBtn label="채팅" active={tab === 'chat'} onClick={() => setTab('chat')} />
-        <ChipBtn label="조직도" active={tab === 'org'} onClick={() => setTab('org')} />
-        <ChipBtn
-          label={`읽지않음 ${totalUnread}`}
-          active={tab === 'unread'}
-          onClick={() => setTab('unread')}
-        />
-        <ChipBtn label="그룹" active={tab === 'group'} onClick={() => setTab('group')} />
-        <ChipBtn label="1:1" active={tab === 'direct'} onClick={() => setTab('direct')} />
-        <ChipBtn label="채널" active={tab === 'channel'} onClick={() => setTab('channel')} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: 'var(--m-card)',
+          borderBottom: '1px solid var(--m-border)',
+          paddingRight: 12,
+        }}
+      >
+        <div
+          className="m-chip-bar"
+          role="tablist"
+          aria-label="채팅 필터"
+          style={{
+            flex: 1,
+            borderBottom: 0,
+            paddingRight: 8,
+          }}
+        >
+          <ChipBtn label="채팅" active={tab === 'chat'} onClick={() => setTab('chat')} />
+          <ChipBtn label="조직도" active={tab === 'org'} onClick={() => setTab('org')} />
+          <ChipBtn
+            label={`읽지않음 ${totalUnread}`}
+            active={tab === 'unread'}
+            onClick={() => setTab('unread')}
+          />
+          <ChipBtn label="그룹" active={tab === 'group'} onClick={() => setTab('group')} />
+          <ChipBtn label="1:1" active={tab === 'direct'} onClick={() => setTab('direct')} />
+        </div>
+        <button
+          className="msm-ibtn"
+          type="button"
+          onClick={() => setSearchOpen((prev) => !prev)}
+          aria-label="검색"
+          style={{ flexShrink: 0 }}
+        >
+          <MIcon name="search" size={20} />
+        </button>
       </div>
       <div className="m-scroll" ref={scrollContainerRef} style={{ overscrollBehaviorY: 'contain' }}>
         {tab === 'org' ? (
@@ -220,16 +228,44 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                 }
               />
             )}
-            {filtered.map((room, i) => (
-              <RoomRow
-                key={room.id}
-                room={room}
-                userId={userId}
-                staffs={staffs}
-                last={i === filtered.length - 1}
-                onClick={() => onOpen(String(room.id))}
-              />
-            ))}
+            {(() => {
+              const pinned = filtered.filter((r) => r.type === 'notice' || String(r.id) === NOTICE_ROOM_ID);
+              const rest = filtered.filter((r) => r.type !== 'notice' && String(r.id) !== NOTICE_ROOM_ID);
+              return (
+                <>
+                  {pinned.length > 0 && (
+                    <>
+                      <div className="msm-sec"><div className="msm-sec-t">고정</div></div>
+                      {pinned.map((room, i) => (
+                        <RoomRow
+                          key={room.id}
+                          room={room}
+                          userId={userId}
+                          staffs={staffs}
+                          last={i === pinned.length - 1}
+                          onClick={() => onOpen(String(room.id))}
+                        />
+                      ))}
+                    </>
+                  )}
+                  {rest.length > 0 && (
+                    <>
+                      <div className="msm-sec"><div className="msm-sec-t">대화</div></div>
+                      {rest.map((room, i) => (
+                        <RoomRow
+                          key={room.id}
+                          room={room}
+                          userId={userId}
+                          staffs={staffs}
+                          last={i === rest.length - 1}
+                          onClick={() => onOpen(String(room.id))}
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -272,6 +308,22 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
     '';
   const ts = formatChatTimestamp(room.last_message_at || room.created_at);
   const unread = room.unread_count || 0;
+  const memberCount = Array.isArray(room.members) ? room.members.length : 0;
+
+  const memberIds = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  const selfRoom = isSelfChatRoom(room, userId);
+  const isGroup = isGroupChatRoom(room);
+  const isNotice = String(room.id) === NOTICE_ROOM_ID;
+  const peer =
+    !isGroup && !isNotice && room.type === 'direct'
+      ? selfRoom
+        ? staffs.find((s) => String(s.id) === String(userId))
+        : memberIds
+            .map((memberId) => staffs.find((s) => String(s.id) === String(memberId)))
+            .find((staff) => Boolean(staff) && String(staff!.id) !== String(userId)) || null
+      : null;
+  const peerPhotoUrl = peer ? peer.photo_url || peer.avatar_url : null;
+  const peerName = peer ? peer.name : '';
 
   return (
     <button
@@ -290,7 +342,26 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
         textAlign: 'left',
       }}
     >
-      <MAvatar tone={tone}>{title.charAt(0) || '방'}</MAvatar>
+      <MAvatar tone={tone}>
+        {isNotice ? (
+          <MIcon name="bell" size={16} color="#fff" />
+        ) : peerPhotoUrl ? (
+          <img
+            src={peerPhotoUrl}
+            alt={peerName || title}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 'inherit',
+            }}
+          />
+        ) : isGroup ? (
+          <span>{getGroupChatRoomBadgeText(title)}</span>
+        ) : (
+          <span>{title.charAt(0) || '방'}</span>
+        )}
+      </MAvatar>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span
@@ -301,11 +372,18 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              flex: '0 1 auto',
+              minWidth: 0,
             }}
           >
             {title}
           </span>
-          <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>
+          {memberCount > 0 && (
+            <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>
+              {memberCount}명
+            </span>
+          )}
+          <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0, marginLeft: 'auto' }}>
             {kind}
           </span>
         </div>
@@ -327,21 +405,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
         {unread > 0 && (
-          <span
-            aria-label={`안 읽음 ${unread}건`}
-            style={{
-              minWidth: 18,
-              height: 18,
-              padding: '0 5px',
-              background: 'var(--m-accent)',
-              color: '#fff',
-              borderRadius: 999,
-              fontSize: 10,
-              fontWeight: 800,
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
+          <span className="msm-unread" aria-label={`안 읽음 ${unread}건`}>
             {unread > 99 ? '99+' : unread}
           </span>
         )}
@@ -363,8 +427,6 @@ function OrgPlaceholder() {
       }}
     >
       조직도 탐색은 곧 추가됩니다.
-      <br />
-      새 대화 시작은 우상단 ✎ 버튼을 사용하세요.
     </div>
   );
 }

@@ -28,7 +28,7 @@ function MAvatarBase({ tone = 'blue', size = 'default', children, className }: M
   ]
     .filter(Boolean)
     .join(' ');
-  return <div className={classes} aria-hidden="true">{children}</div>;
+  return <div className={classes} aria-hidden="true" style={{ overflow: 'hidden' }}>{children}</div>;
 }
 
 const MAvatar = memo(MAvatarBase);

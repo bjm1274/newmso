@@ -4,24 +4,28 @@
  * JM4: 판별 가능한 유니온으로 타입 안정성
  */
 
-export type MTab = 'home' | 'chat' | 'board' | 'approval' | 'more';
+export type MTab = 'notif' | 'mypage' | 'addon' | 'chat' | 'board' | 'approval' | 'hr' | 'stock' | 'admin';
 
-export type MHomeSub = 'attend' | 'todo' | 'docs' | 'alert';
+export type MHomeSub = 'attend' | 'leave' | 'payslip' | 'cert' | 'edit';
 
 export type MRoute =
-  | { tab: 'home'; sub?: MHomeSub }
+  | { tab: 'notif' }
+  | { tab: 'mypage'; sub?: MHomeSub }
+  | { tab: 'addon' }
   | { tab: 'chat' }
   | { tab: 'board' }
   | { tab: 'approval' }
-  | { tab: 'more' };
+  | { tab: 'hr' }
+  | { tab: 'stock' }
+  | { tab: 'admin' };
 
-export function isHomeSub(route: MRoute): route is { tab: 'home'; sub: MHomeSub } {
-  return route.tab === 'home' && typeof route.sub === 'string';
+export function isHomeSub(route: MRoute): route is { tab: 'mypage'; sub: MHomeSub } {
+  return route.tab === 'mypage' && typeof route.sub === 'string';
 }
 
 export function routeKey(route: MRoute): string {
-  if (route.tab === 'home') {
-    return route.sub ? `home/${route.sub}` : 'home';
+  if (route.tab === 'mypage') {
+    return route.sub ? `mypage/${route.sub}` : 'mypage';
   }
   return route.tab;
 }
