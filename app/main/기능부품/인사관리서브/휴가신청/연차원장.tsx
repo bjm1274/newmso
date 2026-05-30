@@ -110,7 +110,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         if (auditError) throw auditError;
         if (balanceError) throw balanceError;
 
-        const leaveIds = new Set((data || []).map((row) => String(row.id)));
+        const leaveIds = new Set((data || []).map((row: any) => String(row.id)));
         const nextRollbackAudits = ((auditData || []) as LeaveRollbackAuditRow[]).filter((row) => {
           const auditedStaffId = String(row.details?.staff_id || '');
           return leaveIds.has(String(row.target_id || '')) || staffIds.includes(auditedStaffId);

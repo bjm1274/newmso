@@ -198,8 +198,8 @@ export default function AttendanceCorrectionForm({
           .filter(Boolean)
       );
 
-      const attendanceByDate = new Map((attendanceRows || []).map((item: any) => [item.date, item]));
-      const attendancesByDate = new Map((attendancesRows || []).map((item: any) => [item.work_date, item]));
+      const attendanceByDate = new Map<string, any>((attendanceRows || []).map((item: any) => [item.date, item]));
+      const attendancesByDate = new Map<string, any>((attendancesRows || []).map((item: any) => [item.work_date, item]));
       const nextProblemDates = new Map<string, ProblemDateItem>();
 
       for (let offset = 0; offset <= 60; offset += 1) {

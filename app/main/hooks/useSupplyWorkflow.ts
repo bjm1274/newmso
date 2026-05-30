@@ -69,7 +69,13 @@ export function useSupplyWorkflow({
     try {
       const [{ data: approvalsData, error: approvalsError }, { data: supportInventoryRows, error: inventoryError }] =
         await Promise.all([
-          supabase.from('approvals').select('*').eq('type', '물품신청').eq('status', '승인').order('created_at', { ascending: false }),
+          supabase
+            .from('approvals')
+            .select('*')
+            .eq('type', '물품신청')
+            .eq('status', '승인')
+            .order('created_at', { ascending: false })
+            .returns<any[]>(),
           fetchSupportInventoryRows(),
         ]);
       if (approvalsError) { console.error('승인된 물품신청 처리 목록 로드 실패:', { source: 'approvals', ...normalizeQueryError(approvalsError) }); setPendingSupplyApprovals([]); setCompletedSupplyApprovals([]); return; }

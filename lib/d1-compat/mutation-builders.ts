@@ -48,7 +48,7 @@ async function executeMutate<T>(body: {
 // ─────────────────────────────────────────────────────────────
 // InsertBuilder
 // ─────────────────────────────────────────────────────────────
-export class InsertBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
+export class InsertBuilder<T = any> implements PromiseLike<QueryResult<T>> {
   private state: InsertState;
   constructor(state: InsertState) {
     this.state = state;
@@ -100,7 +100,7 @@ export class InsertBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 // ─────────────────────────────────────────────────────────────
 // UpdateBuilder
 // ─────────────────────────────────────────────────────────────
-export class UpdateBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
+export class UpdateBuilder<T = any> implements PromiseLike<QueryResult<T>> {
   private state: UpdateState;
   constructor(state: UpdateState) {
     this.state = state;
@@ -142,6 +142,14 @@ export class UpdateBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
   }
   gte(field: string, value: unknown): this {
     this.state.where.push({ field, op: 'gte', value });
+    return this;
+  }
+  filter(field: string, op: string, value: unknown): this {
+    const mappedOp = op === 'eq' ? 'eq' : op === 'in' ? 'in' : 'eq';
+    const parsedVal = op === 'in' && typeof value === 'string' && value.startsWith('(') && value.endsWith(')')
+      ? value.slice(1, -1).split(',').map(s => s.trim().replace(/^'|'$/g, ''))
+      : value;
+    this.state.where.push({ field, op: mappedOp as any, value: parsedVal });
     return this;
   }
 
@@ -190,7 +198,7 @@ export class UpdateBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 // ─────────────────────────────────────────────────────────────
 // DeleteBuilder
 // ─────────────────────────────────────────────────────────────
-export class DeleteBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
+export class DeleteBuilder<T = any> implements PromiseLike<QueryResult<T>> {
   private state: DeleteState;
   constructor(state: DeleteState) {
     this.state = state;

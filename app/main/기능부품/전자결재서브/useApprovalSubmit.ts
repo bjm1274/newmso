@@ -456,7 +456,7 @@ export function useApprovalSubmit({
       return true;
     }
 
-    const duplicate = (data || []).find((item) => normalizeDuplicateApprovalTitle(item.title) === normalizedTitle);
+    const duplicate = (data || []).find((item: any) => normalizeDuplicateApprovalTitle(item.title) === normalizedTitle);
     if (!duplicate) return true;
 
     const metaData = duplicate.meta_data as ApprovalRecord | null | undefined;

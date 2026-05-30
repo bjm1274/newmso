@@ -8,20 +8,20 @@ export interface ApiError {
   code?: string;
   details?: string;
 }
-
-export type QueryResult<T = unknown> =
+export type QueryResult<T = any> =
   | { data: T; error: null; count?: number }
   | { data: null; error: ApiError; count?: number };
 
 export interface WhereCondition {
   field: string;
-  op: 'eq' | 'neq' | 'in' | 'lt' | 'gt' | 'lte' | 'gte' | 'is' | 'isNot' | 'like' | 'ilike';
+  op: 'eq' | 'neq' | 'in' | 'lt' | 'gt' | 'lte' | 'gte' | 'is' | 'isNot' | 'like' | 'ilike' | 'contains';
   value: unknown;
 }
 
 export interface OrderCondition {
   field: string;
   ascending?: boolean;
+  nullsFirst?: boolean;
 }
 
 export interface QueryState {

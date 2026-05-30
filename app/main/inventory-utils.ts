@@ -609,7 +609,8 @@ export async function processInventoryIssue({
         .from('inventory')
         .select('id, item_name, quantity, stock, company, department, category, spec, min_quantity')
         .eq('company', destinationCompany)
-        .eq('item_name', getItemName(sourceItem));
+        .eq('item_name', getItemName(sourceItem))
+        .returns<any[]>();
 
       destinationItem = findDestinationInventoryItem(remoteRows || [], sourceItem, destinationCompany, destinationDept);
     }
@@ -905,7 +906,12 @@ export async function reverseInventoryIssue({
   const srcErr = reverseResp.ok ? null : { message: reverseResp.error };
   if (srcErr) {
     // RPC 미등록 fallback
-    const { data: srcRow } = await supabase.from('inventory').select('quantity, stock').eq('id', sourceItemId).single();
+    const { data: srcRow } = await supabase
+      .from('inventory')
+      .select('quantity, stock')
+      .eq('id', sourceItemId)
+      .single()
+      .returns<any>();
     const curQty = Number(srcRow?.quantity ?? srcRow?.stock ?? 0);
     const { error } = await supabase.from('inventory').update({ quantity: curQty + reverseQty, stock: curQty + reverseQty }).eq('id', sourceItemId);
     if (error) throw error;
@@ -916,7 +922,8 @@ export async function reverseInventoryIssue({
     .from('inventory')
     .select('id, quantity, stock, item_name')
     .eq('company', destinationCompany)
-    .eq('item_name', itemName);
+    .eq('item_name', itemName)
+    .returns<any[]>();
 
   const destItem = (destRows || []).find((r: LooseRecord) =>
     String(r.department || '').trim() === destinationDept.trim() ||

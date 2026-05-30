@@ -92,7 +92,7 @@ export default function DocsSubmSummary() {
 
         const items: SubmRow[] = [];
         for (const s of staffList) {
-          const staffDocs = repoDocs.filter((d) => String(d.created_by) === String(s.id));
+          const staffDocs = repoDocs.filter((d: any) => String(d.created_by) === String(s.id));
           const hireDate = s.join_date || s.joined_at;
 
           // Calculate due date (join_date + 7 days)
@@ -111,7 +111,7 @@ export default function DocsSubmSummary() {
 
           for (const doc of REQUIRED_DOCS) {
             const isSubmitted = staffDocs.some(
-              (d) => d.category === doc.id || d.category === doc.label
+              (d: any) => d.category === doc.id || d.category === doc.label
             );
 
             if (!isSubmitted) {

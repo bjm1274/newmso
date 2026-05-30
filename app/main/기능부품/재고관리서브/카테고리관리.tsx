@@ -123,7 +123,7 @@ export default function CategoryManager({ user }: { user: any }) {
 
   const importFromInventory = async () => {
     const { data } = await supabase.from('inventory').select('category').not('category', 'is', null);
-    const cats = Array.from(new Set((data || []).map((r: any) => r.category).filter(Boolean)));
+    const cats = Array.from(new Set((data || []).map((r: any) => r.category).filter(Boolean))) as string[];
     const existing = categories.map(c => c.name);
     const newCats = cats.filter(c => !existing.includes(c));
     if (newCats.length === 0) return toast('새로 추가할 카테고리가 없습니다.');

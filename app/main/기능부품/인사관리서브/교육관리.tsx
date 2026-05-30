@@ -181,7 +181,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
         .sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number));
 
       const nextLicenseAlerts: LicenseAlert[] = licenseRows
-        .map((license): LicenseAlert | null => {
+        .map((license: any): LicenseAlert | null => {
           const matchedStaff = staffMap.get(String(license.staff_id));
           if (!matchedStaff || !license.expiry_date) return null;
           const daysLeft = Math.ceil((new Date(String(license.expiry_date)).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -197,8 +197,8 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
             type: daysLeft <= 30 ? 'URGENT' : 'PENDING',
           };
         })
-        .filter((x): x is LicenseAlert => x !== null)
-        .sort((a, b) => a.daysLeft - b.daysLeft);
+        .filter((x: LicenseAlert | null): x is LicenseAlert => x !== null)
+        .sort((a: LicenseAlert, b: LicenseAlert) => a.daysLeft - b.daysLeft);
 
       setCompletionMap(nextCompletionMap);
       setNotifications(educationAlerts as Record<string, unknown>[]);

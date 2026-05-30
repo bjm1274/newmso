@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -865,7 +865,7 @@ export default function NotificationSystem({
   const syncBadge = useCallback(async () => {
     if (!effectiveUserId) return;
     const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', effectiveUserId).is('read_at', null);
-    if (count !== null) { setUnreadCount(count); setAppBadge(count); }
+    if (typeof count === 'number') { setUnreadCount(count); setAppBadge(count); }
   }, [effectiveUserId]);
 
   const removeToast = useCallback((id: string) => {

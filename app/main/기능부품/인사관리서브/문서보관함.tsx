@@ -71,15 +71,15 @@ export default function DocumentRepository({
     const [{ data: repositoryDocs }, { data: approvalDocs }] = await Promise.all([repositoryQuery, approvalsQuery]);
     const existingDocNumbers = new Set(
       (repositoryDocs || [])
-        .map((doc) => extractApprovalDocNumberFromDocument(doc as Record<string, unknown>))
+        .map((doc: any) => extractApprovalDocNumberFromDocument(doc as Record<string, unknown>))
         .filter(Boolean)
     );
     const approvalArchiveDocs = (approvalDocs || [])
-      .map((approval) => mapApprovalToDocumentRepositoryEntry(approval as Record<string, unknown>))
-      .filter((approvalDoc) => {
+      .map((approval: any) => mapApprovalToDocumentRepositoryEntry(approval as Record<string, unknown>))
+      .filter((approvalDoc: any) => {
         const approvalDocNumber = extractApprovalDocNumberFromDocument(approvalDoc);
         if (approvalDocNumber && existingDocNumbers.has(approvalDocNumber)) return false;
-        return !(repositoryDocs || []).some((doc) =>
+        return !(repositoryDocs || []).some((doc: any) =>
           String(doc.title || '').trim() === String(approvalDoc.title || '').trim() &&
           String(doc.created_by || '').trim() === String(approvalDoc.created_by || '').trim() &&
           String(doc.company_name || '').trim() === String(approvalDoc.company_name || '').trim()

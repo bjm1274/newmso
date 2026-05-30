@@ -58,6 +58,7 @@ const WhereSchema = z.object({
 const OrderSchema = z.object({
   field: z.string().regex(COLUMN_RE),
   ascending: z.boolean().optional(),
+  nullsFirst: z.boolean().optional(),
 });
 
 const PayloadSchema = z.object({
@@ -149,6 +150,10 @@ function buildWhereSql(where: Payload['where']): SQL[] {
       } else {
         out.push(sql`${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)})`);
       }
+    } else if (cond.op === 'contains') {
+      const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const literal = jsonStr.startsWith('[') && jsonStr.endsWith(']') ? jsonStr.slice(1, -1) : jsonStr;
+      out.push(sql`${col} LIKE ${`%${literal}%`}`);
     }
   }
   return out;
@@ -183,6 +188,11 @@ function buildFilterNodeSql(node: FilterNode): SQL {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) return sql`(1 = 0)`;
       return sql`(${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)}))`;
+    }
+    if (op === 'contains') {
+      const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const literal = jsonStr.startsWith('[') && jsonStr.endsWith(']') ? jsonStr.slice(1, -1) : jsonStr;
+      return sql`(${col} LIKE ${`%${literal}%`})`;
     }
     // 미지원 op — 방어적으로 false 반환
     return sql`(1 = 0)`;
@@ -262,11 +272,16 @@ function buildSelectSql(payload: Payload): SQL {
   const orderSql =
     payload.order && payload.order.length > 0
       ? sql` ORDER BY ${sql.join(
-          payload.order.map((o) =>
-            o.ascending === false
-              ? sql`${sql.identifier(o.field)} DESC`
-              : sql`${sql.identifier(o.field)} ASC`,
-          ),
+          payload.order.map((o) => {
+            const dir = o.ascending === false ? 'DESC' : 'ASC';
+            const nulls =
+              o.nullsFirst === true
+                ? ' NULLS FIRST'
+                : o.nullsFirst === false
+                ? ' NULLS LAST'
+                : '';
+            return sql`${sql.identifier(o.field)} ${sql.raw(dir + nulls)}`;
+          }),
           sql`, `,
         )}`
       : sql.raw('');

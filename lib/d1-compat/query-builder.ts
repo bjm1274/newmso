@@ -42,7 +42,7 @@ async function executeQuery<T>(state: QueryState): Promise<QueryResult<T>> {
   }
 }
 
-export class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
+export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
   private state: QueryState;
 
   constructor(state: QueryState) {
@@ -109,6 +109,10 @@ export class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     this.state.where.push({ field, op: 'ilike', value: pattern });
     return this;
   }
+  contains(field: string, value: unknown): this {
+    this.state.where.push({ field, op: 'contains', value });
+    return this;
+  }
 
   /**
    * .or('a.eq.1,b.eq.2') — PostgREST 스타일 OR 필터.
@@ -127,8 +131,12 @@ export class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     return this;
   }
 
-  order(field: string, options?: { ascending?: boolean }): this {
-    this.state.order.push({ field, ascending: options?.ascending });
+  order(field: string, options?: { ascending?: boolean; nullsFirst?: boolean }): this {
+    this.state.order.push({
+      field,
+      ascending: options?.ascending,
+      nullsFirst: options?.nullsFirst,
+    });
     return this;
   }
 

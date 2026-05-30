@@ -179,7 +179,7 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
         const { data } = await query;
         if (cancelled) return;
         const next = buildSupplyRequestMonthlySuggestions(
-          (data || []).filter((r) => String(r?.status || '').trim() !== '반려'),
+          (data || []).filter((r: any) => String(r?.status || '').trim() !== '반려'),
           MONTHLY_STATS_FETCH_LIMIT,
         );
         setMonthlySuggestions(next);

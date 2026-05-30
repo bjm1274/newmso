@@ -78,7 +78,7 @@ export default function DocsStoreSummary() {
         }
 
         setRows(
-          repoList.map((r) => {
+          repoList.map((r: any) => {
             const cat = String(r.category ?? '기타');
             const sec = cat === '근로계약서' ? '대외비' : '일반';
             return {

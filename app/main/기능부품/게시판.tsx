@@ -950,7 +950,12 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         if (!d1Ok) {
           const { error: rpcErr } = await supabase.rpc('increment_post_views', { p_post_id: selectedPostId });
           if (rpcErr) {
-            const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
+            const { data: row } = await supabase
+              .from('board_posts')
+              .select('views')
+              .eq('id', selectedPostId)
+              .maybeSingle()
+              .returns<any>();
             const nextViews = ((row?.views ?? 0) as number) + 1;
             await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
           }

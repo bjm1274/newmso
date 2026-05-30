@@ -34,8 +34,8 @@ export async function fetchCompanyOptions(): Promise<string[]> {
 
       if (!error && companyRows && companyRows.length > 0) {
         return companyRows
-          .map((row) => row.name as string | null)
-          .filter((name): name is string => Boolean(name));
+          .map((row: any) => row.name as string | null)
+          .filter((name: any): name is string => Boolean(name));
       }
 
       const { data: staffRows } = await supabase
@@ -44,8 +44,8 @@ export async function fetchCompanyOptions(): Promise<string[]> {
       const names = Array.from(
         new Set(
           (staffRows ?? [])
-            .map((row) => row.company as string | null)
-            .filter((name): name is string => Boolean(name)),
+            .map((row: any) => row.company as string | null)
+            .filter((name: any): name is string => Boolean(name)),
         ),
       );
       return names.sort();

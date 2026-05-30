@@ -1005,7 +1005,7 @@ export default function ChatView({
           createdAt: String(row.created_at || '').trim(),
           unread: !row.read_at,
         } satisfies MessengerMentionInboxItem;
-      }).filter((item) => item.id && item.roomId && item.messageId);
+      }).filter((item: MessengerMentionInboxItem) => item.id && item.roomId && item.messageId);
 
       setMentionInboxItems(nextItems);
     } catch {
@@ -1072,14 +1072,14 @@ export default function ChatView({
             followed,
           } satisfies MessengerThreadInboxItem;
         })
-        .filter((item): item is MessengerThreadInboxItem => Boolean(item?.id && item.roomId && item.messageId))
-        .reduce<MessengerThreadInboxItem[]>((acc, item) => {
+        .filter((item: MessengerThreadInboxItem | null): item is MessengerThreadInboxItem => Boolean(item?.id && item.roomId && item.messageId))
+        .reduce((acc: MessengerThreadInboxItem[], item: MessengerThreadInboxItem) => {
           if (acc.some((entry) => entry.threadRootId === item.threadRootId && entry.roomId === item.roomId)) {
             return acc;
           }
           acc.push(item);
           return acc;
-        }, [])
+        }, [] as MessengerThreadInboxItem[])
         .slice(0, 8);
 
       setThreadInboxItems(nextItems);

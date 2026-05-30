@@ -88,7 +88,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setReports(
-        (data || []).map((row) => ({
+        (data || []).map((row: any) => ({
           ...row,
           involved_persons: normalizeInvolvedPersons(row.involved_persons),
         }))

@@ -140,6 +140,10 @@ function buildWhereSql(where: { field: string; op: string; value: unknown }[]): 
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) out.push(sql`1 = 0`);
       else out.push(sql`${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)})`);
+    } else if (cond.op === 'contains') {
+      const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const literal = jsonStr.startsWith('[') && jsonStr.endsWith(']') ? jsonStr.slice(1, -1) : jsonStr;
+      out.push(sql`${col} LIKE ${`%${literal}%`}`);
     }
   }
   return out;

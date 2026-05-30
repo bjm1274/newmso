@@ -647,7 +647,7 @@ export function useChatRoomDataSync({
         });
       });
 
-      const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
+      const missingPinnedIds = nextPinnedIds.filter((messageId: string) => !pinnedLookup.has(messageId));
       if (missingPinnedIds.length > 0) {
         const { data: missingPinnedRows, error: missingPinnedRowsError } =
           await selectChatMessagesWithFallback<ChatMessage[]>(
@@ -672,8 +672,8 @@ export function useChatRoomDataSync({
 
       setPersistedPinnedMessages(
         nextPinnedIds
-          .map((messageId) => pinnedLookup.get(messageId))
-          .filter((message): message is ChatMessage => Boolean(message)),
+          .map((messageId: string) => pinnedLookup.get(messageId))
+          .filter((message: ChatMessage | undefined): message is ChatMessage => Boolean(message)),
       );
     } catch (error) {
       console.error('pinned messages query failed:', error);
@@ -1055,7 +1055,7 @@ export function useChatRoomDataSync({
                 });
               });
 
-              const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
+              const missingPinnedIds = nextPinnedIds.filter((messageId: string) => !pinnedLookup.has(messageId));
               if (missingPinnedIds.length > 0) {
                 const { data: missingPinnedRows, error: missingPinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
                   (selectClause) =>
@@ -1080,8 +1080,8 @@ export function useChatRoomDataSync({
 
               setPersistedPinnedMessages(
                 nextPinnedIds
-                  .map((messageId) => pinnedLookup.get(messageId))
-                  .filter((message): message is ChatMessage => Boolean(message)),
+                  .map((messageId: string) => pinnedLookup.get(messageId))
+                  .filter((message: ChatMessage | undefined): message is ChatMessage => Boolean(message)),
               );
             } else {
               setPersistedPinnedMessages([]);

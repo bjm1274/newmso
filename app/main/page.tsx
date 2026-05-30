@@ -538,6 +538,7 @@ function MainPageContent() {
             .from('companies')
             .select('id, name, type')
             .eq('is_active', true)
+            .returns<any[]>()
             .then(({ data: list, error }) => {
               if (error) {
                 logger.error('companies 조회 오류:', error);
@@ -605,7 +606,8 @@ function MainPageContent() {
           .from('system_configs')
           .select('value')
           .eq('key', 'min_auth_time')
-          .single();
+          .single()
+          .returns<any>();
 
         if (config?.value) {
           const minAuthTime = new Date(config.value).getTime();

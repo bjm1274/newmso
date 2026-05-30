@@ -560,7 +560,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const handleApproveEss = async (request: Record<string, unknown>) => {
     try {
-      const updates = (request.details as Record<string, unknown>)?.requested_changes;
+      const updates = (request.details as Record<string, unknown>)?.requested_changes as Record<string, unknown>;
       // 1. 실제 직원 정보 업데이트
       await supabase.from('staff_members').update(updates).eq('id', request.target_id);
       // 2. 요청 상태 변경
@@ -797,7 +797,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     if (error) throw error;
 
-    return (data || []).find((staff) => {
+    return (data || []).find((staff: any) => {
       if (excludeId != null && String(staff.id) === String(excludeId)) return false;
       return normalizeResidentNo(String(staff.resident_no || '')) === normalizedResident;
     }) || null;

@@ -1,6 +1,5 @@
 'use client';
 
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildChatMessageSelect, CHAT_MESSAGE_OPTIONAL_COLUMNS } from '@/lib/chat-query-columns';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import type { ChatRoom } from '@/types';
@@ -10,9 +9,9 @@ import {
   normalizeMemberIds,
 } from './메신저유틸';
 
-// `supabase`(lib/supabase.ts) 프록시는 SupabaseClient 형태로 노출되며
-// 런타임에 D1으로 라우팅된다. from()만 사용하는 최소 구조적 타입.
-type ChatDataClient = Pick<SupabaseClient<any, any, any>, 'from'>;
+type ChatDataClient = {
+  from: (table: string) => any;
+};
 
 type SelectChatMessagesExecutor<TData> = (params: {
   omittedColumns: ReadonlySet<string>;

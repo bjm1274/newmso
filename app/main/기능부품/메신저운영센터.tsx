@@ -197,7 +197,7 @@ export default function MessengerOperationsCenter({
             .eq('room_id', NOTICE_ROOM_ID)
             .in('user_id', activeStaffs.map((staff) => String(staff.id)));
           setNoticeReadCursors(
-            (readCursors || []).map((cursor) => ({
+            (readCursors || []).map((cursor: any) => ({
               user_id: String(cursor.user_id || ''),
               last_read_at: typeof cursor.last_read_at === 'string' ? cursor.last_read_at : null,
             }))

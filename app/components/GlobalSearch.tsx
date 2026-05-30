@@ -135,13 +135,15 @@ export default function GlobalSearch({
             .select('id, title, content, board_type')
             .ilike('title', likeTerm)
             .order('created_at', { ascending: false })
-            .limit(5),
+            .limit(5)
+            .returns<any[]>(),
           supabase
             .from('board_posts')
             .select('id, title, content, board_type')
             .ilike('content', likeTerm)
             .order('created_at', { ascending: false })
-            .limit(5),
+            .limit(5)
+            .returns<any[]>(),
         ]);
 
         const seenPostIds = new Set(
@@ -174,13 +176,15 @@ export default function GlobalSearch({
           .from('approvals')
           .select('id, title, type, status, sender_name')
           .ilike('title', likeTerm)
-          .limit(5);
+          .limit(5)
+          .returns<any[]>();
 
         const { data: approvalsByContent } = await supabase
           .from('approvals')
           .select('id, title, type, status, sender_name')
           .ilike('content', likeTerm)
-          .limit(5);
+          .limit(5)
+          .returns<any[]>();
 
         const approvalMap = new Map<string, any>();
         [...(approvalsByTitle || []), ...(approvalsByContent || [])].forEach((approval: any) => {
@@ -203,7 +207,8 @@ export default function GlobalSearch({
             .from('chat_rooms')
             .select('id')
             .contains('members', [user.id])
-            .limit(200);
+            .limit(200)
+            .returns<any[]>();
 
           const roomIds = (myRooms || []).map((room: any) => room.id).filter(Boolean);
           if (roomIds.length > 0) {
@@ -214,7 +219,8 @@ export default function GlobalSearch({
               .ilike('content', likeTerm)
               .eq('is_deleted', false)
               .order('created_at', { ascending: false })
-              .limit(5);
+              .limit(5)
+              .returns<any[]>();
 
             (messages || []).forEach((message: any) => {
               nextResults.push({
@@ -233,7 +239,8 @@ export default function GlobalSearch({
             .select('id, content, author_name, created_at')
             .ilike('content', likeTerm)
             .order('created_at', { ascending: false })
-            .limit(5);
+            .limit(5)
+            .returns<any[]>();
 
           (notes || []).forEach((note: any) => {
             const normalized = normalizeHandoverNote(note as HandoverNoteRow);

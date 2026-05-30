@@ -67,7 +67,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
             .order('created_at', { ascending: false });
 
         if (repositoryDocs) {
-            setMyDocs(repositoryDocs.filter(d => d.created_by === _user.id));
+            setMyDocs(repositoryDocs.filter((d: any) => d.created_by === _user.id));
             if (isAdmin) setAllDocs(repositoryDocs);
         }
     };
@@ -254,7 +254,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
 
                 const isLazyStaff = (s: StaffRow) => {
                     const joinDate = new Date(s.join_date ?? '');
-                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
+                    const staffDocs = allDocs.filter((d: any) => d.created_by === s.id);
                     return joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
                 };
 
@@ -309,8 +309,8 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                     );
                                 }}
                                 renderCell={(s, col) => {
-                                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
-                                    const sub = staffDocs.find((d) => d.category === col.data.id);
+                                    const staffDocs = allDocs.filter((d: any) => d.created_by === s.id);
+                                    const sub = staffDocs.find((d: any) => d.category === col.data.id);
                                     if (sub) {
                                         return (
                                             <button
@@ -335,13 +335,13 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                     );
                                 }}
                                 cellTone={(s, col): MatrixCellTone => {
-                                    const staffDocs = allDocs.filter((d) => d.created_by === s.id);
-                                    const sub = staffDocs.find((d) => d.category === col.data.id);
+                                    const staffDocs = allDocs.filter((d: any) => d.created_by === s.id);
+                                    const sub = staffDocs.find((d: any) => d.category === col.data.id);
                                     if (sub) return 'ok';
                                     return isLazyStaff(s) ? 'danger' : 'normal';
                                 }}
                                 rowSummary={(s) => {
-                                    const submitted = allDocs.filter((d) => d.created_by === s.id).length;
+                                    const submitted = allDocs.filter((d: any) => d.created_by === s.id).length;
                                     return (
                                         <span className={submitted >= REQUIRED_DOCS.length ? 'text-emerald-600' : isLazyStaff(s) ? 'text-rose-500' : 'text-[var(--toss-gray-4)]'}>
                                             {submitted}/{REQUIRED_DOCS.length}

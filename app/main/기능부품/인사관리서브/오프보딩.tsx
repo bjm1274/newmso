@@ -246,7 +246,7 @@ export default function OffboardingView({
       }
 
       const names: Record<string, string[]> = {};
-      (data ?? []).forEach((row) => {
+      (data ?? []).forEach((row: any) => {
         const record = row as { staff_id: unknown; license_name: unknown; license_type: unknown };
         const id = String(record.staff_id ?? '');
         if (!id) return;

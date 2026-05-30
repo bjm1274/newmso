@@ -275,9 +275,9 @@ export function useChatWorkflowDrafts({
 
       if (staffError) throw staffError;
 
-      const winners: PollPrizeWinner[] = selectedIds.map((id) => {
+      const winners: PollPrizeWinner[] = (selectedIds as string[]).map((id) => {
         const found = (staffRows ?? []).find((s: { id: unknown; name: unknown }) => String(s.id) === id);
-        return { id, name: String(found?.name || '알 수 없음') };
+        return { id, name: String(found?.name || '알 수 없음') } as PollPrizeWinner;
       });
 
       const { deadlineAt } = extractPollMetaFromQuestion(poll.question);

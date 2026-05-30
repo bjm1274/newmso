@@ -69,7 +69,7 @@ export default function AnnualLeavePromotion({
       .select('staff_id, stage, expiry_date');
     if (data) {
       const keys = new Set<SentKey>(
-        data.map((row) => `${row.staff_id}|${row.stage}|${row.expiry_date}`),
+        data.map((row: any) => `${row.staff_id}|${row.stage}|${row.expiry_date}`),
       );
       setSentKeys(keys);
     }
