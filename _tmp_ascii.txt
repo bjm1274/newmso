@@ -1,0 +1,102 @@
+'use client';
+
+/**
+ *    7 view .
+ *
+ *  :
+ *   < user={user} onBack={() => ...} />
+ *
+ *  view:
+ *   'stock' | 'io' | 'item' | 'analyze' | 'form-item' | 'form-asset' | 'form-order'
+ *
+ *  :
+ *  - 4   (stock/io/item/analyze)   .
+ *  -   stock/io/item,    .
+ *  - (stock)  onBack    ( home ).
+ *
+ * JM:  + /  , ~110
+ * JM4: StockView union, returnFrom union
+ */
+
+import { useCallback, useState } from 'react';
+import type { ErpUser } from '@/types';
+import  from './';
+import  from './';
+import  from './';
+import  from './';
+import  from './';
+import  from './';
+import  from './';
+
+export type StockView =
+  | 'stock'
+  | 'io'
+  | 'item'
+  | 'analyze'
+  | 'form-item'
+  | 'form-asset'
+  | 'form-order';
+
+type ReturnFrom = 'stock' | 'io' | 'item' | 'analyze';
+
+export type Props = {
+  user: ErpUser;
+  onBack: () => void;
+};
+
+export default function ({ user, onBack }: Props) {
+  const [view, setView] = useState<StockView>('stock');
+  //          
+  const [returnFrom, setReturnFrom] = useState<ReturnFrom>('stock');
+
+  const company = typeof user.company === 'string' ? user.company : undefined;
+
+  const openForm = useCallback(
+    (form: 'form-item' | 'form-asset' | 'form-order', from: ReturnFrom) => {
+      setReturnFrom(from);
+      setView(form);
+    },
+    [],
+  );
+
+  const exitForm = useCallback(() => {
+    setView(returnFrom);
+  }, [returnFrom]);
+
+  switch (view) {
+    case 'stock':
+      return (
+        <
+          company={company}
+          onBack={onBack}
+          onPlaceOrder={() => openForm('form-order', 'stock')}
+        />
+      );
+    case 'io':
+      return (
+        <
+          user={user}
+          onBack={onBack}
+          onPlaceOrder={() => openForm('form-order', 'io')}
+        />
+      );
+    case 'item':
+      return (
+        <
+          onBack={onBack}
+          onOpenItemForm={() => openForm('form-item', 'item')}
+          onOpenAssetForm={() => openForm('form-asset', 'item')}
+        />
+      );
+    case 'analyze':
+      return < company={company} onBack={onBack} />;
+    case 'form-item':
+      return < user={user} onBack={exitForm} />;
+    case 'form-asset':
+      return < user={user} onBack={exitForm} />;
+    case 'form-order':
+      return < user={user} onBack={exitForm} />;
+    default:
+      return null;
+  }
+}

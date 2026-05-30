@@ -1,0 +1,102 @@
+     1	'use client';
+     2	
+     3	/**
+     4	 *    7 view .
+     5	 *
+     6	 *  :
+     7	 *   < user={user} onBack={() => ...} />
+     8	 *
+     9	 *  view:
+    10	 *   'stock' | 'io' | 'item' | 'analyze' | 'form-item' | 'form-asset' | 'form-order'
+    11	 *
+    12	 *  :
+    13	 *  - 4   (stock/io/item/analyze)   .
+    14	 *  -   stock/io/item,    .
+    15	 *  - (stock)  onBack    ( home ).
+    16	 *
+    17	 * JM:  + /  , ~110
+    18	 * JM4: StockView union, returnFrom union
+    19	 */
+    20	
+    21	import { useCallback, useState } from 'react';
+    22	import type { ErpUser } from '@/types';
+    23	import  from './';
+    24	import  from './';
+    25	import  from './';
+    26	import  from './';
+    27	import  from './';
+    28	import  from './';
+    29	import  from './';
+    30	
+    31	export type StockView =
+    32	  | 'stock'
+    33	  | 'io'
+    34	  | 'item'
+    35	  | 'analyze'
+    36	  | 'form-item'
+    37	  | 'form-asset'
+    38	  | 'form-order';
+    39	
+    40	type ReturnFrom = 'stock' | 'io' | 'item' | 'analyze';
+    41	
+    42	export type Props = {
+    43	  user: ErpUser;
+    44	  onBack: () => void;
+    45	};
+    46	
+    47	export default function ({ user, onBack }: Props) {
+    48	  const [view, setView] = useState<StockView>('stock');
+    49	  //          
+    50	  const [returnFrom, setReturnFrom] = useState<ReturnFrom>('stock');
+    51	
+    52	  const company = typeof user.company === 'string' ? user.company : undefined;
+    53	
+    54	  const openForm = useCallback(
+    55	    (form: 'form-item' | 'form-asset' | 'form-order', from: ReturnFrom) => {
+    56	      setReturnFrom(from);
+    57	      setView(form);
+    58	    },
+    59	    [],
+    60	  );
+    61	
+    62	  const exitForm = useCallback(() => {
+    63	    setView(returnFrom);
+    64	  }, [returnFrom]);
+    65	
+    66	  switch (view) {
+    67	    case 'stock':
+    68	      return (
+    69	        <
+    70	          company={company}
+    71	          onBack={onBack}
+    72	          onPlaceOrder={() => openForm('form-order', 'stock')}
+    73	        />
+    74	      );
+    75	    case 'io':
+    76	      return (
+    77	        <
+    78	          user={user}
+    79	          onBack={onBack}
+    80	          onPlaceOrder={() => openForm('form-order', 'io')}
+    81	        />
+    82	      );
+    83	    case 'item':
+    84	      return (
+    85	        <
+    86	          onBack={onBack}
+    87	          onOpenItemForm={() => openForm('form-item', 'item')}
+    88	          onOpenAssetForm={() => openForm('form-asset', 'item')}
+    89	        />
+    90	      );
+    91	    case 'analyze':
+    92	      return < company={company} onBack={onBack} />;
+    93	    case 'form-item':
+    94	      return < user={user} onBack={exitForm} />;
+    95	    case 'form-asset':
+    96	      return < user={user} onBack={exitForm} />;
+    97	    case 'form-order':
+    98	      return < user={user} onBack={exitForm} />;
+    99	    default:
+   100	      return null;
+   101	  }
+   102	}
