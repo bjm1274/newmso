@@ -9,6 +9,7 @@
 
 import { memo, type ReactNode } from 'react';
 import MIcon from './MIcon';
+import MChip, { type MChipTone } from './MChip';
 
 export type MListRowTone = '' | 'accent' | 'success' | 'warning' | 'danger';
 
@@ -21,6 +22,8 @@ export type MListRowProps = {
   valUnit?: string;
   onClick?: () => void;
   ariaLabel?: string;
+  badge?: ReactNode;
+  badgeTone?: MChipTone;
   rightSlot?: ReactNode;
 };
 
@@ -33,6 +36,8 @@ function MListRowBase({
   valUnit,
   onClick,
   ariaLabel,
+  badge,
+  badgeTone = '',
   rightSlot,
 }: MListRowProps) {
   const content = (
@@ -41,7 +46,10 @@ function MListRowBase({
         {icon && <MIcon name={icon} size={18} />}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div className="lbl">{label}</div>
+        <div className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>{label}</span>
+          {badge && <MChip tone={badgeTone}>{badge}</MChip>}
+        </div>
         {sub && <div className="sub">{sub}</div>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

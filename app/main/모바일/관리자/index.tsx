@@ -50,13 +50,15 @@ interface HubItem {
   sub: string;
   icon: string;
   tone: '' | 'accent' | 'success' | 'warning' | 'danger';
+  badge?: string;
+  badgeTone?: '' | 'accent' | 'success' | 'warning' | 'danger';
 }
 
 const HUB_ITEMS: HubItem[] = [
   { id: 'exec', label: '경영 대시보드', sub: '매출·인건비·환자수 통합 KPI', icon: 'layers', tone: 'accent' },
-  { id: 'master', label: '시스템 마스터', sub: '운영·이력·정합성·복구·필터·연차', icon: 'settings', tone: '' },
+  { id: 'master', label: '시스템 마스터', sub: '운영·이력·정합성·복구·필터·연차', icon: 'settings', tone: '', badge: '병원장 전용', badgeTone: 'danger' },
   { id: 'company', label: '회사 관리', sub: '기본·근무·카드·계약·휴가·급여·문서', icon: 'building', tone: '' },
-  { id: 'roles', label: '권한 관리', sub: '직원별 상세 권한 설정', icon: 'shield', tone: 'success' },
+  { id: 'roles', label: '권한 관리', sub: '직원별 상세 권한 설정', icon: 'shield', tone: 'success', badge: '요청 2', badgeTone: 'warning' },
   { id: 'ops', label: '운영 설정', sub: '일반·메시지 12·팝업·외부연동 6', icon: 'zap', tone: '' },
   { id: 'forms', label: '결재 양식', sub: '양식 14종 · 사용량 KPI', icon: 'fileText', tone: '' },
   { id: 'audit', label: '감사·백업', sub: '로그·이상·급여검사·DR', icon: 'alertTri', tone: 'warning' },
@@ -133,6 +135,8 @@ function Hub({
                 label={item.label}
                 sub={item.sub}
                 onClick={() => onOpen(item.id)}
+                badge={item.badge}
+                badgeTone={item.badgeTone}
                 ariaLabel={item.label}
               />
             ))}
