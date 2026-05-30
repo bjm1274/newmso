@@ -138,6 +138,22 @@ self.addEventListener('message', (event) => {
   event.waitUntil(self.__erpPushShared.handleClientMessage(event));
 });
 
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'erp-background-sync') {
+    event.waitUntil(
+      self.__erpPushShared ? self.__erpPushShared.flushRetryQueue() : Promise.resolve()
+    );
+  }
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'erp-periodic-sync') {
+    event.waitUntil(
+      self.__erpPushShared ? self.__erpPushShared.flushRetryQueue() : Promise.resolve()
+    );
+  }
+});
+
 self.addEventListener('pushsubscriptionchange', (event) => {
   event.waitUntil(self.__erpPushShared.handlePushSubscriptionChange(event));
 });

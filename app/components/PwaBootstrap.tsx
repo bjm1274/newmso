@@ -36,6 +36,31 @@ export default function PwaBootstrap() {
 
         if (!cancelled) {
           void registration.update().catch(() => {});
+
+          // Background Sync 등록
+          if ('sync' in registration) {
+            try {
+              await (registration as any).sync.register('erp-background-sync');
+            } catch (err) {
+              console.warn('PWA Background Sync 등록 실패:', err);
+            }
+          }
+
+          // Periodic Background Sync 등록
+          if ('periodicSync' in registration) {
+            try {
+              const status = await navigator.permissions.query({
+                name: 'periodic-background-sync' as any,
+              });
+              if (status.state === 'granted') {
+                await (registration as any).periodicSync.register('erp-periodic-sync', {
+                  minInterval: 12 * 60 * 60 * 1000, // 12시간
+                });
+              }
+            } catch (err) {
+              console.warn('PWA Periodic Background Sync 등록 실패:', err);
+            }
+          }
         }
       } catch (error) {
         console.warn('PWA 서비스워커 등록 실패:', error);

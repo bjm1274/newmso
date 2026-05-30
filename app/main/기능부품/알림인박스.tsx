@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -599,6 +599,61 @@ function SettingsTab({ userId }: { userId?: string | null }) {
             >
               상태 새로고침
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 백그라운드 실행 유지 가이드 */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3.5 border-b border-[var(--border)] bg-[var(--muted)]/50 flex items-center justify-between">
+          <h3 className="text-xs font-black text-[var(--toss-gray-3)] uppercase tracking-wider flex items-center gap-1.5">
+            ⚡ 앱을 닫아도 실시간 알림 계속 받기 설정 가이드
+          </h3>
+          <span className="text-[10px] bg-[var(--accent)]/10 text-[var(--accent)] px-2 py-0.5 rounded-full font-bold">수신율 100% 필수 설정</span>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed">
+            운영체제 및 브라우저의 보안/배터리 절약 정책으로 인해, 브라우저 창을 닫으면 실시간 푸시가 지연되거나 오지 않을 수 있습니다. 아래 설정을 완료해 주시면 앱을 닫아도 알림이 정상 작동합니다.
+          </p>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* PC 가이드 */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/20 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💻</span>
+                <p className="text-xs font-bold text-[var(--foreground)]">PC 환경 (Chrome / Edge / Whale)</p>
+              </div>
+              <div className="text-xs text-[var(--toss-gray-3)] space-y-2 leading-relaxed">
+                <p className="font-semibold text-[var(--foreground)]">1. 브라우저 종료 후 백그라운드 작동 활성화</p>
+                <ul className="list-disc list-inside pl-1 space-y-1 text-[11px]">
+                  <li>우측 상단 <b className="text-[var(--foreground)]">더보기(⋮ 또는 ⋯) → 설정</b>으로 이동합니다.</li>
+                  <li>Edge/Whale: <b className="text-[var(--foreground)]">시스템 및 성능</b> / Chrome: <b className="text-[var(--foreground)]">시스템</b> 탭을 클릭합니다.</li>
+                  <li><b className="text-[var(--accent)] font-semibold">"브라우저가 종료된 후에도 백그라운드 앱을 계속 실행"</b> 항목을 <b className="text-emerald-600">켬(ON)</b>으로 활성화합니다.</li>
+                </ul>
+                <p className="font-semibold text-[var(--foreground)] mt-2">2. PWA 설치 권장</p>
+                <p className="text-[11px]">주소창 우측의 [앱 설치 📥] 버튼을 눌러 데스크톱에 단독 앱으로 설치하여 사용하시면 더욱 안정적으로 작동합니다.</p>
+              </div>
+            </div>
+
+            {/* 모바일 가이드 */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/20 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📱</span>
+                <p className="text-xs font-bold text-[var(--foreground)]">모바일 환경 (iPhone / Android)</p>
+              </div>
+              <div className="text-xs text-[var(--toss-gray-3)] space-y-2 leading-relaxed">
+                <p className="font-semibold text-[var(--foreground)]">🍏 iPhone (iOS) 사용자</p>
+                <ul className="list-disc list-inside pl-1 space-y-1 text-[11px]">
+                  <li>반드시 Safari 브라우저 하단의 <b className="text-[var(--foreground)]">공유 📤 → [홈 화면에 추가]</b>를 눌러 PWA로 설치하셔야 백그라운드 푸시가 활성화됩니다.</li>
+                  <li>설치된 앱을 실행한 후 화면을 1회 터치하여 <b className="text-[var(--accent)] font-semibold">알림 허용 권한</b>을 반드시 허용해 주세요.</li>
+                </ul>
+                <p className="font-semibold text-[var(--foreground)] mt-2">🤖 Android (삼성 갤럭시 등) 사용자</p>
+                <ul className="list-disc list-inside pl-1 space-y-1 text-[11px]">
+                  <li><b className="text-[var(--foreground)]">설정 → 애플리케이션 → Chrome</b> (또는 설치된 MSO PWA 앱)으로 이동합니다.</li>
+                  <li><b className="text-[var(--foreground)]">배터리</b> 메뉴를 클릭하여 <b className="text-[var(--accent)] font-semibold">"제한 없음"</b>을 선택해 줍니다. (배터리 최적화로 인한 백그라운드 서비스 강제 종료 방지)</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>

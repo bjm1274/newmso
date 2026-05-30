@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
@@ -18,6 +18,19 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { uploadBoardAttachmentFile } from '../게시판업로드';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import GuideDetailPanel from './GuideDetailPanel';
+import { 
+  Plus, 
+  Search, 
+  FileText, 
+  X, 
+  Edit, 
+  ChevronRight, 
+  Check, 
+  AlertTriangle, 
+  Upload, 
+  MoreHorizontal,
+  FolderOpen
+} from 'lucide-react';
 
 const GUIDE_BOARD_TYPE = '업무가이드';
 const GUIDE_DISPLAY_NAME = '업무공유';
@@ -90,6 +103,7 @@ type GuideResource = GuideRow & {
   divisionName: string;
   companyName: string;
   keywords: string[];
+  isNew?: boolean;
 };
 
 type GuideTask = GuideRow & {
@@ -360,6 +374,32 @@ function formatDate(value: unknown) {
   });
 }
 
+function rel(dateStr: string | null | undefined) {
+  const raw = normalizeText(dateStr);
+  if (!raw) return '';
+  const d = new Date(raw);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return '방금 전';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  
+  const todayStr = now.toDateString();
+  const yest = new Date(now.getTime() - 86400000);
+  if (d.toDateString() === todayStr) return '오늘';
+  if (d.toDateString() === yest.toDateString()) return '어제';
+  if (diffDay < 7) return `${diffDay}일 전`;
+
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${mm}.${dd}`;
+}
+
 function formatDateOnly(value: unknown) {
   const raw = normalizeText(value);
   if (!raw) return '';
@@ -578,7 +618,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const [resources, setResources] = useState<GuideResource[]>([]);
   const [teamTasks, setTeamTasks] = useState<GuideTask[]>([]);
   const [orgTeams, setOrgTeams] = useState<OrgTeamRow[]>([]);
-  // staff_members는 AppDataContext로 동기화 (수동 fetch 제거)
+  
   const staffDirectory = useMemo<OrgStaffRow[]>(
     () =>
       appData.staffs.map((s) => ({
@@ -590,13 +630,22 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       })),
     [appData.staffs],
   );
+  
   const [loading, setLoading] = useState(true);
   const [savingResource, setSavingResource] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
 
+  // B안 신규 상태 제어
+  const [activeTab, setActiveTab] = useState<'res' | 'task'>('res');
   const [showComposer, setShowComposer] = useState(false);
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  
+  // 검증 및 칩 입력을 위한 컴포저 용 로컬 상태
+  const [touched, setTouched] = useState(false);
+  const [keywordsList, setKeywordsList] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [companyFilter, setCompanyFilter] = useState('');
   const [selectedTeamKey, setSelectedTeamKey] = useState('');
@@ -611,7 +660,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const [kind, setKind] = useState<GuideKind>('education');
   const [audience, setAudience] = useState<GuideAudience>('new_hire');
   const [description, setDescription] = useState('');
-  const [keywordsInput, setKeywordsInput] = useState('');
   const [existingAttachments, setExistingAttachments] = useState<AttachmentItem[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
@@ -620,6 +668,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const [taskNote, setTaskNote] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskPriority, setTaskPriority] = useState<GuideTaskPriority>('medium');
+  
+  const [toastMessage, setToastMessage] = useState('');
 
   const canWrite = canAccessBoard(user, GUIDE_BOARD_TYPE, 'write');
   const isPrivileged = isPrivilegedUser(user);
@@ -627,29 +677,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const currentUserId = normalizeText(user?.id);
   const currentCompanyId = normalizeText(user?.company_id);
   const currentCompanyName = normalizeText(user?.company);
-
-  const handleAttachmentDownloadClick = useCallback(async (
-    event: ReactMouseEvent<HTMLAnchorElement>,
-    url: string,
-    fileName: string,
-  ) => {
-    const href = buildStorageDownloadUrl(url, fileName);
-    if (!href) {
-      event.preventDefault();
-      toast('다운로드 주소를 만들지 못했습니다.', 'error');
-      return;
-    }
-    if (!shouldUseManagedBrowserDownload()) {
-      return;
-    }
-    event.preventDefault();
-    try {
-      await triggerManagedBrowserDownload(href, fileName);
-    } catch (error) {
-      console.error('guide attachment download failed', error);
-      toast('모바일 다운로드에 실패했습니다. 다시 시도해 주세요.', 'error');
-    }
-  }, []);
 
   const canManagePost = useCallback(
     (item?: Pick<GuideRow, 'author_id'> | null) => {
@@ -668,9 +695,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     setKind('education');
     setAudience('new_hire');
     setDescription('');
-    setKeywordsInput('');
+    setKeywordsList([]);
+    setKeywordInput('');
     setExistingAttachments([]);
     setPendingFiles([]);
+    setTouched(false);
   }, []);
 
   const resetTaskComposer = useCallback(() => {
@@ -685,7 +714,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     try {
       setLoading(true);
 
-      // staff_members는 AppDataContext에서 가져오므로 별도 fetch 제거
       const [resourceResult, taskResult, orgTeamResult] = await Promise.all([
         withMissingColumnsFallback<GuideRow[]>(
           async (omittedColumns): Promise<QueryResult<GuideRow[]>> => {
@@ -728,7 +756,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   }, [loadGuideWorkspace]);
 
   useEffect(() => {
-    // staff_members realtime은 AppDataContext가 처리하므로 여기선 제거
     const unsubscribe = subscribeRealtime(
       'guide-workspace',
       [
@@ -853,7 +880,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const taskCountsByTeamKey = useMemo(() => {
     const counts: Record<string, number> = {};
     companyTeams.forEach((team) => {
-      counts[team.key] = viewerScopedTasks.filter((item) => matchesTeamScope(item, team)).length;
+      counts[team.key] = viewerScopedTasks.filter((item) => matchesTeamScope(item, team) && !item.isDone).length;
     });
     return counts;
   }, [companyTeams, viewerScopedTasks]);
@@ -892,15 +919,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     });
   }, [audienceFilter, kindFilter, search, teamResources]);
 
-  useEffect(() => {
-    if (!selectedResourceId || !filteredResources.some((resource) => resource.id === selectedResourceId)) {
-      setSelectedResourceId(filteredResources[0]?.id || null);
-    }
-  }, [filteredResources, selectedResourceId]);
-
   const selectedResource = useMemo(
-    () => filteredResources.find((resource) => resource.id === selectedResourceId) || null,
-    [filteredResources, selectedResourceId],
+    () => resources.find((resource) => resource.id === selectedResourceId) || null,
+    [resources, selectedResourceId],
   );
 
   const activeTeamTasks = useMemo(() => {
@@ -941,9 +962,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     setKind(resource.kind);
     setAudience(resource.audience);
     setDescription(resource.description || '');
-    setKeywordsInput(resource.keywords.join(', '));
+    setKeywordsList(resource.keywords);
     setExistingAttachments(resource.attachments || []);
     setPendingFiles([]);
+    setTouched(false);
     setShowComposer(true);
 
     if (resource.companyName) {
@@ -952,7 +974,25 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     }
   }, []);
 
+  const addKeyword = (value: string) => {
+    const trimmed = value.trim().replace(/,/g, '');
+    if (trimmed && !keywordsList.includes(trimmed)) {
+      setKeywordsList([...keywordsList, trimmed]);
+    }
+    setKeywordInput('');
+  };
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addKeyword(keywordInput);
+    } else if (e.key === 'Backspace' && !keywordInput && keywordsList.length > 0) {
+      setKeywordsList(keywordsList.slice(0, -1));
+    }
+  };
+
   const saveResource = useCallback(async () => {
+    setTouched(true);
     const targetTeam = companyTeams.find((team) => team.teamName === teamName) || activeTeam;
     const normalizedTitle = title.trim();
     const normalizedDescription = description.trim();
@@ -966,12 +1006,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       return;
     }
     if (!normalizedTitle) {
-      toast('제목을 입력해 주세요.', 'warning');
-      return;
+      return; // 폼 필드 자체 에러 렌더링
     }
     if (!normalizedDescription && existingAttachments.length === 0 && pendingFiles.length === 0) {
-      toast('설명 또는 첨부파일을 하나 이상 등록해 주세요.', 'warning');
-      return;
+      return; // 폼 필드 자체 에러 렌더링
     }
 
     try {
@@ -989,7 +1027,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         teamName: targetTeam.teamName,
         divisionName: divisionName.trim() || targetTeam.divisionName,
         companyName: targetTeam.companyName,
-        keywords: parseKeywords(keywordsInput),
+        keywords: keywordsList,
       };
 
       const payload: Record<string, unknown> = {
@@ -1025,7 +1063,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         } as GuideRow);
         setResources((prev) => prev.map((resource) => (resource.id === editingResourceId ? normalized : resource)));
         setSelectedResourceId(editingResourceId);
-        toast('업무자료를 수정했습니다.', 'success');
+        
+        setToastMessage('업무자료를 수정했습니다.');
+        setTimeout(() => setToastMessage(''), 2600);
       } else {
         payload.created_at = new Date().toISOString();
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
@@ -1038,10 +1078,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           ...(persistedPayload as GuideRow),
           ...(data || {}),
         } as GuideRow);
+        normalized.isNew = true;
         setResources((prev) => [normalized, ...prev]);
         setSelectedResourceId(normalized.id);
         setSelectedTeamKey(buildTeamKey(targetTeam.companyName, targetTeam.teamName));
-        toast('업무자료를 등록했습니다.', 'success');
+        
+        setToastMessage('업무자료를 등록했습니다.');
+        setTimeout(() => setToastMessage(''), 2600);
       }
 
       resetComposer(targetTeam);
@@ -1064,7 +1107,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     editingResourceId,
     existingAttachments,
     kind,
-    keywordsInput,
+    keywordsList,
     pendingFiles,
     resetComposer,
     resources,
@@ -1079,7 +1122,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const deleteResource = useCallback(async (resource: GuideResource) => {
     if (!canManagePost(resource)) {
       toast('본인이 작성한 자료만 삭제할 수 있습니다.', 'warning');
-      return;
+      return false;
     }
     const confirmed = await openConfirm({
       title: '업무자료 삭제',
@@ -1087,7 +1130,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       confirmText: '삭제',
       tone: 'danger',
     });
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     try {
       const { error } = await supabase.from('board_posts').delete().eq('id', resource.id);
@@ -1101,13 +1144,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         setShowComposer(false);
       }
       toast('업무자료를 삭제했습니다.', 'success');
+      return true;
     } catch (error) {
       console.error('guide resource delete failed', error);
       toast('업무자료 삭제 중 오류가 발생했습니다.', 'error');
+      return false;
     }
   }, [activeTeam, canManagePost, editingResourceId, resetComposer, selectedResourceId]);
-
-
 
   const startTaskEdit = useCallback((task: GuideTask) => {
     setEditingTaskId(task.id);
@@ -1300,571 +1343,800 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
   const canEditSelected = canManagePost(selectedResource);
 
+  // 모달 에러 계산
+  const titleErr = touched && !title.trim();
+  const contentErr = touched && !description.trim() && existingAttachments.length === 0 && pendingFiles.length === 0;
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto custom-scrollbar p-3 md:p-4" data-testid="guide-library-view">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3 md:p-4 bg-[var(--background)]" data-testid="guide-library-view">
       {dialog}
+
       {/* 헤더 + 통계 */}
-      <header className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm shrink-0">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-bold text-[var(--toss-gray-3)]">
-              {activeTeam ? `${activeCompanyLabel} · ${activeTeam.teamName}` : activeCompanyLabel}
+            <div className="text-[11px] font-bold text-[var(--toss-gray-3)] tracking-wider">
+              게시판 › <span className="text-[var(--accent)] font-extrabold">업무공유</span>
+            </div>
+            <h1 className="text-xl font-extrabold text-[var(--foreground)] tracking-tight mt-1">
+              {activeCompanyLabel} · {activeTeam?.teamName || '팀 미지정'}
+            </h1>
+            <p className="text-xs text-[var(--toss-gray-3)] mt-1.5">
+              팀 단위로 자료·인수인계·할일을 한 곳에서 관리합니다. 신규 입사자 온보딩과 업무 전달 기록이 모입니다.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="badge badge-blue">{activeTeamResourceCount}건 자료</span>
-            <span className="badge badge-yellow">{activeTeamHandoverCount}건 인수인계</span>
-            <span className="badge badge-gray">{activeTeamTaskCount}건 할일</span>
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-[var(--accent-soft)] text-[var(--accent)]">
+              <b>{activeTeamResourceCount}</b> 자료
+            </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600">
+              <b>{activeTeamHandoverCount}</b> 인수인계
+            </span>
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-[var(--muted)] text-[var(--toss-gray-3)]">
+              <b>{activeTeamTaskCount}</b> 할일
+            </span>
+            {canWrite && (
+              <button
+                onClick={() => startCreate(activeTeam)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 transition-all shadow-[var(--shadow-xs)]"
+              >
+                <Plus size={14} /> 새 자료 등록
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* 게시글 작성/수정 폼 */}
-      {showComposer && (
-        <section data-testid="guide-form" className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-          <div className="flex flex-col gap-3">
-            <div className="section-header">
-              <h3 className="section-title">{editingResourceId ? '게시글 수정' : '게시글 등록'}</h3>
+      {/* 메인 2컬럼 레이아웃 */}
+      <div className="flex flex-1 gap-4 min-h-0 min-w-0">
+        
+        {/* 좌측 팀 레일 (Left Rail, 244px 고정) */}
+        <aside className="w-[244px] shrink-0 bg-white border border-[var(--border)] rounded-2xl p-4 flex flex-col gap-4 self-stretch">
+          <div>
+            <div className="text-[11px] font-extrabold tracking-wider text-[var(--toss-gray-3)] uppercase mb-2">회사</div>
+            <select
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="w-full h-9 border border-[var(--border)] rounded-xl bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            >
+              {companyOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-grow overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+            {selectedCompany?.divisions.map((div) => (
+              <div key={div.name} className="flex flex-col gap-1">
+                <div className="text-[10px] font-black text-[var(--toss-gray-3)] px-2 mb-1 uppercase tracking-wider">{div.name}</div>
+                {div.teams.map((t) => {
+                  const isOn = t.key === selectedTeamKey;
+                  const resCount = resourceCountsByTeamKey[t.key] || 0;
+                  const taskCount = taskCountsByTeamKey[t.key] || 0;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => { setSelectedTeamKey(t.key); setSelectedResourceId(null); }}
+                      className={`flex items-center justify-between w-full px-3 py-2 rounded-xl text-left transition-all ${
+                        isOn ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'bg-transparent text-[var(--foreground)] hover:bg-[var(--muted)]/50'
+                      }`}
+                    >
+                      <span className={`text-[13.5px] font-bold truncate ${isOn ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-4)]'}`}>
+                        {t.teamName}
+                      </span>
+                      <div className="flex gap-1 shrink-0">
+                        <span className={`min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          isOn ? 'bg-white text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
+                        }`}>
+                          {resCount}
+                        </span>
+                        {taskCount > 0 && (
+                          <span className="min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold bg-amber-500/10 text-amber-600">
+                            {taskCount}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          <button className="flex items-center justify-center gap-1.5 h-9 w-full rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]/30">
+            <Plus size={14} /> 새 팀 추가
+          </button>
+        </aside>
+
+        {/* 우측 메인 영역 (flex-1) */}
+        <section className="flex-1 min-w-0 flex flex-col h-full bg-white border border-[var(--border)] rounded-2xl p-5 self-stretch overflow-hidden">
+          
+          {/* 세그먼트 및 필터 헤더 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4 shrink-0">
+            <div className="inline-flex p-1 bg-[var(--muted)]/60 rounded-xl gap-1">
               <button
-                type="button"
-                onClick={() => {
-                  resetComposer(activeTeam);
-                  setShowComposer(false);
-                }}
-                className="btn-premium-secondary"
+                onClick={() => { setActiveTab('res'); setSelectedResourceId(null); }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'res' ? 'bg-white text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'
+                }`}
               >
-                닫기
+                업무자료·인수인계 <span className="text-[10px] opacity-60 ml-0.5">{activeTeamResourceCount}</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('task'); setSelectedResourceId(null); }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'task' ? 'bg-white text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'
+                }`}
+              >
+                팀 할일 <span className="text-[10px] opacity-60 ml-0.5">{activeTeamTaskCount}</span>
               </button>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">회사</span>
-                <input value={activeCompanyLabel} readOnly className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[13px] font-semibold text-[var(--foreground)]" />
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">팀</span>
+            {activeTab === 'res' && (
+              <div className="flex items-center gap-2">
+                <div className="relative inline-flex items-center">
+                  <Search size={14} className="absolute left-3 text-[var(--toss-gray-3)]" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="제목, 팀, 키워드 검색"
+                    className="h-9 min-w-[200px] rounded-xl border border-[var(--border)] bg-white px-3 pl-8 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all"
+                  />
+                </div>
+                
                 <select
-                  data-testid="guide-team-select"
-                  value={teamName}
-                  onChange={(event) => {
-                    const nextTeam = companyTeams.find((team) => team.teamName === event.target.value) || null;
-                    setTeamName(event.target.value);
-                    setDivisionName(nextTeam?.divisionName || '');
-                  }}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
+                  value={audienceFilter}
+                  onChange={(event) => setAudienceFilter(event.target.value as any)}
+                  className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold text-[var(--foreground)] outline-none cursor-pointer"
                 >
-                  <option value="">팀 선택</option>
-                  {companyTeams.map((team) => (
-                    <option key={team.key} value={team.teamName}>
-                      {team.divisionName} / {team.teamName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-2">
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">제목</span>
-                <input
-                  data-testid="guide-title-input"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder="예: 수술팀 신규 직원 준비 가이드"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">소속 부문</span>
-                <input
-                  value={divisionName}
-                  onChange={(event) => setDivisionName(event.target.value)}
-                  placeholder="예: 간호부"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-3">
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">공유 유형</span>
-                <select
-                  data-testid="guide-kind-select"
-                  value={kind}
-                  onChange={(event) => setKind(normalizeGuideKind(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                >
-                  <option value="education">업무자료</option>
-                  <option value="handover">업무 인수인계</option>
-                </select>
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">대상 직원</span>
-                <select
-                  data-testid="guide-audience-select"
-                  value={audience}
-                  onChange={(event) => setAudience(normalizeGuideAudience(event.target.value))}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                >
+                  <option value="all">대상 — 전체</option>
                   <option value="new_hire">신규직원</option>
                   <option value="current_staff">기존직원</option>
                   <option value="all_staff">전체직원</option>
                 </select>
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-[var(--toss-gray-5)]">검색 키워드</span>
-                <input
-                  data-testid="guide-keywords-input"
-                  value={keywordsInput}
-                  onChange={(event) => setKeywordsInput(event.target.value)}
-                  placeholder="예: 신규교육, 체크리스트"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                />
-              </label>
-            </div>
-
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-[var(--toss-gray-5)]">설명 / 프로세스</span>
-              <textarea
-                data-testid="guide-description-input"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={6}
-                placeholder={'1. 준비 전 확인\n- 환자, 일정, 재고 확인\n\n2. 준비물 세팅\n- 필수 기구와 소모품 준비\n\n3. 진행 순서\n- 실제 업무 순서를 단계별로 작성\n\n4. 주의사항\n- 신규 직원이 헷갈리기 쉬운 포인트 정리'}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold leading-6 outline-none focus:border-[var(--accent)]"
-              />
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-[var(--toss-gray-5)]">첨부파일</span>
-              <input
-                data-testid="guide-file-input"
-                type="file"
-                multiple
-                onChange={(event) => {
-                  const files = event.target.files ? Array.from(event.target.files) : [];
-                  setPendingFiles((prev) => [...prev, ...files].slice(0, 10));
-                  event.currentTarget.value = '';
-                }}
-                className="block w-full rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold"
-              />
-            </label>
-
-            {(existingAttachments.length > 0 || pendingFiles.length > 0) && (
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3">
-                  <p className="text-xs font-semibold text-[var(--toss-gray-5)]">저장된 첨부</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {existingAttachments.map((attachment, index) => (
-                      <button
-                        key={`${attachment.url}-${index}`}
-                        type="button"
-                        onClick={() => setExistingAttachments((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
-                      >
-                        {attachment.name} ×
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-[var(--radius-md)] bg-[var(--muted)] p-3">
-                  <p className="text-xs font-semibold text-[var(--toss-gray-5)]">새로 올릴 파일</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {pendingFiles.map((file, index) => (
-                      <button
-                        key={`${file.name}-${file.size}-${index}`}
-                        type="button"
-                        onClick={() => setPendingFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                        className="rounded-[var(--radius-sm)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
-                      >
-                        {file.name} ×
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  resetComposer(activeTeam);
-                  setShowComposer(false);
-                }}
-                className="btn-premium-secondary"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                data-testid="guide-save"
-                disabled={savingResource}
-                onClick={() => void saveResource()}
-                className="btn-premium-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingResource ? '저장 중...' : editingResourceId ? '수정 저장' : '게시글 등록'}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 메인 2컬럼 레이아웃 */}
-      <section className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
-        {/* 좌측 사이드바 */}
-        <div className="space-y-3">
-          {/* 회사/팀 선택 */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm" data-testid="guide-team-menu">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] font-bold text-[var(--foreground)]">회사 / 팀</p>
-                {canWrite ? (
-                  <button
-                    type="button"
-                    data-testid="guide-open-compose"
-                    onClick={() => startCreate(activeTeam)}
-                    className="btn-premium-primary !py-1 !px-2.5 !text-[11px]"
-                  >
-                    {activeTeam ? `+ ${activeTeam.teamName}` : '+ 게시글'}
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="grid gap-2">
-                <select
-                  data-testid="guide-company-select"
-                  value={companyFilter}
-                  onChange={(event) => setCompanyFilter(event.target.value)}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                >
-                  {companyOptions.map((companyName) => (
-                    <option key={companyName} value={companyName}>
-                      {companyName}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  data-testid="guide-team-filter-select"
-                  value={selectedTeamKey}
-                  onChange={(event) => setSelectedTeamKey(event.target.value)}
-                  disabled={!companyTeams.length}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2.5 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--muted)]"
-                >
-                  <option value="">{companyTeams.length ? '팀 선택' : '등록된 팀 없음'}</option>
-                  {selectedCompany?.divisions.map((division) => (
-                    <optgroup key={division.name} label={division.name}>
-                      {division.teams.map((team) => (
-                        <option key={team.key} value={team.key}>
-                          {division.name} / {team.teamName}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              {!activeTeam ? (
-                <EmptyState
-                  title="등록된 팀이 없습니다"
-                  description="조직도에서 팀을 먼저 등록하면 업무자료를 팀 단위로 정리할 수 있습니다."
-                  compact
-                />
-              ) : null}
-            </div>
           </div>
 
-          {/* 검색 + 필터 */}
-          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-            <div className="space-y-2.5">
-              <input
-                data-testid="guide-search-input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="제목, 팀, 키워드 검색"
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-              />
-
-              <div className="flex flex-wrap gap-1.5">
-                {(['all', 'education', 'handover'] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setKindFilter(value)}
-                    className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
-                      kindFilter === value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
-                    }`}
-                  >
-                    {value === 'all' ? '전체' : value === 'education' ? '업무자료' : '인수인계'}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {(['all', 'new_hire', 'current_staff', 'all_staff'] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setAudienceFilter(value)}
-                    className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
-                      audienceFilter === value ? 'bg-[var(--foreground)] text-[var(--card)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
-                    }`}
-                  >
-                    {value === 'all' ? '전체 대상' : getGuideAudienceLabel(value)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 자료 목록 */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-[11px] font-bold text-[var(--toss-gray-4)]">
-                {activeTeam ? `${activeTeam.teamName} 자료` : '자료 목록'}
-              </p>
-              <span className="badge badge-gray">{filteredResources.length}건</span>
-            </div>
-
-            {loading ? (
-              <LoadingPanel title="자료 목록을 불러오는 중입니다" />
-            ) : filteredResources.length === 0 ? (
-              <EmptyState
-                title="등록된 자료가 없습니다"
-                description={activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
-                compact
-              />
-            ) : (
-              filteredResources.map((resource) => (
-                <button
-                  key={resource.id}
-                  type="button"
-                  data-testid={`guide-card-${resource.id}`}
-                  onClick={() => setSelectedResourceId(resource.id)}
-                  className={`w-full rounded-[var(--radius-lg)] border p-3 text-left transition-colors ${
-                    selectedResourceId === resource.id
-                      ? 'border-[var(--accent)] bg-[var(--accent-light)]'
-                      : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="badge badge-blue">{getGuideKindLabel(resource.kind)}</span>
-                    <span className="badge badge-gray">{getGuideAudienceLabel(resource.audience)}</span>
-                  </div>
-                  <p className="mt-2 text-[13px] font-bold text-[var(--foreground)]">{resource.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-[var(--toss-gray-4)]">
-                    {resource.description || '설명 없음'}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                    <span>{resource.author_name || '작성자 미상'}</span>
-                    <span>{formatDate(resource.updated_at || resource.created_at)}</span>
-                    {resource.attachments.length > 0 && <span>첨부 {resource.attachments.length}</span>}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 우측 콘텐츠 영역 */}
-        <div className="min-w-0 space-y-3">
-          {/* 상세 보기 */}
-          <GuideDetailPanel
-            selectedResource={selectedResource}
-            activeCompanyLabel={activeCompanyLabel}
-            canEditSelected={canEditSelected}
-            onEdit={startEdit}
-            onDelete={deleteResource}
-            onAttachmentPreview={(attachments, clicked) => window.open(clicked.url, '_blank')}
-          />
-
-          {/* 팀별 할일 */}
-          <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm" data-testid="guide-team-task-board">
-            <div className="flex flex-col gap-3 p-4">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h3 className="text-[13px] font-bold text-[var(--foreground)]">
-                    {activeTeam ? `${activeTeam.teamName} 팀별 할일` : '팀별 할일'}
-                  </h3>
-                  <p className="mt-0.5 text-[11px] font-medium text-[var(--toss-gray-4)]">
-                    팀에서 같이 처리해야 할 작업을 관리합니다.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(['open', 'all', 'done'] as const).map((value) => (
+          {/* 탭별 뷰 포트 */}
+          <div className="flex-1 overflow-y-auto min-h-0 pr-1 mt-4">
+            
+            {activeTab === 'res' ? (
+              <>
+                {/* 자료 종류별 가로 칩 필터 */}
+                <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-none whitespace-nowrap shrink-0">
+                  {([
+                    { id: 'all', label: '전체', count: activeTeamResourceCount },
+                    { id: 'education', label: '업무자료', count: activeTeamResourceCount - activeTeamHandoverCount },
+                    { id: 'handover', label: '인수인계', count: activeTeamHandoverCount }
+                  ] as const).map((chip) => (
                     <button
-                      key={value}
-                      type="button"
-                      onClick={() => setTaskFilter(value)}
-                      className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
-                        taskFilter === value ? 'bg-[var(--foreground)] text-[var(--card)]' : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:text-[var(--foreground)]'
+                      key={chip.id}
+                      onClick={() => setKindFilter(chip.id)}
+                      className={`h-7 px-3 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                        kindFilter === chip.id 
+                          ? 'bg-[var(--foreground)] text-white' 
+                          : 'bg-[var(--muted)]/50 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
                       }`}
                     >
-                      {value === 'open' ? '진행중' : value === 'done' ? '완료' : '전체'}
+                      {chip.label} <span className="opacity-60 ml-0.5">{chip.count}</span>
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* 할일 입력 폼 */}
-              {canWrite && activeTeam && (
-                <div className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] p-3">
-                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px_140px]">
-                    <input
-                      data-testid="guide-task-title-input"
-                      value={taskTitle}
-                      onChange={(event) => setTaskTitle(event.target.value)}
-                      placeholder={`${activeTeam.teamName} 팀 할일 제목`}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                    />
-                    <input
-                      data-testid="guide-task-due-date-input"
-                      type="date"
-                      value={taskDueDate}
-                      onChange={(event) => setTaskDueDate(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                    />
-                    <select
-                      data-testid="guide-task-priority-select"
-                      value={taskPriority}
-                      onChange={(event) => setTaskPriority(normalizeGuideTaskPriority(event.target.value))}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold outline-none focus:border-[var(--accent)]"
-                    >
-                      <option value="urgent">긴급</option>
-                      <option value="high">높음</option>
-                      <option value="medium">보통</option>
-                      <option value="low">낮음</option>
-                    </select>
-                  </div>
-                  <textarea
-                    data-testid="guide-task-note-input"
-                    value={taskNote}
-                    onChange={(event) => setTaskNote(event.target.value)}
-                    rows={2}
-                    placeholder="메모, 준비사항, 전달사항"
-                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[13px] font-semibold leading-6 outline-none focus:border-[var(--accent)]"
+                {/* 2열 자료 카드 그리드 */}
+                {loading ? (
+                  <LoadingPanel title="자료 목록을 불러오는 중입니다" />
+                ) : filteredResources.length === 0 ? (
+                  <EmptyState
+                    title="등록된 자료가 없습니다"
+                    description={activeTeam ? `${activeTeam.teamName} 팀의 첫 자료를 등록해 보세요.` : '팀을 선택해 주세요.'}
+                    compact
                   />
-                  <div className="flex justify-end gap-1.5">
-                    {editingTaskId ? (
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
+                    {filteredResources.map((resource) => (
                       <button
-                        type="button"
-                        onClick={resetTaskComposer}
-                        className="btn-premium-secondary"
-                      >
-                        취소
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      data-testid="guide-task-save"
-                      disabled={savingTask}
-                      onClick={() => void saveTask()}
-                      className="btn-premium-primary disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {savingTask ? '저장 중...' : editingTaskId ? '할일 수정' : '할일 등록'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 할일 목록 */}
-              {loading ? (
-                <LoadingPanel title="팀 할일을 불러오는 중입니다" />
-              ) : activeTeamTasks.length === 0 ? (
-                <EmptyState
-                  title="공유된 팀 할일이 없습니다"
-                  description={activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
-                  compact
-                />
-              ) : (
-                <div className="space-y-2">
-                  {activeTeamTasks.map((task) => {
-                    const priorityMeta = getTaskPriorityMeta(task.priority);
-                    return (
-                      <div
-                        key={task.id}
-                        data-testid={`guide-task-card-${task.id}`}
-                        className={`rounded-[var(--radius-md)] border p-3 transition-colors ${
-                          task.isDone ? 'border-[var(--success)]/20 bg-[var(--success)]/5' : 'border-[var(--border)] bg-[var(--card)]'
+                        key={resource.id}
+                        onClick={() => setSelectedResourceId(resource.id)}
+                        className={`group relative text-left border rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                          resource.kind === 'handover' ? 'hover:border-amber-400' : 'hover:border-[var(--accent)]'
+                        } ${
+                          selectedResourceId === resource.id
+                            ? 'border-[var(--accent)] ring-2 ring-[var(--accent-soft)]'
+                            : 'border-[var(--border)] bg-white'
                         }`}
                       >
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0 space-y-1.5">
+                        {/* 유형별 3px 좌측 바 */}
+                        <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl ${
+                          resource.kind === 'handover' ? 'bg-amber-500' : 'bg-[var(--accent)]'
+                        }`} />
+
+                        {/* 상단 메타라인 */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            resource.kind === 'handover' 
+                              ? 'bg-amber-500/10 text-amber-600' 
+                              : 'bg-[var(--accent-soft)]/60 text-[var(--accent)]'
+                          }`}>
+                            {getGuideKindLabel(resource.kind)}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--muted)] text-[var(--toss-gray-4)]">
+                            {getGuideAudienceLabel(resource.audience)}
+                          </span>
+                          {resource.isNew && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500 text-white leading-none">
+                              NEW
+                            </span>
+                          )}
+                          {resource.attachments.length > 0 && (
+                            <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
+                              <FileText size={11} /> {resource.attachments.length}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 제목 및 설명 */}
+                        <h4 className="mt-3 text-[14px] font-black text-[var(--foreground)] line-clamp-1 leading-snug group-hover:text-[var(--accent)] transition-colors">
+                          {resource.title}
+                        </h4>
+                        <p className="mt-1 text-xs text-[var(--toss-gray-4)] line-clamp-2 leading-relaxed min-h-[36px]">
+                          {resource.description || '설명 없음'}
+                        </p>
+
+                        {/* 키워드 태그 리스트 */}
+                        {resource.keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2.5">
+                            {resource.keywords.slice(0, 3).map((keyword) => (
+                              <span key={keyword} className="text-[10px] font-bold text-[var(--accent)] bg-[var(--accent-soft)]/20 px-1.5 py-0.5 rounded">
+                                #{keyword}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 푸터라인 */}
+                        <div className="mt-3 pt-3 border-t border-[var(--border)]/70 flex items-center gap-2 text-[11px] text-[var(--toss-gray-3)] font-bold">
+                          <span className="w-[18px] h-[18px] rounded-full bg-[var(--border)] text-[var(--toss-gray-4)] flex items-center justify-center text-[9px] font-black uppercase shrink-0">
+                            {resource.author_name ? resource.author_name.slice(0, 1) : '익'}
+                          </span>
+                          <span className="text-[var(--foreground)]">{resource.author_name || '익명'}</span>
+                          <span className="ml-auto text-[10px] font-medium font-mono">
+                            {rel(resource.updated_at || resource.created_at)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              /* 팀 할일 탭 뷰 */
+              <div className="space-y-4 pb-4">
+                
+                {/* 빠른 등록 바 */}
+                {canWrite && activeTeam && (
+                  <div className="grid gap-2 border border-[var(--border)] bg-[var(--muted)]/20 rounded-2xl p-4 shadow-inner">
+                    <div className="grid gap-2 md:grid-cols-[1fr_160px_140px]">
+                      <input
+                        value={taskTitle}
+                        onChange={(event) => setTaskTitle(event.target.value)}
+                        placeholder={`${activeTeam.teamName} 팀의 새로운 할일 등록...`}
+                        className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                      <input
+                        type="date"
+                        value={taskDueDate}
+                        onChange={(event) => setTaskDueDate(event.target.value)}
+                        className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all font-mono"
+                      />
+                      <select
+                        value={taskPriority}
+                        onChange={(event) => setTaskPriority(normalizeGuideTaskPriority(event.target.value))}
+                        className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all"
+                      >
+                        <option value="urgent">🚨 긴급</option>
+                        <option value="high">⚠️ 높음</option>
+                        <option value="medium">📝 보통</option>
+                        <option value="low">☕ 낮음</option>
+                      </select>
+                    </div>
+                    <textarea
+                      value={taskNote}
+                      onChange={(event) => setTaskNote(event.target.value)}
+                      rows={2}
+                      placeholder="상세 준비사항 및 메모를 입력하세요 (선택)"
+                      className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-bold leading-relaxed outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                    <div className="flex justify-end gap-2">
+                      {editingTaskId && (
+                        <button
+                          type="button"
+                          onClick={resetTaskComposer}
+                          className="px-3 h-8 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)]"
+                        >
+                          취소
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={savingTask}
+                        onClick={() => void saveTask()}
+                        className="px-4 h-8 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/95 shadow-sm"
+                      >
+                        {savingTask ? '저장 중...' : editingTaskId ? '할일 수정' : '할일 등록'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 할일 상태 가로 칩 필터 */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {([
+                    { id: 'open', label: '진행중' },
+                    { id: 'all', label: '전체' },
+                    { id: 'done', label: '완료' }
+                  ] as const).map((chip) => (
+                    <button
+                      key={chip.id}
+                      onClick={() => setTaskFilter(chip.id)}
+                      className={`h-7 px-3 rounded-full text-xs font-bold transition-all ${
+                        taskFilter === chip.id 
+                          ? 'bg-[var(--foreground)] text-white' 
+                          : 'bg-[var(--muted)]/50 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 할일 목록 카드 덱 */}
+                {loading ? (
+                  <LoadingPanel title="팀 할일을 불러오는 중입니다" />
+                ) : activeTeamTasks.length === 0 ? (
+                  <EmptyState
+                    title="공유된 팀 할일이 없습니다"
+                    description={activeTeam ? `${activeTeam.teamName} 팀의 할일을 등록해 보세요.` : '팀을 선택해 주세요.'}
+                    compact
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {activeTeamTasks.map((task) => {
+                      const priorityMeta = getTaskPriorityMeta(task.priority);
+                      const isSoon = !task.isDone && task.dueDate && task.dueDate <= new Date().toISOString().slice(0, 10);
+                      return (
+                        <div
+                          key={task.id}
+                          className={`rounded-xl border p-3.5 transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                            task.isDone ? 'border-[var(--success)]/20 bg-emerald-50/5' : 'border-[var(--border)] bg-white hover:border-[var(--border-strong)]'
+                          }`}
+                        >
+                          <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={`badge ${priorityMeta.className}`}>{priorityMeta.label}</span>
-                              <span className={`badge ${task.isDone ? 'badge-green' : 'badge-gray'}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                task.priority === 'urgent' ? 'bg-red-500/10 text-red-600' :
+                                task.priority === 'high' ? 'bg-amber-500/10 text-amber-600' :
+                                task.priority === 'low' ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]' :
+                                'bg-[var(--accent-soft)]/60 text-[var(--accent)]'
+                              }`}>
+                                {priorityMeta.label}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                task.isDone ? 'bg-emerald-500/10 text-emerald-600' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                              }`}>
                                 {task.isDone ? '완료' : '진행중'}
                               </span>
-                              {task.dueDate ? (
-                                <span className="badge badge-gray">마감 {formatDateOnly(task.dueDate)}</span>
-                              ) : null}
+                              {task.dueDate && (
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isSoon ? 'bg-red-500/15 text-red-600' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
+                                }`}>
+                                  마감 {formatDateOnly(task.dueDate)}
+                                </span>
+                              )}
                             </div>
-                            <p className={`text-[13px] font-bold ${task.isDone ? 'text-[var(--success)] line-through' : 'text-[var(--foreground)]'}`}>{task.title}</p>
+                            
+                            <h4 className={`text-[13.5px] font-bold ${task.isDone ? 'text-[var(--toss-gray-3)] line-through' : 'text-[var(--foreground)]'}`}>
+                              {task.title}
+                            </h4>
                             {task.note && (
-                              <p className="text-xs font-medium leading-5 text-[var(--toss-gray-4)] whitespace-pre-wrap">
+                              <p className="text-xs text-[var(--toss-gray-4)] whitespace-pre-wrap leading-relaxed">
                                 {task.note}
                               </p>
                             )}
-                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-4)]">
-                              <span>{task.author_name || '작성자 미상'}</span>
+                            
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-[var(--toss-gray-3)]">
+                              <span>작성자: {task.author_name || '익명'}</span>
+                              <span>·</span>
                               <span>{formatDate(task.updated_at || task.created_at)}</span>
-                              {task.isDone ? (
-                                <span>
-                                  {`완료: ${task.completedByName || '확인 불가'}${task.completedAt ? ` · ${formatDate(task.completedAt)}` : ''}`}
-                                </span>
-                              ) : null}
+                              {task.isDone && (
+                                <>
+                                  <span>·</span>
+                                  <span className="text-emerald-600 font-extrabold">
+                                    완료자: {task.completedByName || '확인 불가'}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex shrink-0 flex-wrap gap-1.5">
-                            {canWrite ? (
+                          <div className="flex shrink-0 gap-1.5 self-end sm:self-start">
+                            {canWrite && (
                               <button
-                                type="button"
-                                data-testid={`guide-task-toggle-${task.id}`}
                                 onClick={() => void toggleTask(task)}
-                                className={`rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-bold text-white ${
-                                  task.isDone ? 'bg-[var(--foreground)]' : 'bg-[var(--success)]'
+                                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black text-white ${
+                                  task.isDone ? 'bg-zinc-700 hover:bg-zinc-800' : 'bg-emerald-500 hover:bg-emerald-600'
                                 }`}
                               >
                                 {task.isDone ? '되돌리기' : '완료'}
                               </button>
-                            ) : null}
-                            {canManagePost(task) ? (
+                            )}
+                            {canManagePost(task) && (
                               <>
                                 <button
-                                  type="button"
                                   onClick={() => startTaskEdit(task)}
-                                  className="btn-premium-secondary !py-1.5 !px-2.5 !text-[11px]"
+                                  className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]/50"
                                 >
                                   수정
                                 </button>
                                 <button
-                                  type="button"
                                   onClick={() => void deleteTask(task)}
-                                  className="btn-premium-danger !py-1.5 !px-2.5 !text-[11px]"
+                                  className="px-2.5 py-1.5 rounded-lg border border-red-200 text-[11px] font-bold text-red-600 hover:bg-red-50"
                                 >
                                   삭제
                                 </button>
                               </>
-                            ) : null}
+                            )}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {/* 중앙 상세 모달 */}
+      {selectedResourceId && selectedResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* 스크림 (배경 어둡게 처리 & 터치 방지) */}
+          <div 
+            onClick={() => setSelectedResourceId(null)}
+            className="absolute inset-0 bg-zinc-900/40 backdrop-blur-[2px] transition-all"
+          />
+          {/* 모달 박스 */}
+          <div className="relative w-full max-w-2xl max-h-[85vh] bg-[var(--card)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-y-auto flex flex-col z-10 custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
+            {/* 상단 X 닫기 단추 */}
+            <button
+              onClick={() => setSelectedResourceId(null)}
+              className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full border border-[var(--border)] bg-white flex items-center justify-center text-[var(--toss-gray-4)] hover:bg-[var(--muted)]/50 transition-all shadow-sm"
+              title="닫기"
+            >
+              <X size={16} />
+            </button>
+            <div className="flex-1">
+              <GuideDetailPanel
+                selectedResource={selectedResource}
+                activeCompanyLabel={activeCompanyLabel}
+                canEditSelected={canEditSelected}
+                onEdit={(res) => {
+                  setSelectedResourceId(null);
+                  startEdit(res);
+                }}
+                onDelete={async (res) => {
+                  const success = await deleteResource(res);
+                  if (success) {
+                    setSelectedResourceId(null);
+                  }
+                }}
+                onAttachmentPreview={(attachments, clicked) => window.open(clicked.url, '_blank')}
+              />
             </div>
-          </section>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* 중앙 등록/수정 컴포저 모달 */}
+      {showComposer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* 스크림 */}
+          <div 
+            onClick={() => { resetComposer(activeTeam); setShowComposer(false); }}
+            className="absolute inset-0 bg-zinc-900/40 backdrop-blur-[2px] transition-all"
+          />
+          {/* 컴포저 폼 컨테이너 */}
+          <div className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-[var(--border)] flex flex-col overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* 헤더 */}
+            <div className="flex items-center justify-between border-b border-[var(--border)] p-5 shrink-0 bg-gradient-to-br from-[var(--accent-light)]/20 via-transparent to-transparent">
+              <div>
+                <h3 className="text-base font-extrabold text-[var(--foreground)]">
+                  {editingResourceId ? '업무공유 자료 수정' : '새 자료 등록'}
+                </h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-semibold mt-1">
+                  팀 단위로 매뉴얼 교육자료 또는 인수인계 일지를 공유합니다.
+                </p>
+              </div>
+              <button
+                onClick={() => { resetComposer(activeTeam); setShowComposer(false); }}
+                className="w-8 h-8 rounded-full border border-[var(--border)] bg-white flex items-center justify-center text-[var(--toss-gray-4)] hover:bg-[var(--muted)]/50 transition-all shadow-sm"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* 본문 스크롤 영역 */}
+            <div className="flex-grow overflow-y-auto p-6 space-y-4 scrollbar-thin">
+              
+              {/* 회사 / 팀 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">회사</span>
+                  <input
+                    value={activeCompanyLabel}
+                    readOnly
+                    className="h-9 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 px-3 text-[13px] font-bold text-[var(--toss-gray-3)] outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">팀 <span className="text-red-500">*</span></span>
+                  <select
+                    value={teamName}
+                    onChange={(event) => {
+                      const nextTeam = companyTeams.find((team) => team.teamName === event.target.value) || null;
+                      setTeamName(event.target.value);
+                      setDivisionName(nextTeam?.divisionName || '');
+                    }}
+                    className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="">팀 선택</option>
+                    {companyTeams.map((team) => (
+                      <option key={team.key} value={team.teamName}>
+                        {team.divisionName} / {team.teamName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 제목 / 소속 부문 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">제목 <span className="text-red-500">*</span></span>
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    placeholder="예: 수술실 장비 신규 세팅 가이드"
+                    className={`h-9 rounded-xl border px-3 text-[13px] font-bold outline-none transition-all ${
+                      titleErr ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-[var(--border)] focus:border-[var(--accent)] bg-white'
+                    }`}
+                  />
+                  {titleErr && <span className="text-[11px] font-bold text-red-500">제목을 입력해 주세요.</span>}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">소속 부문</span>
+                  <input
+                    value={divisionName}
+                    onChange={(event) => setDivisionName(event.target.value)}
+                    placeholder="예: 간호부"
+                    className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              </div>
+
+              {/* 공유 유형 라디오 카드 덱 (수려한 디자인) */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">공유 유형</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setKind('education')}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition-all ${
+                      kind === 'education'
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]/30'
+                        : 'border-[var(--border)] bg-white hover:border-[var(--toss-gray-3)]'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${
+                      kind === 'education' ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-[var(--toss-gray-3)] bg-white'
+                    }`}>
+                      {kind === 'education' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </span>
+                    <div>
+                      <span className="block text-[13px] font-extrabold text-[var(--foreground)]">업무자료</span>
+                      <span className="block text-[10px] text-[var(--toss-gray-3)] mt-0.5 leading-normal">매뉴얼·가이드·참조표 등 상시 교육자료</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setKind('handover')}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border-2 text-left transition-all ${
+                      kind === 'handover'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-[var(--border)] bg-white hover:border-[var(--toss-gray-3)]'
+                    }`}
+                  >
+                    <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${
+                      kind === 'handover' ? 'border-amber-600 bg-amber-600' : 'border-[var(--toss-gray-3)] bg-white'
+                    }`}>
+                      {kind === 'handover' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </span>
+                    <div>
+                      <span className="block text-[13px] font-extrabold text-[var(--foreground)]">업무 인수인계</span>
+                      <span className="block text-[10px] text-[var(--toss-gray-3)] mt-0.5 leading-normal">당직 인계·주간 전파 등 시간 기록용 문서</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* 대상 직원 / 검색 키워드 칩 입력 상자 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">대상 직원</span>
+                  <select
+                    value={audience}
+                    onChange={(event) => setAudience(normalizeGuideAudience(event.target.value))}
+                    className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="new_hire">신규직원</option>
+                    <option value="current_staff">기존직원</option>
+                    <option value="all_staff">전체직원</option>
+                  </select>
+                </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">검색 키워드</span>
+                  <div className="flex flex-wrap items-center gap-1.5 border border-[var(--border)] bg-white px-3 py-1.5 rounded-xl min-h-[36px] transition-all focus-within:border-[var(--accent)]">
+                    {keywordsList.map((tag) => (
+                      <span key={tag} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] bg-[var(--accent-soft)] px-2 py-0.5 rounded-full shrink-0">
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => setKeywordsList(keywordsList.filter((k) => k !== tag))}
+                          className="w-3.5 h-3.5 rounded-full flex items-center justify-center hover:bg-[var(--accent)]/15"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      value={keywordInput}
+                      onChange={(e) => setKeywordInput(e.target.value)}
+                      onKeyDown={handleKeywordKeyDown}
+                      onBlur={() => keywordInput.trim() && addKeyword(keywordInput)}
+                      placeholder={keywordsList.length > 0 ? "" : "쉼표나 엔터로 키워드 입력"}
+                      className="flex-grow min-w-[100px] border-none outline-none text-xs font-bold bg-transparent text-[var(--foreground)] placeholder-[var(--toss-gray-3)]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 설명 / 프로세스 */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">설명 / 프로세스 <span className="text-red-500">*</span></span>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={6}
+                  placeholder={`1. 준비 전 확인\n- 장비 작동 여부 점검\n\n2. 장비 세팅 순서\n- 실제 세팅 순서를 순차적으로 기재`}
+                  className={`w-full rounded-xl border px-3 py-2 text-xs font-bold leading-relaxed outline-none transition-all resize-none min-h-[120px] ${
+                    contentErr ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-[var(--border)] focus:border-[var(--accent)] bg-white'
+                  }`}
+                />
+                {contentErr && <span className="text-[11px] font-bold text-red-500">설명 또는 첨부파일을 하나 이상 등록해 주세요.</span>}
+              </div>
+
+              {/* 첨부파일 점선 드롭존 */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">첨부파일</span>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center gap-1.5 p-5 border-2 border-dashed border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/20 rounded-xl bg-[var(--muted)]/20 cursor-pointer transition-all text-center"
+                >
+                  <Upload size={20} className="text-[var(--toss-gray-4)]" />
+                  <span className="text-[12px] font-bold text-[var(--toss-gray-4)]">클릭하여 파일 선택 또는 드래그 앤 드롭</span>
+                  <span className="text-[10px] text-[var(--toss-gray-3)]">PDF · 이미지 · 문서 (개당 20MB 이하, 최대 10개)</span>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={(event) => {
+                    const files = event.target.files ? Array.from(event.target.files) : [];
+                    setPendingFiles((prev) => [...prev, ...files].slice(0, 10));
+                    event.currentTarget.value = '';
+                  }}
+                  className="hidden"
+                />
+
+                {/* 대기 파일 리스트 카드 */}
+                {(existingAttachments.length > 0 || pendingFiles.length > 0) && (
+                  <div className="grid gap-3 grid-cols-1 md:grid-cols-2 mt-2">
+                    {existingAttachments.length > 0 && (
+                      <div className="rounded-xl bg-[var(--muted)]/40 border border-[var(--border)] p-3 space-y-1.5">
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">기존 등록 파일</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {existingAttachments.map((file, idx) => (
+                            <span key={`${file.url}-${idx}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] rounded-lg">
+                              {file.name}
+                              <button
+                                type="button"
+                                onClick={() => setExistingAttachments(existingAttachments.filter((_, i) => i !== idx))}
+                                className="w-3.5 h-3.5 rounded-full hover:bg-[var(--muted)] text-[var(--toss-gray-4)] flex items-center justify-center"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {pendingFiles.length > 0 && (
+                      <div className="rounded-xl bg-[var(--muted)]/40 border border-[var(--border)] p-3 space-y-1.5">
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">새로 업로드 대기 파일</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {pendingFiles.map((file, idx) => (
+                            <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-emerald-200 text-[11px] font-bold text-emerald-600 rounded-lg">
+                              {file.name}
+                              <button
+                                type="button"
+                                onClick={() => setPendingFiles(pendingFiles.filter((_, i) => i !== idx))}
+                                className="w-3.5 h-3.5 rounded-full hover:bg-[var(--muted)] text-emerald-600 flex items-center justify-center"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 푸터 버튼 */}
+            <div className="flex items-center gap-2 p-5 bg-[var(--muted)]/40 border-t border-[var(--border)] shrink-0">
+              <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
+                제목과 (설명 또는 파일)은 필수 항목입니다.
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { resetComposer(activeTeam); setShowComposer(false); }}
+                  className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-all bg-white"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={savingResource}
+                  onClick={() => void saveResource()}
+                  className="px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingResource ? '저장 중...' : editingResourceId ? '수정 저장' : '자료 등록'}
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 성공 토스트 오버레이 */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-zinc-950 text-white rounded-xl shadow-2xl text-[13px] font-bold animate-in slide-in-from-bottom-2 duration-200">
+          <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
+            <Check size={11} strokeWidth={3} />
+          </span>
+          {toastMessage}
+        </div>
+      )}
+
     </div>
   );
 }
