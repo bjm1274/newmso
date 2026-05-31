@@ -80,30 +80,17 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     (async () => {
       try {
         const today = formatLocalDateKey(new Date());
-        // 1. 오늘 날짜의 출퇴근 기록 조회
+        // 오늘 날짜의 출퇴근 기록만 조회한다.
+        // (이전 날짜의 미퇴근 기록을 오늘 기록으로 끌어오면, 출근을 안 눌렀는데도
+        //  '퇴근하기'로 표시되고 어제 출근시각이 오늘 것처럼 보이는 버그가 생긴다.)
         const { data: todayData } = await supabase
           .from('attendance')
           .select('id, date, check_in, check_out')
           .eq('staff_id', staffId)
           .eq('date', today)
           .maybeSingle();
-        
-        if (todayData) {
-          if (!cancelled) setOpenLog((todayData as OpenLog) ?? null);
-          return;
-        }
 
-        // 2. 오늘 기록이 없다면, 이전의 미퇴근(check_out이 null인) 기록 조회
-        const { data: staleData } = await supabase
-          .from('attendance')
-          .select('id, date, check_in, check_out')
-          .eq('staff_id', staffId)
-          .is('check_out', null)
-          .order('date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (!cancelled) setOpenLog((staleData as OpenLog) ?? null);
+        if (!cancelled) setOpenLog((todayData as OpenLog) ?? null);
       } catch {/* silent */}
     })();
     return () => { cancelled = true; };

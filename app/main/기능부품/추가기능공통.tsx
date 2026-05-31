@@ -135,6 +135,7 @@ const loadSurgeryConsultationView = () => import('./수술상담');
 const loadOperationCheckView = () => import('./OP체크');
 const loadEslManagerView = () => import('./ESL관리');
 const loadOrgChartView = () => import('./조직도서브/OrgChart');
+const loadGeminiAssistantView = () => import('./Gemini어시스턴트');
 
 const DepartmentInventoryView = dynamic(loadDepartmentInventoryView, {
   ssr: false,
@@ -180,6 +181,10 @@ const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
 });
+const GeminiAssistantView = dynamic(loadGeminiAssistantView, {
+  ssr: false,
+  loading: () => <SubviewLoading label="Gemini AI 비서" />,
+});
 
 export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   조직도: loadOrgChartView,
@@ -193,6 +198,7 @@ export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   수술상담: loadSurgeryConsultationView,
   OP체크: loadOperationCheckView,
   ESL관리: loadEslManagerView,
+  Gemini비서: loadGeminiAssistantView,
 };
 
 export type FeatureCard = {
@@ -212,6 +218,7 @@ export type FeatureCard = {
 
 // 지시서 §2 사이드바 순서 그대로
 export const FEATURE_CARDS: FeatureCard[] = [
+  { id: 'Gemini비서',     label: 'Gemini AI 비서',  icon: 'Sparkles',     iconKey: 'closing',   desc: '업무 관련 팁, 근무표 짜기, 병원 규정 질문', subView: 'Gemini비서', testId: 'gemini-assistant',    accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
   { id: '조직도',         label: '조직도',          icon: 'Building2',    iconKey: 'org',       desc: '병원장 → 부서그룹 → 직원',         subView: '조직도',         testId: 'org-chart',             accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
   { id: '부서별재고',     label: '부서별 재고',     icon: 'Package',      iconKey: 'inventory', desc: '부서/본사 컨텍스트 · 주 기반 최소재고', subView: '부서별재고',     testId: 'department-inventory',  accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
   { id: '근무현황',       label: '근무현황',        icon: 'CalendarDays', iconKey: 'worknow',   desc: '시프트 + 월간 캘린더',              subView: '근무현황',       testId: 'work-status',           accentClass: 'bg-[var(--muted)] text-[var(--accent)]' },
@@ -386,6 +393,14 @@ export function ExtraFeatureSubview({
     return (
       <FeatureShell onBack={onBack} boxed>
         <EslManagerView user={user || {}} />
+      </FeatureShell>
+    );
+  }
+
+  if (subView === 'Gemini비서') {
+    return (
+      <FeatureShell onBack={onBack} maxWidth="max-w-4xl">
+        <GeminiAssistantView user={user || {}} />
       </FeatureShell>
     );
   }
