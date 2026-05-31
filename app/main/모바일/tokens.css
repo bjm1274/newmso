@@ -45,6 +45,9 @@
   --m-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03);
   --m-shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.05);
 
+  /* iOS 노치/상태바(시계) 안전영역 — 비대응 기기는 0 */
+  --m-safe-top: env(safe-area-inset-top, 0px);
+
   position: fixed;
   inset: 0;
   font-family: var(--m-font);
@@ -104,6 +107,8 @@
   display: flex; flex-direction: column;
   overflow: hidden;
   position: relative;
+  /* 헤더 없는 화면(내정보 홈/허브/채팅목록 등)도 상태바 영역 침범 방지 */
+  padding-top: var(--m-safe-top);
 }
 .mso-mobile .m-scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden;
@@ -122,7 +127,9 @@
 
 /* ─── 헤더 ───────────────────────────────────────────────────*/
 .mso-mobile .m-header {
-  padding: 14px 16px 12px;
+  /* m-screen의 safe-top 패딩만큼 위로 끌어올려 헤더가 상태바 영역까지 흰색으로 채움 */
+  margin-top: calc(-1 * var(--m-safe-top));
+  padding: calc(14px + var(--m-safe-top)) 16px 12px;
   background: var(--m-card);
   border-bottom: 1px solid var(--m-border);
   display: flex; align-items: center; gap: 10px;
@@ -454,6 +461,7 @@
   width: 54px; height: 54px; border-radius: 999px;
   background: rgba(255,255,255,0.22); display: grid; place-items: center;
   font-size: 21px; font-weight: 800; flex-shrink: 0;
+  overflow: hidden;
 }
 .mso-mobile .msm-hero-nm { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
 .mso-mobile .msm-hero-role { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,0.8); margin-top: 2px; }

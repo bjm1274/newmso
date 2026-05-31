@@ -17,6 +17,8 @@
 import { memo, useState, useCallback } from 'react';
 import type { ErpUser } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
+import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import MIcon from '../공통/MIcon';
 import { useTodayCounts } from './data-hooks';
 import type { MHomeSub, MTab } from '../셸/m-routes';
@@ -141,6 +143,9 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const active = isActiveStaff(user);
   const counts = useTodayCounts(staffId);
 
+  // 프로필 사진 — PC 프로필카드와 동일 패턴(getProfilePhotoUrl: path/url/version 처리)
+  const photoUrl = getProfilePhotoUrl(user);
+
   const name = (user.name || '직원') as string;
   const position = (user.position || '') as string;
   const department = (user.department || '') as string;
@@ -236,24 +241,16 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             <MIcon name="edit" size={18} />
           </button>
 
-          {/* 아바타 */}
-          <div
+          {/* 아바타 — 프로필 사진(없으면 이름 첫글자) */}
+          <ProfilePhotoThumbnail
+            src={photoUrl}
+            name={name}
+            previewDisabled
             className="msm-hero-av"
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: 22,
-              background: 'rgba(255,255,255,0.2)',
-              border: '3px solid rgba(255,255,255,0.3)',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 26,
-              fontWeight: 800,
-              margin: '0 auto',
-            }}
-          >
-            {initial}
-          </div>
+            fallback={<span>{initial}</span>}
+            imageClassName="rounded-[22px]"
+          />
+          <style>{`.mso-mobile .msm-hero .msm-hero-av{width:72px;height:72px;border-radius:22px;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.3);display:grid;place-items:center;font-size:26px;font-weight:800;margin:0 auto;overflow:hidden;}`}</style>
 
           {/* 이름 + 직책 */}
           <div

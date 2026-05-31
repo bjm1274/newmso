@@ -112,3 +112,5 @@ scripts/backfill-d1/.backfill-progress.json
 # Local agent scratch & helper scripts
 /scratch/
 /scripts/check_msg_tmpl_cols.js
+
+.claude/scheduled_tasks.lock
