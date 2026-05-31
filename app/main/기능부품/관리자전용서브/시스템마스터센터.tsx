@@ -30,8 +30,6 @@ import type {
   SystemMasterSensitiveStaff,
 } from './시스템마스터센터-modules/types';
 import { type Column } from '@/app/components/ResponsiveTable';
-import { useIsMobile } from '@/app/components/useIsMobile';
-import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import {
   formatCurrency,
   maskResidentNo,
@@ -55,10 +53,7 @@ type SystemMasterCenterProps = {
 };
 
 export default function SystemMasterCenter(props: SystemMasterCenterProps) {
-  const isMobile = useIsMobile();
-  if (isMobile) {
-    return <DesktopOnlyNotice feature="시스템 마스터 관리" />;
-  }
+  // 전부 모바일화: 모바일 차단 해제 — 데스크톱 풀 UI를 모바일에서도 렌더
   return <SystemMasterCenterDesktop {...props} />;
 }
 

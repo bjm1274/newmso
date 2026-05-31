@@ -14,6 +14,7 @@ import SApprovalSent from './기안함';
 import SApprovalRef from './참조함';
 import SApprovalWrite from './작성하기';
 import SApprovalLeaveForm from './연차신청폼';
+import SApprovalGenericForm from './일반기안폼';
 import SApprovalDetail from './결재상세';
 import {
   useApprovalList,
@@ -21,7 +22,7 @@ import {
   type ApprovalRow,
 } from './data-hooks';
 
-export type ApprovalView = 'inbox' | 'sent' | 'ref' | 'write' | 'write-leave' | 'detail';
+export type ApprovalView = 'inbox' | 'sent' | 'ref' | 'write' | 'compose' | 'detail';
 
 export type 결재Props = {
   user: ErpUser;
@@ -33,6 +34,7 @@ export default function 결재({ user }: 결재Props) {
 
   const [view, setView] = useState<ApprovalView>('inbox');
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [composeForm, setComposeForm] = useState<{ slug: string; name: string } | null>(null);
 
   const { rows, loading, refetch } = useApprovalList(staffId);
   const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);
@@ -94,20 +96,30 @@ export default function 결재({ user }: 결재Props) {
     return (
       <SApprovalWrite
         onBack={() => setView('inbox')}
-        onPickLeave={() => setView('write-leave')}
+        onPick={(slug, name) => {
+          setComposeForm({ slug, name });
+          setView('compose');
+        }}
       />
     );
   }
 
-  if (view === 'write-leave') {
+  if (view === 'compose' && composeForm) {
+    const onCancel = () => setView('write');
+    const onSubmitted = () => {
+      refetch();
+      setView('sent');
+    };
+    if (composeForm.slug === 'leave') {
+      return <SApprovalLeaveForm user={user} onCancel={onCancel} onSubmitted={onSubmitted} />;
+    }
     return (
-      <SApprovalLeaveForm
+      <SApprovalGenericForm
         user={user}
-        onCancel={() => setView('write')}
-        onSubmitted={() => {
-          refetch();
-          setView('sent');
-        }}
+        formSlug={composeForm.slug}
+        formName={composeForm.name}
+        onCancel={onCancel}
+        onSubmitted={onSubmitted}
       />
     );
   }

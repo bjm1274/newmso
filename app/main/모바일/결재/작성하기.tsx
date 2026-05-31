@@ -3,19 +3,17 @@
 /**
  * SApprovalWrite — 결재 양식 선택 화면 (작성하기 진입)
  *   - 카테고리별 양식 리스트 (5 그룹)
- *   - 양식 선택 시 데스크톱 안내 시트 표시 (모바일 신규 기안 미지원 — Phase3 §4 정책)
+ *   - 양식 선택 시 onPick(slug, name) → 부모(결재 라우터)가 인라인 작성 화면으로 전환
+ *   - "모바일에서도 모든 기능" 정책: 전 양식 모바일 인라인 작성 지원 (PC 우회 제거)
  *   - PC BUILTIN_FORM_TYPE_DEFINITIONS slug/name 재사용해 정합성 유지
  *
- * JM(파일당 500줄), JM2(정적 데이터, 렌더 비용 최소), JM3(시트 닫기만), JM4(any 금지),
- * JM6(button 시맨틱 + aria-label + dialog role)
+ * JM(파일당 500줄), JM2(정적 데이터, 렌더 비용 최소), JM4(any 금지),
+ * JM6(button 시맨틱 + aria-label)
  */
 
-import { useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
-import MBtn from '../공통/MBtn';
-import MSheet from '../공통/MSheet';
 import { BUILTIN_FORM_TYPE_DEFINITIONS } from '../../기능부품/전자결재서브/approval-constants';
 
 type FormCategory = {
@@ -59,23 +57,11 @@ void BUILTIN_FORM_TYPE_DEFINITIONS;
 
 export type SApprovalWriteProps = {
   onBack: () => void;
-  onPickLeave?: () => void;
+  /** 양식 선택 → 부모가 인라인 작성 화면으로 전환 */
+  onPick: (slug: string, name: string) => void;
 };
 
-// 모바일 인라인 작성 지원 slug — 현재는 'leave' 한 종류만
-const MOBILE_INLINE_SLUGS = new Set<string>(['leave']);
-
-export default function SApprovalWrite({ onBack, onPickLeave }: SApprovalWriteProps) {
-  const [pickedName, setPickedName] = useState<string | null>(null);
-
-  const handlePick = (slug: string, name: string) => {
-    if (MOBILE_INLINE_SLUGS.has(slug) && typeof onPickLeave === 'function') {
-      onPickLeave();
-      return;
-    }
-    setPickedName(name);
-  };
-
+export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) {
   return (
     <div className="m-screen">
       <MobileHeader
@@ -96,102 +82,31 @@ export default function SApprovalWrite({ onBack, onPickLeave }: SApprovalWritePr
               <div className="lbl">{cat.g}</div>
             </div>
             <MCard flush>
-              {cat.items.map((item) => {
-                const inline = MOBILE_INLINE_SLUGS.has(item.slug);
-                return (
-                  <button
-                    key={item.slug}
-                    type="button"
-                    className="m-list-row"
-                    style={{ textAlign: 'left', width: '100%' }}
-                    onClick={() => handlePick(item.slug, item.name)}
-                    aria-label={`${item.name} 양식 선택`}
-                  >
-                    <div className={`ico-tile ${inline ? 'tone-success' : 'tone-accent'}`}>
-                      <MIcon name="fileText" size={18} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="lbl">{item.name}</div>
-                      <div className="sub">{inline ? '모바일에서 바로 작성' : '데스크톱에서 작성'}</div>
-                    </div>
-                    <MIcon name="chevR" size={18} color="var(--z-400)" />
-                  </button>
-                );
-              })}
+              {cat.items.map((item) => (
+                <button
+                  key={item.slug}
+                  type="button"
+                  className="m-list-row"
+                  style={{ textAlign: 'left', width: '100%' }}
+                  onClick={() => onPick(item.slug, item.name)}
+                  aria-label={`${item.name} 양식 선택`}
+                >
+                  <div className="ico-tile tone-accent">
+                    <MIcon name="fileText" size={18} />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="lbl">{item.name}</div>
+                    <div className="sub">모바일에서 바로 작성</div>
+                  </div>
+                  <MIcon name="chevR" size={18} color="var(--z-400)" />
+                </button>
+              ))}
             </MCard>
           </div>
         ))}
 
-        <div className="m-section">
-          <MCard
-            style={{
-              padding: '14px 16px',
-              display: 'flex',
-              gap: 10,
-              alignItems: 'flex-start',
-              background: 'var(--m-warning-soft)',
-              border: '1px solid transparent',
-            }}
-          >
-            <MIcon name="info" size={18} color="var(--m-warning)" />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--m-warning)' }}>
-                대부분의 신규 기안은 데스크톱에서 진행해 주세요
-              </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.55 }}>
-                모바일은 <b>연차/휴가</b> 신청만 인라인 작성을 지원합니다. 그 외 양식은 첨부·결재선 지정이 필요해 PC에서 작성해 주세요.
-              </div>
-            </div>
-          </MCard>
-        </div>
-
         <div style={{ height: 24 }} />
       </div>
-
-      <MSheet
-        open={pickedName !== null}
-        onClose={() => setPickedName(null)}
-        title="데스크톱에서 진행"
-      >
-        <div style={{ padding: '4px 0 16px', textAlign: 'center' }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              background: 'var(--m-accent-soft)',
-              color: 'var(--m-accent)',
-              display: 'grid',
-              placeItems: 'center',
-              margin: '0 auto 12px',
-            }}
-            aria-hidden="true"
-          >
-            <MIcon name="fileText" size={26} />
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em' }}>
-            {pickedName}
-          </div>
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 12,
-              color: 'var(--z-600)',
-              fontWeight: 600,
-              lineHeight: 1.6,
-            }}
-          >
-            모바일에서 새 결재 작성은 지원하지 않습니다.
-            <br />
-            PC에서 전자결재 &gt; 작성하기로 진입해 주세요.
-          </div>
-          <div style={{ marginTop: 16 }}>
-            <MBtn block variant="primary" onClick={() => setPickedName(null)}>
-              확인
-            </MBtn>
-          </div>
-        </div>
-      </MSheet>
     </div>
   );
 }

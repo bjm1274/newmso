@@ -13,8 +13,6 @@ import type { PermissionReview } from './직원권한통합/types';
 import { getToneClasses, getToggleClasses, compareKoreanLabels, getStaffCompanyLabel, getStaffTeamLabel, sortStaffRows } from './직원권한통합/style-utils';
 import { buildPermissionReview } from './직원권한통합/permission-review';
 import { PermissionDiffPanel } from './직원권한통합/PermissionDiffPanel';
-import { useIsMobile } from '@/app/components/useIsMobile';
-import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 /**
  * permissions JSON 안에 함께 저장되지만 권한이 아닌 개인 고유 데이터 키 목록.
  * 권한 복사 시 이 키들은 원본에서 가져오지 않고 대상자의 값을 그대로 유지한다.
@@ -78,10 +76,7 @@ function buildPermissionsForCopy(
 }
 
 export default function StaffPermissionManager(props: { onRefresh?: () => void }) {
-  const isMobile = useIsMobile();
-  if (isMobile) {
-    return <DesktopOnlyNotice feature="직원 권한 통합 관리" />;
-  }
+  // 전부 모바일화: 모바일 차단 해제 — 데스크톱 풀 UI를 모바일에서도 렌더
   return <StaffPermissionManagerDesktop {...props} />;
 }
 

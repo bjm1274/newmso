@@ -27,7 +27,6 @@ import 권한관리 from './권한관리';
 import 운영설정 from './운영설정';
 import 결재양식 from './결재양식';
 import 감사백업 from './감사백업';
-import { DesktopHint } from './공용UI';
 
 export type AdminView =
   | 'hub'
@@ -120,7 +119,6 @@ function Hub({
   return (
     <div className="m-screen">
       <MobileHeader title="관리자" sub={company || '관리자 전용'} back={onBack} />
-      <DesktopHint>편집·민감 작업은 데스크톱에서 — 모바일은 조회·요약 위주</DesktopHint>
       <div className="m-scroll">
         <div className="m-section">
           <div className="m-section-h">
