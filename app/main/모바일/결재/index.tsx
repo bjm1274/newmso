@@ -15,6 +15,8 @@ import SApprovalRef from './참조함';
 import SApprovalWrite from './작성하기';
 import SApprovalLeaveForm from './연차신청폼';
 import SApprovalGenericForm from './일반기안폼';
+import SApprovalOvertimeForm from './연장근무폼';
+import SApprovalLeavePlanForm from './연차계획폼';
 import SApprovalDetail from './결재상세';
 import {
   useApprovalList,
@@ -112,6 +114,28 @@ export default function 결재({ user }: 결재Props) {
     };
     if (composeForm.slug === 'leave') {
       return <SApprovalLeaveForm user={user} onCancel={onCancel} onSubmitted={onSubmitted} />;
+    }
+    if (composeForm.slug === 'overtime') {
+      return (
+        <SApprovalOvertimeForm
+          user={user}
+          formSlug={composeForm.slug}
+          formName={composeForm.name}
+          onCancel={onCancel}
+          onSubmitted={onSubmitted}
+        />
+      );
+    }
+    if (composeForm.slug === 'annual_plan' || composeForm.slug === 'leave_promotion_notice') {
+      return (
+        <SApprovalLeavePlanForm
+          user={user}
+          formSlug={composeForm.slug}
+          formName={composeForm.name}
+          onCancel={onCancel}
+          onSubmitted={onSubmitted}
+        />
+      );
     }
     return (
       <SApprovalGenericForm
