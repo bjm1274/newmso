@@ -179,7 +179,10 @@ function getPrimaryScheduleTimes(schedule?: WeeklyShiftSchedule | null, fallback
   };
 }
 
-function formatWeeklyScheduleSummary(schedule?: WeeklyShiftSchedule | null) {
+function formatWeeklyScheduleSummary(schedule?: WeeklyShiftSchedule | null, shiftType?: string | null) {
+  if (shiftType === '1일근무1일휴무') {
+    return '순환 격일제 (평균 주 3.5일 근무)';
+  }
   if (!schedule) return '';
   const enabledDays = WEEKDAY_OPTIONS.filter((day) => schedule[day.key]?.enabled);
   if (enabledDays.length === 0) return '근무일 없음';
@@ -292,6 +295,7 @@ function calculateWorkMinutes({
 }
 
 function calculateWeeklyWorkHours(shift: {
+  shift_type?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   break_start_time?: string | null;
@@ -299,6 +303,13 @@ function calculateWeeklyWorkHours(shift: {
   weekly_work_days?: number | null;
   daily_schedules?: WeeklyShiftSchedule | null;
 }) {
+  const workMinutes = calculateWorkMinutes(shift);
+
+  if (shift.shift_type === '1일근무1일휴무') {
+    // 1일근무 1일휴무 (격일제)는 주 평균 3.5일 근무로 산정
+    return Math.round(((workMinutes * 3.5) / 60) * 10) / 10;
+  }
+
   if (shift.daily_schedules) {
     const totalMinutes = WEEKDAY_OPTIONS.reduce((sum, day) => {
       const schedule = shift.daily_schedules?.[day.key];
@@ -314,7 +325,6 @@ function calculateWeeklyWorkHours(shift: {
   }
 
   const weeklyDays = Math.max(0, Number(shift.weekly_work_days) || 0);
-  const workMinutes = calculateWorkMinutes(shift);
   return Math.round(((workMinutes * weeklyDays) / 60) * 10) / 10;
 }
 
@@ -832,17 +842,23 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                 </div>
               )}
             </div>
-            <p className="mt-2 text-[10px] font-bold text-[var(--toss-gray-4)] truncate" title={formatWeeklyScheduleSummary(shift.daily_schedules)}>
-              {formatWeeklyScheduleSummary(shift.daily_schedules)}
+            <p className="mt-2 text-[10px] font-bold text-[var(--toss-gray-4)] truncate" title={formatWeeklyScheduleSummary(shift.daily_schedules, shift.shift_type)}>
+              {formatWeeklyScheduleSummary(shift.daily_schedules, shift.shift_type)}
             </p>
             {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift || hasShiftContractMeta(shift)) && (
               <div className="mt-2 text-[9px] font-bold text-white flex flex-wrap gap-1">
                 {shift.is_shift && <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-indigo-600 border border-indigo-700 shadow-sm">교대</span>}
                 {shift.shift_type && <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
-                {shift.weekly_work_days && (
-                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
-                    {formatWorkDayMode(shift.work_day_mode || resolveWorkDayMode(shift))}
+                {shift.shift_type === '1일근무1일휴무' ? (
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-emerald-600 border border-emerald-700 shadow-sm">
+                    평균 주 3.5일
                   </span>
+                ) : (
+                  shift.weekly_work_days && (
+                    <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
+                      {formatWorkDayMode(shift.work_day_mode || resolveWorkDayMode(shift))}
+                    </span>
+                  )
                 )}
                 <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
                   주 {calculateWeeklyWorkHours(shift)}시간
@@ -926,7 +942,11 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
               <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="caption uppercase">요일별 출퇴근 시간</label>
-                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">주 {countEnabledWorkDays(newShift.daily_schedules)}일</span>
+                  <span className="text-[10px] font-bold text-[var(--accent)]">
+                    {newShift.shift_type === '1일근무1일휴무' 
+                      ? '순환 격일제 (평균 주 3.5일)' 
+                      : `주 ${countEnabledWorkDays(newShift.daily_schedules)}일`}
+                  </span>
                 </div>
                 <div className="space-y-1.5">
                   {WEEKDAY_OPTIONS.map((day) => {
