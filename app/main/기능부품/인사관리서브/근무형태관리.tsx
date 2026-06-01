@@ -1205,6 +1205,19 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                   </div>
                 </label>
               </div>
+
+              {/* 💡 격일제/순환 교대제 가이드 */}
+              <div className="bg-emerald-500/10 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-500/20 text-[10px] space-y-1.5 text-emerald-800 dark:text-emerald-500">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span className="text-xs">💡</span>
+                  <span>하루 일하고 하루 쉬는 근로자(순환형 격일제) 설정 팁</span>
+                </div>
+                <p className="font-semibold leading-relaxed">
+                  1. <strong>명칭</strong>에 &quot;격일제 (1일 근무 1일 휴무)&quot;로 입력 후<br />
+                  2. <strong>근무 패턴</strong>에서 <strong>&apos;1일근무1일휴무&apos;</strong>를 선택하세요.<br />
+                  3. 요일과 관계없이 교대 롤링이 가능하도록 위의 <strong>&apos;교대 근무 전용 스케줄 여부&apos;</strong>를 꼭 <strong>체크</strong>해 주시면 교대제 캘린더에서 유연하게 일정을 자동 배정할 수 있습니다.
+                </p>
+              </div>
             </div>
             <div className="flex gap-2 pt-4">
               <button type="button" onClick={() => { setShowAddModal(false); setEditingShiftIds([]); }} className="flex-1 py-4 text-[11px] font-semibold btn-toss-secondary">취소</button>
