@@ -294,3 +294,40 @@ export function useMyLatestPayroll(staffId: string | null | undefined): MyPaysli
 
   return state;
 }
+
+// ─── 증명서: 최근 발급 내역 (certificate_issuances) ───
+export type MyRecentCert = { id: string; title: string; date: string };
+
+export function useMyRecentCerts(staffId: string | null | undefined): { rows: MyRecentCert[]; loading: boolean } {
+  const [rows, setRows] = useState<MyRecentCert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!staffId) { setRows([]); setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('certificate_issuances')
+          .select('id, cert_type, issued_at')
+          .eq('staff_id', staffId)
+          .order('issued_at', { ascending: false })
+          .limit(20);
+        if (cancelled) return;
+        const list = Array.isArray(data) ? (data as Array<Record<string, unknown>>) : [];
+        setRows(list.map((r) => ({
+          id: String(r['id'] ?? ''),
+          title: String(r['cert_type'] ?? '증명서'),
+          date: String(r['issued_at'] ?? '').slice(0, 10).replace(/-/g, '.'),
+        })).filter((r) => r.id));
+      } catch {
+        if (!cancelled) setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [staffId]);
+
+  return { rows, loading };
+}

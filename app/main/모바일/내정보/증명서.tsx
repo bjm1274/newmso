@@ -14,6 +14,7 @@ import { memo } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import { useMyRecentCerts } from './data-hooks';
 
 type CertDoc = {
   id: string;
@@ -22,6 +23,7 @@ type CertDoc = {
   subtitle: string;
 };
 
+// 발급 가능 서류 카탈로그(정적 목록 — 실제 발급은 인사팀 승인 후 처리).
 const CERT_DOCS: CertDoc[] = [
   { id: 'c1', icon: 'fileText', title: '재직증명서', subtitle: '현재 재직 상태를 증명하는 서류' },
   { id: 'c2', icon: 'badge', title: '경력증명서', subtitle: '재직 기간 및 경력을 증명하는 서류' },
@@ -29,22 +31,14 @@ const CERT_DOCS: CertDoc[] = [
   { id: 'c4', icon: 'list', title: '갑종근로소득 지급명세서', subtitle: '근로소득 지급 내역 증빙 서류' },
 ];
 
-type RecentCert = {
-  id: string;
-  title: string;
-  date: string;
-};
-
-const RECENT_CERTS: RecentCert[] = [
-  { id: 'r1', title: '재직증명서', date: '2026.4.28' },
-];
-
 export type 증명서Props = {
   user: ErpUser;
   onBack: () => void;
 };
 
-function 증명서Base({ user: _user, onBack }: 증명서Props) {
+function 증명서Base({ user, onBack }: 증명서Props) {
+  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const { rows: recentCerts, loading } = useMyRecentCerts(staffId);
   return (
     <div className="m-screen">
       <MobileHeader title="증명서" back={onBack} />
@@ -116,7 +110,12 @@ function 증명서Base({ user: _user, onBack }: 증명서Props) {
             <div className="lbl">최근 발급</div>
           </div>
           <div className="m-card flush">
-            {RECENT_CERTS.map((cert) => (
+            {!loading && recentCerts.length === 0 && (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13, fontWeight: 600 }}>
+                최근 발급한 증명서가 없습니다.
+              </div>
+            )}
+            {recentCerts.map((cert) => (
               <div
                 key={cert.id}
                 className="msm-row"
