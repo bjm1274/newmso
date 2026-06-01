@@ -241,14 +241,17 @@ export function buildInternalStorageDownloadUrl(url: string, fileName: string): 
 }
 
 export function isAllowedPublicStorageUrl(url: string): boolean {
-  const config = getR2Config();
-  if (!config?.publicBaseUrl) {
+  const publicBaseUrl =
+    normalizeOptionalUrl(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL) ||
+    normalizeOptionalUrl(process.env.R2_PUBLIC_BASE_URL);
+
+  if (!publicBaseUrl) {
     return false;
   }
 
   try {
     const candidate = new URL(url);
-    const allowed = new URL(config.publicBaseUrl);
+    const allowed = new URL(publicBaseUrl);
     if (candidate.hostname !== allowed.hostname) {
       return false;
     }
