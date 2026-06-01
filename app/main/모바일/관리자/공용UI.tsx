@@ -13,6 +13,7 @@
 
 import { memo, type ReactNode } from 'react';
 import MIcon from '../공통/MIcon';
+import MKpi from '../공통/MKpi';
 
 // ─────────────────────────────────────────────────────────────
 // DesktopHint
@@ -66,53 +67,28 @@ export const DesktopHint = memo(function DesktopHint({
 
 export type KpiTone = '' | 'accent' | 'success' | 'warning' | 'danger';
 
+/**
+ * MiniKpi — 공통 MKpi의 얇은 래퍼(중복 제거).
+ * value를 string|number 모두 받도록 받아 기존 호출부 호환 유지.
+ * icon 지정 시 아이콘 틴트 가로 레이아웃(허브 KPI와 동일).
+ */
 export const MiniKpi = memo(function MiniKpi({
   label,
   value,
   unit,
   sub,
   tone = '',
+  icon,
 }: {
   label: string;
-  value: string;
+  value: string | number;
   unit?: string;
   sub?: string;
   tone?: KpiTone;
+  icon?: string;
 }) {
-  const colorMap: Record<KpiTone, string> = {
-    '': 'var(--z-900)',
-    accent: 'var(--m-accent)',
-    success: 'var(--m-success)',
-    warning: 'var(--m-warning)',
-    danger: 'var(--m-danger)',
-  };
   return (
-    <div className="m-card" style={{ padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
-      <div
-        className="m-tnum"
-        style={{
-          fontSize: 22,
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          marginTop: 4,
-          color: colorMap[tone],
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 3,
-        }}
-      >
-        {value}
-        {unit && (
-          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{unit}</span>
-        )}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
-          {sub}
-        </div>
-      )}
-    </div>
+    <MKpi label={label} value={String(value)} unit={unit} sub={sub} tone={tone} icon={icon} />
   );
 });
 

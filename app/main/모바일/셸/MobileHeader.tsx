@@ -13,11 +13,13 @@ import MIcon from '../공통/MIcon';
 export type MobileHeaderProps = {
   title: string;
   sub?: ReactNode;
+  /** 제목 위에 표시되는 작은 회색 라벨(모듈 카테고리). 허브 화면에서 사용. */
+  eyebrow?: ReactNode;
   back?: () => void;
   actions?: ReactNode;
 };
 
-export default function MobileHeader({ title, sub, back, actions }: MobileHeaderProps) {
+export default function MobileHeader({ title, sub, eyebrow, back, actions }: MobileHeaderProps) {
   return (
     <div className="m-header">
       {back && (
@@ -31,6 +33,7 @@ export default function MobileHeader({ title, sub, back, actions }: MobileHeader
         </button>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <div className="title">{title}</div>
         {sub && <div className="sub">{sub}</div>}
       </div>

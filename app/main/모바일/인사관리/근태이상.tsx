@@ -18,6 +18,7 @@ import { toast } from '@/lib/toast';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MChip from '../공통/MChip';
+import MKpi from '../공통/MKpi';
 import {
   useMyAttendanceMonth,
   useDerivedMonthKey,
@@ -161,36 +162,14 @@ function MineTab({
         }}
       >
         {kpis.map((k) => (
-          <div key={k.label} className="m-card" style={{ padding: '12px 12px' }}>
-            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{k.label}</div>
-            <div
-              className="m-tnum"
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                letterSpacing: '-0.025em',
-                marginTop: 4,
-                color:
-                  k.tone === 'warning'
-                    ? 'var(--m-warning)'
-                    : k.tone === 'danger'
-                      ? 'var(--m-danger)'
-                      : 'var(--z-900)',
-              }}
-            >
-              {k.value}
-              <span
-                style={{
-                  fontSize: 11,
-                  color: 'var(--z-500)',
-                  fontWeight: 700,
-                  marginLeft: 3,
-                }}
-              >
-                회
-              </span>
-            </div>
-          </div>
+          <MKpi
+            key={k.label}
+            icon={k.label === '지각' ? 'clock' : 'alertTri'}
+            label={k.label}
+            value={String(k.value)}
+            unit="회"
+            tone={k.tone}
+          />
         ))}
       </div>
 

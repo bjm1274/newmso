@@ -19,6 +19,7 @@ import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MListRow from '../공통/MListRow';
 import MKpi from '../공통/MKpi';
+import MIcon from '../공통/MIcon';
 import 재고현황 from './재고현황';
 import 입출고 from './입출고';
 import 물품자산 from './물품자산';
@@ -57,9 +58,9 @@ interface StockMenu {
 }
 
 const STOCK_MENU: StockMenu[] = [
-  { id: 'stock', label: '재고 현황', sub: '현황 · 내 부서 · 알림 · 유효기간', icon: 'box', tone: 'accent', badge: '부족 23', badgeTone: 'danger' },
-  { id: 'io', label: '입출고 · 발주', sub: '입출고 · 발주 · 거래처 · 명세서', icon: 'download', tone: '', badge: '발주 3', badgeTone: 'warning' },
-  { id: 'item', label: '물품 · 자산', sub: '물품등록 · 카테고리 · 자산 QR · UDI', icon: 'grid', tone: '' },
+  { id: 'stock', label: '재고 현황', sub: '현황 · 내 부서 · 알림 · 유효기간', icon: 'box', tone: 'accent', badge: '부족 23', badgeTone: 'warning' },
+  { id: 'io', label: '입출고 · 발주', sub: '입출고 · 발주 · 거래처 · 명세서', icon: 'download', tone: 'success', badge: '발주 3', badgeTone: 'warning' },
+  { id: 'item', label: '물품 · 자산', sub: '물품등록 · 카테고리 · 자산 QR · UDI', icon: 'grid', tone: 'accent' },
   { id: 'analyze', label: '분석 · 마감', sub: 'ABC · 수요예측 · 실사 · 월마감', icon: 'layers', tone: '' },
 ];
 
@@ -135,8 +136,21 @@ function Hub({
 }) {
   return (
     <div className="m-screen">
-      <MobileHeader title="재고관리" sub={company || '운영'} back={onExit} />
+      <MobileHeader
+        title="재고관리"
+        eyebrow="운영"
+        back={onExit}
+        actions={
+          <button type="button" aria-label="품목 검색">
+            <MIcon name="search" size={20} />
+          </button>
+        }
+      />
       <div className="m-scroll">
+        <div className="m-company-sel">
+          <span className="nm">{company || '박철홍정형외과'}</span>
+          <MIcon name="chevD" size={18} className="chev" />
+        </div>
         {/* KPI — 데이터 연동은 추후 일괄(현재 표기값은 더미) */}
         <div
           style={{
@@ -146,14 +160,15 @@ function Hub({
             padding: '12px 16px',
           }}
         >
-          <MKpi label="전체 품목" value="847" unit="종" sub="소모품 412" tone="accent" />
-          <MKpi label="부족 품목" value="23" unit="건" sub="발주 권장 12" tone="danger" />
-          <MKpi label="재고 0" value="4" unit="건" sub="긴급 보충" tone="danger" />
-          <MKpi label="유효기간 임박" value="8" unit="건" sub="30일 이내" tone="warning" />
+          <MKpi icon="box" label="전체 품목" value="847" unit="종" sub="소모품 412" tone="accent" />
+          <MKpi icon="alertTri" label="부족 품목" value="23" unit="건" sub="발주 권장 12" tone="warning" />
+          <MKpi icon="alertTri" label="재고 0" value="4" unit="건" sub="긴급 보충" tone="danger" />
+          <MKpi icon="clock" label="유효기간 임박" value="8" unit="건" sub="30일 이내" tone="warning" />
         </div>
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">재고관리 메뉴</div>
+            <div className="cnt">{STOCK_MENU.length}</div>
           </div>
           <div className="m-card flush">
             {STOCK_MENU.map((m) => (

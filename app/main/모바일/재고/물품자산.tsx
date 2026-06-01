@@ -25,6 +25,7 @@ import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
+import MKpi from '../공통/MKpi';
 import {
   useItemData,
   toMTone,
@@ -308,8 +309,8 @@ function UdiPane({
           marginBottom: 12,
         }}
       >
-        <MiniKpi label="등록" value={registered} tone="success" />
-        <MiniKpi label="대상 자산" value={data.assetCount} tone="accent" />
+        <MKpi label="등록" value={String(registered)} tone="success" icon="plus" />
+        <MKpi label="대상 자산" value={String(data.assetCount)} tone="accent" icon="box" />
       </div>
 
       {data.udis.length === 0 ? (
@@ -350,38 +351,3 @@ function UdiPane({
   );
 }
 
-function MiniKpi({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'success' | 'warning' | 'danger' | 'accent';
-}) {
-  const color =
-    tone === 'success'
-      ? 'var(--m-success)'
-      : tone === 'warning'
-        ? 'var(--m-warning)'
-        : tone === 'danger'
-          ? 'var(--m-danger)'
-          : 'var(--m-accent)';
-  return (
-    <div className="m-card" style={{ padding: '12px 12px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
-      <div
-        className="m-tnum"
-        style={{
-          fontSize: 20,
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          marginTop: 4,
-          color,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}

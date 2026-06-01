@@ -118,11 +118,31 @@ function Hub({
   const company = typeof user.company === 'string' ? user.company : '';
   return (
     <div className="m-screen">
-      <MobileHeader title="관리자" sub={company || '관리자 전용'} back={onBack} />
+      <MobileHeader
+        title="관리자"
+        eyebrow="운영"
+        back={onBack}
+        actions={
+          <button type="button" aria-label="알림">
+            <MIcon name="bell" size={20} />
+          </button>
+        }
+      />
       <div className="m-scroll">
+        <div className="m-admin-hero">
+          <div className="cap">2026년 5월 · {company || '박철홍정형외과'} 통합</div>
+          <div className="lbl">5월 누적 매출</div>
+          <div className="big m-tnum">
+            182,420,000<span className="u">원</span>
+          </div>
+          <div className="delta">
+            전월 동기 +4.2% <span className="muted">· 목표 달성률 38%</span>
+          </div>
+        </div>
         <div className="m-section">
           <div className="m-section-h">
-            <div className="lbl">관리자 워크센터 7</div>
+            <div className="lbl">관리자 메뉴</div>
+            <div className="cnt">{HUB_ITEMS.length}</div>
           </div>
           <div className="m-card flush">
             {HUB_ITEMS.map((item) => (

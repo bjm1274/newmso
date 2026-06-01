@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
+import MKpi from '../공통/MKpi';
 import {
   useMyAttendanceMonth,
   useDerivedMonthKey,
@@ -220,24 +221,22 @@ function DashTab({
         }}
       >
         {kpis.map((k) => (
-          <div key={k.label} className="m-card" style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{k.label}</div>
-            <div
-              className="m-tnum"
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                letterSpacing: '-0.025em',
-                marginTop: 4,
-                color: kpiColor(k.tone),
-              }}
-            >
-              {k.value}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
-              {k.sub}
-            </div>
-          </div>
+          <MKpi
+            key={k.label}
+            icon={
+              k.label === '출근'
+                ? 'checkCircle'
+                : k.label === '지각'
+                  ? 'clock'
+                  : k.label === '조퇴'
+                    ? 'alertTri'
+                    : 'calendar'
+            }
+            label={k.label}
+            value={k.value}
+            sub={k.sub}
+            tone={k.tone}
+          />
         ))}
       </div>
 
@@ -295,19 +294,6 @@ function DashTab({
       <div style={{ height: 24 }} />
     </>
   );
-}
-
-function kpiColor(tone: '' | 'accent' | 'success' | 'warning'): string {
-  switch (tone) {
-    case 'success':
-      return 'var(--m-success)';
-    case 'warning':
-      return 'var(--m-warning)';
-    case 'accent':
-      return 'var(--m-accent)';
-    default:
-      return 'var(--z-900)';
-  }
 }
 
 function statusLabel(status: string | null): string {

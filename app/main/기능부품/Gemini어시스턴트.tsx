@@ -161,7 +161,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
           <div>
             <h3 className="text-sm font-black text-[var(--foreground)]">Gemini AI 행정 어시스턴트</h3>
             <p className="text-[10.5px] font-bold text-[var(--toss-gray-3)]">
-              구글 Gemini 2.5 Flash 모델 기반 · 병원 전문 비서
+              구글 Gemini 3.5 Flash 모델 기반 · 병원 전문 비서
             </p>
           </div>
         </div>

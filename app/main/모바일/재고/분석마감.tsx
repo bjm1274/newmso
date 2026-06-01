@@ -25,6 +25,7 @@ import { useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
+import MKpi from '../공통/MKpi';
 import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
 import {
@@ -548,55 +549,10 @@ function RmaPane() {
           marginTop: 12,
         }}
       >
-        <KpiSimple label="AS 진행" hint="모바일 조회 전용" tone="warning" />
-        <KpiSimple label="반품 진행" hint="모바일 조회 전용" tone="accent" />
+        <MKpi icon="receipt" label="AS 진행" value="—" sub="모바일 조회 전용" tone="warning" />
+        <MKpi icon="upload" label="반품 진행" value="—" sub="모바일 조회 전용" tone="accent" />
       </div>
     </div>
   );
 }
 
-function KpiSimple({
-  label,
-  hint,
-  tone,
-}: {
-  label: string;
-  hint: string;
-  tone: 'accent' | 'success' | 'warning' | 'danger';
-}) {
-  const color =
-    tone === 'accent'
-      ? 'var(--m-accent)'
-      : tone === 'success'
-        ? 'var(--m-success)'
-        : tone === 'warning'
-          ? 'var(--m-warning)'
-          : 'var(--m-danger)';
-  return (
-    <div className="m-card" style={{ padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
-      <div
-        className="m-tnum"
-        style={{
-          fontSize: 22,
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          marginTop: 4,
-          color,
-        }}
-      >
-        —
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: 'var(--z-500)',
-          fontWeight: 600,
-          marginTop: 2,
-        }}
-      >
-        {hint}
-      </div>
-    </div>
-  );
-}

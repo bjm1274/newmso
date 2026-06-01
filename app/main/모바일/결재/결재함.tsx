@@ -299,8 +299,8 @@ export default function SApproval({
                 marginBottom: 12,
               }}
             >
-              <KpiCard label="대기" value={inbox.length} tone="accent" />
-              <KpiCard label="24h 초과" value={overdueCount} tone="danger" />
+              <KpiCard label="대기" value={inbox.length} tone="accent" icon="approval" />
+              <KpiCard label="24h 초과" value={overdueCount} tone="danger" icon="clock" />
             </div>
           </div>
         )}

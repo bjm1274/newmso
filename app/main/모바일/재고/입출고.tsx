@@ -24,6 +24,7 @@ import { useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
+import MKpi from '../공통/MKpi';
 import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
 import {
@@ -33,7 +34,7 @@ import {
   canPlaceOrder,
   type StockMutateUser,
 } from './data-hooks';
-import { IORecordForm, KpiCard } from './입출고-form';
+import { IORecordForm } from './입출고-form';
 
 export type IOTab = 'io' | 'order' | 'vendor' | 'doc' | 'history';
 
@@ -179,8 +180,8 @@ function IoPane({
           gap: 8,
         }}
       >
-        <KpiCard label="오늘 입고" value={inCount} unit="건" tone="accent" />
-        <KpiCard label="오늘 출고" value={outCount} unit="건" tone="success" />
+        <MKpi icon="download" label="오늘 입고" value={String(inCount)} unit="건" tone="accent" />
+        <MKpi icon="upload" label="오늘 출고" value={String(outCount)} unit="건" tone="success" />
       </div>
       <div className="m-section">
         <div className="m-section-h">

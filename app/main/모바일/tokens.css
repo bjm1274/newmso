@@ -124,6 +124,7 @@
   letter-spacing: 0.04em; text-transform: uppercase;
 }
 .mso-mobile .m-section-h .more { font-size: 11px; font-weight: 700; color: var(--m-accent); }
+.mso-mobile .m-section-h .cnt { font-size: 12px; font-weight: 800; color: var(--z-400); font-feature-settings: "tnum"; }
 
 /* ─── 헤더 ───────────────────────────────────────────────────*/
 .mso-mobile .m-header {
@@ -141,6 +142,7 @@
   color: var(--z-700);
 }
 .mso-mobile .m-header .title { font-size: 17px; font-weight: 800; letter-spacing: -0.025em; flex: 1; min-width: 0; }
+.mso-mobile .m-header .eyebrow { font-size: 11px; color: var(--z-400); font-weight: 700; letter-spacing: -0.01em; margin-bottom: 1px; }
 .mso-mobile .m-header .sub { font-size: 11px; color: var(--z-500); font-weight: 600; margin-top: 1px; }
 .mso-mobile .m-header .actions { display: flex; gap: 4px; }
 .mso-mobile .m-header .actions button {
@@ -213,6 +215,48 @@
 .mso-mobile .m-list-row .sub { font-size: 11px; color: var(--z-500); margin-top: 1px; font-weight: 500; }
 .mso-mobile .m-list-row .val { font-size: 15px; font-weight: 800; letter-spacing: -0.012em; font-feature-settings: "tnum"; }
 .mso-mobile .m-list-row .val .u { font-size: 10px; color: var(--z-500); font-weight: 700; margin-left: 2px; }
+
+/* ─── 허브 KPI 아이콘 타일 (MKpi icon) ──────────────────────*/
+.mso-mobile .m-kpi-ico {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--z-100); color: var(--z-500);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.mso-mobile .m-kpi-ico.tone-accent  { background: var(--m-accent-soft); color: var(--m-accent); }
+.mso-mobile .m-kpi-ico.tone-success { background: var(--m-success-soft); color: var(--m-success); }
+.mso-mobile .m-kpi-ico.tone-warning { background: var(--m-warning-soft); color: var(--m-warning); }
+.mso-mobile .m-kpi-ico.tone-danger  { background: var(--m-danger-soft); color: var(--m-danger); }
+
+/* ─── 회사 선택 셀렉터 (허브 상단) ──────────────────────────*/
+.mso-mobile .m-company-sel {
+  margin: 12px 16px 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 14px;
+  background: var(--m-card); border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-md);
+  font-size: 14px; font-weight: 700; color: var(--z-800);
+  width: calc(100% - 32px); text-align: left;
+}
+.mso-mobile .m-company-sel:active { background: var(--z-50); }
+.mso-mobile .m-company-sel .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mso-mobile .m-company-sel .chev { color: var(--z-400); flex-shrink: 0; }
+
+/* ─── 관리자 매출 히어로 카드 ───────────────────────────────*/
+.mso-mobile .m-admin-hero {
+  margin: 12px 16px 0;
+  background: linear-gradient(135deg, #18181B, #27272A);
+  border-radius: var(--m-radius-lg);
+  padding: 16px 18px; color: #fff;
+}
+.mso-mobile .m-admin-hero .cap { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); }
+.mso-mobile .m-admin-hero .lbl { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.78); margin-top: 8px; }
+.mso-mobile .m-admin-hero .big {
+  font-size: 28px; font-weight: 800; letter-spacing: -0.03em;
+  margin-top: 2px; font-feature-settings: "tnum";
+}
+.mso-mobile .m-admin-hero .big .u { font-size: 15px; font-weight: 700; margin-left: 2px; }
+.mso-mobile .m-admin-hero .delta { font-size: 12px; font-weight: 700; color: #34D399; margin-top: 8px; }
+.mso-mobile .m-admin-hero .delta .muted { color: rgba(255,255,255,0.6); font-weight: 600; }
 
 /* ─── 칩 ─────────────────────────────────────────────────────*/
 .mso-mobile .m-chip {

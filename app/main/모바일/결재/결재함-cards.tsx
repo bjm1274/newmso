@@ -94,25 +94,36 @@ export function statusTone(
 // KPI 카드
 // ─────────────────────────────────────────────
 
-export type KpiCardProps = { label: string; value: number; tone: 'accent' | 'danger' };
+export type KpiCardProps = { label: string; value: number; tone: 'accent' | 'danger'; icon?: string };
 
-function KpiCardBase({ label, value, tone }: KpiCardProps) {
+function KpiCardBase({ label, value, tone, icon }: KpiCardProps) {
   const color = tone === 'danger' ? 'var(--m-danger)' : 'var(--m-accent)';
+  const toneClass = tone === 'danger' ? 'tone-danger' : 'tone-accent';
   return (
-    <MCard style={{ padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
+    <MCard style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      {icon && (
+        <div className={'m-kpi-ico ' + toneClass}>
+          <MIcon name={icon} size={18} />
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: 'var(--z-700)', fontWeight: 700 }}>{label}</div>
+      </div>
       <div
         className="m-tnum"
         style={{
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: 800,
           letterSpacing: '-0.025em',
-          marginTop: 4,
           color,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 2,
+          flexShrink: 0,
         }}
       >
         {value}
-        <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700, marginLeft: 3 }}>건</span>
+        <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 700 }}>건</span>
       </div>
     </MCard>
   );
