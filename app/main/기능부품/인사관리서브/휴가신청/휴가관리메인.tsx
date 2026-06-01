@@ -3,8 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { syncAnnualLeaveUsedForStaff, calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
-import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
+import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -189,26 +188,25 @@ export default function LeaveManagement({
 
       let recalculatedUsedDays: number | null = null;
       if (targetLeave?.staff_id) {
-        if (typeof window !== 'undefined') {
-          // 브라우저에서는 D1 server-only 바인딩을 피하기 위해 정본 헬퍼로 클라이언트 계산.
-          // calculateApprovedAnnualLeaveUsage 는 연도 클리핑 포함(연말~연초 휴가 과다계산 방지).
-          const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, status } : l));
-          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === targetLeave.staff_id);
+        // 브라우저에서는 D1 server-only 바인딩을 피하기 위해 정본 헬퍼로 클라이언트 계산.
+        // calculateApprovedAnnualLeaveUsage 는 연도 클리핑 포함(연말~연초 휴가 과다계산 방지).
+        const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, status } : l));
+        const staffLeaves = updatedLeaves.filter((l) => l.staff_id === targetLeave.staff_id);
 
-          recalculatedUsedDays = calculateApprovedAnnualLeaveUsage(staffLeaves as Record<string, unknown>[]);
+        recalculatedUsedDays = calculateApprovedAnnualLeaveUsage(staffLeaves as Record<string, unknown>[]);
 
-          await supabase
-            .from('staff_members')
-            .update({ annual_leave_used: recalculatedUsedDays })
-            .eq('id', targetLeave.staff_id);
-        } else {
-          recalculatedUsedDays = await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
-        }
+        await supabase
+          .from('staff_members')
+          .update({ annual_leave_used: recalculatedUsedDays })
+          .eq('id', targetLeave.staff_id);
 
         // leave_balances 정합성 갱신 (JM3: 실패해도 메인 흐름 차단 안 함)
-        recalculateLeaveBalance(targetLeave.staff_id).catch((err) => {
-          console.error('[handleStatusUpdate] recalculateLeaveBalance 실패:', err);
-          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: targetLeave.staff_id }),
+        }).catch((err) => {
+          console.error('[handleStatusUpdate] 연차 동기화 API 실패:', err);
         });
       }
 
@@ -260,24 +258,24 @@ export default function LeaveManagement({
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
       if (target?.staff_id) {
-        if (typeof window !== 'undefined') {
-          const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, ...patch } : l));
-          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
+        const updatedLeaves = leaves.map((l) => (l.id === id ? { ...l, ...patch } : l));
+        const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
 
-          const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
-            staffLeaves as Record<string, unknown>[],
-          );
+        const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
+          staffLeaves as Record<string, unknown>[],
+        );
 
-          await supabase
-            .from('staff_members')
-            .update({ annual_leave_used: approvedAnnualLeaveDays })
-            .eq('id', target.staff_id);
-        } else {
-          await syncAnnualLeaveUsedForStaff(target.staff_id);
-        }
-        recalculateLeaveBalance(target.staff_id).catch((err) => {
-          console.error('[handleEditLeave] recalculateLeaveBalance 실패:', err);
-          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        await supabase
+          .from('staff_members')
+          .update({ annual_leave_used: approvedAnnualLeaveDays })
+          .eq('id', target.staff_id);
+
+        fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: target.staff_id }),
+        }).catch((err) => {
+          console.error('[handleEditLeave] 연차 동기화 API 실패:', err);
         });
       }
 
@@ -331,24 +329,24 @@ export default function LeaveManagement({
       setLeaves((prev) => prev.filter((l) => l.id !== id));
 
       if (target?.staff_id) {
-        if (typeof window !== 'undefined') {
-          const updatedLeaves = leaves.filter((l) => l.id !== id);
-          const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
+        const updatedLeaves = leaves.filter((l) => l.id !== id);
+        const staffLeaves = updatedLeaves.filter((l) => l.staff_id === target.staff_id);
 
-          const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
-            staffLeaves as Record<string, unknown>[],
-          );
+        const approvedAnnualLeaveDays = calculateApprovedAnnualLeaveUsage(
+          staffLeaves as Record<string, unknown>[],
+        );
 
-          await supabase
-            .from('staff_members')
-            .update({ annual_leave_used: approvedAnnualLeaveDays })
-            .eq('id', target.staff_id);
-        } else {
-          await syncAnnualLeaveUsedForStaff(target.staff_id);
-        }
-        recalculateLeaveBalance(target.staff_id).catch((err) => {
-          console.error('[handleDeleteLeave] recalculateLeaveBalance 실패:', err);
-          toast('연차 잔액 갱신에 실패했습니다. 잔액이 일시적으로 부정확할 수 있습니다.', 'warning');
+        await supabase
+          .from('staff_members')
+          .update({ annual_leave_used: approvedAnnualLeaveDays })
+          .eq('id', target.staff_id);
+
+        fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: target.staff_id }),
+        }).catch((err) => {
+          console.error('[handleDeleteLeave] 연차 동기화 API 실패:', err);
         });
       }
 
@@ -416,9 +414,12 @@ export default function LeaveManagement({
         }
 
         await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', (s as Record<string, unknown>).id);
-        // leave_balances 동기화
-        recalculateLeaveBalance(String((s as Record<string, unknown>).id)).catch((err) => {
-          console.error('[runAnnualLeaveAutoGrant] recalculateLeaveBalance 실패:', err, (s as Record<string, unknown>).id);
+        fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: String((s as Record<string, unknown>).id) }),
+        }).catch((err) => {
+          console.error('[runAnnualLeaveAutoGrant] 연차 동기화 API 실패:', err);
         });
       }
       toast('연차 자동 부여가 완료되었습니다.', 'success');

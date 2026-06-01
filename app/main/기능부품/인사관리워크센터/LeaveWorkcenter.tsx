@@ -33,8 +33,7 @@ import {
   type WorkcenterKpi,
 } from './workcenter-common';
 import { supabase } from '@/lib/supabase';
-import { syncAnnualLeaveUsedForStaff, calculateLeaveDays } from '@/lib/annual-leave-ledger';
-import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
+import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { LeaveBalanceTable } from './LeaveWorkcenter/LeaveBalanceTable';
 import LeaveQuickForm from './LeaveWorkcenter/LeaveQuickForm';
@@ -123,8 +122,18 @@ export default function LeaveWorkcenter({
         }
       }
 
-      await syncAnnualLeaveUsedForStaff(targetLeave.staff_id);
-      await recalculateLeaveBalance(targetLeave.staff_id);
+      try {
+        const syncRes = await fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: targetLeave.staff_id }),
+        });
+        if (!syncRes.ok) {
+          console.error('연차 동기화 서버 실패:', await syncRes.text());
+        }
+      } catch (syncErr) {
+        console.error('연차 동기화 API 호출 실패:', syncErr);
+      }
 
       const actor = readClientAuditActor();
       await logAudit(
@@ -171,8 +180,18 @@ export default function LeaveWorkcenter({
           .eq('id', target.staff_id);
       }
 
-      await syncAnnualLeaveUsedForStaff(target.staff_id);
-      await recalculateLeaveBalance(target.staff_id);
+      try {
+        const syncRes = await fetch('/api/admin/annual-leave/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffId: target.staff_id }),
+        });
+        if (!syncRes.ok) {
+          console.error('연차 동기화 서버 실패:', await syncRes.text());
+        }
+      } catch (syncErr) {
+        console.error('연차 동기화 API 호출 실패:', syncErr);
+      }
 
       toast('결재 요청이 삭제되었습니다.', 'success');
       handleSubmitted();
