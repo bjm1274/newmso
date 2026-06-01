@@ -1,3 +1,10 @@
+/**
+ * salary-password.desktop.spec.ts
+ *
+ * 급여명세서 비밀번호 검증.
+ * 진입 경로: 내정보(마이페이지) 메뉴 → 급여·증명서 → 월별 정산 카드
+ */
+
 import { expect, test } from '@playwright/test';
 import { fakeUser, mockSupabase, seedSession } from './helpers';
 
@@ -46,9 +53,10 @@ test('salary slip verification submits the password exactly as entered', async (
       },
     ],
   });
+
   await seedSession(page, {
     localStorage: {
-      erp_last_menu: '\uB0B4\uC815\uBCF4',
+      erp_last_menu: '내정보',
       erp_mypage_tab: 'records',
       erp_mypage_records_view: 'salary',
       erp_permission_prompt_shown: '1',
@@ -68,10 +76,10 @@ test('salary slip verification submits the password exactly as entered', async (
     });
   });
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('\uB0B4\uC815\uBCF4')}`);
+  await page.goto(`/main?open_menu=${encodeURIComponent('내정보')}`);
 
-  await page.getByRole('button', { name: '\uAE09\uC5EC\u00B7\uC99D\uBA85\uC11C' }).click();
-  await page.getByRole('button', { name: '\uC6D4\uBCC4 \uC815\uC0B0 \uCE74\uB4DC' }).click();
+  await page.getByRole('button', { name: '급여·증명서' }).click();
+  await page.getByRole('button', { name: '월별 정산 카드' }).click();
 
   await expect(page.getByTestId('mypage-salary-tab')).toBeVisible();
   await expect(page.getByTestId('salary-password-input')).toBeVisible();

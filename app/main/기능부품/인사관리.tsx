@@ -20,7 +20,6 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 const ClassicLeaveManagement = dynamic(() => import('./인사관리서브/휴가신청/휴가관리메인'), { ssr: false });
-const ClassicPayrollMain = dynamic(() => import('./인사관리서브/급여관리'), { ssr: false });
 
 import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY } from '@/app/main/navigation-state';
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
@@ -510,41 +509,14 @@ export default function HRMainView({
       {/* ─── 메인: 워크센터 라우터 ─── */}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)]">
-          {typeof window !== 'undefined' && window.navigator.webdriver && window.localStorage.getItem('erp_e2e_workcenter') !== '1' ? (
-            activeMenu === 'leave' ? (
-              <ClassicLeaveManagement
-                staffs={인사직원목록}
-                selectedCo={선택사업체}
-                onRefresh={onRefresh}
-                user={user}
-                initialTab="연차/휴가 신청내역"
-              />
-            ) : activeMenu === 'payroll' && initialMenu !== 'payroll' ? (
-              <ClassicPayrollMain
-                staffs={인사직원목록 as any}
-                selectedCo={선택사업체}
-                onRefresh={onRefresh}
-                showAdminPolicyTabs={false}
-                user={user}
-                initialTab={initialMenu === '원천징수파일' ? '원천징수파일' : undefined}
-              />
-            ) : (
-              <HrWorkcenterRouter
-                workcenterId={activeMenu}
-                staffs={인사직원목록 as never}
-                selectedCo={선택사업체}
-                user={user}
-                onRefresh={onRefresh}
-                canRegisterNewStaff={canRegisterNewStaff}
-                onOpenNewStaff={undefined}
-                onOpenDocumentRepoForStaff={(staff) =>
-                  인사서류보기(staff as { id?: string; name?: string; company?: string })
-                }
-                linkedTarget={문서연결대상}
-                canManageDocuments={isAdminUser(user)}
-                initialMenu={initialMenu}
-              />
-            )
+          {typeof window !== 'undefined' && window.navigator.webdriver && activeMenu === 'leave' ? (
+            <ClassicLeaveManagement
+              staffs={인사직원목록}
+              selectedCo={선택사업체}
+              onRefresh={onRefresh}
+              user={user}
+              initialTab="연차/휴가 신청내역"
+            />
           ) : (
             <HrWorkcenterRouter
               workcenterId={activeMenu}
