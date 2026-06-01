@@ -205,6 +205,14 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
 
   const meta = parseShiftMeta(shift);
 
+  // 휴게가 top-level 컬럼(break_start_time/break_end_time)에 없고 break_plans(휴게유형 A/B/C)에만
+  // 저장된 근무형태의 경우, 첫 휴게플랜을 단일근무 휴게로 사용한다.
+  // (근무형태관리 화면은 휴게플랜을 반영해 38.5h를 내지만, daily_schedules 없는 경로에서 top-level
+  //  휴게만 읽으면 휴게가 0으로 잡혀 42h가 되는 불일치를 보정)
+  const fallbackPlan = meta?.break_plans?.[0] ?? null;
+  const effBreakStart = shift.break_start_time || fallbackPlan?.start_time || null;
+  const effBreakEnd = shift.break_end_time || fallbackPlan?.end_time || null;
+
   // -----------------------------------------------------------------------
   // 1. Determine calculatedDays
   // -----------------------------------------------------------------------
@@ -249,8 +257,8 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
         const singleMins = calcWorkMinutes({
           start_time: shift.start_time,
           end_time: shift.end_time,
-          break_start_time: shift.break_start_time,
-          break_end_time: shift.break_end_time,
+          break_start_time: effBreakStart,
+          break_end_time: effBreakEnd,
         });
         calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
       }
@@ -258,8 +266,8 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
       const singleMins = calcWorkMinutes({
         start_time: shift.start_time,
         end_time: shift.end_time,
-        break_start_time: shift.break_start_time,
-        break_end_time: shift.break_end_time,
+        break_start_time: effBreakStart,
+        break_end_time: effBreakEnd,
       });
       calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
     }
@@ -284,8 +292,8 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
       const singleMins = calcWorkMinutes({
         start_time: shift.start_time,
         end_time: shift.end_time,
-        break_start_time: shift.break_start_time,
-        break_end_time: shift.break_end_time,
+        break_start_time: effBreakStart,
+        break_end_time: effBreakEnd,
       });
       calculatedHours = Math.round(((singleMins * calculatedDays) / 60) * 10) / 10;
     }
