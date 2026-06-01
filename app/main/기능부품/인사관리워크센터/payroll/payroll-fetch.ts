@@ -152,7 +152,7 @@ export async function fetchPayrollWorkcenterData({
     const { data, error } = await supabase
       .from('staff_members')
       .select(
-        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions',
+        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account',
       );
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];
@@ -173,6 +173,20 @@ export async function fetchPayrollWorkcenterData({
           salary: row.salary == null ? null : Number(row.salary),
           employee_no: row.employee_no == null ? null : str(row.employee_no),
           permissions: (row.permissions ?? null) as StaffMember['permissions'],
+          base_salary: row.base_salary == null ? 0 : num(row.base_salary),
+          meal_allowance: row.meal_allowance == null ? 0 : num(row.meal_allowance),
+          night_duty_allowance: row.night_duty_allowance == null ? 0 : num(row.night_duty_allowance),
+          vehicle_allowance: row.vehicle_allowance == null ? 0 : num(row.vehicle_allowance),
+          childcare_allowance: row.childcare_allowance == null ? 0 : num(row.childcare_allowance),
+          research_allowance: row.research_allowance == null ? 0 : num(row.research_allowance),
+          other_taxfree: row.other_taxfree == null ? 0 : num(row.other_taxfree),
+          overtime_allowance: row.overtime_allowance == null ? 0 : num(row.overtime_allowance),
+          night_work_allowance: row.night_work_allowance == null ? 0 : num(row.night_work_allowance),
+          holiday_work_allowance: row.holiday_work_allowance == null ? 0 : num(row.holiday_work_allowance),
+          annual_leave_pay: row.annual_leave_pay == null ? 0 : num(row.annual_leave_pay),
+          position_allowance: row.position_allowance == null ? 0 : num(row.position_allowance),
+          bank_name: row.bank_name == null ? null : str(row.bank_name),
+          bank_account: row.bank_account == null ? null : str(row.bank_account),
         };
       })
       .filter((s) => {

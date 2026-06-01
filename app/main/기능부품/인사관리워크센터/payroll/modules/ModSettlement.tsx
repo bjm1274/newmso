@@ -155,6 +155,7 @@ export default function ModSettlement() {
           <h3 className="section-title">정산 5단계 워크플로</h3>
           <button
             type="button"
+            data-testid="mod-settlement-start-button"
             disabled={advancing || doneCount >= 5}
             onClick={handleAdvance}
             aria-disabled={advancing || doneCount >= 5}

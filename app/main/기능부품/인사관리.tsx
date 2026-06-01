@@ -510,7 +510,7 @@ export default function HRMainView({
       {/* ─── 메인: 워크센터 라우터 ─── */}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)]">
-          {typeof window !== 'undefined' && window.navigator.webdriver ? (
+          {typeof window !== 'undefined' && window.navigator.webdriver && window.localStorage.getItem('erp_e2e_workcenter') !== '1' ? (
             activeMenu === 'leave' ? (
               <ClassicLeaveManagement
                 staffs={인사직원목록}

@@ -159,6 +159,7 @@ export default function RiskActionDialog({
           </button>
           <button
             type="button"
+            data-testid="risk-action-dialog-confirm"
             onClick={onConfirm}
             disabled={loading}
             className={`flex-[1.5] rounded-[var(--radius-md)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50 ${

@@ -195,6 +195,7 @@ export default function PayrollDashboard({ onPick }: Props) {
           </div>
           <button
             type="button"
+            data-testid="run-payroll-regular-button"
             onClick={() => handlePick('settlement')}
             className="
               mt-1 px-3.5 py-2
