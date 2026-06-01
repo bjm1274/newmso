@@ -251,9 +251,11 @@ export function normalizeScheduleDateValue(value: unknown) {
 }
 
 export function normalizeScheduleTimeValue(value: unknown) {
+  // 동작 통일: 빈값은 ''로(view-utils 기준). 기존엔 빈값가드가 없어 PC/모바일 결과가 달랐음.
   const raw = String(value ?? '').trim();
-  const matched = raw.match(/^(\d{2}):(\d{2})/);
-  return matched ? `${matched[1]}:${matched[2]}` : raw;
+  if (!raw) return '';
+  const matched = raw.match(/^(\d{2}:\d{2})/);
+  return matched ? matched[1] : raw;
 }
 
 export function isScheduleBoardType(boardType: unknown) {
@@ -319,6 +321,10 @@ export function buildBoardMetaContent(visibleContent: string, meta: BoardMetaPay
 }
 
 export function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
+  // 동작 통일(view-utils 기준): surgery_* 는 typeof boolean 정밀 분기,
+  // schedule_meta_embedded/legacy_missing 필드 부여(PC UI가 의존). 기존 공통판은
+  // fasting에 legacyMissing을 섞고 ?? 폴백을 써 PC와 정규화 결과가 달랐음.
+  if (!post) return post;
   const {
     displayContent: attachmentStrippedContent,
     attachments: embeddedAttachments,
@@ -329,38 +335,38 @@ export function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
     hasEmbeddedMeta,
   } = extractScheduleMetaFromContent(attachmentStrippedContent);
   const {
-    displayContent: cleanContent,
+    displayContent,
     meta: boardMeta,
   } = extractBoardMetaFromContent(scheduleStrippedContent);
   const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? scheduleMeta?.date ?? '');
   const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? scheduleMeta?.time ?? '');
   const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
-  const attachments = embeddedAttachments.length
-    ? embeddedAttachments
-    : Array.isArray(post.attachments)
-      ? post.attachments.map((item) => ({
-          name: String(item?.name || '').trim(),
-          url: String(item?.url || '').trim(),
-          type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')),
-        }))
-      : [];
+  const normalizedAttachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments).map((item) => ({
+    ...item,
+    type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')),
+  }));
 
   return {
     ...post,
-    content: cleanContent,
-    attachments,
+    content: displayContent,
+    attachments: normalizedAttachments,
+    status: String(post.status ?? boardMeta?.status ?? '').trim() || null,
+    scheduled_publish_at: normalizeScheduledPublishAtValue(post.scheduled_publish_at ?? boardMeta?.scheduled_publish_at ?? ''),
     schedule_date: normalizedScheduleDate,
     schedule_time: normalizedScheduleTime,
     schedule_room: String(post.schedule_room ?? scheduleMeta?.room ?? '').trim(),
     patient_name: String(post.patient_name ?? scheduleMeta?.patient ?? '').trim(),
-    surgery_fasting: Boolean(post.surgery_fasting ?? scheduleMeta?.fasting ?? scheduleMetaLegacyMissing),
-    surgery_inpatient: Boolean(post.surgery_inpatient ?? scheduleMeta?.inpatient),
-    surgery_guardian: Boolean(post.surgery_guardian ?? scheduleMeta?.guardian),
-    surgery_caregiver: Boolean(post.surgery_caregiver ?? scheduleMeta?.caregiver),
-    surgery_transfusion: Boolean(post.surgery_transfusion ?? scheduleMeta?.transfusion),
-    mri_contrast_required: Boolean(post.mri_contrast_required ?? scheduleMeta?.contrast),
-    status: String(post.status ?? boardMeta?.status ?? '').trim() || null,
-    scheduled_publish_at: normalizeScheduledPublishAtValue(post.scheduled_publish_at ?? boardMeta?.scheduled_publish_at ?? ''),
+    surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(scheduleMeta?.fasting),
+    surgery_inpatient: typeof post.surgery_inpatient === 'boolean' ? post.surgery_inpatient : Boolean(scheduleMeta?.inpatient),
+    surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(scheduleMeta?.guardian),
+    surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(scheduleMeta?.caregiver),
+    surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(scheduleMeta?.transfusion),
+    mri_contrast_required:
+      typeof post.mri_contrast_required === 'boolean'
+        ? post.mri_contrast_required
+        : Boolean(scheduleMeta?.contrast),
+    schedule_meta_embedded: hasEmbeddedMeta,
+    schedule_meta_legacy_missing: scheduleMetaLegacyMissing,
   };
 }
 
@@ -373,18 +379,24 @@ export function isScheduledNoticePending(post: Partial<BoardPost>, nowMs: number
 }
 
 export function getMissingBoardPostColumn(error: unknown) {
-  const message = String((error as { message?: string })?.message || '').toLowerCase();
-  if (!message.includes('column')) return null;
+  // 동작 통일: message+details+hint 검사(view-utils 기준). 기존 공통판은 message만 봐 폴백이 약했음.
+  if (!error) return null;
+  const e = error as Record<string, unknown>;
+  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
   return BOARD_POST_OPTIONAL_COLUMNS.find((column) => message.includes(column.toLowerCase())) || null;
 }
 
 export function isMissingBoardReadStorageError(error: unknown) {
-  const message = String((error as { message?: string })?.message || '').toLowerCase();
+  // 동작 통일: code(42P01/42703/42P10)+message 검사(view-utils 기준).
+  const e = error as Record<string, unknown> | null;
+  const code = String(e?.code || '').trim();
+  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
   return (
+    code === '42P01' ||
+    code === '42703' ||
+    code === '42P10' ||
     message.includes('board_post_reads') ||
-    message.includes('board read') ||
-    message.includes('does not exist') ||
-    message.includes('schema cache')
+    (message.includes('relation') && message.includes('does not exist'))
   );
 }
 

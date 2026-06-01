@@ -382,22 +382,24 @@ export function isMissingBoardReadStorageError(error: unknown) {
   );
 }
 
-export function normalizeBoardPostStatus(value: unknown) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '게시중';
-  return raw;
-}
-
 export const BOARD_POST_STATUSES = ['게시중', '중요', '검토중', '완료', '보류'] as const;
 
+export function normalizeBoardPostStatus(value: unknown) {
+  // 동작 통일: 허용된 상태만 반환, 미정의는 '게시중'(게시판공통 기준).
+  // 기존 view판은 임의 문자열을 그대로 통과시켜 PC/모바일 정규화가 달랐음.
+  const normalized = String(value ?? '').trim();
+  return (BOARD_POST_STATUSES.find((status) => status === normalized) || '게시중') as (typeof BOARD_POST_STATUSES)[number];
+}
+
 export function getBoardStatusTone(status: string | null | undefined) {
+  // 동작 통일: /10 틴트 색상(게시판공통 기준, 다크모드 친화).
   switch (normalizeBoardPostStatus(status)) {
     case '중요':
-      return 'bg-red-500/10 text-red-600';
+      return 'bg-red-500/10 text-red-500';
     case '검토중':
-      return 'bg-amber-50 text-amber-700';
+      return 'bg-amber-500/10 text-amber-600';
     case '완료':
-      return 'bg-emerald-50 text-emerald-700';
+      return 'bg-emerald-500/10 text-emerald-600';
     case '보류':
       return 'bg-[var(--muted)] text-[var(--toss-gray-3)]';
     default:
