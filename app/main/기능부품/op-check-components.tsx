@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { EmptyState } from '@/app/components/StatePanel';
-import { ANESTHESIA_OPTIONS } from './op-check-types';
+import { ANESTHESIA_OPTIONS } from './OP체크/constants';
 
 type StatusTabOption = {
   value: string;
