@@ -7,6 +7,7 @@ export type ShiftLookupRecord = {
   description?: string | null;
   weekly_work_days?: number | null;
   is_weekend_work?: boolean | null;
+  shift_type?: string | null;
 };
 
 export type ShiftAssignmentReference = {

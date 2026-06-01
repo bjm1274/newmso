@@ -24,6 +24,7 @@ import { getStaffShifts } from '@/lib/staff-shift-resolver';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import type { CommuteLog, ShiftBoundary } from './commute-types';
+import { decideCheckInStatus } from './late-status';
 
 const COMMUTE_STATUS_TO_ATTENDANCES: Record<string, string> = {
   정상: 'present',
@@ -216,7 +217,7 @@ export async function resolveLateThreshold(
         ? supabase
             .from('work_shifts')
             .select(
-              'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work',
+              'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work, shift_type',
             )
             .in('id', shiftIds)
         : Promise.resolve({ data: [], error: null }),
@@ -224,7 +225,7 @@ export async function resolveLateThreshold(
         ? supabase
             .from('work_shifts')
             .select(
-              'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work',
+              'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work, shift_type',
             )
             .in('name', shiftNames)
         : Promise.resolve({ data: [], error: null }),
@@ -246,11 +247,30 @@ export async function resolveLateThreshold(
 
     const startTime = String(shiftRow.start_time || '').trim();
     const endTime = String(shiftRow.end_time || '').trim();
-    return buildShiftBoundary(startTime, endTime, effectiveDepartment);
+    const boundary = buildShiftBoundary(startTime, endTime, effectiveDepartment);
+    return {
+      ...boundary,
+      shiftType: String(shiftRow.shift_type || '') || null,
+      rosterAssigned: !!String(assignment?.shift_id || '').trim(),
+    };
   } catch (error) {
     logger.warn('지각 기준 시간 조회 실패:', error);
     return buildFallbackShiftBoundary(fallback.department ?? undefined);
   }
+}
+
+/**
+ * 근무유형(work_shifts) 시작시각 기준 체크인 상태(정상/지각) 해석. (모바일·데스크톱 공유)
+ * 1일근무1일휴무는 근무표(shift_assignments) 배정 기준으로 근무일을 판정한다.
+ */
+export async function resolveCheckInStatus(
+  staffId: string,
+  workDate: string,
+  checkInIso: string,
+  fallback: LateThresholdContext = {},
+): Promise<'정상' | '지각'> {
+  const boundary = await resolveLateThreshold(staffId, workDate, fallback);
+  return decideCheckInStatus(boundary, checkInIso);
 }
 
 /**

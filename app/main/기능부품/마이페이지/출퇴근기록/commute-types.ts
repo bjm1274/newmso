@@ -22,6 +22,10 @@ export type ShiftBoundary = {
   endHour: number | null;
   endMinute: number | null;
   shiftKnown: boolean;
+  /** 근무유형 종류(예: '1일근무1일휴무'). 지각 판정 시 격일제 휴무일 처리에 사용 */
+  shiftType?: string | null;
+  /** 해당 일자에 근무표(shift_assignments) 배정이 있었는지 */
+  rosterAssigned?: boolean;
 };
 
 export type CommuteLog = {
