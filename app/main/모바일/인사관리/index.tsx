@@ -29,6 +29,7 @@ import 복지 from './복지';
 import 계약문서 from './계약문서';
 import 구성원등록 from './구성원등록';
 import 연차신청 from './연차신청';
+import { useStaffList } from './data-hooks';
 
 export type HrView =
   | 'hub'
@@ -149,6 +150,41 @@ function Hub({
   onExit: () => void;
   onOpen: (view: HrMenuId) => void;
 }) {
+  const { staffs, loading } = useStaffList({ company });
+
+  const headcount = staffs.length;
+  // 고용형태 분포(employment_type 미수집 직원은 '기타'로 집계 생략).
+  const empCounts = staffs.reduce(
+    (acc, s) => {
+      const t = String((s as { employment_type?: string | null }).employment_type ?? '').trim();
+      if (t.includes('정규')) acc.regular += 1;
+      else if (t.includes('계약')) acc.contract += 1;
+      else if (t.includes('수습')) acc.probation += 1;
+      return acc;
+    },
+    { regular: 0, contract: 0, probation: 0 },
+  );
+  const empSub = empCounts.regular + empCounts.contract + empCounts.probation > 0
+    ? `정규 ${empCounts.regular} · 계약 ${empCounts.contract} · 수습 ${empCounts.probation}`
+    : '재직 기준';
+
+  // 평균 근속(hire_date 기반, 연 단위).
+  const now = Date.now();
+  const tenures = staffs
+    .map((s) => {
+      const raw = String((s as { hire_date?: string | null; join_date?: string | null }).hire_date
+        ?? (s as { join_date?: string | null }).join_date ?? '').slice(0, 10);
+      const t = raw ? Date.parse(raw) : NaN;
+      return Number.isFinite(t) ? (now - t) / (365.25 * 24 * 60 * 60 * 1000) : null;
+    })
+    .filter((v): v is number => v != null && v >= 0);
+  const avgTenure = tenures.length > 0
+    ? (tenures.reduce((s, v) => s + v, 0) / tenures.length)
+    : null;
+
+  const headcountValue = loading ? '—' : String(headcount);
+  const avgTenureValue = avgTenure == null ? '—' : avgTenure.toFixed(1);
+
   return (
     <div className="m-screen">
       <MobileHeader
@@ -166,7 +202,7 @@ function Hub({
           <span className="nm">{company || '박철홍정형외과'}</span>
           <MIcon name="chevD" size={18} className="chev" />
         </div>
-        {/* KPI — 데이터 연동은 추후 일괄(현재 표기값은 더미) */}
+        {/* KPI — staff_members 실집계(전체 인원·평균 근속). 오늘 근무·평균 잔여연차는 별도 화면 참조. */}
         <div
           style={{
             display: 'grid',
@@ -175,10 +211,8 @@ function Hub({
             padding: '12px 16px',
           }}
         >
-          <MKpi icon="users" label="전체 인원" value="27" unit="명" sub="정규 22 · 계약 4 · 수습 1" tone="accent" />
-          <MKpi icon="clock" label="오늘 근무" value="24" unit="명" sub="지각 2" tone="success" />
-          <MKpi icon="calendar" label="평균 잔여연차" value="11" unit="일" sub="소진율 27%" tone="warning" />
-          <MKpi icon="star" label="평균 근속" value="4.2" unit="년" sub="신규 11개월" tone="accent" />
+          <MKpi icon="users" label="전체 인원" value={headcountValue} unit="명" sub={empSub} tone="accent" />
+          <MKpi icon="star" label="평균 근속" value={avgTenureValue} unit="년" sub="재직 기준" tone="accent" />
         </div>
         <div className="m-section">
           <div className="m-section-h">
