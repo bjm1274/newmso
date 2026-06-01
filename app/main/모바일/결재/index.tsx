@@ -10,6 +10,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import SApproval from './결재함';
+import SApprovalDocs from './문서조회';
 import SApprovalSent from './기안함';
 import SApprovalRef from './참조함';
 import SApprovalWrite from './작성하기';
@@ -24,11 +25,24 @@ import {
   type ApprovalRow,
 } from './data-hooks';
 
-export type ApprovalView = 'inbox' | 'sent' | 'ref' | 'write' | 'compose' | 'detail';
+export type ApprovalView = 'inbox' | 'docs' | 'sent' | 'ref' | 'write' | 'compose' | 'detail';
 
 export type 결재Props = {
   user: ErpUser;
 };
+
+// id 기준 중복 제거(분류 버킷 합산 시 동일 문서 1회만)
+function dedupeById(list: ApprovalRow[]): ApprovalRow[] {
+  const seen = new Set<string>();
+  const out: ApprovalRow[] = [];
+  for (const row of list) {
+    const id = String(row.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(row);
+  }
+  return out;
+}
 
 export default function 결재({ user }: 결재Props) {
   const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
@@ -40,6 +54,17 @@ export default function 결재({ user }: 결재Props) {
 
   const { rows, loading, refetch } = useApprovalList(staffId);
   const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);
+
+  // 문서 조회용 — 본인 관여 문서를 진행 중 / 처리 완료로 합산(중복 제거)
+  const docProgress = useMemo(() => dedupeById([...inbox, ...progress]), [inbox, progress]);
+  const docCompleted = useMemo(
+    () =>
+      dedupeById([
+        ...done,
+        ...sent.filter((r) => r.status === '승인' || r.status === '반려'),
+      ]),
+    [done, sent],
+  );
 
   const handleOpen = useCallback((id: string) => {
     setDetailId(id);
@@ -65,6 +90,22 @@ export default function 결재({ user }: 결재Props) {
         initialRow={initialDetailRow}
         onBack={handleBackFromDetail}
         onChanged={refetch}
+      />
+    );
+  }
+
+  if (view === 'docs') {
+    return (
+      <SApprovalDocs
+        staffId={staffId}
+        inProgress={docProgress}
+        completed={docCompleted}
+        loading={loading}
+        onOpen={handleOpen}
+        onNavInbox={() => setView('inbox')}
+        onNavSent={() => setView('sent')}
+        onNavRef={() => setView('ref')}
+        onNavWrite={() => setView('write')}
       />
     );
   }
@@ -159,6 +200,7 @@ export default function 결재({ user }: 결재Props) {
       sentCount={sent.length}
       loading={loading}
       onOpen={handleOpen}
+      onNavDocs={() => setView('docs')}
       onNavSent={() => setView('sent')}
       onNavRef={() => setView('ref')}
       onNavWrite={() => setView('write')}

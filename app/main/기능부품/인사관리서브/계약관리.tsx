@@ -270,7 +270,7 @@ export default function ContractMain({
         checkedIds.map((id: number) => ({
           user_id: String(id),
           title: '계약서 서명 요청',
-          message: `${contractType}발송이 완료되었습니다. 확인 후 서명해 주세요.`,
+          body: `${contractType}발송이 완료되었습니다. 확인 후 서명해 주세요.`,
           type: 'INFO',
           read_at: null
         }))

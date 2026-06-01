@@ -41,16 +41,6 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
   const [tab, setTab] = useState<Tab>('mine');
   const [evalTarget, setEvalTarget] = useState<OrgMember | null>(null);
 
-  if (evalTarget) {
-    return (
-      <EvalWriteForm
-        user={user}
-        target={evalTarget}
-        onClose={() => setEvalTarget(null)}
-      />
-    );
-  }
-
   const myAverage = useMemo(() => {
     if (mine.length === 0) return 0;
     const sum = mine.reduce((s, r) => s + (r.score || 0), 0);
@@ -60,6 +50,17 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
   const targetCount = useMemo(() => {
     return groups.flatMap((g) => g.members).length;
   }, [groups]);
+
+  // 모든 훅 호출 이후에 조건부 렌더(Rules of Hooks 준수).
+  if (evalTarget) {
+    return (
+      <EvalWriteForm
+        user={user}
+        target={evalTarget}
+        onClose={() => setEvalTarget(null)}
+      />
+    );
+  }
 
   return (
     <div className="m-screen">

@@ -19,7 +19,7 @@ function classifyAbc(
   for (const l of logs) {
     const name = pickString(l, ['item_name', 'name'], '');
     if (!name) continue;
-    const amt = pickNumber(l, ['amount', 'qty'], 1);
+    const amt = pickNumber(l, ['quantity', 'amount', 'qty'], 0);
     const price = pickNumber(l, ['unit_price'], 1);
     usageMap.set(name, (usageMap.get(name) ?? 0) + amt * price);
   }
@@ -79,7 +79,7 @@ function buildForecast(inventory: Row[], logs: Row[]): ForecastRow[] {
     if (!Number.isFinite(created) || now - created > thirtyDays) continue;
     const name = pickString(l, ['item_name', 'name'], '');
     if (!name) continue;
-    usage30.set(name, (usage30.get(name) ?? 0) + pickNumber(l, ['amount', 'qty'], 1));
+    usage30.set(name, (usage30.get(name) ?? 0) + pickNumber(l, ['quantity', 'amount', 'qty'], 0));
   }
 
   return inventory

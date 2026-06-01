@@ -54,15 +54,6 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
   const [view, setView] = useState<View>('day');
   const [showForm, setShowForm] = useState(false);
 
-  if (showForm) {
-    return (
-      <HandoverNoteForm
-        user={user}
-        onClose={() => { setShowForm(false); void refresh(); }}
-      />
-    );
-  }
-
   const today = todayISO();
   const todayRows = useMemo(() => rows.filter((r) => dateKey(r.created_at) === today), [rows, today]);
 
@@ -82,6 +73,16 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
 
   const generalToday = todayRows.filter((r) => r.scope === 'general');
   const patientToday = todayRows.filter((r) => r.scope === 'patient');
+
+  // 모든 훅 호출 이후에 조건부 렌더(Rules of Hooks 준수).
+  if (showForm) {
+    return (
+      <HandoverNoteForm
+        user={user}
+        onClose={() => { setShowForm(false); void refresh(); }}
+      />
+    );
+  }
 
   return (
     <div className="m-screen">

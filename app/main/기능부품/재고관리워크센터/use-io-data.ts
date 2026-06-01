@@ -55,16 +55,27 @@ const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; ton
 function mapOrderRow(r: Row): PurchaseOrderRow {
   const rawStatus = asString(r['status'], '대기').trim();
   const mapped = ORDER_STATUS_MAP[rawStatus] ?? { status: '발주 대기' as const, tone: 'warn' as const };
-  const items = Array.isArray(r['items']) ? (r['items'] as unknown[]).length : pickNumber(r, ['item_count'], 0);
+  // purchase_orders.items 는 D1에서 JSON 문자열(text)로 저장될 수 있어 파싱 후 길이 계산.
+  const rawItems = r['items'];
+  let itemCount = pickNumber(r, ['item_count'], 0);
+  if (Array.isArray(rawItems)) {
+    itemCount = rawItems.length;
+  } else if (typeof rawItems === 'string' && rawItems.trim()) {
+    try {
+      const parsed = JSON.parse(rawItems);
+      if (Array.isArray(parsed)) itemCount = parsed.length;
+    } catch { /* item_count 폴백 유지 */ }
+  }
   return {
     id: pickString(r, ['id', 'order_number'], '-'),
     vendor: pickString(r, ['supplier_name', 'vendor', 'supplier'], '-'),
-    items,
+    items: itemCount,
     amt: pickNumber(r, ['total_amount', 'amount']),
     status: mapped.status,
     tone: mapped.tone,
     placed: toMonthString(r['created_at']).slice(5).replace('-', '/'),
-    due: toMonthString(r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-',
+    // 정본 납기 컬럼은 expected_delivery_date (legacy delivery_date/due_date 폴백).
+    due: toMonthString(r['expected_delivery_date'] ?? r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-',
   };
 }
 

@@ -42,6 +42,7 @@ export type SApprovalProps = {
   sentCount: number;
   loading: boolean;
   onOpen: (id: string) => void;
+  onNavDocs: () => void;
   onNavSent: () => void;
   onNavRef: () => void;
   onNavWrite: () => void;
@@ -57,6 +58,7 @@ export default function SApproval({
   sentCount,
   loading,
   onOpen,
+  onNavDocs,
   onNavSent,
   onNavRef,
   onNavWrite,
@@ -258,6 +260,9 @@ export default function SApproval({
         </button>
         <button type="button" onClick={onNavRef} aria-label="참조 문서함">
           참조<span className="cnt">{refCount}</span>
+        </button>
+        <button type="button" onClick={onNavDocs} aria-label="문서 조회">
+          문서 조회
         </button>
         <button type="button" onClick={onNavWrite} aria-label="작성하기">
           작성

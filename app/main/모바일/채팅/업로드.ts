@@ -167,6 +167,8 @@ export async function sendMobileFileMessage(
     const insertPayloadTemplate: Record<string, unknown> = {
       room_id: input.roomId,
       sender_id: input.senderId,
+      // 정본 컬럼은 file_kind (메시지 버블 이미지 판정 기준). message_type은 하위호환용 병기.
+      file_kind: fileKind,
       message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
       file_url: '{fileUrl}',
       file_name: input.file.name,

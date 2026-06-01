@@ -174,17 +174,29 @@ export default function AnnualLeavePromotion({
 
       if (notifError) throw notifError;
 
-      // 촉진 로그 INSERT (중복 방지 UNIQUE 제약: staff_id, stage, expiry_date)
+      // 촉진 로그 INSERT.
+      // 정본 스키마: target_year(integer, NOT NULL), step(integer, NOT NULL), id(text PK, NOT NULL).
+      // 누락 시 NOT NULL 제약 위반으로 INSERT 실패하므로 반드시 채운다.
+      const targetYear = staff.expiryDateStr
+        ? Number(staff.expiryDateStr.slice(0, 4))
+        : new Date().getFullYear();
+      const step = staff.promotionStage ?? 1;
       await supabase.from('annual_leave_promotion_logs').upsert(
         {
+          id:
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `alp-${staff.id}-${targetYear}-${step}`,
           staff_id: staff.id,
+          target_year: targetYear,
+          step,
           stage: staff.promotionStage,
           expiry_date: staff.expiryDateStr,
           notified_at: new Date().toISOString(),
           remaining_days_at_notice: staff.remainingLeave,
           notification_id: notifData?.id ?? null,
         },
-        { onConflict: 'staff_id,stage,expiry_date', ignoreDuplicates: true },
+        { onConflict: 'staff_id,target_year,step', ignoreDuplicates: true },
       );
 
       toast(`연차사용촉진 ${stageLabel} 통보가 발송되었습니다.`, 'success');
