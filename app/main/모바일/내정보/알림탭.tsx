@@ -5,27 +5,32 @@
  *   - 상단 큰 제목 '알림' + '모두 읽음' 버튼
  *   - 알림 리스트 (msm-list): unread 파란 틴트 배경, read 기본 카드 배경
  *   - 각 행: 톤 아이콘 타일 + 제목/본문 + 시간
+ * 실제 notifications 테이블 연동(read_at 기반 읽음). D1 정본 스키마는 read_at 컬럼만 존재.
  * JM: 단일 책임 (알림 리스트 표시)
  * JM4: any 금지
  * JM6: button 시맨틱, aria-label
  */
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import type { ErpUser } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import MIcon from '../공통/MIcon';
+
+type Tone = 'accent' | 'success' | 'warn' | 'danger' | 'muted';
 
 /** 알림 항목 타입 */
 type NotifItem = {
   id: string;
   icon: string;
-  tone: 'accent' | 'success' | 'warn' | 'danger' | 'muted';
+  tone: Tone;
   title: string;
   body: string;
   time: string;
   unread: boolean;
 };
 
-const TONE_MAP: Record<NotifItem['tone'], { bg: string; fg: string }> = {
+const TONE_MAP: Record<Tone, { bg: string; fg: string }> = {
   accent:  { bg: 'var(--m-accent-soft)', fg: 'var(--m-accent)' },
   success: { bg: 'var(--m-success-soft)', fg: '#047857' },
   warn:    { bg: 'var(--m-warning-soft)', fg: '#B45309' },
@@ -33,78 +38,114 @@ const TONE_MAP: Record<NotifItem['tone'], { bg: string; fg: string }> = {
   muted:   { bg: 'var(--z-100)', fg: 'var(--z-600)' },
 };
 
-const INITIAL_NOTIFS: NotifItem[] = [
-  {
-    id: 'n1',
-    icon: 'checkCircle',
-    tone: 'accent',
-    title: '결재 요청 도착',
-    body: '김민수 대리의 연차 신청이 도착했습니다.',
-    time: '10분 전',
-    unread: true,
-  },
-  {
-    id: 'n2',
-    icon: 'box',
-    tone: 'danger',
-    title: '재고 0 경고',
-    body: 'A4용지 재고가 0입니다. 즉시 발주하세요.',
-    time: '32분 전',
-    unread: true,
-  },
-  {
-    id: 'n3',
-    icon: 'chat',
-    tone: 'success',
-    title: 'SY INC. 경영지원',
-    body: '이번 달 정산 관련 공유드립니다.',
-    time: '1시간 전',
-    unread: true,
-  },
-  {
-    id: 'n4',
-    icon: 'bell',
-    tone: 'warn',
-    title: '공지사항',
-    body: '5월 워크숍 일정이 확정되었습니다.',
-    time: '어제',
-    unread: false,
-  },
-  {
-    id: 'n5',
-    icon: 'calendar',
-    tone: 'accent',
-    title: '연차 승인 완료',
-    body: '6/2(월) 연차가 승인되었습니다.',
-    time: '2일 전',
-    unread: false,
-  },
-  {
-    id: 'n6',
-    icon: 'won',
-    tone: 'warn',
-    title: '급여명세서 발행',
-    body: '2026년 4월 급여명세서가 발행되었습니다.',
-    time: '3일 전',
-    unread: false,
-  },
-];
+const NOTIFICATION_SELECT = 'id, user_id, type, title, body, read_at, created_at';
+
+/** notifications.type → 모바일 아이콘/톤 매핑 */
+function mapTypeToVisual(type: string): { icon: string; tone: Tone } {
+  switch (type) {
+    case 'approval':
+    case '결재':
+      return { icon: 'checkCircle', tone: 'accent' };
+    case 'inventory':
+    case '재고':
+      return { icon: 'box', tone: 'danger' };
+    case 'message':
+    case 'mention':
+    case 'chat':
+    case '채팅':
+      return { icon: 'chat', tone: 'success' };
+    case 'attendance':
+    case '근태':
+    case 'leave':
+    case '연차':
+      return { icon: 'calendar', tone: 'accent' };
+    case 'payroll':
+    case '급여':
+      return { icon: 'won', tone: 'warn' };
+    case 'board':
+    case '게시판':
+      return { icon: 'fileText', tone: 'warn' };
+    default:
+      return { icon: 'bell', tone: 'muted' };
+  }
+}
+
+type NotificationDbRow = {
+  id?: unknown;
+  type?: unknown;
+  title?: unknown;
+  body?: unknown;
+  read_at?: unknown;
+  created_at?: unknown;
+};
+
+function normalizeRow(row: NotificationDbRow): NotifItem {
+  const type = toNotificationText(row.type, 'notification', true);
+  const visual = mapTypeToVisual(type);
+  const created = toNotificationText(row.created_at, '');
+  return {
+    id: toNotificationText(row.id, '', true),
+    icon: visual.icon,
+    tone: visual.tone,
+    title: toNotificationText(row.title, '알림'),
+    body: toNotificationText(row.body, ''),
+    time: created ? timeAgo(created) : '',
+    unread: row.read_at == null,
+  };
+}
 
 export type 알림탭Props = {
   user: ErpUser;
 };
 
-function 알림탭Base({ user: _user }: 알림탭Props) {
-  const [notifs, setNotifs] = useState<NotifItem[]>(INITIAL_NOTIFS);
+function 알림탭Base({ user }: 알림탭Props) {
+  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleMarkAllRead = useCallback(() => {
+  useEffect(() => {
+    if (!staffId) { setNotifs([]); setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data } = await supabase
+          .from('notifications')
+          .select(NOTIFICATION_SELECT)
+          .eq('user_id', staffId)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? (data as NotificationDbRow[]) : [];
+        setNotifs(rows.map(normalizeRow).filter((n) => n.id));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [staffId]);
+
+  const handleMarkAllRead = useCallback(async () => {
+    if (!staffId) return;
+    const nowIso = new Date().toISOString();
     setNotifs((prev) => prev.map((n) => ({ ...n, unread: false })));
-  }, []);
+    try {
+      await supabase
+        .from('notifications')
+        .update({ read_at: nowIso })
+        .eq('user_id', staffId)
+        .is('read_at', null);
+    } catch { /* 낙관적 업데이트 유지 */ }
+  }, [staffId]);
 
-  const handleTapItem = useCallback((id: string) => {
-    setNotifs((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, unread: false } : n)),
-    );
+  const handleTapItem = useCallback(async (id: string) => {
+    setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    try {
+      await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', id);
+    } catch { /* 낙관적 업데이트 유지 */ }
   }, []);
 
   const unreadCount = notifs.filter((n) => n.unread).length;
@@ -141,6 +182,7 @@ function 알림탭Base({ user: _user }: 알림탭Props) {
           type="button"
           onClick={handleMarkAllRead}
           aria-label="모두 읽음 처리"
+          disabled={unreadCount === 0}
           style={{
             fontSize: 13,
             fontWeight: 700,
@@ -156,6 +198,15 @@ function 알림탭Base({ user: _user }: 알림탭Props) {
 
       {/* 알림 리스트 */}
       <div className="m-scroll">
+        {loading ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13 }}>
+            불러오는 중…
+          </div>
+        ) : notifs.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13, fontWeight: 600 }}>
+            받은 알림이 없습니다.
+          </div>
+        ) : (
         <div className="msm-list" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {notifs.map((n) => {
             const tone = TONE_MAP[n.tone];
@@ -263,6 +314,7 @@ function 알림탭Base({ user: _user }: 알림탭Props) {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
