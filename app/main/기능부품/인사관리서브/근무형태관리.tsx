@@ -3,6 +3,17 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  deriveBreakPlans,
+  normalizeBreakPlans,
+  resolveDayBreakPlanId,
+  createBreakPlan,
+  canAddBreakPlan,
+  reindexBreakPlans,
+  getBreakPlan,
+  indexToBreakPlanLabel,
+  type BreakPlan,
+} from './근무형태관리-break-plans';
 
 type Shift = {
   id: string;
@@ -22,6 +33,7 @@ type Shift = {
   extra_contract_allowance?: number | null;
   work_day_mode?: WorkDayMode;
   daily_schedules?: WeeklyShiftSchedule;
+  break_plans?: BreakPlan[];
 };
 
 type WorkDayMode = 'weekdays' | 'all_days';
@@ -30,8 +42,7 @@ type DayShiftSchedule = {
   enabled: boolean;
   start_time: string;
   end_time: string;
-  break_start_time?: string;
-  break_end_time?: string;
+  break_plan_id?: string | null;
 };
 type WeeklyShiftSchedule = Record<WeekdayKey, DayShiftSchedule>;
 type ShiftGroup = Shift & {
@@ -58,6 +69,7 @@ type ShiftFormState = {
   extra_contract_allowance: number;
   work_day_mode: WorkDayMode;
   daily_schedules: WeeklyShiftSchedule;
+  break_plans: BreakPlan[];
 };
 
 const DEFAULT_COMPANY_OPTIONS: string[] = [];
@@ -78,6 +90,7 @@ type ShiftContractMeta = {
   extra_contract_allowance: number;
   work_day_mode: WorkDayMode;
   daily_schedules?: WeeklyShiftSchedule;
+  break_plans?: BreakPlan[];
 };
 
 type ShiftContractMetaInput = {
@@ -86,6 +99,7 @@ type ShiftContractMetaInput = {
   extra_contract_allowance?: number | null;
   work_day_mode?: WorkDayMode | null;
   daily_schedules?: WeeklyShiftSchedule | null;
+  break_plans?: BreakPlan[] | null;
 };
 
 function cleanTime(value?: string | null, fallback = '09:00') {
@@ -105,6 +119,7 @@ function createWeeklySchedule(
       enabled: mode === 'all_days' || !day.weekend,
       start_time: start,
       end_time: end,
+      break_plan_id: 'A',
     };
     return acc;
   }, {} as WeeklyShiftSchedule);
@@ -123,8 +138,7 @@ function normalizeWeeklySchedule(
       enabled: current?.enabled ?? defaults[day.key].enabled,
       start_time: cleanTime(current?.start_time, defaults[day.key].start_time),
       end_time: cleanTime(current?.end_time, defaults[day.key].end_time),
-      break_start_time: current?.break_start_time ? cleanTime(current.break_start_time, '') : undefined,
-      break_end_time: current?.break_end_time ? cleanTime(current.break_end_time, '') : undefined,
+      break_plan_id: current?.break_plan_id !== undefined ? current.break_plan_id : (current as any)?.apply_break === false ? null : 'A',
     };
     return acc;
   }, {} as WeeklyShiftSchedule);
@@ -205,10 +219,11 @@ function formatWeeklyScheduleSummary(schedule?: WeeklyShiftSchedule | null, shif
 function normalizeShiftContractMeta(meta?: ShiftContractMetaInput | null): ShiftContractMeta {
   return {
     monthly_night_days: Math.max(0, Math.floor(Number(meta?.monthly_night_days) || 0)),
-    additional_work_hours: Math.max(0, Math.round((Number(meta?.additional_work_hours) || 0) * 10) / 10),
-    extra_contract_allowance: Math.max(0, Math.floor(Number(meta?.extra_contract_allowance) || 0)),
+    additional_work_hours: Math.max(0, Number(meta?.additional_work_hours) || 0),
+    extra_contract_allowance: Math.max(0, Number(meta?.extra_contract_allowance) || 0),
     work_day_mode: meta?.work_day_mode === 'all_days' ? 'all_days' : 'weekdays',
     daily_schedules: meta?.daily_schedules || undefined,
+    break_plans: normalizeBreakPlans(meta?.break_plans),
   };
 }
 
@@ -306,6 +321,7 @@ function calculateWeeklyWorkHours(shift: {
   break_end_time?: string | null;
   weekly_work_days?: number | null;
   daily_schedules?: WeeklyShiftSchedule | null;
+  break_plans?: BreakPlan[] | null;
 }) {
   const workMinutes = calculateWorkMinutes(shift);
 
@@ -317,11 +333,12 @@ function calculateWeeklyWorkHours(shift: {
       if (enabledDays.length > 0) {
         const totalMinutes = enabledDays.reduce((sum, day) => {
           const schedule = shift.daily_schedules?.[day.key];
+          const plan = getBreakPlan(shift.break_plans || [], schedule?.break_plan_id);
           return sum + calculateWorkMinutes({
             start_time: schedule?.start_time,
             end_time: schedule?.end_time,
-            break_start_time: schedule?.break_start_time || shift.break_start_time,
-            break_end_time: schedule?.break_end_time || shift.break_end_time,
+            break_start_time: plan?.start_time || null,
+            break_end_time: plan?.end_time || null,
           });
         }, 0);
         const avgDailyMinutes = totalMinutes / enabledDays.length;
@@ -335,11 +352,12 @@ function calculateWeeklyWorkHours(shift: {
     const totalMinutes = WEEKDAY_OPTIONS.reduce((sum, day) => {
       const schedule = shift.daily_schedules?.[day.key];
       if (!schedule?.enabled) return sum;
+      const plan = getBreakPlan(shift.break_plans || [], schedule?.break_plan_id);
       return sum + calculateWorkMinutes({
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        break_start_time: schedule.break_start_time || shift.break_start_time,
-        break_end_time: schedule.break_end_time || shift.break_end_time,
+        break_start_time: plan?.start_time || null,
+        break_end_time: plan?.end_time || null,
       });
     }, 0);
     return Math.round((totalMinutes / 60) * 10) / 10;
@@ -470,6 +488,7 @@ function buildShiftGroupKey(shift: Shift) {
     extra_contract_allowance: shift.extra_contract_allowance ?? 0,
     work_day_mode: shift.work_day_mode || resolveWorkDayMode(shift),
     daily_schedules: shift.daily_schedules || null,
+    break_plans: shift.break_plans || [],
   });
 }
 
@@ -524,6 +543,7 @@ function createEmptyShiftState(selectedCo?: string): ShiftFormState {
     additional_work_hours: 0,
     extra_contract_allowance: 0,
     work_day_mode: 'weekdays' as WorkDayMode,
+    break_plans: [] as BreakPlan[],
   }, 'weekdays');
 }
 
@@ -535,7 +555,15 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   const [editingShiftIds, setEditingShiftIds] = useState<string[]>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>(DEFAULT_COMPANY_OPTIONS);
   const [newShift, setNewShift] = useState<ShiftFormState>(() => createEmptyShiftState(selectedCo as string));
+  const [allowanceInput, setAllowanceInput] = useState('');
   const isEditingShift = editingShiftIds.length > 0;
+
+  useEffect(() => {
+    const currentNum = parseInt(allowanceInput.replace(/,/g, ''), 10) || 0;
+    if (currentNum !== newShift.extra_contract_allowance) {
+      setAllowanceInput(newShift.extra_contract_allowance ? newShift.extra_contract_allowance.toLocaleString('ko-KR') : '0');
+    }
+  }, [newShift.extra_contract_allowance]);
 
   const fetchShifts = async () => {
     setLoading(true);
@@ -558,6 +586,11 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
           is_weekend_work: s.is_weekend_work,
           description: s.description,
         });
+        const breakPlans = deriveBreakPlans(
+          storedWorkDayMode.parsedDescription.meta.break_plans,
+          s.break_start_time,
+          s.break_end_time
+        );
         return {
           id: s.id,
           name: s.name,
@@ -576,6 +609,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
           extra_contract_allowance: storedWorkDayMode.parsedDescription.meta.extra_contract_allowance,
           work_day_mode: storedWorkDayMode.workDayMode,
           daily_schedules: storedWorkDayMode.dailySchedules,
+          break_plans: breakPlans,
         };
       });
       setShifts(list);
@@ -663,6 +697,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
       extra_contract_allowance: newShift.extra_contract_allowance,
       work_day_mode: effectiveWorkDayMode,
       daily_schedules: dailySchedules,
+      break_plans: newShift.break_plans,
     }) || null;
 
     const buildPayloads = (companyName: string) => ({
@@ -672,8 +707,8 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
         end_time: primarySchedule.end_time,
         description,
         company_name: companyName,
-        break_start_time: newShift.break_start_time || null,
-        break_end_time: newShift.break_end_time || null,
+        break_start_time: newShift.break_plans[0]?.start_time || null,
+        break_end_time: newShift.break_plans[0]?.end_time || null,
         shift_type: newShift.shift_type || null,
         weekly_work_days: weeklyWorkDays,
         is_weekend_work: hasWeekendWork(dailySchedules),
@@ -832,6 +867,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                       extra_contract_allowance: shift.extra_contract_allowance ?? 0,
                       work_day_mode: workDayMode,
                       daily_schedules: dailySchedules,
+                      break_plans: shift.break_plans || [],
                     });
                     setShowAddModal(true);
                   }}
@@ -1048,44 +1084,29 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                           </div>
                         </div>
                         {schedule.enabled && (
-                          <div className="grid grid-cols-[68px_1fr_1fr] items-center gap-2 pl-6 pt-1 border-t border-dashed border-[var(--border)]">
-                            <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">휴게시간</span>
-                            <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-orange-600 uppercase">시작</span>
-                              <input
-                                type="time"
-                                value={schedule.break_start_time || newShift.break_start_time || ''}
-                                onChange={e => {
-                                  const value = e.target.value;
-                                  setNewShift((prev) => ({
-                                    ...prev,
-                                    daily_schedules: {
-                                      ...prev.daily_schedules,
-                                      [day.key]: { ...prev.daily_schedules[day.key], break_start_time: value },
-                                    },
-                                  }));
-                                }}
-                                className="w-full pl-8 p-1.5 bg-[var(--card)] border border-orange-500/20 text-orange-800 font-semibold text-[11px] radius-toss"
-                              />
-                            </div>
-                            <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[8px] font-bold text-orange-600 uppercase">종료</span>
-                              <input
-                                type="time"
-                                value={schedule.break_end_time || newShift.break_end_time || ''}
-                                onChange={e => {
-                                  const value = e.target.value;
-                                  setNewShift((prev) => ({
-                                    ...prev,
-                                    daily_schedules: {
-                                      ...prev.daily_schedules,
-                                      [day.key]: { ...prev.daily_schedules[day.key], break_end_time: value },
-                                    },
-                                  }));
-                                }}
-                                className="w-full pl-8 p-1.5 bg-[var(--card)] border border-orange-500/20 text-orange-800 font-semibold text-[11px] radius-toss"
-                              />
-                            </div>
+                          <div className="grid grid-cols-[68px_1fr] items-center gap-2 pl-6 pt-1 border-t border-dashed border-[var(--border)]">
+                            <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">휴게 유형</span>
+                            <select
+                              value={schedule.break_plan_id || ''}
+                              onChange={e => {
+                                const value = e.target.value || null;
+                                setNewShift((prev) => ({
+                                  ...prev,
+                                  daily_schedules: {
+                                    ...prev.daily_schedules,
+                                    [day.key]: { ...prev.daily_schedules[day.key], break_plan_id: value },
+                                  },
+                                }));
+                              }}
+                              className="w-full p-1.5 bg-[var(--card)] border border-[var(--border)] font-semibold text-[11px] radius-toss text-[var(--foreground)]"
+                            >
+                              <option value="">휴게 없음</option>
+                              {newShift.break_plans.map((plan) => (
+                                <option key={plan.id} value={plan.id}>
+                                  유형 {plan.id} ({plan.start_time} ~ {plan.end_time})
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         )}
                       </div>
@@ -1142,24 +1163,79 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                 <label className="caption uppercase block mb-1">설명</label>
                 <textarea value={newShift.description} onChange={e => setNewShift({ ...newShift, description: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs h-20 radius-toss" placeholder="근무 형태에 대한 설명을 입력하세요" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="caption uppercase block mb-1">휴게시간 시작</label>
-                  <input
-                    type="time"
-                    value={newShift.break_start_time}
-                    onChange={e => setNewShift({ ...newShift, break_start_time: e.target.value })}
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
-                  />
+              {/* 🕒 휴게시간 유형 관리 */}
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="caption uppercase font-bold text-[var(--foreground)]">휴게시간 유형 (점심/저녁 등)</label>
+                  {canAddBreakPlan(newShift.break_plans) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const index = newShift.break_plans.length;
+                        setNewShift({
+                          ...newShift,
+                          break_plans: [...newShift.break_plans, createBreakPlan(index, '12:30', '13:30')],
+                        });
+                      }}
+                      className="text-[10px] font-bold text-[var(--accent)] hover:underline"
+                    >
+                      + 유형 추가
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <label className="caption uppercase block mb-1">휴게시간 종료</label>
-                  <input
-                    type="time"
-                    value={newShift.break_end_time}
-                    onChange={e => setNewShift({ ...newShift, break_end_time: e.target.value })}
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
-                  />
+                
+                <div className="space-y-2">
+                  {newShift.break_plans.map((plan, index) => (
+                    <div key={plan.id} className="flex items-center gap-2 bg-[var(--card)] p-2 rounded-lg border border-[var(--border)]">
+                      <span className="w-5 h-5 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[var(--accent)] font-extrabold text-[10px]">
+                        {plan.id}
+                      </span>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">시작</span>
+                          <input
+                            type="time"
+                            value={plan.start_time}
+                            onChange={(e) => {
+                              const nextPlans = [...newShift.break_plans];
+                              nextPlans[index] = { ...nextPlans[index], start_time: e.target.value };
+                              setNewShift({ ...newShift, break_plans: nextPlans });
+                            }}
+                            className="w-full pl-8 p-1.5 bg-[var(--input-bg)] border border-[var(--border)] text-[11px] font-semibold radius-toss"
+                          />
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">종료</span>
+                          <input
+                            type="time"
+                            value={plan.end_time}
+                            onChange={(e) => {
+                              const nextPlans = [...newShift.break_plans];
+                              nextPlans[index] = { ...nextPlans[index], end_time: e.target.value };
+                              setNewShift({ ...newShift, break_plans: nextPlans });
+                            }}
+                            className="w-full pl-8 p-1.5 bg-[var(--input-bg)] border border-[var(--border)] text-[11px] font-semibold radius-toss"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextPlans = newShift.break_plans.filter((_, i) => i !== index);
+                          const { plans: reindexed } = reindexBreakPlans(nextPlans);
+                          setNewShift({ ...newShift, break_plans: reindexed });
+                        }}
+                        className="text-[var(--toss-gray-3)] hover:text-red-500 font-bold text-xs p-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {newShift.break_plans.length === 0 && (
+                    <p className="text-[10px] text-[var(--toss-gray-3)] italic font-semibold text-center py-2">
+                      등록된 휴게 유형이 없습니다. (+ 유형 추가를 눌러 생성해 주세요)
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1274,11 +1350,18 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-orange-700">추가 약정수당</span>
                       <input
-                        type="number"
-                        min={0}
-                        step={10000}
-                        value={newShift.extra_contract_allowance}
-                        onChange={e => setNewShift({ ...newShift, extra_contract_allowance: Number(e.target.value) || 0 })}
+                        type="text"
+                        value={allowanceInput}
+                        placeholder="0"
+                        onChange={e => {
+                          const raw = e.target.value;
+                          const clean = raw.replace(/,/g, '');
+                          if (clean === '' || /^\d+$/.test(clean)) {
+                            const num = clean ? parseInt(clean, 10) : 0;
+                            setAllowanceInput(clean ? num.toLocaleString('ko-KR') : '');
+                            setNewShift(prev => ({ ...prev, extra_contract_allowance: num }));
+                          }
+                        }}
                         className="w-full p-3 bg-[var(--card)] border border-orange-500/20 font-semibold text-xs radius-toss"
                       />
                     </label>
