@@ -635,7 +635,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const getVisibleShiftOptions = (companyName: string) => {
     const selectedCompany = String(companyName || '').trim();
     const visibleList = 근무형태목록.filter((shift: StaffMember) => {
-      const isActive = shift?.is_active !== false;
+      // is_active가 false이거나 0(D1 소프트삭제)인 경우를 안전하게 판정하여 비활성 항목 제외
+      const isActive = shift?.is_active !== false && shift?.is_active !== 0 && shift?.is_active !== 'false';
       const shiftCompany = getShiftCompanyName(shift);
       return isActive && (!selectedCompany || !shiftCompany || shiftCompany === selectedCompany);
     });
