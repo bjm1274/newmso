@@ -158,16 +158,21 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
         )}
         {tab === 'week' && (
           <div style={{ padding: '14px 16px 0' }}>
-            <div className="m-card flush">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <MListRow
-                  key={i}
-                  icon="calendar"
-                  iconTone={i === 0 ? 'warning' : ''}
-                  label={`${i === 0 ? '오늘' : `+${i}일`}`}
-                  sub={i === 0 ? '제출 대기' : '예정'}
-                />
-              ))}
+            <div
+              style={{
+                padding: '16px',
+                background: 'var(--m-accent-soft)',
+                borderRadius: 'var(--m-radius-lg)',
+                color: 'var(--m-accent)',
+                fontSize: 12,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <MIcon name="info" size={16} />
+              주간 마감 현황은 데스크톱에서 확인하세요. 모바일은 오늘 체크리스트만 제공합니다.
             </div>
           </div>
         )}
