@@ -31,7 +31,8 @@ export type SFormChatProps = {
 
 export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
-  const staffs = useChatStaffDirectory();
+  const company = typeof user.company === 'string' ? user.company : null;
+  const staffs = useChatStaffDirectory(company);
   const [tab, setTab] = useState<NewChatTab>('member');
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Record<string, boolean>>({});

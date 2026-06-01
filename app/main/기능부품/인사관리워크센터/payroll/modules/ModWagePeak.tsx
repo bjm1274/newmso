@@ -1,8 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import { usePayrollData } from '../payroll-context';
 import { buildWagePeakRows } from '../payroll-domain';
+
+const LegacyWagePeak = dynamic(
+  () => import('@/app/main/기능부품/인사관리서브/급여명세/임금피크제'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
+        <span className="text-[12px] text-[var(--toss-gray-3)]">임금피크제 화면 불러오는 중…</span>
+      </div>
+    ),
+  },
+);
 
 /**
  * #8 임금피크제 — 만 60세 이상 자동 감지 + 연차별 비율 (정책 hardcoded)
@@ -46,63 +59,14 @@ export default function ModWagePeak() {
         </div>
       </div>
 
-      <div className="app-card overflow-hidden">
-        <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
-          <h3 className="section-title">적용 대상자 명단</h3>
-          <button
-            type="button"
-            className="text-[11px] font-bold px-2.5 py-1 rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-          >
-            적용 통지서 발송
-          </button>
+      <div className="app-card p-0 overflow-hidden">
+        <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
+          <h3 className="section-title">적용 대상자 명단 / 통지서 · 요율 설정</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead className="bg-[var(--page-bg)] text-[var(--toss-gray-4)]">
-              <tr>
-                <th scope="col" className="text-left px-3 py-2 font-semibold">이름</th>
-                <th scope="col" className="text-left px-3 py-2 font-semibold">부서</th>
-                <th scope="col" className="text-right px-3 py-2 font-semibold">만나이</th>
-                <th scope="col" className="text-left px-3 py-2 font-semibold">단계</th>
-                <th scope="col" className="text-right px-3 py-2 font-semibold">기존 월급</th>
-                <th scope="col" className="text-right px-3 py-2 font-semibold">적용 월급</th>
-                <th scope="col" className="text-right px-3 py-2 font-semibold">차감</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-[var(--toss-gray-3)]">
-                    임금피크 적용 대상자가 없습니다. (생년월일 미등록 또는 60세 미만)
-                  </td>
-                </tr>
-              ) : (
-                rows.map((r) => (
-                  <tr key={r.staff_id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]">
-                    <td className="px-3 py-2 font-bold">{r.name}</td>
-                    <td className="px-3 py-2 text-[var(--toss-gray-4)]">{r.dept}</td>
-                    <td className="px-3 py-2 text-right">{r.age}세</td>
-                    <td className="px-3 py-2">{r.ratioLabel}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{r.originalSalary.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-bold">{r.peakedSalary.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-[var(--danger)]">
-                      -{(r.originalSalary - r.peakedSalary).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="app-card p-4 border-l-4 border-[var(--accent)] bg-[var(--accent-light)]">
-        <h4 className="text-[12px] font-bold text-[var(--accent)]">정책 안내</h4>
-        <p className="text-[11px] text-[var(--toss-gray-4)] mt-1">
-          임금피크 적용 시작 나이와 단계별 비율은 회사 정책에 따라 다릅니다.
-          현재 표시 값은 기본값(보건복지부 권고안 평균)이며,
-          관리자 설정에서 override 가능한 구조로 설계되어 있습니다.
-        </p>
+        <LegacyWagePeak
+          staffs={data.staffs}
+          selectedCo={data.selectedCo}
+        />
       </div>
     </div>
   );

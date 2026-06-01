@@ -1,8 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
 import { calculateInsuranceRows } from '../payroll-domain';
+
+const LegacyInsuranceEDI = dynamic(
+  () => import('@/app/main/기능부품/인사관리서브/급여명세/4대보험EDI'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
+        <span className="text-[12px] text-[var(--toss-gray-3)]">4대보험 EDI 불러오는 중…</span>
+      </div>
+    ),
+  },
+);
 
 /**
  * #6 4대보험 — 요율표 + 회사별 산재 + 신고 일정
@@ -130,19 +143,15 @@ export default function ModInsurance() {
         </div>
       </div>
 
-      <div className="app-card p-4">
-        <h3 className="section-title">EDI 신고 / 증명서 발급</h3>
-        <div className="flex flex-wrap gap-2 mt-2">
-          <button type="button" className="text-[12px] font-bold px-3 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]">
-            EDI 신고 파일 생성
-          </button>
-          <button type="button" className="text-[12px] font-semibold px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--muted)]">
-            완납증명서 일괄 출력
-          </button>
-          <button type="button" className="text-[12px] font-semibold px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--muted)]">
-            취득·상실 신고 양식
-          </button>
+      <div className="app-card p-0 overflow-hidden">
+        <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
+          <h3 className="section-title">EDI 신고 / 개인별 4대보험 산출</h3>
         </div>
+        <LegacyInsuranceEDI
+          staffs={data.staffs}
+          selectedCo={data.selectedCo}
+          user={null}
+        />
       </div>
     </div>
   );

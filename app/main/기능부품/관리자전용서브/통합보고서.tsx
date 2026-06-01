@@ -38,11 +38,11 @@ const InventoryBarChart = dynamic(
 type ReportTab = '인사현황' | '급여요약' | '재고현황';
 
 interface StaffMember {
-  dept?: string;
-  department?: string;
-  employment_type?: string;
-  contract_type?: string;
-  base_salary?: number;
+  dept?: string | null;
+  department?: string | null;
+  employment_type?: string | null;
+  contract_type?: string | null;
+  base_salary?: number | null;
   [key: string]: unknown;
 }
 

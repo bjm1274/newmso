@@ -10,6 +10,7 @@
 
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import {
   FilterChips,
@@ -25,6 +26,50 @@ import type { IOTab, PurchaseOrderRow, StockMoveRow, Tone, VendorCard } from './
 import { useIOData, useEmptyMessage } from './stock-workcenter-data';
 
 // ─────────────────────────────────────────────────
+// 레거시 발주관리 (dynamic import)
+// ─────────────────────────────────────────────────
+
+const LegacyPurchaseOrderManagement = dynamic(
+  () => import('../재고관리서브/발주관리'),
+  {
+    loading: () => (
+      <div className="flex min-h-[260px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="발주 관리"
+    >
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold">발주 관리</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="모달 닫기"
+            className="p-1.5 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="px-4 py-4">
+          <LegacyPurchaseOrderManagement user={{}} inventory={[]} suppliers={[]} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────
 // 메인
 // ─────────────────────────────────────────────────
 
@@ -36,6 +81,7 @@ const TABS: TabItem<IOTab>[] = [
 
 export default function IOWorkcenter() {
   const [tab, setTab] = useState<IOTab>('inout');
+  const [showPurchase, setShowPurchase] = useState(false);
   const data = useIOData();
 
   const kpiItems = useMemo<KpiItem[]>(
@@ -82,6 +128,7 @@ export default function IOWorkcenter() {
 
   return (
     <div className="flex flex-col gap-4">
+      {showPurchase && <PurchaseOrderOverlay onClose={() => setShowPurchase(false)} />}
       <StockTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="입출고·발주 탭" />
       <KpiRow items={kpiItems} />
 
@@ -99,6 +146,7 @@ export default function IOWorkcenter() {
               rows={data.orders}
               loading={data.loading}
               error={data.error}
+              onNewOrder={() => setShowPurchase(true)}
             />
           )}
           {tab === 'vendor' && (
@@ -224,10 +272,12 @@ function OrderPanel({
   rows,
   loading,
   error,
+  onNewOrder,
 }: {
   rows: PurchaseOrderRow[];
   loading: boolean;
   error: string | null;
+  onNewOrder: () => void;
 }) {
   const [scope, setScope] = useState<OrderScope>('all');
   const filtered = useMemo(() => filterOrders(rows, scope), [rows, scope]);
@@ -268,8 +318,7 @@ function OrderPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
-          disabled
-          title="준비 중"
+          onClick={onNewOrder}
         >
           + 새 발주
         </button>

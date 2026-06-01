@@ -27,6 +27,7 @@ import 분석마감 from './분석마감';
 import 물품등록 from './물품등록';
 import 자산등록 from './자산등록';
 import 발주등록 from './발주등록';
+import { useStatusData } from './data-hooks';
 
 export type StockView =
   | 'hub'
@@ -57,9 +58,9 @@ interface StockMenu {
   badgeTone?: '' | 'accent' | 'success' | 'warning' | 'danger';
 }
 
-const STOCK_MENU: StockMenu[] = [
-  { id: 'stock', label: '재고 현황', sub: '현황 · 내 부서 · 알림 · 유효기간', icon: 'box', tone: 'accent', badge: '부족 23', badgeTone: 'warning' },
-  { id: 'io', label: '입출고 · 발주', sub: '입출고 · 발주 · 거래처 · 명세서', icon: 'download', tone: 'success', badge: '발주 3', badgeTone: 'warning' },
+const BASE_STOCK_MENU: Omit<StockMenu, 'badge' | 'badgeTone'>[] = [
+  { id: 'stock', label: '재고 현황', sub: '현황 · 내 부서 · 알림 · 유효기간', icon: 'box', tone: 'accent' },
+  { id: 'io', label: '입출고 · 발주', sub: '입출고 · 발주 · 거래처 · 명세서', icon: 'download', tone: 'success' },
   { id: 'item', label: '물품 · 자산', sub: '물품등록 · 카테고리 · 자산 QR · UDI', icon: 'grid', tone: 'accent' },
   { id: 'analyze', label: '분석 · 마감', sub: 'ABC · 수요예측 · 실사 · 월마감', icon: 'layers', tone: '' },
 ];
@@ -134,6 +135,16 @@ function Hub({
   onExit: () => void;
   onOpen: (view: StockMenuId) => void;
 }) {
+  const { total, lowCount, zeroCount, expireCount, loading } = useStatusData(company);
+
+  // 재고현황 메뉴 카드에 부족 건수 배지 실연동
+  const stockMenu: StockMenu[] = BASE_STOCK_MENU.map((m) => {
+    if (m.id === 'stock' && !loading && lowCount > 0) {
+      return { ...m, badge: `부족 ${lowCount}`, badgeTone: 'warning' as const };
+    }
+    return m;
+  });
+
   return (
     <div className="m-screen">
       <MobileHeader
@@ -151,7 +162,6 @@ function Hub({
           <span className="nm">{company || '박철홍정형외과'}</span>
           <MIcon name="chevD" size={18} className="chev" />
         </div>
-        {/* KPI — 데이터 연동은 추후 일괄(현재 표기값은 더미) */}
         <div
           style={{
             display: 'grid',
@@ -160,18 +170,46 @@ function Hub({
             padding: '12px 16px',
           }}
         >
-          <MKpi icon="box" label="전체 품목" value="847" unit="종" sub="소모품 412" tone="accent" />
-          <MKpi icon="alertTri" label="부족 품목" value="23" unit="건" sub="발주 권장 12" tone="warning" />
-          <MKpi icon="alertTri" label="재고 0" value="4" unit="건" sub="긴급 보충" tone="danger" />
-          <MKpi icon="clock" label="유효기간 임박" value="8" unit="건" sub="30일 이내" tone="warning" />
+          <MKpi
+            icon="box"
+            label="전체 품목"
+            value={loading ? '-' : String(total)}
+            unit="종"
+            sub={loading ? '로딩 중' : `부족 ${lowCount}`}
+            tone="accent"
+          />
+          <MKpi
+            icon="alertTri"
+            label="부족 품목"
+            value={loading ? '-' : String(lowCount)}
+            unit="건"
+            sub={loading ? '로딩 중' : '발주 권장'}
+            tone="warning"
+          />
+          <MKpi
+            icon="alertTri"
+            label="재고 0"
+            value={loading ? '-' : String(zeroCount)}
+            unit="건"
+            sub={loading ? '로딩 중' : '긴급 보충'}
+            tone="danger"
+          />
+          <MKpi
+            icon="clock"
+            label="유효기간 임박"
+            value={loading ? '-' : String(expireCount)}
+            unit="건"
+            sub={loading ? '로딩 중' : '30일 이내'}
+            tone="warning"
+          />
         </div>
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">재고관리 메뉴</div>
-            <div className="cnt">{STOCK_MENU.length}</div>
+            <div className="cnt">{stockMenu.length}</div>
           </div>
           <div className="m-card flush">
-            {STOCK_MENU.map((m) => (
+            {stockMenu.map((m) => (
               <MListRow
                 key={m.id}
                 icon={m.icon}
