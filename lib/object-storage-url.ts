@@ -67,6 +67,10 @@ export function buildStorageDownloadUrl(url: string, fileName: string): string {
   if (!normalizedUrl) return '';
 
   if (isInternalStorageObjectUrl(normalizedUrl)) {
+    const directR2Url = rewriteInternalR2UrlToPublic(normalizedUrl);
+    if (directR2Url) {
+      return `/api/download?url=${encodeURIComponent(directR2Url)}&name=${encodeURIComponent(normalizedFileName)}`;
+    }
     return buildInternalStorageDownloadUrl(normalizedUrl, normalizedFileName);
   }
 

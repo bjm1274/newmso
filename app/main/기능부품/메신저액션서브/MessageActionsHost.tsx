@@ -13,7 +13,7 @@
  * JM6: 키보드/터치/스크린리더는 각 자식 컴포넌트가 부담.
  */
 
-import { useCallback, useState, useRef, type TouchEvent, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useState, useRef, useEffect, type MouseEvent, type ReactNode } from 'react';
 import EmojiPicker from './EmojiPicker';
 import MessageContextMenu from './MessageContextMenu';
 
@@ -69,46 +69,79 @@ export default function MessageActionsHost({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMoveRef = useRef<{ x: number; y: number } | null>(null);
 
-  const handleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    if (typeof window !== 'undefined' && window.innerWidth > 768) return;
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-    touchMoveRef.current = null;
-  }, []);
+  const localRef = useRef<HTMLDivElement | null>(null);
 
-  const handleTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    if (!touchStartRef.current) return;
-    const touch = e.touches[0];
-    touchMoveRef.current = { x: touch.clientX, y: touch.clientY };
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      localRef.current = node;
+      if (containerRef) {
+        containerRef(node);
+      }
+    },
+    [containerRef],
+  );
 
-    const diffX = touch.clientX - touchStartRef.current.x;
-    const diffY = touch.clientY - touchStartRef.current.y;
+  useEffect(() => {
+    const el = localRef.current;
+    if (!el) return;
 
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-      // Elastic drag formula (limit max offset to 80px)
-      const dampedOffset = Math.sign(diffX) * Math.min(80, Math.abs(diffX) * 0.5);
-      setSwipeOffset(dampedOffset);
-    }
-  }, []);
+    const onTouchStart = (e: globalThis.TouchEvent) => {
+      if (window.innerWidth > 768) return;
+      const touch = e.touches[0];
+      if (touch) {
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        touchMoveRef.current = null;
+      }
+    };
 
-  const handleTouchEnd = useCallback(() => {
-    if (!touchStartRef.current) return;
-    setSwipeOffset(0);
+    const onTouchMove = (e: globalThis.TouchEvent) => {
+      if (!touchStartRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      touchMoveRef.current = { x: touch.clientX, y: touch.clientY };
 
-    if (touchMoveRef.current) {
-      const diffX = touchMoveRef.current.x - touchStartRef.current.x;
-      const diffY = touchMoveRef.current.y - touchStartRef.current.y;
+      const diffX = touch.clientX - touchStartRef.current.x;
+      const diffY = touch.clientY - touchStartRef.current.y;
 
-      if (Math.abs(diffX) > 50 && Math.abs(diffY) < 30) {
-        if (enableContextMenu) {
-          // Open context menu centered horizontally
-          setCtxMenu({ x: window.innerWidth / 2, y: window.innerHeight - 340 });
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        // Elastic drag formula (limit max offset to 80px)
+        const dampedOffset = Math.sign(diffX) * Math.min(80, Math.abs(diffX) * 0.5);
+        setSwipeOffset(dampedOffset);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!touchStartRef.current) return;
+      setSwipeOffset(0);
+
+      if (touchMoveRef.current) {
+        const diffX = touchMoveRef.current.x - touchStartRef.current.x;
+        const diffY = touchMoveRef.current.y - touchStartRef.current.y;
+
+        if (Math.abs(diffX) > 50 && Math.abs(diffY) < 30) {
+          if (enableContextMenu) {
+            // Open context menu centered horizontally
+            setCtxMenu({ x: window.innerWidth / 2, y: window.innerHeight - 340 });
+          }
         }
       }
-    }
 
-    touchStartRef.current = null;
-    touchMoveRef.current = null;
+      touchStartRef.current = null;
+      touchMoveRef.current = null;
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
   }, [enableContextMenu]);
 
   const handleContextMenu = useCallback(
@@ -142,13 +175,10 @@ export default function MessageActionsHost({
 
   return (
     <div
-      ref={containerRef}
+      ref={setRefs}
       data-chat-message-row
       data-testid={testId}
       onContextMenu={handleContextMenu}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       className={`relative ${className || ''}`}
       style={style}
     >

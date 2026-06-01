@@ -81,10 +81,28 @@ export default function MemberWorkcenter({
     }
   }, []);
 
+  const filteredStaffs = useMemo(() => {
+    if (!selectedCo || selectedCo === '전체') return staffs;
+    return staffs.filter((s) => {
+      const co = (s as Record<string, unknown>)?.company;
+      return typeof co === 'string' && co.trim() === selectedCo.trim();
+    });
+  }, [staffs, selectedCo]);
+
+  // Clear selected staff if they don't belong to the newly selected company
+  useEffect(() => {
+    if (selectedStaff && selectedCo && selectedCo !== '전체') {
+      const belongs = String((selectedStaff as Record<string, unknown>).company ?? '').trim() === selectedCo.trim();
+      if (!belongs) setSelectedStaff(null);
+    }
+  }, [selectedCo, selectedStaff]);
+
   const kpis = useMemo(
-    () => computeMemberKpis({ staffs, selectedCo }),
-    [staffs, selectedCo],
-  );  const [isEditing, setIsEditing] = useState(false);
+    () => computeMemberKpis({ staffs: filteredStaffs, selectedCo }),
+    [filteredStaffs, selectedCo],
+  );
+
+  const [isEditing, setIsEditing] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -112,7 +130,7 @@ export default function MemberWorkcenter({
           <WorkcenterEmbed label="구성원">
             <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
               <StaffTable
-                staffs={staffs}
+                staffs={filteredStaffs}
                 selectedId={selectedStaff ? String(selectedStaff.id) : null}
                 onSelect={setSelectedStaff}
                 onOpenNewStaff={() => setIsRegistering(true)}
@@ -131,19 +149,19 @@ export default function MemberWorkcenter({
 
         {tab === 'appointment' && (
           <WorkcenterEmbed label="인사발령">
-            <AppointmentBoard staffs={staffs} selectedCo={selectedCo} user={user} />
+            <AppointmentBoard staffs={filteredStaffs} selectedCo={selectedCo} user={user} />
           </WorkcenterEmbed>
         )}
 
         {tab === 'education' && (
           <WorkcenterEmbed label="교육·자격">
-            <EducationBoard staffs={staffs} selectedCo={selectedCo} />
+            <EducationBoard staffs={filteredStaffs} selectedCo={selectedCo} />
           </WorkcenterEmbed>
         )}
 
         {tab === 'offboarding' && (
           <WorkcenterEmbed label="오프보딩">
-            <OffboardingView staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+            <OffboardingView staffs={filteredStaffs} selectedCo={selectedCo} onRefresh={onRefresh} />
           </WorkcenterEmbed>
         )}
       </div>
