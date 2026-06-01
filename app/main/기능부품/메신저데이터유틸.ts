@@ -169,19 +169,6 @@ export async function selectChatMessagesWithFallback<TData>(
   );
 }
 
-export function selectFallbackChatRoomId(rooms: ChatRoom[]): string | null {
-  const safeRooms = Array.isArray(rooms)
-    ? rooms.filter((room): room is ChatRoom => Boolean(room?.id))
-    : [];
-
-  const preferredRoom =
-    safeRooms.find((room) => String(room.id) === NOTICE_ROOM_ID) ||
-    safeRooms[0] ||
-    null;
-
-  return preferredRoom ? String(preferredRoom.id) : null;
-}
-
 export async function fetchChatUnreadCountsByRoom(
   client: ChatDataClient,
   params: FetchChatUnreadCountsParams,

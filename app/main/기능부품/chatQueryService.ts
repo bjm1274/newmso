@@ -103,13 +103,6 @@ export async function fetchAllChatRooms(
   return chatRoomsFetchInFlight;
 }
 
-/**
- * 방 목록에서 특정 id의 방을 부분 업데이트.
- * setChatRooms((prev) => prev.map(room => ...)) 패턴이 여러 파일에 반복되어 추출.
- *
- * @example
- * setChatRooms((prev) => updateRoomInList(prev, roomId, { last_message: text }));
- */
 export function readCachedChatRooms(): ChatRoom[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -136,14 +129,4 @@ export function writeCachedChatRooms(rooms: ChatRoom[]) {
   } catch {
     // ignore cache failures
   }
-}
-
-export function updateRoomInList<T extends { id: string | number }>(
-  rooms: T[],
-  targetId: string,
-  update: Partial<T>,
-): T[] {
-  return rooms.map((room) =>
-    String(room.id) === String(targetId) ? { ...room, ...update } : room,
-  );
 }
