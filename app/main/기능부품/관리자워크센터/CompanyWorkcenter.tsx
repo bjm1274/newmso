@@ -17,7 +17,7 @@ import type { CompanyTabId } from './CompanyWorkcenter/types';
 // 정적 import — Turbopack의 한글 폴더+영문 하위 경로 dynamic/lazy panic 회피.
 // 인사관리워크센터의 영문 하위 컴포넌트들과 동일한 패턴.
 import CompanyBasicTab from './CompanyWorkcenter/CompanyBasicTab';
-import CompanyShiftTab from './CompanyWorkcenter/CompanyShiftTab';
+import ShiftManagement from '../인사관리서브/근무형태관리';
 import CompanyCardTab from './CompanyWorkcenter/CompanyCardTab';
 import CompanyTemplateTab from './CompanyWorkcenter/CompanyTemplateTab';
 import CompanyLeaveTab from './CompanyWorkcenter/CompanyLeaveTab';
@@ -52,7 +52,7 @@ export default function CompanyWorkcenter() {
 
       <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
         {tab === 'info' && <CompanyBasicTab />}
-        {tab === 'shift' && <CompanyShiftTab />}
+        {tab === 'shift' && <ShiftManagement selectedCo="전체" />}
         {tab === 'card' && <CompanyCardTab />}
         {tab === 'ctpl' && <CompanyTemplateTab />}
         {tab === 'hol' && <CompanyLeaveTab />}
