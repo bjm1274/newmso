@@ -2,7 +2,6 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ZERO_UUID } from '@/lib/constants';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -241,23 +240,25 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         }
       }
 
-      if (type === 'chat') {
-        await supabase.from('messages').delete().neq('id', ZERO_UUID);
-        await supabase.from('message_reads').delete().neq('id', ZERO_UUID);
-        await supabase.from('room_notification_settings').delete().neq('id', ZERO_UUID);
-        await supabase.from('chat_rooms').delete().neq('id', ZERO_UUID);
-      }
-      else if (type === 'inventory') {
-        await supabase.from('inventory_logs').delete().neq('id', ZERO_UUID);
-        await supabase.from('inventory').delete().neq('id', ZERO_UUID);
-      }
-      else if (type === 'board') {
-        await supabase.from('posts').delete().neq('id', ZERO_UUID);
-        await supabase.from('board_post_comments').delete().neq('id', ZERO_UUID);
-        await supabase.from('board_posts').delete().neq('board_type', '수술일정').neq('board_type', 'MRI일정표').neq('board_type', 'mri');
-      }
-      else if (type === 'schedule') {
-        await supabase.from('board_posts').delete().in('board_type', ['수술일정', 'MRI일정표', 'mri']);
+      if (
+        type === 'chat' ||
+        type === 'inventory' ||
+        type === 'board' ||
+        type === 'schedule' ||
+        type === 'system_logs' ||
+        type === 'expired_contracts' ||
+        type === 'expired_popups' ||
+        type === 'force_logout'
+      ) {
+        const res = await fetch('/api/admin/data-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
       }
       else if (type === 'staff') {
         const res = await fetch('/api/admin/reset-staff', {
@@ -270,22 +271,6 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         toast((data?.message || '삭제 완료') + " 페이지를 새로고침합니다.", 'success');
         setTimeout(() => window.location.reload(), 1500);
         return;
-      }
-      else if (type === 'system_logs') {
-        await supabase.from('audit_logs').delete().neq('id', ZERO_UUID);
-      }
-      else if (type === 'expired_contracts') {
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from('employment_contracts').delete().eq('status', 'pending').lt('created_at', thirtyDaysAgo);
-      }
-      else if (type === 'expired_popups') {
-        await supabase.from('popups').delete().eq('is_active', 0);
-      }
-      else if (type === 'force_logout') {
-        const now = new Date().toISOString();
-        await supabase
-          .from('system_configs')
-          .upsert({ key: 'min_auth_time', value: now, description: '전체 로그아웃 시점' }, { onConflict: 'key' });
       }
 
       toast("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.", 'success');

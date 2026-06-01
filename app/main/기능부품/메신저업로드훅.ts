@@ -25,27 +25,7 @@ import {
 } from './메신저첨부재시도큐';
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
-
-const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  avif: 'image/avif',
-  mp4: 'video/mp4',
-  mov: 'video/quicktime',
-  m4v: 'video/mp4',
-  webm: 'video/webm',
-  pdf: 'application/pdf',
-  txt: 'text/plain',
-  csv: 'text/csv',
-  zip: 'application/zip',
-};
+import { getFileExtension, getUploadContentType } from '@/lib/upload-mime';
 
 type ShareTarget = {
   id: string;
@@ -72,24 +52,6 @@ function getFileKind(mime: string): 'image' | 'video' | 'file' {
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   return 'file';
-}
-
-function getFileExtension(file: File) {
-  const rawName = String(file.name || '').trim();
-  const lastDotIndex = rawName.lastIndexOf('.');
-  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
-    return rawName.slice(lastDotIndex + 1).toLowerCase();
-  }
-  return '';
-}
-
-function getUploadContentType(file: File) {
-  const rawMimeType = String(file.type || '').trim().toLowerCase();
-  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
-  if (rawMimeType === 'image/x-png') return 'image/png';
-  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
-
-  return MIME_BY_EXTENSION[getFileExtension(file)] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
 function isImageFile(file: File) {

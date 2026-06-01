@@ -57,7 +57,7 @@ const HUB_ITEMS: HubItem[] = [
   { id: 'exec', label: '경영 대시보드', sub: '매출·인건비·환자수 통합 KPI', icon: 'layers', tone: 'accent' },
   { id: 'master', label: '시스템 마스터', sub: '운영·이력·정합성·복구·필터·연차', icon: 'settings', tone: '', badge: '병원장 전용', badgeTone: 'danger' },
   { id: 'company', label: '회사 관리', sub: '기본·근무·카드·계약·휴가·급여·문서', icon: 'building', tone: '' },
-  { id: 'roles', label: '권한 관리', sub: '직원별 상세 권한 설정', icon: 'shield', tone: 'success', badge: '요청 2', badgeTone: 'warning' },
+  { id: 'roles', label: '권한 관리', sub: '직원별 상세 권한 설정', icon: 'shield', tone: 'success' },
   { id: 'ops', label: '운영 설정', sub: '일반·메시지 12·팝업·외부연동 6', icon: 'zap', tone: '' },
   { id: 'forms', label: '결재 양식', sub: '양식 14종 · 사용량 KPI', icon: 'fileText', tone: '' },
   { id: 'audit', label: '감사·백업', sub: '로그·이상·급여검사·DR', icon: 'alertTri', tone: 'warning' },
@@ -123,20 +123,20 @@ function Hub({
         eyebrow="운영"
         back={onBack}
         actions={
-          <button type="button" aria-label="알림">
+          <button type="button" aria-label="알림" disabled title="준비 중">
             <MIcon name="bell" size={20} />
           </button>
         }
       />
       <div className="m-scroll">
         <div className="m-admin-hero">
-          <div className="cap">2026년 5월 · {company || '박철홍정형외과'} 통합</div>
-          <div className="lbl">5월 누적 매출</div>
-          <div className="big m-tnum">
-            182,420,000<span className="u">원</span>
+          <div className="cap">{company || ''} 통합 관리</div>
+          <div className="lbl">경영 현황</div>
+          <div className="big m-tnum" style={{ fontSize: 16, fontWeight: 700 }}>
+            데이터 준비 중
           </div>
           <div className="delta">
-            전월 동기 +4.2% <span className="muted">· 목표 달성률 38%</span>
+            매출 연동 예정
           </div>
         </div>
         <div className="m-section">

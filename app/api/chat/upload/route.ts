@@ -6,7 +6,8 @@ import {
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
-
+import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
+import { DEFAULT_CONTENT_TYPE, normalizeUploadMimeType } from '@/lib/upload-mime';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,29 +16,7 @@ export const dynamic = 'force-dynamic';
 const UPLOAD_RATE_LIMIT_MAX = 30;
 const UPLOAD_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
-import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
-
 const R2_BUCKET = 'pchos-files';
-const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  avif: 'image/avif',
-  mp4: 'video/mp4',
-  mov: 'video/quicktime',
-  m4v: 'video/mp4',
-  webm: 'video/webm',
-  pdf: 'application/pdf',
-  txt: 'text/plain',
-  csv: 'text/csv',
-  zip: 'application/zip',
-};
 
 type UploadPlanRequest = {
   fileName?: string;
@@ -68,16 +47,6 @@ function guessFileExtension(fileName: string, mimeType: string): string {
   if (mimeType === 'application/pdf') return 'pdf';
   if (mimeType === 'text/plain') return 'txt';
   return 'bin';
-}
-
-function normalizeUploadMimeType(fileName: string, mimeType: string): string {
-  const rawMimeType = String(mimeType || '').trim().toLowerCase();
-  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
-  if (rawMimeType === 'image/x-png') return 'image/png';
-  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
-
-  const ext = guessFileExtension(fileName, '');
-  return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
 function buildFallbackFileName(mimeType: string, ext: string): string {

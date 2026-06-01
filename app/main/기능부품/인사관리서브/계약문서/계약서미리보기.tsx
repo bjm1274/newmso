@@ -20,6 +20,7 @@ import {
   withWeeklyRotationShifts,
 } from '@/lib/contract-shift-rotation';
 import ContractStandardPreview from './계약서표준미리보기';
+import ConfidentialityPledge from './비밀유지서약서';
 
 type Props = {
   staff?: any;
@@ -447,6 +448,9 @@ export default function ContractPreview({
   const companyName = (company?.name as string) || staff.company || '';
   const isHospital = companyName.match(/병원|의원|정형외과|내과|소아과|치과/);
   const ceoTitle = isHospital ? '대표원장' : '대표이사';
+  const contractDateText = contract?.requested_at
+    ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
+    : `${new Date().getFullYear()}년        월        일`;
 
   return (
     <div className="flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar bg-slate-100 print:bg-white print:border-none print:h-auto print:overflow-visible">
@@ -487,7 +491,7 @@ export default function ContractPreview({
               <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 px-[44px] py-[36px]">
+            <div className="flex flex-col flex-1 px-[44px] py-[40px] border-[1.5px] border-slate-600 rounded-[2px] shadow-[inset_0_0_0_3px_var(--card),inset_0_0_0_4px_rgba(100,116,139,0.4)] print:border-0 print:rounded-none print:shadow-none print:px-0 print:py-0">
               <ContractStandardPreview
                 templateText={text}
                 closingData={{
@@ -500,11 +504,16 @@ export default function ContractPreview({
                   employeeName: staff.name,
                   employeeAddress: staff.address || undefined,
                   employeePhone: staff.phone || undefined,
-                  contractDate: contract?.requested_at
-                    ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
-                    : `${new Date().getFullYear()}년        월        일`,
+                  contractDate: contractDateText,
                   signatureDataUrl: sig,
                 }}
+              />
+
+              <ConfidentialityPledge
+                companyName={companyName}
+                employeeName={staff.name}
+                contractDate={contractDateText}
+                signatureDataUrl={sig}
               />
 
               {/* 하단 여백 + 문서 식별 */}

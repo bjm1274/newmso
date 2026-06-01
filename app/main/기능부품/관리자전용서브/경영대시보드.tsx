@@ -46,7 +46,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
     {
       label: '총 직원',
       value: `${activeStaffs.length}명`,
-      detail: '이번 달 입사 2명',
+      detail: '재직 기준',
       icon: 'users',
       tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
     },
@@ -67,9 +67,9 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
   ];
 
   const notices = [
-    { label: '3월 급여 이상치 없음', detail: '2시간 전', icon: 'check', tone: 'text-[var(--success)] bg-[var(--success-light)]' },
-    { label: `결재 대기 ${pendingApprovalCount}건`, detail: '5분 전', icon: 'history', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
-    { label: '정서운 근무 이탈 감지', detail: '12분 전', icon: 'users', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
+    ...(pendingApprovalCount > 0
+      ? [{ label: `결재 대기 ${pendingApprovalCount}건`, detail: '확인 필요', icon: 'history', tone: 'text-[var(--warning)] bg-[var(--warning-light)]' }]
+      : []),
   ];
 
   const quickLinks = [
@@ -115,17 +115,21 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
         <section className="app-card p-4 md:p-5">
           <h3 className="mb-5 text-base font-bold text-[var(--foreground)]">최근 알림</h3>
           <div className="space-y-4">
-            {notices.map((notice) => (
-              <div key={notice.label} className="flex items-center gap-3">
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${notice.tone}`}>
-                  <MenuIcon name={notice.icon} className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[var(--foreground)]">{notice.label}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">{notice.detail}</p>
+            {notices.length === 0 ? (
+              <p className="text-[12px] text-[var(--zinc-400)]">데이터 준비 중</p>
+            ) : (
+              notices.map((notice) => (
+                <div key={notice.label} className="flex items-center gap-3">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${notice.tone}`}>
+                    <MenuIcon name={notice.icon} className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[var(--foreground)]">{notice.label}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">{notice.detail}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </section>
 

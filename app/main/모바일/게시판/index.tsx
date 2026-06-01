@@ -166,6 +166,7 @@ export default function 게시판({ user, onBack }: 게시판Props) {
       onRefresh={refetch}
       showHome={view === 'home'}
       onOpenCategory={handleOpenCategory}
+      company={userCompany ?? ''}
     />
   );
 }

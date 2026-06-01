@@ -139,12 +139,16 @@ function CatalogPanel({
           <button
             type="button"
             className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-bold hover:bg-[var(--muted)]"
+            disabled
+            title="준비 중"
           >
             일괄 가져오기
           </button>
           <button
             type="button"
             className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+            disabled
+            title="준비 중"
           >
             + 물품 등록
           </button>
@@ -292,6 +296,8 @@ function AssetQrPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--zinc-900)] hover:bg-white/90"
+          disabled
+          title="준비 중"
         >
           라벨 인쇄
         </button>
@@ -304,6 +310,8 @@ function AssetQrPanel({
             <button
               type="button"
               className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+              disabled
+              title="준비 중"
             >
               + 자산 등록
             </button>

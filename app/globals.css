@@ -3796,6 +3796,42 @@ button, a, [role="button"] {
     break-after: avoid;
     page-break-after: avoid;
   }
+
+  /* 고급 장식 테두리 — position:fixed 라 매 페이지마다 반복 인쇄된다.
+     이중선(바깥 가는 선 + 본선)을 border+outline 으로 구현해 인쇄 호환성 확보.
+     프레임 안쪽 여백(7mm/9mm) < 본문 padding(10mm/12mm) 이므로 글자가 선에 닿지 않는다. */
+  body:has([data-print-root]) [data-print-root]::before {
+    content: '';
+    position: fixed;
+    top: 7mm;
+    left: 9mm;
+    right: 9mm;
+    bottom: 7mm;
+    border: 1.5px solid #334155;
+    outline: 1px solid rgba(71, 85, 105, 0.55);
+    outline-offset: 3px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 배경·강조색이 흑백으로 빠지지 않도록 강제 */
+  body:has([data-print-root]) [data-print-root],
+  body:has([data-print-root]) [data-print-root] * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 조 단위 블록이 페이지 경계에서 잘리지 않도록 */
+  body:has([data-print-root]) [data-print-root] .contract-article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 비밀유지 서약서는 새 페이지에서 시작 */
+  body:has([data-print-root]) [data-print-root] .contract-pledge {
+    break-before: page;
+    page-break-before: always;
+  }
 }
 
 /* Mobile Context Menu as Bottom Sheet & Backdrop (Added for Swipe Actions) */

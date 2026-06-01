@@ -79,6 +79,8 @@ export function StockStatusTable({
                 <button
                   type="button"
                   className="rounded-[var(--radius-sm)] border border-[var(--accent)] bg-transparent px-2 py-0.5 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-selected-subtle)]"
+                  disabled
+                  title="준비 중"
                 >
                   발주
                 </button>
@@ -117,6 +119,8 @@ export function UrgentAlertList({ rows }: { rows: StockStatusRow[] }) {
         <button
           type="button"
           className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[10px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+          disabled
+          title="준비 중"
         >
           설정
         </button>
@@ -148,6 +152,8 @@ export function UrgentAlertList({ rows }: { rows: StockStatusRow[] }) {
               <button
                 type="button"
                 className="shrink-0 rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[var(--accent-hover)]"
+                disabled
+                title="준비 중"
               >
                 {a.status === '재고 0' ? '자동 발주' : a.status === '유효기간' ? '사용 우선' : '발주'}
               </button>
