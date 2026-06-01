@@ -585,6 +585,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await openCompose(page);
     await selectComposeFormTab(page, '연장근무');
     await selectApprover(page);
+    await page.getByTestId('approval-overtime-query-button').click();
     await expect(page.getByTestId('approval-overtime-record-0')).toBeVisible();
     await page.getByTestId('approval-overtime-record-0').click();
     await page.getByTestId('approval-content-input').fill('연장근무 수당 청구 사유입니다.');

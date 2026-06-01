@@ -251,7 +251,7 @@ export default function ApprovalComposerView({
                       <option key={option.tab} value={option.tab}>
                         {option.label}
                         {option.requiresPermission ? ' · 권한 필요' : ''}
-                        {option.isCustom ? ' (커스텀)' : ''}
+                        {option.isCustom && option.normalized !== 'overtime' ? ' (커스텀)' : ''}
                       </option>
                     ))}
                   </optgroup>

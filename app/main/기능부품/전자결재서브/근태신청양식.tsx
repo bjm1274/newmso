@@ -29,6 +29,8 @@ export default function AttendanceForms({
   const [localEndDate, setLocalEndDate] = useState('');
   const [leaveType, setLeaveType] = useState(DEFAULT_LEAVE_TYPE);
   const [selectedDelegateId, setSelectedDelegateId] = useState('');
+  const [hasQueried, setHasQueried] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const initialLeaveType =
     String(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE).trim() || DEFAULT_LEAVE_TYPE;
@@ -101,21 +103,31 @@ export default function AttendanceForms({
     selectedDelegateId,
   ]);
 
-  useEffect(() => {
-    const load = async () => {
+  const handleQueryOvertime = async () => {
+    setIsLoading(true);
+    try {
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const dateString = sixtyDaysAgo.toISOString().split('T')[0];
+
       const { data: attendance } = await supabase
         .from('attendance')
         .select('*')
         .eq('staff_id', currentUser.id as string)
+        .gte('date', dateString)
         .order('date', { ascending: false });
+
       const { data: workSchedules } = await supabase.from('work_schedules').select('*');
 
       setAttendanceRows(attendance || []);
       setSchedules(workSchedules || []);
-    };
-
-    load();
-  }, [currentUser.id]);
+      setHasQueried(true);
+    } catch (error) {
+      console.error('Cloudflare D1 근태 기록 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const calculateOT = (record: any): number => {
     const staff = staffRows.find((item) => item.id === currentUser.id);
@@ -252,54 +264,107 @@ export default function AttendanceForms({
 
       {formType === '연장근무' ? (
         <>
-          <div className="border-b border-orange-100 bg-orange-500/10 p-3">
-            <h4 className="text-sm font-bold text-orange-600">연장근무 내역 선택</h4>
-            <p className="mt-1 text-[11px] font-semibold text-orange-500/70">
-              근태 기록을 기준으로 초과 근무 내역을 불러옵니다.
-            </p>
+          <div className="flex items-center justify-between border-b border-orange-100 bg-orange-500/10 p-3">
+            <div>
+              <h4 className="text-sm font-bold text-orange-600">연장근무 내역 선택</h4>
+              <p className="mt-1 text-[11px] font-semibold text-orange-500/70">
+                근태 기록을 기준으로 최근 60일의 초과 근무 내역을 조회합니다.
+              </p>
+            </div>
+            {hasQueried && !isLoading && (
+              <button
+                type="button"
+                onClick={handleQueryOvertime}
+                className="flex items-center gap-1 rounded-[var(--radius-md)] border border-orange-200 bg-[var(--card)] px-2 py-1 text-[10px] font-bold text-orange-600 transition-colors hover:bg-orange-500/5"
+              >
+                다시 조회
+              </button>
+            )}
           </div>
 
-          <div className="custom-scrollbar grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 md:grid-cols-2 md:gap-3">
-            {attendanceRows.map((row, index) => {
-              const overtimeMinutes = calculateOT(row);
-              if (overtimeMinutes <= 0) return null;
+          {!hasQueried && !isLoading ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-[var(--tab-bg)]/30 border border-dashed border-orange-200/50 rounded-b-2xl">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
+                <span className="text-xl">⏱️</span>
+              </div>
+              <h5 className="text-xs font-black text-[var(--foreground)]">연장근무 내역 조회하기</h5>
+              <p className="mt-1 max-w-[280px] text-[10px] font-medium text-[var(--muted-foreground)] leading-relaxed">
+                조회 버튼을 클릭하면 최근 60일간의 근태 기록(출퇴근 로그)을 분석하여 미청구된 초과 근무 내역을 불러옵니다.
+              </p>
+              <button
+                type="button"
+                data-testid="approval-overtime-query-button"
+                onClick={handleQueryOvertime}
+                className="mt-4 min-h-[38px] rounded-[var(--radius-md)] bg-orange-500 px-5 text-xs font-bold text-white shadow-sm transition-all hover:bg-orange-600 hover:shadow-md active:scale-95"
+              >
+                조회하기
+              </button>
+            </div>
+          ) : isLoading ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center bg-[var(--tab-bg)]/30 border border-dashed border-orange-200/50 rounded-b-2xl">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+              <p className="mt-3 text-xs font-bold text-orange-600 animate-pulse">
+                최근 60일간의 근태 기록 분석 중...
+              </p>
+            </div>
+          ) : (
+            <div className="custom-scrollbar grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 md:grid-cols-2 md:gap-3">
+              {(() => {
+                const records = attendanceRows.filter((row) => calculateOT(row) > 0);
+                if (records.length === 0) {
+                  return (
+                    <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
+                      <div className="mb-2 text-xl">🎉</div>
+                      <p className="text-xs font-black text-[var(--foreground)]">
+                        최근 60일 내 연장근무 이력이 없습니다.
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                        초과 근무 기록이 없거나, 정규 업무 시간 이내에 퇴근하셨습니다.
+                      </p>
+                    </div>
+                  );
+                }
 
-              return (
-                <button
-                  key={`${row.date}-${index}`}
-                  type="button"
-                  data-testid={`approval-overtime-record-${index}`}
-                  onClick={() => {
-                    setSelectedDate(row.date);
-                    updateExtraData({
-                      date: row.date,
-                      minutes: overtimeMinutes,
-                      hours: Math.round((overtimeMinutes / 60) * 100) / 100,
-                      amount: Math.floor((overtimeMinutes / 60) * 15000),
-                    });
-                    updateFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
-                  }}
-                  className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
-                    selectedDate === row.date
-                      ? 'border-orange-500 bg-[var(--card)] shadow-sm'
-                      : 'border-[var(--border)] bg-[var(--card)]/50 hover:bg-[var(--card)]'
-                  }`}
-                >
-                  <div>
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)] md:text-[11px]">
-                      {row.date}
-                    </span>
-                    <p className="text-xs font-bold text-[var(--foreground)]">
-                      퇴근: {String(row.check_out || '').slice(11, 16)}
-                    </p>
-                  </div>
-                  <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
-                    +{formatOTLabel(overtimeMinutes)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                return records.map((row, index) => {
+                  const overtimeMinutes = calculateOT(row);
+                  return (
+                    <button
+                      key={`${row.date}-${index}`}
+                      type="button"
+                      data-testid={`approval-overtime-record-${index}`}
+                      onClick={() => {
+                        setSelectedDate(row.date);
+                        updateExtraData({
+                          date: row.date,
+                          minutes: overtimeMinutes,
+                          hours: Math.round((overtimeMinutes / 60) * 100) / 100,
+                          amount: Math.floor((overtimeMinutes / 60) * 15000),
+                        });
+                        updateFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
+                      }}
+                      className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
+                        selectedDate === row.date
+                          ? 'border-orange-500 bg-[var(--card)] shadow-sm'
+                          : 'border-[var(--border)] bg-[var(--card)]/50 hover:bg-[var(--card)]'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] md:text-[11px]">
+                          {row.date}
+                        </span>
+                        <p className="text-xs font-bold text-[var(--foreground)]">
+                          퇴근: {String(row.check_out || '').slice(11, 16)}
+                        </p>
+                      </div>
+                      <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
+                        +{formatOTLabel(overtimeMinutes)}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          )}
         </>
       ) : null}
     </div>
