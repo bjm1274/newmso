@@ -117,9 +117,11 @@ test("leave management tabs and actions stay clickable", async ({ page }) => {
   // eslint-disable-next-line no-console
   console.log(modalHtml.slice(0, 2000));
 
-  // leave_requests에 대한 PATCH 요청 대기 설정
+  // leave_requests 결재 처리 요청 대기 (D1 mutate API 경유)
   const leaveApproveRequest = page.waitForRequest(
-    (request) => request.url().includes("/leave_requests") && request.method() === "PATCH"
+    (request) =>
+      (request.url().includes("/api/d1/mutate") && request.method() === "POST") ||
+      (request.url().includes("/leave_requests") && request.method() === "PATCH")
   );
 
   // "승인하기" 버튼이 있으면 클릭, 없으면 "변경" 버튼으로 상태 토글
