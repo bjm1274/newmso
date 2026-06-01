@@ -411,6 +411,179 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     [hourlySalaryUsesMinimumFloor, previewMinimumWage, rawHourlySalaryAmount],
   );
 
+  const parsedShiftMeta = useMemo(() => {
+    if (!primaryShift) return null;
+    const description = String(primaryShift.description || '');
+    const marker = '[SHIFT_META]';
+    const markerIndex = description.lastIndexOf(marker);
+    if (markerIndex === -1) {
+      return {
+        shift_type: primaryShift.shift_type || null,
+        weekly_work_days: primaryShift.weekly_work_days || 5,
+        is_weekend_work: primaryShift.is_weekend_work || false,
+        daily_schedules: null as any,
+        break_plans: null as any,
+      };
+    }
+    try {
+      const metaText = description.slice(markerIndex + marker.length).trim();
+      const parsed = JSON.parse(metaText);
+      return {
+        shift_type: parsed.shift_type || primaryShift.shift_type || null,
+        weekly_work_days: parsed.weekly_work_days ?? primaryShift.weekly_work_days ?? 5,
+        is_weekend_work: parsed.is_weekend_work ?? primaryShift.is_weekend_work ?? false,
+        daily_schedules: parsed.daily_schedules || null,
+        break_plans: parsed.break_plans || null,
+      };
+    } catch {
+      return {
+        shift_type: primaryShift.shift_type || null,
+        weekly_work_days: primaryShift.weekly_work_days || 5,
+        is_weekend_work: primaryShift.is_weekend_work || false,
+        daily_schedules: null as any,
+        break_plans: null as any,
+      };
+    }
+  }, [primaryShift]);
+
+  const calculateDailyNightHours = (start?: string, end?: string) => {
+    if (!start || !end) return 0;
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0;
+    let sMins = sh * 60 + sm;
+    let eMins = eh * 60 + em;
+    if (eMins <= sMins) {
+      eMins += 24 * 60; // Overnight
+    }
+    
+    let nightMins = 0;
+    for (let m = sMins; m < eMins; m++) {
+      const modM = m % (24 * 60);
+      if (modM >= 22 * 60 || modM < 6 * 60) {
+        nightMins++;
+      }
+    }
+    return nightMins / 60;
+  };
+
+  const allowanceRecommendations = useMemo(() => {
+    const weeklyHours = Number(신규직원.working_hours_per_week || 40);
+    const weeklyDays = Number(신규직원.working_days_per_week || 5);
+    const hourlyRate = hourlySalaryAmount || previewMinimumWage;
+    
+    // 1. 약정연장수당
+    const dailyHours = isAlternateDayShift ? (weeklyHours / 3.5) : (weeklyHours / weeklyDays);
+    let weeklyOvertime = 0;
+    if (isAlternateDayShift) {
+      weeklyOvertime = Math.max(0, dailyHours - 8) * 3.5;
+    } else {
+      weeklyOvertime = Math.max(0, weeklyHours - 40);
+    }
+    const monthlyOvertimeHours = weeklyOvertime * 4.345;
+    const recommendedAgreedOvertime = Math.round(hourlyRate * monthlyOvertimeHours * 1.5);
+    const showAgreedOvertime = monthlyOvertimeHours > 0;
+
+    // 2. 약정야간수당
+    let weeklyNightHours = 0;
+    if (parsedShiftMeta?.daily_schedules) {
+      const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      days.forEach(day => {
+        const sched = parsedShiftMeta.daily_schedules[day];
+        if (sched?.enabled) {
+          weeklyNightHours += calculateDailyNightHours(sched.start_time, sched.end_time);
+        }
+      });
+    } else if (primaryShift) {
+      const dailyNight = calculateDailyNightHours(primaryShift.start_time, primaryShift.end_time);
+      weeklyNightHours = dailyNight * (primaryShift.weekly_work_days || 5);
+    }
+    const monthlyNightHours = weeklyNightHours * 4.345;
+    const recommendedAgreedNight = Math.round(hourlyRate * monthlyNightHours * 0.5);
+    const showAgreedNight = monthlyNightHours > 0;
+
+    // 3. 휴일근로수당
+    let weeklyHolidayHours = 0;
+    const isWeekendWork = !!(parsedShiftMeta?.is_weekend_work || primaryShift?.is_weekend_work);
+    if (parsedShiftMeta?.daily_schedules) {
+      ['sat', 'sun'].forEach(day => {
+        const sched = parsedShiftMeta.daily_schedules[day];
+        if (sched?.enabled) {
+          const start = sched.start_time || primaryShift?.start_time || '09:00';
+          const end = sched.end_time || primaryShift?.end_time || '18:00';
+          const [sh, sm] = start.split(':').map(Number);
+          const [eh, em] = end.split(':').map(Number);
+          if (!isNaN(sh) && !isNaN(eh)) {
+            let diff = (eh * 60 + em - (sh * 60 + sm)) / 60;
+            if (diff <= 0) diff += 24;
+            
+            let breakDiff = 1;
+            if (primaryShift?.break_start_time && primaryShift?.break_end_time) {
+              const [bsh, bsm] = primaryShift.break_start_time.split(':').map(Number);
+              const [beh, bem] = primaryShift.break_end_time.split(':').map(Number);
+              if (!isNaN(bsh) && !isNaN(beh)) {
+                let bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
+                if (bdiff > 0) breakDiff = bdiff;
+              }
+            }
+            weeklyHolidayHours += Math.max(0, diff - breakDiff);
+          }
+        }
+      });
+    } else if (isWeekendWork && primaryShift) {
+      const start = primaryShift.start_time || '09:00';
+      const end = primaryShift.end_time || '18:00';
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      if (!isNaN(sh) && !isNaN(eh)) {
+        let diff = (eh * 60 + em - (sh * 60 + sm)) / 60;
+        if (diff <= 0) diff += 24;
+        let breakDiff = 1;
+        if (primaryShift.break_start_time && primaryShift.break_end_time) {
+          const [bsh, bsm] = primaryShift.break_start_time.split(':').map(Number);
+          const [beh, bem] = primaryShift.break_end_time.split(':').map(Number);
+          if (!isNaN(bsh) && !isNaN(beh)) {
+            let bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
+            if (bdiff > 0) breakDiff = bdiff;
+          }
+        }
+        weeklyHolidayHours = Math.max(0, diff - breakDiff);
+      }
+    }
+    const monthlyHolidayHours = weeklyHolidayHours * 4.345;
+    const recommendedHoliday = Math.round(hourlyRate * monthlyHolidayHours * 1.5);
+    const showHoliday = monthlyHolidayHours > 0;
+
+    // 4. 연차휴가수당
+    const annualLeaves = Number(신규직원.연차총개수 || 0);
+    const recommendedAnnualLeave = Math.round((annualLeaves / 12) * 8 * hourlyRate);
+    const showAnnualLeave = annualLeaves > 0;
+
+    return {
+      agreedOvertime: {
+        show: showAgreedOvertime,
+        hours: monthlyOvertimeHours,
+        amount: recommendedAgreedOvertime,
+        dailyOvertime: isAlternateDayShift ? Math.max(0, dailyHours - 8) : 0,
+        dailyHours,
+      },
+      agreedNight: {
+        show: showAgreedNight,
+        hours: monthlyNightHours,
+        amount: recommendedAgreedNight,
+      },
+      holiday: {
+        show: showHoliday,
+        hours: monthlyHolidayHours,
+        amount: recommendedHoliday,
+      },
+      annualLeave: {
+        show: showAnnualLeave,
+        amount: recommendedAnnualLeave,
+      }
+    };
+  }, [신규직원.working_hours_per_week, 신규직원.working_days_per_week, 신규직원.연차총개수, hourlySalaryAmount, isAlternateDayShift, parsedShiftMeta, primaryShift, previewMinimumWage]);
+
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
   const [showEssModal, setShowEssModal] = useState(false);
@@ -2380,8 +2553,159 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30"
                               />
                             </div>
-                          );
-                        })}
+                        );
+                      })}
+                      </div>
+
+                      {/* 지능형 법정 수당 추천 및 근거 안내 widget */}
+                      <div className="p-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm space-y-3">
+                        <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">⚖️</span>
+                            <div>
+                              <h4 className="text-xs font-bold text-[var(--foreground)]">지능형 법정 수당 추천 및 근거 안내</h4>
+                              <p className="text-[9px] text-[var(--toss-gray-3)] font-semibold mt-0.5">선택한 근무형태 및 시급 정보를 기준으로 가산수당 요건을 분석합니다.</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                          {/* 1. 약정연장수당 추천 */}
+                          {allowanceRecommendations.agreedOvertime.show && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[11px] hover:border-amber-500/20 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">약정연장 추천</span>
+                                  <span className="font-bold text-[var(--foreground)]">하루 8시간 초과 근로 감지</span>
+                                </div>
+                                <p className="text-[var(--toss-gray-4)] leading-relaxed text-[10px]">
+                                  소정근로시간 중 일 8시간(또는 주 40시간) 초과분인 주 {((allowanceRecommendations.agreedOvertime.hours / 4.345) / 1.5).toFixed(1)}시간(월 약 {allowanceRecommendations.agreedOvertime.hours.toFixed(1)}시간분)은 법정 연장근로에 해당합니다. 50% 가산을 포함한 약정 연장수당 적용이 권장됩니다.
+                                </p>
+                                <div className="text-[9px] text-[var(--accent)] font-semibold">⚖️ 근거: 근로기준법 제50조 및 제56조 (1일 8시간, 주 40시간 초과분 가산 필수)</div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                <span className="text-xs font-black text-[var(--foreground)]">{allowanceRecommendations.agreedOvertime.amount.toLocaleString()}원</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    신규직원설정(prev => ({ ...prev, agreed_overtime_allowance: allowanceRecommendations.agreedOvertime.amount }));
+                                    toast('약정연장수당 추천액이 적용되었습니다.');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-md bg-[var(--accent)] text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-all"
+                                >
+                                  적용하기
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. 약정야간수당 추천 */}
+                          {allowanceRecommendations.agreedNight.show && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[11px] hover:border-indigo-500/20 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">약정야간 추천</span>
+                                  <span className="font-bold text-[var(--foreground)]">야간근로 시간대(22:00~06:00) 포함</span>
+                                </div>
+                                <p className="text-[var(--toss-gray-4)] leading-relaxed text-[10px]">
+                                  근무시간 내 야간 근로(월 약 {allowanceRecommendations.agreedNight.hours.toFixed(1)}시간분)가 포함되어 있습니다. 해당 시간에 대해 50% 가산액을 약정 야간수당으로 책정해야 법적 리스크가 방지됩니다.
+                                </p>
+                                <div className="text-[9px] text-indigo-500 font-semibold">⚖️ 근거: 근로기준법 제56조제3항 (야간 시간 가산수당 지급 의무)</div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                <span className="text-xs font-black text-[var(--foreground)]">{allowanceRecommendations.agreedNight.amount.toLocaleString()}원</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    신규직원설정(prev => ({ ...prev, agreed_night_allowance: allowanceRecommendations.agreedNight.amount }));
+                                    toast('약정야간수당 추천액이 적용되었습니다.');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-md bg-indigo-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-all"
+                                >
+                                  적용하기
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. 휴일근로수당 추천 */}
+                          {allowanceRecommendations.holiday.show && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[11px] hover:border-rose-500/20 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 border border-rose-500/20">휴일근로 추천</span>
+                                  <span className="font-bold text-[var(--foreground)]">휴일(토/일) 근로 감지</span>
+                                </div>
+                                <p className="text-[var(--toss-gray-4)] leading-relaxed text-[10px]">
+                                  소정 근무일정에 주말(토/일) 휴일 근로(월 약 {allowanceRecommendations.holiday.hours.toFixed(1)}시간)가 고정적으로 포함되어 있습니다. 1.5배의 가산 수당 지급이 필요합니다.
+                                </p>
+                                <div className="text-[9px] text-rose-500 font-semibold">⚖️ 근거: 근로기준법 제56조제2항 (휴일근로 가산 지급 의무)</div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                <span className="text-xs font-black text-[var(--foreground)]">{allowanceRecommendations.holiday.amount.toLocaleString()}원</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    신규직원설정(prev => ({ ...prev, holiday_work_allowance: allowanceRecommendations.holiday.amount }));
+                                    toast('휴일근로수당 추천액이 적용되었습니다.');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-md bg-rose-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-all"
+                                >
+                                  적용하기
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. 연차휴가수당 추천 */}
+                          {allowanceRecommendations.annualLeave.show && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[11px] hover:border-emerald-500/20 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">연차수당 추천</span>
+                                  <span className="font-bold text-[var(--foreground)]">연차 {신규직원.연차총개수}일 기준 고정 분할</span>
+                                </div>
+                                <p className="text-[var(--toss-gray-4)] leading-relaxed text-[10px]">
+                                  입력된 연차 {신규직원.연차총개수}일에 대한 미사용 수당(1일 8시간 기준)을 월급에 포함(매월 고정 분할)하여 지급하는 연차수당 설계입니다.
+                                </p>
+                                <div className="text-[9px] text-emerald-600 font-semibold">⚖️ 근거: 근로기준법 제60조 (미사용 연차에 대한 유급 수당 정산)</div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                <span className="text-xs font-black text-[var(--foreground)]">{allowanceRecommendations.annualLeave.amount.toLocaleString()}원</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    신규직원설정(prev => ({ ...prev, annual_leave_pay: allowanceRecommendations.annualLeave.amount }));
+                                    toast('연차휴가수당 추천액이 적용되었습니다.');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold shadow-sm hover:opacity-90 transition-all"
+                                >
+                                  적용하기
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 5. 사후 정산 항목 안내 (연장/야간 수당) */}
+                          <div className="p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[11px] space-y-1 hover:border-slate-500/20 transition-all duration-200">
+                            <div className="flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20">사후 정산</span>
+                              <span className="font-bold text-[var(--foreground)]">연장근로수당 & 야간근로수당 (사후정산용)</span>
+                            </div>
+                            <p className="text-[var(--toss-gray-4)] leading-relaxed text-[10px]">
+                              근로계약상 예정된 근로 외에 임시적/비고정적으로 추가 연장 및 야간 근무(22시~06시)가 발생한 경우, 매월 실근무 기록에 근거해 가산율(연장 50%, 야간 50%)을 적용해 정산 지급합니다.
+                            </p>
+                            <div className="text-[9px] text-slate-500 font-semibold">⚖️ 근거: 근로기준법 제56조제1항 및 제3항 (실제 근무에 따른 정산 의무)</div>
+                          </div>
+
+                          {/* 6. 추천 항목이 없는 경우 */}
+                          {!allowanceRecommendations.agreedOvertime.show && !allowanceRecommendations.agreedNight.show && !allowanceRecommendations.holiday.show && !allowanceRecommendations.annualLeave.show && (
+                            <div className="p-4 text-center rounded-lg bg-[var(--muted)] border border-dashed border-[var(--border)] text-[11px] text-[var(--toss-gray-3)] font-bold flex flex-col items-center justify-center gap-1 animate-in fade-in duration-300">
+                              <span>🎉 고정 가산수당 설계 요건 없음</span>
+                              <span className="text-[9px] text-[var(--toss-gray-4)] font-semibold">선택한 근무형태는 기본 소정근로시간 범위에 해당하여, 고정형 법정 가산수당 대상이 아닙니다.</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
