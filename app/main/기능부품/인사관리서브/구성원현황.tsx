@@ -208,6 +208,84 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
+  const [targetSalaryInput, setTargetSalaryInput] = useState('');
+  const [targetNightHoursInput, setTargetNightHoursInput] = useState('');
+  const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
+  const previewMinimumWage = getMinimumWageByYear(previewMinimumWageYear);
+
+  const reverseCalculateSplit = useMemo(() => {
+    const target = parseInt(targetSalaryInput.replace(/,/g, ''), 10) || 0;
+    if (target <= 0) return null;
+
+    const allowances =
+      Number(신규직원.meal_allowance || 0) +
+      Number(신규직원.vehicle_allowance || 0) +
+      Number(신규직원.childcare_allowance || 0) +
+      Number(신규직원.research_allowance || 0) +
+      Number(신규직원.other_taxfree || 0) +
+      Number(신규직원.position_allowance || 0);
+
+    const rem = target - allowances;
+    if (rem <= 0) {
+      return {
+        isValid: false,
+        message: '고정 수당 합계가 목표 월급보다 큽니다. 고정 수당을 조정하거나 목표 월급을 높여주세요.',
+      };
+    }
+
+    const wHours = Number(신규직원.working_hours_per_week || 40);
+    const nHours = Number(targetNightHoursInput || 0);
+
+    let hBase = getMonthlyWorkingHours(wHours);
+    let hOver = 0;
+
+    if (wHours > 40) {
+      hBase = 209;
+      hOver = (wHours - 40) * 4.345 * 1.5;
+    }
+
+    const hNight = nHours * 4.345 * 0.5;
+    const totalHours = hBase + hOver + hNight;
+    const derivedHourlyRate = Math.ceil(rem / totalHours);
+
+    if (derivedHourlyRate < previewMinimumWage) {
+      const minRem = Math.ceil(totalHours * previewMinimumWage);
+      const minTarget = minRem + allowances;
+      return {
+        isValid: false,
+        derivedHourlyRate,
+        minTarget,
+        message: `최저시급 미달 (역산시급: ${derivedHourlyRate.toLocaleString()}원 / 기준: ${previewMinimumWage.toLocaleString()}원). 최소 세전 ${minTarget.toLocaleString()}원 이상 입력하셔야 합니다.`,
+      };
+    }
+
+    const calculatedBase = Math.floor(derivedHourlyRate * hBase);
+    const calculatedAgreedNight = Math.floor(derivedHourlyRate * hNight);
+    const calculatedAgreedOvertime = rem - calculatedBase - calculatedAgreedNight;
+
+    return {
+      isValid: true,
+      derivedHourlyRate,
+      base_salary: calculatedBase,
+      agreed_overtime_allowance: calculatedAgreedOvertime,
+      agreed_night_allowance: calculatedAgreedNight,
+      message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)`,
+    };
+  }, [targetSalaryInput, targetNightHoursInput, 신규직원.meal_allowance, 신규직원.vehicle_allowance, 신규직원.childcare_allowance, 신규직원.research_allowance, 신규직원.other_taxfree, 신규직원.position_allowance, 신규직원.working_hours_per_week, previewMinimumWage]);
+
+  const handleApplySplit = () => {
+    if (!reverseCalculateSplit || !reverseCalculateSplit.isValid) {
+      toast('역산 조건이 맞지 않습니다. 입력값을 확인하세요.', 'warning');
+      return;
+    }
+    신규직원설정((prev) => ({
+      ...prev,
+      base_salary: reverseCalculateSplit.base_salary || 0,
+      agreed_overtime_allowance: reverseCalculateSplit.agreed_overtime_allowance || 0,
+      agreed_night_allowance: reverseCalculateSplit.agreed_night_allowance || 0,
+    }));
+    toast('기본급과 약정수당이 최적의 법적 비율로 분할 적용되었습니다.');
+  };
   // staff_licenses 연동: staff_id별 면허 rows. 자격안전센터와 공유하는 단일 기준값.
   const [licensesByStaff, licensesByStaff설정] = useState<Record<string, StaffLicenseRow[]>>({});
   // 편집 중인 직원의 첫 번째 면허 row id (없으면 null → 저장 시 insert)
@@ -285,8 +363,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     () => getMonthlyWorkingHours(신규직원.working_hours_per_week),
     [신규직원.working_hours_per_week],
   );
-  const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
-  const previewMinimumWage = getMinimumWageByYear(previewMinimumWageYear);
   const rawHourlySalaryAmount = useMemo(
     () => calculateHourlyRateFromMonthlySalary(ordinarySalaryTotal, 신규직원.working_hours_per_week, 'ceil'),
     [신규직원.working_hours_per_week, ordinarySalaryTotal],
@@ -810,6 +886,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       ...createEmptyStaffForm(defaultCompany),
       팀: defaultTeam,
     });
+    setTargetSalaryInput('');
+    setTargetNightHoursInput('');
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const findDuplicateStaffMember = async (staffName: string, residentNo: string, excludeId?: string | number | null) => {
@@ -1234,6 +1312,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 수정시작 = (직원: StaffMember) => {
     선택된직원ID설정(직원.id);
     프로필사진파일설정(null);
+    setTargetSalaryInput('');
+    setTargetNightHoursInput('');
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
     const extensionValue = getStaffExtension(직원);
     // staff_licenses 첫 번째 row를 폼에 로드 (없으면 빈 값 + null)
@@ -2144,6 +2224,98 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
                 {activeTab === '급여' && (
                   <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* 🎯 포괄임금 월급 역산 도우미 */}
+                    <div className="p-4 rounded-[var(--radius-xl)] bg-[var(--page-bg)] border border-[var(--border)] space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base" aria-hidden="true">🎯</span>
+                        <h4 className="text-xs font-bold text-[var(--foreground)]">
+                          포괄임금 월급 역산 도우미
+                        </h4>
+                        <span className="text-[10px] text-[var(--toss-gray-3)] font-semibold">
+                          (근무 스케줄 기준 법적 비율 분할)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--toss-gray-4)] font-medium">
+                        합의된 세전 월급 총액을 입력하시면, 설정된 **주 소정근로시간({신규직원.working_hours_per_week}시간)** 및 입력된 고정 수당(식대, 직책수당 등)을 계산하여 법적으로 가장 안전한 비율의 **기본급과 약정연장수당**으로 자동 배분해 드립니다.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="약정 세전 월급 입력 (예: 3,500,000)"
+                            value={targetSalaryInput ? Number(targetSalaryInput.replace(/,/g, '')).toLocaleString() : ''}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/,/g, '');
+                              if (/^\d*$/.test(raw)) {
+                                setTargetSalaryInput(raw);
+                              }
+                            }}
+                            className="w-full p-3 pr-8 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                          />
+                          {targetSalaryInput && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                              원
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="주 평균 야간근로시간 (선택, 예: 4)"
+                            value={targetNightHoursInput}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (/^\d*$/.test(raw)) {
+                                setTargetNightHoursInput(raw);
+                              }
+                            }}
+                            className="w-full p-3 pr-16 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                            시간/주
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleApplySplit}
+                          disabled={!reverseCalculateSplit?.isValid}
+                          className="w-full sm:w-auto px-5 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-bold text-xs shadow-sm hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                        >
+                          자동 분할 적용하기
+                        </button>
+                      </div>
+                      
+                      {reverseCalculateSplit && (
+                        <div className={`p-3 rounded-[var(--radius-lg)] text-[11px] font-semibold border ${
+                          reverseCalculateSplit.isValid 
+                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' 
+                            : 'bg-rose-500/10 text-rose-700 border-rose-500/20'
+                        }`}>
+                          <div className="flex items-start gap-2">
+                            <span className="text-[12px]">{reverseCalculateSplit.isValid ? '✅' : '⚠️'}</span>
+                            <div className="flex-1 space-y-1">
+                              <p>{reverseCalculateSplit.message}</p>
+                              {reverseCalculateSplit.isValid && (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1.5 mt-1.5 border-t border-emerald-500/20 text-[10px] text-emerald-600">
+                                  <div>· 기본급(예정): <span className="font-bold">{reverseCalculateSplit.base_salary?.toLocaleString()}원</span></div>
+                                  <div>· 약정연장(예정): <span className="font-bold">{reverseCalculateSplit.agreed_overtime_allowance?.toLocaleString()}원</span></div>
+                                  {reverseCalculateSplit.agreed_night_allowance && reverseCalculateSplit.agreed_night_allowance > 0 ? (
+                                    <div>· 약정야간(예정): <span className="font-bold">{reverseCalculateSplit.agreed_night_allowance.toLocaleString()}원</span></div>
+                                  ) : null}
+                                  <div>· 역산시급: <span className="font-bold">{reverseCalculateSplit.derivedHourlyRate?.toLocaleString()}원</span></div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* (과세) 월 급여 및 고정 수당 */}
                     <div className="space-y-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
