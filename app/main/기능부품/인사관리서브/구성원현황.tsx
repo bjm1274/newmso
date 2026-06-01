@@ -54,6 +54,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     base_salary: 0,
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
+    agreed_overtime_allowance: 0, agreed_night_allowance: 0,
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
@@ -63,6 +64,8 @@ function createEmptyStaffForm(selectedCompany?: string) {
 const TAXABLE_SALARY_FIELDS = [
   { key: 'base_salary', label: '기본급 (월)' },
   { key: 'position_allowance', label: '직책수당' },
+  { key: 'agreed_overtime_allowance', label: '약정연장수당' },
+  { key: 'agreed_night_allowance', label: '약정야간수당' },
   { key: 'overtime_allowance', label: '연장근로수당' },
   { key: 'night_work_allowance', label: '야간근로수당' },
   { key: 'holiday_work_allowance', label: '휴일근로수당' },
@@ -89,6 +92,9 @@ const STAFF_MUTATION_ALLOWANCE_COLUMNS = [
   'night_work_allowance',
   'holiday_work_allowance',
   'annual_leave_pay',
+  'salary_info',
+  'agreed_night_allowance',
+  'agreed_overtime_allowance',
 ] as const;
 
 const STAFF_MUTATION_WORK_CONDITION_COLUMNS = [
@@ -253,6 +259,28 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     [신규직원],
   );
   const totalSalaryAmount = taxableSalaryTotal + taxfreeSalaryTotal;
+  const ordinarySalaryTotal = useMemo(() => {
+    const base = Number(신규직원.base_salary || 0);
+    const position = Number(신규직원.position_allowance || 0);
+    const agreedOvertime = Number(신규직원.agreed_overtime_allowance || 0);
+    const agreedNight = Number(신규직원.agreed_night_allowance || 0);
+    const meal = Number(신규직원.meal_allowance || 0);
+    const vehicle = Number(신규직원.vehicle_allowance || 0);
+    const childcare = Number(신규직원.childcare_allowance || 0);
+    const research = Number(신규직원.research_allowance || 0);
+    const otherTaxfree = Number(신규직원.other_taxfree || 0);
+    return base + position + agreedOvertime + agreedNight + meal + vehicle + childcare + research + otherTaxfree;
+  }, [
+    신규직원.base_salary,
+    신규직원.position_allowance,
+    신규직원.agreed_overtime_allowance,
+    신규직원.agreed_night_allowance,
+    신규직원.meal_allowance,
+    신규직원.vehicle_allowance,
+    신규직원.childcare_allowance,
+    신규직원.research_allowance,
+    신규직원.other_taxfree,
+  ]);
   const monthlyWorkingHours = useMemo(
     () => getMonthlyWorkingHours(신규직원.working_hours_per_week),
     [신규직원.working_hours_per_week],
@@ -260,8 +288,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
   const previewMinimumWage = getMinimumWageByYear(previewMinimumWageYear);
   const rawHourlySalaryAmount = useMemo(
-    () => calculateHourlyRateFromMonthlySalary(totalSalaryAmount, 신규직원.working_hours_per_week, 'ceil'),
-    [신규직원.working_hours_per_week, totalSalaryAmount],
+    () => calculateHourlyRateFromMonthlySalary(ordinarySalaryTotal, 신규직원.working_hours_per_week, 'ceil'),
+    [신규직원.working_hours_per_week, ordinarySalaryTotal],
   );
   const hasHourlyPremiumAdjustments = useMemo(
     () =>
@@ -1225,7 +1253,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       취득일자: 첫면허?.issued_date || '',
       면허기타내용: 첫면허?.memo || '',
       계좌정보: 직원.bank_account || '',
-      임금정보: (직원.salary_info as string) || '', 상태: 직원.status || '재직',
+      임금정보: (직원.salary_info as string) || (직원.permissions?.payroll_allowances as any)?.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
       연차사용개수: (직원.annual_leave_used as number) || 0,
       근무형태ID: 직원근무형태IDs[0] || (직원.shift_id as string) || '',
@@ -1236,6 +1264,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       other_taxfree: (직원.other_taxfree as number) ?? 0, position_allowance: (직원.position_allowance as number) ?? 0,
       overtime_allowance: (직원.overtime_allowance as number) ?? 0, night_work_allowance: (직원.night_work_allowance as number) ?? 0,
       holiday_work_allowance: (직원.holiday_work_allowance as number) ?? 0, annual_leave_pay: (직원.annual_leave_pay as number) ?? 0,
+      agreed_overtime_allowance: Number(직원.agreed_overtime_allowance || (직원.permissions?.payroll_allowances as any)?.agreed_overtime_allowance || 0),
+      agreed_night_allowance: Number(직원.agreed_night_allowance || (직원.permissions?.payroll_allowances as any)?.agreed_night_allowance || 0),
       고용형태: getStaffEmploymentType(직원),
       계약종료일: getStaffContractEndDate(직원),
       probation_months: getStaffProbationMonths(직원, 0),
@@ -2137,11 +2167,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[var(--muted)] p-3 rounded-[var(--radius-xl)]">
                         {TAXABLE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
-                            <div key={key} className="space-y-1.5">
+                            <div key={key} className="space-y-1">
                               <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">{label}</label>
                               <input
                                 type="text"
@@ -2153,7 +2183,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                   신규직원설정({ ...신규직원, [key]: n });
                                 }}
                                 placeholder="0"
-                                className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30"
+                                className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30"
                               />
                             </div>
                           );
@@ -2167,7 +2197,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
                         비과세 수당 항목
                       </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--muted)] p-3 rounded-[var(--radius-xl)]">
                         {TAXFREE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
@@ -2183,7 +2213,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                   신규직원설정({ ...신규직원, [key]: n });
                                 }}
                                 placeholder="0"
-                                className="w-full p-2.5 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] focus:ring-2 focus:ring-emerald-500/30"
+                                className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] focus:ring-2 focus:ring-emerald-500/30"
                               />
                             </div>
                           );

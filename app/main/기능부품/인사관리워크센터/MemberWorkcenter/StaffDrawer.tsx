@@ -21,6 +21,7 @@ import {
   pickHireDate,
   pickToneForStaff,
 } from './data';
+import { computeLicenseStatus } from '@/lib/license-renewal-policy';
 
 const StaffHistoryTimeline = dynamic(
   () => import('../../인사관리서브/인사이력타임라인'),
@@ -154,6 +155,8 @@ function StaffDrawerInner({
 
         <RecentActivitySection staffId={String(staff.id)} />
 
+        <StaffLicensesSection staffId={String(staff.id)} />
+
         <section>
           <div className="section-title mb-2">인사 이력 타임라인</div>
           <StaffHistoryTimeline staffId={String(staff.id)} staffName={staff.name ?? ''} />
@@ -219,7 +222,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
     const fetchAll = async () => {
       setState((prev) => ({ ...prev, loading: true }));
       // JM3: 각 도메인은 독립 try, 한 곳이 실패해도 나머지 표시
-      const safeQuery = async <T,>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | null> => {
+      const safeQuery = async (p: any) => {
         try {
           const { data } = await p;
           return data ?? null;
@@ -227,12 +230,13 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
           return null;
         }
       };
+      const cleanStaffId = String(staffId || '').toLowerCase().trim();
       const [att, lv, doc] = await Promise.all([
         safeQuery(
           supabase
             .from('attendances')
             .select('work_date, status, check_in_time')
-            .eq('staff_id', staffId)
+            .eq('staff_id', cleanStaffId)
             .order('work_date', { ascending: false })
             .limit(1)
             .maybeSingle() as unknown as PromiseLike<{
@@ -244,7 +248,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
           supabase
             .from('leave_requests')
             .select('start_date, end_date, leave_type, status, created_at')
-            .eq('staff_id', staffId)
+            .eq('staff_id', cleanStaffId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle() as unknown as PromiseLike<{
@@ -262,7 +266,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
           supabase
             .from('document_repository')
             .select('category, file_url, created_at, updated_at')
-            .eq('created_by', staffId)
+            .eq('created_by', cleanStaffId)
             .order('updated_at', { ascending: false })
             .limit(1)
             .maybeSingle() as unknown as PromiseLike<{
@@ -351,6 +355,138 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
               </span>
             </li>
           ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+interface StaffLicense {
+  id: string;
+  license_type: string | null;
+  license_name: string;
+  license_number: string | null;
+  issued_date: string | null;
+  expiry_date: string | null;
+  renewed_date: string | null;
+  issuing_body: string | null;
+  memo: string | null;
+}
+
+const LICENSE_STATUS_COLORS: Record<string, string> = {
+  valid: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
+  expiring: 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
+  expired: 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400',
+  unknown: 'bg-gray-500/15 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400',
+};
+
+const LICENSE_STATUS_LABELS: Record<string, string> = {
+  valid: '유효',
+  expiring: '만료 임박',
+  expired: '만료',
+  unknown: '확인 필요',
+};
+
+function StaffLicensesSection({ staffId }: { staffId: string }) {
+  const [licenses, setLicenses] = useState<StaffLicense[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchLicenses = async () => {
+      setLoading(true);
+      const cleanStaffId = String(staffId || '').toLowerCase().trim();
+      try {
+        const { data, error } = await supabase
+          .from('staff_licenses')
+          .select('*')
+          .eq('staff_id', cleanStaffId)
+          .order('expiry_date', { ascending: true });
+        if (error) throw error;
+        if (!cancelled) {
+          setLicenses((data as StaffLicense[]) ?? []);
+        }
+      } catch (err) {
+        console.error('[StaffLicensesSection] failed to fetch licenses:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void fetchLicenses();
+    return () => {
+      cancelled = true;
+    };
+  }, [staffId]);
+
+  if (loading) {
+    return (
+      <section>
+        <div className="section-title mb-2">면허 및 자격 정보</div>
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-4 text-center text-[11px] text-[var(--toss-gray-4)]">
+          면허 및 자격 정보를 불러오는 중…
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <div className="section-title mb-2">면허 및 자격 정보</div>
+      {licenses.length === 0 ? (
+        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-4 text-center text-[11px] text-[var(--toss-gray-4)]">
+          등록된 면허/자격 정보가 없습니다.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {licenses.map((lic) => {
+            const computed = computeLicenseStatus({
+              license_type: lic.license_type,
+              expiry_date: lic.expiry_date,
+              renewed_date: lic.renewed_date,
+              issued_date: lic.issued_date,
+            });
+            const statusLabel = LICENSE_STATUS_LABELS[computed.status] || '확인 필요';
+            const statusColor = LICENSE_STATUS_COLORS[computed.status] || 'bg-gray-500/15 text-gray-700';
+
+            return (
+              <li
+                key={lic.id}
+                className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] p-3 shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-[var(--foreground)]">
+                    {lic.license_name}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${statusColor}`}>
+                    {statusLabel}
+                  </span>
+                </div>
+                {lic.license_number && (
+                  <div className="text-[11px] font-medium text-[var(--toss-gray-4)]">
+                    면허번호:{' '}
+                    <span className="font-semibold text-[var(--foreground)]">
+                      {lic.license_number}
+                    </span>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-x-2 text-[10px] text-[var(--toss-gray-4)] border-t border-[var(--border)] pt-1.5 mt-0.5">
+                  {lic.issued_date && <span>발급: {lic.issued_date}</span>}
+                  {lic.renewed_date && <span>· 갱신: {lic.renewed_date}</span>}
+                  {computed.effective.date && (
+                    <span className="font-semibold text-[var(--foreground)]">
+                      · 만료: {computed.effective.date}
+                    </span>
+                  )}
+                  {lic.issuing_body && <span>· {lic.issuing_body}</span>}
+                </div>
+                {lic.memo && (
+                  <div className="text-[10px] italic text-[var(--toss-gray-4)] bg-[var(--muted)]/50 px-2 py-1 rounded-[var(--radius-sm)] mt-1">
+                    {lic.memo}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

@@ -1,4 +1,4 @@
-﻿import { buildSelectClause } from '@/lib/query-columns-utils';
+import { buildSelectClause } from '@/lib/query-columns-utils';
 
 export const STAFF_APPROVAL_DIRECTORY_SELECT = [
   'id',
@@ -48,6 +48,8 @@ const STAFF_BOOTSTRAP_COLUMNS = [
   'bank_name',
   'shift_id',
   'auth_user_id',
+  'employment_type',
+  'contract_type',
   'created_at',
 ];
 

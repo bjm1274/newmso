@@ -127,6 +127,12 @@ export function normalizeProfileUser<T>(source: T): T {
     normalizedPermissions.payroll_allowances = payrollAllowances;
   }
 
+  const employType =
+    cleanString(base.employ_type) ||
+    cleanString(base.employment_type) ||
+    cleanString(permissions.employ_type) ||
+    cleanString(permissions.employment_type);
+
   const normalizedBase = {
     ...base,
     permissions: normalizedPermissions,
@@ -137,6 +143,8 @@ export function normalizeProfileUser<T>(source: T): T {
     profile_photo_updated_at: photoUpdatedAt,
     avatar_url: photoUrl,
     photo_url: photoUrl,
+    employ_type: employType,
+    employment_type: employType,
   } as Record<string, any>;
 
   for (const key of STAFF_ALLOWANCE_KEYS) {
