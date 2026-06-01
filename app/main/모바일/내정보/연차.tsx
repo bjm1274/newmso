@@ -14,23 +14,9 @@ import { memo } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import { useMyLeave, type MyLeaveHistory } from './data-hooks';
 
-type LeaveHistory = {
-  id: string;
-  type: string;
-  days: string;
-  date: string;
-  status: '승인' | '대기' | '반려';
-};
-
-const LEAVE_HISTORY: LeaveHistory[] = [
-  { id: 'l1', type: '연차', days: '1일', date: '2026.05.15', status: '승인' },
-  { id: 'l2', type: '반차(오후)', days: '0.5일', date: '2026.04.22', status: '승인' },
-  { id: 'l3', type: '연차', days: '2일', date: '2026.03.10 ~ 03.11', status: '승인' },
-  { id: 'l4', type: '반차(오전)', days: '0.5일', date: '2026.02.14', status: '승인' },
-];
-
-const STATUS_STYLE: Record<LeaveHistory['status'], { bg: string; color: string }> = {
+const STATUS_STYLE: Record<MyLeaveHistory['status'], { bg: string; color: string }> = {
   '승인': { bg: 'var(--m-success-soft)', color: 'var(--m-success)' },
   '대기': { bg: 'var(--m-warning-soft)', color: 'var(--m-warning)' },
   '반려': { bg: 'var(--m-danger-soft)', color: 'var(--m-danger)' },
@@ -41,7 +27,10 @@ export type 연차Props = {
   onBack: () => void;
 };
 
-function 연차Base({ user: _user, onBack }: 연차Props) {
+function 연차Base({ user, onBack }: 연차Props) {
+  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const { remaining, total, used, usageRate, history, loading } = useMyLeave(staffId);
+  const currentYear = new Date().getFullYear();
   return (
     <div className="m-screen">
       <MobileHeader title="연차" back={onBack} />
@@ -59,7 +48,7 @@ function 연차Base({ user: _user, onBack }: 연차Props) {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>
-            2026년 잔여 연차
+            {currentYear}년 잔여 연차
           </div>
           <div
             style={{
@@ -70,10 +59,11 @@ function 연차Base({ user: _user, onBack }: 연차Props) {
               fontFeatureSettings: '"tnum"',
             }}
           >
-            11 <span style={{ fontSize: 20, opacity: 0.7 }}>/ 15일</span>
+            {loading ? '—' : remaining}{' '}
+            <span style={{ fontSize: 20, opacity: 0.7 }}>/ {total}일</span>
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.75, marginTop: 6 }}>
-            사용 4일 · 소진율 27%
+            사용 {used}일 · 소진율 {usageRate}%
           </div>
         </div>
 
@@ -109,7 +99,12 @@ function 연차Base({ user: _user, onBack }: 연차Props) {
             <div className="lbl">사용 내역</div>
           </div>
           <div className="msm-list m-card flush" style={{ overflow: 'hidden' }}>
-            {LEAVE_HISTORY.map((h) => {
+            {!loading && history.length === 0 && (
+              <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13, fontWeight: 600 }}>
+                연차 사용 내역이 없습니다.
+              </div>
+            )}
+            {history.map((h) => {
               const st = STATUS_STYLE[h.status];
               return (
                 <div
