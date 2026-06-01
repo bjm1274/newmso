@@ -162,6 +162,8 @@ export default function ArchivedDocumentView({ doc, companyName }: ArchivedDocum
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden bg-[var(--card)]">
         <iframe
           srcDoc={approvalPrintHtml}
+          // 보안: 보관 문서 미리보기는 정적 HTML만 렌더. 스크립트·폼·팝업 차단(XSS 방어).
+          sandbox=""
           className="w-full"
           style={{ height: '700px', border: '0', background: '#fff' }}
           title={String(doc.title || '전자결재 문서')}

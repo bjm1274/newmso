@@ -222,6 +222,8 @@ export default function ApprovalDetailModal({
               data-testid="approval-detail-preview"
               title={`${detailTitle || templateMeta.name || '결재 문서'}${detailDocNumber ? ` (${detailDocNumber})` : ''} 미리보기`}
               srcDoc={detailPreviewHtml}
+              // 보안: 결재 문서 미리보기는 정적 HTML만 렌더. 스크립트·폼·팝업 차단(XSS 방어).
+              sandbox=""
               className="block w-full border-0 bg-white"
               style={{ height: 'min(1120px, calc(100dvh - 290px))' }}
             />
