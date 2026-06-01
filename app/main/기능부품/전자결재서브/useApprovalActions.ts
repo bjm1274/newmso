@@ -7,7 +7,7 @@ import {
   lockApprovalMeta,
 } from '@/lib/approval-workflow';
 import { supabase } from '@/lib/supabase';
-import { buildApprovalHistoryEntryCore } from '@/lib/approval-shared';
+import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import type { StaffMember } from '@/types';
 import type {
   TransitionApprovalsOnServer,
@@ -68,16 +68,7 @@ export function useApprovalActions({
     return isApprovalLocked(metaData);
   }, []);
 
-  const buildApprovalHistoryEntry = useCallback(
-    (action: ApprovalHistoryEntry['action'], note?: string | null) =>
-      buildApprovalHistoryEntryCore(
-        user?.id ? String(user.id) : null,
-        user?.name ? String(user.name) : null,
-        action,
-        note
-      ),
-    [user?.id, user?.name]
-  );
+  const buildApprovalHistoryEntry = useApprovalHistoryEntry(user);
 
   const buildNextApprovalMetaData = useCallback(
     (

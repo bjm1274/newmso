@@ -1,4 +1,9 @@
 // 근태관리 순수 유틸 함수 및 상수 모음
+// ⚠️ 주의: 같은 폴더의 근태관리메인-내부유틸.ts에 동명 심볼이 있으나 값/의미가 다르다.
+//  - 이 파일의 LEGACY_ROSTER_APPROVAL_TYPE = 'roster_schedule_approval'
+//  - 내부유틸의 LEGACY_ROSTER_APPROVAL_TYPE = '근무표'
+//  두 파일은 서로 다른 approvals.type 을 조회하므로 통합/혼용 금지(동작 보존).
+//  이 모듈은 근태일괄수정모달.tsx 전용. 근태관리메인.tsx는 내부유틸을 쓴다.
 
 export function isWardDept(dept: string) {
   return /병동|ward|icu|중환자|응급|간호|nicu|picu/i.test(dept);

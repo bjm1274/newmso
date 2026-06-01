@@ -9,7 +9,7 @@ import {
   resolveApprovalDocNumberConfig,
 } from '@/lib/approval-workflow';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
-import { buildApprovalHistoryEntryCore } from '@/lib/approval-shared';
+import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import { isMissingColumnError } from '@/lib/supabase-compat';
 import {
   extractOfficialDocRequest,
@@ -134,16 +134,7 @@ export function useApprovalSubmit({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const confirmApprovalSubmit = openConfirm;
 
-  const buildApprovalHistoryEntry = useCallback(
-    (action: ApprovalHistoryEntry['action'], note?: string | null) =>
-      buildApprovalHistoryEntryCore(
-        user?.id ? String(user.id) : null,
-        user?.name ? String(user.name) : null,
-        action,
-        note
-      ),
-    [user?.id, user?.name]
-  );
+  const buildApprovalHistoryEntry = useApprovalHistoryEntry(user);
 
   const insertApprovalWithLegacyFallback = useCallback(async (row: ApprovalRecord) => {
     let candidateRow = { ...row };

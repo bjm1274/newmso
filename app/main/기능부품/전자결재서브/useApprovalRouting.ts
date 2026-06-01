@@ -15,11 +15,11 @@ import {
   normalizeApprovalLineIds as normalizeApprovalLineIdsCore,
   resolveApprovalLineIds as resolveApprovalLineIdsCore,
   resolveStoredCurrentApproverId as resolveStoredCurrentApproverIdCore,
-  buildApprovalHistoryEntryCore,
 } from '@/lib/approval-shared';
 import type { StaffMember } from '@/types';
 import { APPROVER_POSITIONS } from './approval-constants';
 import { useApprovalDelegation } from './useApprovalDelegation';
+import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 
 type ApprovalRecord = Record<string, unknown>;
 type ApprovalHistoryEntry = Parameters<typeof appendApprovalHistory>[1];
@@ -70,16 +70,7 @@ export function useApprovalRouting({
     []
   );
 
-  const buildApprovalHistoryEntry = useCallback(
-    (action: ApprovalHistoryEntry['action'], note?: string | null) =>
-      buildApprovalHistoryEntryCore(
-        user?.id ? String(user.id) : null,
-        user?.name ? String(user.name) : null,
-        action,
-        note
-      ),
-    [user?.id, user?.name]
-  );
+  const buildApprovalHistoryEntry = useApprovalHistoryEntry(user);
 
   const {
     resolveEffectiveApproverId,
