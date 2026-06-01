@@ -446,122 +446,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     }
   }, [primaryShift]);
 
-  // 💡 지정 스케줄(근무형태) 선택/변경 시 상세 근로시간(주당근로시간, 주당근무일수) 자동 추천/주입 연동 (UX 개선)
-  useEffect(() => {
-    if (!primaryShift) return;
-    
-    // 1. 주당 근무일수 계산
-    let calculatedDays = 5;
-    if (parsedShiftMeta?.daily_schedules) {
-      const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      calculatedDays = days.filter(d => parsedShiftMeta.daily_schedules[d]?.enabled).length;
-    } else {
-      calculatedDays = Number(primaryShift.weekly_work_days) || 5;
-    }
-    if (primaryShift.shift_type === '1일근무1일휴무') {
-      calculatedDays = 3.5;
-    }
 
-    // 2. 주당 근로시간 계산
-    let calculatedHours = 40;
-    const calcWorkMinutes = (s: { start_time?: string | null, end_time?: string | null, break_start_time?: string | null, break_end_time?: string | null }) => {
-      if (!s.start_time || !s.end_time) return 0;
-      const [sh, sm] = s.start_time.split(':').map(Number);
-      const [eh, em] = s.end_time.split(':').map(Number);
-      if (isNaN(sh) || isNaN(eh)) return 0;
-      let workMins = (eh * 60 + em) - (sh * 60 + sm);
-      if (workMins <= 0) workMins += 24 * 60;
-      
-      const bstart = s.break_start_time;
-      const bend = s.break_end_time;
-      if (bstart && bend) {
-        const [bsh, bsm] = bstart.split(':').map(Number);
-        const [beh, bem] = bend.split(':').map(Number);
-        if (!isNaN(bsh) && !isNaN(beh)) {
-          let breakMins = (beh * 60 + bem) - (bsh * 60 + bsm);
-          if (breakMins <= 0) breakMins += 24 * 60;
-          workMins = Math.max(0, workMins - breakMins);
-        }
-      }
-      return workMins;
-    };
-
-    const getPlan = (plans: any[] | null | undefined, planId: any) => {
-      if (!plans || !planId) return null;
-      return plans.find(p => String(p.id) === String(planId)) || null;
-    };
-
-    if (primaryShift.shift_type === '1일근무1일휴무') {
-      if (parsedShiftMeta?.daily_schedules) {
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const enabledDays = days.filter(d => parsedShiftMeta.daily_schedules[d]?.enabled);
-        if (enabledDays.length > 0) {
-          const totalMins = enabledDays.reduce((sum, d) => {
-            const sched = parsedShiftMeta.daily_schedules[d];
-            const plan = getPlan(parsedShiftMeta.break_plans, sched?.break_plan_id);
-            return sum + calcWorkMinutes({
-              start_time: sched?.start_time,
-              end_time: sched?.end_time,
-              break_start_time: plan?.start_time || null,
-              break_end_time: plan?.end_time || null,
-            });
-          }, 0);
-          calculatedHours = Math.round(((totalMins / enabledDays.length) * 3.5 / 60) * 10) / 10;
-        } else {
-          const singleMins = calcWorkMinutes({
-            start_time: primaryShift.start_time,
-            end_time: primaryShift.end_time,
-            break_start_time: primaryShift.break_start_time,
-            break_end_time: primaryShift.break_end_time,
-          });
-          calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
-        }
-      } else {
-        const singleMins = calcWorkMinutes({
-          start_time: primaryShift.start_time,
-          end_time: primaryShift.end_time,
-          break_start_time: primaryShift.break_start_time,
-          break_end_time: primaryShift.break_end_time,
-        });
-        calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
-      }
-    } else {
-      if (parsedShiftMeta?.daily_schedules) {
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const totalMins = days.reduce((sum, d) => {
-          const sched = parsedShiftMeta.daily_schedules[d];
-          if (!sched?.enabled) return sum;
-          const plan = getPlan(parsedShiftMeta.break_plans, sched?.break_plan_id);
-          return sum + calcWorkMinutes({
-            start_time: sched?.start_time,
-            end_time: sched?.end_time,
-            break_start_time: plan?.start_time || null,
-            break_end_time: plan?.end_time || null,
-          });
-        }, 0);
-        calculatedHours = Math.round((totalMins / 60) * 10) / 10;
-      } else {
-        const singleMins = calcWorkMinutes({
-          start_time: primaryShift.start_time,
-          end_time: primaryShift.end_time,
-          break_start_time: primaryShift.break_start_time,
-          break_end_time: primaryShift.break_end_time,
-        });
-        calculatedHours = Math.round(((singleMins * calculatedDays) / 60) * 10) / 10;
-      }
-    }
-
-    if (
-      calculatedHours !== 신규직원.working_hours_per_week ||
-      calculatedDays !== 신규직원.working_days_per_week
-    ) {
-      신규직원설정(prev => ({
-        ...prev,
-        working_hours_per_week: calculatedHours,
-        working_days_per_week: calculatedDays,
-      }));
-    }
-  }, [primaryShift, parsedShiftMeta]);
 
   const calculateDailyNightHours = (start?: string, end?: string) => {
     if (!start || !end) return 0;
@@ -749,13 +634,27 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     근무형태목록.find((shift: StaffMember) => String(shift.id) === String(shiftId));
   const getVisibleShiftOptions = (companyName: string) => {
     const selectedCompany = String(companyName || '').trim();
-    return sortShiftOptions(
-      근무형태목록.filter((shift: StaffMember) => {
-        const isActive = shift?.is_active !== false;
-        const shiftCompany = getShiftCompanyName(shift);
-        return isActive && (!selectedCompany || !shiftCompany || shiftCompany === selectedCompany);
-      })
-    );
+    const visibleList = 근무형태목록.filter((shift: StaffMember) => {
+      const isActive = shift?.is_active !== false;
+      const shiftCompany = getShiftCompanyName(shift);
+      return isActive && (!selectedCompany || !shiftCompany || shiftCompany === selectedCompany);
+    });
+
+    const seen = new Set<string>();
+    const uniqueList: StaffMember[] = [];
+    for (const shift of visibleList) {
+      const name = String(shift?.name || '').trim();
+      const comp = getShiftCompanyName(shift);
+      const start = String(shift?.start_time || '').trim();
+      const end = String(shift?.end_time || '').trim();
+      const key = `${name}|${comp}|${start}|${end}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueList.push(shift);
+      }
+    }
+
+    return sortShiftOptions(uniqueList);
   };
 
   const 선택근무형태IDs = useMemo(
@@ -772,9 +671,153 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     [신규직원.사업체, 선택근무형태IDs, 근무형태목록],
   );
 
+  const parseShiftMetaHelper = (shift: any) => {
+    if (!shift) return null;
+    const description = String(shift.description || '');
+    const marker = '[SHIFT_META]';
+    const markerIndex = description.lastIndexOf(marker);
+    if (markerIndex === -1) {
+      return {
+        shift_type: shift.shift_type || null,
+        weekly_work_days: shift.weekly_work_days || 5,
+        is_weekend_work: shift.is_weekend_work || false,
+        daily_schedules: null as any,
+        break_plans: null as any,
+      };
+    }
+    try {
+      const metaText = description.slice(markerIndex + marker.length).trim();
+      const parsed = JSON.parse(metaText);
+      return {
+        shift_type: parsed.shift_type || shift.shift_type || null,
+        weekly_work_days: parsed.weekly_work_days ?? shift.weekly_work_days ?? 5,
+        is_weekend_work: parsed.is_weekend_work ?? shift.is_weekend_work ?? false,
+        daily_schedules: parsed.daily_schedules || null,
+        break_plans: parsed.break_plans || null,
+      };
+    } catch {
+      return {
+        shift_type: shift.shift_type || null,
+        weekly_work_days: shift.weekly_work_days || 5,
+        is_weekend_work: shift.is_weekend_work || false,
+        daily_schedules: null as any,
+        break_plans: null as any,
+      };
+    }
+  };
+
+  const getShiftHoursAndDays = (shift: any) => {
+    if (!shift) return { hours: 40, days: 5 };
+    const meta = parseShiftMetaHelper(shift);
+    
+    let calculatedDays = 5;
+    if (meta?.daily_schedules) {
+      const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      calculatedDays = days.filter(d => meta.daily_schedules[d]?.enabled).length;
+    } else {
+      calculatedDays = Number(shift.weekly_work_days) || 5;
+    }
+    if (shift.shift_type === '1일근무1일휴무') {
+      calculatedDays = 3.5;
+    }
+
+    let calculatedHours = 40;
+    const calcWorkMinutes = (s: any) => {
+      if (!s.start_time || !s.end_time) return 0;
+      const [sh, sm] = s.start_time.split(':').map(Number);
+      const [eh, em] = s.end_time.split(':').map(Number);
+      if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0;
+      let workMins = (eh * 60 + em) - (sh * 60 + sm);
+      if (workMins <= 0) workMins += 24 * 60;
+      
+      const bstart = s.break_start_time;
+      const bend = s.break_end_time;
+      if (bstart && bend) {
+        const [bsh, bsm] = bstart.split(':').map(Number);
+        const [beh, bem] = bend.split(':').map(Number);
+        if (!isNaN(bsh) && !isNaN(beh)) {
+          let breakMins = (beh * 60 + bem) - (bsh * 60 + bsm);
+          if (breakMins <= 0) breakMins += 24 * 60;
+          workMins = Math.max(0, workMins - breakMins);
+        }
+      }
+      return workMins;
+    };
+
+    const getPlan = (plans: any[] | null | undefined, planId: any) => {
+      if (!plans || !planId) return null;
+      return plans.find(p => String(p.id) === String(planId)) || null;
+    };
+
+    if (shift.shift_type === '1일근무1일휴무') {
+      if (meta?.daily_schedules) {
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const enabledDays = days.filter(d => meta.daily_schedules[d]?.enabled);
+        if (enabledDays.length > 0) {
+          const totalMins = enabledDays.reduce((sum, d) => {
+            const sched = meta.daily_schedules[d];
+            const plan = getPlan(meta.break_plans, sched?.break_plan_id);
+            return sum + calcWorkMinutes({
+              start_time: sched?.start_time,
+              end_time: sched?.end_time,
+              break_start_time: plan?.start_time || null,
+              break_end_time: plan?.end_time || null,
+            });
+          }, 0);
+          calculatedHours = Math.round(((totalMins / enabledDays.length) * 3.5 / 60) * 10) / 10;
+        } else {
+          const singleMins = calcWorkMinutes({
+            start_time: shift.start_time,
+            end_time: shift.end_time,
+            break_start_time: shift.break_start_time,
+            break_end_time: shift.break_end_time,
+          });
+          calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
+        }
+      } else {
+        const singleMins = calcWorkMinutes({
+          start_time: shift.start_time,
+          end_time: shift.end_time,
+          break_start_time: shift.break_start_time,
+          break_end_time: shift.break_end_time,
+        });
+        calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
+      }
+    } else {
+      if (meta?.daily_schedules) {
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const totalMins = days.reduce((sum, d) => {
+          const sched = meta.daily_schedules[d];
+          if (!sched?.enabled) return sum;
+          const plan = getPlan(meta.break_plans, sched?.break_plan_id);
+          return sum + calcWorkMinutes({
+            start_time: sched?.start_time,
+            end_time: sched?.end_time,
+            break_start_time: plan?.start_time || null,
+            break_end_time: plan?.end_time || null,
+          });
+        }, 0);
+        calculatedHours = Math.round((totalMins / 60) * 10) / 10;
+      } else {
+        const singleMins = calcWorkMinutes({
+          start_time: shift.start_time,
+          end_time: shift.end_time,
+          break_start_time: shift.break_start_time,
+          break_end_time: shift.break_end_time,
+        });
+        calculatedHours = Math.round(((singleMins * calculatedDays) / 60) * 10) / 10;
+      }
+    }
+
+    return { hours: calculatedHours, days: calculatedDays };
+  };
+
   const 대표근무형태설정 = (shiftId: string) => {
     try {
       const nextShiftId = String(shiftId || '').trim();
+      const targetShift = 근무형태목록.find(s => String(s.id) === nextShiftId);
+      const { hours, days } = getShiftHoursAndDays(targetShift);
+      
       신규직원설정((prev) => {
         if (!nextShiftId) {
           return { ...prev, 근무형태ID: '', 근무형태IDs: [] };
@@ -783,7 +826,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const restShiftIds = getStaffFormShiftIds(prev).filter(
           (id) => id !== previousPrimary && id !== nextShiftId,
         );
-        return { ...prev, 근무형태ID: nextShiftId, 근무형태IDs: [nextShiftId, ...restShiftIds] };
+        return {
+          ...prev,
+          근무형태ID: nextShiftId,
+          근무형태IDs: [nextShiftId, ...restShiftIds],
+          working_hours_per_week: hours,
+          working_days_per_week: days,
+        };
       });
     } catch (error) {
       console.error('대표 근무형태 설정 실패:', error);
