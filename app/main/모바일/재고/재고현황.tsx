@@ -82,10 +82,10 @@ export default function 재고현황({ company, onBack, onPlaceOrder }: 재고�
         back={onBack}
         actions={
           <>
-            <button type="button" aria-label="검색">
+            <button type="button" aria-label="검색" disabled title="준비 중">
               <MIcon name="search" size={20} />
             </button>
-            <button type="button" aria-label="QR 스캔">
+            <button type="button" aria-label="QR 스캔" disabled title="준비 중">
               <MIcon name="qr" size={20} />
             </button>
           </>
@@ -225,10 +225,10 @@ export default function 재고현황({ company, onBack, onPlaceOrder }: 재고�
       </div>
 
       <div className="m-sticky-foot">
-        <MBtn block icon="arrowDown" ariaLabel="입고 등록">
+        <MBtn block icon="arrowDown" ariaLabel="입고 등록" disabled title="준비 중">
           입고
         </MBtn>
-        <MBtn block icon="arrowUp" ariaLabel="출고 등록">
+        <MBtn block icon="arrowUp" ariaLabel="출고 등록" disabled title="준비 중">
           출고
         </MBtn>
         <MBtn

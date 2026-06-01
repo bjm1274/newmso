@@ -6,7 +6,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { buildPollQuestionContent, extractPollMetaFromQuestion } from './메신저유틸';
 import type { PollPrizeWinner } from './메신저유틸';
-import { insertChatMessageWithFallback } from './메신저메시지서비스';
+import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 
 const DEFAULT_POLL_OPTIONS = ['찬성', '반대'];
 
@@ -307,7 +307,7 @@ export function useChatWorkflowDrafts({
         const resultContent = `🎉 추첨 결과\n[${displayQuestion}]\n🎁 상품: ${prize.name}\n🏆 당첨: ${winnerNames}`;
 
         try {
-          await insertChatMessageWithFallback({
+          await insertChatMessageWithFallback(supabase, {
             room_id: roomId,
             sender_id: senderId || null,
             content: resultContent,

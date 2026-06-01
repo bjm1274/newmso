@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 
 import { inferAttachmentType } from './게시판공통';
 
-import { getFileExtension, getUploadContentType } from '@/lib/upload-mime';
+import { getUploadContentType } from '@/lib/upload-mime';
 
 const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
 const CACHE_CONTROL = '3600';

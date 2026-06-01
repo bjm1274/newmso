@@ -141,6 +141,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
                 key={link.label}
                 type="button"
                 className="flex h-11 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-4 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+                disabled
+                title="준비 중"
               >
                 <MenuIcon name={link.icon} className="h-4 w-4 text-[var(--accent)]" />
                 <span>{link.label}</span>

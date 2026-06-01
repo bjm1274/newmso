@@ -450,6 +450,8 @@ function UdiPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+          disabled
+          title="준비 중"
         >
           + UDI 등록
         </button>

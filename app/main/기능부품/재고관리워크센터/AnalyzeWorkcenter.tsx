@@ -235,6 +235,8 @@ function ForecastPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-bold hover:bg-[var(--muted)]"
+          disabled
+          title="준비 중"
         >
           예측 리포트
         </button>
@@ -340,6 +342,8 @@ function InspectPanel({
           <button
             type="button"
             className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+            disabled
+            title="준비 중"
           >
             실사 시작
           </button>

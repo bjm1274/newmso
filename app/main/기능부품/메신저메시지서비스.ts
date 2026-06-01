@@ -1,7 +1,5 @@
 'use client';
 
-import { insertChatMessageWithFallback as insertChatMessageWithClientFallback } from '@/lib/chat-message-write';
-import { supabase } from '@/lib/supabase';
 import type { ChatMessage } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
 
@@ -18,12 +16,6 @@ export type SendMessageOptions = {
   albumIndex?: number | null;
   albumTotal?: number | null;
 };
-
-export async function insertChatMessageWithFallback<
-  TData extends Record<string, unknown> = Record<string, unknown>,
->(payload: Record<string, unknown>, selectClause = '*') {
-  return insertChatMessageWithClientFallback<TData>(supabase, payload, selectClause);
-}
 
 export function buildForwardedMessageContent(message: ChatMessage) {
   const senderName =

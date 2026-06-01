@@ -29,12 +29,9 @@ export function formatDateDisplay(value?: string | null): string {
 
 /**
  * 한국 시간 기준(UTC+9) 오늘 날짜 문자열 반환 (YYYY-MM-DD)
+ * lib/seoul-time의 Intl 기반 정본을 재사용.
  */
-export function getKoreanTodayString(): string {
-  const now = new Date();
-  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return koreaNow.toISOString().split('T')[0];
-}
+export { getKoreanTodayString } from '@/lib/seoul-time';
 
 /**
  * Date → 로컬 타임존 기준 'YYYY-MM-DD' 키 문자열.

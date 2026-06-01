@@ -2,6 +2,7 @@ import { stripHiddenMessageMetaBlocks } from './메신저첨부';
 import type { ChatRoom, StaffMember } from '@/types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import { getKoreanTodayString as _getKoreanTodayStringFromSeoul } from '@/lib/seoul-time';
 export { NOTICE_ROOM_ID };
 export const NOTICE_ROOM_NAME = '공지사항';
 export const SELF_ROOM_NAME = '나와의 채팅';
@@ -476,9 +477,7 @@ export function arraysMatch(left: string[], right: string[]): boolean {
 }
 
 export function getKoreanTodayString() {
-  const now = new Date();
-  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return koreaNow.toISOString().split('T')[0];
+  return _getKoreanTodayStringFromSeoul();
 }
 
 export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {

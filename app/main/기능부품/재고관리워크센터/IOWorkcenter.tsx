@@ -171,6 +171,8 @@ function InoutPanel({
           <button
             type="button"
             className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
+            disabled
+            title="준비 중"
           >
             + 수동 등록
           </button>
@@ -266,6 +268,8 @@ function OrderPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+          disabled
+          title="준비 중"
         >
           + 새 발주
         </button>
@@ -312,6 +316,8 @@ function OrderPanel({
                     <button
                       type="button"
                       className="rounded-[var(--radius-sm)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
+                      disabled
+                      title="준비 중"
                     >
                       상세
                     </button>

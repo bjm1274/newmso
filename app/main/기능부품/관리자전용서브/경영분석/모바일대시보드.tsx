@@ -70,23 +70,27 @@ export default function 경영분석모바일대시보드({
           최근 알림
         </h3>
         <div className="space-y-3">
-          {notices.map((notice) => (
-            <div key={notice.label} className="flex items-center gap-3">
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${notice.tone}`}
-              >
-                <MenuIcon name={notice.icon} className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-[var(--foreground)] truncate">
-                  {notice.label}
-                </p>
-                <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">
-                  {notice.detail}
-                </p>
+          {notices.length === 0 ? (
+            <p className="text-[12px] text-[var(--zinc-400)]">데이터 준비 중</p>
+          ) : (
+            notices.map((notice) => (
+              <div key={notice.label} className="flex items-center gap-3">
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] ${notice.tone}`}
+                >
+                  <MenuIcon name={notice.icon} className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[var(--foreground)] truncate">
+                    {notice.label}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--zinc-400)]">
+                    {notice.detail}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
 
@@ -100,6 +104,8 @@ export default function 경영분석모바일대시보드({
               key={link.label}
               type="button"
               className="flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-3 text-left text-[12px] font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)]/40 hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+              disabled
+              title="준비 중"
             >
               <MenuIcon
                 name={link.icon}

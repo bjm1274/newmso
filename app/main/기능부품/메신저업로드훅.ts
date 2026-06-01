@@ -25,7 +25,7 @@ import {
 } from './메신저첨부재시도큐';
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
-import { getFileExtension, getUploadContentType } from '@/lib/upload-mime';
+import { getUploadContentType } from '@/lib/upload-mime';
 
 type ShareTarget = {
   id: string;
