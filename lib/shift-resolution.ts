@@ -26,8 +26,6 @@ type ShiftDailySchedule = {
   enabled?: boolean | null;
   start_time?: string | null;
   end_time?: string | null;
-  break_start_time?: string | null;
-  break_end_time?: string | null;
 };
 
 function getDateInfo(dateValue: string | null | undefined) {
@@ -83,8 +81,6 @@ function applyDailyScheduleForDate(
     ...shift,
     start_time: dailySchedule.start_time || shift.start_time,
     end_time: dailySchedule.end_time || shift.end_time,
-    break_start_time: dailySchedule.break_start_time || (shift as any).break_start_time,
-    break_end_time: dailySchedule.break_end_time || (shift as any).break_end_time,
   };
 }
 
