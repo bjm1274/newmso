@@ -230,11 +230,18 @@ export function renderApprovalAttachmentsHtml(metaData: ApprovalMetaData) {
           <tbody>
             ${attachments
               .map(
-                (attachment) => `
+                (attachment) => {
+                  const href = buildStorageDownloadUrl(attachment.url, attachment.name);
+                  return `
                   <tr>
-                    <td>${escapeHtml(attachment.name)}</td>
+                    <td>
+                      <a href="${escapeHtml(href)}" download="${escapeHtml(attachment.name)}" target="_blank" style="color: var(--accent, #2563eb); text-decoration: underline; font-weight: bold;">
+                        ${escapeHtml(attachment.name)}
+                      </a>
+                    </td>
                     <td>${escapeHtml(formatApprovalAttachmentSize(attachment.size) || '-')}</td>
-                  </tr>`
+                  </tr>`;
+                }
               )
               .join('')}
           </tbody>

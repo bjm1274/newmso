@@ -1,10 +1,11 @@
-﻿'use client';
+'use client';
 
 import type { StaffMember } from '@/types';
 import { isApprovalLocked } from '@/lib/approval-workflow';
 import { alphaColor } from '../전자결재-utils';
 import ApprovalLineTimeline from './ApprovalLineTimeline';
 import { resolveRejectReason } from './ApprovalRiskReviewDialog';
+import { ApprovalAttachmentsPanel } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -217,6 +218,12 @@ export default function ApprovalDetailModal({
               resolveCurrentApproverId={resolveCurrentApproverId}
             />
           </div>
+          
+          {/* 샌드박스 아이프레임 바깥 영역에 첨부파일 다운로드 카드 배치 */}
+          <div className="mx-auto mb-3 w-full max-w-[860px]">
+            <ApprovalAttachmentsPanel metaData={detailMetaData} />
+          </div>
+
           <div className="mx-auto mb-4 w-full max-w-[860px] overflow-hidden rounded-[var(--radius-lg)] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.65)]">
             <iframe
               data-testid="approval-detail-preview"
