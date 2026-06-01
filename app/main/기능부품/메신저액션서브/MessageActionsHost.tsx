@@ -13,7 +13,7 @@
  * JM6: 키보드/터치/스크린리더는 각 자식 컴포넌트가 부담.
  */
 
-import { useCallback, useState, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useState, useRef, type TouchEvent, type MouseEvent, type ReactNode } from 'react';
 import EmojiPicker from './EmojiPicker';
 import MessageContextMenu from './MessageContextMenu';
 
@@ -65,6 +65,51 @@ export default function MessageActionsHost({
 }: MessageActionsHostProps) {
   const [ctxMenu, setCtxMenu] = useState<Anchor | null>(null);
   const [picker, setPicker] = useState<Anchor | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchMoveRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (typeof window !== 'undefined' && window.innerWidth > 768) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    touchMoveRef.current = null;
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (!touchStartRef.current) return;
+    const touch = e.touches[0];
+    touchMoveRef.current = { x: touch.clientX, y: touch.clientY };
+
+    const diffX = touch.clientX - touchStartRef.current.x;
+    const diffY = touch.clientY - touchStartRef.current.y;
+
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+      // Elastic drag formula (limit max offset to 80px)
+      const dampedOffset = Math.sign(diffX) * Math.min(80, Math.abs(diffX) * 0.5);
+      setSwipeOffset(dampedOffset);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStartRef.current) return;
+    setSwipeOffset(0);
+
+    if (touchMoveRef.current) {
+      const diffX = touchMoveRef.current.x - touchStartRef.current.x;
+      const diffY = touchMoveRef.current.y - touchStartRef.current.y;
+
+      if (Math.abs(diffX) > 50 && Math.abs(diffY) < 30) {
+        if (enableContextMenu) {
+          // Open context menu centered horizontally
+          setCtxMenu({ x: window.innerWidth / 2, y: window.innerHeight - 340 });
+        }
+      }
+    }
+
+    touchStartRef.current = null;
+    touchMoveRef.current = null;
+  }, [enableContextMenu]);
 
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -101,10 +146,21 @@ export default function MessageActionsHost({
       data-chat-message-row
       data-testid={testId}
       onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className={`relative ${className || ''}`}
       style={style}
     >
-      {children}
+      <div
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: swipeOffset === 0 ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+          width: '100%',
+        }}
+      >
+        {children}
+      </div>
       {ctxMenu && (
         <MessageContextMenu
           x={ctxMenu.x}

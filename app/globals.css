@@ -3797,3 +3797,39 @@ button, a, [role="button"] {
     page-break-after: avoid;
   }
 }
+
+/* Mobile Context Menu as Bottom Sheet & Backdrop (Added for Swipe Actions) */
+@media (max-width: 768px) {
+  .message-ctx-menu {
+    left: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 12px)) !important;
+    animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+

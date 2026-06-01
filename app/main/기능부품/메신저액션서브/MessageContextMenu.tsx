@@ -115,131 +115,140 @@ export default function MessageContextMenu({
   };
 
   return (
-    <div
-      ref={ref}
-      role="menu"
-      aria-label="메시지 액션 메뉴"
-      onClick={stop}
-      style={{ left: pos.left, top: pos.top }}
-      className={`message-ctx-menu fixed z-[100] min-w-[220px] rounded-[12px] border border-[var(--border)] bg-[var(--card)] p-1.5 text-[13px] shadow-[0_20px_50px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.06)] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
-    >
-      {/* Quick reactions row */}
-      <div className="flex items-center gap-1 p-1">
-        {QUICK_REACTIONS.map((emoji) => (
+    <>
+      <div
+        className="fixed inset-0 z-[99] bg-black/40 md:hidden animate-fade-in"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+      />
+      <div
+        ref={ref}
+        role="menu"
+        aria-label="메시지 액션 메뉴"
+        onClick={stop}
+        style={{ left: pos.left, top: pos.top }}
+        className={`message-ctx-menu fixed z-[100] min-w-[220px] rounded-[12px] border border-[var(--border)] bg-[var(--card)] p-1.5 text-[13px] shadow-[0_20px_50px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.06)] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {/* Quick reactions row */}
+        <div className="flex items-center gap-1 p-1">
+          {QUICK_REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              role="menuitem"
+              aria-label={`${emoji} 반응`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReact(emoji);
+                onClose();
+              }}
+              className="grid h-7 w-7 place-items-center rounded-md text-[15px] transition-transform hover:scale-[1.18] hover:bg-[var(--muted)]"
+            >
+              {emoji}
+            </button>
+          ))}
           <button
-            key={emoji}
             type="button"
             role="menuitem"
-            aria-label={`${emoji} 반응`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onReact(emoji);
-              onClose();
-            }}
-            className="grid h-7 w-7 place-items-center rounded-md text-[15px] transition-transform hover:scale-[1.18] hover:bg-[var(--muted)]"
+            aria-label="이모지 추가"
+            onClick={handleAddEmoji}
+            className="ml-0.5 grid h-7 w-7 place-items-center rounded-md border-l border-dashed border-[var(--border)] pl-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
           >
-            {emoji}
+            +
           </button>
-        ))}
+        </div>
+        <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
         <button
           type="button"
           role="menuitem"
-          aria-label="이모지 추가"
-          onClick={handleAddEmoji}
-          className="ml-0.5 grid h-7 w-7 place-items-center rounded-md border-l border-dashed border-[var(--border)] pl-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+          data-default-focus
+          onClick={() => {
+            onReply();
+            onClose();
+          }}
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
         >
-          +
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">↩</span>
+          <span>답글로 전송</span>
+          <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">R</kbd>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onCopy();
+            onClose();
+          }}
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+        >
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">⧉</span>
+          <span>메시지 복사</span>
+          <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">⌘C</kbd>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onForward();
+            onClose();
+          }}
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+        >
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✈</span>
+          <span>다른 대화로 전달</span>
+          <span />
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onBookmark();
+            onClose();
+          }}
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+        >
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">🔖</span>
+          <span>북마크에 저장</span>
+          <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">B</kbd>
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onTask();
+            onClose();
+          }}
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+        >
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📋</span>
+          <span>할 일로 변환</span>
+          <span />
+        </button>
+        <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
+        <button
+          type="button"
+          role="menuitem"
+          disabled={!canDelete}
+          aria-disabled={!canDelete}
+          onClick={() => {
+            if (canDelete) {
+              onDelete?.();
+              onClose();
+            }
+          }}
+          className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors ${
+            canDelete
+              ? 'text-[var(--danger)] hover:bg-[var(--danger-light,color-mix(in_srgb,var(--danger)_12%,transparent))]'
+              : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
+          }`}
+        >
+          <span aria-hidden="true">🗑</span>
+          <span>메시지 삭제</span>
+          <span />
         </button>
       </div>
-      <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
-      <button
-        type="button"
-        role="menuitem"
-        data-default-focus
-        onClick={() => {
-          onReply();
-          onClose();
-        }}
-        className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-      >
-        <span aria-hidden="true" className="text-[var(--toss-gray-4)]">↩</span>
-        <span>답글로 전송</span>
-        <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">R</kbd>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          onCopy();
-          onClose();
-        }}
-        className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-      >
-        <span aria-hidden="true" className="text-[var(--toss-gray-4)]">⧉</span>
-        <span>메시지 복사</span>
-        <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">⌘C</kbd>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          onForward();
-          onClose();
-        }}
-        className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-      >
-        <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✈</span>
-        <span>다른 대화로 전달</span>
-        <span />
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          onBookmark();
-          onClose();
-        }}
-        className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-      >
-        <span aria-hidden="true" className="text-[var(--toss-gray-4)]">🔖</span>
-        <span>북마크에 저장</span>
-        <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">B</kbd>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          onTask();
-          onClose();
-        }}
-        className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-      >
-        <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📋</span>
-        <span>할 일로 변환</span>
-        <span />
-      </button>
-      <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
-      <button
-        type="button"
-        role="menuitem"
-        disabled={!canDelete}
-        aria-disabled={!canDelete}
-        onClick={() => {
-          if (canDelete) {
-            onDelete?.();
-            onClose();
-          }
-        }}
-        className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors ${
-          canDelete
-            ? 'text-[var(--danger)] hover:bg-[var(--danger-light,color-mix(in_srgb,var(--danger)_12%,transparent))]'
-            : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
-        }`}
-      >
-        <span aria-hidden="true">🗑</span>
-        <span>메시지 삭제</span>
-        <span />
-      </button>
-    </div>
+    </>
   );
 }
