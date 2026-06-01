@@ -38,8 +38,21 @@ import RiskActionDialog from './RiskActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { formatWon as libFormatWon } from '@/lib/date-formatter';
 import { getWeeklyRotationShiftIds } from '@/lib/contract-shift-rotation';
+import { averageShiftHoursAndDays, type Shift as WorkShift } from '@/lib/shift-working-hours';
+import {
+  HOURS_BASED_ALLOWANCE_FIELDS,
+  allowanceWonFromHours,
+  getAllowanceMultiplier,
+  isHoursBasedAllowance,
+  type AllowanceHoursKey,
+} from '@/lib/payroll-allowance-hours';
 
 const formatWon = (amount: number) => libFormatWon(Math.round(amount || 0));
+
+// 시간 입력 기반 수당의 기본 시간값(전부 0) — createEmptyStaffForm·로드 복원에서 공통 사용 (JM4)
+const EMPTY_ALLOWANCE_HOURS = Object.fromEntries(
+  HOURS_BASED_ALLOWANCE_FIELDS.map((field) => [field.key, 0]),
+) as Record<AllowanceHoursKey, number>;
 
 function createEmptyStaffForm(selectedCompany?: string) {
   const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '';
@@ -58,6 +71,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
+    allowance_hours: { ...EMPTY_ALLOWANCE_HOURS },
   };
 }
 
@@ -672,153 +686,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     [신규직원.사업체, 선택근무형태IDs, 근무형태목록],
   );
 
-  const parseShiftMetaHelper = (shift: any) => {
-    if (!shift) return null;
-    const description = String(shift.description || '');
-    const marker = '[SHIFT_META]';
-    const markerIndex = description.lastIndexOf(marker);
-    if (markerIndex === -1) {
-      return {
-        shift_type: shift.shift_type || null,
-        weekly_work_days: shift.weekly_work_days || 5,
-        is_weekend_work: shift.is_weekend_work || false,
-        daily_schedules: null as any,
-        break_plans: null as any,
-      };
-    }
-    try {
-      const metaText = description.slice(markerIndex + marker.length).trim();
-      const parsed = JSON.parse(metaText);
-      return {
-        shift_type: parsed.shift_type || shift.shift_type || null,
-        weekly_work_days: parsed.weekly_work_days ?? shift.weekly_work_days ?? 5,
-        is_weekend_work: parsed.is_weekend_work ?? shift.is_weekend_work ?? false,
-        daily_schedules: parsed.daily_schedules || null,
-        break_plans: parsed.break_plans || null,
-      };
-    } catch {
-      return {
-        shift_type: shift.shift_type || null,
-        weekly_work_days: shift.weekly_work_days || 5,
-        is_weekend_work: shift.is_weekend_work || false,
-        daily_schedules: null as any,
-        break_plans: null as any,
-      };
-    }
-  };
-
-  const getShiftHoursAndDays = (shift: any) => {
-    if (!shift) return { hours: 40, days: 5 };
-    const meta = parseShiftMetaHelper(shift);
-    
-    let calculatedDays = 5;
-    if (meta?.daily_schedules) {
-      const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      calculatedDays = days.filter(d => meta.daily_schedules[d]?.enabled).length;
-    } else {
-      calculatedDays = Number(shift.weekly_work_days) || 5;
-    }
-    if (shift.shift_type === '1일근무1일휴무') {
-      calculatedDays = 3.5;
-    }
-
-    let calculatedHours = 40;
-    const calcWorkMinutes = (s: any) => {
-      if (!s.start_time || !s.end_time) return 0;
-      const [sh, sm] = s.start_time.split(':').map(Number);
-      const [eh, em] = s.end_time.split(':').map(Number);
-      if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0;
-      let workMins = (eh * 60 + em) - (sh * 60 + sm);
-      if (workMins <= 0) workMins += 24 * 60;
-      
-      const bstart = s.break_start_time;
-      const bend = s.break_end_time;
-      if (bstart && bend) {
-        const [bsh, bsm] = bstart.split(':').map(Number);
-        const [beh, bem] = bend.split(':').map(Number);
-        if (!isNaN(bsh) && !isNaN(beh)) {
-          let breakMins = (beh * 60 + bem) - (bsh * 60 + bsm);
-          if (breakMins <= 0) breakMins += 24 * 60;
-          workMins = Math.max(0, workMins - breakMins);
-        }
-      }
-      return workMins;
-    };
-
-    const getPlan = (plans: any[] | null | undefined, planId: any) => {
-      if (!plans || !planId) return null;
-      return plans.find(p => String(p.id) === String(planId)) || null;
-    };
-
-    if (shift.shift_type === '1일근무1일휴무') {
-      if (meta?.daily_schedules) {
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const enabledDays = days.filter(d => meta.daily_schedules[d]?.enabled);
-        if (enabledDays.length > 0) {
-          const totalMins = enabledDays.reduce((sum, d) => {
-            const sched = meta.daily_schedules[d];
-            const plan = getPlan(meta.break_plans, sched?.break_plan_id);
-            return sum + calcWorkMinutes({
-              start_time: sched?.start_time,
-              end_time: sched?.end_time,
-              break_start_time: plan?.start_time || null,
-              break_end_time: plan?.end_time || null,
-            });
-          }, 0);
-          calculatedHours = Math.round(((totalMins / enabledDays.length) * 3.5 / 60) * 10) / 10;
-        } else {
-          const singleMins = calcWorkMinutes({
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            break_start_time: shift.break_start_time,
-            break_end_time: shift.break_end_time,
-          });
-          calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
-        }
-      } else {
-        const singleMins = calcWorkMinutes({
-          start_time: shift.start_time,
-          end_time: shift.end_time,
-          break_start_time: shift.break_start_time,
-          break_end_time: shift.break_end_time,
-        });
-        calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
-      }
-    } else {
-      if (meta?.daily_schedules) {
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const totalMins = days.reduce((sum, d) => {
-          const sched = meta.daily_schedules[d];
-          if (!sched?.enabled) return sum;
-          const plan = getPlan(meta.break_plans, sched?.break_plan_id);
-          return sum + calcWorkMinutes({
-            start_time: sched?.start_time,
-            end_time: sched?.end_time,
-            break_start_time: plan?.start_time || null,
-            break_end_time: plan?.end_time || null,
-          });
-        }, 0);
-        calculatedHours = Math.round((totalMins / 60) * 10) / 10;
-      } else {
-        const singleMins = calcWorkMinutes({
-          start_time: shift.start_time,
-          end_time: shift.end_time,
-          break_start_time: shift.break_start_time,
-          break_end_time: shift.break_end_time,
-        });
-        calculatedHours = Math.round(((singleMins * calculatedDays) / 60) * 10) / 10;
-      }
-    }
-
-    return { hours: calculatedHours, days: calculatedDays };
+  // 선택된 근무형태들의 시간·일수 평균을 계산 (JM4: 순수 헬퍼 lib/shift-working-hours 재사용)
+  // 근무형태를 1개만 넣으면 그 형태값, 여러 개(또는 중복)면 평균값을 상세 근로시간에 주입한다.
+  const 선택형태평균계산 = (shiftIds: string[]) => {
+    const shifts = shiftIds
+      .map((id) => findShiftById(id))
+      .filter((shift): shift is StaffMember => Boolean(shift))
+      .map((shift) => shift as unknown as WorkShift);
+    return averageShiftHoursAndDays(shifts);
   };
 
   const 대표근무형태설정 = (shiftId: string) => {
     try {
       const nextShiftId = String(shiftId || '').trim();
-      const targetShift = 근무형태목록.find(s => String(s.id) === nextShiftId);
-      const { hours, days } = getShiftHoursAndDays(targetShift);
-      
       신규직원설정((prev) => {
         if (!nextShiftId) {
           return { ...prev, 근무형태ID: '', 근무형태IDs: [] };
@@ -827,10 +707,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const restShiftIds = getStaffFormShiftIds(prev).filter(
           (id) => id !== previousPrimary && id !== nextShiftId,
         );
+        const nextIds = [nextShiftId, ...restShiftIds];
+        const { hours, days } = 선택형태평균계산(nextIds);
         return {
           ...prev,
           근무형태ID: nextShiftId,
-          근무형태IDs: [nextShiftId, ...restShiftIds],
+          근무형태IDs: nextIds,
           working_hours_per_week: hours,
           working_days_per_week: days,
         };
@@ -858,7 +740,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const currentIds = getStaffFormShiftIds(prev);
         if (currentIds.includes(shiftId)) return prev;
         const nextIds = currentIds.length > 0 ? [...currentIds, shiftId] : [shiftId];
-        return { ...prev, 근무형태ID: nextIds[0] || '', 근무형태IDs: nextIds };
+        const { hours, days } = 선택형태평균계산(nextIds);
+        return {
+          ...prev,
+          근무형태ID: nextIds[0] || '',
+          근무형태IDs: nextIds,
+          working_hours_per_week: hours,
+          working_days_per_week: days,
+        };
       });
       추가근무형태ID설정('');
       새근무형태표시설정(false);
@@ -872,7 +761,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     try {
       신규직원설정((prev) => {
         const nextIds = getStaffFormShiftIds(prev).filter((id) => id !== shiftId);
-        return { ...prev, 근무형태ID: nextIds[0] || '', 근무형태IDs: nextIds };
+        if (nextIds.length === 0) {
+          return { ...prev, 근무형태ID: '', 근무형태IDs: [] };
+        }
+        const { hours, days } = 선택형태평균계산(nextIds);
+        return {
+          ...prev,
+          근무형태ID: nextIds[0] || '',
+          근무형태IDs: nextIds,
+          working_hours_per_week: hours,
+          working_days_per_week: days,
+        };
       });
     } catch (error) {
       console.error('근무형태 제거 실패:', error);
@@ -1432,6 +1331,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           is_basic_living: 신규직원.is_basic_living,
           is_medical_benefit: 신규직원.is_medical_benefit,
           other_welfare: 신규직원.other_welfare,
+          // 수당 '시간' 입력값 보존(환산시급×시간×법정배수의 원천 시간값) — DB 컬럼이 아니라 permissions에 저장
+          payroll_allowance_hours: 신규직원.allowance_hours,
           // ── 다중 근무형태 메타 (신버전과 동일 형식 유지) ─────────────
           work_conditions: nextWorkConditions,
           shift_group_ids: selectedShiftIds,
@@ -1723,7 +1624,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       duru_nuri_end: (ins.duru_nuri_end as string) || '',
       other_welfare: (직원.permissions?.other_welfare as string) || '',
       working_hours_per_week: resolveWeeklyWorkingHours(직원, 40),
-      working_days_per_week: resolveWorkingDaysPerWeek(직원, 5)
+      working_days_per_week: resolveWorkingDaysPerWeek(직원, 5),
+      allowance_hours: {
+        ...EMPTY_ALLOWANCE_HOURS,
+        ...((직원.permissions?.payroll_allowance_hours as Record<string, number>) || {}),
+      }
     });
     편집모드설정(true);
 
@@ -2704,9 +2609,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-[var(--muted)] p-3 rounded-[var(--radius-xl)]">
                         {TAXABLE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
+                          const hoursKey = isHoursBasedAllowance(key) ? key : null;
+                          const hoursVal = hoursKey ? Number(신규직원.allowance_hours?.[hoursKey] ?? 0) : 0;
+                          const multiplier = hoursKey ? getAllowanceMultiplier(hoursKey) : 1;
                           return (
                             <div key={key} className="space-y-1">
-                              <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">{label}</label>
+                              <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1 flex items-center gap-1">
+                                {label}
+                                {hoursKey && (
+                                  <span className="text-[8px] font-extrabold text-[var(--accent)] bg-[var(--toss-blue-light)] px-1 py-0.5 rounded">
+                                    시급×{multiplier}
+                                  </span>
+                                )}
+                              </label>
                               <input
                                 type="text"
                                 inputMode="numeric"
@@ -2719,6 +2634,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 placeholder="0"
                                 className="w-full p-2 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30"
                               />
+                              {hoursKey && (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    data-testid={`new-staff-salary-hours-${key}`}
+                                    value={hoursVal ? String(hoursVal) : ''}
+                                    onChange={e => {
+                                      const h = parseFloat(e.target.value.replace(/[^0-9.]/g, '')) || 0;
+                                      const won = allowanceWonFromHours(hourlySalaryAmount, h, hoursKey);
+                                      신규직원설정(prev => ({
+                                        ...prev,
+                                        allowance_hours: { ...prev.allowance_hours, [hoursKey]: h },
+                                        [hoursKey]: won,
+                                      }));
+                                    }}
+                                    placeholder="시간 입력"
+                                    className="flex-1 min-w-0 p-1.5 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"
+                                    aria-label={`${label} 시간 입력 (환산시급 × 시간 × ${multiplier})`}
+                                  />
+                                  <span className="text-[8px] font-bold text-[var(--toss-gray-3)] whitespace-nowrap">시간</span>
+                                </div>
+                              )}
                             </div>
                         );
                       })}

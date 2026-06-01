@@ -42,6 +42,24 @@ const STAFF_BOOTSTRAP_COLUMNS = [
   'annual_leave_total',
   'annual_leave_used',
   'base_salary',
+  // taxable allowances
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+  // tax-free allowances
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  // work conditions
+  'working_hours_per_week',
+  'working_days_per_week',
+  // identity
+  'resident_no',
   'presence_status',
   'permissions',
   'bank_account',
@@ -76,6 +94,24 @@ export const STAFF_BOOTSTRAP_OPTIONAL_COLUMNS = [
   'annual_leave_used',
   'salary',
   'base_salary',
+  // taxable allowances
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+  // tax-free allowances
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
+  'other_taxfree',
+  // work conditions
+  'working_hours_per_week',
+  'working_days_per_week',
+  // identity
+  'resident_no',
   'presence_status',
   'permissions',
   'avatar_url',
