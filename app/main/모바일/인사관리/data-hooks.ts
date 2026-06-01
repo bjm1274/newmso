@@ -30,10 +30,11 @@ import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 export type StaffListOptions = {
   company?: string;
   limit?: number;
+  includeResigned?: boolean;
 };
 
 export function useStaffList(options: StaffListOptions = {}) {
-  const { company, limit = 200 } = options;
+  const { company, limit = 200, includeResigned = false } = options;
   const [staffs, setStaffs] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,8 +56,9 @@ export function useStaffList(options: StaffListOptions = {}) {
         const { data, error } = await query;
         if (error) throw error;
         if (cancelled) return;
-        const list = ((data ?? []) as StaffMember[]).filter(isActiveStaff);
-        setStaffs(list);
+        const list = (data ?? []) as StaffMember[];
+        const filtered = includeResigned ? list : list.filter(isActiveStaff);
+        setStaffs(filtered);
       } catch (err) {
         if (!cancelled) {
           console.error('[mobile-hr] staff list load failed', err);
@@ -70,7 +72,7 @@ export function useStaffList(options: StaffListOptions = {}) {
     return () => {
       cancelled = true;
     };
-  }, [company, limit]);
+  }, [company, limit, includeResigned]);
 
   return { staffs, loading };
 }

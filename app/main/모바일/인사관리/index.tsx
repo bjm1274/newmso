@@ -14,7 +14,7 @@
  * JM4: HrView union으로 타입 안정성
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MListRow from '../공통/MListRow';
@@ -30,6 +30,7 @@ import 계약문서 from './계약문서';
 import 구성원등록 from './구성원등록';
 import 연차신청 from './연차신청';
 import { useStaffList } from './data-hooks';
+import { isActiveStaff } from '@/lib/active-staff';
 
 export type HrView =
   | 'hub'
@@ -150,11 +151,18 @@ function Hub({
   onExit: () => void;
   onOpen: (view: HrMenuId) => void;
 }) {
-  const { staffs, loading } = useStaffList({ company });
+  const { staffs, loading } = useStaffList({ company, includeResigned: true });
 
-  const headcount = staffs.length;
-  // 고용형태 분포(employment_type 미수집 직원은 '기타'로 집계 생략).
-  const empCounts = staffs.reduce(
+  // 재직자 목록 분리
+  const activeStaffs = useMemo(() => staffs.filter(isActiveStaff), [staffs]);
+  const resignedStaffs = useMemo(() => staffs.filter((s) => !isActiveStaff(s)), [staffs]);
+
+  const headcount = activeStaffs.length;
+  const activeCount = activeStaffs.length;
+  const resignedCount = resignedStaffs.length;
+
+  // 고용형태 분포(재직자 기준)
+  const empCounts = activeStaffs.reduce(
     (acc, s) => {
       const t = String((s as { employment_type?: string | null }).employment_type ?? '').trim();
       if (t.includes('정규')) acc.regular += 1;
@@ -170,7 +178,7 @@ function Hub({
 
   // 평균 근속(hire_date 기반, 연 단위).
   const now = Date.now();
-  const tenures = staffs
+  const tenures = activeStaffs
     .map((s) => {
       const raw = String((s as { hire_date?: string | null; join_date?: string | null }).hire_date
         ?? (s as { join_date?: string | null }).join_date ?? '').slice(0, 10);
@@ -184,6 +192,17 @@ function Hub({
 
   const headcountValue = loading ? '—' : String(headcount);
   const avgTenureValue = avgTenure == null ? '—' : avgTenure.toFixed(1);
+
+  // 회사별 직원 수 집계 (재직자 기준)
+  const companyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    activeStaffs.forEach((s) => {
+      const co = (s as { company?: string | null }).company;
+      const coName = typeof co === 'string' && co.trim() ? co.trim() : '미지정';
+      counts[coName] = (counts[coName] || 0) + 1;
+    });
+    return counts;
+  }, [activeStaffs]);
 
   return (
     <div className="m-screen">
@@ -214,6 +233,43 @@ function Hub({
           <MKpi icon="users" label="전체 인원" value={headcountValue} unit="명" sub={empSub} tone="accent" />
           <MKpi icon="star" label="평균 근속" value={avgTenureValue} unit="년" sub="재직 기준" tone="accent" />
         </div>
+
+        {/* 통계 섹션 (회사별 직원 & 재직자퇴사자별 직원) */}
+        {!loading && (
+          <div className="m-section" style={{ marginTop: 0 }}>
+            <div className="m-section-h">
+              <div className="lbl">직원 현황 통계</div>
+            </div>
+            <div className="m-card p-3 space-y-3">
+              {/* 재직/퇴사자 통계 */}
+              <div>
+                <div className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1.5">재직/퇴사 상태별</div>
+                <div className="flex gap-2">
+                  <span className="inline-flex items-center bg-[var(--accent-light)] dark:bg-blue-950/45 px-2.5 py-1 rounded-[var(--radius-sm)] text-[11px] font-bold text-[var(--accent)]">
+                    재직 {activeCount}명
+                  </span>
+                  <span className="inline-flex items-center bg-zinc-200/60 dark:bg-zinc-800/80 px-2.5 py-1 rounded-[var(--radius-sm)] text-[11px] font-bold text-[var(--toss-gray-4)]">
+                    퇴사 {resignedCount}명
+                  </span>
+                </div>
+              </div>
+
+              {/* 회사별 통계 */}
+              <div className="border-t border-[var(--border-subtle)] pt-2.5">
+                <div className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1.5">회사별 직원</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(companyCounts).map(([companyName, count]) => (
+                    <div key={companyName} className="flex justify-between items-center bg-[var(--muted)]/40 px-2 py-1.5 rounded-[var(--radius-sm)] text-[11px] border border-[var(--border-subtle)]/50">
+                      <span className="truncate max-w-[100px] text-[var(--toss-gray-4)] font-medium">{companyName}</span>
+                      <span className="font-bold text-[var(--foreground)]">{count}명</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">인사관리 메뉴</div>

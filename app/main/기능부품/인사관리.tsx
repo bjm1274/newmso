@@ -240,6 +240,34 @@ export default function HRMainView({
     return Array.from(set);
   }, [인사직원목록]);
 
+  const stats = useMemo(() => {
+    const companyCounts: Record<string, number> = {};
+    let activeCount = 0;
+    let resignedCount = 0;
+
+    인사직원목록.forEach((s) => {
+      const co = (s as Record<string, unknown>)?.company;
+      const status = (s as Record<string, unknown>)?.status;
+      const companyName = typeof co === 'string' && co.trim() ? co.trim() : '미지정';
+      
+      // count by company
+      companyCounts[companyName] = (companyCounts[companyName] || 0) + 1;
+      
+      // count by status
+      if (status === '퇴사') {
+        resignedCount++;
+      } else {
+        activeCount++;
+      }
+    });
+
+    return {
+      companyCounts,
+      activeCount,
+      resignedCount,
+    };
+  }, [인사직원목록]);
+
   // 사업체 동기화
   useEffect(() => {
     if (사업체목록.includes(선택사업체)) return;
@@ -448,6 +476,33 @@ export default function HRMainView({
               <option value="재직">재직자</option>
               <option value="퇴사">퇴사자</option>
             </select>
+          </div>
+
+          {/* 데스크톱/모바일 전체 노출 통계 */}
+          <div className="mt-2.5 space-y-2 rounded-lg bg-[var(--muted)]/50 p-2 text-[10px] border border-[var(--border-subtle)]">
+            <div>
+              <div className="font-bold text-[var(--toss-gray-3)] px-0.5 mb-1 text-[9.5px]">상태별 현황</div>
+              <div className="flex gap-1 px-0.5">
+                <span className="inline-flex items-center gap-0.5 bg-emerald-500/10 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded-[var(--radius-xs)] font-bold text-emerald-600 dark:text-emerald-400">
+                  재직 {stats.activeCount}명
+                </span>
+                <span className="inline-flex items-center gap-0.5 bg-zinc-200/50 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded-[var(--radius-xs)] font-bold text-[var(--toss-gray-4)]">
+                  퇴사 {stats.resignedCount}명
+                </span>
+              </div>
+            </div>
+            
+            <div className="border-t border-[var(--border-subtle)] pt-2">
+              <div className="font-bold text-[var(--toss-gray-3)] px-0.5 mb-1 text-[9.5px]">회사별 직원</div>
+              <div className="grid grid-cols-1 gap-1 px-0.5 max-h-[120px] overflow-y-auto custom-scrollbar">
+                {Object.entries(stats.companyCounts).map(([companyName, count]) => (
+                  <div key={companyName} className="flex justify-between items-center text-[10px]">
+                    <span className="truncate max-w-[110px] text-[var(--toss-gray-4)] font-medium">{companyName}</span>
+                    <span className="font-bold text-[var(--foreground)] shrink-0">{count}명</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </aside>

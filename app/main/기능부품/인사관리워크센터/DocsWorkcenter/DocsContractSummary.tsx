@@ -79,29 +79,48 @@ export default function DocsContractSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
+        // 1. 계약서 기본 정보 조회 (제한된 컬럼들만 select)
+        const { data: contracts, error: contractErr } = await supabase
           .from('employment_contracts')
-          .select(`
-            id,
-            status,
-            contract_type,
-            effective_date,
-            probation_months,
-            staff_id,
-            staff_members (
-              name,
-              joined_at,
-              join_date,
-              permissions
-            )
-          `)
+          .select('id, status, contract_type, effective_date, probation_months, staff_id, created_at')
           .order('created_at', { ascending: false })
           .limit(40);
+        
         if (cancelled) return;
-        if (error) throw error;
-        const list = (data as Array<Record<string, any>> | null) ?? [];
+        if (contractErr) throw contractErr;
+
+        const list = (contracts as Array<Record<string, any>> | null) ?? [];
+        
+        // 2. 고유한 staff_id 수집
+        const staffIds = Array.from(
+          new Set(
+            list
+              .map((c) => String(c.staff_id ?? ''))
+              .filter(Boolean)
+          )
+        );
+
+        // 3. 해당 직원들의 인적 사항 및 권한 조회
+        const staffMap: Record<string, any> = {};
+        if (staffIds.length > 0) {
+          const { data: staffs, error: staffErr } = await supabase
+            .from('staff_members')
+            .select('id, name, joined_at, join_date, permissions')
+            .in('id', staffIds);
+          
+          if (cancelled) return;
+          if (staffErr) throw staffErr;
+
+          if (staffs) {
+            for (const s of staffs) {
+              staffMap[String(s.id)] = s;
+            }
+          }
+        }
+
+        // 4. 인메모리 상에서 두 결과를 매핑하여 가공
         const items: ContractRow[] = list.map((r) => {
-          const staff = r.staff_members;
+          const staff = staffMap[String(r.staff_id ?? '')];
           const name = staff?.name ?? '직원';
 
           // 고용 유형 파악
