@@ -15,29 +15,38 @@ import { memo } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import { useMyLatestPayroll } from './data-hooks';
 
-type PayItem = { label: string; amount: string };
+const won = (n: number) => n.toLocaleString('ko-KR');
 
-const PAY_ITEMS: PayItem[] = [
-  { label: '기본급', amount: '3,200,000' },
-  { label: '직책수당', amount: '200,000' },
-  { label: '식대', amount: '150,000' },
-  { label: '야간수당', amount: '85,470' },
-];
-
-const DEDUCT_ITEMS: PayItem[] = [
-  { label: '국민연금', amount: '-145,350' },
-  { label: '건강보험', amount: '-112,440' },
-  { label: '소득세', amount: '-78,210' },
-  { label: '주민세', amount: '-7,820' },
-];
+function formatYearMonth(ym: string): string {
+  const m = /^(\d{4})-?(\d{2})/.exec(ym);
+  if (m) return `${m[1]}년 ${Number(m[2])}월 급여명세`;
+  return ym ? `${ym} 급여명세` : '급여명세';
+}
 
 export type 급여명세Props = {
   user: ErpUser;
   onBack: () => void;
 };
 
-function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
+function 급여명세Base({ user, onBack }: 급여명세Props) {
+  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const { yearMonth, netPay, payItems, deductItems, payTotal, deductTotal, loading, found } = useMyLatestPayroll(staffId);
+
+  if (!loading && !found) {
+    return (
+      <div className="m-screen">
+        <MobileHeader title="급여명세" back={onBack} />
+        <div className="m-scroll" style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+          <div style={{ textAlign: 'center', color: 'var(--z-400)', fontSize: 14, fontWeight: 600 }}>
+            발행된 급여명세가 없습니다.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="m-screen">
       <MobileHeader title="급여명세" back={onBack} />
@@ -55,7 +64,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.7 }}>
-            2026년 4월 급여명세
+            {formatYearMonth(yearMonth)}
           </div>
           <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.5, marginTop: 6 }}>
             실수령액
@@ -69,7 +78,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
               marginTop: 4,
             }}
           >
-            3,436,470
+            {loading ? '—' : won(netPay)}
             <span style={{ fontSize: 18, fontWeight: 700 }}>원</span>
           </div>
         </div>
@@ -80,7 +89,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
             <div className="lbl">지급 내역</div>
           </div>
           <div className="m-card flush">
-            {PAY_ITEMS.map((item) => (
+            {payItems.map((item) => (
               <div
                 key={item.label}
                 style={{
@@ -94,7 +103,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
               >
                 <span style={{ fontWeight: 600, color: 'var(--z-600)' }}>{item.label}</span>
                 <span className="m-tnum" style={{ fontWeight: 700 }}>
-                  {item.amount}원
+                  {won(item.amount)}원
                 </span>
               </div>
             ))}
@@ -111,7 +120,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
             >
               <span style={{ fontWeight: 800 }}>지급 합계</span>
               <span className="m-tnum" style={{ fontWeight: 800, color: 'var(--m-accent)' }}>
-                3,635,470원
+                {won(payTotal)}원
               </span>
             </div>
           </div>
@@ -123,7 +132,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
             <div className="lbl">공제 내역</div>
           </div>
           <div className="m-card flush">
-            {DEDUCT_ITEMS.map((item) => (
+            {deductItems.map((item) => (
               <div
                 key={item.label}
                 style={{
@@ -137,7 +146,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
               >
                 <span style={{ fontWeight: 600, color: 'var(--z-600)' }}>{item.label}</span>
                 <span className="m-tnum" style={{ fontWeight: 700, color: 'var(--m-danger)' }}>
-                  {item.amount}원
+                  -{won(item.amount)}원
                 </span>
               </div>
             ))}
@@ -154,7 +163,7 @@ function 급여명세Base({ user: _user, onBack }: 급여명세Props) {
             >
               <span style={{ fontWeight: 800 }}>공제 합계</span>
               <span className="m-tnum" style={{ fontWeight: 800, color: 'var(--m-danger)' }}>
-                -343,820원
+                -{won(deductTotal)}원
               </span>
             </div>
           </div>

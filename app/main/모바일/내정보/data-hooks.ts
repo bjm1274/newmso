@@ -208,3 +208,89 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
 
   return state;
 }
+
+// ─── 급여명세: 최신 payroll_records 1건 ───
+export type PaySlipLine = { label: string; amount: number };
+export type MyPayslip = {
+  yearMonth: string;
+  netPay: number;
+  payItems: PaySlipLine[];
+  deductItems: PaySlipLine[];
+  payTotal: number;
+  deductTotal: number;
+  loading: boolean;
+  found: boolean;
+};
+
+type PayrollRow = Record<string, unknown>;
+
+function num(row: PayrollRow, key: string): number {
+  const v = row[key];
+  return typeof v === 'number' ? v : Number(v ?? 0) || 0;
+}
+
+export function useMyLatestPayroll(staffId: string | null | undefined): MyPayslip {
+  const [state, setState] = useState<MyPayslip>({
+    yearMonth: '', netPay: 0, payItems: [], deductItems: [], payTotal: 0, deductTotal: 0, loading: true, found: false,
+  });
+
+  useEffect(() => {
+    if (!staffId) { setState((p) => ({ ...p, loading: false })); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('payroll_records')
+          .select('*')
+          .eq('staff_id', staffId)
+          .order('year_month', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled) return;
+        if (!data) { setState((p) => ({ ...p, loading: false, found: false })); return; }
+        const r = data as PayrollRow;
+
+        const payItems: PaySlipLine[] = [
+          { label: '기본급', amount: num(r, 'base_salary') },
+          { label: '식대', amount: num(r, 'meal_allowance') },
+          { label: '차량유지', amount: num(r, 'vehicle_allowance') },
+          { label: '보육수당', amount: num(r, 'childcare_allowance') },
+          { label: '연구수당', amount: num(r, 'research_allowance') },
+          { label: '야간수당', amount: num(r, 'night_duty_allowance') },
+          { label: '연장근로', amount: num(r, 'overtime_pay') },
+          { label: '기타수당', amount: num(r, 'extra_allowance') },
+          { label: '상여금', amount: num(r, 'bonus') },
+        ].filter((it) => it.amount > 0);
+
+        const deductItems: PaySlipLine[] = [
+          { label: '국민연금', amount: num(r, 'national_pension') },
+          { label: '건강보험', amount: num(r, 'health_insurance') },
+          { label: '장기요양', amount: num(r, 'long_term_care') },
+          { label: '고용보험', amount: num(r, 'employment_insurance') },
+          { label: '소득세', amount: num(r, 'income_tax') },
+          { label: '지방소득세', amount: num(r, 'local_tax') },
+          { label: '근태공제', amount: num(r, 'attendance_deduction') },
+        ].filter((it) => it.amount > 0);
+
+        const payTotal = payItems.reduce((s, it) => s + it.amount, 0);
+        const deductTotal = deductItems.reduce((s, it) => s + it.amount, 0);
+
+        setState({
+          yearMonth: String(r['year_month'] ?? ''),
+          netPay: num(r, 'net_pay'),
+          payItems,
+          deductItems,
+          payTotal,
+          deductTotal,
+          loading: false,
+          found: true,
+        });
+      } catch {
+        if (!cancelled) setState((p) => ({ ...p, loading: false }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [staffId]);
+
+  return state;
+}
