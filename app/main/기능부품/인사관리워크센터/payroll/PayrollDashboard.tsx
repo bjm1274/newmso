@@ -1,11 +1,24 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { useCallback, useMemo, useState } from 'react';
 import PayrollModuleCard from './PayrollModuleCard';
 import { PAYROLL_MODULES } from './payroll-data';
 import type { PayrollModuleId, SettlementStepState } from './payroll-types';
 import { usePayroll, usePayrollData } from './payroll-context';
 import { calculateKpis, detectAlerts } from './payroll-kpi';
+
+const LegacyLockPanel = dynamic<Record<string, unknown>>(
+  () => import('../../인사관리서브/급여명세/급여월마감잠금'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-6 text-center text-sm text-[var(--toss-gray-3)]">
+        마감 잠금 패널 로드 중…
+      </div>
+    ),
+  },
+);
 
 /**
  * 급여 워크센터 — 대시보드 (한 화면이 13장 대체).
@@ -69,7 +82,8 @@ function deriveSettlementSteps(
 
 export default function PayrollDashboard({ onPick }: Props) {
   const data = usePayrollData();
-  const { loading, yearMonth, setYearMonth } = usePayroll();
+  const { loading, yearMonth, setYearMonth, selectedCo } = usePayroll();
+  const [showLockPanel, setShowLockPanel] = useState(false);
 
   const kpis = useMemo(() => calculateKpis(data), [data]);
   const alerts = useMemo(() => detectAlerts(data), [data]);
@@ -193,22 +207,47 @@ export default function PayrollDashboard({ onPick }: Props) {
               </>
             )}
           </div>
-          <button
-            type="button"
-            data-testid="run-payroll-regular-button"
-            onClick={() => handlePick('settlement')}
-            className="
-              mt-1 px-3.5 py-2
-              rounded-[var(--radius-md)]
-              bg-[var(--accent)] hover:bg-[var(--accent-hover)]
-              text-white text-[12px] font-bold
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white
-            "
-          >
-            정산 시작 →
-          </button>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="run-payroll-regular-button"
+              onClick={() => handlePick('settlement')}
+              className="
+                px-3.5 py-2
+                rounded-[var(--radius-md)]
+                bg-[var(--accent)] hover:bg-[var(--accent-hover)]
+                text-white text-[12px] font-bold
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white
+              "
+            >
+              정산 시작 →
+            </button>
+            <button
+              type="button"
+              data-testid="run-payroll-lock-button"
+              onClick={() => setShowLockPanel((v) => !v)}
+              className="
+                px-3.5 py-2
+                rounded-[var(--radius-md)]
+                bg-[var(--zinc-700)] hover:bg-[var(--zinc-600)]
+                text-white text-[12px] font-bold
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white
+              "
+            >
+              {showLockPanel ? '잠금 닫기' : '마감 잠금'}
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* ── 마감 잠금 패널 ──────────────────────── */}
+      {showLockPanel && (
+        <LegacyLockPanel
+          yearMonth={yearMonth}
+          companyName={selectedCo !== '전체' ? selectedCo : undefined}
+          onLockChange={() => setShowLockPanel(false)}
+        />
+      )}
 
       {/* ── 2. 8 KPI grid ────────────────────────── */}
       <section
