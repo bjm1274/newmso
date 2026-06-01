@@ -266,8 +266,8 @@ function CatalogPanel({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.sku}>
+              {rows.map((r, idx) => (
+                <tr key={`${r.sku}-${idx}`}>
                   <td className="font-bold tabular-nums text-[var(--accent)] text-[11px]">
                     {r.sku}
                   </td>

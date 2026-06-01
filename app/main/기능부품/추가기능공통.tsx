@@ -124,7 +124,6 @@ export function FontFamilyControl() {
   );
 }
 
-const loadDepartmentInventoryView = () => import('./재고관리서브/부서별물품장비현황');
 const loadWorkStatusView = () => import('./근무현황');
 const loadHandoverNotesView = () => import('./인계노트');
 const loadDischargeReviewView = () => import('./퇴원심사');
@@ -137,10 +136,6 @@ const loadEslManagerView = () => import('./ESL관리');
 const loadOrgChartView = () => import('./조직도서브/OrgChart');
 const loadGeminiAssistantView = () => import('./Gemini어시스턴트');
 
-const DepartmentInventoryView = dynamic(loadDepartmentInventoryView, {
-  ssr: false,
-  loading: () => <SubviewLoading label="부서별 재고" />,
-});
 const WorkStatusView = dynamic(loadWorkStatusView, {
   ssr: false,
   loading: () => <SubviewLoading label="근무현황" />,
@@ -188,7 +183,6 @@ const GeminiAssistantView = dynamic(loadGeminiAssistantView, {
 
 export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   조직도: loadOrgChartView,
-  부서별재고: loadDepartmentInventoryView,
   근무현황: loadWorkStatusView,
   인계노트: loadHandoverNotesView,
   퇴원심사: loadDischargeReviewView,
@@ -315,7 +309,9 @@ export function ExtraFeatureSubview({
   if (subView === '부서별재고') {
     return (
       <FeatureShell onBack={onBack} boxed>
-        <DepartmentInventoryView user={user || {}} />
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-sm font-bold text-[var(--toss-gray-4)]">부서별 재고 기능이 재고관리 워크센터로 통합되었습니다.</p>
+        </div>
       </FeatureShell>
     );
   }

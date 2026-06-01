@@ -349,6 +349,7 @@ export default function LeaveWorkcenter({
   }, [closeSuggest, data.rows, suggest.item]);
 
   return (
+    <div data-testid="leave-workcenter-view" className="contents">
     <WorkcenterShell headerExtra={<WorkcenterKpiRow items={kpis} />}>
       {errMsg && (
         <div
@@ -367,6 +368,7 @@ export default function LeaveWorkcenter({
             data.totals.pending > 0 ? (
               <button
                 type="button"
+                data-testid="leave-approval-pending-btn"
                 onClick={() => {
                   setApprovalTab('pending');
                   setShowApprovalModal(true);
@@ -588,6 +590,7 @@ export default function LeaveWorkcenter({
                             </button>
                             <button
                               type="button"
+                              data-testid={`leave-approve-btn-${req.id}`}
                               onClick={() => handleStatusUpdate(req.id, '승인')}
                               disabled={actioningId === req.id}
                               className="px-4 py-2 bg-[var(--accent)] text-white rounded-xl text-[10px] font-bold shadow-sm hover:opacity-90 disabled:opacity-50 transition-opacity"
@@ -643,5 +646,6 @@ export default function LeaveWorkcenter({
         </div>
       )}
     </WorkcenterShell>
+    </div>
   );
 }

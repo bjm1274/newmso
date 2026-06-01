@@ -936,24 +936,20 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth, approvalWeekDate]);
 
   const shouldApplyApprovalDateFilter = useMemo(() => {
-    if (typeof window !== 'undefined' && window.navigator.webdriver) {
-      return false;
-    }
-
     if (approvalDateMode === 'range') {
       return Boolean(approvalDateFrom || approvalDateTo);
+    }
+
+    if (!approvalDateTouched) {
+      return false;
     }
 
     if (approvalDateMode === 'week') {
       return Boolean(approvalWeekDate);
     }
 
-    if (!approvalDateTouched && approvalMonth === defaultApprovalMonth) {
-      return false;
-    }
-
     return Boolean(approvalMonth);
-  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, approvalWeekDate, defaultApprovalMonth, defaultApprovalWeekDate]);
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, approvalWeekDate]);
 
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||

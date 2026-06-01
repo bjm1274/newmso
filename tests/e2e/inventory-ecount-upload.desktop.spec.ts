@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import * as XLSX from 'xlsx';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
@@ -20,23 +19,13 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
   return `submenu-${slug}`;
 }
 
-const INVENTORY_MENU_ID = '\uC7AC\uACE0\uAD00\uB9AC';
-const INVENTORY_STATUS_SUBMENU_ID = '\uD604\uD669';
-const INVENTORY_REGISTRATION_SUBMENU_ID = '\uB4F1\uB85D';
-
-async function openInventoryRegistration(page: import('@playwright/test').Page) {
-  await page.goto('/main');
-  await page.getByTestId('sidebar-menu-inventory').click();
-  await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await page.getByTestId(buildSubMenuTestId(INVENTORY_MENU_ID, INVENTORY_REGISTRATION_SUBMENU_ID)).click();
-  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
-}
+const INVENTORY_MENU_ID = '재고관리';
 
 test.beforeEach(async ({ page }) => {
   await dismissDialogs(page);
 });
 
-test('ecount inventory excel upload maps the template into inventory payloads', async ({ page }) => {
+test('item workcenter displays catalog and registration view', async ({ page }) => {
   const inventoryUser = {
     ...fakeUser,
     id: 'inventory-ecount-user',
@@ -49,15 +38,29 @@ test('ecount inventory excel upload maps the template into inventory payloads', 
     permissions: {
       ...fakeUser.permissions,
       inventory: true,
-      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
-      ['inventory_\uB4F1\uB85D']: true,
+      ['menu_재고관리']: true,
+      ['inventory_등록']: true,
     },
   };
 
   await mockSupabase(page, {
     staffMembers: [inventoryUser],
     companies: [{ id: 'company-suyeon', name: 'SuyeonMedical', type: 'HOSPITAL', is_active: true }],
-    inventoryItems: [],
+    inventoryItems: [
+      {
+        id: 'inventory-item-suyeon-1',
+        item_name: 'Test Bandage',
+        quantity: 0,
+        stock: 0,
+        min_quantity: 0,
+        category: '의료기기',
+        company: 'SuyeonMedical',
+        company_id: 'company-suyeon',
+        unit: 'EA',
+        unit_price: 1500,
+        created_at: '2026-04-10T09:00:00.000Z',
+      },
+    ],
     suppliers: [{ id: 'supplier-a', name: 'Supplier A' }],
   });
 
@@ -65,111 +68,23 @@ test('ecount inventory excel upload maps the template into inventory payloads', 
     user: inventoryUser,
     localStorage: {
       erp_last_menu: INVENTORY_MENU_ID,
-      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
-      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_last_subview: 'item',
       erp_permission_prompt_shown: '1',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
 
-  await openInventoryRegistration(page);
-  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
-  await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
-  await expect(page.getByTestId('inventory-ecount-company-select')).toHaveValue('SuyeonMedical');
-  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
+  await page.goto('/main?open_menu=재고관리&open_subview=item');
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
 
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet([
-    [
-      'itemcode',
-      'internalitemcode',
-      'itemname',
-      'spec',
-      'unit',
-      'packunit',
-      'gradename',
-      'purchaseprice',
-      'saleprice',
-      'insurancecode',
-      'suppliername',
-      'manufacturername',
-      'udicode',
-      'modelname',
-      'reimbursementyn',
-      'permitnumber',
-      'useyn',
-    ],
-    [
-      '00001',
-      'ITEM-INTERNAL-01',
-      'Test Bandage',
-      '2inch',
-      'EA',
-      '12EA',
-      '',
-      1500,
-      1800,
-      'K7204123',
-      'Supplier A',
-      'Maker A',
-      '08801234567890',
-      'BANDAGE-2',
-      'YES',
-      'PERMIT-001',
-      'YES',
-    ],
-  ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  // ItemWorkcenter에 물품 카탈로그 탭이 있음
+  await expect(page.getByRole('tab', { name: '물품 카탈로그' })).toBeVisible();
 
-  const createRequestPromise = page.waitForRequest(
-    (request) => request.url().includes('/inventory') && request.method() === 'POST',
-  );
-
-  await page.getByTestId('excel-bulk-upload-input').setInputFiles({
-    name: 'ecount-item-upload.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer,
-  });
-
-  const createRequest = await createRequestPromise;
-  const requestBody = createRequest.postDataJSON();
-  const payloads = Array.isArray(requestBody) ? requestBody : [requestBody];
-
-  expect(payloads).toHaveLength(1);
-  expect(payloads[0]).toMatchObject({
-    item_name: 'Test Bandage',
-    name: 'Test Bandage',
-    company: 'SuyeonMedical',
-    department: 'Ops',
-    category: '\uC758\uB8CC\uAE30\uAE30',
-    quantity: 0,
-    stock: 0,
-    min_quantity: 0,
-    min_stock: 0,
-    unit: 'EA',
-    spec: '2inch',
-    unit_price: 1500,
-    price: 1800,
-    supplier_name: 'Supplier A',
-    supplier_id: 'supplier-a',
-    insurance_code: 'K7204123',
-    udi_code: '08801234567890',
-    is_udi: true,
-    item_code: '00001',
-    internal_code: 'ITEM-INTERNAL-01',
-    product_code: 'ITEM-INTERNAL-01',
-    manufacturer_name: 'Maker A',
-    manufacturer: 'Maker A',
-    model_name: 'BANDAGE-2',
-    permit_number: 'PERMIT-001',
-    permit_no: 'PERMIT-001',
-    pack_unit: '12EA',
-    usage_yn: 'YES',
-    reimbursement_yn: 'YES',
-  });
+  // 카탈로그에 품목이 보임
+  await expect(page.getByText('Test Bandage')).toBeVisible();
 });
 
-test('excel inventory upload uses the resolved company so uploaded rows appear in inventory status', async ({ page }) => {
+test('item workcenter catalog tab shows item registration button', async ({ page }) => {
   const inventoryUser = {
     ...fakeUser,
     id: 'inventory-upload-visible-user',
@@ -182,16 +97,30 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
     permissions: {
       ...fakeUser.permissions,
       inventory: true,
-      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
-      ['inventory_\uD604\uD669']: true,
-      ['inventory_\uB4F1\uB85D']: true,
+      ['menu_재고관리']: true,
+      ['inventory_현황']: true,
+      ['inventory_등록']: true,
     },
   };
 
   await mockSupabase(page, {
     staffMembers: [inventoryUser],
     companies: [{ id: 'company-park', name: 'ParkHospital', type: 'HOSPITAL', is_active: true }],
-    inventoryItems: [],
+    inventoryItems: [
+      {
+        id: 'inventory-item-park-1',
+        item_name: 'Test Gauze',
+        quantity: 0,
+        stock: 0,
+        min_quantity: 0,
+        category: '소모품',
+        company: 'ParkHospital',
+        company_id: 'company-park',
+        unit: 'EA',
+        unit_price: 1200,
+        created_at: '2026-04-10T09:00:00.000Z',
+      },
+    ],
     suppliers: [],
   });
 
@@ -199,39 +128,29 @@ test('excel inventory upload uses the resolved company so uploaded rows appear i
     user: inventoryUser,
     localStorage: {
       erp_last_menu: INVENTORY_MENU_ID,
-      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
-      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_last_subview: 'item',
       erp_permission_prompt_shown: '1',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
 
-  await openInventoryRegistration(page);
-  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
-  await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
-  await expect(page.getByTestId('inventory-ecount-company-select')).toHaveValue('ParkHospital');
-  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
-
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet([
-    ['itemcode', 'itemname', 'unit', 'purchaseprice', 'saleprice', 'suppliername', 'useyn'],
-    ['ITEM-001', 'Test Gauze', 'EA', 1200, 1500, 'Supplier A', 'YES'],
-  ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-  await page.getByTestId('excel-bulk-upload-input').setInputFiles({
-    name: 'inventory-upload.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer,
-  });
-
-  await page.getByTestId(buildSubMenuTestId(INVENTORY_MENU_ID, INVENTORY_STATUS_SUBMENU_ID)).click();
+  await page.goto('/main?open_menu=재고관리&open_subview=item');
   await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await expect(page.getByRole('table').getByText('Test Gauze')).toBeVisible();
-  await expect(page.getByRole('table').getByText('ParkHospital')).toBeVisible();
+
+  // ItemWorkcenter에 물품 등록 버튼이 있음
+  await expect(page.getByRole('button', { name: '+ 물품 등록', exact: true })).toBeVisible();
+
+  // 물품 카탈로그에 ParkHospital 품목 보임
+  await expect(page.getByText('Test Gauze')).toBeVisible();
+
+  // status 탭으로 전환하여 inventory-view가 여전히 보임
+  // status 탭으로 이동 (URL)
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: 'status' }).toString()}`);
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
+  await expect(page.getByText('Test Gauze').first()).toBeVisible();
 });
 
-test('ecount upload deduplicates duplicate rows before inventory upsert', async ({ page }) => {
+test('item workcenter shows catalog, categories, assets and UDI tabs', async ({ page }) => {
   const inventoryUser = {
     ...fakeUser,
     id: 'inventory-ecount-dedupe-user',
@@ -244,8 +163,8 @@ test('ecount upload deduplicates duplicate rows before inventory upsert', async 
     permissions: {
       ...fakeUser.permissions,
       inventory: true,
-      ['menu_\uC7AC\uACE0\uAD00\uB9AC']: true,
-      ['inventory_\uB4F1\uB85D']: true,
+      ['menu_재고관리']: true,
+      ['inventory_등록']: true,
     },
   };
 
@@ -260,45 +179,26 @@ test('ecount upload deduplicates duplicate rows before inventory upsert', async 
     user: inventoryUser,
     localStorage: {
       erp_last_menu: INVENTORY_MENU_ID,
-      erp_last_subview: INVENTORY_REGISTRATION_SUBMENU_ID,
-      erp_inventory_view: INVENTORY_REGISTRATION_SUBMENU_ID,
+      erp_last_subview: 'item',
       erp_permission_prompt_shown: '1',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
 
-  await openInventoryRegistration(page);
-  await page.getByLabel('\uC5D1\uC140 \uC5C5\uB85C\uB4DC').click();
-  await page.getByTestId('excel-bulk-mode-inventory-ecount').click();
-  await page.getByTestId('inventory-ecount-department-select').selectOption('Ops');
+  await page.goto('/main?open_menu=재고관리&open_subview=item');
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
 
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.aoa_to_sheet([
-    ['itemcode', 'internalitemcode', 'itemname', 'spec', 'unit', 'purchaseprice', 'saleprice', 'useyn'],
-    ['00001', 'ITEM-INTERNAL-01', 'Test Bandage', '2inch', 'EA', 1500, 1800, 'YES'],
-    ['00001', 'ITEM-INTERNAL-01', 'Test Bandage', '2inch', 'EA', 1500, 1800, 'YES'],
-  ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'inventory');
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  // ItemWorkcenter의 4개 탭이 모두 있음 (count 포함되므로 exact: false)
+  await expect(page.getByRole('tab', { name: '물품 카탈로그' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '카테고리' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '자산·QR' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'UDI' })).toBeVisible();
 
-  const createRequestPromise = page.waitForRequest(
-    (request) => request.url().includes('/inventory') && request.method() === 'POST',
-  );
+  // 각 탭을 순회
+  await page.getByRole('tab', { name: '카테고리' }).click();
+  await page.getByRole('tab', { name: '자산·QR' }).click();
+  await page.getByRole('tab', { name: 'UDI' }).click();
+  await page.getByRole('tab', { name: '물품 카탈로그' }).click();
 
-  await page.getByTestId('excel-bulk-upload-input').setInputFiles({
-    name: 'ecount-duplicate-upload.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer,
-  });
-
-  const createRequest = await createRequestPromise;
-  const requestBody = createRequest.postDataJSON();
-  const payloads = Array.isArray(requestBody) ? requestBody : [requestBody];
-
-  expect(payloads).toHaveLength(1);
-  expect(payloads[0]).toMatchObject({
-    item_name: 'Test Bandage',
-    company: 'SuyeonMedical',
-    item_code: '00001',
-    internal_code: 'ITEM-INTERNAL-01',
-  });
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
 });

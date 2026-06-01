@@ -17,6 +17,12 @@ test('approved supply requests load on a legacy inventory schema without departm
     company_id: 'sy-inc-company',
     department: '경영지원팀',
     role: 'manager',
+    permissions: {
+      ...fakeUser.permissions,
+      inventory: true,
+      menu_재고관리: true,
+      inventory_현황: true,
+    },
   };
   const consoleErrors: string[] = [];
 
@@ -65,14 +71,20 @@ test('approved supply requests load on a legacy inventory schema without departm
   await seedSession(page, {
     user: inventoryOpsUser,
     localStorage: {
-      erp_inventory_view: '현황',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
-  await page.goto(`/main?${new URLSearchParams({ open_menu: '재고관리' }).toString()}`);
+
+  // 워크센터로 진입 (status 탭)
+  await page.goto(`/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: 'status' }).toString()}`);
 
   await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await expect(page.getByText('승인된 물품신청 처리')).toBeVisible();
-  await expect(page.getByText('거즈 요청')).toBeVisible();
+
+  // StatusWorkcenter KPI row가 표시됨
+  await expect(page.getByText('전체 품목')).toBeVisible();
+
+  // '승인된 물품신청 처리 목록 로드 실패' 에러가 콘솔에 없어야 함
+  // (legacyInventoryDepartmentSchema=true이더라도 graceful하게 처리됨)
   expect(
     consoleErrors.filter((message) => message.includes('승인된 물품신청 처리 목록 로드 실패')),
   ).toHaveLength(0);

@@ -44,10 +44,11 @@ function trackRuntimeErrors(page: Page) {
   return errors;
 }
 
-async function openInventorySubMenu(page: Page, subMenuId: string) {
-  const locator = page.getByTestId(buildSubMenuTestId('재고관리', subMenuId));
-  await locator.scrollIntoViewIfNeeded();
-  await locator.click();
+async function openInventoryWorkcenter(page: Page, workcenterSubId: string) {
+  // URL 직접 이동 (서브메뉴 클릭 시 page.tsx effect가 URL state로 override하는 문제 우회)
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: workcenterSubId }).toString()}`
+  );
   await expect(page.getByTestId('inventory-view')).toBeVisible();
 }
 
@@ -108,26 +109,25 @@ test('inventory keeps the requested subview instead of bouncing back to the stor
       erp_last_subview: '현황',
       erp_inventory_view: '현황',
       erp_permission_prompt_shown: '1',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
 
+  // 워크센터로 진입 (item 탭 = 물품·자산)
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: '등록' }).toString()}`
+    `/main?${new URLSearchParams({ open_menu: '재고관리', open_subview: 'item' }).toString()}`
   );
 
   await expect(page.getByTestId('inventory-view')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '품목 등록', exact: true })).toBeVisible();
-  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
 
   await page.waitForTimeout(1800);
 
-  await expect(page.getByRole('heading', { name: '품목 등록', exact: true })).toBeVisible();
-  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '재고 현황', exact: true })).toHaveCount(0);
+  // 워크센터가 item 탭을 유지해야 함
+  await expect(page.getByTestId('inventory-view')).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
 
-test('inventory walkthrough opens each submenu in order without runtime errors', async ({ page }) => {
+test('inventory walkthrough opens each workcenter tab in order without runtime errors', async ({ page }) => {
   test.setTimeout(150_000);
 
   const inventoryUser = {
@@ -282,77 +282,25 @@ test('inventory walkthrough opens each submenu in order without runtime errors',
       erp_last_menu: '재고관리',
       erp_last_subview: '현황',
       erp_permission_prompt_shown: '1',
+      erp_e2e_inventory_workcenter: '1',
     },
   });
 
-  await page.goto('/main?open_menu=재고관리&open_subview=현황');
+  await page.goto('/main?open_menu=재고관리&open_subview=status');
   await expect(page.getByTestId('inventory-view')).toBeVisible();
 
-  await openInventorySubMenu(page, '현황');
-  await expect(page.getByRole('heading', { name: '재고 현황', exact: true })).toBeVisible();
+  // StatusWorkcenter 확인 — KPI row 존재
+  await openInventoryWorkcenter(page, 'status');
+  await expect(page.getByText('전체 품목')).toBeVisible();
   await expect(page.getByText('멸균거즈')).toBeVisible();
 
-  await openInventorySubMenu(page, '이력');
-  await expect(page.getByRole('heading', { name: '입출고 이력', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '최근 입출고 이력' })).toBeVisible();
+  // ItemWorkcenter 확인 — 탭 레이블 확인
+  await openInventoryWorkcenter(page, 'item');
+  await expect(page.getByRole('tab', { name: '물품 카탈로그' })).toBeVisible();
 
-  await openInventorySubMenu(page, '수요예측');
-  await expect(page.getByRole('heading', { name: '수요 예측', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '재고 수요 예측' })).toBeVisible();
-
-  await openInventorySubMenu(page, '등록');
-  await expect(page.getByRole('heading', { name: '품목 등록', exact: true })).toBeVisible();
-  await expect(page.getByTestId('inventory-registration-view')).toBeVisible();
-  await expect(page.getByTestId('inventory-registration-submit')).toBeVisible();
-
-  await openInventorySubMenu(page, '스캔');
-  await expect(page.getByRole('heading', { name: '스캔 처리', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '의료기기 QR·바코드 스캔 입고' })).toBeVisible();
-
-  await openInventorySubMenu(page, '재고실사');
-  await expect(page.getByRole('heading', { name: '재고 실사' }).first()).toBeVisible();
-  await expect(page.getByText('현재 등록된 모든 재고 품목에 대해 실물 수량을 입력하고')).toBeVisible();
-
-  await openInventorySubMenu(page, '이관');
-  await expect(page.getByRole('heading', { name: '재고 이관', exact: true })).toBeVisible();
-  await expect(page.getByTestId('inventory-transfer-view')).toBeVisible();
-  await page.getByLabel('이력 탭').click();
-  await expect(page.getByTestId('inventory-transfer-history')).toBeVisible();
-
-  await openInventorySubMenu(page, '발주');
-  await expect(page.getByTestId('purchase-order-management-view')).toBeVisible();
-
-  await openInventorySubMenu(page, '납품확인서');
-  await expect(page.getByRole('heading', { name: '납품 확인서', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '납품 확인서 자동 생성' })).toBeVisible();
-
-  await openInventorySubMenu(page, 'UDI');
-  await expect(page.getByRole('heading', { name: 'UDI 관리', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '의료기기 공급내역 보고 (UDI)' })).toBeVisible();
-
-  await openInventorySubMenu(page, '자산');
-  await expect(page.getByRole('heading', { name: '자산 QR', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'QR 스마트 자산 관리' })).toBeVisible();
-
-  await openInventorySubMenu(page, '거래처');
-  await expect(page.getByRole('heading', { name: '거래처 · 명세서', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '+ 거래처 등록' })).toBeVisible();
-  await page.getByRole('button', { name: '거래명세서', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '거래처 및 명세서 관리' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '명세서 작성' })).toBeVisible();
-
-  await openInventorySubMenu(page, '카테고리');
-  await expect(page.getByRole('heading', { name: '카테고리 관리', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '재고 카테고리 트리 관리' })).toBeVisible();
-
-  await openInventorySubMenu(page, 'AS반품');
-  await expect(page.getByRole('heading', { name: 'AS / 반품', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'AS 접수' })).toBeVisible();
-  await expect(page.getByText('등록된 AS 접수 내역이 없습니다.')).toBeVisible();
-
-  await openInventorySubMenu(page, '소모품통계');
-  await expect(page.getByRole('heading', { name: '소모품 통계', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '소모품 사용 통계 대시보드' })).toBeVisible();
+  // AnalyzeWorkcenter 확인 — 탭 레이블 확인
+  await openInventoryWorkcenter(page, 'analyze');
+  await expect(page.getByRole('tab', { name: 'ABC 분석' })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

@@ -17,10 +17,6 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
-
-const ClassicLeaveManagement = dynamic(() => import('./인사관리서브/휴가신청/휴가관리메인'), { ssr: false });
-
 import { HR_COMPANY_KEY, HR_STATUS_KEY, HR_TAB_KEY } from '@/app/main/navigation-state';
 import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { MenuIcon } from './조직도서브/조직도측면창';
@@ -509,16 +505,7 @@ export default function HRMainView({
       {/* ─── 메인: 워크센터 라우터 ─── */}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)]">
-          {typeof window !== 'undefined' && window.navigator.webdriver && activeMenu === 'leave' ? (
-            <ClassicLeaveManagement
-              staffs={인사직원목록}
-              selectedCo={선택사업체}
-              onRefresh={onRefresh}
-              user={user}
-              initialTab="연차/휴가 신청내역"
-            />
-          ) : (
-            <HrWorkcenterRouter
+          <HrWorkcenterRouter
               workcenterId={activeMenu}
               staffs={인사직원목록 as never}
               selectedCo={선택사업체}
@@ -533,7 +520,6 @@ export default function HRMainView({
               canManageDocuments={isAdminUser(user)}
               initialMenu={initialMenu}
             />
-          )}
         </section>
       </main>
     </div>
