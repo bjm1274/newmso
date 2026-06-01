@@ -73,7 +73,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
     });
 
     if (!match) {
-      toast(`등록되지 않은 의료기기 코드입니다.\n(${code})`, 'success');
+      toast(`등록되지 않은 의료기기 코드입니다.\n(${code})`, 'warning');
       setCodeInput('');
       if (inputRef.current) inputRef.current.focus();
       return;

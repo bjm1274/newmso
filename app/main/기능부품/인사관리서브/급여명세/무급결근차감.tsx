@@ -66,7 +66,7 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
   };
 
   const openAdd = (staff: any) => {
-    const monthlySalary = staff.base || 3000000;
+    const monthlySalary = staff.base_salary || 3000000;
     const workingDays = 22;
     const absentDays = 0;
     const { dailyWage, deduction } = calcDeduction(monthlySalary, workingDays, absentDays);

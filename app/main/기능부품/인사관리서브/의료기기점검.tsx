@@ -104,7 +104,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
     const target = devices.find((device) => device.id === id);
     const confirmed = await openConfirm({
       title: '의료기기 삭제',
-      description: `${target?.device_name || '선택한 장비'}를 삭제합니다.\n점검 주기와 다음 점검 일정도 함께 제거됩니다.`,
+      description: `${target?.name || '선택한 장비'}를 삭제합니다.\n점검 주기와 다음 점검 일정도 함께 제거됩니다.`,
       confirmText: '삭제',
       tone: 'danger',
     });

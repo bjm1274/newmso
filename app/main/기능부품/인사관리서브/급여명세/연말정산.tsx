@@ -399,7 +399,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
 
   const sendCertificateEmail = async (staff: Record<string, unknown>) => {
     if (!staff?.staff_email) {
-      toast('직원 이메일이 등록되지 않아 발송할 수 없습니다.', 'success');
+      toast('직원 이메일이 등록되지 않아 발송할 수 없습니다.', 'warning');
       return;
     }
 
@@ -424,7 +424,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     const missingSchema = code.startsWith('PGRST') || message.includes('schema cache') || message.includes('Could not find the table');
     if (missingSchema) {
       console.warn('email_queue table is not configured:', error);
-      toast('이메일 큐가 설정되지 않아 메일을 보낼 수 없습니다. 다운로드 버튼으로 직접 저장해 주세요.', 'success');
+      toast('이메일 큐가 설정되지 않아 메일을 보낼 수 없습니다. 다운로드 버튼으로 직접 저장해 주세요.', 'warning');
       return;
     }
 

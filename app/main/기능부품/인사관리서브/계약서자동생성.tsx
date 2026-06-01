@@ -67,7 +67,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         staff_name: s.name || '',
         position: s.position || '',
         department: s.dept || s.department || '',
-        salary: s.base ? String(s.base) : '',
+        salary: s.base_salary ? String(s.base_salary) : '',
       }));
     }
   };

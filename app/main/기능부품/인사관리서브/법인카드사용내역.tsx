@@ -275,7 +275,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         }
         imported++;
       }
-      toast(failed > 0 ? `${imported}건 가져왔고 ${failed}건은 실패했습니다.` : `${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`, 'error');
+      toast(failed > 0 ? `${imported}건 가져왔고 ${failed}건은 실패했습니다.` : `${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`, failed > 0 ? 'warning' : 'success');
       fetchTransactions();
     } finally {
       setImporting(false);
@@ -308,7 +308,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         updated++;
       }
     }
-    toast(failed > 0 ? `${updated}건 자동 분류, ${failed}건 실패했습니다.` : `${updated}건 자동 분류 완료.`, 'error');
+    toast(failed > 0 ? `${updated}건 자동 분류, ${failed}건 실패했습니다.` : `${updated}건 자동 분류 완료.`, failed > 0 ? 'warning' : 'success');
     fetchTransactions();
   };
 

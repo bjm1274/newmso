@@ -155,14 +155,14 @@ export default function EducationList({
           if (!uploadRes.ok) {
             const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
             console.warn('Storage error, but continuing', errJson.error);
-            toast('파일 업로드 중 오류가 발생했습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'success');
+            toast('파일 업로드 중 오류가 발생했습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'warning');
           } else {
             const uploadData = (await uploadRes.json()) as { url: string };
             url = uploadData.url;
           }
         } catch (uploadErr) {
           console.warn('Storage error, but continuing', uploadErr);
-          toast('파일 업로드 중 권한 에러가 발생했을 수 있습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'success');
+          toast('파일 업로드 중 권한 에러가 발생했을 수 있습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'warning');
         }
       }
 

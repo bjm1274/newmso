@@ -138,7 +138,7 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
     기타: 0,
   };
   for (const s of active) {
-    const raw = String((s as Record<string, unknown>).employ_type ?? '').trim();
+    const raw = String((s as Record<string, unknown>).employment_type ?? '').trim();
     if (raw.includes('정규')) employTypeCounts.정규 += 1;
     else if (raw.includes('계약')) employTypeCounts.계약 += 1;
     else if (raw.includes('수습')) employTypeCounts.수습 += 1;

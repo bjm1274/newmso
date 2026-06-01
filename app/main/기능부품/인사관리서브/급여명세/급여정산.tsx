@@ -286,7 +286,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     if (noBase.length > 0) {
       const names = noBase.map((s: StaffMember) => s.name).join(', ');
       toast(`기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
-        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'success');
+        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'warning');
       return;
     }
 

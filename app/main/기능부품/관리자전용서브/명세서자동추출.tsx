@@ -265,7 +265,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
                             <span className="text-5xl opacity-30 mb-4">🪄</span>
                             <p className="text-sm font-bold text-[var(--toss-gray-4)]">AI 파싱 대기 중</p>
                             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mt-2 text-center max-w-xs">
-                                왼쪽에서 명세서 이미 지나 PDF 파일을 선택한 후<br />데이터 추출을 시작하세요.
+                                왼쪽에서 명세서 이미지나 PDF 파일을 선택한 후<br />데이터 추출을 시작하세요.
                             </p>
                         </div>
                     )}

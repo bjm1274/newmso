@@ -199,7 +199,7 @@ interface StaffRowProps {
 const StaffRow = memo(function StaffRow({ staff, selected, onSelect }: StaffRowProps) {
   const tone = pickToneForStaff(staff.name ?? '');
   const hire = pickHireDate(staff);
-  const employ = (staff as Record<string, unknown>).employ_type;
+  const employ = (staff as Record<string, unknown>).employment_type;
   const employText = typeof employ === 'string' ? employ : '정규직';
   const employCls = EMPLOY_CHIP[employText] ?? 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
   const initial = (staff.name ?? '?').charAt(0);
