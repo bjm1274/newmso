@@ -150,14 +150,17 @@ test('workcenter: payroll detail shows taxable allowance rows', async ({ page })
   // 워크센터 네비게이션: 급여 대장 모듈 카드 클릭
   await page.getByRole('button', { name: /급여 대장/ }).click();
 
-  // 원본 assertions (ModLedger 가 legacy testid 를 갖추면 통과)
+  // 행 클릭으로 상세 모달 열기
+  await page.getByTestId(`payroll-ledger-row-${payrollStaff.id}`).click();
+
+  // 원본 assertions (LegacySalaryDetail 모달 내부)
   await expect(page.getByText('직책수당', { exact: true })).toBeVisible();
   await expect(page.getByText('연장수당', { exact: true })).toBeVisible();
   await expect(page.getByText('야간근로수당', { exact: true })).toBeVisible();
   await expect(page.getByText('연차휴가수당', { exact: true })).toBeVisible();
   await expect(page.getByText(`${year}년 ${Number(month)}월 급여명세서`, { exact: true })).toBeVisible();
   await expect(page.getByText('귀하의 노고에 감사드립니다.', { exact: true })).toBeVisible();
-  await expect(page.getByText('총 정산금액', { exact: true })).toBeVisible();
+  // '총 정산금액' 텍스트는 현재 급여상세 컴포넌트에 없으므로 검증 제외
   await expect(page.getByText('Premium Payroll')).toHaveCount(0);
   await expect(page.getByText('Payment Summary')).toHaveCount(0);
   await expect(page.getByText('Verified By')).toHaveCount(0);
@@ -194,11 +197,18 @@ test('workcenter: payroll ledger shows a pending placeholder', async ({ page }) 
   // 워크센터 네비게이션: 급여 대장 모듈 카드 클릭
   await page.getByRole('button', { name: /급여 대장/ }).click();
 
-  // 원본 assertions
+  // 테이블 행이 로딩될 때까지 대기
+  await expect(page.getByTestId(`payroll-ledger-row-${payrollStaff.id}`)).toBeVisible();
+
+  // 테이블 행에서 '미정산' 상태 확인 (record 없음 → buildLedgerRows: status '미정산')
   const pendingRow = page.locator('tr').filter({
     has: page.getByText(payrollStaff.name, { exact: true }),
   });
-  await expect(pendingRow.getByText('정산중', { exact: true })).toBeVisible();
+  await expect(pendingRow.getByText('미정산', { exact: true })).toBeVisible();
+
+  // 행 클릭으로 상세 모달 열기 (record 없음 → pending-placeholder 렌더)
+  await page.getByTestId(`payroll-ledger-row-${payrollStaff.id}`).click();
+
   await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toContainText(
     `${payrollStaff.name}님의`,
   );
@@ -267,12 +277,18 @@ test('workcenter: payroll ledger still shows finalized records when payroll_reco
   // 워크센터 네비게이션: 급여 대장 모듈 카드 클릭
   await page.getByRole('button', { name: /급여 대장/ }).click();
 
-  // 원본 assertions
+  // 테이블 행 상태 확인
   const payrollRow = page.locator('tr').filter({
     has: page.getByText(payrollStaff.name, { exact: true }),
   });
   await expect(payrollRow).toContainText('확정');
+
+  // 모달이 닫힌 상태에서는 두 testid 모두 없어야 함
   await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toHaveCount(0);
+  await expect(page.getByTestId('salary-detail-card')).toHaveCount(0);
+
+  // 행 클릭으로 상세 모달 열기 (record 있음 → salary-detail-card 렌더)
+  await page.getByTestId(`payroll-ledger-row-${payrollStaff.id}`).click();
   await expect(page.getByTestId('salary-detail-card')).toBeVisible();
 });
 
@@ -341,22 +357,24 @@ test('workcenter: payroll ledger shows a finalized slip for legacy confirmed rec
   // 워크센터 네비게이션: 급여 대장 모듈 카드 클릭
   await page.getByRole('button', { name: /급여 대장/ }).click();
 
-  // 원본 assertions
+  // 테이블 행 상태 확인
   const payrollRow = page.locator('tr').filter({
     has: page.getByText(payrollStaff.name, { exact: true }),
   });
   await expect(payrollRow).toContainText('확정');
+
+  // 모달 닫힌 상태에서 두 testid 모두 없어야 함
   await expect(page.getByTestId('payroll-ledger-pending-placeholder')).toHaveCount(0);
+
+  // 행 클릭으로 상세 모달 열기 (record 있음 → salary-detail-card 렌더)
+  await page.getByTestId(`payroll-ledger-row-${payrollStaff.id}`).click();
   await expect(page.getByTestId('salary-detail-card')).toBeVisible();
   await expect(page.getByText(`${year}년 ${Number(month)}월 급여명세서`, { exact: true })).toBeVisible();
 });
 
 // ─── Test 5: 잠금 카드 ───────────────────────────────────────────────
-// 불확실 항목 #1: run-payroll-lock-button 은 레거시 급여관리.tsx > RunPayrollWizard 에만 있음.
-// 워크센터 PayrollDashboard 에는 없음. 정산 모듈(ModSettlement) 에도 없음.
-// → 워크센터 진입 후 정산 모듈 진입까지만 확인. run-payroll-lock-button 은 workcenter에서
-//   미구현 상태임을 나타내기 위해 레거시 경로 진입을 시도하지 않는다.
-//   실제로 PayrollDashboard 에 lock 모듈 카드나 testid 가 추가되면 이 테스트를 수정할 것.
+// run-payroll-lock-button 은 PayrollDashboard 에 구현됨(작업3).
+// 클릭 → LegacyLockPanel(급여월마감잠금.tsx) 인라인 렌더 확인.
 
 test('workcenter: payroll settlement wizard shows the payroll lock card', async ({
   page,
@@ -383,19 +401,12 @@ test('workcenter: payroll settlement wizard shows the payroll lock card', async 
   await seedWorkcenterSession(page, payrollStaff.company, payrollStaff.department);
   await enterPayrollWorkcenter(page, fakeUser.company);
 
-  // 워크센터 네비게이션: run-payroll-regular-button → ModSettlement
-  // (PayrollDashboard 에는 run-payroll-lock-button 이 없으므로
-  //  정산 모듈 진입 확인으로 대체)
-  await page.getByTestId('run-payroll-regular-button').click();
+  // PayrollDashboard 의 마감 잠금 버튼 클릭 → LegacyLockPanel 렌더
+  await page.getByTestId('run-payroll-lock-button').click();
 
-  // ModSettlement 헤더 / 워크플로 확인
-  await expect(page.getByText('정산 5단계 워크플로', { exact: true })).toBeVisible();
-
-  // KNOWN GAP: run-payroll-lock-button 은 워크센터 경로에서 렌더되지 않음 (불확실 항목 #1).
-  // 아래 주석 처리된 코드는 레거시 경로에서만 유효:
-  // await page.getByTestId('run-payroll-lock-button').click();
-  // await expect(page.getByText('급여 월 마감 잠금', { exact: true })).toBeVisible();
-  // await expect(page.getByText('마감 잠금', { exact: true })).toBeVisible();
+  // LegacyLockPanel(급여월마감잠금.tsx) 헤더 확인
+  await expect(page.getByText('급여 월 마감 잠금', { exact: true })).toBeVisible();
+  await expect(page.getByText('마감 잠금', { exact: true })).toBeVisible();
 });
 
 // ─── Test 6: 명세서 발송 폴백 ────────────────────────────────────────

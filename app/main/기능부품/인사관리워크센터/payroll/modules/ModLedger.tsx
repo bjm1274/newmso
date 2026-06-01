@@ -227,7 +227,22 @@ export default function ModLedger() {
                 </button>
               </div>
               <div className="p-2">
-                <LegacySalaryDetail record={record as any} staff={staff as any} />
+                {record ? (
+                  <LegacySalaryDetail record={record as any} staff={staff as any} />
+                ) : (
+                  <div
+                    data-testid="payroll-ledger-pending-placeholder"
+                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center"
+                  >
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--muted)] text-2xl">🧾</div>
+                    <h3 className="mt-4 text-xl font-bold text-[var(--foreground)]">
+                      {staff?.name}님의 급여는 아직 정산중입니다
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--toss-gray-3)]">
+                      급여정산에서 저장 또는 확정한 뒤 다시 확인해 주세요.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

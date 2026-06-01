@@ -559,11 +559,11 @@ test('workcenter: insurance EDI lists only finalized payroll staff for the selec
   await expect(page.getByTestId('insurance-edi-view')).toBeVisible();
   // insurance-edi-count는 InsuranceEDI 컴포넌트에 있음
   await expect(page.getByTestId('insurance-edi-count')).toContainText('1명');
-  // 확정 직원명은 표에 있어야 함
-  await expect(page.getByText(confirmedStaff.name, { exact: true })).toBeVisible();
+  // 확정 직원명은 표에 있어야 함 (테이블 셀 컨텍스트로 범위 제한)
+  await expect(page.getByTestId('insurance-edi-view').getByText(confirmedStaff.name, { exact: true }).first()).toBeVisible();
   // 임시저장·미정산 직원은 표에 없어야 함
-  await expect(page.getByText(draftStaff.name, { exact: true })).toHaveCount(0);
-  await expect(page.getByText(missingStaff.name, { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('insurance-edi-view').getByText(draftStaff.name, { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('insurance-edi-view').getByText(missingStaff.name, { exact: true })).toHaveCount(0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
