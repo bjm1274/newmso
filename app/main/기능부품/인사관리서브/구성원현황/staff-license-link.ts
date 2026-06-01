@@ -58,7 +58,7 @@ export async function fetchStaffLicensesGrouped(
   staffIds: (string | number)[],
 ): Promise<StaffLicensesGrouped> {
   const normalizedIds = Array.from(
-    new Set(staffIds.map((value) => String(value).trim()).filter(Boolean)),
+    new Set(staffIds.map((value) => String(value).toLowerCase().trim()).filter(Boolean)),
   );
   if (normalizedIds.length === 0) return {};
 
@@ -79,8 +79,9 @@ export async function fetchStaffLicensesGrouped(
     for (const raw of Array.isArray(data) ? data : []) {
       const row = normalizeLicenseRow(raw);
       if (!row) continue;
-      if (!grouped[row.staff_id]) grouped[row.staff_id] = [];
-      grouped[row.staff_id].push(row);
+      const key = row.staff_id.toLowerCase().trim();
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(row);
     }
     return grouped;
   } catch (error) {

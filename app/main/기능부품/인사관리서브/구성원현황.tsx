@@ -718,6 +718,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, []);
 
   useEffect(() => {
+    if (근무형태목록.length === 0) return; // 근무형태 목록이 아직 비어 있으면 필터링 처리를 보류한다.
+
     const visibleShiftIds = new Set(
       getVisibleShiftOptions(신규직원.사업체).map((shift: StaffMember) => String(shift.id)),
     );
@@ -874,7 +876,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 직원고용형태 = (직원: StaffMember): string => getStaffEmploymentType(직원);
   // staff_licenses 기준 면허 요약 (0건 '-', 1건 이름, N건 'X 외 N-1건')
   const 직원면허요약 = (직원: StaffMember) =>
-    summarizeLicenses(licensesByStaff[String(직원.id)]);
+    summarizeLicenses(licensesByStaff[String(직원.id || '').toLowerCase().trim()]);
   const 직원연락요약 = (직원: StaffMember) => {
     const extension = getStaffExtension(직원);
     const parts = [
@@ -1112,7 +1114,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         overtime_allowance: 신규직원.overtime_allowance ?? 0,
         night_work_allowance: 신규직원.night_work_allowance ?? 0,
         holiday_work_allowance: 신규직원.holiday_work_allowance ?? 0,
-        annual_leave_pay: 신규직원.annual_leave_pay ?? 0
+        annual_leave_pay: 신규직원.annual_leave_pay ?? 0,
+        agreed_overtime_allowance: 신규직원.agreed_overtime_allowance ?? 0,
+        agreed_night_allowance: 신규직원.agreed_night_allowance ?? 0
       };
 
       if (편집모드 && 선택된직원ID) {
@@ -1334,7 +1338,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
     const extensionValue = getStaffExtension(직원);
     // staff_licenses 첫 번째 row를 폼에 로드 (없으면 빈 값 + null)
-    const 직원면허목록 = licensesByStaff[String(직원.id)] || [];
+    const cleanStaffId = String(직원.id || '').toLowerCase().trim();
+    const 직원면허목록 = licensesByStaff[cleanStaffId] || [];
     const 첫면허 = 직원면허목록[0] ?? null;
     편집중면허ID설정(첫면허?.id ?? null);
     const ins = (직원.permissions?.insurance as Record<string, unknown>) || { national: true, health: true, employment: true, injury: true };
@@ -1512,7 +1517,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       });
   }, [appliedStaffNameSearch, 보기상태, 선택사업체, 직원목록]);
   const 면허등록인원수 = 필터목록.filter(
-    (직원: StaffMember) => (licensesByStaff[String(직원.id)]?.length ?? 0) > 0,
+    (직원: StaffMember) => (licensesByStaff[String(직원.id || '').toLowerCase().trim()]?.length ?? 0) > 0,
   ).length;
   const 계약직인원수 = 필터목록.filter((직원: StaffMember) => 직원고용형태(직원) === '계약직').length;
   const 부서수 = new Set(필터목록.map((직원: StaffMember) => 직원.department).filter(Boolean)).size;
@@ -1592,7 +1597,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         <div>
           <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
           <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-            취득일 {licensesByStaff[String(직원.id)]?.[0]?.issued_date || '-'}
+            취득일 {licensesByStaff[String(직원.id || '').toLowerCase().trim()]?.[0]?.issued_date || '-'}
           </p>
         </div>
       ),
@@ -1939,9 +1944,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         <p className="text-[10px] font-semibold text-amber-700">
                           만료일·갱신일·다중 면허는 자격안전센터에서 관리됩니다.
                         </p>
-                        {편집모드 && (licensesByStaff[String(선택된직원ID)]?.length ?? 0) >= 2 && (
+                        {편집모드 && (licensesByStaff[String(선택된직원ID || '').toLowerCase().trim()]?.length ?? 0) >= 2 && (
                           <p className="text-[10px] font-bold text-amber-800 bg-amber-100 rounded-[var(--radius-md)] px-2 py-1">
-                            이 직원은 면허 {licensesByStaff[String(선택된직원ID)]?.length}건 — 여기서는 첫 번째 면허만 수정됩니다
+                            이 직원은 면허 {licensesByStaff[String(선택된직원ID || '').toLowerCase().trim()]?.length}건 — 여기서는 첫 번째 면허만 수정됩니다
                           </p>
                         )}
                         <div className="grid grid-cols-2 gap-3">
