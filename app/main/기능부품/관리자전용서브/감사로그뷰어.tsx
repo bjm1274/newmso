@@ -5,17 +5,11 @@ import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
+import { escapeLikePattern } from '@/lib/like-escape';
 
 const PAGE_SIZE = 100;
 const ROW_HEIGHT = 36; // 각 행의 고정 높이 (px)
 const LIST_HEIGHT = 500; // 가상 스크롤 영역 높이 (px)
-
-// 사용자 입력의 LIKE 와일드카드(%, _)와 이스케이프 문자(\)를 리터럴로 처리.
-// d1/query 라우트가 `ESCAPE '\'`로 emit하므로 백슬래시 접두로 이스케이프한다.
-// `\`를 먼저 치환해야 이중 이스케이프되지 않으며, %term% 래핑으로 부분일치는 유지된다.
-function escapeLikePattern(input: string): string {
-  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
 
 // react-window v2: rowProps로 전달할 커스텀 props
 interface AuditRowProps {

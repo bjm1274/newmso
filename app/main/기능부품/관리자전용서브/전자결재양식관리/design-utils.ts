@@ -50,24 +50,8 @@ export const BUILTIN_TEMPLATE_DEFAULTS: Record<string, TemplateDesign> = {
   payroll_slip: { title: '급여 명세서', primaryColor: '#163b70', borderColor: '#d8e1ee', sealLabel: '급여 직인' },
 };
 
-export function alphaColor(hexColor: string | undefined, alpha: number) {
-  if (!hexColor) return `rgba(21, 94, 239, ${alpha})`;
-  const cleaned = hexColor.replace('#', '');
-  const expanded =
-    cleaned.length === 3
-      ? cleaned
-          .split('')
-          .map((char) => `${char}${char}`)
-          .join('')
-      : cleaned;
-
-  if (expanded.length !== 6) return `rgba(21, 94, 239, ${alpha})`;
-
-  const r = parseInt(expanded.slice(0, 2), 16);
-  const g = parseInt(expanded.slice(2, 4), 16);
-  const b = parseInt(expanded.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+// 색상 유틸은 lib/color-utils로 통합(전자결재-utils와 중복 제거). 호환 위해 re-export.
+export { alphaColor } from '@/lib/color-utils';
 
 export function resolveCompanyLabelValue(value: string | undefined, fallback: string) {
   const trimmed = String(value || '').trim();

@@ -3,14 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatPatientBedLabel, normalizeHandoverNote, type HandoverNoteRow } from '@/lib/handover-notes';
-
-// 사용자 입력의 LIKE 와일드카드(%, _)와 이스케이프 문자(\)를 리터럴로 처리.
-// d1/query 라우트가 `ESCAPE '\'`로 emit하므로 백슬래시 접두로 이스케이프한다.
-// `\`를 먼저 치환해야 이후 추가되는 백슬래시가 이중 이스케이프되지 않는다.
-// %term% 래핑은 호출부에서 유지하므로 부분일치 동작은 변하지 않는다.
-function escapeLikePattern(input: string): string {
-  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
+import { escapeLikePattern } from '@/lib/like-escape';
 
 type SearchType = 'staff' | 'post' | 'approval' | 'message' | 'handover';
 
