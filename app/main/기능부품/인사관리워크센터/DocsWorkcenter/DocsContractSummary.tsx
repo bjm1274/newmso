@@ -59,6 +59,7 @@ function pickEmployTone(employ: string): ContractRow['employTone'] {
 
 function pickStatusTone(endDate: string | null, statusRaw: string): { status: string; tone: ContractRow['statusTone'] } {
   if (statusRaw === '종료' || statusRaw === '해지') return { status: statusRaw, tone: 'muted' };
+  if (statusRaw === '서명대기') return { status: '서명대기', tone: 'warn' };
   const days = daysUntil(endDate);
   if (days === null) return { status: '유효', tone: 'success' };
   if (days < 0) return { status: '만료', tone: 'muted' };
@@ -80,25 +81,50 @@ export default function DocsContractSummary() {
       try {
         const { data, error } = await supabase
           .from('employment_contracts')
-          .select('id, staff_name, employ_type, contract_kind, start_date, end_date, auto_renew, status')
-          .order('end_date', { ascending: true, nullsFirst: false })
+          .select(`
+            id,
+            status,
+            contract_type,
+            effective_date,
+            probation_months,
+            staff_id,
+            staff_members (
+              name,
+              joined_at,
+              join_date,
+              permissions
+            )
+          `)
+          .order('created_at', { ascending: false })
           .limit(40);
         if (cancelled) return;
         if (error) throw error;
-        const list = (data as Array<Record<string, unknown>> | null) ?? [];
+        const list = (data as Array<Record<string, any>> | null) ?? [];
         const items: ContractRow[] = list.map((r) => {
-          const employ = String(r.employ_type ?? '정규직');
-          const endRaw = r.end_date ? String(r.end_date) : null;
+          const staff = r.staff_members;
+          const name = staff?.name ?? '직원';
+
+          // 고용 유형 파악
+          let employ = '정규직';
+          if (staff?.permissions) {
+            const perms = staff.permissions;
+            employ = perms.employment_type || perms.current_work_type || '정규직';
+          }
+
+          const startRaw = staff?.joined_at || staff?.join_date || r.effective_date || null;
+          const endRaw = staff?.permissions?.contract_end_date || null;
+          const autoRenew = staff?.permissions?.auto_renew || false;
+
           const statusRaw = String(r.status ?? '');
           const { status, tone: statusTone } = pickStatusTone(endRaw, statusRaw);
           return {
             id: String(r.id ?? ''),
-            name: String(r.staff_name ?? '직원'),
+            name,
             employ,
-            kind: String(r.contract_kind ?? '근로계약'),
-            start: formatDate(r.start_date),
-            end: endRaw ? formatDate(r.end_date) : '영구',
-            auto: r.auto_renew ? '자동 연장' : '-',
+            kind: String(r.contract_type ?? '근로계약'),
+            start: formatDate(startRaw),
+            end: endRaw ? formatDate(endRaw) : '영구',
+            auto: autoRenew ? '자동 연장' : '-',
             status,
             employTone: pickEmployTone(employ),
             statusTone,

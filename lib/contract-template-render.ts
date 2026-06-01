@@ -412,6 +412,7 @@ export function fillEmploymentContractTemplate(
         probationStart = formatDate(startD);
         const endD = new Date(startD);
         endD.setMonth(endD.getMonth() + probationMonthsNum);
+        endD.setDate(endD.getDate() - 1);
         probationEnd = formatDate(endD);
       }
     }

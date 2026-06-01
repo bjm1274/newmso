@@ -269,6 +269,54 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
   };
   const { error } = await supabase.from('leave_requests').insert(payload);
   if (error) throw new Error(error.message);
+
+  // 전자결재(approvals)에도 함께 기안 상신 등록
+  try {
+    const { data: staffData } = await supabase
+      .from('staff_members')
+      .select('name, company, company_id, department, position')
+      .eq('id', input.staffId)
+      .maybeSingle();
+
+    const { data: adminData } = await supabase
+      .from('staff_members')
+      .select('id, name')
+      .or("role.eq.admin,permissions->>admin.eq.true")
+      .limit(1);
+
+    const adminId = adminData?.[0]?.id || null;
+    const staffName = staffData?.name || '직원';
+
+    let titleType = '연차 사용 신청';
+    if (input.leaveType === '연차(부여)') titleType = '연차 신규 부여';
+    else if (input.leaveType === '연차(과거사용)') titleType = '도입 전 사용 소급';
+
+    const approvalPayload = {
+      company_id: staffData?.company_id || null,
+      sender_id: input.staffId,
+      sender_name: staffName,
+      sender_company: staffData?.company || 'SY INC.',
+      type: '연차/휴가',
+      title: `[연차/휴가] ${staffName} - ${titleType}`,
+      content: input.reason || '',
+      status: '대기',
+      current_approver_id: adminId,
+      meta_data: {
+        startDate: input.startDate,
+        endDate: input.endDate || input.startDate,
+        leaveType: input.leaveType,
+        reason: input.reason || '',
+        days: input.days,
+        approver_line: adminId ? [adminId] : [],
+        cc_departments: ['행정팀']
+      },
+      created_at: new Date().toISOString()
+    };
+
+    await supabase.from('approvals').insert(approvalPayload);
+  } catch (err) {
+    console.error('전자결재 상신 등록 중 오류 발생:', err);
+  }
 }
 
 // ─── 소멸 권고 알림 ────────────────────────────────────────────────
