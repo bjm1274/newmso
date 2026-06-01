@@ -61,17 +61,25 @@ export function resolveWeeklyWorkingHours(source: unknown, fallback = 40) {
   const resolved = resolveNestedWorkCondition(source, 'working_hours_per_week');
   return resolved !== undefined ? resolved : toNumber(source as NumericInput, fallback);
 }
-
 export function resolveWorkingDaysPerWeek(source: unknown, fallback = 5) {
   const resolved = resolveNestedWorkCondition(source, 'working_days_per_week');
   return resolved !== undefined ? resolved : toNumber(source as NumericInput, fallback);
 }
 
-export function getMonthlyWorkingHours(weeklyHours: NumericInput) {
+export function getMonthlyWorkingHours(weeklyHours: NumericInput, isAlternateDayShift?: boolean) {
   const normalizedWeeklyHours = toNumber(weeklyHours, 40);
 
   if (normalizedWeeklyHours <= 0) {
     return MONTHLY_STANDARD_HOURS;
+  }
+
+  if (isAlternateDayShift) {
+    const dailyHours = normalizedWeeklyHours / 3.5;
+    const weeklyBase = Math.min(8, dailyHours) * 3.5;
+    const weeklyOvertime = Math.max(0, dailyHours - 8) * 3.5;
+    const hBase = Math.round(MONTHLY_STANDARD_HOURS * (weeklyBase / 40) * 10) / 10;
+    const hOver = weeklyOvertime * 4.345 * 1.5;
+    return Math.max(1, Math.round((hBase + hOver) * 10) / 10);
   }
 
   return Math.max(
@@ -84,8 +92,9 @@ export function calculateHourlyRateFromMonthlySalary(
   monthlySalary: NumericInput,
   weeklyHours: NumericInput,
   rounding: HourlyRateRounding = 'ceil',
+  isAlternateDayShift?: boolean,
 ) {
-  const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours);
+  const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours, isAlternateDayShift);
   const normalizedMonthlySalary = Math.max(0, toNumber(monthlySalary));
   const rawHourlyRate = monthlyWorkingHours > 0 ? normalizedMonthlySalary / monthlyWorkingHours : 0;
 

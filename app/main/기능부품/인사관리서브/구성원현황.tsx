@@ -239,7 +239,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     let hBase = getMonthlyWorkingHours(wHours);
     let hOver = 0;
 
-    if (wHours > 40) {
+    const primaryShift = 근무형태목록.find(s => String(s.id) === String(신규직원.근무형태ID));
+    const isAlternateDayShift = primaryShift?.shift_type === '1일근무1일휴무';
+
+    if (isAlternateDayShift) {
+      const dailyHours = wHours / 3.5;
+      const dailyOvertime = Math.max(0, dailyHours - 8);
+      const weeklyBase = Math.min(8, dailyHours) * 3.5;
+      const weeklyOvertime = dailyOvertime * 3.5;
+
+      hBase = getMonthlyWorkingHours(weeklyBase);
+      hOver = weeklyOvertime * 4.345 * 1.5;
+    } else if (wHours > 40) {
       hBase = 209;
       hOver = (wHours - 40) * 4.345 * 1.5;
     }
@@ -271,7 +282,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       agreed_night_allowance: calculatedAgreedNight,
       message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)`,
     };
-  }, [targetSalaryInput, targetNightHoursInput, 신규직원.meal_allowance, 신규직원.vehicle_allowance, 신규직원.childcare_allowance, 신규직원.research_allowance, 신규직원.other_taxfree, 신규직원.position_allowance, 신규직원.working_hours_per_week, previewMinimumWage]);
+  }, [targetSalaryInput, targetNightHoursInput, 신규직원.meal_allowance, 신규직원.vehicle_allowance, 신규직원.childcare_allowance, 신규직원.research_allowance, 신규직원.other_taxfree, 신규직원.position_allowance, 신규직원.working_hours_per_week, 신규직원.근무형태ID, 근무형태목록, previewMinimumWage]);
 
   const handleApplySplit = () => {
     if (!reverseCalculateSplit || !reverseCalculateSplit.isValid) {
@@ -359,13 +370,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     신규직원.research_allowance,
     신규직원.other_taxfree,
   ]);
+  const primaryShift = useMemo(
+    () => 근무형태목록.find(s => String(s.id) === String(신규직원.근무형태ID)),
+    [근무형태목록, 신규직원.근무형태ID]
+  );
+  const isAlternateDayShift = !!(primaryShift?.shift_type === '1일근무1일휴무');
+
   const monthlyWorkingHours = useMemo(
-    () => getMonthlyWorkingHours(신규직원.working_hours_per_week),
-    [신규직원.working_hours_per_week],
+    () => getMonthlyWorkingHours(신규직원.working_hours_per_week, isAlternateDayShift),
+    [신규직원.working_hours_per_week, isAlternateDayShift],
   );
   const rawHourlySalaryAmount = useMemo(
-    () => calculateHourlyRateFromMonthlySalary(ordinarySalaryTotal, 신규직원.working_hours_per_week, 'ceil'),
-    [신규직원.working_hours_per_week, ordinarySalaryTotal],
+    () => calculateHourlyRateFromMonthlySalary(ordinarySalaryTotal, 신규직원.working_hours_per_week, 'ceil', isAlternateDayShift),
+    [신규직원.working_hours_per_week, ordinarySalaryTotal, isAlternateDayShift],
   );
   const hasHourlyPremiumAdjustments = useMemo(
     () =>

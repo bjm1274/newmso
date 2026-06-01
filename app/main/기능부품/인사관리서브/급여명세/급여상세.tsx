@@ -169,6 +169,8 @@ interface StaffInfo {
   research_allowance?: number;
   other_taxfree?: number;
   working_hours_per_week?: number;
+  shift_type?: string | null;
+  isAlternateDayShift?: boolean;
 }
 
 export default function SalaryDetail({
@@ -318,8 +320,9 @@ export default function SalaryDetail({
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
   const advancePayAmount = toNumber(record?.advance_pay);
   const isAdvancePay = advancePayAmount > 0;
+  const isAlternateDayShift = !!(staff?.isAlternateDayShift || staff?.shift_type === '1일근무1일휴무');
   const weeklyHours = resolveWeeklyWorkingHours(staff, 40);
-  const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours);
+  const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours, isAlternateDayShift);
   const fixedMonthlySalary =
     toNumber(data.base_salary) +
     toNumber(data.extra_allowance) +
@@ -329,7 +332,7 @@ export default function SalaryDetail({
     toNumber(data.childcare_allowance) +
     toNumber(data.research_allowance) +
     toNumber(data.other_taxfree);
-  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, weeklyHours, 'ceil');
+  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, weeklyHours, 'ceil', isAlternateDayShift);
   const settlementAmount = isAdvancePay ? advancePayAmount : calc.net;
 
   const taxableAllowanceBreakdown = useMemo(() => {
