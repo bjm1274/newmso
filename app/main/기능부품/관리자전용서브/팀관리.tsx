@@ -17,6 +17,13 @@ import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
 const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
 
+/** SY INC. DB 저장값(레거시 포함)을 UI division 값으로 변환 */
+function toUIDivision(dbDivision: string): string {
+  if (dbDivision === '총무부') return '운영본부';
+  if (dbDivision === '진료부') return '전략기획본부';
+  return dbDivision;
+}
+
 type TeamManagerProps = {
   onRefresh?: () => void;
   selectedCompany?: string;
@@ -139,15 +146,10 @@ function TeamManagerDesktop({
   const handleAdd = async () => {
     if (disabled || !effectiveCompany) return toast('회사명을 먼저 입력해 주세요.', 'warning');
     if (!newTeam.team_name.trim()) return toast('팀명을 입력하세요.', 'warning');
-    const resolvedDivision =
-      effectiveCompany === 'SY INC.'
-        ? newTeam.division === '운영본부'
-          ? '총무부'
-          : '진료부'
-        : newTeam.division;
+    const resolvedDivision = newTeam.division;
     const siblings = teams.filter((t) => {
       if (effectiveCompany === 'SY INC.') {
-        return newTeam.division === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+        return toUIDivision(t.division) === newTeam.division;
       }
       return t.division === newTeam.division;
     });
@@ -186,10 +188,8 @@ function TeamManagerDesktop({
   const startEdit = (team: OrgTeam) => {
     setEditingTeam(team);
     setEditingName(team.team_name);
-    let uiDivision = team.division;
-    if (effectiveCompany === 'SY INC.') {
-      uiDivision = team.division === '총무부' ? '운영본부' : '전략기획본부';
-    }
+    const uiDivision =
+      effectiveCompany === 'SY INC.' ? toUIDivision(team.division) : team.division;
     setEditingDivision(uiDivision);
     
     let initialShifts: string[] = [];
@@ -206,13 +206,8 @@ function TeamManagerDesktop({
   const handleSaveEdit = async () => {
     if (!editingTeam) return;
     if (!editingName.trim()) return toast('팀명을 입력하세요.', 'warning');
-    
-    const resolvedDivision =
-      effectiveCompany === 'SY INC.'
-        ? editingDivision === '운영본부'
-          ? '총무부'
-          : '진료부'
-        : editingDivision;
+
+    const resolvedDivision = editingDivision;
         
     const { error } = await updateOrgTeam({
       id: editingTeam.id,
@@ -235,7 +230,7 @@ function TeamManagerDesktop({
   const byDivision = currentDivisions.map((d) => ({
     name: d,
     teams: teams.filter((t) => {
-      if (effectiveCompany === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+      if (effectiveCompany === 'SY INC.') return toUIDivision(t.division) === d;
       return t.division === d;
     }),
   }));

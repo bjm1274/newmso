@@ -117,7 +117,7 @@ export default function AttendanceForms({
         .gte('date', dateString)
         .order('date', { ascending: false });
 
-      const { data: workSchedules } = await supabase.from('work_schedules').select('*');
+      const { data: workSchedules } = await supabase.from('work_shifts').select('*');
 
       setAttendanceRows(attendance || []);
       setSchedules(workSchedules || []);
@@ -131,7 +131,7 @@ export default function AttendanceForms({
 
   const calculateOT = (record: any): number => {
     const staff = staffRows.find((item) => item.id === currentUser.id);
-    const schedule = schedules.find((item: any) => item.id === staff?.schedule_id);
+    const schedule = schedules.find((item: any) => item.id === staff?.shift_id);
     if (!record?.check_out || !schedule?.end_time) return 0;
 
     const actualOut = new Date(record.check_out);

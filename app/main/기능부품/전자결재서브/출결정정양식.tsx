@@ -339,7 +339,6 @@ export default function AttendanceCorrectionForm({
         reason: reason.trim(),
         correction_type: correctionType,
         requested_at: requestedAt,
-        approval_status: '대기',
         status: '대기',
       }));
 
@@ -347,7 +346,7 @@ export default function AttendanceCorrectionForm({
         () => supabase.from('attendance_corrections').insert(rows),
         () => {
           const legacyRows = rows.map(
-            ({ attendance_date, requested_at, approval_status, ...rest }) => rest
+            ({ attendance_date, requested_at, ...rest }) => rest
           );
           return supabase.from('attendance_corrections').insert(legacyRows);
         }

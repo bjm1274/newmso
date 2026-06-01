@@ -450,10 +450,7 @@ export async function processFinalApprovalEffects(
         reason: String(itemMetaData?.correction_reason || item.content || ''),
         correction_type: correctionType,
         requested_at: approvedAt,
-        approval_status: '승인',
         status: '승인',
-        approved_by: actorId || null,
-        approved_at: approvedAt,
       }));
 
       await upsertAttendanceCorrectionRows(correctionRows);

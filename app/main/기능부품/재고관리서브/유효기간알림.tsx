@@ -41,7 +41,7 @@ function getItemSupplier(item: InventoryExpiryItem) {
 }
 
 function getItemExpiryDate(item: InventoryExpiryItem) {
-  return String(item?.expiration_date || item?.expiry_date || '').trim();
+  return String(item?.expiry_date || item?.expiration_date || '').trim();
 }
 
 function buildExpirationSummaryAlertKey(
@@ -198,13 +198,17 @@ export default function ExpirationAlert() {
     const { data: expiring } = await supabase
       .from('inventory')
       .select('*')
-      .lte('expiration_date', sixMonthsLaterKey)
-      .gte('expiration_date', todayKey);
+      .or(
+        `expiry_date.lte.${sixMonthsLaterKey},expiration_date.lte.${sixMonthsLaterKey}`,
+      )
+      .or(
+        `expiry_date.gte.${todayKey},expiration_date.gte.${todayKey}`,
+      );
 
     const { data: expired } = await supabase
       .from('inventory')
       .select('*')
-      .lt('expiration_date', todayKey);
+      .or(`expiry_date.lt.${todayKey},expiration_date.lt.${todayKey}`);
 
     const nextExpiring = Array.isArray(expiring) ? expiring : [];
     const nextExpired = Array.isArray(expired) ? expired : [];

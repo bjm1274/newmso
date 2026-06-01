@@ -10,7 +10,6 @@ import { getItemQuantity, getItemMinQuantity, getItemName } from '@/app/main/inv
 type ConsumptionLog = {
   id: string;
   item_id: string;
-  item_name?: string;
   quantity: number;
   actor_name: string;
   created_at: string;
@@ -60,6 +59,12 @@ export default function DepartmentConsumption({
   const lowStockCount = useMemo(
     () => deptInventory.filter((i) => getItemQuantity(i) <= getItemMinQuantity(i)).length,
     [deptInventory],
+  );
+
+  // inventory_logs에 item_name 컬럼이 없으므로 item_id → 품목명 맵을 prop에서 구성
+  const itemNameMap = useMemo(
+    () => new Map(inventory.map((item) => [item.id, getItemName(item)])),
+    [inventory],
   );
 
   // 소모 이력 조회
@@ -232,7 +237,7 @@ export default function DepartmentConsumption({
               <div key={log.id} className="flex items-center justify-between px-4 py-2.5">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-[var(--foreground)]">
-                    {String((log as Record<string, unknown>).item_name || '')} <span className="text-[var(--accent)] font-bold">{log.quantity}개</span> 사용
+                    {itemNameMap.get(log.item_id) ?? '(품목 미상)'} <span className="text-[var(--accent)] font-bold">{log.quantity}개</span> 사용
                   </p>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">{log.actor_name}{log.notes ? ` · ${log.notes}` : ''}</p>
                 </div>
