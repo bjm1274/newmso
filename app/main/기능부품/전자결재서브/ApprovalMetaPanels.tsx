@@ -514,10 +514,12 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
     </th>`;
   }).join('');
 
+  const resolvedBands = new Set<string>();
   const bodyRows = staffRows.map(row => {
     const cellsHtml = daysArray.map(d => {
       const shift = row.cells[d] || '휴무';
       const band = resolveBand(shift);
+      resolvedBands.add(band);
       const style = getStyleForBand(band);
       const shortLabel = band === 'day' ? 'D' : band === 'evening' ? 'E' : band === 'night' ? 'N' : 'OFF';
       return `<td style="text-align:center;padding:4px 2px;font-size:9px;border:1px solid #cbd5e1;font-weight:bold;${style}" title="${escapeHtml(shift)}">
@@ -530,6 +532,13 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
       ${cellsHtml}
     </tr>`;
   }).join('');
+
+  const legendHtml = [
+    resolvedBands.has('day') ? `<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ecfdf5;border:1px solid #a7f3d0;"></span> D · 데이</span>` : '',
+    resolvedBands.has('evening') ? `<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fff7ed;border:1px solid #fed7aa;"></span> E · 이브닝</span>` : '',
+    resolvedBands.has('night') ? `<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eef2ff;border:1px solid #c7d2fe;"></span> N · 나이트</span>` : '',
+    resolvedBands.has('off') ? `<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f8fafc;border:1px solid #e2e8f0;"></span> OFF · 휴무</span>` : '',
+  ].filter(Boolean).join('\n');
 
   return `
     <div class="section" style="margin-top:16px;">
@@ -548,10 +557,7 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
         </table>
       </div>
       <div style="display:flex;gap:12px;font-size:10px;color:#64748b;font-weight:600;margin-top:4px;">
-        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ecfdf5;border:1px solid #a7f3d0;"></span> D · 데이</span>
-        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#fff7ed;border:1px solid #fed7aa;"></span> E · 이브닝</span>
-        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#eef2ff;border:1px solid #c7d2fe;"></span> N · 나이트</span>
-        <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f8fafc;border:1px solid #e2e8f0;"></span> OFF · 휴무</span>
+        ${legendHtml}
       </div>
     </div>
   `;
@@ -644,6 +650,14 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
     return 'day';
   };
 
+  const resolvedBands = new Set<string>();
+  staffRows.forEach((row: { staffName: string; cells: Record<number, string> }) => {
+    daysArray.forEach((d: number) => {
+      const shift = row.cells[d] || '휴무';
+      resolvedBands.add(resolveBand(shift));
+    });
+  });
+
   const getStyleForBand = (band: string) => {
     switch (band) {
       case 'day': return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400';
@@ -697,10 +711,18 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
         </table>
       </div>
       <div className="flex flex-wrap gap-4 mt-3 text-[11px] font-semibold text-[var(--toss-gray-4)]">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-300"></span> D · 데이</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400 border border-amber-300"></span> E · 이브닝</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-indigo-600 border border-indigo-400"></span> N · 나이트</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-300"></span> OFF · 휴무</span>
+        {resolvedBands.has('day') && (
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500 border border-emerald-300"></span> D · 데이</span>
+        )}
+        {resolvedBands.has('evening') && (
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-400 border border-amber-300"></span> E · 이브닝</span>
+        )}
+        {resolvedBands.has('night') && (
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-indigo-600 border border-indigo-400"></span> N · 나이트</span>
+        )}
+        {resolvedBands.has('off') && (
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-100 border border-slate-300"></span> OFF · 휴무</span>
+        )}
       </div>
     </div>
   );

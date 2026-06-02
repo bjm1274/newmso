@@ -21,10 +21,10 @@ const POLL_META_SUFFIX = '[[/POLL_META]]';
 const RESIGNED_STATUSES = new Set(['\uD1F4\uC0AC', '\uD1F4\uC9C1']);
 
 /**
- * \uC11C\uBC84(D1) \uD0C0\uC784\uC2A4\uD0EC\uD504\uB97C Date\uB85C \uD30C\uC2F1\uD55C\uB2E4.
- * D1(SQLite)\uC758 CURRENT_TIMESTAMP\uB294 KST \uD604\uC7AC \uC2DC\uAC01 "YYYY-MM-DD HH:MM:SS" \uD615\uC2DD\uC73C\uB85C \uC800\uC7A5\uB418\uBBC0\uB85C
- * timezone \uD45C\uAE30\uAC00 \uC5C6\uB294 \uBB38\uC790\uC5F4\uC740 KST(+09:00)\uB85C \uAC04\uC8FC\uD574 '+09:00' \uC624\uD504\uC14B\uC744 \uBD99\uC5EC \uD30C\uC2F1\uD55C\uB2E4.
- * \uC774\uBBF8 'Z'\u00B7\uC624\uD504\uC14B\uC774 \uC788\uB294 ISO \uBB38\uC790\uC5F4(\uD074\uB77C\uC774\uC5B8\uD2B8 optimistic \uBA54\uC2DC\uC9C0 \uB4F1)\uC740 \uADF8\uB300\uB85C \uD30C\uC2F1.
+ * 서버(D1) 타임스탬프를 Date로 파싱한다.
+ * D1(SQLite)의 CURRENT_TIMESTAMP는 UTC 현재 시각 "YYYY-MM-DD HH:MM:SS" 형식으로 저장되므로
+ * timezone 표기가 없는 문자열은 UTC로 간주해 '+00:00' 오프셋을 붙여 파싱해야 올바르게 현지 시간(KST)으로 렌더링됩니다.
+ * 이미 'Z'·오프셋이 있는 ISO 문자열(클라이언트 optimistic 메시지 등)은 그대로 파싱.
  */
 export function toChatDate(value?: string | number | null): Date {
   if (value === null || value === undefined || value === '') return new Date(0);
@@ -32,9 +32,9 @@ export function toChatDate(value?: string | number | null): Date {
   const raw = String(value).trim();
   if (!raw) return new Date(0);
   if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  // D1(SQLite) CURRENT_TIMESTAMP는 timezone 표기 없는 KST 로컬 문자열
-  // → +09:00 오프셋을 붙여 KST 기준으로 파싱한다.
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
+  // D1(SQLite) CURRENT_TIMESTAMP는 timezone 표기 없는 UTC 문자열
+  // → +00:00 오프셋을 붙여 UTC 기준으로 파싱한다.
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+00:00`);
   return new Date(raw);
 }
 
