@@ -696,6 +696,42 @@ export function useApprovalSubmit({
       toast('결재 문서는 상신됐지만 문서보관함 저장에는 실패했습니다.', 'warning');
     }
     await createApprovalReferenceNotifications((insertedApproval as ApprovalRecord | null) ?? row);
+
+    // Fix C: 첫 번째 결재자에게 결재 요청 알림 전송
+    try {
+      const firstApproverStaffId = String(approverLine[0]?.id || '').trim();
+      const resolvedFirstApproverId = firstApproverStaffId
+        ? (resolveEffectiveApproverId(firstApproverStaffId) || firstApproverStaffId)
+        : '';
+      if (resolvedFirstApproverId) {
+        const submittedApproval = (insertedApproval as ApprovalRecord | null) ?? row;
+        const approvalTitle = String(submittedApproval.title || formTitle || '전자결재 문서');
+        const senderName = String(user.name || '기안자');
+        const firstApproverNotification = {
+          user_id: resolvedFirstApproverId,
+          type: 'approval',
+          title: '결재 요청',
+          body: `${senderName}님이 ${approvalTitle} 결재를 요청했습니다.`,
+          metadata: {
+            id: submittedApproval.id,
+            approval_id: submittedApproval.id,
+            type: 'approval',
+            approval_role: 'approver',
+            sender_name: user.name || null,
+            document_type: formType || null,
+          },
+        };
+        const { error: approverNotifError } = await supabase
+          .from('notifications')
+          .insert([firstApproverNotification]);
+        if (approverNotifError) {
+          console.error('첫 결재자 알림 생성 실패:', approverNotifError);
+        }
+      }
+    } catch {
+      // 알림 실패는 기안 처리에 영향 없음
+    }
+
     if (composeSeedApproval?.id) {
       const supersededMetaData = {
         ...((sourceApprovalMeta || {}) as ApprovalRecord),

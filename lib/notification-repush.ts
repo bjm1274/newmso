@@ -44,7 +44,8 @@ type PushSubscriptionRow = {
 };
 
 // 재알림 대상 — 공지/전자결재 등 중요 항목만. 채팅 메시지는 리마인드 대상에서 제외(공지방은 예외).
-const REPUSH_ELIGIBLE_TYPES = new Set(['approval', 'notice', 'announcement']);
+// 수정 H: inventory, board, 인사, payroll 추가 — 야간 발생 중요 알림 다음날 재발송
+const REPUSH_ELIGIBLE_TYPES = new Set(['approval', 'notice', 'announcement', 'inventory', 'board', '인사', 'payroll']);
 const CHAT_NOTIFICATION_TYPES = new Set(['message', 'mention', 'chat']);
 
 function getNormalizedTypeCandidates(row: NotificationRow): string[] {

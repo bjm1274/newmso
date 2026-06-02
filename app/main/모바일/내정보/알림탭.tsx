@@ -11,11 +11,13 @@
  * JM6: button 시맨틱, aria-label
  */
 
-import { memo, useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { ErpUser } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import MIcon from '../공통/MIcon';
+
+const NOTIFICATION_LIST_UPDATED_EVENT = 'NOTIFICATION_LIST_UPDATED_EVENT';
 
 type Tone = 'accent' | 'success' | 'warn' | 'danger' | 'muted';
 
@@ -102,28 +104,40 @@ function 알림탭Base({ user }: 알림탭Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const cancelledRef = useRef(false);
 
-  useEffect(() => {
+  const fetchNotifs = useCallback(async () => {
     if (!staffId) { setNotifs([]); setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase
-          .from('notifications')
-          .select(NOTIFICATION_SELECT)
-          .eq('user_id', staffId)
-          .order('created_at', { ascending: false })
-          .limit(100);
-        if (cancelled) return;
-        const rows = Array.isArray(data) ? (data as NotificationDbRow[]) : [];
-        setNotifs(rows.map(normalizeRow).filter((n) => n.id));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from('notifications')
+        .select(NOTIFICATION_SELECT)
+        .eq('user_id', staffId)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (cancelledRef.current) return;
+      const rows = Array.isArray(data) ? (data as NotificationDbRow[]) : [];
+      setNotifs(rows.map(normalizeRow).filter((n) => n.id));
+    } finally {
+      if (!cancelledRef.current) setLoading(false);
+    }
   }, [staffId]);
+
+  // 초기 fetch
+  useEffect(() => {
+    cancelledRef.current = false;
+    void fetchNotifs();
+    return () => { cancelledRef.current = true; };
+  }, [fetchNotifs]);
+
+  // 수정 F: NOTIFICATION_LIST_UPDATED_EVENT 리스너 — 실시간 갱신
+  useEffect(() => {
+    if (!staffId || typeof window === 'undefined') return;
+    const handler = () => { void fetchNotifs(); };
+    window.addEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handler);
+  }, [staffId, fetchNotifs]);
 
   const handleMarkAllRead = useCallback(async () => {
     if (!staffId) return;

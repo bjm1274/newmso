@@ -314,6 +314,23 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     };
 
     await supabase.from('approvals').insert(approvalPayload);
+
+    // 수정 E: 결재자 즉시 알림 — approver_line 첫 번째 staffId에게 알림 발송
+    const firstApproverId: string | null = approvalPayload.meta_data.approver_line?.[0] ?? null;
+    if (firstApproverId) {
+      try {
+        await supabase.from('notifications').insert({
+          user_id: firstApproverId,
+          title: '연차 승인 요청',
+          body: `${staffName}님이 연차를 신청했습니다`,
+          type: 'approval',
+          read_at: null,
+          created_at: new Date().toISOString(),
+        });
+      } catch (notifErr) {
+        console.error('결재자 알림 발송 중 오류:', notifErr);
+      }
+    }
   } catch (err) {
     console.error('전자결재 상신 등록 중 오류 발생:', err);
   }

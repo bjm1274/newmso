@@ -20,6 +20,7 @@ import {
   getD1Binding,
   getD1Drizzle,
 } from '@/lib/db';
+import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
 
 type ApprovalRow = Record<string, unknown>;
 
@@ -417,6 +418,28 @@ async function transitionSingleApproval(params: {
       },
     });
 
+    // Fix A: 기안자에게 반려 알림 전송
+    try {
+      const senderId = String(item.sender_id || '').trim();
+      if (senderId) {
+        const approvalTitle = String(item.title || '전자결재 문서');
+        const actorName = actor.name ? `${actor.name}님이 ` : '';
+        await insertNotificationsOrThrow([{
+          user_id: senderId,
+          type: 'approval',
+          title: '결재 반려',
+          body: `${actorName}${approvalTitle} 문서를 반려했습니다.`,
+          metadata: {
+            approval_id: approvalId,
+            actor_id: actor.id,
+            actor_name: actor.name,
+          },
+        } satisfies NotificationRow]);
+      }
+    } catch {
+      // 알림 실패는 결재 처리에 영향 없음
+    }
+
     return {
       approvalId,
       action,
@@ -472,6 +495,27 @@ async function transitionSingleApproval(params: {
   const updatedApproval = await updateApprovalRecord(approvalId, updateData);
 
   if (!isFinalApproval) {
+    // Fix D: 다음 결재자에게 결재 차례 알림 전송
+    try {
+      const nextId = String(nextApproverId || '').trim();
+      if (nextId) {
+        const approvalTitle = String(item.title || '전자결재 문서');
+        await insertNotificationsOrThrow([{
+          user_id: nextId,
+          type: 'approval',
+          title: '결재 차례',
+          body: `${approvalTitle} 결재가 도착했습니다.`,
+          metadata: {
+            approval_id: approvalId,
+            actor_id: actor.id,
+            actor_name: actor.name,
+          },
+        } satisfies NotificationRow]);
+      }
+    } catch {
+      // 알림 실패는 결재 처리에 영향 없음
+    }
+
     return {
       approvalId,
       action,

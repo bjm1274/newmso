@@ -839,11 +839,13 @@ async function cleanupOldNotifications(userId: string) {
     const last = lastRaw ? Number(lastRaw) : 0;
     if (Number.isFinite(last) && Date.now() - last < NOTIFICATIONS_CLEANUP_THROTTLE_MS) return;
     const cutoff = new Date(Date.now() - NOTIFICATIONS_RETENTION_MS).toISOString();
+    // 수정 G: read_at IS NOT NULL 조건 추가 — 미읽은 알림은 삭제하지 않음
     await supabase
       .from('notifications')
       .delete()
       .eq('user_id', userId)
-      .lt('created_at', cutoff);
+      .lt('created_at', cutoff)
+      .not('read_at', 'is', null);
     window.localStorage.setItem(NOTIFICATIONS_CLEANUP_KEY, String(Date.now()));
   } catch {
     // JM3: cleanup 실패는 silent — 다음 마운트에서 재시도

@@ -573,6 +573,30 @@ export async function processFinalApprovalEffects(
     warnings.push(`공문서 발송대장 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
   }
 
+  // Fix B: 물품요청 외 타입에 대해 기안자에게 최종 승인 알림 전송
+  // (물품요청은 prepareSupplyApprovalInventoryWorkflow 안에서 이미 처리됨)
+  if (item.type !== '물품요청') {
+    try {
+      const senderId = String(item.sender_id || '').trim();
+      if (senderId) {
+        const approvalTitle = String(item.title || '전자결재 문서');
+        await insertNotificationsOrThrow([{
+          user_id: senderId,
+          type: 'approval',
+          title: '결재 승인',
+          body: `${approvalTitle} 문서가 최종 승인되었습니다.`,
+          metadata: {
+            approval_id: String(item.id || ''),
+            approval_type: item.type ?? null,
+          },
+        } as NotificationRow]);
+        steps.push('sender_approval_notification');
+      }
+    } catch {
+      // 알림 실패는 결재 처리에 영향 없음
+    }
+  }
+
   const processedAt = new Date().toISOString();
   const nextMetaData = {
     ...(itemMetaData || {}),

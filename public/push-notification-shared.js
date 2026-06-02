@@ -359,10 +359,11 @@ function erpIsMobileDevice() {
   return /android|iphone|ipad|ipod/i.test(userAgent);
 }
 
+// 수정 J: 항상 true가 되는 버그 수정.
+// 모바일 기기에서만 foreground popup 표시 (데스크톱은 인앱 toast로 충분).
 function erpShouldShowForegroundPopup(payload) {
-  if (!erpIsMobileDevice()) return false;
-  const notificationType = erpNormalizeString(payload?.data?.type || payload?.type);
-  return !notificationType || Boolean(notificationType);
+  void payload;
+  return erpIsMobileDevice();
 }
 
 async function erpBroadcastPreviewToVisibleClients(payload) {

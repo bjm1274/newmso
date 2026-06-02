@@ -529,7 +529,20 @@ export async function dispatchChatPushForMessage(params: {
     } satisfies ChatPushDispatchResult;
   }
 
-  const targetIds = members.filter((id) => id && id !== senderId && !mutedIdsEarly.has(id));
+  // 수정 K: 멘션된 사용자는 뮤트 여부와 무관하게 발송 대상에 포함
+  // @[표시명](staff:staffId) 패턴에서 staffId 추출
+  const mentionedIds = new Set<string>();
+  const mentionPattern = /@\[.*?\]\(staff:([^)]+)\)/g;
+  const contentStr = String(message.content || '');
+  let mentionMatch: RegExpExecArray | null;
+  while ((mentionMatch = mentionPattern.exec(contentStr)) !== null) {
+    const mentionedId = String(mentionMatch[1] || '').trim();
+    if (mentionedId) mentionedIds.add(mentionedId);
+  }
+
+  const targetIds = members.filter(
+    (id) => id && id !== senderId && (!mutedIdsEarly.has(id) || mentionedIds.has(id)),
+  );
 
   if (targetIds.length === 0) {
     await updateChatPushJobByMessageId(params.messageId, {
