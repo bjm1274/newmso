@@ -159,6 +159,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     salaryChangeMap: Record<string, SalaryChangeHistoryRow[]> = salaryChangesByStaff,
     autoOvertimeMins = 0,
     autoHolidayHours = 0,
+    autoNightWorkMins = 0,
   ): SettlementEntry => {
     const savedRecord = savedRecordsByStaff[String(staff.id)];
     const staffSalaryChanges = salaryChangeMap[String(staff.id)] || [];
@@ -213,23 +214,32 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       if (result.summary) salaryChangeProration.push(result.summary);
     });
 
-    // 통상시급 환산용 임시 draft 엔트리 빌드 후 통상시급 산출
+    // 통상시급은 월 통상임금 전액 기준, 일할 미적용 (C-08)
+    // 중도입사·중도퇴사자도 소정근로에 대한 통상시급은 마스터 원액 기준으로 산정해야
+    // 연장/야간/휴일 가산수당 과소를 방지한다 (검산 45% 과소 버그 수정).
+    // 정상 입사자(일할 없음)는 resolveAmount 결과 = 마스터 원액이므로 결과 동일(no-op).
     const draftEntryForHourlyRate: Partial<SettlementEntry> = {
-      base_salary: baseSalary,
-      meal_allowance: mealAllowance,
-      night_duty_allowance: nightDutyAllowance,
-      vehicle_allowance: vehicleAllowance,
-      childcare_allowance: childcareAllowance,
-      research_allowance: researchAllowance,
-      other_taxfree: otherTaxfree,
-      taxable_allowance_breakdown: changeAwareBreakdown,
+      base_salary: Number(staff.base_salary) || 0,
+      meal_allowance: Number(staff.meal_allowance) || 0,
+      night_duty_allowance: Number(staff.night_duty_allowance) || 0,
+      vehicle_allowance: Number(staff.vehicle_allowance) || 0,
+      childcare_allowance: Number(staff.childcare_allowance) || 0,
+      research_allowance: Number(staff.research_allowance) || 0,
+      other_taxfree: Number(staff.other_taxfree) || 0,
+      taxable_allowance_breakdown: getStaffTaxableAllowanceBreakdown(staff),
     };
     const calculatedHourlyRate = getRegularHourlyRate(staff, draftEntryForHourlyRate);
 
-    // 자동 가산수당 금액 계산 (가산 1.5배 적용)
+    // 자동 가산수당 금액 계산
+    // 평일 연장: 소정시간 초과분 × 1.5배 (근로기준법 §56①)
     const autoOvertimePay = Math.round((autoOvertimeMins / 60) * calculatedHourlyRate * 1.5);
-    const autoHolidayPay = Math.round(autoHolidayHours * calculatedHourlyRate * 1.5);
-    const recommendedOvertimePay = autoOvertimePay + autoHolidayPay;
+    // C-11: 휴일근로 8h 이내 1.5배, 8h 초과분 2.0배 (근로기준법 §56②)
+    const holidayHours8    = Math.min(8, autoHolidayHours);
+    const holidayHoursOver8 = Math.max(0, autoHolidayHours - 8);
+    const autoHolidayPay  = Math.round(holidayHours8 * calculatedHourlyRate * 1.5 + holidayHoursOver8 * calculatedHourlyRate * 2.0);
+    // C-10: 야간근로(22:00~06:00) 0.5배 가산 (근로기준법 §56③, 연장 여부 무관)
+    const autoNightPay    = Math.round((autoNightWorkMins / 60) * calculatedHourlyRate * 0.5);
+    const recommendedOvertimePay = autoOvertimePay + autoHolidayPay + autoNightPay;
 
     // 만약 이미 저장된 연장수당 정보가 있으면 보존하고, 없을 경우 추천액으로 pre-fill
     const overtimePay = Number(
@@ -319,6 +329,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       auto_holiday_pay: autoHolidayPay,
       auto_overtime_minutes: autoOvertimeMins,
       auto_holiday_hours: autoHolidayHours,
+      auto_night_pay: autoNightPay,
+      auto_night_minutes: autoNightWorkMins,
       calculated_hourly_rate: calculatedHourlyRate,
     };
   };
@@ -379,9 +391,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         .lte('work_date', endDate);
       if (attendanceError) throw attendanceError;
 
-      const staffAutoAllowances: Record<string, { overtimeMins: number; holidayHours: number }> = {};
+      const staffAutoAllowances: Record<string, { overtimeMins: number; holidayHours: number; nightWorkMins: number }> = {};
       selectedStaffs.forEach((s) => {
-        staffAutoAllowances[String(s.id)] = { overtimeMins: 0, holidayHours: 0 };
+        staffAutoAllowances[String(s.id)] = { overtimeMins: 0, holidayHours: 0, nightWorkMins: 0 };
       });
 
       const attendanceRecordRows: Array<{
@@ -500,7 +512,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                       });
                     }
 
-                    // ─── 자동 수당(연장/휴일) 적산 로직 ───
+                    // ─── 자동 수당(연장/휴일/야간) 적산 로직 ───
                     if (checkIn && checkOut) {
                       // 1. 소정 근로시간 환산 (휴게 1시간 차감 반영)
                       let scheduledHours = 8;
@@ -521,13 +533,38 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                       const isHoliday = isSunday || isSaturday || holidaysSet.has(workDate);
 
                       if (isHoliday) {
-                        if (staffAutoAllowances[staffId]) {
-                          staffAutoAllowances[staffId].holidayHours += scheduledHours;
+                        // C-11: 휴일 실근무시간(checkIn~checkOut - 휴게1h) 기준으로
+                        //        8h 이내/초과 분리 집계. 소정시간 대신 실근무 사용.
+                        const actualCheckInDate = new Date(checkIn);
+                        const actualCheckOutDate = new Date(checkOut);
+                        if (
+                          staffAutoAllowances[staffId] &&
+                          !Number.isNaN(actualCheckInDate.getTime()) &&
+                          !Number.isNaN(actualCheckOutDate.getTime())
+                        ) {
+                          const actualWorkMins = Math.max(
+                            0,
+                            (actualCheckOutDate.getTime() - actualCheckInDate.getTime()) / 60000 - 60 // 휴게 1h 차감
+                          );
+                          const actualWorkHours = actualWorkMins / 60;
+                          // holidayHours8: 8h 이내 부분, holidayHoursOver8: 초과 부분
+                          // 단일 필드 대신 holidayHours에 {h8, hOver8} 인코딩하면 기존 타입 파괴되므로
+                          // holidayHours 필드를 "8h 이내 실시간"으로 재정의하고
+                          // overtimeMins 필드를 재활용하는 대신 새 전용 필드를 사용.
+                          // staffAutoAllowances 타입에 holidayHoursOver8 추가 없이도
+                          // 계산은 buildSettlementEntry에서 수행하므로, 여기서는
+                          // holidayHours = min(8, actualWorkHours),
+                          // 그리고 8h 초과분은 overtimeMins 에 넣지 않고
+                          // holidayHours에 실근무시간 전체를 넣되 over8 식별자를 포함한다.
+                          // → 가장 안전한 방법: holidayHours에 실근무시간 전체(소수 포함)를 넣는다.
+                          //   buildSettlementEntry에서 min(8,x)*1.5 + max(0,x-8)*2.0 로 분기.
+                          staffAutoAllowances[staffId].holidayHours += actualWorkHours;
                         }
+                        // 휴일이면 overtimeMins에 추가하지 않음(중복 가산 방지 — C-11).
                       }
 
-                      // 3. 연장근로 시간 계산
-                      if (boundary.shiftKnown && boundary.endHour !== null && boundary.endMinute !== null) {
+                      // 3. 연장근로 시간 계산 (평일만)
+                      if (!isHoliday && boundary.shiftKnown && boundary.endHour !== null && boundary.endMinute !== null) {
                         const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
                         const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
                         if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
@@ -536,7 +573,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
                         const actualCheckOut = new Date(checkOut);
                         if (!Number.isNaN(actualCheckOut.getTime())) {
-                          // 야간 체크아웃 일자 보정
+                          // 야간 체크아웃 일자 보정 (교대제용, 동작 불변)
                           const endMin = boundary.endHour * 60 + boundary.endMinute;
                           const startMin = boundary.hour * 60 + boundary.minute;
                           const isNightShift = endMin < startMin;
@@ -555,8 +592,48 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                           }
                         }
                       }
+
+                      // 4. C-10: 야간근로(22:00~06:00) 분 집계
+                      //    휴일/평일 무관, checkIn~checkOut 중 야간대 교집합.
+                      if (staffAutoAllowances[staffId]) {
+                        const ciDate = new Date(checkIn);
+                        const coDate = new Date(checkOut);
+                        if (!Number.isNaN(ciDate.getTime()) && !Number.isNaN(coDate.getTime())) {
+                          // 실근무 구간을 분(epoch minutes)으로 환산
+                          const ciMs = ciDate.getTime();
+                          const coMs = coDate.getTime();
+
+                          // 야간대(22:00~06:00)를 하루 단위로 분할하여 교집합 계산.
+                          // checkIn 날짜 기준으로 최대 2일치 야간대를 검사.
+                          let nightMins = 0;
+                          const checkInDay = new Date(ciDate);
+                          checkInDay.setHours(0, 0, 0, 0);
+
+                          for (let dayOffset = 0; dayOffset <= 2; dayOffset++) {
+                            const dayStart = checkInDay.getTime() + dayOffset * 86400000;
+                            // 야간 전반: 22:00~24:00
+                            const nightStart1 = dayStart + 22 * 3600000;
+                            const nightEnd1   = dayStart + 24 * 3600000;
+                            const overlap1Start = Math.max(ciMs, nightStart1);
+                            const overlap1End   = Math.min(coMs, nightEnd1);
+                            if (overlap1End > overlap1Start) {
+                              nightMins += Math.round((overlap1End - overlap1Start) / 60000);
+                            }
+                            // 야간 후반: 00:00~06:00
+                            const nightStart2 = dayStart;
+                            const nightEnd2   = dayStart + 6 * 3600000;
+                            const overlap2Start = Math.max(ciMs, nightStart2);
+                            const overlap2End   = Math.min(coMs, nightEnd2);
+                            if (overlap2End > overlap2Start) {
+                              nightMins += Math.round((overlap2End - overlap2Start) / 60000);
+                            }
+                          }
+
+                          staffAutoAllowances[staffId].nightWorkMins += nightMins;
+                        }
+                      }
                     }
-                    // ─── 자동 수당(연장/휴일) 적산 로직 끝 ───
+                    // ─── 자동 수당(연장/휴일/야간) 적산 로직 끝 ───
                   }
                 }
               }
@@ -633,14 +710,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             : undefined,
           { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
-        const autoAllow = staffAutoAllowances[s.id] || { overtimeMins: 0, holidayHours: 0 };
+        const autoAllow = staffAutoAllowances[s.id] || { overtimeMins: 0, holidayHours: 0, nightWorkMins: 0 };
         initialData[s.id] = buildSettlementEntry(
           s,
           total,
           detail,
           latestSalaryChangesByStaff,
           autoAllow.overtimeMins,
-          autoAllow.holidayHours
+          autoAllow.holidayHours,
+          autoAllow.nightWorkMins,
         );
       });
       setSettlementData(initialData);
@@ -714,16 +792,28 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     const childcare_tf = Math.min(Number(data.childcare_allowance), TAX_FREE_LIMITS.childcare);
     const childcare_taxable = Math.max(0, Number(data.childcare_allowance) - TAX_FREE_LIMITS.childcare);
 
-    const nightDuty = Number(data.night_duty_allowance) || 0;
+    // nightDuty 비과세 한도 (C-04): 소득세법 시행령 야간근로수당 비과세 한도
+    // TODO: 설정 테이블에 night_duty_limit 컬럼 추가 후 taxFreeLimits에서 읽도록 개선
+    const NIGHT_DUTY_TAX_FREE_LIMIT = 240_000; // 월 24만원 (생산직 야간수당 비과세 한도, 소득세법 시행령 제17조)
+    const nightDutyRaw = Number(data.night_duty_allowance) || 0;
+    const nightDuty_tf = Math.min(nightDutyRaw, NIGHT_DUTY_TAX_FREE_LIMIT);
+    const nightDuty_taxable = Math.max(0, nightDutyRaw - NIGHT_DUTY_TAX_FREE_LIMIT);
 
     const research_tf = Math.min(Number(data.research_allowance), TAX_FREE_LIMITS.research);
     const research_taxable = Math.max(0, Number(data.research_allowance) - TAX_FREE_LIMITS.research);
 
-    const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + nightDuty + Number(data.other_taxfree);
+    // other_taxfree 비과세 한도 (C-04): 한도 0/미설정이면 전액 과세로 간주 (무한 비과세 방지)
+    const otherTaxfreeRaw = Number(data.other_taxfree) || 0;
+    const otherTaxfreeLimit = taxFreeLimits.other_taxfree_limit || 0;
+    const otherTaxfree_tf = otherTaxfreeLimit > 0 ? Math.min(otherTaxfreeRaw, otherTaxfreeLimit) : 0;
+    const otherTaxfree_taxable = otherTaxfreeRaw - otherTaxfree_tf;
+
+    const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + nightDuty_tf + otherTaxfree_tf;
 
     // 과세 대상: 기본급 + 한도초과 비과세분 + 연장수당 + 상여 + 기타수당 - 근태차감
     const attendance_deduction = Number(data.attendance_deduction) || 0;
     const total_taxable = Number(data.base_salary) + meal_taxable + vehicle_taxable + childcare_taxable + research_taxable +
+      nightDuty_taxable + otherTaxfree_taxable +
       Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance) - attendance_deduction;
 
     const total_payment = total_taxable + total_taxfree;
@@ -842,6 +932,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           auto_holiday_pay: Number(data?.auto_holiday_pay || 0),
           auto_overtime_minutes: Number(data?.auto_overtime_minutes || 0),
           auto_holiday_hours: Number(data?.auto_holiday_hours || 0),
+          auto_night_pay: Number(data?.auto_night_pay || 0),
+          auto_night_minutes: Number(data?.auto_night_minutes || 0),
           calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0),
         };
 

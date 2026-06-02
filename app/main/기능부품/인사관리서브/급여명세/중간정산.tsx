@@ -383,13 +383,33 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     const researchTaxFree = Math.min(research, taxFreeLimits.research_limit);
     const researchTaxable = Math.max(0, research - taxFreeLimits.research_limit);
 
+    // 야간·당직 비과세 한도 (월 24만원, 소득세법 시행령 제17조) — 급여정산.tsx와 동일 기준
+    // TODO: 생산직 요건(월정액급여 210만원 이하 등) 반영 및 설정 테이블화 필요
+    const NIGHT_DUTY_TAX_FREE_LIMIT = 240_000;
+    const nightDutyTaxFree = Math.min(nightDuty, NIGHT_DUTY_TAX_FREE_LIMIT);
+    const nightDutyTaxable = Math.max(0, nightDuty - NIGHT_DUTY_TAX_FREE_LIMIT);
+
+    // other_taxfree 비과세 한도 적용
+    // other_taxfree_limit가 0 또는 미설정이면 무한 비과세 방지를 위해 전액 과세 처리
+    const otherTaxfreeLimit = taxFreeLimits.other_taxfree_limit ?? 0;
+    const otherTaxfreeTaxFree =
+      otherTaxfreeLimit > 0
+        ? Math.min(otherTaxfree, otherTaxfreeLimit)
+        : 0;
+    const otherTaxfreeTaxable =
+      otherTaxfreeLimit > 0
+        ? Math.max(0, otherTaxfree - otherTaxfreeLimit)
+        : otherTaxfree;
+
     const totalTaxfree =
       mealTaxFree +
       vehicleTaxFree +
       childcareTaxFree +
       researchTaxFree +
-      nightDuty +
-      otherTaxfree;
+      nightDutyTaxFree +
+      otherTaxfreeTaxFree;
+    // 근로소득 과세표준: severance(퇴직소득)는 분류과세(소득세법 §22)이므로 합산 제외
+    // TODO: 퇴직소득세 분류과세 별도 계산 필요
     const totalTaxable =
       Math.max(
         0,
@@ -398,14 +418,16 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           vehicleTaxable +
           childcareTaxable +
           researchTaxable +
+          nightDutyTaxable +
+          otherTaxfreeTaxable +
           extraAllowance +
           overtimePay +
           bonus -
           allowanceDeduction -
           attendanceDeduction,
-      ) +
-      severance;
-    const total = totalTaxable + totalTaxfree;
+      );
+    // 실지급 총액: severance는 과세표준에서 제외되지만 지급액에는 포함
+    const total = totalTaxable + totalTaxfree + severance;
 
     const dependentCount = Math.max(
       0,

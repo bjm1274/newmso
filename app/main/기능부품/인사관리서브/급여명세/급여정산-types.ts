@@ -27,6 +27,8 @@ export interface SettlementEntry {
   auto_holiday_pay?: number;
   auto_overtime_minutes?: number;
   auto_holiday_hours?: number;
+  auto_night_pay?: number;
+  auto_night_minutes?: number;
   calculated_hourly_rate?: number;
 }
 

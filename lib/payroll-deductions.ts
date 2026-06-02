@@ -1,5 +1,5 @@
 import { calculateMonthlyIncomeTax, type TaxInsuranceRates, hasExactIncomeTaxBracket } from './use-tax-insurance-rates';
-import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from './tax-free-limits';
+import { NP_INCOME_CEILING, NP_INCOME_FLOOR, HEALTH_INCOME_CEILING } from './tax-free-limits';
 
 export interface StatutoryDeductionOptions {
   applyInsurance?: boolean;
@@ -52,13 +52,17 @@ export function calcStatutoryDeductions(
     national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
 
     // 2. 건강보험 및 장기요양보험 - 의료급여 수급자는 제외 (0원)
+    //    보수월액 상한 적용 (HEALTH_INCOME_CEILING) 및 음수 소득 방지 가드 적용
     if (!isMedicalBenefit) {
-      health_insurance = Math.floor(taxableIncome * rates.health_insurance_rate);
-      long_term_care = Math.floor(taxableIncome * rates.long_term_care_rate);
+      const hiBase = Math.min(Math.max(0, taxableIncome), HEALTH_INCOME_CEILING);
+      health_insurance = Math.floor(hiBase * rates.health_insurance_rate);
+      long_term_care = Math.floor(hiBase * rates.long_term_care_rate);
     }
 
     // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
-    const full_employment = Math.floor(taxableIncome * rates.employment_insurance_rate);
+    //    음수 소득 방지 가드 적용
+    const eiBase = Math.max(0, taxableIncome);
+    const full_employment = Math.floor(eiBase * rates.employment_insurance_rate);
     employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
   }
 

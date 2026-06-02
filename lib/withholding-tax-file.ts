@@ -203,7 +203,7 @@ export function buildExportRows(
 
       return {
         staffName: String(staff.name || ''),
-        residentNumber: String(staff.resident_number || staff.rrn || ''),
+        residentNumber: String(staff.resident_no ?? staff.resident_number ?? staff.rrn ?? ''),
         department: String(staff.department || ''),
         position: String(staff.position || ''),
         baseSalary: Number(pr.base_salary) || 0,

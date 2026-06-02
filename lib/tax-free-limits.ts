@@ -23,6 +23,14 @@ export const MINIMUM_WAGE_2026 = 10_320;
 export const NP_INCOME_CEILING = 6_370_000;
 export const NP_INCOME_FLOOR = 400_000;
 
+/**
+ * 건강보험 보수월액 상한
+ * 건강보험법 시행규칙 제42조 및 보건복지부 고시 기준
+ * TODO: 2026 건강보험 보수월액 상한값 확인 필요
+ * (참고: 2025년 상한 119,625,706원/월 — 2026년 고시 확인 후 갱신)
+ */
+export const HEALTH_INCOME_CEILING = 119_625_706;
+
 export function getMinimumWageByYear(year: number) {
   return year >= 2026 ? MINIMUM_WAGE_2026 : MINIMUM_WAGE_2025;
 }

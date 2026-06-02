@@ -128,10 +128,16 @@ export function getRegularHourlyRate(staff: StaffMember, data: Partial<Settlemen
     resolvedAgreedOvertime +
     resolvedAgreedNight;
 
+  // 격일제 판별: 급여상세.tsx line 325와 동일한 식 (C-09)
+  // 격일제(1일근무1일휴무)는 분모 계산 방식이 달라 통상시급이 달라진다.
+  // lib/payroll-working-hours.ts:81의 분모 * 1.5 공식 자체는 이번 수정 범위 밖.
+  const isAlternateDayShift = !!(staff?.isAlternateDayShift || staff?.shift_type === '1일근무1일휴무');
+
   return calculateHourlyRateFromMonthlySalary(
     fixedMonthlyPay,
     resolveWeeklyWorkingHours(staff, 40),
     'ceil',
+    isAlternateDayShift,
   );
 }
 
