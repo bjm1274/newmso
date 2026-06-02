@@ -31,9 +31,9 @@ export default function ContractClosingBlock(props: Props) {
                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
         return (
             <div className="flex items-stretch text-[11.5px] min-h-[36px]">
-                <span className={`w-[78px] shrink-0 flex items-center px-2.5 ${labelClass} font-bold`}>{label}</span>
+                <span className={`w-[78px] shrink-0 flex items-start pt-[10px] px-2.5 ${labelClass} font-bold`}>{label}</span>
                 <span
-                    className="flex-1 min-w-0 flex items-center px-2.5 text-[var(--foreground)] font-semibold leading-snug truncate"
+                    className="flex-1 min-w-0 px-2.5 py-[9px] text-[var(--foreground)] font-semibold leading-snug break-all whitespace-normal"
                     title={value}
                 >
                     {value}
@@ -43,8 +43,8 @@ export default function ContractClosingBlock(props: Props) {
     };
 
     return (
-        <div className="mt-5 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-3">
+        <div className="mt-5 space-y-3 break-inside-avoid">
+            <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-3 break-inside-avoid">
                 <div className="rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--card)]">
                     <div className="px-3 py-2 bg-slate-800 text-white text-center">
                         <span className="text-[10px] font-black tracking-[0.2em]">사 용 자</span>
@@ -109,7 +109,7 @@ export default function ContractClosingBlock(props: Props) {
                 </div>
             </div>
 
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--tab-bg)] px-4 py-3 text-[12px] text-[var(--foreground)]">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--tab-bg)] px-4 py-3 text-[12px] text-[var(--foreground)] break-inside-avoid break-before-avoid">
                 <p className="font-bold mb-1">근로계약서 교부 확인</p>
                 <p className="text-[var(--toss-gray-5)]">
                     본인은 본 근로계약서 1부를 교부받았음을 확인합니다.
