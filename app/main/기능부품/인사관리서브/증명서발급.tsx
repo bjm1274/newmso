@@ -3,7 +3,7 @@ import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/supabase';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
@@ -38,13 +38,16 @@ function getClosingText(certType: string) {
     재직증명서: '위와 같이 현재 재직 중임을 증명합니다.',
     경력증명서: '위와 같이 재직 경력을 증명합니다.',
     퇴직증명서: '위와 같이 퇴직 사실을 증명합니다.',
+    급여인증서: '위와 같이 급여 지급 사실을 증명합니다.',
     급여지급증명서: '위와 같이 급여 지급 사실을 증명합니다.',
     보수지급명세서: '위와 같이 보수 지급 사실을 증명합니다.',
     연봉금액확인서: '위와 같이 계약 연봉 금액을 확인합니다.',
     근무확인서: '위와 같이 근무 사실을 확인합니다.',
     '직무교육 이수확인서': '위와 같이 직무교육 이수 사실을 증명합니다.',
     원천징수영수증: '위와 같이 원천징수 사실을 확인합니다.',
+    소득금액증명원: '위와 같이 소득 금액을 확인합니다.',
     소득금액증명서: '위와 같이 소득 금액을 확인합니다.',
+    근로소득원천징수필증: '위와 같이 근로소득 원천징수 사실을 확인합니다.',
     '근로소득 원천징수확인': '위와 같이 근로소득 원천징수 사실을 확인합니다.',
   };
 
@@ -72,7 +75,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
   useEffect(() => {
     const loadResources = async () => {
       const [sealResult, designStore] = await Promise.all([
-        supabase.from('contract_templates').select('company_name, seal_url'),
+        d1.from('contract_templates').select('company_name, seal_url'),
         fetchDocumentDesignStore(),
       ]);
 
@@ -95,7 +98,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     if (!showHistory) return;
 
     const loadHistory = async () => {
-      const { data: certData } = await supabase
+      const { data: certData } = await d1
         .from('certificate_issuances')
         .select('*')
         .order('issued_at', { ascending: false })
@@ -109,7 +112,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       );
       let staffLookup: Map<string, { name: string | null; company: string | null }> = new Map();
       if (staffIds.length > 0) {
-        const { data: staffData } = await supabase
+        const { data: staffData } = await d1
           .from('staff_members')
           .select('id, name, company')
           .in('id', staffIds);
@@ -164,17 +167,64 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     ['부서', (selectedStaff?.department as string) || '-'],
     ['직위', (selectedStaff?.position as string) || '-'],
   ];
-  const certificateRows: Array<[string, string]> = [
-    ['근무부서', (selectedStaff?.department as string) || '-'],
-    ['직위/직급', [(selectedStaff?.position as string), rankLabel].filter(Boolean).join(' / ') || '-'],
-    ['입사일자', formatDateLabel(joinedAt as string)],
-    ['담당업무', dutyLabel as string],
-    ['발급일자', formatDateLabel(new Date().toISOString())],
-    ['발급번호', serialNo || '__SERIAL__'],
-    ...(certType === '급여지급증명서' || certType === '소득금액증명서' || certType === '원천징수영수증'
-      ? [['기준 급여', `${totalPay.toLocaleString()}원`] as [string, string]]
-      : []),
-  ];
+  const isResigned = selectedStaff?.status === '퇴사';
+  const resignedAt = selectedStaff?.resigned_at || selectedStaff?.resign_date;
+
+  const getCertificateRows = () => {
+    const baseRows: Array<[string, string]> = [
+      ['근무부서', (selectedStaff?.department as string) || '-'],
+      ['직위/직급', [(selectedStaff?.position as string), rankLabel].filter(Boolean).join(' / ') || '-'],
+    ];
+
+    const joinedLabel = formatDateLabel(joinedAt as string);
+    const resignedLabel = resignedAt ? formatDateLabel(resignedAt as string) : '현재';
+
+    if (certType === '퇴직증명서') {
+      baseRows.push(
+        ['입사일자', joinedLabel],
+        ['퇴사일자', resignedAt ? formatDateLabel(resignedAt as string) : '-'],
+        ['재직기간', joinedAt ? `${joinedLabel} ~ ${resignedAt ? formatDateLabel(resignedAt as string) : '-'}` : '-']
+      );
+    } else if (certType === '경력증명서') {
+      baseRows.push(
+        ['근무기간', joinedAt ? `${joinedLabel} ~ ${resignedLabel}` : '-']
+      );
+    } else {
+      baseRows.push(
+        ['입사일자', joinedLabel],
+        ['재직기간', joinedAt ? `${joinedLabel} ~ ${resignedLabel}` : '-']
+      );
+    }
+
+    baseRows.push(['담당업무', dutyLabel as string]);
+
+    if (certType === '퇴직증명서' || (certType === '경력증명서' && isResigned)) {
+      baseRows.push(['퇴사사유', (selectedStaff?.resigned_reason || selectedStaff?.resign_reason || '일신상의 사정') as string]);
+    }
+
+    const isSalaryCert =
+      certType === '급여인증서' ||
+      certType === '보수지급명세서' ||
+      certType === '연봉금액확인서' ||
+      certType === '소득금액증명원' ||
+      certType === '원천징수영수증' ||
+      certType === '근로소득원천징수필증' ||
+      certType === '급여지급증명서' ||
+      certType === '소득금액증명서';
+
+    if (isSalaryCert) {
+      baseRows.push(['기준 급여', `${totalPay.toLocaleString()}원`]);
+    }
+
+    baseRows.push(
+      ['발급일자', formatDateLabel(new Date().toISOString())],
+      ['발급번호', serialNo || '__SERIAL__']
+    );
+
+    return baseRows;
+  };
+
+  const certificateRows = getCertificateRows();
 
   const handleIssue = async () => {
     if (!selectedStaff) {
@@ -189,7 +239,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       const rawUser = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEYS.USER) : null;
       const currentUser = rawUser ? JSON.parse(rawUser) : {};
 
-      await supabase.from('certificate_issuances').insert({
+      await d1.from('certificate_issuances').insert({
         staff_id: selectedStaff.id,
         cert_type: certType,
         serial_no: nextSerial,
@@ -203,7 +253,14 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     // 마이페이지 발급 증명서와 동일한 자체 완결 HTML 빌더로 인쇄한다.
     // (Tailwind/CSS 변수에 의존하던 head 복제 방식은 새 창에서 본문이 비어 출력되는 문제가 있었다.)
     const isSalaryCert =
-      certType === '급여지급증명서' || certType === '소득금액증명서' || certType === '원천징수영수증';
+      certType === '급여인증서' ||
+      certType === '보수지급명세서' ||
+      certType === '연봉금액확인서' ||
+      certType === '소득금액증명원' ||
+      certType === '원천징수영수증' ||
+      certType === '근로소득원천징수필증' ||
+      certType === '급여지급증명서' ||
+      certType === '소득금액증명서';
     const cert: IssuedCertificate = {
       id: String(selectedStaff.id ?? ''),
       cert_type: certType,
@@ -228,6 +285,9 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       extraInfoRows: isSalaryCert
         ? [{ label: '기준 급여', value: `${totalPay.toLocaleString()}원` }]
         : null,
+      resignedAt: (resignedAt as string | undefined) || null,
+      resignationReason: (selectedStaff.resigned_reason || selectedStaff.resign_reason || '일신상의 사정') as string,
+      isResigned,
     };
 
     try {

@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/supabase';
 import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
   CONTRACT_TEMPLATE_VARIABLES,
@@ -49,7 +49,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
         setCompanyInfo(null);
         return;
       }
-      const { data } = await supabase
+      const { data } = await d1
         .from('companies')
         .select('business_no, address, phone, ceo_name')
         .eq('name', selectedCo)
@@ -64,7 +64,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
   useEffect(() => {
     const fetchTemplate = async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await d1
         .from('contract_templates')
         .select('template_content, seal_url')
         .eq('company_name', selectedCo)
@@ -74,7 +74,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
         setSealUrl(data?.seal_url || null);
       } else {
         setSealUrl(data?.seal_url || null);
-        const { data: fallback } = await supabase
+        const { data: fallback } = await d1
           .from('contract_templates')
           .select('template_content')
           .eq('company_name', '전체')
@@ -90,7 +90,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
     setSaving(true);
     const normalizedTemplate = upgradeLegacyContractTemplate(template);
     setTemplate(normalizedTemplate);
-    const { error } = await supabase.from('contract_templates').upsert(
+    const { error } = await d1.from('contract_templates').upsert(
       {
         company_name: selectedCo,
         template_content: normalizedTemplate,
@@ -268,49 +268,51 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
 
           <div className="custom-scrollbar flex flex-1 justify-center overflow-y-auto p-4 md:p-5">
             {/* 고해상도 미리보기 페이퍼 (전자서명 모달과 동일 디자인) */}
-            <div className="w-full max-w-[680px] bg-[var(--card)] shadow-sm rounded-sm border border-[var(--border)] min-h-[900px] flex flex-col p-[44px]">
+            <div className="w-full max-w-[700px] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.10)] min-h-[980px] flex flex-col p-[16px]">
               {template ? (
-                <ContractStandardPreview
-                  templateText={fillEmploymentContractTemplate(
-                    template,
-                    {
-                      name: '홍길동',
-                      joined_at: new Date().toISOString().slice(0, 10),
-                      employment_type: '정규직',
-                      probation_months: 3,
-                      probation_percent: 90,
-                      base_salary: 2500000,
-                      meal_allowance: 100000,
-                      resident_no: '950101-1234567',
-                    },
-                    {
-                      contract_start_date: new Date().toISOString().slice(0, 10),
-                      probation_months: 3,
-                      probation_percent: 90,
-                    },
-                    null,
-                    {
-                      name: selectedCo,
-                      ceo_name: companyInfo?.ceo_name || '대표자',
-                      business_no: companyInfo?.business_no || '123-45-67890',
-                      address: companyInfo?.address || '서울특별시 강남구',
-                      phone: companyInfo?.phone || '02-123-4567',
-                      payment_day: '10',
-                    }
-                  )}
-                  closingData={{
-                    companyName: selectedCo,
-                    companyBusinessNo: companyInfo?.business_no || '자동 연동',
-                    companyAddress: companyInfo?.address || '자동 연동',
-                    companyPhone: companyInfo?.phone || '자동 연동',
-                    companyCeo: companyInfo?.ceo_name || '자동 연동',
-                    sealUrl: sealUrl || undefined,
-                    employeeName: '홍길동',
-                    employeeAddress: '자동 연동',
-                    employeePhone: '자동 연동',
-                    contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`,
-                  }}
-                />
+                <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d]">
+                  <ContractStandardPreview
+                    templateText={fillEmploymentContractTemplate(
+                      template,
+                      {
+                        name: '홍길동',
+                        joined_at: new Date().toISOString().slice(0, 10),
+                        employment_type: '정규직',
+                        probation_months: 3,
+                        probation_percent: 90,
+                        base_salary: 2500000,
+                        meal_allowance: 100000,
+                        resident_no: '950101-1234567',
+                      },
+                      {
+                        contract_start_date: new Date().toISOString().slice(0, 10),
+                        probation_months: 3,
+                        probation_percent: 90,
+                      },
+                      null,
+                      {
+                        name: selectedCo,
+                        ceo_name: companyInfo?.ceo_name || '대표자',
+                        business_no: companyInfo?.business_no || '123-45-67890',
+                        address: companyInfo?.address || '서울특별시 강남구',
+                        phone: companyInfo?.phone || '02-123-4567',
+                        payment_day: '10',
+                      }
+                    )}
+                    closingData={{
+                      companyName: selectedCo,
+                      companyBusinessNo: companyInfo?.business_no || '자동 연동',
+                      companyAddress: companyInfo?.address || '자동 연동',
+                      companyPhone: companyInfo?.phone || '자동 연동',
+                      companyCeo: companyInfo?.ceo_name || '자동 연동',
+                      sealUrl: sealUrl || undefined,
+                      employeeName: '홍길동',
+                      employeeAddress: '자동 연동',
+                      employeePhone: '자동 연동',
+                      contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`,
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
                   <span className="text-4xl mb-4">⌨️</span>

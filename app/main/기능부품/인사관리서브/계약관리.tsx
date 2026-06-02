@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/supabase';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getStaffProbationMonths, toIntegerOrFallback } from '@/lib/staff-meta';
 import { getPrimaryShiftBatch } from '@/lib/staff-shift-resolver';
@@ -20,8 +20,8 @@ export default function ContractMain({
   showAdminPolicyTabs = true,
   showTemplateEditor = true,
 }: Record<string, unknown>) {
-  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
-  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('계약현황');
@@ -74,7 +74,7 @@ export default function ContractMain({
     requests: Record<string, unknown>[],
     omittedColumns: ReadonlySet<string>,
   ) =>
-    supabase
+    d1
       .from('employment_contracts')
       .upsert(
         requests.map((request) => omitColumnsFromRecord(request, omittedColumns)),
@@ -92,7 +92,7 @@ export default function ContractMain({
   }, [checkedIds, staffs]);
 
   const fetchContracts = async () => {
-    const { data, error } = await supabase.from('employment_contracts').select('*');
+    const { data, error } = await d1.from('employment_contracts').select('*');
     if (!error && data) setContracts(data);
   };
 
@@ -118,21 +118,21 @@ export default function ContractMain({
       const contractType = getContractType();
 
       // 선택된 직원들의 주근무유형 배치 조회 (staff_shift_assignments.is_primary → staff_members.shift_id 폴백)
-      const checkedStaffIds = checkedIds.map((id: number) => String(id));
+      const checkedStaffIds = checkedIds;
       const primaryShiftByStaff = await getPrimaryShiftBatch(checkedStaffIds);
 
       const resolvedShiftIds = [...new Set([...primaryShiftByStaff.values()].filter(Boolean))] as string[];
       let shiftMap: Record<string, any> = {};
       if (resolvedShiftIds.length > 0) {
-        const { data: shiftRows } = await supabase
+        const { data: shiftRows } = await d1
           .from('work_shifts')
           .select('id, start_time, end_time, break_start_time, break_end_time')
           .in('id', resolvedShiftIds);
         if (shiftRows) shiftMap = Object.fromEntries(shiftRows.map((sh: any) => [sh.id, sh]));
       }
 
-      const requests = checkedIds.map((staffId: number) => {
-        const s = (staffs as any[])?.find((x: any) => x.id === staffId);
+      const requests = checkedIds.map((staffId: string) => {
+        const s = (staffs as any[])?.find((x: any) => String(x.id) === String(staffId));
         const probationMonths = getStaffProbationMonths(s, 0);
         const workingDaysPerWeek = toIntegerOrFallback(
           resolveWorkingDaysPerWeek(s, salaryInfo.working_days_per_week || 5),
@@ -193,8 +193,8 @@ export default function ContractMain({
       });
 
       // 기존 미발송/반려 상태 레코드를 먼저 서명대기로 업데이트, 없으면 신규 insert
-      const staffIdList = checkedIds.map((id: number) => id);
-      await supabase
+      const staffIdList = checkedIds;
+      await d1
         .from('employment_contracts')
         .update({ status: '서명대기', requested_at: new Date().toISOString() })
         .in('staff_id', staffIdList)
@@ -251,9 +251,9 @@ export default function ContractMain({
 
 
       if (includeTaxFree) {
-        await Promise.all(checkedIds.map((id: number) => {
-          const s = (staffs as any[])?.find((x: any) => x.id === id);
-          return supabase.from('staff_members').update({
+        await Promise.all(checkedIds.map((id: string) => {
+          const s = (staffs as any[])?.find((x: any) => String(x.id) === String(id));
+          return d1.from('staff_members').update({
             base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
             meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
             vehicle_allowance: salaryInfo.vehicle_allowance ?? s?.vehicle_allowance ?? 0,
@@ -266,8 +266,8 @@ export default function ContractMain({
       }
 
       // 발송 시 알림함으로 노티 발송
-      await supabase.from('notifications').insert(
-        checkedIds.map((id: number) => ({
+      await d1.from('notifications').insert(
+        checkedIds.map((id: string) => ({
           user_id: String(id),
           title: '계약서 서명 요청',
           body: `${contractType}발송이 완료되었습니다. 확인 후 서명해 주세요.`,
@@ -401,7 +401,7 @@ export default function ContractMain({
                     selectedCo={selectedCo as string}
                     staffs={staffs as any[]}
                     contracts={contracts}
-                    onSelect={(id: number) => { setSelectedStaffId(id); setMobileListOpen(false); }}
+                    onSelect={(id: string) => { setSelectedStaffId(id); setMobileListOpen(false); }}
                     checkedIds={checkedIds}
                     setCheckedIds={setCheckedIds}
                     isCompact={true}

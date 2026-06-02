@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterDarkBanner,
@@ -183,16 +183,16 @@ export default function DocsWorkcenter({
       try {
         // 계약·결재(증명서대기용)·직원·서류 제출 fetch 병렬
         const [contractRes, approvalsRes, staffRes, repoRes] = await Promise.all([
-          supabase
+          d1
             .from('employment_contracts')
             .select('end_date, contract_end_date, status'),
-          supabase
+          d1
             .from('approvals')
             .select('status, form_type'),
-          supabase
+          d1
             .from('staff_members')
             .select('id, status'),
-          supabase
+          d1
             .from('document_repository')
             .select('created_by, category'),
         ]);
@@ -344,6 +344,10 @@ export default function DocsWorkcenter({
       <div className="min-h-0 flex-1">
         {tab === 'contract' && (
           <div className="flex flex-col gap-3">
+            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-700 px-4 py-3 rounded-xl text-xs font-semibold leading-relaxed flex items-center gap-2">
+              <span>💡</span>
+              <span><strong>계약 현황 (전자서명용)</strong>: 구성원 리스트에서 직원을 선택해 **인앱 전자 근로계약서**를 발송하고 실시간 진행 상태(서명대기/완료)를 관리하는 공간입니다.</span>
+            </div>
             <DocsContractSummary />
             <WorkcenterEmbed label="계약 현황">
               <ContractMain
@@ -358,6 +362,10 @@ export default function DocsWorkcenter({
         )}
         {tab === 'autogen' && (
           <div className="flex flex-col gap-3">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 px-4 py-3 rounded-xl text-xs font-semibold leading-relaxed flex items-center gap-2">
+              <span>💡</span>
+              <span><strong>계약서 자동생성 (오프라인 수기 인쇄용)</strong>: 서명 프로세스 없이 **오프라인 수기 인쇄 및 보관** 목적으로 근로계약·위임계약·용역계약 양식을 바로 생성·출력하는 공간입니다.</span>
+            </div>
             <DocsGenSummary />
             <WorkcenterEmbed label="계약서 자동생성">
               <ContractAutoGenerator

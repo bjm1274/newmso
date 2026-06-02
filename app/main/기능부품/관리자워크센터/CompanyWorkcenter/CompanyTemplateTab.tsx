@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { d1 } from '@/lib/supabase';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_TEMPLATES } from './fallback-data';
 import type { TemplateItem } from './types';
@@ -33,7 +33,7 @@ function formatDate(isoStr: unknown): string {
 async function loadTemplates(): Promise<TemplateItem[]> {
   try {
     // 1. Fetch contract templates with correct schema columns
-    const { data, error } = await supabase
+    const { data, error } = await d1
       .from('contract_templates')
       .select('company_name,updated_at')
       .limit(50);
@@ -43,13 +43,13 @@ async function loadTemplates(): Promise<TemplateItem[]> {
     }
 
     // 2. Fetch staff members to map staff_id -> company
-    const { data: staffData } = await supabase
+    const { data: staffData } = await d1
       .from('staff_members')
       .select('id,company')
       .limit(1000);
 
     // 3. Fetch employment contracts to count usage
-    const { data: contractData } = await supabase
+    const { data: contractData } = await d1
       .from('employment_contracts')
       .select('staff_id')
       .limit(1000);

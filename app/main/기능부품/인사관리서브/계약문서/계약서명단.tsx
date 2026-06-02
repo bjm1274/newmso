@@ -3,16 +3,16 @@ import { useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
-type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string; status?: string | null };
-type Contract = { staff_id: number; status?: string };
+type Staff = { id: string | number; name: string; employee_no?: string; company?: string; department?: string; position?: string; status?: string | null };
+type Contract = { staff_id: string | number; status?: string };
 
 interface ContractListProps {
   selectedCo?: string;
-  staffs?: Staff[];
-  contracts?: Contract[];
-  onSelect?: (id: number) => void;
-  checkedIds?: number[];
-  setCheckedIds?: (ids: number[]) => void;
+  staffs?: any[];
+  contracts?: any[];
+  onSelect?: (id: any) => void;
+  checkedIds?: any[];
+  setCheckedIds?: (ids: any[]) => void;
   isCompact?: boolean;
 }
 
@@ -35,8 +35,8 @@ export default function ContractList({
 }: ContractListProps) {
   const [filter, setFilter] = useState('');
 
-  const checkedIds = (_checkedIds ?? []) as number[];
-  const setCheckedIds = (_setCheckedIds ?? (() => {})) as (ids: number[]) => void;
+  const checkedIds = (_checkedIds ?? []) as any[];
+  const setCheckedIds = (_setCheckedIds ?? (() => {})) as (ids: any[]) => void;
 
   // 계약 발송 대상 명부 — 퇴사자 제외 (현직 직원만 신규/변경 계약 발송)
   const filtered = useMemo(
@@ -53,7 +53,7 @@ export default function ContractList({
   const rows: Row[] = useMemo(
     () =>
       filtered.map((s) => {
-        const contract = contracts.find((c) => c.staff_id === s.id);
+        const contract = contracts.find((c) => String(c.staff_id) === String(s.id));
         const status = contract?.status || '미발송';
         return { ...s, __status: status, __statusClass: statusClass(status) };
       }),
@@ -70,10 +70,18 @@ export default function ContractList({
   };
 
   const toggleOne = (key: string) => {
-    const id = Number(key);
-    if (Number.isNaN(id)) return;
-    if (checkedIds.includes(id)) setCheckedIds(checkedIds.filter((i) => i !== id));
-    else setCheckedIds([...checkedIds, id]);
+    if (!key) return;
+    const exists = checkedIds.some((i) => String(i) === key);
+    if (exists) {
+      setCheckedIds(checkedIds.filter((i) => String(i) !== key));
+    } else {
+      const originalStaff = filtered.find((s) => String(s.id) === key);
+      if (originalStaff) {
+        setCheckedIds([...checkedIds, originalStaff.id]);
+      } else {
+        setCheckedIds([...checkedIds, key]);
+      }
+    }
   };
 
   const columns: Column<Row>[] = isCompact
@@ -148,14 +156,20 @@ export default function ContractList({
         <div className="p-4 border-b border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4">
           <h3 className="text-base font-bold text-[var(--foreground)]">계약 대상자 관리</h3>
           <div className="relative w-full md:w-64">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">🔍</span>
+            <span 
+              className="absolute top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]"
+              style={{ left: '12px' }}
+            >
+              🔍
+            </span>
             <input
               type="text"
               placeholder="이름/사번 검색"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               aria-label="이름 또는 사번으로 검색"
-              className="w-full pl-9 pr-4 py-2 bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] text-xs outline-none focus:border-[var(--accent)] transition-all"
+              className="w-full pr-4 py-2 bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] text-xs outline-none focus:border-[var(--accent)] transition-all"
+              style={{ paddingLeft: '36px' }}
             />
           </div>
         </div>
@@ -163,14 +177,20 @@ export default function ContractList({
 
       {isCompact && (
         <div className="mb-4 relative px-1">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)] text-[10px]">🔍</span>
+          <span 
+            className="absolute top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)] text-[10px]"
+            style={{ left: '10px' }}
+          >
+            🔍
+          </span>
           <input
             type="text"
             placeholder="이름 검색"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             aria-label="이름 검색"
-            className="w-full pl-8 pr-4 py-1.5 bg-[var(--tab-bg)] border border-[var(--border)] rounded-lg text-[10px] outline-none focus:border-[var(--accent)]"
+            className="w-full pr-4 py-1.5 bg-[var(--tab-bg)] border border-[var(--border)] rounded-lg text-[10px] outline-none focus:border-[var(--accent)]"
+            style={{ paddingLeft: '32px' }}
           />
         </div>
       )}

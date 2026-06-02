@@ -121,6 +121,9 @@ export type IssuedCertificateContext = {
   profilePhotoUrl?: string | null;
   // 본문 표에 추가로 노출할 행 (예: 급여 증명서의 기준 급여)
   extraInfoRows?: Array<{ label: string; value: string }> | null;
+  resignedAt?: string | null;
+  resignationReason?: string | null;
+  isResigned?: boolean | null;
 };
 
 function getClosingText(certType: string) {
@@ -175,11 +178,65 @@ export function buildIssuedCertificatePrintHtml(
   const primaryColor = escapeHtml(context.primaryColor || '#197c86');
   const borderColor = escapeHtml(context.borderColor || '#d7dee5');
   const closingText = escapeHtml(getClosingText(certType));
-  const extraInfoRowsHtml = (context.extraInfoRows || [])
-    .filter((row) => row && row.label)
+
+  // Dynamic rows based on certType
+  const rows: Array<{ label: string; value: string }> = [
+    { label: '근무부서', value: department },
+    { label: '직위/직급', value: positionRankSafe },
+  ];
+
+  const joinedLabel = formatDateLabel(context.joinedAt);
+  const resignedLabel = context.resignedAt ? formatDateLabel(context.resignedAt) : '현재';
+
+  if (certType === '퇴직증명서') {
+    rows.push(
+      { label: '입사일자', value: joinedLabel },
+      { label: '퇴사일자', value: context.resignedAt ? formatDateLabel(context.resignedAt) : '-' },
+      { label: '재직기간', value: context.joinedAt ? `${joinedLabel} ~ ${context.resignedAt ? formatDateLabel(context.resignedAt) : '-'}` : '-' },
+    );
+  } else if (certType === '경력증명서') {
+    rows.push(
+      { label: '근무기간', value: context.joinedAt ? `${joinedLabel} ~ ${resignedLabel}` : '-' },
+    );
+  } else {
+    rows.push(
+      { label: '입사일자', value: joinedLabel },
+      { label: '재직기간', value: context.joinedAt ? `${joinedLabel} ~ ${resignedLabel}` : '-' },
+    );
+  }
+
+  rows.push({ label: '담당업무', value: duty });
+
+  if (certType === '퇴직증명서' || (certType === '경력증명서' && (context.isResigned || context.resignedAt))) {
+    rows.push({ label: '퇴사사유', value: escapeHtml(context.resignationReason || '일신상의 사정') });
+  }
+
+  const isSalaryCert =
+    certType === '급여인증서' ||
+    certType === '보수지급명세서' ||
+    certType === '연봉금액확인서' ||
+    certType === '소득금액증명원' ||
+    certType === '원천징수영수증' ||
+    certType === '근로소득원천징수필증' ||
+    certType === '급여지급증명서' ||
+    certType === '소득금액증명서';
+
+  if (isSalaryCert && context.extraInfoRows) {
+    const salaryRow = context.extraInfoRows.find(r => r.label === '기준 급여');
+    if (salaryRow) {
+      rows.push({ label: '기준 급여', value: escapeHtml(salaryRow.value) });
+    }
+  }
+
+  rows.push({ label: '발급일자', value: issuedAt });
+  if (serial) {
+    rows.push({ label: '발급번호', value: serial });
+  }
+
+  const rowsHtml = rows
     .map(
       (row) =>
-        `<div class="info-row"><span class="label">${escapeHtml(row.label)}</span><span>:</span><span class="value">${escapeHtml(row.value)}</span></div>`,
+        `<div class="info-row"><span class="label">${row.label}</span><span>:</span><span class="value">${row.value}</span></div>`,
     )
     .join('');
 
@@ -278,13 +335,7 @@ window.onload = () => window.print();
       <p class="closing">${closingText}</p>
 
       <section class="info-table" aria-label="증명 사항">
-        <div class="info-row"><span class="label">근무부서</span><span>:</span><span class="value">${department}</span></div>
-        <div class="info-row"><span class="label">직위/직급</span><span>:</span><span class="value">${positionRankSafe}</span></div>
-        <div class="info-row"><span class="label">입사일자</span><span>:</span><span class="value">${joinedAt}</span></div>
-        <div class="info-row"><span class="label">담당업무</span><span>:</span><span class="value">${duty}</span></div>
-        <div class="info-row"><span class="label">발급일자</span><span>:</span><span class="value">${issuedAt}</span></div>
-        ${serial ? `<div class="info-row"><span class="label">발급번호</span><span>:</span><span class="value">${serial}</span></div>` : ''}
-        ${extraInfoRowsHtml}
+        ${rowsHtml}
       </section>
 
       <section class="sign-block" aria-label="발급 책임자">
