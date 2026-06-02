@@ -3798,8 +3798,9 @@ button, a, [role="button"] {
   }
 
   /* 고급 장식 테두리 — position:fixed 라 매 페이지마다 반복 인쇄된다.
-     이중선(바깥 가는 선 + 본선)을 border+outline 으로 구현해 인쇄 호환성 확보.
-     프레임 안쪽 여백(7mm/9mm) < 본문 padding(10mm/12mm) 이므로 글자가 선에 닿지 않는다. */
+     증서/상장 느낌의 네이비(바깥) + 골드(안쪽) 이중 프레임을 두 개의 pseudo 로 구현
+     (box-shadow 는 인쇄 시 누락될 수 있어 border 로 처리해 호환성 확보).
+     안쪽 프레임 여백(8.2mm/10.2mm) < 본문 padding(10mm/12mm) 이므로 글자가 선에 닿지 않는다. */
   body:has([data-print-root]) [data-print-root]::before {
     content: '';
     position: fixed;
@@ -3807,9 +3808,18 @@ button, a, [role="button"] {
     left: 9mm;
     right: 9mm;
     bottom: 7mm;
-    border: 1.5px solid #334155;
-    outline: 1px solid rgba(71, 85, 105, 0.55);
-    outline-offset: 3px;
+    border: 2px solid #1e2a4a;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body:has([data-print-root]) [data-print-root]::after {
+    content: '';
+    position: fixed;
+    top: 8.2mm;
+    left: 10.2mm;
+    right: 10.2mm;
+    bottom: 8.2mm;
+    border: 1px solid #c2a14d;
     pointer-events: none;
     z-index: 0;
   }

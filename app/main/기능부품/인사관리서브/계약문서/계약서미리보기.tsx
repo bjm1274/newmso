@@ -484,14 +484,14 @@ export default function ContractPreview({
 
       {/* A4 용지 */}
       <div className="flex-1 p-6 flex justify-center">
-        <div data-print-root className="w-full max-w-[700px] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.10)] min-h-[980px] flex flex-col print:shadow-none print:max-w-full">
+        <div data-print-root className="w-full max-w-[700px] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.10)] min-h-[980px] flex flex-col p-[16px] print:p-0 print:shadow-none print:max-w-full">
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 px-[44px] py-[40px] border-[1.5px] border-slate-600 rounded-[2px] shadow-[inset_0_0_0_3px_var(--card),inset_0_0_0_4px_rgba(100,116,139,0.4)] print:border-0 print:rounded-none print:shadow-none print:px-0 print:py-0">
+            <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-0 print:py-0">
               <ContractStandardPreview
                 templateText={text}
                 closingData={{
