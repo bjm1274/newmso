@@ -13,6 +13,7 @@ import {
   withMissingColumnFallback,
   withMissingColumnsFallback,
 } from '@/lib/supabase-compat';
+import { patchChatRoom } from '@/lib/chat-rooms-client';
 import {
   countChecklistDone,
   getDefaultChecklist,
@@ -89,6 +90,53 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
 
   if (notificationsResult.error) {
     cleanupWarnings.push({ target: 'notifications', error: notificationsResult.error });
+  }
+
+  // 단체 채팅방에서 퇴사자 제거 (1:1 direct 채팅은 보존)
+  type ChatRoomRow = { id: string; name: string | null; type: string | null; members: unknown; member_ids: unknown };
+  const chatRoomsResult = await supabase
+    .from('chat_rooms')
+    .select('id, name, type, members, member_ids') as { data: ChatRoomRow[] | null; error: unknown };
+
+  if (chatRoomsResult.error) {
+    cleanupWarnings.push({ target: 'chat_rooms.select', error: chatRoomsResult.error });
+  } else {
+    const allRooms = chatRoomsResult.data ?? [];
+    const groupRoomsWithMember = allRooms.filter((room) => {
+      if (room.type === 'direct') return false;
+      const membersArr: unknown = Array.isArray(room.members)
+        ? room.members
+        : Array.isArray(room.member_ids)
+          ? room.member_ids
+          : null;
+      if (!Array.isArray(membersArr)) return false;
+      return (membersArr as unknown[]).some((m) => String(m) === staffId);
+    });
+
+    let removedCount = 0;
+    for (const room of groupRoomsWithMember) {
+      const rawMembers: unknown = Array.isArray(room.members)
+        ? room.members
+        : Array.isArray(room.member_ids)
+          ? room.member_ids
+          : [];
+      const newMembers = (rawMembers as unknown[])
+        .map((m) => String(m))
+        .filter((m) => m !== staffId);
+      const result = await patchChatRoom(room.id, { members: newMembers });
+      if (!result.ok) {
+        cleanupWarnings.push({
+          target: `chat_rooms.${room.id}`,
+          error: result.error,
+        });
+      } else {
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.info(`오프보딩: 단체 채팅방 ${removedCount}개에서 퇴사자를 내보냈습니다.`, { staffId });
+    }
   }
 
   if (cleanupWarnings.length > 0) {

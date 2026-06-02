@@ -537,7 +537,10 @@ function MessengerTimelineComponent({
                 : '';
               const readStatusSummary = totalRecipients > 0 && unreadRecipients > 0 ? `${unreadRecipients}` : null;
               const canOpenReadStatus = deliveryState === 'sent' && totalRecipients > 0;
-              const displayedReadStatusSummary = isMine ? readStatusSummary : null;
+              // 1:1 채팅(roomMembers 2명)에서는 상대방 메시지에 읽음 표시 불필요(의미 없음)
+              // 그룹 채팅(3명+)에서는 상대방 메시지에도 미읽음 수 표시
+              const isGroupChat = roomMembers.length >= 3;
+              const displayedReadStatusSummary = (isMine || isGroupChat) ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {
