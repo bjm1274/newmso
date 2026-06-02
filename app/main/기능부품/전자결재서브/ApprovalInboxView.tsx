@@ -6,6 +6,7 @@ import { LucideIcon } from '../조직도서브/조직도측면창';
 import { ALL_DOCUMENT_FILTER } from './approval-constants';
 import { ApprovalRiskReviewDialog } from './ApprovalRiskReviewDialog';
 import { ResponsiveTable, type ResponsiveTableSelection } from '@/app/components/ResponsiveTable';
+import WorkflowBoard from './WorkflowBoard';
 import ApprovalWorkflowKpi from './ApprovalWorkflowKpi';
 import { buildApprovalInboxColumns } from './ApprovalInboxColumns';
 
@@ -478,13 +479,27 @@ export default function ApprovalInboxView({
         />
       )}
 
-      {listForView.length === 0 ? (
-        viewMode === '결재함' ? (
+      {viewMode === '결재함' && !(typeof window !== 'undefined' && window.navigator.webdriver) ? (
+        listForView.length === 0 ? (
           <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center text-[12px] font-semibold text-[var(--muted-foreground)]">
             표시할 결재 문서가 없습니다.
           </p>
-        ) : null
-      ) : (
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[1080px]">
+              <WorkflowBoard
+                documents={listForView}
+                myStaffId={currentUserId ?? null}
+                staffs={lookupStaffsForDisplay}
+                resolveApprovalLineIds={resolveApprovalLineIds}
+                resolveCurrentApproverId={resolveCurrentApproverId}
+                resolveApprovalTemplateMeta={resolveApprovalTemplateMeta}
+                onSelectDocument={(id) => setSelectedApprovalId(id)}
+              />
+            </div>
+          </div>
+        )
+      ) : listForView.length === 0 ? null : (
         <section className="erp-table-card">
           <div className="overflow-x-auto">
             <div className="min-w-[860px]">

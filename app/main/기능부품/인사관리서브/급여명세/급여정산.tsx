@@ -28,6 +28,7 @@ import {
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
+import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
 import RiskActionDialog from '../RiskActionDialog';
 import type {
   SettlementEntry,
@@ -356,7 +357,6 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         const { data: list } = await supabase
           .from('company_holidays')
           .select('holiday_date, company_name')
-          .eq('is_active', 1)
           .gte('holiday_date', startDate)
           .lte('holiday_date', endDate);
         companyHolidaysList = list || [];
@@ -740,29 +740,27 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       isDuruNuriActive = (current >= String(insSettings.duru_nuri_start) && current <= String(insSettings.duru_nuri_end));
     }
 
-    // 공제 상세: 4대보험은 저장된 연도별 요율을 사용합니다.
-    let national_pension = 0, health_insurance = 0, long_term_care = 0, employment_insurance = 0, income_tax = 0, local_tax = 0;
-    if (data.apply_insurance) {
-      // 1. 국민연금 - 기준소득월액 상·하한 적용 (2025.7~2026.6: 상한 617만원, 하한 39만원)
-      //    두루누리 80% 지원 적용 시 근로자 부담분 20%만 부과
-      const npBase = Math.min(Math.max(total_taxable, NP_INCOME_FLOOR), NP_INCOME_CEILING);
-      const full_national = Math.floor(npBase * taxInsuranceRates.national_pension_rate);
-      national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
-
-      // 2. 건강보험 - 의료급여 수급자는 제외(0원)
-      //    장기요양보험 = 과세소득 × DB 저장 요율(기본 0.46% ≈ 건강보험료×12.95%)
-      if (!isMedicalBenefit) {
-        health_insurance = Math.floor(total_taxable * taxInsuranceRates.health_insurance_rate);
-        long_term_care = Math.floor(total_taxable * taxInsuranceRates.long_term_care_rate);
-      }
-
-      // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
-      const full_employment = Math.floor(total_taxable * taxInsuranceRates.employment_insurance_rate);
-      employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
-    }
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
     const qualifyingChildCount = Math.min(dependentCount, Math.max(0, Number(data.child_count_8_20) || 0));
     const withholdingRatePercent = normalizeWithholdingRatePercent(data.withholding_rate_percent);
+
+    const deductions = calcStatutoryDeductions(total_taxable, taxInsuranceRates, {
+      applyInsurance: data.apply_insurance !== false,
+      applyTax: data.apply_tax !== false,
+      isDuruNuriActive,
+      isMedicalBenefit,
+      dependentCount,
+      qualifyingChildCount,
+      withholdingRatePercent,
+    });
+
+    const national_pension = deductions.national_pension;
+    const health_insurance = deductions.health_insurance;
+    const long_term_care = deductions.long_term_care;
+    const employment_insurance = deductions.employment_insurance;
+    const income_tax = deductions.income_tax;
+    const local_tax = deductions.local_tax;
+
     const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0, {
       withholdingRatePercent: 100,
       qualifyingChildCount: 0,
@@ -775,22 +773,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       withholdingRatePercent: 100,
       qualifyingChildCount,
     });
-    const exactIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
-      withholdingRatePercent,
-      qualifyingChildCount,
-    });
     const dependentTaxCredit = hasExactWithholdingTable
       ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12500;
     const childTaxCredit = hasExactWithholdingTable
       ? Math.max(0, familyAdjustedIncomeTax - preRatioIncomeTax)
       : calculateQualifyingChildTaxCredit(qualifyingChildCount);
-    if (data.apply_tax && hasExactWithholdingTable) {
-      income_tax = Math.max(0, exactIncomeTax);
-      local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
-    }
+
     const custom_deduction = Number(data.custom_deduction) || 0;
-    const deduction = national_pension + health_insurance + long_term_care + employment_insurance + income_tax + local_tax + custom_deduction;
+    const deduction = deductions.national_pension + deductions.health_insurance + deductions.long_term_care + deductions.employment_insurance + deductions.income_tax + deductions.local_tax + custom_deduction;
     const deductionDetail = {
       national_pension,
       health_insurance,

@@ -177,7 +177,10 @@ export function SettlementStaffCard({
           label="연장/상여"
           value={Number(data.overtime_pay) + Number(data.bonus)}
           hourlyRate={hourlyRate}
-          onChange={(nextValue) => onUpdate(s.id, 'overtime_pay', nextValue)}
+          onChange={(nextValue) => {
+            onUpdate(s.id, 'overtime_pay', nextValue);
+            onUpdate(s.id, 'bonus', 0);
+          }}
           dataTestId={`salary-settlement-overtime-total-${s.id}`}
           labelClassName="text-[var(--toss-gray-4)]"
           inputClassName="text-[var(--foreground)]"

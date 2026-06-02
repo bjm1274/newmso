@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -492,29 +492,47 @@ export default function ContractPreview({
             </div>
           ) : (
             <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-0 print:py-0">
-              <ContractStandardPreview
-                templateText={text}
-                closingData={{
-                  companyName,
-                  companyBusinessNo: (company?.business_no as string) || undefined,
-                  companyAddress: (company?.address as string) || undefined,
-                  companyPhone: (company?.phone as string) || undefined,
-                  companyCeo: (company?.ceo_name as string) || undefined,
-                  sealUrl: (company?.seal_url as string) || undefined,
-                  employeeName: staff.name,
-                  employeeAddress: staff.address || undefined,
-                  employeePhone: staff.phone || undefined,
-                  contractDate: contractDateText,
-                  signatureDataUrl: sig,
-                }}
-              />
+              <table className="w-full border-collapse border-0 print:m-0">
+                <thead className="hidden print:table-header-group">
+                  <tr>
+                    <td className="h-0 print:h-[6mm]"></td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="align-top p-0">
+                      <ContractStandardPreview
+                        templateText={text}
+                        closingData={{
+                          companyName,
+                          companyBusinessNo: (company?.business_no as string) || undefined,
+                          companyAddress: (company?.address as string) || undefined,
+                          companyPhone: (company?.phone as string) || undefined,
+                          companyCeo: (company?.ceo_name as string) || undefined,
+                          sealUrl: (company?.seal_url as string) || undefined,
+                          employeeName: staff.name,
+                          employeeAddress: staff.address || undefined,
+                          employeePhone: staff.phone || undefined,
+                          contractDate: contractDateText,
+                          signatureDataUrl: sig,
+                        }}
+                      />
 
-              <ConfidentialityPledge
-                companyName={companyName}
-                employeeName={staff.name}
-                contractDate={contractDateText}
-                signatureDataUrl={sig}
-              />
+                      <ConfidentialityPledge
+                        companyName={companyName}
+                        employeeName={staff.name}
+                        contractDate={contractDateText}
+                        signatureDataUrl={sig}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot className="hidden print:table-footer-group">
+                  <tr>
+                    <td className="h-0 print:h-[6mm]"></td>
+                  </tr>
+                </tfoot>
+              </table>
 
               {/* 하단 여백 + 문서 식별 */}
               <div className="mt-8 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between print:hidden">

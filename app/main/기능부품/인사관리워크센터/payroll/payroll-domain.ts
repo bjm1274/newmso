@@ -17,7 +17,10 @@ import {
   calculateEmployeeInsuranceDeductions,
   calculateIndustrialAccidentInsurance,
 } from '@/lib/payroll-insurance-rates';
-import { calculateHourlyRateFromMonthlySalary } from '@/lib/payroll-working-hours';
+import {
+  calculateHourlyRateFromMonthlySalary,
+  resolveWeeklyWorkingHours,
+} from '@/lib/payroll-working-hours';
 import { calculateAge } from './payroll-policy';
 import type { PayrollWorkcenterData } from './payroll-fetch';
 
@@ -181,7 +184,9 @@ export function buildMinWageRows(data: PayrollWorkcenterData): MinWageRowCompute
   return data.staffs
     .map((s) => {
       const monthly = s.salary ?? 0;
-      const hourly = monthly > 0 ? calculateHourlyRateFromMonthlySalary(monthly, 40) : 0;
+      const isAlternateDayShift = !!((s as any).isAlternateDayShift || (s.permissions as any)?.isAlternateDayShift || (s.permissions as any)?.work_conditions?.isAlternateDayShift);
+      const weeklyHours = resolveWeeklyWorkingHours(s, 40);
+      const hourly = monthly > 0 ? calculateHourlyRateFromMonthlySalary(monthly, weeklyHours, 'ceil', isAlternateDayShift) : 0;
       const gap = hourly - limit;
       const status: '적합' | '미달' = hourly >= limit ? '적합' : '미달';
       return {

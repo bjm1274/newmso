@@ -133,6 +133,7 @@ export default function MemberWorkcenter({
                 staffs={filteredStaffs}
                 selectedId={selectedStaff ? String(selectedStaff.id) : null}
                 onSelect={setSelectedStaff}
+                onDoubleClick={handleEditStaff}
                 onOpenNewStaff={() => setIsRegistering(true)}
                 canRegisterNewStaff={canRegisterNewStaff}
               />

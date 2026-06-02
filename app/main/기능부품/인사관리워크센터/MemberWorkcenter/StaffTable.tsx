@@ -39,6 +39,7 @@ interface StaffTableProps {
   staffs: StaffMember[];
   selectedId: string | null;
   onSelect: (staff: StaffMember) => void;
+  onDoubleClick?: (staff: StaffMember) => void;
   onOpenNewStaff?: () => void;
   canRegisterNewStaff?: boolean;
 }
@@ -47,6 +48,7 @@ function StaffTableBase({
   staffs,
   selectedId,
   onSelect,
+  onDoubleClick,
   onOpenNewStaff,
   canRegisterNewStaff = false,
 }: StaffTableProps) {
@@ -149,6 +151,7 @@ function StaffTableBase({
                   staff={staff}
                   selected={selectedId === String(staff.id)}
                   onSelect={onSelect}
+                  onDoubleClick={onDoubleClick}
                 />
               ))}
             </tbody>
@@ -194,9 +197,10 @@ interface StaffRowProps {
   staff: StaffMember;
   selected: boolean;
   onSelect: (staff: StaffMember) => void;
+  onDoubleClick?: (staff: StaffMember) => void;
 }
 
-const StaffRow = memo(function StaffRow({ staff, selected, onSelect }: StaffRowProps) {
+const StaffRow = memo(function StaffRow({ staff, selected, onSelect, onDoubleClick }: StaffRowProps) {
   const tone = pickToneForStaff(staff.name ?? '');
   const hire = pickHireDate(staff);
   const employ = (staff as Record<string, unknown>).employment_type;
@@ -208,6 +212,7 @@ const StaffRow = memo(function StaffRow({ staff, selected, onSelect }: StaffRowP
       role="row"
       aria-selected={selected}
       onClick={() => onSelect(staff)}
+      onDoubleClick={onDoubleClick ? () => onDoubleClick(staff) : undefined}
       className={`cursor-pointer border-b border-[var(--border)] transition-colors ${
         selected ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--muted)]'
       }`}

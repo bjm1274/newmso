@@ -323,29 +323,45 @@ function calculateWeeklyWorkHours(shift: {
   daily_schedules?: WeeklyShiftSchedule | null;
   break_plans?: BreakPlan[] | null;
 }) {
-  const workMinutes = calculateWorkMinutes(shift);
+  const shiftTypeClean = String(shift.shift_type || '').replace(/\s+/g, '');
+  const isRotationShift = ['3교대', '교대', '전담', '3shift', '3-shift'].some(kw => shiftTypeClean.includes(kw));
+  const is2Work1Off = ['2일근무1일휴무', '2일근무 1일휴무'].some(kw => String(shift.shift_type || '').includes(kw));
+
+  // 단일 근무일 근로 시간 산출 (휴게 제외)
+  let singleMins = 0;
+  if (shift.daily_schedules) {
+    const enabledDays = WEEKDAY_OPTIONS.filter((day) => shift.daily_schedules?.[day.key]?.enabled);
+    if (enabledDays.length > 0) {
+      const totalMinutes = enabledDays.reduce((sum, day) => {
+        const schedule = shift.daily_schedules?.[day.key];
+        const plan = getBreakPlan(shift.break_plans || [], schedule?.break_plan_id);
+        return sum + calculateWorkMinutes({
+          start_time: schedule?.start_time,
+          end_time: schedule?.end_time,
+          break_start_time: plan?.start_time || null,
+          break_end_time: plan?.end_time || null,
+        });
+      }, 0);
+      singleMins = totalMinutes / enabledDays.length;
+    } else {
+      singleMins = calculateWorkMinutes(shift);
+    }
+  } else {
+    singleMins = calculateWorkMinutes(shift);
+  }
+
+  if (isRotationShift) {
+    // 3교대 및 전담 등 교대제는 일 실근로시간 * 5일 기준 (최대 40시간 제한)
+    return Math.min(40, Math.round(((singleMins * 5) / 60) * 10) / 10);
+  }
+
+  if (is2Work1Off) {
+    // 2일근무 1일휴무는 평균 주 4.67일 기준
+    return Math.round(((singleMins * 4.67) / 60) * 10) / 10;
+  }
 
   if (shift.shift_type === '1일근무1일휴무') {
-    // 1일근무 1일휴무 (격일제)는 주 평균 3.5일 근무로 산정
-    // 요일별 스케줄이 설정되어 있는 경우 각 요일의 실제 일일근무시간(휴게시간 제하고)의 평균을 산정
-    if (shift.daily_schedules) {
-      const enabledDays = WEEKDAY_OPTIONS.filter((day) => shift.daily_schedules?.[day.key]?.enabled);
-      if (enabledDays.length > 0) {
-        const totalMinutes = enabledDays.reduce((sum, day) => {
-          const schedule = shift.daily_schedules?.[day.key];
-          const plan = getBreakPlan(shift.break_plans || [], schedule?.break_plan_id);
-          return sum + calculateWorkMinutes({
-            start_time: schedule?.start_time,
-            end_time: schedule?.end_time,
-            break_start_time: plan?.start_time || null,
-            break_end_time: plan?.end_time || null,
-          });
-        }, 0);
-        const avgDailyMinutes = totalMinutes / enabledDays.length;
-        return Math.round(((avgDailyMinutes * 3.5) / 60) * 10) / 10;
-      }
-    }
-    return Math.round(((workMinutes * 3.5) / 60) * 10) / 10;
+    return Math.round(((singleMins * 3.5) / 60) * 10) / 10;
   }
 
   if (shift.daily_schedules) {
@@ -364,7 +380,7 @@ function calculateWeeklyWorkHours(shift: {
   }
 
   const weeklyDays = Math.max(0, Number(shift.weekly_work_days) || 0);
-  return Math.round(((workMinutes * weeklyDays) / 60) * 10) / 10;
+  return Math.round(((singleMins * weeklyDays) / 60) * 10) / 10;
 }
 
 function needsExtendedContractSettings(shift: {
@@ -389,7 +405,7 @@ function needsExtendedContractSettings(shift: {
 
 function isThreeShiftPattern(shiftType?: string | null) {
   const pattern = String(shiftType || '').replace(/\s+/g, '');
-  return ['3교대', '데이전담', '이브전담', '나이트전담', '야간전담'].some((keyword) => pattern.includes(keyword));
+  return ['3교대', '교대', '전담', '3shift', '3-shift'].some((keyword) => pattern.includes(keyword));
 }
 
 function resolveWorkDayMode(shift: {
@@ -424,10 +440,14 @@ function getStoredWorkDayMode(shift: {
   );
   const workDayMode = storedDailySchedules ? inferWorkDayModeFromSchedule(dailySchedules) : fallbackWorkDayMode;
 
+  const isRotation = isThreeShiftPattern(shift.shift_type);
+  const is2Work1Off = ['2일근무1일휴무', '2일근무 1일휴무'].some(kw => String(shift.shift_type || '').includes(kw));
+  const weeklyWorkDays = isRotation ? 5 : is2Work1Off ? 4.67 : (storedDailySchedules ? countEnabledWorkDays(dailySchedules) : shift.weekly_work_days ?? (workDayMode === 'all_days' ? 7 : 5));
+
   return {
     parsedDescription,
     workDayMode,
-    weeklyWorkDays: storedDailySchedules ? countEnabledWorkDays(dailySchedules) : shift.weekly_work_days ?? (workDayMode === 'all_days' ? 7 : 5),
+    weeklyWorkDays,
     isWeekendWork: storedDailySchedules ? hasWeekendWork(dailySchedules) : shift.is_weekend_work ?? (workDayMode === 'all_days'),
     dailySchedules,
   };
@@ -1005,13 +1025,19 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                       : `주 ${countEnabledWorkDays(newShift.daily_schedules)}일`}
                   </span>
                 </div>
+                <div className="grid grid-cols-[38px_1.1fr_1.1fr_1.4fr] gap-1 px-2 text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">
+                  <div className="text-left pl-5">요일</div>
+                  <div className="text-center">출근 시각</div>
+                  <div className="text-center">퇴근 시각</div>
+                  <div className="text-center">휴게 유형</div>
+                </div>
                 <div className="space-y-1.5">
                   {WEEKDAY_OPTIONS.map((day) => {
                     const schedule = newShift.daily_schedules[day.key];
                     return (
-                      <div key={day.key} className="p-2 bg-[var(--card)] rounded-lg border border-[var(--border)] space-y-2">
-                        <div className="grid grid-cols-[68px_1fr_1fr] items-center gap-2">
-                          <label className="flex items-center gap-2 text-[11px] font-bold text-[var(--foreground)] cursor-pointer">
+                      <div key={day.key} className="p-2 bg-[var(--card)] rounded-lg border border-[var(--border)]">
+                        <div className="grid grid-cols-[38px_1.1fr_1.1fr_1.4fr] items-center gap-1">
+                          <label className="flex items-center gap-1 text-[11px] font-bold text-[var(--foreground)] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={schedule.enabled}
@@ -1042,73 +1068,63 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                             />
                             {day.shortLabel}
                           </label>
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">출근</span>
-                            <input
-                              type="time"
-                              value={schedule.start_time}
-                              disabled={!schedule.enabled}
-                              onChange={e => {
-                                const value = e.target.value;
-                                setNewShift((prev) => ({
-                                  ...prev,
-                                  daily_schedules: {
-                                    ...prev.daily_schedules,
-                                    [day.key]: { ...prev.daily_schedules[day.key], start_time: value },
-                                  },
-                                }));
-                              }}
-                              className="w-full pl-8 p-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss disabled:opacity-40"
-                              data-testid={`shift-day-${day.key}-start`}
-                            />
-                          </div>
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">퇴근</span>
-                            <input
-                              type="time"
-                              value={schedule.end_time}
-                              disabled={!schedule.enabled}
-                              onChange={e => {
-                                const value = e.target.value;
-                                setNewShift((prev) => ({
-                                  ...prev,
-                                  daily_schedules: {
-                                    ...prev.daily_schedules,
-                                    [day.key]: { ...prev.daily_schedules[day.key], end_time: value },
-                                  },
-                                }));
-                              }}
-                              className="w-full pl-8 p-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss disabled:opacity-40"
-                              data-testid={`shift-day-${day.key}-end`}
-                            />
-                          </div>
+                          <input
+                            type="time"
+                            value={schedule.start_time}
+                            disabled={!schedule.enabled}
+                            onChange={e => {
+                              const value = e.target.value;
+                              setNewShift((prev) => ({
+                                ...prev,
+                                daily_schedules: {
+                                  ...prev.daily_schedules,
+                                  [day.key]: { ...prev.daily_schedules[day.key], start_time: value },
+                                },
+                              }));
+                            }}
+                            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)]"
+                            data-testid={`shift-day-${day.key}-start`}
+                          />
+                          <input
+                            type="time"
+                            value={schedule.end_time}
+                            disabled={!schedule.enabled}
+                            onChange={e => {
+                              const value = e.target.value;
+                              setNewShift((prev) => ({
+                                ...prev,
+                                daily_schedules: {
+                                  ...prev.daily_schedules,
+                                  [day.key]: { ...prev.daily_schedules[day.key], end_time: value },
+                                },
+                              }));
+                            }}
+                            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)]"
+                            data-testid={`shift-day-${day.key}-end`}
+                          />
+                          <select
+                            value={schedule.break_plan_id || ''}
+                            disabled={!schedule.enabled}
+                            onChange={e => {
+                              const value = e.target.value || null;
+                              setNewShift((prev) => ({
+                                ...prev,
+                                daily_schedules: {
+                                  ...prev.daily_schedules,
+                                  [day.key]: { ...prev.daily_schedules[day.key], break_plan_id: value },
+                                },
+                              }));
+                            }}
+                            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)] cursor-pointer"
+                          >
+                            <option value="">휴게 없음</option>
+                            {newShift.break_plans.map((plan) => (
+                              <option key={plan.id} value={plan.id}>
+                                유형 {plan.id}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                        {schedule.enabled && (
-                          <div className="grid grid-cols-[68px_1fr] items-center gap-2 pl-6 pt-1 border-t border-dashed border-[var(--border)]">
-                            <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">휴게 유형</span>
-                            <select
-                              value={schedule.break_plan_id || ''}
-                              onChange={e => {
-                                const value = e.target.value || null;
-                                setNewShift((prev) => ({
-                                  ...prev,
-                                  daily_schedules: {
-                                    ...prev.daily_schedules,
-                                    [day.key]: { ...prev.daily_schedules[day.key], break_plan_id: value },
-                                  },
-                                }));
-                              }}
-                              className="w-full p-1.5 bg-[var(--card)] border border-[var(--border)] font-semibold text-[11px] radius-toss text-[var(--foreground)]"
-                            >
-                              <option value="">휴게 없음</option>
-                              {newShift.break_plans.map((plan) => (
-                                <option key={plan.id} value={plan.id}>
-                                  유형 {plan.id} ({plan.start_time} ~ {plan.end_time})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
                       </div>
                     );
                   })}

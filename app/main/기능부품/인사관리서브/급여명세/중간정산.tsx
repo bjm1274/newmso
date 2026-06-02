@@ -24,6 +24,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
+import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
@@ -448,27 +449,22 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     }
 
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
-    let nationalPension = 0;
-    let healthInsurance = 0;
-    let longTermCare = 0;
-    let employmentInsurance = 0;
-    let incomeTax = 0;
-    let localTax = 0;
+    const deductions = calcStatutoryDeductions(totalTaxable, taxInsuranceRates, {
+      applyInsurance,
+      applyTax,
+      isDuruNuriActive,
+      isMedicalBenefit,
+      dependentCount,
+      qualifyingChildCount,
+      withholdingRatePercent,
+    });
 
-    if (applyInsurance) {
-      // 국민연금 - 기준소득월액 상·하한 적용(정본 tax-free-limits 상수). 정규 급여정산과 동일 기준.
-      const npBase = Math.min(Math.max(totalTaxable, NP_INCOME_FLOOR), NP_INCOME_CEILING);
-      const fullNationalPension = Math.floor(npBase * taxInsuranceRates.national_pension_rate);
-      nationalPension = isDuruNuriActive ? Math.floor(fullNationalPension * 0.2) : fullNationalPension;
-
-      if (!isMedicalBenefit) {
-        healthInsurance = Math.floor(totalTaxable * taxInsuranceRates.health_insurance_rate);
-        longTermCare = Math.floor(totalTaxable * taxInsuranceRates.long_term_care_rate);
-      }
-
-      const fullEmploymentInsurance = Math.floor(totalTaxable * taxInsuranceRates.employment_insurance_rate);
-      employmentInsurance = isDuruNuriActive ? Math.floor(fullEmploymentInsurance * 0.2) : fullEmploymentInsurance;
-    }
+    const nationalPension = deductions.national_pension;
+    const healthInsurance = deductions.health_insurance;
+    const longTermCare = deductions.long_term_care;
+    const employmentInsurance = deductions.employment_insurance;
+    const incomeTax = deductions.income_tax;
+    const localTax = deductions.local_tax;
 
     const baselineIncomeTax = calculateMonthlyIncomeTax(totalTaxable, taxInsuranceRates, 0, {
       withholdingRatePercent: 100,
@@ -482,10 +478,6 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       withholdingRatePercent: 100,
       qualifyingChildCount,
     });
-    const exactIncomeTax = calculateMonthlyIncomeTax(totalTaxable, taxInsuranceRates, dependentCount, {
-      withholdingRatePercent,
-      qualifyingChildCount,
-    });
     const dependentTaxCredit = hasExactWithholdingTable
       ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12_500;
@@ -493,12 +485,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       ? Math.max(0, familyAdjustedIncomeTax - preRatioIncomeTax)
       : calculateQualifyingChildTaxCredit(qualifyingChildCount);
 
-    if (applyTax && hasExactWithholdingTable) {
-      incomeTax = Math.max(0, exactIncomeTax);
-      localTax = Math.floor((incomeTax * 0.1) / 10) * 10;
-    }
-
-    const deduction = nationalPension + healthInsurance + longTermCare + employmentInsurance + incomeTax + localTax;
+    const deduction = deductions.national_pension + deductions.health_insurance + deductions.long_term_care + deductions.employment_insurance + deductions.income_tax + deductions.local_tax;
     const deductionDetail = {
       national_pension: nationalPension,
       health_insurance: healthInsurance,
@@ -571,7 +558,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     setLoading(true);
     try {
       const calc = calculateSettlement(selectedStaff);
-      const yearMonth = settlementDate.slice(0, 7) + '-I';
+      const yearMonth = settlementDate.slice(0, 7);
 
       const record: any = {
         staff_id: selectedStaff.id,

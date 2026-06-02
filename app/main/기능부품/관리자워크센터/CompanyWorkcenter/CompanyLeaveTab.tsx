@@ -33,7 +33,7 @@ async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
   try {
     const { data, error } = await supabase
       .from('company_holidays')
-      .select('date,name,kind')
+      .select('holiday_date,name,note')
       .eq('company_name', companyName)
       .limit(100);
     
@@ -42,16 +42,16 @@ async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
       if (companyName !== '전체') {
         const { data: allData } = await supabase
           .from('company_holidays')
-          .select('date,name,kind')
+          .select('holiday_date,name,note')
           .eq('company_name', '전체')
           .limit(100);
         if (Array.isArray(allData) && allData.length > 0) {
           return allData.filter(isRecord).map((r): HolidayItem => {
-            const kindRaw = typeof r.kind === 'string' ? r.kind : '법정';
+            const kindRaw = typeof r.note === 'string' ? r.note : '법정';
             const kind: HolidayItem['kind'] =
               kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
             return {
-              date: typeof r.date === 'string' ? r.date : '-',
+              date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
               name: typeof r.name === 'string' ? r.name : '-',
               kind,
             };
@@ -62,11 +62,11 @@ async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
     }
     
     return data.filter(isRecord).map((r): HolidayItem => {
-      const kindRaw = typeof r.kind === 'string' ? r.kind : '법정';
+      const kindRaw = typeof r.note === 'string' ? r.note : '법정';
       const kind: HolidayItem['kind'] =
         kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
       return {
-        date: typeof r.date === 'string' ? r.date : '-',
+        date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
         name: typeof r.name === 'string' ? r.name : '-',
         kind,
       };
@@ -228,7 +228,7 @@ export default function CompanyLeaveTab() {
           company_name: selectedCompany,
           holiday_date: newHoliDate,
           name: newHoliName,
-          kind: newHoliKind,
+          note: newHoliKind,
         });
 
       if (error) throw error;

@@ -444,22 +444,33 @@ export function useChatGlobalSearch({
     return visibleRooms
       .map((room: ChatRoom) => {
         const roomId = String(room.id);
+        const memberIds = normalizeMemberIds(room.members);
+        const membersProfiles = allKnownStaffs.filter((staff) =>
+          memberIds.includes(String(staff.id))
+        );
+        const memberNames = membersProfiles.map((staff) => staff.name || '').join(' ').toLowerCase();
+        const memberDepts = membersProfiles.map((staff) => staff.department || '').join(' ').toLowerCase();
+        const memberPositions = membersProfiles.map((staff) => staff.position || '').join(' ').toLowerCase();
+        const memberCompanies = membersProfiles.map((staff) => staff.company || '').join(' ').toLowerCase();
+        const memberSearchText = `${memberNames} ${memberDepts} ${memberPositions} ${memberCompanies}`;
+
         return {
           room,
           roomId,
           label: roomLabelMap.get(roomId) || '',
           preview: getRoomPreviewText(room),
-          memberCount: normalizeMemberIds(room.members).length,
+          memberCount: memberIds.length,
           isHidden: roomPrefs[room.id]?.hidden === true,
           isNoticeChannel: room.id === NOTICE_ROOM_ID,
+          memberSearchText,
         };
       })
-      .filter(({ label, preview }) => {
-        const haystack = `${String(label || '').toLowerCase()} ${String(preview || '').toLowerCase()}`;
+      .filter(({ label, preview, memberSearchText }) => {
+        const haystack = `${String(label || '').toLowerCase()} ${String(preview || '').toLowerCase()} ${memberSearchText}`;
         return haystack.includes(normalizedRoomSearchQuery);
       })
       .slice(0, 50);
-  }, [normalizedRoomSearchQuery, roomLabelMap, roomPrefs, visibleRooms]);
+  }, [allKnownStaffs, normalizedRoomSearchQuery, roomLabelMap, roomPrefs, visibleRooms]);
 
   const globalSearchMessageResults = useMemo(
     () => globalSearchResults.filter((message: ChatMessage) => !String(message.file_url || '').trim()),
@@ -509,9 +520,23 @@ export function useChatGlobalSearch({
       }
 
       const scopedVisibleRoomIds = parsedQuery.roomQuery
-        ? visibleRoomIds.filter((roomId) =>
-            String(roomLabelMap.get(String(roomId)) || '').toLowerCase().includes(parsedQuery.roomQuery)
-          )
+        ? visibleRoomIds.filter((roomId) => {
+            const label = String(roomLabelMap.get(String(roomId)) || '').toLowerCase();
+            if (label.includes(parsedQuery.roomQuery)) return true;
+
+            const room = visibleRooms.find((r) => String(r.id) === String(roomId));
+            if (!room) return false;
+
+            const memberIds = normalizeMemberIds(room.members);
+            const membersProfiles = allKnownStaffs.filter((staff) =>
+              memberIds.includes(String(staff.id))
+            );
+            return membersProfiles.some((staff) =>
+              String(staff.name || '').toLowerCase().includes(parsedQuery.roomQuery) ||
+              String(staff.department || '').toLowerCase().includes(parsedQuery.roomQuery) ||
+              String(staff.position || '').toLowerCase().includes(parsedQuery.roomQuery)
+            );
+          })
         : visibleRoomIds;
 
       if (scopedVisibleRoomIds.length === 0) {
@@ -600,7 +625,7 @@ export function useChatGlobalSearch({
     } finally {
       setGlobalSearchLoading(false);
     }
-  }, [globalSearchQuery, resolveStaffProfile, roomLabelMap, visibleRoomIds]);
+  }, [allKnownStaffs, globalSearchQuery, resolveStaffProfile, roomLabelMap, visibleRoomIds, visibleRooms]);
 
   useEffect(() => {
     if (!showGlobalSearch) return;

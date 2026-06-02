@@ -2020,6 +2020,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             rows={필터목록}
             keyField="id"
             emptyMessage="표시할 직원이 없습니다."
+            onRowDoubleClick={수정시작}
           />
         </div>
       </div>

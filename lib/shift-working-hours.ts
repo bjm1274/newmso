@@ -196,9 +196,6 @@ export function parseShiftMeta(shift: Shift): ShiftMeta | null {
  * Otherwise:
  *   days  = count of enabled daily_schedules keys, or weekly_work_days
  *   hours = sum of enabled-day minutes / 60  (with daily_schedules)
- *         = singleDayMinutes × days / 60     (without daily_schedules)
- *
- * (Ported from getShiftHoursAndDays, lines 710-814.)
  */
 export function getShiftHoursAndDays(shift: Shift): { hours: number; days: number } {
   if (!shift) return { hours: 40, days: 5 };
@@ -207,24 +204,29 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
 
   // 휴게가 top-level 컬럼(break_start_time/break_end_time)에 없고 break_plans(휴게유형 A/B/C)에만
   // 저장된 근무형태의 경우, 첫 휴게플랜을 단일근무 휴게로 사용한다.
-  // (근무형태관리 화면은 휴게플랜을 반영해 38.5h를 내지만, daily_schedules 없는 경로에서 top-level
-  //  휴게만 읽으면 휴게가 0으로 잡혀 42h가 되는 불일치를 보정)
   const fallbackPlan = meta?.break_plans?.[0] ?? null;
   const effBreakStart = shift.break_start_time || fallbackPlan?.start_time || null;
   const effBreakEnd = shift.break_end_time || fallbackPlan?.end_time || null;
+
+  const shiftTypeClean = String(shift.shift_type || '').replace(/\s+/g, '');
+  const isRotationShift = ['3교대', '교대', '전담', '3shift', '3-shift'].some(kw => shiftTypeClean.includes(kw));
+  const is2Work1Off = ['2일근무1일휴무', '2일근무 1일휴무'].some(kw => String(shift.shift_type || '').includes(kw));
 
   // -----------------------------------------------------------------------
   // 1. Determine calculatedDays
   // -----------------------------------------------------------------------
   let calculatedDays = 5;
-  if (meta?.daily_schedules) {
+  if (isRotationShift) {
+    calculatedDays = 5;
+  } else if (is2Work1Off) {
+    calculatedDays = 4.67;
+  } else if (shift.shift_type === '1일근무1일휴무') {
+    calculatedDays = 3.5;
+  } else if (meta?.daily_schedules) {
     const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     calculatedDays = DAY_KEYS.filter((d) => meta.daily_schedules![d]?.enabled).length;
   } else {
     calculatedDays = Number(shift.weekly_work_days) || 5;
-  }
-  if (shift.shift_type === '1일근무1일휴무') {
-    calculatedDays = 3.5;
   }
 
   // -----------------------------------------------------------------------
@@ -233,7 +235,33 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
   let calculatedHours = 40;
   const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-  if (shift.shift_type === '1일근무1일휴무') {
+  // 단일 근무일 근로 시간 산출 (휴게 제외)
+  let singleMins = 0;
+  const firstEnabledDay = DAY_KEYS.map(d => meta?.daily_schedules?.[d]).find(s => s?.enabled);
+  if (firstEnabledDay) {
+    const plan = getPlan(meta?.break_plans, firstEnabledDay.break_plan_id);
+    singleMins = calcWorkMinutes({
+      start_time: firstEnabledDay.start_time,
+      end_time: firstEnabledDay.end_time,
+      break_start_time: plan?.start_time ?? null,
+      break_end_time: plan?.end_time ?? null
+    });
+  } else {
+    singleMins = calcWorkMinutes({
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      break_start_time: effBreakStart,
+      break_end_time: effBreakEnd
+    });
+  }
+
+  if (isRotationShift) {
+    // 3교대 및 전담 등 교대제는 일 실근로시간 * 5일 기준 (최대 40시간 제한)
+    calculatedHours = Math.min(40, Math.round(((singleMins * 5) / 60) * 10) / 10);
+  } else if (is2Work1Off) {
+    // 2일근무 1일휴무는 평균 주 4.67일 기준
+    calculatedHours = Math.round(((singleMins * 4.67) / 60) * 10) / 10;
+  } else if (shift.shift_type === '1일근무1일휴무') {
     if (meta?.daily_schedules) {
       const enabledDays = DAY_KEYS.filter((d) => meta.daily_schedules![d]?.enabled);
       if (enabledDays.length > 0) {
@@ -254,21 +282,9 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
         calculatedHours =
           Math.round(((totalMins / enabledDays.length) * 3.5) / 60 * 10) / 10;
       } else {
-        const singleMins = calcWorkMinutes({
-          start_time: shift.start_time,
-          end_time: shift.end_time,
-          break_start_time: effBreakStart,
-          break_end_time: effBreakEnd,
-        });
         calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
       }
     } else {
-      const singleMins = calcWorkMinutes({
-        start_time: shift.start_time,
-        end_time: shift.end_time,
-        break_start_time: effBreakStart,
-        break_end_time: effBreakEnd,
-      });
       calculatedHours = Math.round(((singleMins * 3.5) / 60) * 10) / 10;
     }
   } else {
@@ -280,8 +296,8 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
         return (
           sum +
           calcWorkMinutes({
-            start_time: sched?.start_time,
-            end_time: sched?.end_time,
+            start_time: sched.start_time,
+            end_time: sched.end_time,
             break_start_time: plan?.start_time ?? null,
             break_end_time: plan?.end_time ?? null,
           })
@@ -289,12 +305,6 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
       }, 0);
       calculatedHours = Math.round((totalMins / 60) * 10) / 10;
     } else {
-      const singleMins = calcWorkMinutes({
-        start_time: shift.start_time,
-        end_time: shift.end_time,
-        break_start_time: effBreakStart,
-        break_end_time: effBreakEnd,
-      });
       calculatedHours = Math.round(((singleMins * calculatedDays) / 60) * 10) / 10;
     }
   }

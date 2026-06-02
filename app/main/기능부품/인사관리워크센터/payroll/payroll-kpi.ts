@@ -10,7 +10,10 @@
  * JM5: 정수 누적만
  */
 
-import { calculateHourlyRateFromMonthlySalary } from '@/lib/payroll-working-hours';
+import {
+  calculateHourlyRateFromMonthlySalary,
+  resolveWeeklyWorkingHours,
+} from '@/lib/payroll-working-hours';
 import { calculateAge } from './payroll-policy';
 import type {
   PayrollRecordNormalized,
@@ -129,7 +132,9 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
   let minWageBelow = 0;
   staffs.forEach((s) => {
     if (!s.salary || s.salary <= 0) return;
-    const hourly = calculateHourlyRateFromMonthlySalary(s.salary, 40);
+    const isAlternateDayShift = !!((s as any).isAlternateDayShift || (s.permissions as any)?.isAlternateDayShift || (s.permissions as any)?.work_conditions?.isAlternateDayShift);
+    const weeklyHours = resolveWeeklyWorkingHours(s, 40);
+    const hourly = calculateHourlyRateFromMonthlySalary(s.salary, weeklyHours, 'ceil', isAlternateDayShift);
     if (hourly < minHourly) minWageBelow += 1;
   });
   if (minWageBelow > 0) {

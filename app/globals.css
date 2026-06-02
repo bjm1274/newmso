@@ -3733,8 +3733,11 @@ button, a, [role="button"] {
   .no-print { display: none !important; }
   .print-only { display: block; }
 
-  /* @page 마진 0 → 브라우저 자동 헤더(날짜, URL 등) 제거 */
-  @page { margin: 0; size: A4; }
+  /* 1. @page 여백 설정: 테두리(Navy/Gold)의 기준점 역할을 하도록 설정 */
+  @page {
+    margin: 8mm 10mm !important;
+    size: A4;
+  }
 
   /* [data-print-root]와 무관한 모든 요소를 display:none으로 완전 제거 */
   body:has([data-print-root]) *:not(:has([data-print-root])):not([data-print-root]):not([data-print-root] *) {
@@ -3761,11 +3764,11 @@ button, a, [role="button"] {
     display: block !important;
   }
 
-  /* [data-print-root] 자체 */
+  /* 2. [data-print-root] 자체: 안쪽 본문 패딩 설정 (테두리선 내부 여백 확보) */
   body:has([data-print-root]) [data-print-root] {
     position: static !important;
     margin: 0 !important;
-    padding: 10mm 12mm !important;
+    padding: 0 8mm !important; /* 좌우만 패딩 적용하고, 상하는 테이블 header/footer가 페이징별로 완벽히 처리 */
     width: auto !important;
     max-width: none !important;
     background: white !important;
@@ -3788,6 +3791,45 @@ button, a, [role="button"] {
     max-height: none !important;
   }
 
+  /* 3. 본문 텍스트 및 조항 스타일 콤팩트 최적화 */
+  body:has([data-print-root]) [data-print-root] p,
+  body:has([data-print-root]) [data-print-root] span,
+  body:has([data-print-root]) [data-print-root] div,
+  body:has([data-print-root]) [data-print-root] td {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  body:has([data-print-root]) [data-print-root] h1 {
+    font-size: 20px !important;
+    margin-bottom: 8px !important;
+  }
+
+  body:has([data-print-root]) [data-print-root] h2 {
+    font-size: 16px !important;
+    margin-bottom: 8px !important;
+  }
+
+  body:has([data-print-root]) [data-print-root] h4 {
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+  }
+
+  body:has([data-print-root]) [data-print-root] .contract-article {
+    margin-bottom: 6px !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 4. 임금 구성표 등 테이블 간격 최적화 */
+  body:has([data-print-root]) [data-print-root] table,
+  body:has([data-print-root]) [data-print-root] .bg-\[var\(--tab-bg\)\]\/80 {
+    font-size: 10px !important;
+    padding: 8px 10px !important;
+    margin-top: 6px !important;
+    margin-bottom: 4px !important;
+  }
+
   /* 인쇄 영역 내부 긴 단어(주소·URL 등)가 테두리 밖으로 삐져나오지 않도록 */
   body:has([data-print-root]) [data-print-root] * {
     overflow-wrap: break-word !important;
@@ -3804,17 +3846,17 @@ button, a, [role="button"] {
     page-break-after: avoid;
   }
 
-  /* 고급 장식 테두리 — position:fixed 라 매 페이지마다 반복 인쇄된다.
-     증서/상장 느낌의 네이비(바깥) + 골드(안쪽) 이중 프레임을 두 개의 pseudo 로 구현
-     (box-shadow 는 인쇄 시 누락될 수 있어 border 로 처리해 호환성 확보).
-     안쪽 프레임 여백(8.2mm/10.2mm) < 본문 padding(10mm/12mm) 이므로 글자가 선에 닿지 않는다. */
+  /* 고급 장식 테두리 — position: fixed이므로 매 페이지마다 반복 인쇄됩니다.
+     상장 느낌의 네이비(바깥) + 골드(안쪽) 이중 프레임을 구현합니다.
+     브라우저 외곽 영역 잘림 현상을 방지하기 위해 음수 오프셋을 배제하고,
+     Navy 라인을 인쇄 여백 끝(0)에, Gold 라인을 1.2mm 안쪽에 고정합니다. */
   body:has([data-print-root]) [data-print-root]::before {
     content: '';
     position: fixed;
-    top: 7mm;
-    left: 9mm;
-    right: 9mm;
-    bottom: 7mm;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     border: 2px solid #1e2a4a;
     pointer-events: none;
     z-index: 0;
@@ -3822,10 +3864,10 @@ button, a, [role="button"] {
   body:has([data-print-root]) [data-print-root]::after {
     content: '';
     position: fixed;
-    top: 8.2mm;
-    left: 10.2mm;
-    right: 10.2mm;
-    bottom: 8.2mm;
+    top: 1.2mm;
+    left: 1.2mm;
+    right: 1.2mm;
+    bottom: 1.2mm;
     border: 1px solid #c2a14d;
     pointer-events: none;
     z-index: 0;
@@ -3836,12 +3878,6 @@ button, a, [role="button"] {
   body:has([data-print-root]) [data-print-root] * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-  }
-
-  /* 조 단위 블록이 페이지 경계에서 잘리지 않도록 */
-  body:has([data-print-root]) [data-print-root] .contract-article {
-    break-inside: avoid;
-    page-break-inside: avoid;
   }
 
   /* 비밀유지 서약서는 새 페이지에서 시작 */

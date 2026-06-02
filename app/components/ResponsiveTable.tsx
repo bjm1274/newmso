@@ -34,6 +34,7 @@ export type ResponsiveTableProps<T> = {
   rows: T[];
   keyField: keyof T;
   onRowClick?: (row: T) => void;
+  onRowDoubleClick?: (row: T) => void;
   emptyMessage?: string;
   className?: string;
   selection?: ResponsiveTableSelection;
@@ -65,6 +66,7 @@ export function ResponsiveTable<T>({
   rows,
   keyField,
   onRowClick,
+  onRowDoubleClick,
   emptyMessage = '표시할 데이터가 없습니다.',
   className = '',
   selection,
@@ -134,8 +136,9 @@ export function ResponsiveTable<T>({
                 <tr
                   key={key}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  role={onRowClick ? 'button' : undefined}
+                  onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
+                  tabIndex={onRowClick || onRowDoubleClick ? 0 : undefined}
+                  role={onRowClick || onRowDoubleClick ? 'button' : undefined}
                   aria-selected={selection ? isSelected : undefined}
                   onKeyDown={
                     onRowClick
@@ -216,10 +219,11 @@ export function ResponsiveTable<T>({
                 </label>
               )}
               <CardEl
-                type={onRowClick ? 'button' : undefined}
-                role={onRowClick ? undefined : 'listitem'}
+                type={onRowClick || onRowDoubleClick ? 'button' : undefined}
+                role={onRowClick || onRowDoubleClick ? undefined : 'listitem'}
                 aria-selected={selection ? isSelected : undefined}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                 className={[
                   'block w-full px-4 py-3 text-left',
                   selection && canSelect ? 'pl-12' : '',
