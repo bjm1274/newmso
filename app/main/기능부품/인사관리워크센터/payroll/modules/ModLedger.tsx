@@ -4,8 +4,8 @@ import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
 import { buildLedgerRows } from '../payroll-domain';
-import LaborCostTrend from '../../../급여명세/인건비추이분석';
-import TotalLaborCostForecast from '../../../급여명세/총인건비예측';
+import LaborCostTrend from '../../../인사관리서브/급여명세/인건비추이분석';
+import TotalLaborCostForecast from '../../../인사관리서브/급여명세/총인건비예측';
 
 const LegacySalaryDetail = dynamic(
   () => import('../../../인사관리서브/급여명세/급여상세'),

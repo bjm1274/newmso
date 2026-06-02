@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { usePayrollData } from '../payroll-context';
 import { buildUnpaidRows } from '../payroll-domain';
-import UnpaidAllowanceAlert from '../../../급여명세/미지급수당알림';
+import UnpaidAllowanceAlert from '../../../인사관리서브/급여명세/미지급수당알림';
 
 /**
  * #12 미지급 수당 점검 — 전월 대비 야간/연장수당 누락 자동 감지 및 실시간 근태 대조
