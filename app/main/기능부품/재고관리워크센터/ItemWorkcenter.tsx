@@ -11,6 +11,7 @@
 
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import {
   KpiRow,
@@ -25,6 +26,70 @@ import type { AssetRow, CatalogRow, CategoryCard, ItemTab, UdiRow } from './stoc
 import { useItemData, useEmptyMessage } from './stock-workcenter-data';
 
 // ─────────────────────────────────────────────────
+// 레거시 dynamic imports
+// ─────────────────────────────────────────────────
+
+function LoadingSpinner() {
+  return (
+    <div className="flex min-h-[260px] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+    </div>
+  );
+}
+
+const LegacyProductRegistration = dynamic(
+  () => import('../재고관리서브/물품등록'),
+  { loading: () => <LoadingSpinner />, ssr: false },
+);
+
+const LegacyQRAssetManager = dynamic(
+  () => import('../재고관리서브/자산QR관리'),
+  { loading: () => <LoadingSpinner />, ssr: false },
+);
+
+const LegacyUDIManagement = dynamic(
+  () => import('../재고관리서브/UDI관리'),
+  { loading: () => <LoadingSpinner />, ssr: false },
+);
+
+type LegacyModal = 'product' | 'asset' | 'udi' | null;
+
+/** 범용 레거시 오버레이 래퍼 */
+function LegacyOverlay({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="모달 닫기"
+            className="p-1.5 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="px-4 py-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────
 // 메인
 // ─────────────────────────────────────────────────
 
@@ -37,6 +102,7 @@ const TABS: TabItem<ItemTab>[] = [
 
 export default function ItemWorkcenter() {
   const [tab, setTab] = useState<ItemTab>('items');
+  const [modal, setModal] = useState<LegacyModal>(null);
   const data = useItemData();
 
   const kpiItems = useMemo<KpiItem[]>(
@@ -83,22 +149,37 @@ export default function ItemWorkcenter() {
 
   return (
     <div className="flex flex-col gap-4">
+      {modal === 'product' && (
+        <LegacyOverlay title="물품 등록" onClose={() => setModal(null)}>
+          <LegacyProductRegistration user={{}} inventory={[]} suppliers={[]} />
+        </LegacyOverlay>
+      )}
+      {modal === 'asset' && (
+        <LegacyOverlay title="자산 QR 관리" onClose={() => setModal(null)}>
+          <LegacyQRAssetManager user={{}} inventory={[]} />
+        </LegacyOverlay>
+      )}
+      {modal === 'udi' && (
+        <LegacyOverlay title="UDI 관리" onClose={() => setModal(null)}>
+          <LegacyUDIManagement user={{}} inventory={[]} />
+        </LegacyOverlay>
+      )}
       <StockTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="물품·자산 탭" />
       <KpiRow items={kpiItems} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
         <section role="tabpanel">
           {tab === 'items' && (
-            <CatalogPanel rows={data.catalog} loading={data.loading} error={data.error} />
+            <CatalogPanel rows={data.catalog} loading={data.loading} error={data.error} onRegister={() => setModal('product')} />
           )}
           {tab === 'cats' && (
             <CategoryPanel items={data.categories} loading={data.loading} error={data.error} />
           )}
           {tab === 'asset' && (
-            <AssetQrPanel assets={data.assets} loading={data.loading} error={data.error} />
+            <AssetQrPanel assets={data.assets} loading={data.loading} error={data.error} onRegisterAsset={() => setModal('asset')} />
           )}
           {tab === 'udi' && (
-            <UdiPanel rows={data.udis} loading={data.loading} error={data.error} />
+            <UdiPanel rows={data.udis} loading={data.loading} error={data.error} onRegisterUdi={() => setModal('udi')} />
           )}
         </section>
 
@@ -125,10 +206,12 @@ function CatalogPanel({
   rows,
   loading,
   error,
+  onRegister,
 }: {
   rows: CatalogRow[];
   loading: boolean;
   error: string | null;
+  onRegister: () => void;
 }) {
   const emptyMessage = useEmptyMessage(loading, error, rows.length);
   return (
@@ -139,12 +222,15 @@ function CatalogPanel({
           <button
             type="button"
             className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-bold hover:bg-[var(--muted)]"
+            disabled
+            title="준비 중"
           >
             일괄 가져오기
           </button>
           <button
             type="button"
             className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+            onClick={onRegister}
           >
             + 물품 등록
           </button>
@@ -180,8 +266,8 @@ function CatalogPanel({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.sku}>
+              {rows.map((r, idx) => (
+                <tr key={`${r.sku}-${idx}`}>
                   <td className="font-bold tabular-nums text-[var(--accent)] text-[11px]">
                     {r.sku}
                   </td>
@@ -275,10 +361,12 @@ function AssetQrPanel({
   assets,
   loading,
   error,
+  onRegisterAsset,
 }: {
   assets: AssetRow[];
   loading: boolean;
   error: string | null;
+  onRegisterAsset: () => void;
 }) {
   const emptyMessage = useEmptyMessage(loading, error, assets.length);
   const firstAsset = assets[0];
@@ -292,6 +380,8 @@ function AssetQrPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--zinc-900)] hover:bg-white/90"
+          disabled
+          title="준비 중"
         >
           라벨 인쇄
         </button>
@@ -304,6 +394,7 @@ function AssetQrPanel({
             <button
               type="button"
               className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+              onClick={onRegisterAsset}
             >
               + 자산 등록
             </button>
@@ -429,10 +520,12 @@ function UdiPanel({
   rows,
   loading,
   error,
+  onRegisterUdi,
 }: {
   rows: UdiRow[];
   loading: boolean;
   error: string | null;
+  onRegisterUdi: () => void;
 }) {
   const emptyMessage = useEmptyMessage(loading, error, rows.length);
   return (
@@ -442,6 +535,7 @@ function UdiPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+          onClick={onRegisterUdi}
         >
           + UDI 등록
         </button>

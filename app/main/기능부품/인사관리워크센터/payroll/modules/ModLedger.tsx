@@ -1,8 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
 import { buildLedgerRows } from '../payroll-domain';
+
+const LegacySalaryDetail = dynamic(
+  () => import('../../../인사관리서브/급여명세/급여상세'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">
+        명세서 로드 중…
+      </div>
+    ),
+  },
+);
 
 /**
  * #2 급여 대장 — 월별·부서 필터 + 표 (실데이터 staff_members + payroll_records)
@@ -14,6 +27,7 @@ export default function ModLedger() {
   const data = usePayrollData();
   const { yearMonth, setYearMonth } = usePayroll();
   const [dept, setDept] = useState<string>('전체');
+  const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
 
   const rows = useMemo(() => buildLedgerRows(data), [data]);
 
@@ -128,7 +142,12 @@ export default function ModLedger() {
               </tr>
             ) : (
               filteredRows.map((r) => (
-                <tr key={r.staff_id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]">
+                <tr
+                  key={r.staff_id}
+                  className="border-t border-[var(--border)] hover:bg-[var(--muted)] cursor-pointer"
+                  onClick={() => setSelectedStaffId(r.staff_id)}
+                  data-testid={`payroll-ledger-row-${r.staff_id}`}
+                >
                   <td className="px-3 py-2 font-bold">{r.name}</td>
                   <td className="px-3 py-2 text-[var(--toss-gray-4)]">{r.dept}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.base.toLocaleString()}</td>
@@ -176,6 +195,59 @@ export default function ModLedger() {
           )}
         </table>
       </div>
+
+      {/* 급여 상세 모달 */}
+      {selectedStaffId !== null && (() => {
+        const staff = data.staffs.find((s) => String(s.id) === String(selectedStaffId));
+        const record = data.records.find((r) => String(r.staff_id) === String(selectedStaffId));
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="급여 상세"
+            data-testid="payroll-ledger-detail-modal"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setSelectedStaffId(null)}
+          >
+            <div
+              className="relative w-full max-w-[680px] max-h-[90vh] overflow-y-auto bg-white rounded-[var(--radius-lg)] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
+                <span className="text-[13px] font-bold">
+                  {staff ? `${staff.name} 급여 명세서` : '급여 명세서'}
+                </span>
+                <button
+                  type="button"
+                  aria-label="닫기"
+                  onClick={() => setSelectedStaffId(null)}
+                  className="text-[18px] leading-none text-[var(--toss-gray-3)] hover:text-[var(--foreground)] px-1"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-2">
+                {record ? (
+                  <LegacySalaryDetail record={record as any} staff={staff as any} />
+                ) : (
+                  <div
+                    data-testid="payroll-ledger-pending-placeholder"
+                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-6 py-10 text-center"
+                  >
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--muted)] text-2xl">🧾</div>
+                    <h3 className="mt-4 text-xl font-bold text-[var(--foreground)]">
+                      {staff?.name}님의 급여는 아직 정산중입니다
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[var(--toss-gray-3)]">
+                      급여정산에서 저장 또는 확정한 뒤 다시 확인해 주세요.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

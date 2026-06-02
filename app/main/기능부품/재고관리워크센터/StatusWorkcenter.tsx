@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FilterChips,
   KpiRow,
@@ -25,6 +25,10 @@ import {
 } from './stock-types';
 import { useStatusData, useEmptyMessage } from './stock-workcenter-data';
 import { DeptUsageTop5, StockStatusTable, UrgentAlertList } from './StatusSubViews';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { useNavigation } from '@/app/main/contexts/NavigationContext';
+import { useSupplyWorkflow } from '@/app/main/hooks/useSupplyWorkflow';
+import { INVENTORY_SUPPORT_COMPANY, INVENTORY_SUPPORT_DEPARTMENT } from '@/app/main/inventory-utils';
 
 type SortKey = '위치별' | '카테고리별' | '재고 적은 순' | '만료 임박 순';
 
@@ -45,6 +49,55 @@ export default function StatusWorkcenter() {
   const [sortBy, setSortBy] = useState<SortKey>('위치별');
 
   const data = useStatusData();
+
+  // supply approval 패널 (MSO 재고 운영자 전용)
+  const { user } = useAppData();
+  const isInventoryOpsUser = useMemo(
+    () =>
+      (String(user?.company || '').trim() === INVENTORY_SUPPORT_COMPANY &&
+        String(user?.department || '').trim() === INVENTORY_SUPPORT_DEPARTMENT) ||
+      user?.permissions?.mso === true,
+    [user],
+  );
+  const refreshFn = useCallback(async () => {}, []);
+  const fetchLogsFn = useCallback(async () => {}, []);
+  const workflow = useSupplyWorkflow({
+    user: user ?? undefined,
+    isInventoryOpsUser,
+    activeView: 'status',
+    refreshCurrentInventory: refreshFn,
+    fetchLogs: fetchLogsFn,
+  });
+
+  const [highlightTarget, setHighlightTarget] = useState<string | null>(null);
+  const highlightRef = useRef<string | null>(null);
+
+  const { setHighlightedSupplyApprovalId, fetchPendingSupplyApprovals, pendingSupplyApprovals } = workflow;
+
+  // URL param open_inventory_approval 처리 — pendingApprovals 로드 후 하이라이트 설정
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const approvalId = params.get('open_inventory_approval');
+    if (!approvalId) return;
+    const found = pendingSupplyApprovals.some((a: { id?: string | null }) => String(a.id ?? '') === approvalId);
+    if (!found) return;
+    if (approvalId === highlightRef.current) return;
+    highlightRef.current = approvalId;
+    setHighlightTarget(approvalId);
+    setHighlightedSupplyApprovalId(approvalId);
+    const t = window.setTimeout(() => {
+      setHighlightedSupplyApprovalId((c: string | null) =>
+        c === approvalId ? null : c,
+      );
+      setHighlightTarget(null);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [setHighlightedSupplyApprovalId, pendingSupplyApprovals]);
+
+  useEffect(() => {
+    void fetchPendingSupplyApprovals();
+  }, [fetchPendingSupplyApprovals]);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [
@@ -110,8 +163,172 @@ export default function StatusWorkcenter() {
   const sorted = useMemo(() => sortRows(filtered, sortBy), [filtered, sortBy]);
   const emptyMessage = useEmptyMessage(data.loading, data.error, sorted.length);
 
+  // supply approval types
+  type WI = Record<string, unknown>;
+  type AR = { id?: string | null; title?: string; sender_name?: string | null; sender_company?: string | null; live_inventory_workflow?: { items?: WI[]; summary?: Record<string, unknown> }; meta_data?: Record<string, unknown>; [k: string]: unknown };
+
+  const nav = useNavigation();
+  const pendingApprovals = workflow.pendingSupplyApprovals as AR[];
+  const completedApprovals = workflow.completedSupplyApprovals as AR[];
+  const hasPending = isInventoryOpsUser && pendingApprovals.length > 0;
+  const hasHistory = isInventoryOpsUser && completedApprovals.length > 0;
+
   return (
     <div className="flex flex-col gap-4">
+      {workflow.dialog}
+
+      {/* ── 공급신청 워크플로우 (ops only) ── */}
+      {hasPending && (
+        <div data-testid="inventory-supply-approval-panel" className="app-card overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-3.5">
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span className="text-sm font-bold text-[var(--foreground)]">승인된 물품신청 처리</span>
+            <span className="px-2 py-0.5 bg-[var(--accent)] text-white text-[10px] font-black rounded-full">{pendingApprovals.length}</span>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {pendingApprovals.map((approval) => {
+              const items = (approval.live_inventory_workflow?.items || []) as WI[];
+              const summary = approval.live_inventory_workflow?.summary || {};
+              return (
+                <div
+                  key={String(approval.id ?? '')}
+                  data-testid={`inventory-supply-approval-${String(approval.id ?? '')}`}
+                  data-supply-approval-id={String(approval.id ?? '')}
+                  data-highlighted={workflow.highlightedSupplyApprovalId === String(approval.id) ? 'true' : 'false'}
+                  className={`rounded-[var(--radius-lg)] border p-4 transition-all ${
+                    workflow.highlightedSupplyApprovalId === String(approval.id)
+                      ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20'
+                      : 'border-[var(--border)] bg-[var(--muted)]/20'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div>
+                      <p className="text-xs font-bold text-[var(--foreground)]">{approval.title}</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">
+                        {approval.sender_name} · {approval.sender_company}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded">불출 {Number((summary as Record<string,unknown>).issue_ready_count || 0)}</span>
+                      <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 text-[10px] font-bold rounded">발주 {Number((summary as Record<string,unknown>).order_required_count || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {items.map((wItem) => {
+                      const requestIndex = Number(wItem.request_index ?? 0);
+                      const key = `${String(approval.id ?? '')}:${requestIndex}`;
+                      const busy = workflow.workflowActionKey === `${key}:issue` || workflow.workflowActionKey === `${key}:order` || workflow.workflowActionKey === `${key}:order-cancel`;
+                      const issued = wItem.status === 'issued';
+                      const ordered = wItem.status === 'ordered';
+                      return (
+                        <div key={key} className="flex items-center gap-3 bg-[var(--card)] rounded-[var(--radius-md)] px-3 py-2.5 border border-[var(--border)]">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[var(--foreground)] truncate">{String(wItem.name ?? '')}</p>
+                            <p className="text-[10px] text-[var(--toss-gray-3)]">{String(wItem.purpose ?? '') || '-'} / {String(wItem.dept ?? '') || '-'}</p>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            {!issued && !ordered && wItem.recommended_action === 'issue' && (
+                              <button
+                                data-testid={`inventory-supply-issue-${String(approval.id ?? '')}-${requestIndex}`}
+                                disabled={busy}
+                                onClick={() => void workflow.handleSupplyIssue(approval as Parameters<typeof workflow.handleSupplyIssue>[0], wItem as Parameters<typeof workflow.handleSupplyIssue>[1])}
+                                className="px-3 py-1.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)] disabled:opacity-50"
+                              >
+                                {busy ? '...' : '최종불출'}
+                              </button>
+                            )}
+                            {!issued && !ordered && wItem.recommended_action === 'order' && (
+                              <button
+                                data-testid={`inventory-supply-order-${String(approval.id ?? '')}-${requestIndex}`}
+                                disabled={busy}
+                                onClick={() => void workflow.handleSupplyOrder(approval as Parameters<typeof workflow.handleSupplyOrder>[0], wItem as Parameters<typeof workflow.handleSupplyOrder>[1])}
+                                className="px-3 py-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-[var(--radius-md)] disabled:opacity-50"
+                              >
+                                {busy ? '...' : '발주'}
+                              </button>
+                            )}
+                            {ordered && !Boolean(wItem.order_approval_requested) && (
+                              <button
+                                data-testid={`inventory-supply-history-cancel-order-${String(approval.id ?? '')}-${requestIndex}`}
+                                disabled={busy}
+                                onClick={() => void workflow.handleSupplyOrderCancel(approval as Parameters<typeof workflow.handleSupplyOrderCancel>[0], wItem as Parameters<typeof workflow.handleSupplyOrderCancel>[1])}
+                                className="px-2 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded-[var(--radius-md)] border border-[var(--border)] disabled:opacity-50"
+                              >취소</button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 처리완료 히스토리 ── */}
+      {hasHistory && (
+        <div data-testid="inventory-supply-history-panel" className="app-card overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-3">
+            <span className="text-xs font-bold text-[var(--toss-gray-4)]">처리 완료 히스토리</span>
+            <span className="text-[10px] text-[var(--toss-gray-3)]">{completedApprovals.length}건</span>
+          </div>
+          <div className="px-5 py-4 space-y-2">
+            {completedApprovals.slice(0, 8).map((approval) => {
+              const items = (approval.live_inventory_workflow?.items || []) as WI[];
+              return (
+                <div key={`h-${String(approval.id ?? '')}`} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/20 p-3">
+                  <p className="text-xs font-semibold text-[var(--foreground)] mb-2">{approval.title}</p>
+                  <div className="flex flex-col gap-2">
+                    {items.map((wItem, idx) => {
+                      const requestIndex = Number(wItem.request_index ?? idx);
+                      const busy = workflow.workflowActionKey === `${String(approval.id ?? '')}:${requestIndex}:order-cancel`;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 flex-wrap">
+                          <span
+                            data-testid={`inventory-supply-history-item-${String(approval.id ?? '')}-${requestIndex}`}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${
+                              wItem.status === 'issued' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-amber-500/10 text-amber-700'
+                            }`}
+                          >
+                            {String(wItem.name ?? '')} · {String(wItem.qty ?? '')}개
+                            · {wItem.status === 'issued' ? '불출 완료' : '발주 처리'}
+                          </span>
+                          {wItem.status === 'ordered' && Boolean(wItem.order_approval_requested) && (
+                            <button
+                              data-testid={`inventory-supply-history-open-order-${String(approval.id ?? '')}-${requestIndex}`}
+                              onClick={() => {
+                                // localStorage를 io로 업데이트 후 서브뷰 이동
+                                try { window.localStorage.setItem('erp_inventory_view', 'io'); } catch { /* */ }
+                                nav.setSubView('io');
+                              }}
+                              className="px-2 py-1 bg-[var(--foreground)] text-white text-[10px] font-bold rounded"
+                            >
+                              발주 보기
+                            </button>
+                          )}
+                          {wItem.status === 'ordered' && !Boolean(wItem.order_approval_requested) && (
+                            <button
+                              data-testid={`inventory-supply-history-cancel-order-${String(approval.id ?? '')}-${requestIndex}`}
+                              disabled={busy}
+                              onClick={() => void workflow.handleSupplyOrderCancel(approval as Parameters<typeof workflow.handleSupplyOrderCancel>[0], wItem as Parameters<typeof workflow.handleSupplyOrderCancel>[1])}
+                              className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded border border-[var(--border)] disabled:opacity-50"
+                            >
+                              취소
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <KpiRow items={kpiItems} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { stripHiddenMessageMetaBlocks } from './메신저첨부';
 import { parseMarkdownSegments } from './메신저포매팅';
 import { getEmoticonDef, buildEmoticonSVG } from './메신저액션서브/emoticon-engine';
@@ -135,94 +135,3 @@ export function renderMessageContent(content: string, isMine = false, highlightQ
   return renderFormattedSegments(visibleContent, isMine, highlightQuery);
 }
 
-/** 메시지에서 첫 번째 URL 추출 */
-export function extractFirstUrl(content: string): string | null {
-  const match = content.match(/https?:\/\/[^\s<>]+/);
-  return match?.[0] || null;
-}
-
-type OgData = {
-  url: string;
-  title: string | null;
-  description: string | null;
-  image: string | null;
-  siteName: string | null;
-};
-
-const ogCache = new Map<string, OgData | null>();
-
-/** OG 링크 미리보기 카드 */
-export function OgLinkPreview({ url, isMine }: { url: string; isMine: boolean }) {
-  const [og, setOg] = useState<OgData | null>(ogCache.get(url) ?? null);
-  const [loaded, setLoaded] = useState(ogCache.has(url));
-
-  useEffect(() => {
-    if (loaded) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/chat/og-preview?url=${encodeURIComponent(url)}`);
-        if (!res.ok) return;
-        const data: OgData = await res.json();
-        if (!cancelled && (data.title || data.description)) {
-          ogCache.set(url, data);
-          setOg(data);
-        } else {
-          ogCache.set(url, null);
-        }
-      } catch {
-        ogCache.set(url, null);
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [url, loaded]);
-
-  if (!og || (!og.title && !og.description)) return null;
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className={`mt-1.5 block overflow-hidden rounded-[var(--radius-md)] border transition-colors ${
-        isMine
-          ? 'border-white/20 bg-white/10 hover:bg-white/15'
-          : 'border-[var(--border)] bg-[var(--muted)]/50 hover:bg-[var(--muted)]'
-      }`}
-    >
-      {og.image && (
-        <div className="h-32 w-full overflow-hidden bg-[var(--muted)]">
-          <img
-            src={og.image}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        </div>
-      )}
-      <div className="px-2.5 py-2">
-        {og.siteName && (
-          <p className={`text-[9px] font-bold uppercase ${isMine ? 'text-white/50' : 'text-[var(--toss-gray-3)]'}`}>
-            {og.siteName}
-          </p>
-        )}
-        {og.title && (
-          <p className={`text-[11px] font-bold leading-snug ${isMine ? 'text-white' : 'text-[var(--foreground)]'}`}>
-            {og.title.length > 60 ? og.title.slice(0, 60) + '…' : og.title}
-          </p>
-        )}
-        {og.description && (
-          <p className={`mt-0.5 text-[10px] leading-relaxed ${isMine ? 'text-white/70' : 'text-[var(--toss-gray-3)]'}`}>
-            {og.description.length > 100 ? og.description.slice(0, 100) + '…' : og.description}
-          </p>
-        )}
-      </div>
-    </a>
-  );
-}

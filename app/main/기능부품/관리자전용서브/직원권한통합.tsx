@@ -3,7 +3,6 @@ import { toast } from '@/lib/toast';
 import { useActionDialog } from '@/app/components/useActionDialog';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { FEATURE_PERMISSION_GROUPS } from '@/lib/feature-permissions';
@@ -117,8 +116,21 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
 
   const updateStaffRecord = useCallback(
     async (staffId: string, updates: Record<string, any>) => {
-      const { error } = await supabase.from('staff_members').update(updates).eq('id', staffId);
-      if (error) return { error };
+      try {
+        const response = await fetch('/api/admin/staff-permission', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ staffId, updates }),
+        });
+        const body = await response.json().catch(() => null);
+        if (!response.ok || !body?.ok) {
+          const message = body?.error || '권한 변경 중 오류가 발생했습니다.';
+          return { error: new Error(message) };
+        }
+      } catch (err) {
+        return { error: err instanceof Error ? err : new Error('권한 변경 중 오류가 발생했습니다.') };
+      }
 
       setStaffs((prev) => prev.map((staff) => (staff.id === staffId ? { ...staff, ...updates } : staff)));
       setSelectedStaff((prev: any) => (prev?.id === staffId ? { ...prev, ...updates } : prev));

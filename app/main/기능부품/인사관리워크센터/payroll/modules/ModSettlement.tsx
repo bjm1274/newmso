@@ -1,8 +1,17 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
-import { usePayrollData } from '../payroll-context';
+import { usePayroll, usePayrollData } from '../payroll-context';
 import { calculateKpis } from '../payroll-kpi';
+import type { StaffMember } from '@/types';
+
+type SalarySettlementProps = { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void };
+
+const LegacySalarySettlement = dynamic<SalarySettlementProps>(
+  () => import('../../../인사관리서브/급여명세/급여정산'),
+  { ssr: false, loading: () => <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">급여정산 로드 중…</div> },
+);
 
 /**
  * #1 급여 정산 — 5단계 워크플로 (근태 마감 → 수당·공제 → 결재 → 지급 → 원천징수)
@@ -34,8 +43,10 @@ function stepBadgeClass(state: StepState): string {
 
 export default function ModSettlement() {
   const data = usePayrollData();
+  const { selectedCo, reload } = usePayroll();
   const kpis = useMemo(() => calculateKpis(data), [data]);
   const [advancing, setAdvancing] = useState(false);
+  const [showLegacy, setShowLegacy] = useState(false);
 
   const hasRecord = data.records.length > 0;
   const allConfirmed =
@@ -89,11 +100,33 @@ export default function ModSettlement() {
 
   const handleAdvance = () => {
     setAdvancing(true);
-    setTimeout(() => setAdvancing(false), 600);
+    setShowLegacy(true);
+    setTimeout(() => setAdvancing(false), 300);
   };
 
   return (
     <div className="flex flex-col gap-4">
+      {showLegacy && (
+        <div className="app-card overflow-hidden">
+          <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
+            <h3 className="section-title">급여 정산 실행</h3>
+            <button
+              type="button"
+              onClick={() => setShowLegacy(false)}
+              className="text-[11px] font-semibold px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border)] hover:bg-[var(--muted)]"
+            >
+              닫기
+            </button>
+          </div>
+          <div className="p-3">
+            <LegacySalarySettlement
+              staffs={data.staffs}
+              selectedCo={selectedCo}
+              onRefresh={reload}
+            />
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div className="app-card p-3">
           <div className="text-[11px] text-[var(--toss-gray-4)]">정산 진행 단계</div>
@@ -122,6 +155,7 @@ export default function ModSettlement() {
           <h3 className="section-title">정산 5단계 워크플로</h3>
           <button
             type="button"
+            data-testid="mod-settlement-start-button"
             disabled={advancing || doneCount >= 5}
             onClick={handleAdvance}
             aria-disabled={advancing || doneCount >= 5}

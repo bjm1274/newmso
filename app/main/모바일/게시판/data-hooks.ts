@@ -76,7 +76,7 @@ export type UseBoardPostsResult = {
   refetch: () => Promise<void>;
 };
 
-export function useBoardPosts(userId: string | null): UseBoardPostsResult {
+export function useBoardPosts(userId: string | null, company?: string | null): UseBoardPostsResult {
   const [posts, setPosts] = useState<BoardListPost[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -85,7 +85,7 @@ export function useBoardPosts(userId: string | null): UseBoardPostsResult {
     try {
       const { data } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
-          const result = await supabase
+          let q = supabase
             .from('board_posts')
             .select(
               buildSelectColumns(
@@ -97,6 +97,8 @@ export function useBoardPosts(userId: string | null): UseBoardPostsResult {
             .in('board_type', LIST_BOARD_TYPES)
             .order('created_at', { ascending: false })
             .limit(100);
+          if (company && company !== '전체') q = q.eq('company', company);
+          const result = await q;
           return result as unknown as { data: BoardPost[] | null; error: unknown };
         },
         [...BOARD_POST_OPTIONAL_COLUMNS],
@@ -149,7 +151,7 @@ export function useBoardPosts(userId: string | null): UseBoardPostsResult {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, company]);
 
   useEffect(() => {
     void fetchPosts();

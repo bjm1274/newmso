@@ -65,7 +65,8 @@ const SCROLL_TOP_THRESHOLD_PX = 80;
 export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom }: SChatRoomProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : '';
-  const staffs = useChatStaffDirectory();
+  const company = typeof user.company === 'string' ? user.company : null;
+  const staffs = useChatStaffDirectory(company);
   const {
     messages,
     loading,

@@ -19,6 +19,12 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
+import {
+  buildShiftBoundary,
+  buildFallbackShiftBoundary,
+  calculateEarlyLeaveMinutes,
+} from '../../마이페이지/출퇴근기록/checkin-utils';
+import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import RiskActionDialog from '../RiskActionDialog';
@@ -286,7 +292,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     if (noBase.length > 0) {
       const names = noBase.map((s: StaffMember) => s.name).join(', ');
       toast(`기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
-        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'success');
+        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'warning');
       return;
     }
 
@@ -342,7 +348,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             try {
               const { data: workShifts, error: workShiftsError } = await supabase
                 .from('work_shifts')
-                .select('id, name')
+                .select('id, name, start_time, end_time, shift_type')
                 .in('id', usedShiftIds);
 
               if (!workShiftsError && Array.isArray(workShifts)) {
@@ -351,6 +357,86 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                     .filter((shift) => /off|휴무|연차|leave/i.test(String(shift.name || '')))
                     .map((shift) => String(shift.id))
                 );
+
+                // shiftId → 시작/종료 시각 맵 구성 (지각·조퇴 판정용)
+                const shiftTimeMap = new Map<
+                  string,
+                  { start_time: string; end_time: string; shift_type: string | null }
+                >(
+                  workShifts
+                    .filter((shift) => !offLikeShiftIds.has(String(shift.id)))
+                    .map((shift) => [
+                      String(shift.id),
+                      {
+                        start_time: String(shift.start_time || ''),
+                        end_time: String(shift.end_time || ''),
+                        shift_type: shift.shift_type ? String(shift.shift_type) : null,
+                      },
+                    ])
+                );
+
+                // shiftAssignment 날짜별 shift 정보 맵: "staffId_workDate" → shiftId
+                const assignmentMap = new Map<string, string>();
+                shiftAssignments.forEach((row) => {
+                  const shiftId = String(row.shift_id || '').trim();
+                  if (!shiftId || offLikeShiftIds.has(shiftId)) return;
+                  const workDate = String(row.work_date || '').slice(0, 10);
+                  if (!workDate) return;
+                  assignmentMap.set(`${row.staff_id}_${workDate}`, shiftId);
+                });
+
+                // attendances 레코드에서 지각·조퇴 분 계산
+                if (Array.isArray(attendances)) {
+                  for (const att of attendances) {
+                    const staffId = String(att.staff_id || '');
+                    const workDate = String(att.work_date || '').slice(0, 10);
+                    if (!staffId || !workDate) continue;
+
+                    const checkIn = att.check_in_time ? String(att.check_in_time) : null;
+                    const checkOut = att.check_out_time ? String(att.check_out_time) : null;
+
+                    const assignedShiftId = assignmentMap.get(`${staffId}_${workDate}`);
+                    const shiftInfo = assignedShiftId ? shiftTimeMap.get(assignedShiftId) : null;
+
+                    const boundary = shiftInfo
+                      ? {
+                          ...buildShiftBoundary(shiftInfo.start_time, shiftInfo.end_time),
+                          shiftType: shiftInfo.shift_type ?? null,
+                          rosterAssigned: true,
+                        }
+                      : buildFallbackShiftBoundary();
+
+                    let lateMinutes: number | null = null;
+                    let earlyLeaveMinutes: number | null = null;
+
+                    if (checkIn && boundary.shiftKnown) {
+                      const status = decideCheckInStatus(boundary, checkIn);
+                      if (status === '지각') {
+                        const scheduledStart = new Date(workDate);
+                        scheduledStart.setHours(boundary.hour, boundary.minute, 0, 0);
+                        const actual = new Date(checkIn);
+                        lateMinutes = Math.max(
+                          0,
+                          Math.round((actual.getTime() - scheduledStart.getTime()) / 60000),
+                        );
+                      }
+                    }
+
+                    if (checkOut) {
+                      const mins = calculateEarlyLeaveMinutes(workDate, checkOut, boundary);
+                      if (mins > 0) earlyLeaveMinutes = mins;
+                    }
+
+                    if (lateMinutes !== null || earlyLeaveMinutes !== null) {
+                      attendanceRecordRows.push({
+                        staff_id: staffId,
+                        work_date: workDate,
+                        late_minutes: lateMinutes,
+                        early_leave_minutes: earlyLeaveMinutes,
+                      });
+                    }
+                  }
+                }
               }
             } catch {
               // work_shifts lookup is optional for divisor improvements.

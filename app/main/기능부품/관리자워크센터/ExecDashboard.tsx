@@ -13,6 +13,7 @@ import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
 import { Card, Chip, KpiGrid, ProgressBar, SmBtn, TabBar, WorkcenterHeader } from './admin-workcenter-common';
 import { ADMIN_WORKCENTERS, type AdminKpi } from './admin-types';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 
 // ─── 실제 서브 컴포넌트 (lazy) ──────────────────────────
 const Loading = () => (
@@ -263,6 +264,8 @@ function OverviewTab({ onTabChange }: { onTabChange: (t: ExecTabId) => void }) {
 }
 
 export default function ExecDashboard() {
+  const { user, data } = useAppData();
+  const staffs = data.staffs;
   const meta = ADMIN_WORKCENTERS.exec;
   const [tab, setTab] = useState<ExecTabId>('overview');
 
@@ -286,10 +289,10 @@ export default function ExecDashboard() {
       {tab === 'overview' && <OverviewTab onTabChange={setTab} />}
       {tab === 'biz' && <BusinessDashboard />}
       {tab === 'fin' && <FinancialDashboard />}
-      {tab === 'budget' && <BudgetManagement staffs={[]} />}
-      {tab === 'report' && <IntegratedReport staffs={[]} />}
-      {tab === 'pnl' && <CompanyPnL staffs={[]} selectedCo="전체" user={null} />}
-      {tab === 'custom' && <CustomDashboard user={{}} selectedCo="전체" />}
+      {tab === 'budget' && <BudgetManagement staffs={staffs} />}
+      {tab === 'report' && <IntegratedReport staffs={staffs} />}
+      {tab === 'pnl' && <CompanyPnL staffs={staffs} selectedCo="전체" user={user} />}
+      {tab === 'custom' && <CustomDashboard user={(user ?? {}) as Record<string, unknown>} selectedCo="전체" />}
     </>
   );
 }

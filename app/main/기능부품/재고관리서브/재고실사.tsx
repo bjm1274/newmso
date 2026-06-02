@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
-import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
-import InventoryCountGrid, { type CountRow } from './재고실사Grid';
 
-type CountItem = CountRow;
+type CountItem = { id: string; item_name: string; category: string; company: string; expected: number; actual: string; };
 
 export default function InventoryCount({ user, inventory, fetchInventory }: { user: any; inventory: any[]; fetchInventory: () => void }) {
   const { dialog, openConfirm } = useActionDialog();
@@ -226,21 +224,6 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
     <>
     {dialog}
     <div className="space-y-4">
-      <InventorySummaryStrip
-        items={[
-          { label: '실사 대상', value: `${items.length.toLocaleString('ko-KR')}건`, detail: '세션 시작 시점의 등록 품목', tone: 'info' },
-          { label: '입력 완료', value: `${enteredCount.toLocaleString('ko-KR')}건`, detail: `${Math.round(items.length > 0 ? (enteredCount / items.length) * 100 : 0)}% 진행`, tone: enteredCount === items.length ? 'success' : 'default' },
-          { label: '차이 발견', value: `${discrepancies.length.toLocaleString('ko-KR')}건`, detail: '저장 시 재고 조정 대상', tone: discrepancies.length > 0 ? 'warning' : 'success' },
-          { label: '입력 오류', value: `${invalidEntries.length.toLocaleString('ko-KR')}건`, detail: '완료 전 수정 필요', tone: invalidEntries.length > 0 ? 'danger' : 'default' },
-        ]}
-      />
-      <InventoryStepSummary
-        steps={[
-          { label: '대상 확정', detail: `${items.length.toLocaleString('ko-KR')}개 품목으로 실사를 시작했습니다.`, state: 'done' },
-          { label: '실수량 입력', detail: `${enteredCount.toLocaleString('ko-KR')}개 입력됨`, state: enteredCount === items.length ? 'done' : 'active' },
-          { label: '차이 조정', detail: discrepancies.length > 0 ? `${discrepancies.length}개 품목 변경 예정` : '차이가 발견되면 완료 시 자동 조정됩니다.', state: discrepancies.length > 0 ? 'warning' : 'pending' },
-        ]}
-      />
       {/* 진행 상황 */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
@@ -299,8 +282,35 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         </button>
       </div>
 
-      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden p-2">
-        <InventoryCountGrid rows={filtered} onChangeActual={setActual} />
+      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+        <table className="w-full text-[12px]">
+          <thead className="bg-[var(--muted)] border-b border-[var(--border)]">
+            <tr>
+              <th className="px-3 py-2 text-left font-bold">품목명</th>
+              <th className="px-3 py-2 text-left font-bold">카테고리</th>
+              <th className="px-3 py-2 text-right font-bold">장부 수량</th>
+              <th className="px-3 py-2 text-center font-bold">실물 수량</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(row => (
+              <tr key={row.id} className="border-b border-[var(--border-subtle)]">
+                <td className="px-3 py-2 font-semibold">{row.item_name}</td>
+                <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.category}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{row.expected}</td>
+                <td className="px-3 py-2">
+                  <input
+                    type="text"
+                    value={row.actual}
+                    onChange={e => setActual(row.id, e.target.value)}
+                    className="w-20 px-2 py-1 rounded border border-[var(--border)] text-center text-[12px] font-bold"
+                    placeholder="-"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
     </>

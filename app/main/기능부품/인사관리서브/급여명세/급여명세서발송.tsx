@@ -71,7 +71,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
 
   const handleSendAll = async () => {
     if (!_staffs?.length) {
-      toast('발송 가능한 직원이 없습니다.', 'success');
+      toast('발송 가능한 직원이 없습니다.', 'warning');
       return;
     }
 
@@ -178,7 +178,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       const fallbackMessage = emailFallback
         ? '\n이메일 큐가 설정되지 않아 사내 알림만 발송했습니다.'
         : '';
-      toast(`급여명세서 발송을 마쳤습니다.\n사내 알림 ${notificationCount}건\n이메일 큐 ${emailCount}건\n실패 ${failureCount}건${fallbackMessage}`, 'error');
+      toast(`급여명세서 발송을 마쳤습니다.\n사내 알림 ${notificationCount}건\n이메일 큐 ${emailCount}건\n실패 ${failureCount}건${fallbackMessage}`, 'success');
     } catch (sendError) {
       console.error('payroll email sender failed:', sendError);
       toast('급여명세서 발송 중 오류가 발생했습니다.', 'error');

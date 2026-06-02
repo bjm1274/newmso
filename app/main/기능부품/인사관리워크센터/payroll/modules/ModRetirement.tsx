@@ -1,11 +1,23 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { usePayroll } from '../payroll-context';
+import { usePayroll, usePayrollData } from '../payroll-context';
 import {
   fetchRecentRetirees,
   type RetirementComputed,
 } from '../payroll-fetch';
+
+// 중간정산.tsx의 export default는 props 타입이 Record<string, unknown>
+const LegacyInterimSettlement = dynamic<Record<string, unknown>>(
+  () => import('../../../인사관리서브/급여명세/중간정산'),
+  { ssr: false, loading: () => <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">중간정산 로드 중…</div> },
+);
+
+const LegacyEmailSender = dynamic<Record<string, unknown>>(
+  () => import('../../../인사관리서브/급여명세/급여명세서발송'),
+  { ssr: false, loading: () => <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">발송 패널 로드 중…</div> },
+);
 
 /**
  * #4 퇴직 정산 — staff_members.resign_date IS NOT NULL 기준
@@ -19,9 +31,12 @@ import {
  */
 
 export default function ModRetirement() {
-  const { selectedCo } = usePayroll();
+  const { selectedCo, data, reload, yearMonth } = usePayroll();
+  const allData = usePayrollData();
   const [rows, setRows] = useState<RetirementComputed[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showInterim, setShowInterim] = useState(false);
+  const [showEmailSender, setShowEmailSender] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,9 +83,10 @@ export default function ModRetirement() {
           <h3 className="section-title">최근 퇴직 정산 내역</h3>
           <button
             type="button"
+            onClick={() => setShowInterim((v) => !v)}
             className="text-[11px] font-bold px-2.5 py-1 rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
           >
-            중간정산 등록
+            {showInterim ? '닫기' : '중간정산 등록'}
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -113,6 +129,50 @@ export default function ModRetirement() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {showInterim && (
+        <div className="app-card overflow-hidden">
+          <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
+            <h3 className="section-title">중간정산 등록</h3>
+            <button
+              type="button"
+              onClick={() => setShowInterim(false)}
+              className="text-[11px] font-semibold px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border)] hover:bg-[var(--muted)]"
+            >
+              닫기
+            </button>
+          </div>
+          <div className="p-3">
+            <LegacyInterimSettlement
+              staffs={data?.staffs ?? []}
+              selectedCo={selectedCo}
+              onRefresh={reload}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 급여명세서 발송 섹션 */}
+      <div className="app-card overflow-hidden">
+        <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
+          <h3 className="section-title">급여명세서 발송</h3>
+          <button
+            type="button"
+            onClick={() => setShowEmailSender((v) => !v)}
+            className="text-[11px] font-bold px-2.5 py-1 rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
+          >
+            {showEmailSender ? '닫기' : '발송 패널 열기'}
+          </button>
+        </div>
+        {showEmailSender && (
+          <div className="p-3">
+            <LegacyEmailSender
+              staffs={allData.staffs}
+              yearMonth={yearMonth}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -47,12 +47,13 @@ function dedupeById(list: ApprovalRow[]): ApprovalRow[] {
 export default function 결재({ user }: 결재Props) {
   const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
   const staffName = typeof user.name === 'string' ? user.name : null;
+  const company = typeof user.company === 'string' ? user.company : null;
 
   const [view, setView] = useState<ApprovalView>('inbox');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [composeForm, setComposeForm] = useState<{ slug: string; name: string } | null>(null);
 
-  const { rows, loading, refetch } = useApprovalList(staffId);
+  const { rows, loading, refetch } = useApprovalList(staffId, company);
   const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);
 
   // 문서 조회용 — 본인 관여 문서를 진행 중 / 처리 완료로 합산(중복 제거)

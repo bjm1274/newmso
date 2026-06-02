@@ -12,6 +12,7 @@
 
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import {
@@ -23,6 +24,50 @@ import {
   type KpiItem,
   type TabItem,
 } from './stock-workcenter-common';
+
+// ─────────────────────────────────────────────────
+// 레거시 재고실사 (dynamic import)
+// ─────────────────────────────────────────────────
+
+const LegacyInventoryCount = dynamic(
+  () => import('../재고관리서브/재고실사'),
+  {
+    loading: () => (
+      <div className="flex min-h-[260px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+function InventoryCountOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="재고 실사"
+    >
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
+          <h2 className="text-base font-bold">재고 실사</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="모달 닫기"
+            className="p-1.5 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="px-4 py-4">
+          <LegacyInventoryCount user={{}} inventory={[]} fetchInventory={() => {}} />
+        </div>
+      </div>
+    </div>
+  );
+}
 import type {
   AbcGrade,
   AnalyzeTab,
@@ -60,6 +105,7 @@ const TABS: TabItem<AnalyzeTab>[] = [
 
 export default function AnalyzeWorkcenter() {
   const [tab, setTab] = useState<AnalyzeTab>('abc');
+  const [showInspect, setShowInspect] = useState(false);
   const data = useAnalyzeData();
 
   const kpiItems = useMemo<KpiItem[]>(
@@ -95,6 +141,7 @@ export default function AnalyzeWorkcenter() {
 
   return (
     <div className="flex flex-col gap-4">
+      {showInspect && <InventoryCountOverlay onClose={() => setShowInspect(false)} />}
       <StockTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="분석·마감 탭" />
       <KpiRow items={kpiItems} />
 
@@ -112,6 +159,7 @@ export default function AnalyzeWorkcenter() {
               pct={data.inspectProgressPct}
               loading={data.loading}
               error={data.error}
+              onStartInspect={() => setShowInspect(true)}
             />
           )}
           {tab === 'clo' && <ClosePanel />}
@@ -235,6 +283,8 @@ function ForecastPanel({
         <button
           type="button"
           className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-bold hover:bg-[var(--muted)]"
+          disabled
+          title="준비 중"
         >
           예측 리포트
         </button>
@@ -296,11 +346,13 @@ function InspectPanel({
   pct,
   loading,
   error,
+  onStartInspect,
 }: {
   rows: InspectRow[];
   pct: number;
   loading: boolean;
   error: string | null;
+  onStartInspect: () => void;
 }) {
   const emptyMessage = useEmptyMessage(loading, error, rows.length);
   const totalCount = rows.reduce((s, r) => s + r.total, 0);
@@ -340,6 +392,7 @@ function InspectPanel({
           <button
             type="button"
             className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[var(--accent-hover)]"
+            onClick={onStartInspect}
           >
             실사 시작
           </button>

@@ -75,6 +75,8 @@ export type SBoardProps = {
   showHome?: boolean;
   /** Phase 6: 카테고리 클릭 시 호출 */
   onOpenCategory?: (catId: BoardCatId) => void;
+  /** 헤더 sub 텍스트에 표시할 회사명 */
+  company?: string;
 };
 
 // ─── 필터 유틸 ────────────────────────────────────────────
@@ -300,6 +302,7 @@ function SBoardBase({
   onRefresh,
   showHome,
   onOpenCategory,
+  company,
 }: SBoardProps) {
   const filtered = useMemo(() => filterByCat(posts, cat), [posts, cat]);
 
@@ -318,7 +321,7 @@ function SBoardBase({
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="게시판"
-        sub="박철홍정형외과"
+        sub={company ?? ''}
         back={onBack}
         actions={
           <>

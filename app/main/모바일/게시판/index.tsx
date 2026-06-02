@@ -47,7 +47,7 @@ export default function 게시판({ user, onBack }: 게시판Props) {
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
 
-  const { posts: fetched, loading, refetch } = useBoardPosts(userId);
+  const { posts: fetched, loading, refetch } = useBoardPosts(userId, userCompany);
   const posts = overridePosts ?? fetched;
 
   const { likeSet, setLikeSet } = useMyLikes(userId);
@@ -166,6 +166,7 @@ export default function 게시판({ user, onBack }: 게시판Props) {
       onRefresh={refetch}
       showHome={view === 'home'}
       onOpenCategory={handleOpenCategory}
+      company={userCompany ?? ''}
     />
   );
 }

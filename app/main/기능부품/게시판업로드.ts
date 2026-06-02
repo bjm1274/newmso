@@ -3,29 +3,10 @@ import { logger } from '@/lib/logger';
 
 import { inferAttachmentType } from './게시판공통';
 
-const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
-const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
-const CACHE_CONTROL = '3600';
+import { getUploadContentType } from '@/lib/upload-mime';
 
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  avif: 'image/avif',
-  mp4: 'video/mp4',
-  mov: 'video/quicktime',
-  m4v: 'video/mp4',
-  webm: 'video/webm',
-  pdf: 'application/pdf',
-  txt: 'text/plain',
-  csv: 'text/csv',
-  zip: 'application/zip',
-};
+const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
+const CACHE_CONTROL = '3600';
 
 type UploadProvider = 'r2' | 'supabase';
 
@@ -50,24 +31,6 @@ export type UploadedBoardAttachment = {
 
 function getUploadFileName(file: File) {
   return String(file.name || '').trim() || 'attachment';
-}
-
-function getFileExtension(file: File) {
-  const rawName = String(file.name || '').trim();
-  const lastDotIndex = rawName.lastIndexOf('.');
-  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
-    return rawName.slice(lastDotIndex + 1).toLowerCase();
-  }
-  return '';
-}
-
-function getUploadContentType(file: File) {
-  const rawMimeType = String(file.type || '').trim().toLowerCase();
-  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
-  if (rawMimeType === 'image/x-png') return 'image/png';
-  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
-
-  return MIME_BY_EXTENSION[getFileExtension(file)] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
 
 function getFallbackAttachmentType(file: File) {

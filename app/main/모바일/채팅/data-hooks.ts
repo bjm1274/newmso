@@ -51,16 +51,18 @@ type StaffDirectoryEntry = Pick<
   'id' | 'name' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
 >;
 
-export function useChatStaffDirectory() {
+export function useChatStaffDirectory(company?: string | null) {
   const [staffs, setStaffs] = useState<StaffDirectoryEntry[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const { data, error } = await supabase
+        let q = supabase
           .from('staff_members')
-          .select('id, name, department, position, photo_url, avatar_url, status, permissions');
+          .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
+        if (company && company !== '전체') q = (q as typeof q).eq('company', company);
+        const { data, error } = await q;
         if (!active) return;
         if (error || !Array.isArray(data)) {
           setStaffs([]);
@@ -75,7 +77,7 @@ export function useChatStaffDirectory() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [company]);
 
   return staffs;
 }

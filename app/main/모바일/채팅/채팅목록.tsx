@@ -47,8 +47,9 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const userId = typeof user.id === 'string' ? user.id : null;
+  const company = typeof user.company === 'string' ? user.company : null;
 
-  const staffs = useChatStaffDirectory();
+  const staffs = useChatStaffDirectory(company);
 
   const loading = rooms.length === 0; // 부모가 loading 상태를 따로 노출하지 않으므로 대략 처리
 

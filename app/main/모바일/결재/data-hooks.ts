@@ -150,7 +150,7 @@ export function classifyForStaff(rows: ApprovalRow[], staffId: string) {
 // fetch — 한 번에 가져와서 분류
 // ─────────────────────────────────────────────
 
-export function useApprovalList(staffId: string | null) {
+export function useApprovalList(staffId: string | null, company?: string | null) {
   const [rows, setRows] = useState<ApprovalRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,14 +167,17 @@ export function useApprovalList(staffId: string | null) {
     setError(null);
     try {
       const { data, error: queryError } = await withMissingColumnsFallback(
-        (omittedColumns) =>
-          supabase
+        (omittedColumns) => {
+          let q = supabase
             .from('approvals')
             .select(buildApprovalSelect(omittedColumns))
             .order('created_at', { ascending: false })
-            .limit(200),
+            .limit(200);
+          if (company && company !== '전체') q = q.eq('sender_company', company);
+          return q;
+        },
         APPROVAL_OPTIONAL_COLUMNS,
-        { cacheKey: 'approval-list-mobile' }
+        { cacheKey: `approval-list-mobile-${company ?? ''}` }
       );
       if (queryError) throw queryError;
       const next = (data ?? []) as unknown as ApprovalRow[];
@@ -187,7 +190,7 @@ export function useApprovalList(staffId: string | null) {
       setLoading(false);
       inflightRef.current = false;
     }
-  }, [staffId]);
+  }, [staffId, company]);
 
   useEffect(() => {
     void fetcher();

@@ -1429,39 +1429,35 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         toast(프로필사진업로드경고 || '직원 정보가 수정되었습니다.', 프로필사진업로드경고 ? 'warning' : 'success');
         if (면허저장경고) toast(면허저장경고, 'warning');
       } else {
-        // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
+        // 사번 부여 로직: 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
-        if (신규직원.성명 === '박철홍') {
-          newEmployeeNo = '1';
-        } else {
-          const { data: employeeNos, error: employeeNoError } = await supabase
-            .from('staff_members')
-            .select('employee_no');
+        const { data: employeeNos, error: employeeNoError } = await supabase
+          .from('staff_members')
+          .select('employee_no');
 
-          if (employeeNoError) {
-            throw employeeNoError;
-          }
-
-          const existingEmployeeNos = new Set(
-            (employeeNos || [])
-              .map((row: { employee_no?: unknown }) => String(row?.employee_no || '').trim())
-              .filter(Boolean)
-          );
-
-          const lastNo = (employeeNos || []).reduce((maxNo: number, row: { employee_no?: unknown }) => {
-            const parsed = Number.parseInt(String(row?.employee_no || ''), 10);
-            if (!Number.isFinite(parsed) || parsed < 2) {
-              return maxNo;
-            }
-            return Math.max(maxNo, parsed);
-          }, 1);
-
-          let nextNo = Math.max(2, lastNo + 1);
-          while (existingEmployeeNos.has(String(nextNo))) {
-            nextNo += 1;
-          }
-          newEmployeeNo = String(nextNo);
+        if (employeeNoError) {
+          throw employeeNoError;
         }
+
+        const existingEmployeeNos = new Set(
+          (employeeNos || [])
+            .map((row: { employee_no?: unknown }) => String(row?.employee_no || '').trim())
+            .filter(Boolean)
+        );
+
+        const lastNo = (employeeNos || []).reduce((maxNo: number, row: { employee_no?: unknown }) => {
+          const parsed = Number.parseInt(String(row?.employee_no || ''), 10);
+          if (!Number.isFinite(parsed) || parsed < 1) {
+            return maxNo;
+          }
+          return Math.max(maxNo, parsed);
+        }, 0);
+
+        let nextNo = Math.max(1, lastNo + 1);
+        while (existingEmployeeNos.has(String(nextNo))) {
+          nextNo += 1;
+        }
+        newEmployeeNo = String(nextNo);
 
         const insertPayload = {
           ...commonData,
@@ -1587,7 +1583,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     // 다중 근무형태 IDs 추출 (신버전 동일 방식): permissions.shift_group_ids / weekly_rotation_shift_ids / secondary_shift_id
     const 직원근무형태IDs = getWeeklyRotationShiftIds(직원 as unknown as Record<string, unknown>, 직원.shift_id);
     신규직원설정({
-      성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue as string, 사업체: 직원.company || '박철홍정형외과',
+      성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue as string, 사업체: 직원.company || '',
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
       퇴사일: (직원.resigned_at as string) || '', 주민번호: (직원.resident_no as string) || '', 이메일: 직원.email || '',
       주소: 직원.address || '',

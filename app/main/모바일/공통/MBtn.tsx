@@ -26,6 +26,7 @@ export type MBtnProps = {
   ariaLabel?: string;
   children?: ReactNode;
   className?: string;
+  title?: string;
 };
 
 function MBtnBase({
@@ -40,6 +41,7 @@ function MBtnBase({
   ariaLabel,
   children,
   className,
+  title,
 }: MBtnProps) {
   const classes = [
     'm-btn',
@@ -57,6 +59,7 @@ function MBtnBase({
       disabled={disabled}
       onClick={onClick}
       aria-label={ariaLabel}
+      title={title}
     >
       {icon && <MIcon name={icon} size={lg ? 18 : 16} />}
       {children}

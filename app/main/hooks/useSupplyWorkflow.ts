@@ -79,7 +79,8 @@ export function useSupplyWorkflow({
           fetchSupportInventoryRows(),
         ]);
       if (approvalsError) { console.error('승인된 물품신청 처리 목록 로드 실패:', { source: 'approvals', ...normalizeQueryError(approvalsError) }); setPendingSupplyApprovals([]); setCompletedSupplyApprovals([]); return; }
-      if (inventoryError) { console.error('승인된 물품신청 처리 목록 로드 실패:', { source: 'support_inventory', ...normalizeQueryError(inventoryError) }); setPendingSupplyApprovals([]); setCompletedSupplyApprovals([]); return; }
+      // 레거시 스키마(department 컬럼 없음)에서 오류 발생 시 빈 재고로 계속 처리
+      if (inventoryError) { console.warn('승인된 물품신청 처리 — 재고 조회 실패, 빈 재고로 처리:', normalizeQueryError(inventoryError)); }
 
       const nextPending: ApprovalRecord[] = [];
       const nextCompleted: ApprovalRecord[] = [];

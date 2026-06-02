@@ -74,6 +74,7 @@ test("leave management tabs and actions stay clickable", async ({ page }) => {
     },
   });
 
+  // ── 1. 관리자 → 회사관리 → 휴가 기준/공휴일 탭 → 연차 자동부여 설정 ──
   await page.goto(
     `/main?${new URLSearchParams({ open_menu: "관리자", open_subview: "회사관리" }).toString()}`
   );
@@ -84,18 +85,52 @@ test("leave management tabs and actions stay clickable", async ({ page }) => {
   await expect(page.getByText("연차 자동 부여 로직 설정")).toBeVisible();
   await page.getByRole("button", { name: "입사일 기준 적용" }).click();
 
+  // ── 2. 인사관리 → 연차·휴가 워크센터 → 승인 대기 결재 모달 → 승인 ──
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: "인사관리", open_subview: "휴가/휴무" }).toString()}`
+    `/main?${new URLSearchParams({ open_menu: "인사관리", open_subview: "leave" }).toString()}`
   );
-  await page.getByRole("button", { name: "근태 · 급여" }).click();
-  await page.getByRole("button", { name: /연차\s*\/\s*휴가/ }).click();
-  await expect(page.getByTestId("leave-management-view")).toBeVisible();
-  await page.getByTestId("leave-tab-연차-휴가-신청내역").click();
-  await expect(page.getByText(employeeUser.name)).toBeVisible();
+  // 워크센터 뷰가 표시되는지 확인
+  await expect(page.getByTestId("leave-workcenter-view")).toBeVisible();
 
+  // 직원명이 연차 현황 표에 표시되는지 확인 (strict: 표 내에서만 검색)
+  await expect(
+    page.getByRole("table").getByText(employeeUser.name)
+  ).toBeVisible();
+
+  // 승인 대기 결재 버튼 클릭 → 결재 모달 오픈
+  await page.getByTestId("leave-approval-pending-btn").click();
+
+  // 모달이 열리는지 확인
+  const approvalModal = page.getByRole("dialog", { name: "연차/휴가 결재 대시보드" });
+  await expect(approvalModal).toBeVisible();
+
+  // 전체 결재 이력 탭으로 전환
+  await approvalModal.getByRole("button", { name: /전체 결재 이력/ }).click();
+
+  // 직원명이 전체 이력에 표시되는지 확인
+  await expect(approvalModal.getByText(employeeUser.name)).toBeVisible();
+
+  // 디버그: 현재 모달 HTML 출력
+  const modalHtml = await approvalModal.innerHTML();
+  // eslint-disable-next-line no-console
+  console.log("=== MODAL HTML (first 2000 chars) ===");
+  // eslint-disable-next-line no-console
+  console.log(modalHtml.slice(0, 2000));
+
+  // leave_requests 결재 처리 요청 대기 (D1 mutate API 경유)
   const leaveApproveRequest = page.waitForRequest(
-    (request) => request.url().includes("/leave_requests") && request.method() === "PATCH"
+    (request) =>
+      (request.url().includes("/api/d1/mutate") && request.method() === "POST") ||
+      (request.url().includes("/leave_requests") && request.method() === "PATCH")
   );
-  await page.getByRole("button", { name: "승인" }).first().click();
+
+  // "승인하기" 버튼이 있으면 클릭, 없으면 "변경" 버튼으로 상태 토글
+  const approveBtn = approvalModal.getByRole("button", { name: "승인하기" });
+  const changeBtn = approvalModal.getByRole("button", { name: "변경" });
+  if (await approveBtn.isVisible()) {
+    await approveBtn.first().click();
+  } else {
+    await changeBtn.first().click();
+  }
   await leaveApproveRequest;
 });

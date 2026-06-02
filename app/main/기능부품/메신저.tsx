@@ -15,7 +15,6 @@ import {
 import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import { POLL_SELECT } from '@/lib/chat-query-columns';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import {
   AttachmentListCard,
@@ -89,13 +88,10 @@ import {
   WARD_QUICK_REPLY_OPTIONS,
   compareStaffMembers,
   extractWardMessageMeta,
-  getBookmarkStorageKey,
   getConversationRoomIdsByRoomId,
-  getConversationRoomIdSet,
   getDirectRoomMembersKey,
   getLatestReadCursor,
   getPinnedRoomOrderStorageKey,
-  getPinnedStorageKey,
   getRoomDisplayName,
   getRoomPrefsStorageKey,
   haveSameMembers,

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-const LEGACY_ADMIN_LOGIN_IDS = ['1'];
+const LEGACY_ADMIN_LOGIN_IDS: string[] = [];
 type PrivilegedKind = 'admin' | 'master';
 type PrivilegedVerificationResult =
   | { ok: true; kind: PrivilegedKind }

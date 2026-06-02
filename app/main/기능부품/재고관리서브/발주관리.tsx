@@ -4,7 +4,6 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { InventorySummaryStrip, InventoryStepSummary } from './InventoryDesignPanels';
 import {
   getItemMinQuantity,
   getItemName,
@@ -325,21 +324,6 @@ export default function PurchaseOrderManagement({
   return (
     <div className="space-y-4 animate-in fade-in duration-500" data-testid="purchase-order-management-view">
       {dialog}
-      <InventorySummaryStrip
-        items={[
-          { label: '발주 후보', value: `${lowStockItems.length.toLocaleString('ko-KR')}건`, detail: '최소재고 이하 품목', tone: lowStockItems.length > 0 ? 'warning' : 'success' },
-          { label: '대기 발주', value: `${pendingOrderCount.toLocaleString('ko-KR')}건`, detail: `${totalPendingAmount.toLocaleString('ko-KR')}원 예정`, tone: pendingOrderCount > 0 ? 'info' : 'default' },
-          { label: '결재 연동', value: `${linkedOrderCount.toLocaleString('ko-KR')}건`, detail: '물품요청에서 생성된 발주', tone: linkedOrderCount > 0 ? 'success' : 'default' },
-          { label: '전체 이력', value: `${orderRecords.length.toLocaleString('ko-KR')}건`, detail: '직접 발주와 자동 발주 포함', tone: 'default' },
-        ]}
-      />
-      <InventoryStepSummary
-        steps={[
-          { label: '대상 확인', detail: lowStockItems.length > 0 ? `${lowStockItems.length}개 품목 보충 필요` : '현재 자동 발주 후보가 없습니다.', state: lowStockItems.length > 0 ? 'active' : 'done' },
-          { label: '발주 생성', detail: '거래처별로 묶어 발주서를 생성합니다.', state: pendingOrderCount > 0 ? 'done' : 'pending' },
-          { label: '입고 예정 관리', detail: '승인 후 입고 예정일과 D-day를 관리합니다.', state: orderRecords.some((order) => order.expected_delivery_date) ? 'done' : 'pending' },
-        ]}
-      />
       <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
           <div>

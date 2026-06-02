@@ -14,7 +14,7 @@
  * JM6: button 시맨틱, aria-label, aria-live
  */
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import type { ErpUser } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
@@ -157,18 +157,44 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const [pwGate, setPwGate] = useState<'payslip' | 'cert' | null>(null);
   const [pw, setPw] = useState('');
   const [pwErr, setPwErr] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+  const pwLoadingRef = useRef(false);
 
-  const handlePwConfirm = useCallback(() => {
+  const handlePwConfirm = useCallback(async () => {
     if (pw.length < 4) {
       setPwErr(true);
       return;
     }
-    const target = pwGate;
-    setPwGate(null);
-    setPw('');
-    setPwErr(false);
-    if (target) onSub(target);
-  }, [pw, pwGate, onSub]);
+    if (pwLoadingRef.current) return;
+    pwLoadingRef.current = true;
+    setPwLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: pw,
+          userId: staffId ?? undefined,
+        }),
+      });
+      const data: { verified?: boolean } = await res.json().catch(() => ({}));
+      const ok = res.ok && data.verified === true;
+      if (!ok) {
+        setPwErr(true);
+        return;
+      }
+      const target = pwGate;
+      setPwGate(null);
+      setPw('');
+      setPwErr(false);
+      if (target) onSub(target);
+    } catch {
+      setPwErr(true);
+    } finally {
+      pwLoadingRef.current = false;
+      setPwLoading(false);
+    }
+  }, [pw, pwGate, staffId, onSub]);
 
   const handlePwCancel = useCallback(() => {
     setPwGate(null);
@@ -676,7 +702,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     paddingLeft: 4,
                   }}
                 >
-                  비밀번호를 4자 이상 입력해 주세요.
+                  비밀번호가 올바르지 않습니다.
                 </div>
               )}
             </div>
@@ -700,19 +726,21 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               </button>
               <button
                 type="button"
-                onClick={handlePwConfirm}
+                onClick={() => { void handlePwConfirm(); }}
+                disabled={pwLoading}
                 style={{
                   flex: 1,
                   height: 46,
                   borderRadius: 12,
                   border: 0,
-                  background: 'var(--m-accent)',
+                  background: pwLoading ? 'var(--z-300)' : 'var(--m-accent)',
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 700,
+                  cursor: pwLoading ? 'not-allowed' : 'pointer',
                 }}
               >
-                확인
+                {pwLoading ? '확인 중…' : '확인'}
               </button>
             </div>
           </div>

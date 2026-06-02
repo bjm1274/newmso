@@ -61,6 +61,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Password is required' }, { status: 400 });
     }
 
+    const MIN_PASSWORD_LENGTH = 4;
+    if (!clearPassword && password.trim().length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { ok: false, error: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.` },
+        { status: 400 },
+      );
+    }
+
     const adminUserId = String(session.user?.id ?? session.user?.user_id ?? 'unknown');
     const adminUserName = String(session.user?.name ?? session.user?.username ?? '');
 

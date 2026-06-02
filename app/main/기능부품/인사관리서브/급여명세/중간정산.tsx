@@ -340,8 +340,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     let severance = 0;
     let workDays = 0;
     if (includeSeverance && reason === '퇴사') {
-      const joined = staff.joined_at || staff.join_date;
-      const resigned = staff.resigned_at || settlementDate;
+      const joined = staff.joined_at || staff.join_date || staff.hire_date;
+      const resigned = staff.resigned_at || staff.resign_date || settlementDate;
       if (joined) {
         const j = new Date(joined);
         const r = new Date(resigned);

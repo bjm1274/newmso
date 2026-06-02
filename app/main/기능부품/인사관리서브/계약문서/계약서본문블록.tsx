@@ -46,7 +46,7 @@ export default function ContractBodyBlock({ templateText }: Props) {
                 const lines = body.split('\n').filter((l) => l.trim());
 
                 return (
-                    <div key={si} className="mb-4 last:mb-0">
+                    <div key={si} className="contract-article mb-4 last:mb-0">
                         <h4 className="text-[15px] font-black text-[var(--foreground)] mb-3 flex items-center gap-2.5">
                             <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0" />
                             제{sec.num}조 [{sec.title}]

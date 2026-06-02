@@ -1,7 +1,20 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
+
+const LegacyTaxFileGenerator = dynamic(
+  () => import('@/app/main/기능부품/인사관리서브/원천징수파일생성'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
+        <span className="text-[12px] text-[var(--toss-gray-3)]">원천징수 파일 생성기 불러오는 중…</span>
+      </div>
+    ),
+  },
+);
 
 /**
  * #7 원천징수 — 소득세·지방세 집계 + 국세청 제출 파일 생성 폼
@@ -127,26 +140,11 @@ export default function ModWithholding() {
           </p>
         </form>
 
-        <div className="app-card p-4">
-          <h3 className="section-title">연말정산 / 신고 자료</h3>
-          <ul className="mt-3 flex flex-col gap-2 text-[12px]">
-            <li className="flex justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[var(--muted)]">
-              <span>근로소득 지급명세서</span>
-              <button type="button" className="text-[11px] font-semibold text-[var(--accent)]">다운로드</button>
-            </li>
-            <li className="flex justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[var(--muted)]">
-              <span>일용근로 지급명세서</span>
-              <button type="button" className="text-[11px] font-semibold text-[var(--accent)]">다운로드</button>
-            </li>
-            <li className="flex justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[var(--muted)]">
-              <span>사업소득(3.3%) 지급명세서</span>
-              <button type="button" className="text-[11px] font-semibold text-[var(--accent)]">다운로드</button>
-            </li>
-            <li className="flex justify-between p-2 rounded-[var(--radius-sm)] hover:bg-[var(--muted)]">
-              <span>지방소득세 신고서</span>
-              <button type="button" className="text-[11px] font-semibold text-[var(--accent)]">다운로드</button>
-            </li>
-          </ul>
+        <div className="app-card p-0 overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-[var(--border)]">
+            <h3 className="section-title">홈택스 / EDI / 사내대장 파일 생성</h3>
+          </div>
+          <LegacyTaxFileGenerator staffs={data.staffs} selectedCo={data.selectedCo} />
         </div>
       </div>
     </div>

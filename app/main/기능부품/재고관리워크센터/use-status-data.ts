@@ -78,8 +78,11 @@ export function useStatusData(userCompany?: string): StatusWorkcenterData {
 
     const load = async () => {
       try {
+        const invQuery = supabase.from('inventory').select('*').limit(500);
         const [inv, logs] = await Promise.all([
-          supabase.from('inventory').select('*').limit(500),
+          userCompany && userCompany !== '전체'
+            ? invQuery.eq('company', userCompany)
+            : invQuery,
           supabase
             .from('inventory_logs')
             .select('actor_name,department,quantity,change_type,created_at')

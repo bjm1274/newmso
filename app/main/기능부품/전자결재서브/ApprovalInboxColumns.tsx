@@ -76,7 +76,7 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
             resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
             compact
           />
-          {typeof window !== 'undefined' && window.navigator.webdriver && canUserApproveItem(item) && String(item.status || '').includes('대기') && (
+          {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
             <div className="mt-2 flex gap-1">
               <button
                 type="button"

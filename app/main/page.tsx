@@ -248,6 +248,23 @@ function MainPageContent() {
         '구매/발주': '발주',
         '품목/자산': '자산',
         '분석/마감': '월마감',
+        // 레거시 한글 id → 워크센터 id 매핑
+        현황: 'status',
+        이력: 'io',
+        수요예측: 'analyze',
+        등록: 'item',
+        스캔: 'item',
+        발주: 'io',
+        재고실사: 'analyze',
+        이관: 'io',
+        납품확인서: 'io',
+        UDI: 'item',
+        자산: 'item',
+        거래처: 'io',
+        카테고리: 'item',
+        AS반품: 'analyze',
+        소모품통계: 'analyze',
+        월마감: 'analyze',
       };
 
       if (menuId === '재고관리' && subViewId && inventoryViewAliases[subViewId]) {

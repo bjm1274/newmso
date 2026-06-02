@@ -6,7 +6,9 @@ import { toast } from '@/lib/toast';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
-import { insertChatMessageWithFallback, type SendMessageOptions } from './메신저메시지서비스';
+import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
+import { supabase } from '@/lib/supabase';
+import type { SendMessageOptions } from './메신저메시지서비스';
 import {
   NOTICE_ROOM_ID,
   buildChatMessageInsertPayload,
@@ -207,7 +209,7 @@ export function useChatMessageSending({
     }
     emitTypingState(false);
 
-    const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(insertPayload);
+    const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(supabase, insertPayload);
 
     if (!error && inserted) {
       removeChatRetryQueueEntry(actorId, optimisticId);

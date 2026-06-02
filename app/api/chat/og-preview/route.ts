@@ -88,14 +88,43 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ERPBot/1.0)',
         Accept: 'text/html',
       },
       signal: AbortSignal.timeout(5000),
-      redirect: 'follow',
+      redirect: 'manual',
     });
+
+    // 리다이렉트 응답(3xx)이면 Location을 isPublicHttpUrl로 재검증 후 1회만 재요청
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) {
+        return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
+      }
+      let redirectUrl: URL;
+      try {
+        redirectUrl = new URL(location, url);
+      } catch {
+        return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
+      }
+      if (!isPublicHttpUrl(redirectUrl)) {
+        return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
+      }
+      response = await fetch(redirectUrl.href, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ERPBot/1.0)',
+          Accept: 'text/html',
+        },
+        signal: AbortSignal.timeout(5000),
+        redirect: 'manual',
+      });
+      // 재요청에서도 3xx이면 루프 방지를 위해 빈 OG 반환
+      if (response.status >= 300 && response.status < 400) {
+        return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
+      }
+    }
 
     if (!response.ok) {
       return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });

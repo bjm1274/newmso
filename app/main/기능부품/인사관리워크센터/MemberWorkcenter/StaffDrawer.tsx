@@ -95,7 +95,7 @@ function StaffDrawerInner({
   const labelId = useMemo(() => `member-drawer-title-${staff.id}`, [staff.id]);
   const status = staff.status ?? '재직';
   const employ = (() => {
-    const raw = (staff as Record<string, unknown>).employ_type;
+    const raw = (staff as Record<string, unknown>).employment_type;
     return typeof raw === 'string' ? raw : '정규직';
   })();
   const licenseSummary = (() => {

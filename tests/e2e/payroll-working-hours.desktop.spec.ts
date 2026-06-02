@@ -1,3 +1,10 @@
+/**
+ * payroll-working-hours.desktop.spec.ts
+ *
+ * 근로시간·시급 산정 공유 라이브러리 단위 검증.
+ * 라이브러리 순수 함수를 검증하므로 브라우저 페이지를 열지 않는다.
+ */
+
 import { expect, test } from '@playwright/test';
 import {
   calculateHourlyRateFromMonthlySalary,

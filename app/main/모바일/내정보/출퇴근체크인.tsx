@@ -23,6 +23,7 @@ import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import { useMonthlyAttendance } from './data-hooks';
+import { resolveCheckInStatus } from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
 
 type OpenLog = {
   id: string;
@@ -133,10 +134,18 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
       const today = formatLocalDateKey(new Date());
       const nowIso = new Date().toISOString();
       if (state === 'before') {
+        // 근무유형(work_shifts) 시작시각 기준 지각 판정. 1일근무1일휴무는 근무표(shift_assignments) 배정 기준.
+        // 온라인일 때만 정확 판정하고, 오프라인/조회 실패 시 '정상'으로 폴백한다.
+        let checkInStatus: '정상' | '지각' = '정상';
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          try {
+            checkInStatus = await resolveCheckInStatus(staffId, today, nowIso, { company });
+          } catch {/* 조회 실패 → '정상' 폴백 */}
+        }
         const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
           kind: 'upsert',
           table: 'attendance',
-          payload: { staff_id: staffId, date: today, check_in: nowIso, status: '정상' },
+          payload: { staff_id: staffId, date: today, check_in: nowIso, status: checkInStatus },
         });
         if (error) throw new Error(error);
         if (queued) {
@@ -146,7 +155,10 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
           if (row) setOpenLog(row);
-          toast('출근 체크인이 완료되었습니다.', 'success');
+          toast(
+            checkInStatus === '지각' ? '지각 처리되었습니다.' : '출근 체크인이 완료되었습니다.',
+            checkInStatus === '지각' ? 'warning' : 'success',
+          );
         }
       } else if (state === 'in') {
         const dateKey = openLog?.date ?? today;
