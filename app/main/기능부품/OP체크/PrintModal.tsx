@@ -6,6 +6,14 @@
 import { formatDateLabel } from './schedule-helpers';
 import type { PatientCheckState } from './patient-check-helpers';
 
+/** D1 KST timestamp(timezone 표기 없음)을 KST 기준 Date로 파싱. */
+function parseD1KstDate(value: string): Date {
+  const raw = value.trim();
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
+  return new Date(raw);
+}
+
 type OpCheckPrintModalProps = {
   open: boolean;
   checkForm: PatientCheckState | null;
@@ -61,8 +69,8 @@ export function OpCheckPrintModal({
               {checkForm.anesthesia_type && <div><span className="font-semibold text-gray-500">마취방법</span> <span className="ml-2">{checkForm.anesthesia_type}</span></div>}
               <div><span className="font-semibold text-gray-500">수술일</span> <span className="ml-2">{formatDateLabel(checkForm.schedule_date)}</span></div>
               <div><span className="font-semibold text-gray-500">수술실</span> <span className="ml-2">{scheduleRoom}</span></div>
-              {checkForm.surgery_started_at && <div><span className="font-semibold text-gray-500">수술 시작</span> <span className="ml-2">{new Date(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
-              {checkForm.surgery_ended_at && <div><span className="font-semibold text-gray-500">수술 종료</span> <span className="ml-2">{new Date(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span></div>}
+              {checkForm.surgery_started_at && <div><span className="font-semibold text-gray-500">수술 시작</span> <span className="ml-2">{parseD1KstDate(checkForm.surgery_started_at).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}</span></div>}
+              {checkForm.surgery_ended_at && <div><span className="font-semibold text-gray-500">수술 종료</span> <span className="ml-2">{parseD1KstDate(checkForm.surgery_ended_at).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}</span></div>}
             </div>
           </div>
 

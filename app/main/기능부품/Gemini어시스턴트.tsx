@@ -201,7 +201,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
                         isUser ? 'text-white/60 text-right' : 'text-[var(--toss-gray-3)]'
                       }`}
                     >
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {msg.timestamp.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                 </div>

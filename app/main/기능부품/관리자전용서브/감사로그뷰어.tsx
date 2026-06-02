@@ -30,7 +30,7 @@ function AuditRow({ index, style, logs }: {
       className="flex items-center text-xs border-b border-[var(--border)] hover:bg-[var(--muted)]"
     >
       <div className="w-[30%] px-2 font-mono text-[11px] whitespace-nowrap truncate">
-        {new Date(l.created_at).toLocaleString()}
+        {new Date(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
       </div>
       <div className="w-[20%] px-2 font-bold whitespace-nowrap truncate">
         {l.action}

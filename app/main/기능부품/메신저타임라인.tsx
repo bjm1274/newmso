@@ -413,8 +413,8 @@ function MessengerTimelineComponent({
                 const isMineAlbum = String(albumItem.sender_id) === effectiveChatUserId;
                 const senderName = (albumItem.staff as { name?: string } | null)?.name || albumItem.sender_name || '알 수 없음';
                 const created = toChatDate(albumItem.created_at);
-                const dateLabel = created.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
-                const dateShort = `${created.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { weekday: 'short' })})`;
+                const dateLabel = created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                const dateShort = `${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', weekday: 'short' })})`;
                 const dateKey = formatTimelineDateKey(albumItem.created_at);
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
@@ -424,7 +424,7 @@ function MessengerTimelineComponent({
                   .map((message) => String(message.id || '').trim())
                   .filter(Boolean);
                 const gridCols = count === 1 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-3';
-                const timeStr = created.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                const timeStr = created.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
                 const albumReplyTarget =
                   albumMsgs.find((message) => String(message.content || '').trim()) ||
                   albumMsgs[0] ||
@@ -541,12 +541,13 @@ function MessengerTimelineComponent({
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {
+                timeZone: 'Asia/Seoul',
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
                 weekday: 'short',
               });
-              const dateShort = `${created.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { weekday: 'short' })})`;
+              const dateShort = `${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', weekday: 'short' })})`;
               const dateKey = formatTimelineDateKey(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
@@ -580,7 +581,7 @@ function MessengerTimelineComponent({
                   ? `스레드 보기 · 답글 ${threadSummary.replyCount}개`
                   : `답글 ${threadSummary?.replyCount || 0}개`;
               const threadBadgeTitle = threadSummary
-                ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${toChatDate(threadSummary.latestReplyAt).toLocaleString('ko-KR')}` : ''}`
+                ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${toChatDate(threadSummary.latestReplyAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}` : ''}`
                 : '';
               const showThreadAttention =
                 Boolean(
@@ -824,7 +825,7 @@ function MessengerTimelineComponent({
                                 )
                               )}
                               <span className="text-[10px] font-bold tabular-nums text-[var(--toss-gray-3)]">
-                                {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {created.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
                           </div>

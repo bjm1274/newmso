@@ -2359,11 +2359,11 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                         작성자 {selectedPostAuthorSignal?.name || selectedPost.author_name || '익명'}
                         {selectedPostAuthorSignal?.meta ? ` · ${selectedPostAuthorSignal.meta}` : ''}
                       </span>
-                      <span>{new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}</span>
+                      <span>{new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</span>
                     </div>
                     {selectedPost.board_type === '공지사항' && selectedPost.scheduled_publish_at && (
                       <p className="mt-1 text-[11px] md:text-[12px] font-bold text-amber-700">
-                        예약 게시: {new Date(selectedPost.scheduled_publish_at).toLocaleString('ko-KR')}
+                        예약 게시: {new Date(selectedPost.scheduled_publish_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                         {isScheduledNoticePending(selectedPost, noticeVisibilityTick) ? ' · 게시 전' : ' · 게시됨'}
                       </p>
                     )}

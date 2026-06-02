@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { useCallback,useEffect,useRef,useState } from 'react';
 import {
   buildFallbackShiftBoundary,
@@ -383,8 +384,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   };
 
   const fetchMonthlyLogs = async () => {
-    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
-    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    const startOfMonth = formatKoreanDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+    const endOfMonth = formatKoreanDateKey(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0));
     const userId = effectiveUserId;
     if (!userId) return;
 
@@ -944,7 +945,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const formatTime = (isoString: string) => {
     if (!isoString) return '-';
-    return new Date(isoString).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    return new Date(isoString).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
   };
 
   const formatWorkedDuration = (workedMinutes: number) => {
@@ -971,10 +972,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
         <div className="space-y-1 z-10 min-w-0">
           <p className="text-[11px] font-semibold text-white/55">
-            {currentTime.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+            {currentTime.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
           <h2 className="text-3xl sm:text-[34px] font-bold tabular-nums whitespace-nowrap leading-none">
-            {currentTime.toLocaleTimeString('ko-KR')}
+            {currentTime.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })}
           </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full animate-pulse ${activeTodayLog ? (activeTodayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-400') : 'bg-red-400'}`}></span>

@@ -113,8 +113,20 @@ export function getInitials(name: string, fallback = '?'): string {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
+/** D1 KST timestamp 문자열(timezone 표기 없음)을 안전하게 파싱. */
+function parseTimestampMs(value: number | string): number {
+  if (typeof value === 'number') return value;
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+  // 이미 Z 또는 오프셋이 있으면 그대로 파싱
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw).getTime();
+  // D1 KST 문자열("YYYY-MM-DD HH:MM:SS") → +09:00 오프셋 부여
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`).getTime();
+  return new Date(raw).getTime();
+}
+
 export function timeAgo(value: number | string): string {
-  const ms = typeof value === 'string' ? new Date(value).getTime() : value;
+  const ms = parseTimestampMs(value);
   const diffSeconds = (Date.now() - ms) / 1000;
   if (diffSeconds < 10) return '방금';
   if (diffSeconds < 60) return `${Math.floor(diffSeconds)}초 전`;

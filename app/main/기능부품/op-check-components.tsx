@@ -252,9 +252,16 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
   );
 }
 
+function parseD1KstDate(value: string): Date {
+  const raw = value.trim();
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
+  return new Date(raw);
+}
+
 function formatEventTime(value?: string | null) {
   if (!value) return '';
-  return new Date(value).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  return parseD1KstDate(value).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
 }
 
 function getDurationMinutes(start?: string | null, end?: string | null) {

@@ -22,9 +22,8 @@ const RESIGNED_STATUSES = new Set(['\uD1F4\uC0AC', '\uD1F4\uC9C1']);
 
 /**
  * \uC11C\uBC84(D1) \uD0C0\uC784\uC2A4\uD0EC\uD504\uB97C Date\uB85C \uD30C\uC2F1\uD55C\uB2E4.
- * D1(SQLite)\uC758 CURRENT_TIMESTAMP\uB294 "YYYY-MM-DD HH:MM:SS" \uD615\uC2DD\uC758 UTC \uBB38\uC790\uC5F4\uC774\uC9C0\uB9CC
- * \uD0C0\uC784\uC874 \uD45C\uAE30\uAC00 \uC5C6\uC5B4 `new Date()`\uAC00 \uC774\uB97C \uB85C\uCEEC \uC2DC\uAC01\uC73C\uB85C \uC798\uBABB \uD574\uC11D\uD55C\uB2E4(KST \uAE30\uC900 9\uC2DC\uAC04 \uC624\uCC28).
- * \uD0C0\uC784\uC874 \uD45C\uAE30\uAC00 \uC5C6\uB294 \uC2DC\uAC01 \uBB38\uC790\uC5F4\uC740 UTC\uB85C \uAC04\uC8FC\uD574 'Z'\uB97C \uBD99\uC5EC \uD30C\uC2F1\uD55C\uB2E4.
+ * D1(SQLite)\uC758 CURRENT_TIMESTAMP\uB294 KST \uD604\uC7AC \uC2DC\uAC01 "YYYY-MM-DD HH:MM:SS" \uD615\uC2DD\uC73C\uB85C \uC800\uC7A5\uB418\uBBC0\uB85C
+ * timezone \uD45C\uAE30\uAC00 \uC5C6\uB294 \uBB38\uC790\uC5F4\uC740 KST(+09:00)\uB85C \uAC04\uC8FC\uD574 '+09:00' \uC624\uD504\uC14B\uC744 \uBD99\uC5EC \uD30C\uC2F1\uD55C\uB2E4.
  * \uC774\uBBF8 'Z'\u00B7\uC624\uD504\uC14B\uC774 \uC788\uB294 ISO \uBB38\uC790\uC5F4(\uD074\uB77C\uC774\uC5B8\uD2B8 optimistic \uBA54\uC2DC\uC9C0 \uB4F1)\uC740 \uADF8\uB300\uB85C \uD30C\uC2F1.
  */
 export function toChatDate(value?: string | number | null): Date {
@@ -33,7 +32,9 @@ export function toChatDate(value?: string | number | null): Date {
   const raw = String(value).trim();
   if (!raw) return new Date(0);
   if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}Z`);
+  // D1(SQLite) CURRENT_TIMESTAMP는 timezone 표기 없는 KST 로컬 문자열
+  // → +09:00 오프셋을 붙여 KST 기준으로 파싱한다.
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
   return new Date(raw);
 }
 

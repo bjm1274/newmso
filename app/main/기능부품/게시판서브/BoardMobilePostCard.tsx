@@ -46,8 +46,8 @@ export default function BoardMobilePostCard({
   const postTitle = String(post.title || '').trim() || postPreview || '제목 없음';
   const shouldShowPreview = Boolean(postPreview && postPreview !== postTitle);
   const postDateLabel = isPendingScheduledNotice && post.scheduled_publish_at
-    ? new Date(post.scheduled_publish_at).toLocaleDateString()
-    : new Date(post.created_at ?? '').toLocaleDateString();
+    ? new Date(post.scheduled_publish_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
+    : new Date(post.created_at ?? '').toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
   return (
     <div
       key={post.id || idx}
