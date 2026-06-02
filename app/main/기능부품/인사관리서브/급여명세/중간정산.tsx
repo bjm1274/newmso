@@ -38,7 +38,7 @@ type InterimAdjustmentKey =
   | 'allowanceDeduction'
   | 'attendanceDeduction';
 
-type InterimAdjustments = Record<InterimAdjustmentKey, number>;
+type InterimAdjustments = Record<InterimAdjustmentKey, number | ''>;
 
 const EMPTY_INTERIM_ADJUSTMENTS: InterimAdjustments = {
   nightDutyAdjustment: 0,
@@ -86,13 +86,25 @@ function InterimTenMinuteUnitField({
   tone = 'default',
 }: {
   label: string;
-  value: number;
+  value: number | '';
   hourlyRate: number;
-  onChange: (value: number) => void;
+  onChange: (value: number | '') => void;
   testId: string;
   tone?: 'default' | 'deduction' | 'success';
 }) {
   const amount = parseInterimWonInput(value);
+  const [inputValue, setInputValue] = useState(
+    value === '' || value === undefined || value === null ? '' : (value === 0 ? '0' : Number(value).toLocaleString())
+  );
+
+  useEffect(() => {
+    const currentNumeric = parseInt(inputValue.replace(/,/g, ''), 10) || 0;
+    const targetNumeric = Number(value) || 0;
+    if (currentNumeric !== targetNumeric) {
+      setInputValue(value === '' || value === undefined || value === null ? '' : (value === 0 ? '0' : Number(value).toLocaleString()));
+    }
+  }, [value]);
+
   const quickInputRef = useRef<HTMLInputElement>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openedByHoldRef = useRef(false);
@@ -138,6 +150,16 @@ function InterimTenMinuteUnitField({
     }
     onChange(Math.max(0, amount + stepAmount * direction));
   };
+  const handleAmountChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value;
+    setInputValue(rawValue);
+    const numeric = rawValue.replace(/[^\d.-]/g, '');
+    if (numeric === '') {
+      onChange('');
+    } else {
+      onChange(parseInterimWonInput(rawValue));
+    }
+  };
   const applyUnitInput = () => {
     onChange(parseInterimWonInput(unitInputValue) * stepAmount);
     setUnitInputOpen(false);
@@ -176,8 +198,8 @@ function InterimTenMinuteUnitField({
           data-testid={testId}
           type="text"
           inputMode="numeric"
-          value={amount.toLocaleString()}
-          onChange={(event) => onChange(parseInterimWonInput(event.target.value))}
+          value={inputValue}
+          onChange={handleAmountChange}
           className="min-w-0 flex-1 border-0 bg-transparent px-3 text-xs font-bold outline-none"
         />
         <button
@@ -297,10 +319,10 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     setAdjustments({ ...EMPTY_INTERIM_ADJUSTMENTS });
   }, [selectedStaff?.id]);
 
-  const updateAdjustment = (key: InterimAdjustmentKey, value: number) => {
+  const updateAdjustment = (key: InterimAdjustmentKey, value: number | '') => {
     setAdjustments((prev) => ({
       ...prev,
-      [key]: parseInterimWonInput(value),
+      [key]: value === '' ? '' : parseInterimWonInput(value),
     }));
   };
 
@@ -410,7 +432,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       (staff.withholding_rate_percent ??
         (staff.permissions?.payroll as Record<string, unknown> | undefined)?.withholding_rate_percent ??
         (staff.permissions?.tax as Record<string, unknown> | undefined)?.withholding_rate_percent ??
-        80) as number | string | null | undefined
+        100) as number | string | null | undefined
     );
     const insuranceSettings = (staff.permissions?.insurance as Record<string, unknown> | undefined) || {};
     const applyInsurance = insuranceSettings.national !== false;

@@ -171,6 +171,8 @@ interface StaffInfo {
   working_hours_per_week?: number;
   shift_type?: string | null;
   isAlternateDayShift?: boolean;
+  agreed_overtime_allowance?: number;
+  agreed_night_allowance?: number;
 }
 
 export default function SalaryDetail({
@@ -323,18 +325,6 @@ export default function SalaryDetail({
   const isAlternateDayShift = !!(staff?.isAlternateDayShift || staff?.shift_type === '1일근무1일휴무');
   const weeklyHours = resolveWeeklyWorkingHours(staff, 40);
   const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours, isAlternateDayShift);
-  const fixedMonthlySalary =
-    toNumber(data.base_salary) +
-    toNumber(data.extra_allowance) +
-    toNumber(data.meal_allowance) +
-    toNumber(data.night_duty_allowance) +
-    toNumber(data.vehicle_allowance) +
-    toNumber(data.childcare_allowance) +
-    toNumber(data.research_allowance) +
-    toNumber(data.other_taxfree);
-  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, weeklyHours, 'ceil', isAlternateDayShift);
-  const settlementAmount = isAdvancePay ? advancePayAmount : calc.net;
-
   const taxableAllowanceBreakdown = useMemo(() => {
     const savedBreakdown =
       deductionDetail.taxable_allowance_breakdown &&
@@ -360,6 +350,37 @@ export default function SalaryDetail({
       manual_extra_allowance: toNumber(source.manual_extra_allowance),
     };
   }, [deductionDetail, staff]);
+
+  // 약정연장/약정야간수당은 통상임금에 산입되므로 비례 배분 추출
+  const masterAgreedOvertime = Number(staff?.agreed_overtime_allowance || 0);
+  const masterTotalOvertime = Number(staff?.overtime_allowance || 0) + masterAgreedOvertime;
+  const resolvedOvertime = toNumber(taxableAllowanceBreakdown.overtime_allowance);
+  const resolvedAgreedOvertime = masterTotalOvertime > 0
+    ? Math.round((resolvedOvertime * masterAgreedOvertime) / masterTotalOvertime)
+    : masterAgreedOvertime;
+
+  const masterAgreedNight = Number(staff?.agreed_night_allowance || 0);
+  const masterTotalNight = Number(staff?.night_work_allowance || 0) + masterAgreedNight;
+  const resolvedNight = toNumber(taxableAllowanceBreakdown.night_work_allowance);
+  const resolvedAgreedNight = masterTotalNight > 0
+    ? Math.round((resolvedNight * masterAgreedNight) / masterTotalNight)
+    : masterAgreedNight;
+
+  const fixedMonthlySalary =
+    toNumber(data.base_salary) +
+    toNumber(data.meal_allowance) +
+    toNumber(data.night_duty_allowance) +
+    toNumber(data.vehicle_allowance) +
+    toNumber(data.childcare_allowance) +
+    toNumber(data.research_allowance) +
+    toNumber(data.other_taxfree) +
+    toNumber(taxableAllowanceBreakdown.position_allowance) +
+    toNumber(taxableAllowanceBreakdown.manual_extra_allowance) +
+    resolvedAgreedOvertime +
+    resolvedAgreedNight;
+
+  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, weeklyHours, 'ceil', isAlternateDayShift);
+  const settlementAmount = isAdvancePay ? advancePayAmount : calc.net;
 
   const fixedTaxableAllowanceTotal =
     taxableAllowanceBreakdown.position_allowance +

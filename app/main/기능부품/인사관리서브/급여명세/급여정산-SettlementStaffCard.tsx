@@ -1,5 +1,6 @@
 'use client';
 // 급여정산 2단계: 직원별 수당·공제 입력 카드 (순수 추출 — 인라인 JSX → props)
+import { useState, useEffect } from 'react';
 import type { StaffMember } from '@/types';
 import type { SettlementEntry } from './급여정산-types';
 import { TenMinuteUnitAmountField } from './급여정산-TenMinuteUnitAmountField';
@@ -30,6 +31,58 @@ export function SettlementStaffCard({
   onUpdate: (id: string, field: string, value: any) => void;
 }) {
   const s = staff;
+  const [extraAllowanceInput, setExtraAllowanceInput] = useState(
+    data.extra_allowance === '' || data.extra_allowance === undefined || data.extra_allowance === null
+      ? ''
+      : Number(data.extra_allowance || 0).toLocaleString()
+  );
+  const [advancePayInput, setAdvancePayInput] = useState(
+    data.advance_pay === '' || data.advance_pay === undefined || data.advance_pay === null
+      ? ''
+      : Number(data.advance_pay || 0).toLocaleString()
+  );
+  const [customDeductionInput, setCustomDeductionInput] = useState(
+    data.custom_deduction === '' || data.custom_deduction === undefined || data.custom_deduction === null
+      ? ''
+      : Number(data.custom_deduction || 0).toLocaleString()
+  );
+
+  useEffect(() => {
+    const currentVal = parseInt(extraAllowanceInput.replace(/,/g, ''), 10) || 0;
+    const targetVal = Number(data.extra_allowance) || 0;
+    if (currentVal !== targetVal) {
+      setExtraAllowanceInput(
+        data.extra_allowance === '' || data.extra_allowance === undefined || data.extra_allowance === null
+          ? ''
+          : Number(data.extra_allowance || 0).toLocaleString()
+      );
+    }
+  }, [data.extra_allowance]);
+
+  useEffect(() => {
+    const currentVal = parseInt(advancePayInput.replace(/,/g, ''), 10) || 0;
+    const targetVal = Number(data.advance_pay) || 0;
+    if (currentVal !== targetVal) {
+      setAdvancePayInput(
+        data.advance_pay === '' || data.advance_pay === undefined || data.advance_pay === null
+          ? ''
+          : Number(data.advance_pay || 0).toLocaleString()
+      );
+    }
+  }, [data.advance_pay]);
+
+  useEffect(() => {
+    const currentVal = parseInt(customDeductionInput.replace(/,/g, ''), 10) || 0;
+    const targetVal = Number(data.custom_deduction) || 0;
+    if (currentVal !== targetVal) {
+      setCustomDeductionInput(
+        data.custom_deduction === '' || data.custom_deduction === undefined || data.custom_deduction === null
+          ? ''
+          : Number(data.custom_deduction || 0).toLocaleString()
+      );
+    }
+  }, [data.custom_deduction]);
+
   const advancePay = Number(data?.advance_pay) || 0;
   const hasAdvanceDeduction = advancePay > 0;
   const deductionTotal = Math.round(Number(res?.deduction || 0));
@@ -94,11 +147,21 @@ export function SettlementStaffCard({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">과세·기본급</label>
-          <input type="text" value={Number(data.base_salary).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--muted)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
+          <input type="text" value={Number(data.base_salary || 0).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--muted)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-[var(--accent)] ml-1">수당 합계(고정포함)</label>
-          <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => onUpdate(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20 outline-none" />
+          <input
+            type="text"
+            value={extraAllowanceInput}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setExtraAllowanceInput(raw);
+              const val = raw.replace(/[^\d.-]/g, '');
+              onUpdate(s.id, 'extra_allowance', val === '' ? '' : (parseInt(val.replace(/,/g, ''), 10) || 0));
+            }}
+            className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20 outline-none"
+          />
         </div>
         <TenMinuteUnitAmountField
           label="야간/당직 (비과세)"
@@ -108,6 +171,7 @@ export function SettlementStaffCard({
           dataTestId={`salary-settlement-night-duty-${s.id}`}
           labelClassName="text-[var(--toss-gray-4)]"
           inputClassName="text-[var(--foreground)]"
+          allowManualAmountInput
         />
         <TenMinuteUnitAmountField
           label="연장/상여"
@@ -127,10 +191,22 @@ export function SettlementStaffCard({
           dataTestId={`salary-settlement-attendance-deduction-${s.id}`}
           labelClassName="text-orange-600"
           inputClassName="text-orange-700"
+          allowManualAmountInput
         />
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
-          <input data-testid={`salary-settlement-advance-pay-${s.id}`} type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => onUpdate(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
+          <input
+            data-testid={`salary-settlement-advance-pay-${s.id}`}
+            type="text"
+            value={advancePayInput}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setAdvancePayInput(raw);
+              const val = raw.replace(/[^\d.-]/g, '');
+              onUpdate(s.id, 'advance_pay', val === '' ? '' : (parseInt(val.replace(/,/g, ''), 10) || 0));
+            }}
+            className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none"
+          />
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-emerald-700 ml-1">부양가족/인적공제</label>
@@ -139,8 +215,11 @@ export function SettlementStaffCard({
             type="number"
             min={0}
             max={10}
-            value={Number(data.dependent_count) || 0}
-            onChange={(e) => onUpdate(s.id, 'dependent_count', Math.max(0, parseInt(e.target.value, 10) || 0))}
+            value={data.dependent_count === '' ? '' : Number(data.dependent_count || 0)}
+            onChange={(e) => {
+              const val = e.target.value;
+              onUpdate(s.id, 'dependent_count', val === '' ? '' : Math.max(0, parseInt(val, 10) || 0));
+            }}
             className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
           />
         </div>
@@ -150,8 +229,8 @@ export function SettlementStaffCard({
             data-testid={`salary-settlement-child-count-${s.id}`}
             type="number"
             min={0}
-            max={Number(data.dependent_count) || 0}
-            value={Number(data.child_count_8_20) || 0}
+            max={data.dependent_count === '' ? 0 : Number(data.dependent_count) || 0}
+            value={data.child_count_8_20 === '' ? '' : Number(data.child_count_8_20 || 0)}
             onChange={(e) => onUpdate(s.id, 'child_count_8_20', e.target.value)}
             className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
           />
@@ -160,8 +239,8 @@ export function SettlementStaffCard({
           <label className="text-[10px] font-bold text-sky-700 ml-1">원천징수 비율</label>
           <select
             data-testid={`salary-settlement-withholding-rate-${s.id}`}
-            value={Number(data.withholding_rate_percent) || 80}
-            onChange={(e) => onUpdate(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 80)}
+            value={Number(data.withholding_rate_percent) || 100}
+            onChange={(e) => onUpdate(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 100)}
             className="w-full h-8 px-3 border border-sky-200 bg-sky-50/30 rounded-lg text-xs font-bold text-sky-700 outline-none"
           >
             <option value={80}>80%</option>
@@ -174,8 +253,13 @@ export function SettlementStaffCard({
           <input
             data-testid={`salary-settlement-custom-deduction-${s.id}`}
             type="text"
-            value={Number(data.custom_deduction).toLocaleString()}
-            onChange={(e) => onUpdate(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+            value={customDeductionInput}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setCustomDeductionInput(raw);
+              const val = raw.replace(/[^\d.-]/g, '');
+              onUpdate(s.id, 'custom_deduction', val === '' ? '' : (parseInt(val.replace(/,/g, ''), 10) || 0));
+            }}
             className="w-full h-8 px-3 border border-orange-500/20 bg-orange-500/10/30 rounded-lg text-xs font-bold text-orange-700 outline-none"
           />
         </div>
@@ -187,11 +271,34 @@ export function SettlementStaffCard({
             <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">자동 근태차감: ₩{Number(data.attendance_deduction || 0).toLocaleString()}</span>
           </div>
           <div className="flex gap-2">
-            {data.attendance_deduction > 0 && (
+            {Number(data.attendance_deduction || 0) > 0 && (
               <button onClick={() => onUpdate(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-[var(--card)] px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
             )}
           </div>
         </div>
+        {((data.auto_overtime_minutes || 0) > 0 || (data.auto_holiday_hours || 0) > 0) && (
+          <div data-testid={`salary-settlement-recommendation-${s.id}`} className="col-span-2 lg:col-span-4 rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-2 text-[11px] font-bold text-sky-800 space-y-1">
+            <p className="flex items-center gap-1">⏱️ 출퇴근 기록 자동 분석 결과 (가산 1.5배 반영)</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-sky-700">
+              {Number(data.auto_overtime_minutes || 0) > 0 && (
+                <span>· 연장근로: {Math.floor((data.auto_overtime_minutes || 0) / 60)}시간 {(data.auto_overtime_minutes || 0) % 60}분 (₩{data.auto_overtime_pay?.toLocaleString()}원)</span>
+              )}
+              {Number(data.auto_holiday_hours || 0) > 0 && (
+                <span>· 주말/공휴일 근무: {data.auto_holiday_hours}시간 (₩{data.auto_holiday_pay?.toLocaleString()}원)</span>
+              )}
+              <span>· 추천 총액: <span className="font-extrabold text-blue-600">₩{((data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0)).toLocaleString()}원</span></span>
+            </div>
+            {Number(data.overtime_pay || 0) !== ((data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0)) && (
+              <button
+                type="button"
+                onClick={() => onUpdate(s.id, 'overtime_pay', (data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0))}
+                className="text-[9px] font-bold bg-sky-600 text-white px-2 py-0.5 rounded shadow-sm hover:opacity-90 mt-1 transition-all"
+              >
+                추천액 자동 적용하기
+              </button>
+            )}
+          </div>
+        )}
         <div className="col-span-2 lg:col-span-4 rounded-xl border border-red-100 bg-red-50/50 px-4 py-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="text-[10px] font-black text-red-700 uppercase">공제 내역</span>

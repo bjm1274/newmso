@@ -88,16 +88,45 @@ export function parsePayrollWonInput(value: unknown) {
 }
 
 export function getRegularHourlyRate(staff: StaffMember, data: Partial<SettlementEntry>) {
-  const fixedMonthlyPay = [
-    data.base_salary,
-    data.extra_allowance,
-    data.meal_allowance,
-    data.night_duty_allowance,
-    data.vehicle_allowance,
-    data.childcare_allowance,
-    data.research_allowance,
-    data.other_taxfree,
-  ].reduce<number>((sum, value) => sum + parsePayrollWonInput(value), 0);
+  const baseSalary = parsePayrollWonInput(data.base_salary);
+  const mealAllowance = parsePayrollWonInput(data.meal_allowance);
+  const nightDutyAllowance = parsePayrollWonInput(data.night_duty_allowance);
+  const vehicleAllowance = parsePayrollWonInput(data.vehicle_allowance);
+  const childcareAllowance = parsePayrollWonInput(data.childcare_allowance);
+  const researchAllowance = parsePayrollWonInput(data.research_allowance);
+  const otherTaxfree = parsePayrollWonInput(data.other_taxfree);
+
+  const breakdown = data.taxable_allowance_breakdown || EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN;
+  const positionAllowance = parsePayrollWonInput(breakdown.position_allowance);
+  const manualExtra = parsePayrollWonInput(breakdown.manual_extra_allowance);
+
+  // 약정연장/약정야간수당은 통상임금에 산입되므로, 마스터의 비율에 기반해 비례 배분 추출
+  const masterAgreedOvertime = Number(staff.agreed_overtime_allowance || 0);
+  const masterTotalOvertime = Number(staff.overtime_allowance || 0) + masterAgreedOvertime;
+  const resolvedOvertime = parsePayrollWonInput(breakdown.overtime_allowance);
+  const resolvedAgreedOvertime = masterTotalOvertime > 0
+    ? Math.round((resolvedOvertime * masterAgreedOvertime) / masterTotalOvertime)
+    : masterAgreedOvertime;
+
+  const masterAgreedNight = Number(staff.agreed_night_allowance || 0);
+  const masterTotalNight = Number(staff.night_work_allowance || 0) + masterAgreedNight;
+  const resolvedNight = parsePayrollWonInput(breakdown.night_work_allowance);
+  const resolvedAgreedNight = masterTotalNight > 0
+    ? Math.round((resolvedNight * masterAgreedNight) / masterTotalNight)
+    : masterAgreedNight;
+
+  const fixedMonthlyPay =
+    baseSalary +
+    mealAllowance +
+    nightDutyAllowance +
+    vehicleAllowance +
+    childcareAllowance +
+    researchAllowance +
+    otherTaxfree +
+    positionAllowance +
+    manualExtra +
+    resolvedAgreedOvertime +
+    resolvedAgreedNight;
 
   return calculateHourlyRateFromMonthlySalary(
     fixedMonthlyPay,
@@ -121,8 +150,8 @@ export function getTaxableAllowanceBreakdownTotal(value?: Partial<TaxableAllowan
 export function getStaffTaxableAllowanceBreakdown(staff: StaffMember): TaxableAllowanceBreakdown {
   return {
     position_allowance: Number(staff.position_allowance || 0),
-    overtime_allowance: Number(staff.overtime_allowance || 0),
-    night_work_allowance: Number(staff.night_work_allowance || 0),
+    overtime_allowance: Number(staff.overtime_allowance || 0) + Number(staff.agreed_overtime_allowance || 0),
+    night_work_allowance: Number(staff.night_work_allowance || 0) + Number(staff.agreed_night_allowance || 0),
     holiday_work_allowance: Number(staff.holiday_work_allowance || 0),
     annual_leave_pay: Number(staff.annual_leave_pay || 0),
     manual_extra_allowance: 0,
@@ -251,26 +280,91 @@ function calculateSalaryAmountWithChanges({
   field,
   yearMonth,
   salaryChanges,
+  staff,
 }: {
   fallback: unknown;
   field: SalaryAmountField;
   yearMonth: string;
   salaryChanges?: SalaryChangeHistoryRow[];
+  staff?: StaffMember;
 }) {
   const bounds = getPayrollMonthBounds(yearMonth);
   const defaultAmount = Math.round(normalizeNonNegativePayrollAmount(fallback));
   if (!bounds) return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
 
+  // check mid-month hire or resignation
+  const hireDateStr = staff?.hire_date || staff?.join_date || staff?.joined_at;
+  const resignDateStr = staff?.resign_date || staff?.resigned_at;
+  const hireDate = hireDateStr ? parsePayrollDate(hireDateStr) : null;
+  const resignDate = resignDateStr ? parsePayrollDate(resignDateStr) : null;
+
+  let effectiveStart = bounds.start;
+  let effectiveEnd = bounds.end;
+  let isMidMonthEmployed = false;
+
+  if (hireDate) {
+    const hireYear = hireDate.getFullYear();
+    const hireMonth = hireDate.getMonth() + 1;
+    if (hireYear === bounds.start.getFullYear() && hireMonth === (bounds.start.getMonth() + 1)) {
+      effectiveStart = maxPayrollDate(effectiveStart, hireDate);
+      isMidMonthEmployed = true;
+    }
+  }
+
+  if (resignDate) {
+    const resignYear = resignDate.getFullYear();
+    const resignMonth = resignDate.getMonth() + 1;
+    if (resignYear === bounds.end.getFullYear() && resignMonth === (bounds.end.getMonth() + 1)) {
+      effectiveEnd = minPayrollDate(effectiveEnd, resignDate);
+      isMidMonthEmployed = true;
+    }
+  }
+
   const orderedChanges = getSalaryChangesForField(salaryChanges, field, yearMonth);
   if (orderedChanges.length === 0) {
+    if (isMidMonthEmployed) {
+      const employedDays = getInclusivePayrollDays(effectiveStart, effectiveEnd);
+      const proratedAmount = Math.floor((defaultAmount * employedDays) / bounds.lastDay);
+      
+      const reasonParts = [];
+      if (hireDate && hireDate.getFullYear() === bounds.start.getFullYear() && (hireDate.getMonth() + 1) === (bounds.start.getMonth() + 1)) {
+        reasonParts.push('중도 입사');
+      }
+      if (resignDate && resignDate.getFullYear() === bounds.end.getFullYear() && (resignDate.getMonth() + 1) === (bounds.end.getMonth() + 1)) {
+        reasonParts.push('중도 퇴사');
+      }
+      const reason = reasonParts.join(' 및 ') + ' 일할 정산';
+
+      return {
+        amount: proratedAmount,
+        summary: {
+          field,
+          label: SALARY_CHANGE_FIELD_LABELS[field] || String(field),
+          effective_dates: [formatPayrollDateKey(hireDate || resignDate)],
+          before_value: defaultAmount,
+          after_value: defaultAmount,
+          reason,
+          amount: proratedAmount,
+          segments: [
+            {
+              period_start: formatPayrollDateKey(effectiveStart),
+              period_end: formatPayrollDateKey(effectiveEnd),
+              days: employedDays,
+              monthly_amount: defaultAmount,
+              prorated_amount: proratedAmount,
+            },
+          ],
+        },
+      };
+    }
     return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
   }
 
   let rawTotal = 0;
   const segments: SalaryChangeProrationSegment[] = [];
   const addSegment = (start: Date, end: Date, monthlyAmount: unknown) => {
-    const periodStart = maxPayrollDate(start, bounds.start);
-    const periodEnd = minPayrollDate(end, bounds.end);
+    const periodStart = maxPayrollDate(start, effectiveStart);
+    const periodEnd = minPayrollDate(end, effectiveEnd);
     if (periodStart.getTime() > periodEnd.getTime()) return;
 
     const days = getInclusivePayrollDays(periodStart, periodEnd);
@@ -288,12 +382,12 @@ function calculateSalaryAmountWithChanges({
   };
 
   const firstChange = orderedChanges[0];
-  addSegment(bounds.start, shiftPayrollDate(firstChange.effectiveDate, -1), firstChange.change.before_value ?? fallback);
+  addSegment(effectiveStart, shiftPayrollDate(firstChange.effectiveDate, -1), firstChange.change.before_value ?? fallback);
   orderedChanges.forEach((entry, index) => {
     const nextChange = orderedChanges[index + 1];
     addSegment(
       entry.effectiveDate,
-      nextChange ? shiftPayrollDate(nextChange.effectiveDate, -1) : bounds.end,
+      nextChange ? shiftPayrollDate(nextChange.effectiveDate, -1) : effectiveEnd,
       entry.change.after_value ?? fallback,
     );
   });
@@ -329,28 +423,17 @@ function resolveSavedOrCalculatedAmount({
   savedValue,
   fallback,
   calculation,
+  status,
 }: {
   savedValue: unknown;
   fallback: unknown;
   calculation: ReturnType<typeof calculateSalaryAmountWithChanges>;
+  status?: string | null;
 }) {
-  if (savedValue !== null && savedValue !== undefined) {
-    const normalizedSavedValue = Math.round(normalizeNonNegativePayrollAmount(savedValue));
-    const refreshCandidates = [
-      normalizeNonNegativePayrollAmount(fallback),
-      calculation.summary?.before_value,
-      calculation.summary?.after_value,
-    ]
-      .filter((value): value is number => typeof value === 'number')
-      .map((value) => Math.round(value));
-
-    if (
-      normalizedSavedValue !== Math.round(calculation.amount) &&
-      refreshCandidates.some((value) => normalizedSavedValue === value)
-    ) {
-      return calculation.amount;
+  if (status === '확정') {
+    if (savedValue !== null && savedValue !== undefined) {
+      return Number(savedValue) || 0;
     }
-    return Number(savedValue) || 0;
   }
 
   return calculation.amount;
@@ -362,15 +445,19 @@ export function resolveSalaryAmountForSettlement({
   field,
   yearMonth,
   salaryChanges,
+  staff,
+  status,
 }: {
   savedValue: unknown;
   fallback: unknown;
   field: SalaryAmountField;
   yearMonth: string;
   salaryChanges?: SalaryChangeHistoryRow[];
+  staff?: StaffMember;
+  status?: string | null;
 }) {
-  const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges });
-  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation });
+  const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges, staff });
+  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation, status });
   return {
     amount,
     summary: calculation.summary ? { ...calculation.summary, amount } : null,

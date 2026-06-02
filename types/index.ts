@@ -49,6 +49,8 @@ export interface StaffMember {
   salary?: number | null;
   presence_status?: 'online' | 'away' | 'offline' | null;
   permissions?: StaffPermissions | null;
+  agreed_overtime_allowance?: number | null;
+  agreed_night_allowance?: number | null;
   avatar_url?: string | null;
   photo_url?: string | null;
   profile_photo_path?: string | null;

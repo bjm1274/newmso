@@ -23,6 +23,7 @@ import {
   buildShiftBoundary,
   buildFallbackShiftBoundary,
   calculateEarlyLeaveMinutes,
+  buildDateWithTime,
 } from '../../마이페이지/출퇴근기록/checkin-utils';
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
@@ -155,6 +156,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     attendanceDeduction: number,
     attendanceDetail: Record<string, unknown>,
     salaryChangeMap: Record<string, SalaryChangeHistoryRow[]> = salaryChangesByStaff,
+    autoOvertimeMins = 0,
+    autoHolidayHours = 0,
   ): SettlementEntry => {
     const savedRecord = savedRecordsByStaff[String(staff.id)];
     const staffSalaryChanges = salaryChangeMap[String(staff.id)] || [];
@@ -167,6 +170,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         field,
         yearMonth,
         salaryChanges: staffSalaryChanges,
+        staff,
+        status: savedRecord?.status,
       });
       if (result.summary) salaryChangeProration.push(result.summary);
       return result.amount;
@@ -200,10 +205,38 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         field,
         yearMonth,
         salaryChanges: staffSalaryChanges,
+        staff,
+        status: savedRecord?.status,
       });
       changeAwareBreakdown[field] = result.amount;
       if (result.summary) salaryChangeProration.push(result.summary);
     });
+
+    // 통상시급 환산용 임시 draft 엔트리 빌드 후 통상시급 산출
+    const draftEntryForHourlyRate: Partial<SettlementEntry> = {
+      base_salary: baseSalary,
+      meal_allowance: mealAllowance,
+      night_duty_allowance: nightDutyAllowance,
+      vehicle_allowance: vehicleAllowance,
+      childcare_allowance: childcareAllowance,
+      research_allowance: researchAllowance,
+      other_taxfree: otherTaxfree,
+      taxable_allowance_breakdown: changeAwareBreakdown,
+    };
+    const calculatedHourlyRate = getRegularHourlyRate(staff, draftEntryForHourlyRate);
+
+    // 자동 가산수당 금액 계산 (가산 1.5배 적용)
+    const autoOvertimePay = Math.round((autoOvertimeMins / 60) * calculatedHourlyRate * 1.5);
+    const autoHolidayPay = Math.round(autoHolidayHours * calculatedHourlyRate * 1.5);
+    const recommendedOvertimePay = autoOvertimePay + autoHolidayPay;
+
+    // 만약 이미 저장된 연장수당 정보가 있으면 보존하고, 없을 경우 추천액으로 pre-fill
+    const overtimePay = Number(
+      savedRecord?.overtime_pay !== null && savedRecord?.overtime_pay !== undefined
+        ? savedRecord.overtime_pay
+        : recommendedOvertimePay
+    ) || 0;
+
     const savedBreakdown = normalizeTaxableAllowanceBreakdown(savedDeductionDetail.taxable_allowance_breakdown);
     const hasSavedBreakdown = getTaxableAllowanceBreakdownTotal(savedBreakdown) > 0;
     const savedLooksLikeCurrentBreakdown = taxableChangeFields.every(
@@ -243,7 +276,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       research_allowance: researchAllowance,
       other_taxfree: otherTaxfree,
       extra_allowance: persistedExtraAllowance,
-      overtime_pay: Number(savedRecord?.overtime_pay ?? 0) || 0,
+      overtime_pay: overtimePay,
       bonus: Number(savedRecord?.bonus ?? 0) || 0,
       apply_tax: savedDeductionDetail.apply_tax !== false && (staff.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
       apply_insurance: savedDeductionDetail.apply_insurance !== false && (staff.permissions?.insurance as Record<string, unknown>)?.national !== false,
@@ -275,12 +308,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           (staff as Record<string, unknown>).withholding_rate_percent ??
           (staff.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
           (staff.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
-          80) as number | string | null | undefined,
+          100) as number | string | null | undefined,
       ),
       advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
       salary_change_proration: salaryChangeProration,
       saved_status: String(savedRecord?.status || ''),
       taxable_allowance_breakdown: nextBreakdown,
+      auto_overtime_pay: autoOvertimePay,
+      auto_holiday_pay: autoHolidayPay,
+      auto_overtime_minutes: autoOvertimeMins,
+      auto_holiday_hours: autoHolidayHours,
+      calculated_hourly_rate: calculatedHourlyRate,
     };
   };
 
@@ -312,6 +350,27 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         toast('급여 변경 이력 조회에 실패해 현재 등록 금액 기준으로 정산합니다.', 'warning');
       }
 
+      // 회사 공휴일 조회
+      let companyHolidaysList: any[] = [];
+      try {
+        const { data: list } = await supabase
+          .from('company_holidays')
+          .select('holiday_date, company_name')
+          .eq('is_active', 1)
+          .gte('holiday_date', startDate)
+          .lte('holiday_date', endDate);
+        companyHolidaysList = list || [];
+      } catch (holidayQueryError) {
+        console.error('company holidays query failed:', holidayQueryError);
+      }
+
+      const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
+      const holidaysSet = new Set(
+        companyHolidaysList
+          .filter((h) => h.company_name === '전체' || h.company_name === ruleCompany)
+          .map((h) => String(h.holiday_date).slice(0, 10))
+      );
+
       const { data: attendances, error: attendanceError } = await supabase
         .from('attendances')
         .select('*')
@@ -319,6 +378,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         .gte('work_date', startDate)
         .lte('work_date', endDate);
       if (attendanceError) throw attendanceError;
+
+      const staffAutoAllowances: Record<string, { overtimeMins: number; holidayHours: number }> = {};
+      selectedStaffs.forEach((s) => {
+        staffAutoAllowances[String(s.id)] = { overtimeMins: 0, holidayHours: 0 };
+      });
 
       const attendanceRecordRows: Array<{
         staff_id: string;
@@ -435,6 +499,64 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         early_leave_minutes: earlyLeaveMinutes,
                       });
                     }
+
+                    // ─── 자동 수당(연장/휴일) 적산 로직 ───
+                    if (checkIn && checkOut) {
+                      // 1. 소정 근로시간 환산 (휴게 1시간 차감 반영)
+                      let scheduledHours = 8;
+                      if (boundary.shiftKnown && boundary.endHour !== null && boundary.endMinute !== null) {
+                        const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
+                        const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
+                        if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
+                          scheduledEnd.setDate(scheduledEnd.getDate() + 1);
+                        }
+                        const shiftDuration = (scheduledEnd.getTime() - scheduledStart.getTime()) / 3600000;
+                        scheduledHours = Math.max(0, shiftDuration - 1);
+                      }
+
+                      // 2. 휴일 및 법정공휴일 근무 판정
+                      const dayOfWeek = new Date(workDate).getDay();
+                      const isSunday = dayOfWeek === 0;
+                      const isSaturday = dayOfWeek === 6;
+                      const isHoliday = isSunday || isSaturday || holidaysSet.has(workDate);
+
+                      if (isHoliday) {
+                        if (staffAutoAllowances[staffId]) {
+                          staffAutoAllowances[staffId].holidayHours += scheduledHours;
+                        }
+                      }
+
+                      // 3. 연장근로 시간 계산
+                      if (boundary.shiftKnown && boundary.endHour !== null && boundary.endMinute !== null) {
+                        const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
+                        const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
+                        if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
+                          scheduledEnd.setDate(scheduledEnd.getDate() + 1);
+                        }
+
+                        const actualCheckOut = new Date(checkOut);
+                        if (!Number.isNaN(actualCheckOut.getTime())) {
+                          // 야간 체크아웃 일자 보정
+                          const endMin = boundary.endHour * 60 + boundary.endMinute;
+                          const startMin = boundary.hour * 60 + boundary.minute;
+                          const isNightShift = endMin < startMin;
+                          if (isNightShift && actualCheckOut.getTime() < scheduledStart.getTime()) {
+                            scheduledStart.setDate(scheduledStart.getDate() - 1);
+                            scheduledEnd.setDate(scheduledEnd.getDate() - 1);
+                          }
+
+                          if (actualCheckOut.getTime() > scheduledEnd.getTime()) {
+                            const otMins = Math.round((actualCheckOut.getTime() - scheduledEnd.getTime()) / 60000);
+                            if (otMins >= 10) { // 10분 이상 지체 근로만 연장 인정
+                              if (staffAutoAllowances[staffId]) {
+                                staffAutoAllowances[staffId].overtimeMins += otMins;
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    // ─── 자동 수당(연장/휴일) 적산 로직 끝 ───
                   }
                 }
               }
@@ -463,7 +585,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         // shift_assignments is optional for divisor improvements.
       }
 
-      const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
+      // ruleCompany is already declared above
       const { data: rule, error: ruleError } = await supabase
         .from('attendance_deduction_rules')
         .select('*')
@@ -511,7 +633,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             : undefined,
           { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
-        initialData[s.id] = buildSettlementEntry(s, total, detail, latestSalaryChangesByStaff);
+        const autoAllow = staffAutoAllowances[s.id] || { overtimeMins: 0, holidayHours: 0 };
+        initialData[s.id] = buildSettlementEntry(
+          s,
+          total,
+          detail,
+          latestSalaryChangesByStaff,
+          autoAllow.overtimeMins,
+          autoAllow.holidayHours
+        );
       });
       setSettlementData(initialData);
       setStep(2);
@@ -531,15 +661,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       const nextEntry = { ...current, [field]: value } as SettlementEntry;
 
       if (field === 'dependent_count') {
-        const nextDependentCount = Math.max(0, parseInt(String(value), 10) || 0);
-        nextEntry.dependent_count = nextDependentCount;
-        if ((nextEntry.child_count_8_20 || 0) > nextDependentCount) {
-          nextEntry.child_count_8_20 = nextDependentCount;
+        const nextDependentCount = value === '' ? 0 : Math.max(0, parseInt(String(value), 10) || 0);
+        nextEntry.dependent_count = value === '' ? '' : nextDependentCount;
+        if ((Number(nextEntry.child_count_8_20) || 0) > nextDependentCount) {
+          nextEntry.child_count_8_20 = value === '' ? '' : nextDependentCount;
         }
       }
 
       if (field === 'child_count_8_20') {
-        nextEntry.child_count_8_20 = Math.min(
+        nextEntry.child_count_8_20 = value === '' ? '' : Math.min(
           Math.max(0, parseInt(String(value), 10) || 0),
           Math.max(0, Number(nextEntry.dependent_count) || 0),
         );
@@ -717,6 +847,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           salary_change_proration: data?.salary_change_proration || [],
           advance_pay_deduction: advancePay,
           net_pay_before_advance: Math.round(Number(calc?.net || 0)),
+          auto_overtime_pay: Number(data?.auto_overtime_pay || 0),
+          auto_holiday_pay: Number(data?.auto_holiday_pay || 0),
+          auto_overtime_minutes: Number(data?.auto_overtime_minutes || 0),
+          auto_holiday_hours: Number(data?.auto_holiday_hours || 0),
+          calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0),
         };
 
         return {

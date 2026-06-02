@@ -1259,6 +1259,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           : {};
       const nextWorkConditions = {
         ...existingWorkConditions,
+        working_hours_per_week: weeklyWorkingHours,
+        working_days_per_week: workingDaysPerWeek,
         shift_group_ids: selectedShiftIds,
         weekly_rotation_shift_ids: selectedShiftIds.slice(1),
         secondary_shift_id: selectedShiftIds[1] || null,

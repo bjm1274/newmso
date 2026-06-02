@@ -1,11 +1,18 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { usePayrollData } from '../payroll-context';
 import {
   calculateEmployeeInsuranceDeductions,
 } from '@/lib/payroll-insurance-rates';
 import { calculateAge } from '../payroll-policy';
+import {
+  calculateMonthlyIncomeTax,
+  fetchTaxInsuranceRates,
+  DEFAULT_TAX_INSURANCE_RATES,
+  hasExactIncomeTaxBracket,
+  type TaxInsuranceRates,
+} from '@/lib/use-tax-insurance-rates';
 
 /**
  * #3 급여 시뮬레이터 — 좌측 입력 / 우측 실시간 계산
@@ -53,19 +60,32 @@ interface SimulatorResult {
   hourly: number;
 }
 
-function computeSimulation(input: SimulatorInputs, age: number): SimulatorResult {
+function computeSimulation(
+  input: SimulatorInputs,
+  age: number,
+  taxInsuranceRates: TaxInsuranceRates | null,
+  dependentCount: number
+): SimulatorResult {
   const hourly = Math.floor(input.base / 209);
   const overtimePay = Math.floor(hourly * input.overtimeHours * 1.5);
   const nightPay = Math.floor(hourly * input.nightHours * 1.5);
   const holidayPay = Math.floor(hourly * input.holidayHours * 1.5);
   const gross = input.base + overtimePay + nightPay + holidayPay + input.taxableExtra;
 
-  const taxable = gross - input.taxFreeExtra;
+  const taxable = Math.max(0, gross - input.taxFreeExtra);
   const ins = calculateEmployeeInsuranceDeductions(taxable, age);
-  // 단순 간이세액 6% (실제는 간이세액표 — 후속 차수에서 lib/use-tax-insurance-rates 연동)
-  const taxBase = Math.max(0, taxable - ins.total);
-  const incomeTax = Math.floor(taxBase * 0.06);
-  const localTax = Math.floor(incomeTax * 0.1);
+  
+  const rates = taxInsuranceRates || DEFAULT_TAX_INSURANCE_RATES;
+  const incomeTax = calculateMonthlyIncomeTax(
+    taxable,
+    rates,
+    dependentCount,
+    {
+      withholdingRatePercent: 100,
+      qualifyingChildCount: 0,
+    }
+  );
+  const localTax = Math.floor((incomeTax * 0.1) / 10) * 10;
 
   const netPay = gross - ins.total - incomeTax - localTax;
 
@@ -93,12 +113,40 @@ export default function ModSimulator() {
   const [taxableExtra, setTaxableExtra] = useState<string>('0');
   const [taxFreeExtra, setTaxFreeExtra] = useState<string>('200000');
 
+  const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const year = new Date().getFullYear();
+        const rates = await fetchTaxInsuranceRates(data.selectedCo || '전체', year);
+        if (active) setTaxInsuranceRates(rates);
+      } catch (err) {
+        console.error('Failed to fetch tax rates in simulator:', err);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [data.selectedCo]);
+
   // 직원 선택 시 그 직원의 salary로 base 자동 채우기
   const selectedStaff = useMemo(
     () => data.staffs.find((s) => String(s.id) === staffId),
     [data.staffs, staffId],
   );
   const age = useMemo(() => calculateAge(selectedStaff?.birth_date) ?? 30, [selectedStaff]);
+
+  const dependentCount = useMemo(() => {
+    if (!selectedStaff) return 1;
+    return Number(
+      selectedStaff.dependent_count ??
+      (selectedStaff.permissions?.payroll as Record<string, unknown> | undefined)?.dependent_count ??
+      (selectedStaff.permissions?.tax as Record<string, unknown> | undefined)?.dependent_count ??
+      1
+    ) || 1;
+  }, [selectedStaff]);
 
   const inputs: SimulatorInputs = {
     staffId,
@@ -110,7 +158,10 @@ export default function ModSimulator() {
     taxFreeExtra: parseNumber(taxFreeExtra),
   };
 
-  const result = useMemo(() => computeSimulation(inputs, age), [inputs, age]);
+  const result = useMemo(
+    () => computeSimulation(inputs, age, taxInsuranceRates, dependentCount),
+    [inputs, age, taxInsuranceRates, dependentCount],
+  );
 
   const handlePickStaff = (id: string) => {
     setStaffId(id);
@@ -230,7 +281,7 @@ export default function ModSimulator() {
         </div>
 
         <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">
-          ※ 4대보험 요율은 2026 기준 / 소득세는 단순 6% 추정. 정확한 간이세액표는 정산 화면 사용.
+          ※ 4대보험 요율은 2026 기준 / 소득세는 회사의 간이세액표 및 부양가족 수 기준으로 정확하게 자동 계산됩니다.
         </p>
       </form>
 

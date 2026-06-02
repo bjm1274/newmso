@@ -14,15 +14,27 @@ export function TenMinuteUnitAmountField({
   allowManualAmountInput = false,
 }: {
   label: string;
-  value: number;
+  value: number | '';
   hourlyRate: number;
-  onChange: (nextValue: number) => void;
+  onChange: (nextValue: number | '') => void;
   dataTestId: string;
   labelClassName: string;
   inputClassName: string;
   allowManualAmountInput?: boolean;
 }) {
   const amount = parsePayrollWonInput(value);
+  const [inputValue, setInputValue] = useState(
+    value === '' || value === undefined || value === null ? '' : (value === 0 ? '0' : Number(value).toLocaleString())
+  );
+
+  useEffect(() => {
+    const currentNumeric = parseInt(inputValue.replace(/,/g, ''), 10) || 0;
+    const targetNumeric = Number(value) || 0;
+    if (currentNumeric !== targetNumeric) {
+      setInputValue(value === '' || value === undefined || value === null ? '' : (value === 0 ? '0' : Number(value).toLocaleString()));
+    }
+  }, [value]);
+
   const quickInputRef = useRef<HTMLInputElement>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openedByHoldRef = useRef(false);
@@ -63,7 +75,14 @@ export function TenMinuteUnitAmountField({
     onChange(Math.max(0, amount + stepAmount * direction));
   };
   const handleAmountChange = (event: ChangeEvent<HTMLInputElement>) => {
-    onChange(parsePayrollWonInput(event.target.value));
+    const rawValue = event.target.value;
+    setInputValue(rawValue);
+    const numeric = rawValue.replace(/[^\d.-]/g, '');
+    if (numeric === '') {
+      onChange('');
+    } else {
+      onChange(parsePayrollWonInput(rawValue));
+    }
   };
   const handleUnitInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     setUnitInputValue(event.target.value.replace(/[^\d]/g, ''));
@@ -107,7 +126,7 @@ export function TenMinuteUnitAmountField({
           data-testid={dataTestId}
           type="text"
           inputMode="numeric"
-          value={amount.toLocaleString()}
+          value={inputValue}
           readOnly={!allowManualAmountInput}
           onChange={allowManualAmountInput ? handleAmountChange : undefined}
           className={`min-w-0 flex-1 border-0 bg-transparent px-3 text-xs font-bold outline-none ${inputClassName}`}

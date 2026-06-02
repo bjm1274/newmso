@@ -152,7 +152,7 @@ export async function fetchPayrollWorkcenterData({
     const { data, error } = await supabase
       .from('staff_members')
       .select(
-        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account',
+        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, agreed_overtime_allowance, agreed_night_allowance',
       );
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];
@@ -187,6 +187,8 @@ export async function fetchPayrollWorkcenterData({
           position_allowance: row.position_allowance == null ? 0 : num(row.position_allowance),
           bank_name: row.bank_name == null ? null : str(row.bank_name),
           bank_account: row.bank_account == null ? null : str(row.bank_account),
+          agreed_overtime_allowance: row.agreed_overtime_allowance == null ? 0 : num(row.agreed_overtime_allowance),
+          agreed_night_allowance: row.agreed_night_allowance == null ? 0 : num(row.agreed_night_allowance),
         };
       })
       .filter((s) => {

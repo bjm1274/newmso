@@ -59,6 +59,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  serverExternalPackages: ['better-sqlite3'],
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,

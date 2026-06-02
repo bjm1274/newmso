@@ -8,23 +8,42 @@ import { isActiveStaff } from '@/lib/active-staff';
 
 const DEFAULT_LEAVE_TYPE = '연차 (1.0)';
 
+const formatLocalTime = (isoString: string) => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 export default function AttendanceForms({
   user,
   staffs,
   formType,
   setExtraData,
   setFormTitle,
+  setFormContent,
   initialExtraData,
 }: Record<string, unknown>) {
   const currentUser = (user ?? {}) as Record<string, unknown>;
   const staffRows = ((staffs as StaffMember[]) ?? []);
   const updateExtraData = setExtraData as (value: Record<string, unknown>) => void;
   const updateFormTitle = setFormTitle as (value: string) => void;
+  const updateFormContent = setFormContent as ((value: string) => void) | undefined;
   const seedExtraData = (initialExtraData ?? {}) as Record<string, unknown>;
 
   const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDates, setSelectedDates] = useState<string[]>(() => {
+    if (Array.isArray(seedExtraData.selectedDates)) {
+      return seedExtraData.selectedDates as string[];
+    }
+    if (seedExtraData.date) {
+      return [String(seedExtraData.date)];
+    }
+    return [];
+  });
   const [localStartDate, setLocalStartDate] = useState('');
   const [localEndDate, setLocalEndDate] = useState('');
   const [leaveType, setLeaveType] = useState(DEFAULT_LEAVE_TYPE);
@@ -156,6 +175,80 @@ export default function AttendanceForms({
     return `${minute}분`;
   };
 
+  const overtimeRecords = useMemo(() => {
+    return attendanceRows.filter((row) => calculateOT(row) > 0);
+  }, [attendanceRows, schedules, staffRows, currentUser.id]);
+
+  const updateMultipleOTExtraData = useCallback((dates: string[]) => {
+    if (dates.length === 0) {
+      updateExtraData({});
+      updateFormTitle('');
+      if (updateFormContent) updateFormContent('');
+      return;
+    }
+
+    const selectedRecords = overtimeRecords.filter((r) => dates.includes(r.date));
+    const totalMinutes = selectedRecords.reduce((sum, r) => sum + calculateOT(r), 0);
+    const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+    const totalAmount = Math.floor((totalMinutes / 60) * 15000);
+
+    updateExtraData({
+      selectedDates: dates,
+      minutes: totalMinutes,
+      hours: totalHours,
+      amount: totalAmount,
+      items: selectedRecords.map((r) => {
+        const mins = calculateOT(r);
+        return {
+          date: r.date,
+          minutes: mins,
+          hours: Math.round((mins / 60) * 100) / 100,
+          amount: Math.floor((mins / 60) * 15000),
+          check_out: r.check_out,
+          check_out_local: formatLocalTime(r.check_out),
+        };
+      }),
+    });
+
+    let nextTitle = '';
+    if (dates.length === 1) {
+      nextTitle = `[추가수당청구] ${dates[0]} 연장근무 ${formatOTLabel(totalMinutes)}`;
+    } else {
+      nextTitle = `[추가수당청구] ${dates[0]} 외 ${dates.length - 1}건 연장근무 총 ${formatOTLabel(totalMinutes)}`;
+    }
+    updateFormTitle(nextTitle);
+
+    if (updateFormContent) {
+      const contentLines = [
+        '### [연장근무 신청 내역]',
+        `* **총 연장근무 일수**: ${dates.length}일`,
+        `* **총 연장근무 시간**: ${formatOTLabel(totalMinutes)} (${totalHours}시간)`,
+        `* **예상 추가수당 합계**: ₩${totalAmount.toLocaleString()}`,
+        '',
+        '| 근무 일자 | 퇴근 시간 | 연장근무 시간 |',
+        '| :--- | :--- | :--- |',
+        ...selectedRecords.map((r) => {
+          const mins = calculateOT(r);
+          return `| ${r.date} | ${formatLocalTime(r.check_out)} | ${formatOTLabel(mins)} |`;
+        }),
+        '',
+        '위와 같이 연장근무에 대한 추가수당을 청구하오니 재가하여 주시기 바랍니다.'
+      ];
+      updateFormContent(contentLines.join('\n'));
+    }
+  }, [overtimeRecords, updateExtraData, updateFormTitle, updateFormContent]);
+
+  const handleToggleSelectAll = () => {
+    if (selectedDates.length === overtimeRecords.length) {
+      setSelectedDates([]);
+      updateMultipleOTExtraData([]);
+    } else {
+      const allDates = overtimeRecords.map((r) => r.date);
+      setSelectedDates(allDates);
+      updateMultipleOTExtraData(allDates);
+    }
+  };
+
   return (
     <div
       data-testid="approval-attendance-form-view"
@@ -282,6 +375,20 @@ export default function AttendanceForms({
             )}
           </div>
 
+          {hasQueried && !isLoading && overtimeRecords.length > 0 && (
+            <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--tab-bg)]/20 px-4 py-2.5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={overtimeRecords.length > 0 && selectedDates.length === overtimeRecords.length}
+                  onChange={handleToggleSelectAll}
+                  className="w-4 h-4 rounded border-[var(--border)] text-orange-600 focus:ring-orange-500 animate-in fade-in"
+                />
+                <span className="text-xs font-bold text-[var(--foreground)]">전체 선택 ({selectedDates.length}/{overtimeRecords.length}개 선택됨)</span>
+              </label>
+            </div>
+          )}
+
           {!hasQueried && !isLoading ? (
             <div className="flex flex-col items-center justify-center p-8 text-center bg-[var(--tab-bg)]/30 border border-dashed border-orange-200/50 rounded-b-2xl">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
@@ -310,8 +417,7 @@ export default function AttendanceForms({
           ) : (
             <div className="custom-scrollbar grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 md:grid-cols-2 md:gap-3">
               {(() => {
-                const records = attendanceRows.filter((row) => calculateOT(row) > 0);
-                if (records.length === 0) {
+                if (overtimeRecords.length === 0) {
                   return (
                     <div className="col-span-full flex flex-col items-center justify-center py-8 text-center">
                       <div className="mb-2 text-xl">🎉</div>
@@ -325,7 +431,7 @@ export default function AttendanceForms({
                   );
                 }
 
-                return records.map((row, index) => {
+                return overtimeRecords.map((row, index) => {
                   const overtimeMinutes = calculateOT(row);
                   return (
                     <button
@@ -333,28 +439,34 @@ export default function AttendanceForms({
                       type="button"
                       data-testid={`approval-overtime-record-${index}`}
                       onClick={() => {
-                        setSelectedDate(row.date);
-                        updateExtraData({
-                          date: row.date,
-                          minutes: overtimeMinutes,
-                          hours: Math.round((overtimeMinutes / 60) * 100) / 100,
-                          amount: Math.floor((overtimeMinutes / 60) * 15000),
-                        });
-                        updateFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
+                        const isSelected = selectedDates.includes(row.date);
+                        const nextDates = isSelected
+                          ? selectedDates.filter((d) => d !== row.date)
+                          : [...selectedDates, row.date];
+                        setSelectedDates(nextDates);
+                        updateMultipleOTExtraData(nextDates);
                       }}
                       className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
-                        selectedDate === row.date
+                        selectedDates.includes(row.date)
                           ? 'border-orange-500 bg-[var(--card)] shadow-sm'
                           : 'border-[var(--border)] bg-[var(--card)]/50 hover:bg-[var(--card)]'
                       }`}
                     >
-                      <div>
-                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] md:text-[11px]">
-                          {row.date}
-                        </span>
-                        <p className="text-xs font-bold text-[var(--foreground)]">
-                          퇴근: {String(row.check_out || '').slice(11, 16)}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedDates.includes(row.date)}
+                          readOnly
+                          className="w-4 h-4 rounded border-[var(--border)] text-orange-600 focus:ring-orange-500"
+                        />
+                        <div>
+                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] md:text-[11px]">
+                            {row.date}
+                          </span>
+                          <p className="text-xs font-bold text-[var(--foreground)]">
+                            퇴근: {formatLocalTime(row.check_out)}
+                          </p>
+                        </div>
                       </div>
                       <span className="rounded-[var(--radius-md)] bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
                         +{formatOTLabel(overtimeMinutes)}

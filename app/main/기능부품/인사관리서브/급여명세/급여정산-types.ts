@@ -1,28 +1,33 @@
 // 급여정산 도메인 타입 정의 (순수 추출 — 동작 보존)
 
 export interface SettlementEntry {
-  base_salary: number;
-  meal_allowance: number;
-  night_duty_allowance: number;
-  vehicle_allowance: number;
-  childcare_allowance: number;
-  research_allowance: number;
-  other_taxfree: number;
-  extra_allowance: number;
-  overtime_pay: number;
-  bonus: number;
+  base_salary: number | '';
+  meal_allowance: number | '';
+  night_duty_allowance: number | '';
+  vehicle_allowance: number | '';
+  childcare_allowance: number | '';
+  research_allowance: number | '';
+  other_taxfree: number | '';
+  extra_allowance: number | '';
+  overtime_pay: number | '';
+  bonus: number | '';
   apply_tax: boolean;
   apply_insurance: boolean;
-  attendance_deduction: number;
+  attendance_deduction: number | '';
   attendance_deduction_detail: Record<string, unknown>;
-  custom_deduction: number;
-  dependent_count: number;
-  child_count_8_20: number;
+  custom_deduction: number | '';
+  dependent_count: number | '';
+  child_count_8_20: number | '';
   withholding_rate_percent: 80 | 100 | 120;
-  advance_pay: number;
+  advance_pay: number | '';
   salary_change_proration?: SalaryChangeProrationSummary[];
   saved_status?: string;
   taxable_allowance_breakdown: TaxableAllowanceBreakdown;
+  auto_overtime_pay?: number;
+  auto_holiday_pay?: number;
+  auto_overtime_minutes?: number;
+  auto_holiday_hours?: number;
+  calculated_hourly_rate?: number;
 }
 
 export interface TaxableAllowanceBreakdown {

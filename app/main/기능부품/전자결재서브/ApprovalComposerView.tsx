@@ -340,6 +340,7 @@ export default function ApprovalComposerView({
                 formType={formType}
                 setExtraData={setExtraData}
                 setFormTitle={setFormTitle}
+                setFormContent={setFormContent}
                 initialExtraData={extraData}
               />
             ) : formType === '물품신청' ? (
