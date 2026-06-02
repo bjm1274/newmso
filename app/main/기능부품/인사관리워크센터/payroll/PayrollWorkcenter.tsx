@@ -30,7 +30,7 @@ import ModAbsence     from './modules/ModAbsence';
  * JM6: 백버튼 aria-label 명시.
  */
 
-const MODULE_COMPONENTS: Record<PayrollModuleId, () => React.JSX.Element> = {
+const MODULE_COMPONENTS: Record<PayrollModuleId, (props: { user?: any }) => React.JSX.Element> = {
   settlement:  ModSettlement,
   ledger:      ModLedger,
   simulator:   ModSimulator,
@@ -64,12 +64,12 @@ export default function PayrollWorkcenter({
 } = {}) {
   return (
     <PayrollProvider selectedCo={selectedCo}>
-      <PayrollWorkcenterInner initialModule={initialModule} />
+      <PayrollWorkcenterInner initialModule={initialModule} user={user} />
     </PayrollProvider>
   );
 }
 
-function PayrollWorkcenterInner({ initialModule }: { initialModule?: string | null }) {
+function PayrollWorkcenterInner({ initialModule, user }: { initialModule?: string | null; user?: any }) {
   const [current, setCurrent] = useState<PayrollModuleId | null>(() => {
     if (initialModule === '원천징수파일') return 'withholding';
     return null;
@@ -150,7 +150,7 @@ function PayrollWorkcenterInner({ initialModule }: { initialModule?: string | nu
         )}
       </div>
 
-      <Module />
+      <Module user={user} />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import UnpaidAllowanceAlert from '../../../인사관리서브/급여명세/미�
  * #12 미지급 수당 점검 — 전월 대비 야간/연장수당 누락 자동 감지 및 실시간 근태 대조
  */
 
-export default function ModUnpaid() {
+export default function ModUnpaid({ user }: { user?: any }) {
   const data = usePayrollData();
   const [activeTab, setActiveTab] = useState<'legacy' | 'realtime'>('realtime');
   const rows = useMemo(() => buildUnpaidRows(data), [data]);
@@ -51,7 +51,7 @@ export default function ModUnpaid() {
           <UnpaidAllowanceAlert
             staffs={data.staffs}
             selectedCo={data.selectedCo}
-            user={data.user}
+            user={user}
           />
         </div>
       ) : (

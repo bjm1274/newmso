@@ -23,7 +23,7 @@ const LegacySalaryDetail = dynamic(
  * #2 급여 대장 — 월별·부서 필터 + 표 및 시각적 분석 대시보드
  */
 
-export default function ModLedger() {
+export default function ModLedger({ user }: { user?: any }) {
   const data = usePayrollData();
   const { yearMonth, setYearMonth, selectedCo } = usePayroll();
   const [activeTab, setActiveTab] = useState<'ledger' | 'analysis'>('ledger');
@@ -105,7 +105,7 @@ export default function ModLedger() {
           <TotalLaborCostForecast
             staffs={data.staffs}
             selectedCo={selectedCo}
-            user={data.user}
+            user={user}
           />
           <div className="p-4 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)]">
             <LaborCostTrend selectedCo={selectedCo} />
