@@ -424,12 +424,11 @@ export function useWelfareBundle(company: string | undefined) {
           .order('expiry_date', { ascending: true })
           .limit(30);
 
-        let deviceQ = supabase
+        const deviceQ = supabase
           .from('medical_devices')
-          .select('id, device_name, vendor, next_check_date, cycle, status, company')
-          .order('next_check_date', { ascending: true })
+          .select('id, name, model, next_inspection_date, cycle')
+          .order('next_inspection_date', { ascending: true })
           .limit(30);
-        if (useCompany) deviceQ = deviceQ.eq('company', company!);
 
         const [familyRes, checkupRes, licenseRes, deviceRes] = await Promise.all([
           familyQ,
@@ -468,11 +467,11 @@ export function useWelfareBundle(company: string | undefined) {
           })),
           device: ((deviceRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
-            device_name: typeof r.device_name === 'string' ? r.device_name : null,
-            vendor: typeof r.vendor === 'string' ? r.vendor : null,
-            next_check_date: typeof r.next_check_date === 'string' ? r.next_check_date : null,
-            cycle: typeof r.cycle === 'string' ? r.cycle : null,
-            status: typeof r.status === 'string' ? r.status : null,
+            device_name: typeof r.name === 'string' ? r.name : null,
+            vendor: null,
+            next_check_date: typeof r.next_inspection_date === 'string' ? r.next_inspection_date : null,
+            cycle: typeof r.cycle === 'number' ? `${r.cycle}개월` : (typeof r.cycle === 'string' ? r.cycle : null),
+            status: '정상',
           })),
         });
       } catch (err) {

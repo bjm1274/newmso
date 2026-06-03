@@ -103,36 +103,63 @@ export async function atomicStockTransfer(
   destId: string,
   quantity: number,
 ): Promise<StockTransferResult> {
-  const rows = await db
-    .select({
-      id: inventory.id,
-      prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)`,
-    })
-    .from(inventory)
-    .where(inArray(inventory.id, [sourceId, destId]));
+  return await db.transaction(async (tx) => {
+    // 1. Decrement source inventory quantity and stock where quantity >= quantity
+    const updatedSrc = await tx
+      .update(inventory)
+      .set({
+        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
+        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
+      })
+      .where(
+        sql`${inventory.id} = ${sourceId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${quantity}`,
+      )
+      .returning({
+        next_qty: inventory.quantity,
+      });
 
-  const srcRow = rows.find((r) => r.id === sourceId);
-  const dstRow = rows.find((r) => r.id === destId);
-  if (!srcRow) throw new StockError('SOURCE_NOT_FOUND');
-  if (!dstRow) throw new StockError('DEST_NOT_FOUND');
+    if (updatedSrc.length === 0) {
+      // Check if source exists at all
+      const foundSrc = await tx
+        .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
+        .from(inventory)
+        .where(eq(inventory.id, sourceId));
 
-  const srcPrev = Number(srcRow.prev ?? 0);
-  const dstPrev = Number(dstRow.prev ?? 0);
-  if (srcPrev - quantity < 0) {
-    throw new StockError(
-      'INSUFFICIENT_STOCK',
-      `INSUFFICIENT_STOCK: prev=${srcPrev}, qty=${quantity}`,
-    );
-  }
-  const srcNext = srcPrev - quantity;
-  const dstNext = dstPrev + quantity;
+      if (foundSrc.length === 0) {
+        throw new StockError('SOURCE_NOT_FOUND');
+      }
+      const prev = Number(foundSrc[0].prev ?? 0);
+      throw new StockError(
+        'INSUFFICIENT_STOCK',
+        `INSUFFICIENT_STOCK: prev=${prev}, qty=${quantity}`,
+      );
+    }
 
-  await db.batch([
-    db.update(inventory).set({ quantity: srcNext, stock: srcNext }).where(eq(inventory.id, sourceId)),
-    db.update(inventory).set({ quantity: dstNext, stock: dstNext }).where(eq(inventory.id, destId)),
-  ]);
+    const srcNext = Number(updatedSrc[0].next_qty ?? 0);
+    const srcPrev = srcNext + quantity;
 
-  return { src_prev: srcPrev, src_next: srcNext, dst_prev: dstPrev, dst_next: dstNext };
+    // 2. Increment destination inventory quantity and stock
+    const updatedDst = await tx
+      .update(inventory)
+      .set({
+        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
+        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
+      })
+      .where(eq(inventory.id, destId))
+      .returning({
+        next_qty: inventory.quantity,
+      });
+
+    if (updatedDst.length === 0) {
+      // Destination doesn't exist
+      throw new StockError('DEST_NOT_FOUND');
+    }
+
+    const dstNext = Number(updatedDst[0].next_qty ?? 0);
+    const dstPrev = dstNext - quantity;
+
+    return { src_prev: srcPrev, src_next: srcNext, dst_prev: dstPrev, dst_next: dstNext };
+  });
 }
 
 /**
@@ -175,27 +202,38 @@ export async function atomicStockConsumeWithLog(
     notes: string | null;
   }
 ): Promise<StockUpdateResult> {
-  const found = await db
-    .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
-    .from(inventory)
-    .where(eq(inventory.id, itemId));
-  if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
-  const prev = Number(found[0].prev ?? 0);
-  if (prev - consumeAmount < 0) {
-    throw new StockError(
-      'INSUFFICIENT_STOCK',
-      `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
-    );
-  }
-  const next = prev - consumeAmount;
-
-  const logId = crypto.randomUUID();
-  await db.batch([
-    db
+  return await db.transaction(async (tx) => {
+    const updated = await tx
       .update(inventory)
-      .set({ quantity: next, stock: next })
-      .where(eq(inventory.id, itemId)),
-    db
+      .set({
+        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
+        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
+      })
+      .where(
+        sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${consumeAmount}`,
+      )
+      .returning({
+        next_qty: inventory.quantity,
+      });
+
+    if (updated.length === 0) {
+      const found = await tx
+        .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
+        .from(inventory)
+        .where(eq(inventory.id, itemId));
+      if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
+      const prev = Number(found[0].prev ?? 0);
+      throw new StockError(
+        'INSUFFICIENT_STOCK',
+        `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
+      );
+    }
+
+    const next = Number(updated[0].next_qty ?? 0);
+    const prev = next + consumeAmount;
+    const logId = crypto.randomUUID();
+
+    await tx
       .insert(inventory_logs)
       .values({
         id: logId,
@@ -211,9 +249,9 @@ export async function atomicStockConsumeWithLog(
         company_id: logRow.company_id ?? null,
         department: logRow.department,
         notes: logRow.notes,
-      })
-  ]);
+      });
 
-  return { prev_qty: prev, next_qty: next };
+    return { prev_qty: prev, next_qty: next };
+  });
 }
 

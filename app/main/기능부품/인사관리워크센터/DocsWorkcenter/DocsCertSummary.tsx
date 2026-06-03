@@ -45,22 +45,43 @@ export default function DocsCertSummary() {
     const fetchData = async () => {
       try {
         const { data, error } = await supabase
-          .from('certificate_issues')
-          .select('id, document_type, count, last_issued_at')
-          .order('count', { ascending: false })
-          .limit(6);
+          .from('certificate_issuances')
+          .select('id, cert_type, issued_at')
+          .order('issued_at', { ascending: false })
+          .limit(200);
         if (cancelled) return;
         if (error) throw error;
         const list = (data as Array<Record<string, unknown>> | null) ?? [];
         if (list.length > 0) {
-          setCards(
-            list.map((r) => ({
-              id: String(r.id ?? ''),
-              name: String(r.document_type ?? '증명서'),
-              iss: Number(r.count ?? 0),
-              last: formatShortDate(r.last_issued_at),
-            })),
-          );
+          const certMap = new Map<string, { count: number; last_issued_at: string; first_id: string }>();
+          for (const item of list) {
+            const type = String(item.cert_type ?? '증명서');
+            const issuedAt = String(item.issued_at ?? '');
+            const existing = certMap.get(type);
+            if (existing) {
+              existing.count += 1;
+            } else {
+              certMap.set(type, {
+                count: 1,
+                last_issued_at: issuedAt,
+                first_id: String(item.id ?? ''),
+              });
+            }
+          }
+
+          const sortedCerts = Array.from(certMap.entries())
+            .map(([name, val]) => ({
+              id: val.first_id,
+              name,
+              iss: val.count,
+              last: formatShortDate(val.last_issued_at),
+            }))
+            .sort((a, b) => b.iss - a.iss)
+            .slice(0, 6);
+
+          if (sortedCerts.length > 0) {
+            setCards(sortedCerts);
+          }
         }
       } catch (error) {
         console.warn('[DocsCertSummary] cert fetch failed, using fallback', error);

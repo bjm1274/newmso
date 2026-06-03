@@ -9,7 +9,7 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
   useEffect(() => {
     if (!staffId) return;
     (async () => {
-      const { data: c } = await supabase.from('staff_certifications').select('*').eq('staff_id', staffId).order('issue_date', { ascending: false });
+      const { data: c } = await supabase.from('staff_licenses').select('id, license_name, issuing_body, issued_date, expiry_date').eq('staff_id', staffId).order('issued_date', { ascending: false });
       const { data: t } = await supabase.from('staff_transfer_history').select('*').eq('staff_id', staffId).order('effective_date', { ascending: false });
       setCerts(c || []);
       setTransfers(t || []);
@@ -24,8 +24,8 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
           <div className="space-y-2">
             {certs.map((x) => (
               <div key={x.id} className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
-                <p className="text-sm font-bold">{x.name}</p>
-                <p className="text-[11px] text-[var(--toss-gray-3)]">{x.issuer} · {x.issue_date} {x.expiry_date ? `~ ${x.expiry_date}` : ''}</p>
+                <p className="text-sm font-bold">{x.license_name}</p>
+                <p className="text-[11px] text-[var(--toss-gray-3)]">{x.issuing_body || '발행기관 없음'} · {x.issued_date} {x.expiry_date ? `~ ${x.expiry_date}` : ''}</p>
               </div>
             ))}
           </div>

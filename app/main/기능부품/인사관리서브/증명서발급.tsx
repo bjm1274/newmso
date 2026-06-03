@@ -302,7 +302,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     const certificateTitle = selectedCertificate?.label || design.title || '재직증명서';
     const closingText = certificateTitle.includes('재직')
       ? '상기인은 아래와 같이 근무하고 있음을 증명합니다.'
-      : getClosingText(certificateTitle);
+      : getClosingText(selectedCertificate?.id || certType);
 
     return (
       <div
@@ -663,7 +663,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 }}
               >
                 <p className="text-[16px] font-black leading-relaxed text-[var(--foreground)]">
-                  {getClosingText(selectedCertificate?.label || certType)}
+                  {getClosingText(selectedCertificate?.id || certType)}
                 </p>
                 {design.footerText && (
                   <p className="mt-3 text-[12px] leading-relaxed text-[var(--toss-gray-3)]">

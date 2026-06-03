@@ -658,6 +658,12 @@ export default function SalaryDetail({
           </div>
         )}
 
+        {!record && (
+          <div className="salary-print-avoid my-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200">
+            💡 확정된 급여 대장 기록이 존재하지 않아 소득세가 3% 단일세율로 임시 계산되었습니다. 실제 지급 시 국세청 간이세액표에 따라 세액이 달라질 수 있습니다.
+          </div>
+        )}
+
         <div
           className="salary-print-avoid mt-auto flex items-end justify-between gap-4 border-t pt-5 print:pt-3"
           style={{ borderColor }}

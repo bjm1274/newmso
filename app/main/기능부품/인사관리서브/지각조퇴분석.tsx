@@ -61,16 +61,15 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
 
         const { data } = await supabase
           .from('attendances')
-          .select('staff_id, status, work_date')
+          .select('staff_id, status, work_date, late_minutes, early_leave_minutes')
           .in('staff_id', staffIds)
           .gte('work_date', since.toISOString().slice(0, 10));
 
         const records = (data || []).map((record: any) => {
-          const status = String(record.status || '').toLowerCase();
           return {
             ...record,
-            late_minutes: status.includes('late') || status.includes('지각') ? 1 : 0,
-            early_leave_minutes: status.includes('early') || status.includes('조퇴') ? 1 : 0,
+            late_minutes: Number(record.late_minutes ?? 0),
+            early_leave_minutes: Number(record.early_leave_minutes ?? 0),
           };
         });
         const result = filteredStaffs.map((staff: any) => {

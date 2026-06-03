@@ -21,6 +21,7 @@ import {
   eq,
   and,
   isNull,
+  sql,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -114,36 +115,19 @@ export async function POST(request: NextRequest) {
     // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
     // metadata.approval_id === approvalId 인 미열람 알림을 읽음 처리한다.
     try {
-      const rows = await db
-        .select({ id: notificationsTable.id, metadata: notificationsTable.metadata })
-        .from(notificationsTable)
-        .where(and(eq(notificationsTable.type, 'approval'), isNull(notificationsTable.read_at)))
-        .limit(500);
-
-      const matchedIds = rows
-        .filter((row) => {
-          if (typeof row.metadata !== 'string' || row.metadata.length === 0) return false;
-          try {
-            const parsed = JSON.parse(row.metadata) as unknown;
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              return String((parsed as Record<string, unknown>).approval_id || '') === approvalId;
-            }
-          } catch {
-            return false;
-          }
-          return false;
-        })
-        .map((row) => String(row.id));
-
       const readAt = new Date().toISOString();
-      for (const id of matchedIds) {
-        await db
-          .update(notificationsTable)
-          .set({ read_at: readAt })
-          .where(eq(notificationsTable.id, id));
-      }
-    } catch {
-      // silent — 알림 처리 실패는 회수 성공에 영향 없음
+      await db
+        .update(notificationsTable)
+        .set({ read_at: readAt })
+        .where(
+          and(
+            eq(notificationsTable.type, 'approval'),
+            isNull(notificationsTable.read_at),
+            sql`json_extract(${notificationsTable.metadata}, '$.approval_id') = ${approvalId}`
+          )
+        );
+    } catch (err) {
+      console.error('[api/approval/recall] 알림 읽음 처리 실패:', err);
     }
 
     return NextResponse.json({ ok: true, approvalId });

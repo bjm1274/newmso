@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       systemInstruction: systemInstruction,
     });
 
@@ -137,7 +137,7 @@ function getMockResponseForUserMessage(message: string): string {
 
   return `질문하신 **"${message}"**에 대해 안내해 드립니다.
 
-구글 **Gemini 3.5 Flash** AI가 분석한 병원 행정적 가이드는 다음과 같습니다:
+위와 같이 구글 **Gemini 2.5 Flash** AI가 분석한 병원 행정적 가이드는 다음과 같습니다:
 
 1. **규정 및 데이터 대조**:
    - 요청하신 테마는 병원 내부의 표준 업무 매뉴얼 및 조직 흐름에 부합하도록 처리되어야 합니다.

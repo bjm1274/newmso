@@ -21,6 +21,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // 업로드
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -82,6 +83,9 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
@@ -112,6 +116,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     // 3. 실제 녹음 기동
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       chunksRef.current = [];
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -127,6 +132,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       };
 
       mr.start(500);

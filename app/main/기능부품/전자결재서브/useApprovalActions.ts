@@ -237,7 +237,7 @@ export function useApprovalActions({
 
     const { error } = await supabase
       .from('approvals')
-      .update({ status: '반려', meta_data: { ...(rejectMetaData || {}), reject_reason: reason } })
+      .update({ status: '반려', meta_data: { ...(nextRejectedMetaData || {}), reject_reason: reason } })
       .eq('id', item.id);
     if (!error) {
       toast('반려 처리했습니다.', 'success');

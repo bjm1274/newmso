@@ -161,8 +161,7 @@ export const attendance_corrections = sqliteTable("attendance_corrections", {
 	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 },
 (table) => [
-	// 비유니크 — 동일 (staff_id, attendance_date)에 정정 신청이 여러 건 존재할 수 있다.
-	index("idx_attendance_corrections_staff_date").on(table.staff_id, table.attendance_date),
+	uniqueIndex("idx_attendance_corrections_staff_date_unique").on(table.staff_id, table.attendance_date),
 ]);
 
 export const attendance_deduction_rules = sqliteTable("attendance_deduction_rules", {

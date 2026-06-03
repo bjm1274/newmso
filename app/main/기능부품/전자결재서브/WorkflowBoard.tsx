@@ -86,6 +86,14 @@ function classifyStage(
   currentApproverId: string | null,
 ): WorkflowStage {
   const status = String(item.status || '대기').trim();
+  if (
+    status === '회수' ||
+    status === '임시저장' ||
+    status === '작성' ||
+    status === '임시'
+  ) {
+    return 'draft';
+  }
   if (status.includes('승인') || status.includes('완료')) return 'approved';
   if (status.includes('반려')) return 'rejected';
   // 대기 흐름: 현재 결재자가 나면 '검토 중', 아니면 '결재 대기'
