@@ -913,6 +913,24 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const persistSettlement = async (targetStatus: '임시저장' | '확정') => {
     setLoading(true);
     try {
+      // E-1: 마감 잠금된 월은 임시저장·확정을 모두 차단한다(클라이언트 가드).
+      // 잠금 스코프는 '전체' 또는 선택 회사. 조회 실패(컬럼/테이블 미적용 등) 시 막지 않음(fail-open).
+      const lockScopes = selectedCo && selectedCo !== '전체' ? ['전체', selectedCo] : ['전체'];
+      const { data: lockRows, error: lockError } = await supabase
+        .from('payroll_locks')
+        .select('year_month, company_name')
+        .eq('year_month', yearMonth)
+        .in('company_name', lockScopes);
+      if (lockError) {
+        console.error('payroll lock check failed:', lockError);
+      } else if (Array.isArray(lockRows) && lockRows.length > 0) {
+        toast(
+          `${yearMonth} 급여가 마감 잠금되어 저장할 수 없습니다.\n재오픈 승인 후 다시 시도해 주세요.`,
+          'error',
+        );
+        return null;
+      }
+
       const records = selectedStaffs.map((staff) => {
         const staffId = String(staff.id);
         const data = settlementData[staffId];

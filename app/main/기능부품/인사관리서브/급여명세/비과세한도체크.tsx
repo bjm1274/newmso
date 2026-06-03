@@ -34,13 +34,14 @@ interface TaxFreeRow {
 type TaxFreeItemKey = keyof TaxFreeKey;
 
 // 비과세 한도 SSOT: 정본 lib/tax-free-limits 의 법정 한도를 사용한다.
-// childcare(출산·보육수당 10만원), night(야간근로수당 24만원), overseas(국외근로소득 100만원)는
-// 정본 TAX_FREE_LEGAL_LIMITS 가 커버하지 않는 항목이라 기존 값을 유지(임의 변경 금지). 보고 참조.
+// childcare(출산·보육수당)는 2024년 개정으로 월 20만원이며 정본 TAX_FREE_LEGAL_LIMITS.childcare가
+// 커버한다 (과거 10만원 하드코딩 → SSOT 200,000으로 정정, N-5).
+// night(야간근로수당 24만원)·overseas(국외근로소득 100만원)는 정본 미커버 항목이라 값 유지.
 const TAX_FREE_LIMITS: Record<TaxFreeItemKey, { label: string; limit: number }> = {
   meal: { label: '식대', limit: TAX_FREE_LEGAL_LIMITS.meal.limit },
   car: { label: '자가운전보조금', limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit },
   research: { label: '연구활동비', limit: TAX_FREE_LEGAL_LIMITS.research.limit },
-  childcare: { label: '출산·보육수당', limit: 100000 },
+  childcare: { label: '출산·보육수당', limit: TAX_FREE_LEGAL_LIMITS.childcare.limit },
   night: { label: '야간근로수당(생산직)', limit: 240000 },
   overseas: { label: '국외근로소득(비파견)', limit: 1000000 },
 };
@@ -87,15 +88,21 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yearMonth, selectedCo]);
 
+  // payroll_records의 실제 비과세 수당 컬럼에서 직접 읽는다.
+  // (과거 meta_data 컬럼은 payroll_records에 존재하지 않아 항상 0이 되어 점검이 무력화됐음 — N-3)
   const getAmounts = (record: Record<string, unknown>): TaxFreeKey => {
-    const meta = (record?.meta_data ?? {}) as Record<string, number>;
+    const num = (value: unknown) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
     return {
-      meal: (meta.meal_allowance ?? meta['식대'] ?? 0) as number,
-      car: (meta.car_allowance ?? meta['자가운전보조금'] ?? 0) as number,
-      research: (meta.research_allowance ?? meta['연구활동비'] ?? 0) as number,
-      childcare: (meta.childcare_allowance ?? meta['보육수당'] ?? 0) as number,
-      night: (meta.night_allowance ?? meta['야간근로수당'] ?? 0) as number,
-      overseas: (meta.overseas_income ?? meta['국외근로소득'] ?? 0) as number,
+      meal: num(record.meal_allowance),
+      car: num(record.vehicle_allowance),
+      research: num(record.research_allowance),
+      childcare: num(record.childcare_allowance),
+      night: num(record.night_duty_allowance),
+      // payroll_records에 국외근로소득 전용 컬럼이 없어 현재는 미추적(0).
+      overseas: 0,
     };
   };
 

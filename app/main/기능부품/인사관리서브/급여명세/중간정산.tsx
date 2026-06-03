@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { supabase } from '@/lib/supabase';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
@@ -585,6 +586,20 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     try {
       const calc = calculateSettlement(selectedStaff);
       const yearMonth = settlementDate.slice(0, 7);
+
+      // E-1: 마감 잠금된 월은 중간정산 저장(확정)도 차단한다. 조회 실패 시 막지 않음(fail-open).
+      const lockScopes = companyScope && companyScope !== '전체' ? ['전체', companyScope] : ['전체'];
+      const { data: lockRows, error: lockError } = await supabase
+        .from('payroll_locks')
+        .select('year_month, company_name')
+        .eq('year_month', yearMonth)
+        .in('company_name', lockScopes);
+      if (lockError) {
+        console.error('payroll lock check failed:', lockError);
+      } else if (Array.isArray(lockRows) && lockRows.length > 0) {
+        toast(`${yearMonth} 급여가 마감 잠금되어 저장할 수 없습니다.\n재오픈 승인 후 다시 시도해 주세요.`, 'error');
+        return;
+      }
 
       const record: any = {
         staff_id: selectedStaff.id,
