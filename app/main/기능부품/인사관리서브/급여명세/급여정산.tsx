@@ -936,6 +936,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           auto_night_minutes: Number(data?.auto_night_minutes || 0),
           calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0),
         };
+        // calc.deductionDetail은 조기 반환 분기 때문에 `{전체}|{}` 유니온이므로 Record로 캐스트 후 읽는다.
+        const dd = (calc?.deductionDetail ?? {}) as Record<string, unknown>;
 
         return {
           staff_id: staff.id,
@@ -953,6 +955,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           total_taxable: Math.round(Number(calc?.taxable || 0)),
           total_taxfree: Math.round(Number(calc?.taxfree || 0)),
           total_deduction: Math.round(Number(calc?.deduction || 0)),
+          // R-2: 4대보험·소득세 공제를 top-level 컬럼에도 저장한다.
+          // 모바일 급여명세서·내정보·워크센터 4대보험 요약·EDI는 deduction_detail JSON이 아니라
+          // 이 컬럼들을 읽으므로, 미저장 시 직원 명세서에 공제가 전부 0원으로 표시되는 문제를 해소.
+          national_pension: Math.round(Number(dd.national_pension || 0)),
+          health_insurance: Math.round(Number(dd.health_insurance || 0)),
+          long_term_care: Math.round(Number(dd.long_term_care || 0)),
+          employment_insurance: Math.round(Number(dd.employment_insurance || 0)),
+          income_tax: Math.round(Number(dd.income_tax || 0)),
+          local_tax: Math.round(Number(dd.local_tax || 0)),
           deduction_detail: deductionDetail,
           net_pay: netPay,
           attendance_deduction: Math.round(Number(data?.attendance_deduction) || 0),
@@ -965,7 +976,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
       const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
         records: records as Record<string, unknown>[],
-        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
+        optionalColumns: [
+          ...PAYROLL_RECORD_OPTIONAL_COLUMNS,
+          'national_pension',
+          'health_insurance',
+          'long_term_care',
+          'employment_insurance',
+          'income_tax',
+          'local_tax',
+        ],
       });
       if (payrollSaveError) throw payrollSaveError;
 

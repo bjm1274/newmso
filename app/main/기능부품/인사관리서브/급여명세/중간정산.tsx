@@ -286,7 +286,11 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     : _staffs.filter((s: any) => s.company === selectedCo);
 
   const candidates = filterRetirees
-    ? filtered.filter((s: any) => (s.status || '').toLowerCase() === '퇴사' || s.resigned_at)
+    ? filtered.filter((s: any) => {
+        const status = (s.status || '').toLowerCase();
+        // resign_date가 정본 컬럼(payroll-fetch가 로딩). resigned_at은 일부 경로 호환용.
+        return status === '퇴사' || status === '퇴직' || s.resign_date || s.resigned_at;
+      })
     : filtered;
 
   const effectiveYear = parseInt(settlementDate.slice(0, 4), 10) || new Date().getFullYear();
@@ -598,6 +602,13 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         total_taxable: calc.totalTaxable,
         total_taxfree: calc.totalTaxfree,
         total_deduction: calc.deduction,
+        // R-2: 공제 항목을 top-level 컬럼에도 저장 (모바일 명세서·EDI가 deduction_detail 대신 읽음)
+        national_pension: calc.deductionDetail.national_pension,
+        health_insurance: calc.deductionDetail.health_insurance,
+        long_term_care: calc.deductionDetail.long_term_care,
+        employment_insurance: calc.deductionDetail.employment_insurance,
+        income_tax: calc.deductionDetail.income_tax,
+        local_tax: calc.deductionDetail.local_tax,
         deduction_detail: calc.deductionDetail,
         net_pay: calc.net,
         attendance_deduction: calc.allowanceDeduction + calc.attendanceDeduction,
@@ -624,6 +635,12 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           'childcare_allowance',
           'research_allowance',
           'other_taxfree',
+          'national_pension',
+          'health_insurance',
+          'long_term_care',
+          'employment_insurance',
+          'income_tax',
+          'local_tax',
           'attendance_deduction',
           'attendance_deduction_detail',
           'advance_pay',

@@ -195,9 +195,13 @@ export async function fetchPayrollWorkcenterData({
         };
       })
       .filter((s) => {
-        if (!isActiveStaff(s)) return false;
         if (selectedCo && selectedCo !== '전체' && s.company !== selectedCo) return false;
-        return true;
+        if (isActiveStaff(s)) return true;
+        // R-1: 중도퇴사자도 정산월에 재직했다면 최종 월급·중간정산 대상에 포함한다.
+        //      (status를 '퇴사'/'퇴직'으로 바꾼 뒤에도 그 달 급여를 정산할 수 있어야 함.
+        //       resign_date(YYYY-MM)가 정산월 이상이면 그 달에 재직한 것으로 본다.)
+        const resignYm = s.resign_date ? String(s.resign_date).slice(0, 7) : '';
+        return resignYm !== '' && resignYm >= yearMonth;
       });
   } catch (e) {
     const msg = e instanceof Error ? e.message : '직원 마스터 조회 실패';
