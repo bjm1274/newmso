@@ -8,6 +8,7 @@ import {
   EMPLOYEE_INSURANCE_RATES_2026,
   getIndustrialAccidentInsuranceInfo,
 } from '@/lib/payroll-insurance-rates';
+import { getPayrollStaffAge } from '@/lib/payroll-insurance-settings';
 import { supabase } from '@/lib/supabase';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
@@ -109,7 +110,8 @@ export default function InsuranceEDI({
             Number(record.base_salary ?? 0),
             Number(staff.base_salary ?? staff.base ?? 0)
           );
-          const employeeInsurance = calculateEmployeeInsuranceDeductions(base);
+          const age = getPayrollStaffAge(staff, new Date(`${yearMonth}-01`)) ?? 30;
+          const employeeInsurance = calculateEmployeeInsuranceDeductions(base, age);
           const industrialAccident = calculateIndustrialAccidentInsurance(base, selectedCompanyLabel);
 
           return [

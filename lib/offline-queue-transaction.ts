@@ -194,29 +194,129 @@ export async function enqueueSupabaseTransaction(
 // 내부: 잔여 steps 큐잉
 // ─────────────────────────────────────────────────────────────
 
+function createMockResultsProxy(prefix = '$prev'): any {
+  return new Proxy([], {
+    get(target, prop) {
+      const index = Number(prop);
+      if (Number.isInteger(index)) {
+        return createMockObjectProxy(`${prefix}[${index}]`);
+      }
+      return (target as any)[prop];
+    }
+  });
+}
+
+function createMockObjectProxy(path: string): any {
+  return new Proxy(() => {}, {
+    get(target, prop) {
+      if (typeof prop === 'symbol') return undefined;
+      if (prop === 'toString' || prop === 'valueOf' || prop === 'toJSON') {
+        return () => path;
+      }
+      const segment = /^\d+$/.test(String(prop)) ? `[${String(prop)}]` : `.${String(prop)}`;
+      return createMockObjectProxy(path + segment);
+    },
+    apply(target, thisArg, argumentsList) {
+      return path;
+    }
+  });
+}
+
+function getValueByPath(obj: any, path: string): any {
+  if (obj === null || obj === undefined) return undefined;
+  if (!path || path === '.') return obj;
+
+  const normalized = path
+    .replace(/\[(\d+)\]/g, '.$1')
+    .split('.')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  let current = obj;
+  for (const seg of normalized) {
+    if (current === null || current === undefined) return undefined;
+    const idx = Number(seg);
+    if (Number.isInteger(idx)) {
+      current = Array.isArray(current) ? current[idx] : current[seg];
+    } else {
+      current = current[seg];
+    }
+  }
+  return current;
+}
+
+export function resolveInjectedPayload(val: unknown, prevResults: unknown[]): unknown {
+  if (typeof val === 'string' && val.startsWith('$prev')) {
+    const match = /^\$prev\[(\d+)\](.*)/.exec(val);
+    if (match) {
+      const index = Number(match[1]);
+      const path = match[2];
+      const targetObj = prevResults[index];
+      return getValueByPath(targetObj, path);
+    }
+  }
+  if (Array.isArray(val)) {
+    return val.map(item => resolveInjectedPayload(item, prevResults));
+  }
+  if (val && typeof val === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(val)) {
+      next[k] = resolveInjectedPayload(v, prevResults);
+    }
+    return next;
+  }
+  return val;
+}
+
 function enqueueRemainingSteps(
   steps: TransactionStep[],
   startIndex: number,
-  _completedData: unknown[],
+  completedData: unknown[],
   groupId: string,
 ): TransactionResult {
   const queue = getOfflineQueue();
+  const allResults = [...completedData];
+
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
-    const resolvedPayload = step.payload ?? {};
+    let resolvedPayload = step.payload;
+
+    if (!resolvedPayload && step.inject) {
+      try {
+        const currentMockResults = createMockResultsProxy();
+        const stepResults = new Proxy([], {
+          get(target, prop) {
+            const index = Number(prop);
+            if (Number.isInteger(index)) {
+              return index < allResults.length ? allResults[index] : currentMockResults[index];
+            }
+            return (target as any)[prop];
+          }
+        });
+        resolvedPayload = step.inject(stepResults) as Record<string, unknown>;
+      } catch (err) {
+        console.error('[tx-queue] failed to generate mock payload for inject:', err);
+        resolvedPayload = {};
+      }
+    }
+
+    const dataPayload = resolvedPayload ?? {};
+
     queue.enqueue({
       type: `db:${step.kind}:${step.table}`,
       payload: {
         kind: step.kind,
         table: step.table,
-        data: resolvedPayload,
+        data: dataPayload,
         match: step.match,
       },
       groupId,
       groupIndex: startIndex + i,
     });
+
+    allResults.push(createMockObjectProxy(`$prev[${startIndex + i}]`));
   }
-  return { data: _completedData, queued: true, error: null };
+  return { data: completedData, queued: true, error: null };
 }
 
 function generateGroupId(): string {

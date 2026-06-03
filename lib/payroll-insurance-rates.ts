@@ -83,7 +83,7 @@ export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age:
   const taxableBase = Math.max(0, Math.floor(Number(taxableIncome) || 0));
   const pensionBase = Math.min(Math.max(taxableBase, NP_INCOME_FLOOR), NP_INCOME_CEILING);
   const nationalPension =
-    age >= 65 ? 0 : Math.floor(pensionBase * EMPLOYEE_INSURANCE_RATES_2026.nationalPension);
+    age >= 60 ? 0 : Math.floor(pensionBase * EMPLOYEE_INSURANCE_RATES_2026.nationalPension);
   const healthInsurance = Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.healthInsurance);
   const longTermCare = Math.floor(healthInsurance * LONG_TERM_CARE_HEALTH_RATIO_2026);
   const employmentInsurance = Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance);

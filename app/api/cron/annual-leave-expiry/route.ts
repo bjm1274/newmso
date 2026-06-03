@@ -20,9 +20,11 @@ export async function GET(request: Request) {
     const balanceErrors: string[] = [];
     for (const r of results) {
       // 금전 보상 기록 (companies.unused_leave_compensation=TRUE 인 경우)
-      recordUnusedLeaveCompensation(r.staffId, r.expiredDays).catch((compErr) => {
+      try {
+        await recordUnusedLeaveCompensation(r.staffId, r.expiredDays);
+      } catch (compErr) {
         console.error('[annual-leave-expiry cron] recordUnusedLeaveCompensation 실패:', r.staffId, compErr);
-      });
+      }
 
       try {
         await recalculateLeaveBalance(r.staffId, new Date(r.expiryDate).getFullYear());

@@ -19,6 +19,7 @@
 
 import { getOfflineQueue, type QueuedAction } from './offline-queue';
 import { supabase } from './supabase';
+import { resolveInjectedPayload } from './offline-queue-transaction';
 
 // ─────────────────────────────────────────────────────────────
 // 타입
@@ -169,6 +170,9 @@ export async function enqueueSupabaseMutation<T = unknown>(
 
 let flushInitialized = false;
 
+// 캐시를 플러시할 때 각 트랜잭션 그룹별로 실행 결과(성공한 행 데이터 등)를 누적 보관합니다.
+const transactionGroupResults = new Map<string, unknown[]>();
+
 /**
  * 앱 마운트 시 1회 호출. online 이벤트 시 큐를 자동 replay한다.
  * 이미 초기화되어 있으면 no-op.
@@ -185,7 +189,21 @@ export function initOfflineQueueFlush(): () => void {
     const p = action.payload as QueuedMutationPayload;
     if (!p || typeof p.kind !== 'string' || typeof p.table !== 'string') return;
 
-    await executeMutation(p.kind as MutationKind, p.table, p.data, p.match);
+    let resolvedData = p.data;
+    if (action.groupId) {
+      let groupResults = transactionGroupResults.get(action.groupId);
+      if (!groupResults) {
+        groupResults = [];
+        transactionGroupResults.set(action.groupId, groupResults);
+      }
+      resolvedData = resolveInjectedPayload(p.data, groupResults) as Record<string, unknown> | Record<string, unknown>[];
+    }
+
+    const resData = await executeMutation(p.kind as MutationKind, p.table, resolvedData, p.match);
+
+    if (action.groupId) {
+      transactionGroupResults.get(action.groupId)?.push(resData);
+    }
   });
 
   return () => {

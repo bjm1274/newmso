@@ -96,8 +96,8 @@ export type LicenseExpiryJobsResult = {
 
 function daysBetween(target: Date, base: Date): number {
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
-  const t = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
-  const b = Date.UTC(base.getFullYear(), base.getMonth(), base.getDate());
+  const t = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const b = Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate());
   return Math.round((t - b) / MS_PER_DAY);
 }
 
