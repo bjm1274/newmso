@@ -48,6 +48,7 @@ import {
   normalizeTaxableAllowanceBreakdown,
   resolveSalaryAmountForSettlement,
   fetchSalaryChangeHistoryForMonth,
+  getEmploymentProratedBaseForMonth,
 } from './급여정산-utils';
 import { Step1TargetSelection } from './급여정산-Step1TargetSelection';
 import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
@@ -696,7 +697,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}),
           }));
         const { total, detail } = calculateAttendanceDeduction(
-          Number(s.base_salary) || 0,
+          // A-2: 중도입사·중도퇴사자는 분모(소정근로일수)가 부분월이므로
+          // 분자도 일할 후 기본급으로 맞춰 결근차감 과대공제를 방지한다.
+          getEmploymentProratedBaseForMonth(s, yearMonth, s.base_salary),
           yearMonth,
           staffAtts,
           r

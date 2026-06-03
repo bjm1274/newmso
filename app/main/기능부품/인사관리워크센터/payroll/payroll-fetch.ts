@@ -22,6 +22,7 @@ import {
   calculateTenureYears,
   type PayrollPolicy,
 } from './payroll-policy';
+import { calculateDcRetirementBenefitFromMonthlyWage } from '@/lib/severance-pay';
 
 // ─── 정규화된 payroll record ─────────────────────────
 export interface PayrollRecordNormalized {
@@ -302,7 +303,7 @@ export async function fetchRecentRetirees(
   try {
     const { data, error } = await supabase
       .from('staff_members')
-      .select('id, name, company, department, hire_date, resign_date, salary, status')
+      .select('id, name, company, department, hire_date, resign_date, salary, base_salary, meal_allowance, status')
       .not('resign_date', 'is', null);
     if (error) throw new Error(error.message);
     if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
@@ -319,7 +320,6 @@ export async function fetchRecentRetirees(
       .map((row) => {
         const hire = row.hire_date == null ? null : str(row.hire_date);
         const resign = row.resign_date == null ? null : str(row.resign_date);
-        const sal = Number(row.salary ?? 0);
         const tenure = calculateTenureYears(hire, resign ? new Date(resign) : undefined);
         const tenureLabel =
           tenure === null
@@ -327,7 +327,15 @@ export async function fetchRecentRetirees(
             : tenure < 1
               ? `${Math.floor(tenure * 12)}개월`
               : `${tenure.toFixed(1)}년`;
-        const estimatedPay = tenure !== null && sal > 0 ? Math.floor(sal * tenure) : 0;
+        // F-1: 중간정산과 동일한 DC 퇴직금 공식으로 통일.
+        // 월평균임금 = 기본급 + 식대, 재직일수/365, 1년 미만은 0.
+        const monthlyAvgWage = num(row.base_salary) + num(row.meal_allowance);
+        const workDays =
+          hire && resign
+            ? Math.max(0, Math.floor((new Date(resign).getTime() - new Date(hire).getTime()) / 86_400_000))
+            : 0;
+        const estimatedPay =
+          workDays > 0 ? calculateDcRetirementBenefitFromMonthlyWage(monthlyAvgWage, workDays) : 0;
         return {
           staff_id: str(row.id),
           name: str(row.name),

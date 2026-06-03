@@ -494,3 +494,53 @@ export async function fetchSalaryChangeHistoryForMonth(yearMonth: string, staffI
     {},
   );
 }
+
+/**
+ * 근태(결근/지각/조퇴) 차감의 분자로 쓸 "그 달 실제 지급 기준 기본급"을 반환한다 (A-2).
+ *
+ * 근태차감 일당 = 기본급 ÷ 그 달 소정근로일수. 그런데 중도입사·중도퇴사자는
+ * 소정근로일수(분모)가 부분월로 줄어드는데 분자에 월 전액 기본급을 그대로 쓰면
+ * 일당이 과대(약 2배)해져 결근차감이 과대공제된다.
+ * 분자도 일할 후 금액(floor(월액 × 재직일수 / 역일수))으로 맞춰 분모와 일관시킨다.
+ * 정상(전월 재직) 직원은 일할이 없으므로 월 전액을 그대로 반환(동작 불변).
+ */
+export function getEmploymentProratedBaseForMonth(
+  staff: StaffMember | undefined,
+  yearMonth: string,
+  fullBase: unknown,
+): number {
+  const base = Math.max(0, Math.round(normalizeNonNegativePayrollAmount(fullBase)));
+  const bounds = getPayrollMonthBounds(yearMonth);
+  if (!bounds || !staff) return base;
+
+  const hireDateStr = staff?.hire_date || staff?.join_date || staff?.joined_at;
+  const resignDateStr = staff?.resign_date || staff?.resigned_at;
+  const hireDate = hireDateStr ? parsePayrollDate(hireDateStr) : null;
+  const resignDate = resignDateStr ? parsePayrollDate(resignDateStr) : null;
+
+  let effectiveStart = bounds.start;
+  let effectiveEnd = bounds.end;
+  let isMidMonthEmployed = false;
+
+  if (
+    hireDate &&
+    hireDate.getFullYear() === bounds.start.getFullYear() &&
+    hireDate.getMonth() === bounds.start.getMonth()
+  ) {
+    effectiveStart = maxPayrollDate(effectiveStart, hireDate);
+    isMidMonthEmployed = true;
+  }
+  if (
+    resignDate &&
+    resignDate.getFullYear() === bounds.end.getFullYear() &&
+    resignDate.getMonth() === bounds.end.getMonth()
+  ) {
+    effectiveEnd = minPayrollDate(effectiveEnd, resignDate);
+    isMidMonthEmployed = true;
+  }
+
+  if (!isMidMonthEmployed) return base;
+
+  const employedDays = getInclusivePayrollDays(effectiveStart, effectiveEnd);
+  return Math.max(0, Math.floor((base * employedDays) / bounds.lastDay));
+}

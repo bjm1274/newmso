@@ -73,8 +73,8 @@ export default function ModRetirement() {
         </div>
         <div className="app-card p-3">
           <div className="text-[11px] text-[var(--toss-gray-4)]">계산 기준</div>
-          <div className="text-[13px] font-bold">월 평균임금 × 근속연수</div>
-          <div className="text-[10px] text-[var(--toss-gray-3)]">단순 추정 · 실제는 평균/통상임금 비교</div>
+          <div className="text-[13px] font-bold">DC 기준 (기본급+식대)</div>
+          <div className="text-[10px] text-[var(--toss-gray-3)]">재직일수/365 · 1년 미만 제외 · 중간정산과 동일식</div>
         </div>
       </div>
 
