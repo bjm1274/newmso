@@ -67,11 +67,6 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
     cleanupWarnings.push({ target: 'push_subscriptions.staff_id', error: pushByStaffResult.error });
   }
 
-  const pushByUserResult = await supabase.from('push_subscriptions').delete().eq('user_id', staffId);
-  if (pushByUserResult.error && !isMissingColumnError(pushByUserResult.error, 'user_id')) {
-    cleanupWarnings.push({ target: 'push_subscriptions.user_id', error: pushByUserResult.error });
-  }
-
   const notificationsResult = await withMissingColumnFallback(
     () =>
       supabase

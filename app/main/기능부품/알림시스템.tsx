@@ -550,8 +550,53 @@ export async function initNotificationService(options?: InitNotificationServiceO
         sub = null;
       }
       if (!sub) {
-        try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) }); }
-        catch (e) { console.warn('푸시 구독 실패:', e); }
+        const subscribeOpts = { userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) };
+        try {
+          sub = await reg.pushManager.subscribe(subscribeOpts);
+        } catch (subscribeErr) {
+          recordPushDebug({
+            source: 'app',
+            stage: 'subscribe-failed-attempt-1',
+            message: '푸시 구독 1차 시도 실패. 기존 구독 조회 후 재시도합니다.',
+            detail: { error: String((subscribeErr as { message?: string } | null)?.message || subscribeErr || '') },
+          });
+          // 1. 실패 직전에 브라우저가 이미 보유한 구독이 있으면 재사용
+          try {
+            const existing = await reg.pushManager.getSubscription();
+            if (existing) {
+              sub = existing;
+              recordPushDebug({
+                source: 'app',
+                stage: 'subscribe-reuse-existing',
+                message: '기존 브라우저 구독을 재사용합니다.',
+                detail: { endpoint: existing.endpoint },
+              });
+            }
+          } catch {
+            // 기존 구독 조회 실패는 무시하고 재시도로 진행
+          }
+          // 2. 기존 구독도 없으면 짧은 지연 후 1회 재시도
+          if (!sub) {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            try {
+              sub = await reg.pushManager.subscribe(subscribeOpts);
+              recordPushDebug({
+                source: 'app',
+                stage: 'subscribe-retry-success',
+                message: '푸시 구독 재시도 성공.',
+              });
+            } catch (retryErr) {
+              recordPushDebug({
+                source: 'app',
+                stage: 'subscribe-retry-failed',
+                message: '푸시 구독 재시도도 실패했습니다. 다음 상호작용 시 재시도됩니다.',
+                detail: { error: String((retryErr as { message?: string } | null)?.message || retryErr || '') },
+              });
+              // 다음 focus/visibilitychange 이벤트에서 재시도될 수 있도록 active 상태를 false 유지
+              // (setPushSubscriptionActiveState는 아래 else 분기에서 처리)
+            }
+          }
+        }
       }
       if (sub) {
         const j: any = sub.toJSON();

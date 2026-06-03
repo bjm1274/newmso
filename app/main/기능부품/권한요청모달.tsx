@@ -38,11 +38,23 @@ export default function PermissionPromptModal() {
     try {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
+        let resolvedStaffId: string | undefined;
         try {
           const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.USER) : null;
-          const u = raw ? JSON.parse(raw) : null;
-          await initNotificationService(u?.id);
-        } catch (_) { }
+          const u = raw ? (JSON.parse(raw) as Record<string, unknown> | null) : null;
+          const candidateId = typeof u?.id === 'string' ? u.id.trim() : '';
+          // UUID 형식이 아니거나 빈 문자열이면 guest로 구독하지 않음
+          const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidateId);
+          if (!isValidUuid) {
+            toast('로그인 후 다시 시도해 주세요. 로그인된 사용자만 푸시 알림을 등록할 수 있습니다.', 'warning');
+            return;
+          }
+          resolvedStaffId = candidateId;
+        } catch {
+          toast('사용자 정보를 읽지 못했습니다. 로그인 후 다시 시도해 주세요.', 'warning');
+          return;
+        }
+        await initNotificationService(resolvedStaffId);
         toast('알림이 허용되었습니다. 채팅·결재 등 푸시 알림을 받을 수 있습니다.');
         setActionDone(true);
       } else if (permission === 'denied') {

@@ -1776,8 +1776,18 @@ export const push_subscriptions = sqliteTable("push_subscriptions", {
 (table) => [
 	index("idx_push_subscriptions_staff_id").on(table.staff_id),
 	uniqueIndex("idx_push_subscriptions_staff_endpoint").on(table.staff_id, table.endpoint),
-	uniqueIndex("idx_push_subscriptions_staff_device_unique").on(table.staff_id, table.device_id),
-	uniqueIndex("idx_push_subscriptions_fcm_token_unique").on(table.fcm_token),
+	// 부분 유니크 인덱스: device_id=NULL인 VAPID 구독이 여럿이어도 충돌 없도록
+	// Postgres 마이그레이션(20260416_push_subscriptions_device_columns_and_dedupe.sql)의
+	// WHERE staff_id IS NOT NULL AND device_id IS NOT NULL 와 동일한 동작 보장.
+	// SQLite는 NULL을 UNIQUE 대상에서 제외하지 않으므로 명시적 WHERE 절 필수.
+	uniqueIndex("idx_push_subscriptions_staff_device_unique")
+		.on(table.staff_id, table.device_id)
+		.where(sql`staff_id IS NOT NULL AND device_id IS NOT NULL`),
+	// fcm_token 부분 유니크: NULL fcm_token 행이 여럿이어도 충돌 없도록
+	// Postgres WHERE fcm_token IS NOT NULL 과 동일.
+	uniqueIndex("idx_push_subscriptions_fcm_token_unique")
+		.on(table.fcm_token)
+		.where(sql`fcm_token IS NOT NULL`),
 	index("idx_push_subscriptions_fcm_token").on(table.fcm_token),
 ]);
 

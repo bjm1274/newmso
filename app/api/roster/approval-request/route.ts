@@ -3,6 +3,7 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
+import { deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
 import {
   approvals as approvalsTable,
   staff_members as staffMembersTable,
@@ -331,18 +332,36 @@ async function dispatchImmediateApprovalPush(
       }
     });
 
+    const webTargets = Array.from(uniqueWebSubscriptions.values()).filter(
+      (s) => s.endpoint && s.p256dh && s.auth,
+    );
     const webResults = await Promise.allSettled(
-      Array.from(uniqueWebSubscriptions.values())
-        .filter((s) => s.endpoint && s.p256dh && s.auth)
-        .map((subscription) =>
-          sendWebPushNotification(
-            { endpoint: subscription.endpoint!, p256dh: subscription.p256dh!, auth: subscription.auth! },
-            payloadJson,
-          ),
+      webTargets.map((subscription) =>
+        sendWebPushNotification(
+          { endpoint: subscription.endpoint!, p256dh: subscription.p256dh!, auth: subscription.auth! },
+          payloadJson,
         ),
+      ),
     );
 
-    pushSentCount += webResults.filter((result) => result.status === 'fulfilled').length;
+    const expiredWebIds: string[] = [];
+    for (let i = 0; i < webResults.length; i += 1) {
+      const r = webResults[i];
+      if (r.status === 'fulfilled') {
+        pushSentCount += 1;
+      } else {
+        const err = r.reason as { statusCode?: number; status?: number } | undefined;
+        const statusCode = Number(err?.statusCode || err?.status || 0);
+        if (statusCode === 404 || statusCode === 410) {
+          expiredWebIds.push(webTargets[i].id);
+        }
+      }
+    }
+
+    if (expiredWebIds.length > 0) {
+      const d1 = await getD1Binding();
+      if (d1) await deleteExpiredWebPushSubscriptions(d1, expiredWebIds);
+    }
   }
 
   return {

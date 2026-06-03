@@ -351,7 +351,11 @@ async function erpFlushRetryQueue() {
 }
 
 function erpIsVisibleClient(client) {
-  return client?.visibilityState === 'visible' || client?.focused === true;
+  // visibilityState만으로는 부족: 데스크톱 창이 최소화돼도 일부 브라우저에서
+  // visibilityState가 'visible'로 유지된다. focused를 AND 조건으로 함께 확인해
+  // 실제로 사용자가 앱을 보고 있는 경우(포커스 있음)에만 visible로 판정.
+  // 최소화·다른 앱 포커스 시에는 false를 반환 → 시스템 알림 표시로 이어짐.
+  return client?.visibilityState === 'visible' && client?.focused === true;
 }
 
 function erpIsMobileDevice() {
