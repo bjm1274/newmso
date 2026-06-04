@@ -496,11 +496,16 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
                 // shiftAssignment 날짜별 shift 정보 맵: "staffId_workDate" → shiftId
                 const assignmentMap = new Map<string, string>();
+                const rosterOffSet = new Set<string>();
                 shiftAssignments.forEach((row) => {
                   const shiftId = String(row.shift_id || '').trim();
-                  if (!shiftId || offLikeShiftIds.has(shiftId)) return;
+                  if (!shiftId) return;
                   const workDate = String(row.work_date || '').slice(0, 10);
                   if (!workDate) return;
+                  if (offLikeShiftIds.has(shiftId)) {
+                    rosterOffSet.add(`${row.staff_id}_${workDate}`);
+                    return;
+                  }
                   assignmentMap.set(`${row.staff_id}_${workDate}`, shiftId);
                 });
 
@@ -573,7 +578,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                       const dayOfWeek = new Date(workDate).getDay();
                       const isSunday = dayOfWeek === 0;
                       const isSaturday = dayOfWeek === 6;
-                      const isHoliday = isSunday || isSaturday || holidaysSet.has(workDate);
+                      const isHoliday =
+                        isSunday ||
+                        isSaturday ||
+                        holidaysSet.has(workDate) ||
+                        rosterOffSet.has(`${staffId}_${workDate}`);
 
                       if (isHoliday) {
                         // C-11: 휴일 실근무시간(checkIn~checkOut - 휴게1h) 기준으로
