@@ -31,6 +31,7 @@ import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate } from '@/lib/payroll-insurance-settings';
 import RiskActionDialog from '../RiskActionDialog';
 import type {
   SettlementEntry,
@@ -260,8 +261,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     ];
     taxableChangeFields.forEach((field) => {
       let fallbackVal = staffBreakdown[field];
-      if (field === 'holiday_work_allowance' && autoHolidayHours > 0) {
-        fallbackVal = autoHolidayPay;
+      if (field === 'holiday_work_allowance') {
+        fallbackVal = autoHolidayHours > 0 ? autoHolidayPay : 0;
       }
       const result = resolveSalaryAmountForSettlement({
         savedValue: undefined,
@@ -913,6 +914,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     const qualifyingChildCount = Math.min(dependentCount, Math.max(0, Number(data.child_count_8_20) || 0));
     const withholdingRatePercent = normalizeWithholdingRatePercent(data.withholding_rate_percent);
 
+    const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
+
     const deductions = calcStatutoryDeductions(total_taxable, taxInsuranceRates, {
       applyInsurance: data.apply_insurance !== false,
       applyTax: data.apply_tax !== false,
@@ -921,6 +924,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       dependentCount,
       qualifyingChildCount,
       withholdingRatePercent,
+      applyNationalPension: resolvedIns.national,
+      applyHealthInsurance: resolvedIns.health,
+      applyEmploymentInsurance: resolvedIns.employment,
     });
 
     const national_pension = deductions.national_pension;

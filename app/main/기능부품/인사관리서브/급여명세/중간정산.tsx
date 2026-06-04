@@ -27,6 +27,7 @@ import {
   resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate } from '@/lib/payroll-insurance-settings';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
@@ -476,6 +477,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         current <= String(insuranceSettings.duru_nuri_end);
     }
 
+    const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(settlementDate.slice(0, 7)));
+
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
     const deductions = calcStatutoryDeductions(totalTaxable, taxInsuranceRates, {
       applyInsurance,
@@ -485,6 +488,9 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       dependentCount,
       qualifyingChildCount,
       withholdingRatePercent,
+      applyNationalPension: resolvedIns.national,
+      applyHealthInsurance: resolvedIns.health,
+      applyEmploymentInsurance: resolvedIns.employment,
     });
 
     const nationalPension = deductions.national_pension;

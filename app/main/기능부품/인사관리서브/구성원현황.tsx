@@ -610,6 +610,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     request: Record<string, unknown>;
   } | null>(null);
   const [pendingRetirementStaff, setPendingRetirementStaff] = useState<StaffMember | null>(null);
+  const [pendingDeleteStaff, setPendingDeleteStaff] = useState<StaffMember | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [staffNameSearchInput, setStaffNameSearchInput] = useState('');
   const [appliedStaffNameSearch, setAppliedStaffNameSearch] = useState('');
 
@@ -1716,6 +1718,47 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     }
   };
 
+  const 직원완전삭제 = async (직원: StaffMember) => {
+    setIsDeleting(true);
+    try {
+      const actor = readClientAuditActor();
+      const { error } = await supabase
+        .from('staff_members')
+        .delete()
+        .eq('id', 직원.id);
+
+      if (error) throw error;
+
+      await logAudit(
+        '직원완전삭제',
+        'staff_member',
+        String(직원.id),
+        {
+          staff_name: 직원.name,
+          employee_no: 직원.employee_no || null,
+        },
+        actor.userId,
+        actor.userName
+      );
+
+      toast('직원 정보가 데이터베이스에서 완전히 삭제되었습니다.', 'success');
+      if (선택된직원ID === 직원.id) {
+        닫기함수();
+      }
+      새로고침?.();
+    } catch (e: any) {
+      console.error('직원 완전 삭제 실패:', e);
+      const errMsg = e?.message || String(e || '');
+      if (errMsg.includes('FOREIGN KEY') || errMsg.includes('foreign key') || errMsg.includes('constraint') || errMsg.includes('삭제할 수 없습니다')) {
+        toast('이 직원은 연결된 결재 문서, 근태, 급여 또는 공지채팅 등 활동 이력이 존재하여 완전 삭제할 수 없습니다. 대신 퇴사 처리를 진행해 주세요.', 'error');
+      } else {
+        toast(`직원 삭제 중 오류가 발생했습니다: ${errMsg}`, 'error');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const 필터목록 = useMemo(() => {
     const normalizedKeyword = appliedStaffNameSearch.trim().toLocaleLowerCase('ko-KR');
 
@@ -1875,9 +1918,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setPendingRetirementStaff(직원); }}
+            className="px-3 py-2 bg-amber-500/10 text-amber-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-amber-500/20 transition-all"
+          >
+            퇴사 처리
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setPendingDeleteStaff(직원); }}
             className="px-3 py-2 bg-red-500/10 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-500/20 transition-all"
           >
-            삭제
+            완전 삭제
           </button>
           {onOpenDocumentRepoForStaff && (
             <button
@@ -3077,6 +3126,39 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           const staff = pendingRetirementStaff;
           await 직원삭제(staff);
           setPendingRetirementStaff(null);
+        }}
+      />
+
+      <RiskActionDialog
+        open={!!pendingDeleteStaff}
+        title="직원 정보 완전 삭제"
+        description="이 작업은 선택된 직원의 모든 마스터 데이터를 데이터베이스에서 영구적으로 삭제합니다."
+        targetLabel={pendingDeleteStaff ? `${pendingDeleteStaff.name} · ${pendingDeleteStaff.company || '-'} · ${pendingDeleteStaff.department || '-'}` : undefined}
+        tone="danger"
+        loading={isDeleting}
+        items={[
+          { label: '처리 방식', value: '데이터베이스 영구 삭제 (완전 삭제)', tone: 'danger' },
+          { label: '사번', value: String(pendingDeleteStaff?.employee_no || '-') },
+          { label: '입사일', value: String(pendingDeleteStaff?.joined_at || '-') },
+          { label: '직함', value: String(pendingDeleteStaff?.position || '-') },
+        ]}
+        changes={[
+          { label: '직원 정보', before: pendingDeleteStaff?.name, after: '완전 삭제 (복구 불가)' },
+        ]}
+        impacts={[
+          '해당 직원의 인적 사항, 급여 기준, 면허 사항 등 모든 정보가 삭제됩니다.',
+          '직원 삭제 감사 로그가 영구 기록됩니다.',
+        ]}
+        warnings={[
+          '실제 결재 내역, 메신저 메시지 등 감사 추적이 필요한 다른 정보에 이 직원의 ID가 사용된 경우 외래키 제약조건에 의해 삭제가 차단될 수 있습니다. 이 경우, 완전 삭제 대신 퇴사 처리를 해야 합니다.',
+          '삭제 후에는 데이터를 복구할 수 없습니다. 신중히 실행하세요.',
+        ]}
+        confirmLabel="완전 삭제 실행"
+        onCancel={() => setPendingDeleteStaff(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteStaff) return;
+          await 직원완전삭제(pendingDeleteStaff);
+          setPendingDeleteStaff(null);
         }}
       />
     </div>

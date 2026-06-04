@@ -9,6 +9,9 @@ export interface StatutoryDeductionOptions {
   dependentCount?: number;
   qualifyingChildCount?: number;
   withholdingRatePercent?: number;
+  applyNationalPension?: boolean;
+  applyHealthInsurance?: boolean;
+  applyEmploymentInsurance?: boolean;
 }
 
 export interface StatutoryDeductionResult {
@@ -30,6 +33,9 @@ export function calcStatutoryDeductions(
   opts: StatutoryDeductionOptions = {}
 ): StatutoryDeductionResult {
   const applyInsurance = opts.applyInsurance !== false;
+  const applyNational = opts.applyNationalPension !== false && applyInsurance;
+  const applyHealth = opts.applyHealthInsurance !== false && applyInsurance;
+  const applyEmployment = opts.applyEmploymentInsurance !== false && applyInsurance;
   const applyTax = opts.applyTax !== false;
   const isDuruNuriActive = !!opts.isDuruNuriActive;
   const isMedicalBenefit = !!opts.isMedicalBenefit;
@@ -44,23 +50,25 @@ export function calcStatutoryDeductions(
   let income_tax = 0;
   let local_tax = 0;
 
-  if (applyInsurance) {
-    // 1. 국민연금 - 기준소득월액 상·하한 적용 (2025.7~2026.6: 상한 637만원, 하한 40만원)
-    //    두루누리 80% 지원 적용 시 근로자 부담분 20%만 부과
+  // 1. 국민연금 - 기준소득월액 상·하한 적용 (2025.7~2026.6: 상한 637만원, 하한 40만원)
+  //    두루누리 80% 지원 적용 시 근로자 부담분 20%만 부과
+  if (applyNational) {
     const npBase = Math.min(Math.max(taxableIncome, NP_INCOME_FLOOR), NP_INCOME_CEILING);
     const full_national = Math.floor(npBase * rates.national_pension_rate);
     national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
+  }
 
-    // 2. 건강보험 및 장기요양보험 - 의료급여 수급자는 제외 (0원)
-    //    보수월액 상한 적용 (HEALTH_INCOME_CEILING) 및 음수 소득 방지 가드 적용
-    if (!isMedicalBenefit) {
-      const hiBase = Math.min(Math.max(0, taxableIncome), HEALTH_INCOME_CEILING);
-      health_insurance = Math.floor(hiBase * rates.health_insurance_rate);
-      long_term_care = Math.floor(hiBase * rates.long_term_care_rate);
-    }
+  // 2. 건강보험 및 장기요양보험 - 의료급여 수급자는 제외 (0원)
+  //    보수월액 상한 적용 (HEALTH_INCOME_CEILING) 및 음수 소득 방지 가드 적용
+  if (applyHealth && !isMedicalBenefit) {
+    const hiBase = Math.min(Math.max(0, taxableIncome), HEALTH_INCOME_CEILING);
+    health_insurance = Math.floor(hiBase * rates.health_insurance_rate);
+    long_term_care = Math.floor(hiBase * rates.long_term_care_rate);
+  }
 
-    // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
-    //    음수 소득 방지 가드 적용
+  // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
+  //    음수 소득 방지 가드 적용
+  if (applyEmployment) {
     const eiBase = Math.max(0, taxableIncome);
     const full_employment = Math.floor(eiBase * rates.employment_insurance_rate);
     employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;

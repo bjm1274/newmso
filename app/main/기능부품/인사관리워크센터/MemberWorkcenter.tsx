@@ -143,6 +143,7 @@ export default function MemberWorkcenter({
                 onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
                 onEditStaff={handleEditStaff}
                 canRegisterNewStaff={canRegisterNewStaff}
+                onRefresh={onRefresh}
               />
             </div>
           </WorkcenterEmbed>

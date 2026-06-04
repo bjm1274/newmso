@@ -65,7 +65,7 @@ function isHidden(): boolean {
 }
 
 function shouldSkipPolling(): boolean {
-  return isHidden() || !isWindowFocused;
+  return isHidden();
 }
 
 function ensureVisibilityHandler(): void {
@@ -78,17 +78,6 @@ function ensureVisibilityHandler(): void {
     for (const entry of channelRegistry.values()) {
       void pollOnce(entry);
     }
-  });
-
-  window.addEventListener('focus', () => {
-    isWindowFocused = true;
-    for (const entry of channelRegistry.values()) {
-      void pollOnce(entry);
-    }
-  });
-
-  window.addEventListener('blur', () => {
-    isWindowFocused = false;
   });
 }
 

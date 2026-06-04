@@ -22,6 +22,10 @@ import {
   pickToneForStaff,
 } from './data';
 import { computeLicenseStatus } from '@/lib/license-renewal-policy';
+import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
+import { readClientAuditActor, logAudit, buildAuditDiff } from '@/lib/audit';
+import RiskActionDialog from '../../인사관리서브/RiskActionDialog';
 
 const StaffHistoryTimeline = dynamic(
   () => import('../../인사관리서브/인사이력타임라인'),
@@ -48,6 +52,7 @@ interface StaffDrawerProps {
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
   onEditStaff?: (staff: StaffMember) => void;
   canRegisterNewStaff?: boolean;
+  onRefresh?: () => void;
 }
 
 export default function StaffDrawer({
@@ -56,6 +61,7 @@ export default function StaffDrawer({
   onOpenDocumentRepoForStaff,
   onEditStaff,
   canRegisterNewStaff = false,
+  onRefresh,
 }: StaffDrawerProps) {
   if (!staff) {
     return (
@@ -71,6 +77,7 @@ export default function StaffDrawer({
       onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
       onEditStaff={onEditStaff}
       canRegisterNewStaff={canRegisterNewStaff}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -81,13 +88,95 @@ function StaffDrawerInner({
   onOpenDocumentRepoForStaff,
   onEditStaff,
   canRegisterNewStaff,
+  onRefresh,
 }: {
   staff: StaffMember;
   onClose?: () => void;
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
   onEditStaff?: (staff: StaffMember) => void;
   canRegisterNewStaff?: boolean;
+  onRefresh?: () => void;
 }) {
+  const [pendingRetirementStaff, setPendingRetirementStaff] = useState<StaffMember | null>(null);
+  const [pendingDeleteStaff, setPendingDeleteStaff] = useState<StaffMember | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const 직원삭제 = async (직원: StaffMember) => {
+    try {
+      const actor = readClientAuditActor();
+      const today = getKoreanTodayString();
+      const afterStaff = {
+        ...직원,
+        status: '퇴사',
+        resigned_at: (직원 as any).resigned_at || today,
+      };
+      await supabase
+        .from('staff_members')
+        .update({
+          status: '퇴사',
+          resigned_at: (직원 as any).resigned_at || today,
+        })
+        .eq('id', 직원.id);
+
+      await logAudit(
+        '직원퇴사처리',
+        'staff_member',
+        String(직원.id),
+        {
+          staff_name: 직원.name,
+          employee_no: 직원.employee_no || null,
+          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']),
+        },
+        actor.userId,
+        actor.userName
+      );
+      toast('직원이 퇴사 처리되었습니다.', 'success');
+      onClose?.();
+      onRefresh?.();
+    } catch (e: unknown) {
+      toast('직원 퇴사 처리 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  const 직원완전삭제 = async (직원: StaffMember) => {
+    setIsDeleting(true);
+    try {
+      const actor = readClientAuditActor();
+      const { error } = await supabase
+        .from('staff_members')
+        .delete()
+        .eq('id', 직원.id);
+
+      if (error) throw error;
+
+      await logAudit(
+        '직원완전삭제',
+        'staff_member',
+        String(직원.id),
+        {
+          staff_name: 직원.name,
+          employee_no: 직원.employee_no || null,
+        },
+        actor.userId,
+        actor.userName
+      );
+
+      toast('직원 정보가 데이터베이스에서 완전히 삭제되었습니다.', 'success');
+      onClose?.();
+      onRefresh?.();
+    } catch (e: any) {
+      console.error('직원 완전 삭제 실패:', e);
+      const errMsg = e?.message || String(e || '');
+      if (errMsg.includes('FOREIGN KEY') || errMsg.includes('foreign key') || errMsg.includes('constraint') || errMsg.includes('삭제할 수 없습니다')) {
+        toast('이 직원은 연결된 결재 문서, 근태, 급여 또는 공지채팅 등 활동 이력이 존재하여 완전 삭제할 수 없습니다. 대신 퇴사 처리를 진행해 주세요.', 'error');
+      } else {
+        toast(`직원 삭제 중 오류가 발생했습니다: ${errMsg}`, 'error');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const tone = pickToneForStaff(staff.name ?? '');
   const hire = pickHireDate(staff);
   const initial = (staff.name ?? '?').charAt(0);
@@ -167,13 +256,29 @@ function StaffDrawerInner({
             <div className="section-title mb-2">빠른 액션</div>
             <div className="flex flex-col gap-2">
               {canRegisterNewStaff && onEditStaff && (
-                <button
-                  type="button"
-                  onClick={() => onEditStaff(staff)}
-                  className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[12px] font-bold text-white transition-all hover:bg-[var(--accent-hover)] shadow-sm"
-                >
-                  ✏️ 정보 수정하기
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onEditStaff(staff)}
+                    className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[12px] font-bold text-white transition-all hover:bg-[var(--accent-hover)] shadow-sm"
+                  >
+                    ✏️ 정보 수정하기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingRetirementStaff(staff)}
+                    className="w-full rounded-[var(--radius-md)] bg-amber-500/10 text-amber-600 px-3 py-2 text-[12px] font-bold transition-all hover:bg-amber-500/20"
+                  >
+                    퇴사 처리
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDeleteStaff(staff)}
+                    className="w-full rounded-[var(--radius-md)] bg-red-500/10 text-red-600 px-3 py-2 text-[12px] font-bold transition-all hover:bg-red-500/20"
+                  >
+                    완전 삭제
+                  </button>
+                </>
               )}
               {onOpenDocumentRepoForStaff && (
                 <button
@@ -188,6 +293,73 @@ function StaffDrawerInner({
           </section>
         )}
       </div>
+
+      <RiskActionDialog
+        open={!!pendingRetirementStaff}
+        title="퇴사 처리 확인"
+        description="직원 퇴사 처리 버튼은 실제 삭제가 아니라 재직 상태를 퇴사로 전환합니다."
+        targetLabel={pendingRetirementStaff ? `${pendingRetirementStaff.name} · ${pendingRetirementStaff.company || '-'} · ${pendingRetirementStaff.department || '-'}` : undefined}
+        tone="danger"
+        items={[
+          { label: '처리 방식', value: '재직 → 퇴사', tone: 'danger' },
+          { label: '퇴사일', value: String((pendingRetirementStaff as any)?.resigned_at || getKoreanTodayString()) },
+          { label: '사번', value: String(pendingRetirementStaff?.employee_no || '-') },
+          { label: '직함', value: String(pendingRetirementStaff?.position || '-') },
+        ]}
+        changes={[
+          { label: '상태', before: String(pendingRetirementStaff?.status || '재직'), after: '퇴사' },
+          { label: '퇴사일', before: String((pendingRetirementStaff as any)?.resigned_at || '(빈 값)'), after: String((pendingRetirementStaff as any)?.resigned_at || getKoreanTodayString()) },
+        ]}
+        impacts={[
+          '재직자 목록과 인사관리 기본 필터에서 제외됩니다.',
+          '퇴사 처리 감사 로그가 남고 선택 중인 직원 편집 화면은 닫힙니다.',
+          '급여, 계약, 문서 이력은 삭제되지 않으며 기존 데이터와 연결을 유지합니다.',
+        ]}
+        warnings={[
+          '최종 급여 정산, 계약 종료, 장비 반납 등 오프보딩 작업 완료 여부를 확인하세요.',
+        ]}
+        confirmLabel="퇴사 처리"
+        onCancel={() => setPendingRetirementStaff(null)}
+        onConfirm={async () => {
+          if (!pendingRetirementStaff) return;
+          const target = pendingRetirementStaff;
+          await 직원삭제(target);
+          setPendingRetirementStaff(null);
+        }}
+      />
+
+      <RiskActionDialog
+        open={!!pendingDeleteStaff}
+        title="직원 정보 완전 삭제"
+        description="이 작업은 선택된 직원의 모든 마스터 데이터를 데이터베이스에서 영구적으로 삭제합니다."
+        targetLabel={pendingDeleteStaff ? `${pendingDeleteStaff.name} · ${pendingDeleteStaff.company || '-'} · ${pendingDeleteStaff.department || '-'}` : undefined}
+        tone="danger"
+        loading={isDeleting}
+        items={[
+          { label: '처리 방식', value: '데이터베이스 영구 삭제 (완전 삭제)', tone: 'danger' },
+          { label: '사번', value: String(pendingDeleteStaff?.employee_no || '-') },
+          { label: '입사일', value: String(pendingDeleteStaff?.joined_at || '-') },
+          { label: '직함', value: String(pendingDeleteStaff?.position || '-') },
+        ]}
+        changes={[
+          { label: '직원 정보', before: pendingDeleteStaff?.name, after: '완전 삭제 (복구 불가)' },
+        ]}
+        impacts={[
+          '해당 직원의 인적 사항, 급여 기준, 면허 사항 등 모든 정보가 삭제됩니다.',
+          '직원 삭제 감사 로그가 영구 기록됩니다.',
+        ]}
+        warnings={[
+          '실제 결재 내역, 메신저 메시지 등 감사 추적이 필요한 다른 정보에 이 직원의 ID가 사용된 경우 외래키 제약조건에 의해 삭제가 차단될 수 있습니다. 이 경우, 완전 삭제 대신 퇴사 처리를 해야 합니다.',
+          '삭제 후에는 데이터를 복구할 수 없습니다. 신중히 실행하세요.',
+        ]}
+        confirmLabel="완전 삭제 실행"
+        onCancel={() => setPendingDeleteStaff(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteStaff) return;
+          await 직원완전삭제(pendingDeleteStaff);
+          setPendingDeleteStaff(null);
+        }}
+      />
     </aside>
   );
 }
