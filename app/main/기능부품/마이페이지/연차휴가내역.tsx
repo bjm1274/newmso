@@ -61,6 +61,7 @@ function formatDateTimeKst(value: unknown) {
   const parsed = new Date(String(value));
   if (Number.isNaN(parsed.getTime())) return formatDateOnly(value);
   return parsed.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'short',
     day: 'numeric',

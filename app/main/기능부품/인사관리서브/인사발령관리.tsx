@@ -338,7 +338,7 @@ export default function PersonnelAppointment({
       return `${index + 1}. ${record.staff_name} | ${record.order_type} | ${beforeDept}${beforePosition} → ${afterDept}${afterPosition} | 발령일: ${record.effective_date}`;
     });
 
-    const text = `═══ 인사발령 관보 ═══\n발행일: ${new Date().toLocaleDateString('ko-KR')}\n\n${lines.join('\n')}\n\n위와 같이 인사발령 합니다.\n${selectedCo === '전체' ? '회사 공통' : selectedCo}`;
+    const text = `═══ 인사발령 관보 ═══\n발행일: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}\n\n${lines.join('\n')}\n\n위와 같이 인사발령 합니다.\n${selectedCo === '전체' ? '회사 공통' : selectedCo}`;
     await navigator.clipboard?.writeText(text);
     toast('관보 내용이 클립보드에 복사되었습니다.', 'success');
   };
@@ -568,7 +568,7 @@ export default function PersonnelAppointment({
                 ═══ 인사발령 관보 ═══
               </p>
               <p className="mb-4 text-[10px] text-[var(--toss-gray-3)]">
-                발행일: {new Date().toLocaleDateString('ko-KR')}
+                발행일: {new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
               </p>
               {filteredRecords.length === 0 ? (
                 <p className="py-5 text-center text-[var(--toss-gray-3)]">이번 달 발령 내역이 없습니다.</p>

@@ -366,6 +366,7 @@ function formatDate(value: unknown) {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -406,6 +407,7 @@ function formatDateOnly(value: unknown) {
   const parsed = new Date(`${raw}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return raw;
   return parsed.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

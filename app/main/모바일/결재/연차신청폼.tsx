@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -56,7 +57,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-leave');
 
-  const today = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+  const today = useMemo(() => getKoreanTodayString(), []);
   const [kind, setKind] = useState<LeaveKind>('연차');
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState(today);

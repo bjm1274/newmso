@@ -31,7 +31,7 @@ export function formatDateTime(value: unknown) {
   const raw = String(value || '').trim();
   if (!raw) return '-';
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('ko-KR');
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 export function formatPushPlatformLabel(platform: unknown) {

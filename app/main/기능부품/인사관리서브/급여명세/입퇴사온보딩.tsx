@@ -35,7 +35,7 @@ function formatDate(value: string | null | undefined) {
   if (!value) return '-';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString('ko-KR');
+  return parsed.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 function getTitle(type: ChecklistType) {

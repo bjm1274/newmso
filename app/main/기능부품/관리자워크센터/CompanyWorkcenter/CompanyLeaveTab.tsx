@@ -200,10 +200,10 @@ export default function CompanyLeaveTab() {
         { onConflict: 'company_name,rule_name' }
       );
       if (error) throw error;
-      setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR'));
+      setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }));
     } catch (e) {
       console.warn('[CompanyLeaveTab] save welfare error:', e);
-      setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR') + ' (로컬 임시저장)');
+      setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }) + ' (로컬 임시저장)');
     } finally {
       setSavingWelfare(false);
     }

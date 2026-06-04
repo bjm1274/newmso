@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -29,10 +30,9 @@ type Todo = {
 };
 
 function getTodayKr() {
-  // 로컬 시간대 기준 오늘 날짜(YYYY-MM-DD). 'en-CA' 로캘은 ISO 형식을 보장한다.
-  // (이전 구현은 now+9h 후 toISOString 으로, 런타임이 이미 KST면 이중 가산되어
-  //  자정 부근에서 날짜가 하루 밀리는 위험이 있었다)
-  return new Date().toLocaleDateString('en-CA');
+  // KST(Asia/Seoul) 기준 오늘 날짜(YYYY-MM-DD). Intl 기반 정본 헬퍼라 디바이스
+  // 타임존과 무관하게 항상 한국 날짜이며 +9h 이중 가산 위험도 없다.
+  return getKoreanTodayString();
 }
 
 const FILTER_LABEL: Record<TodoFilter, string> = {

@@ -270,7 +270,7 @@ export function GlobalSearchModal({
                               name={fileName}
                               kind={attachmentKind}
                               summary={message.content || null}
-                              meta={`${roomName} · ${(message.staff as { name?: string } | null | undefined)?.name || '이름 없음'} · ${new Date(message.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} ${new Date(message.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
+                              meta={`${roomName} · ${(message.staff as { name?: string } | null | undefined)?.name || '이름 없음'} · ${new Date(message.created_at || 0).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })} ${new Date(message.created_at || 0).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}`}
                               badgeLabel={isImage ? '이미지' : isFile ? '파일' : '동영상'}
                               onPreview={() => onPreviewAttachment(fileUrl, fileName, attachmentKind)}
                               onActivate={() => onOpenRoom(String(message.room_id), String(message.id))}
@@ -285,8 +285,8 @@ export function GlobalSearchModal({
                                   <span className="text-[11px] font-bold text-foreground truncate">{(message.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
                                 </div>
                                 <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
-                                  {new Date(message.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}{' '}
-                                  {new Date(message.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(message.created_at || 0).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })}{' '}
+                                  {new Date(message.created_at || 0).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                               {message.content ? <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">{message.content}</p> : null}

@@ -9,8 +9,8 @@ export { escapeHtml };
 
 export function formatDocumentDate(value: unknown): string {
   const date = value ? new Date(String(value)) : new Date();
-  if (Number.isNaN(date.getTime())) return new Date().toLocaleDateString('ko-KR');
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (Number.isNaN(date.getTime())) return new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: string): void {

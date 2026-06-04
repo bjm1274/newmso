@@ -31,7 +31,7 @@ const Row = memo(function ExpiryRow({ item, busy, onAlert, onSuggestUse }: RowPr
   const name = item.staff.name ?? '직원';
   const dept = item.staff.department ?? '-';
   const expiryLabel = item.expiryDate
-    ? new Date(item.expiryDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+    ? new Date(item.expiryDate).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })
     : '연말';
   const danger = item.daysUntilExpiry <= 7;
   return (

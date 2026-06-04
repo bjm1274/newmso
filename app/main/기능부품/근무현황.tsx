@@ -94,6 +94,7 @@ function formatShiftRange(shift?: WorkShiftRow | null) {
 
 function formatDisplayDate(date: Date) {
   return date.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -102,7 +103,7 @@ function formatDisplayDate(date: Date) {
 }
 
 function formatMonthLabel(date: Date) {
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long' });
 }
 
 function formatClockLabel(value?: string | null) {

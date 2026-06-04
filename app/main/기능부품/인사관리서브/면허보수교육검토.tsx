@@ -274,7 +274,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
                       {it.license_name_hint ? ` · ${it.license_name_hint}` : ''}
                     </p>
                     <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">
-                      제출 {it.submitted_at ? new Date(it.submitted_at).toLocaleDateString('ko-KR') : '-'}
+                      제출 {it.submitted_at ? new Date(it.submitted_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-'}
                     </p>
                   </button>
                 );

@@ -302,7 +302,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
               {patientGroups.map((group) => {
                 const isActive = selectedPatientKey === group.key;
                 const latestDate = new Date(group.latestAt).toLocaleDateString('ko-KR', {
-                  month: 'short', day: 'numeric',
+                  timeZone: 'Asia/Seoul', month: 'short', day: 'numeric',
                 });
                 return (
                   <button
@@ -420,7 +420,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                       <div className="min-w-0">
                         <p className="text-[12px] font-bold text-[var(--foreground)] truncate">{rec.filename}</p>
                         <p className="text-[10px] text-[var(--toss-gray-3)] font-medium">
-                          {new Date(rec.created_at).toLocaleString('ko-KR')}
+                          {new Date(rec.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                         </p>
                         {rec.result.chief_complaint && (
                           <p className="text-[11px] text-[var(--toss-gray-4)] truncate mt-0.5">{rec.result.chief_complaint}</p>
@@ -473,7 +473,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                     ← 이력 목록으로
                   </button>
                   <span className="text-[11px] text-[var(--toss-gray-3)]">
-                    {new Date(selectedRecord.created_at).toLocaleString('ko-KR')} · {selectedRecord.filename}
+                    {new Date(selectedRecord.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} · {selectedRecord.filename}
                   </span>
                 </div>
                 <ResultPanel res={displayResult} label={displayLabel} />

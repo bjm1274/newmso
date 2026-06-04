@@ -206,6 +206,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         const date = input instanceof Date ? input : new Date(String(input));
         if (Number.isNaN(date.getTime())) return '';
         return date.toLocaleDateString('ko-KR', {
+            timeZone: 'Asia/Seoul',
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -327,7 +328,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             // - 계약서 본문
             // - 동의 항목 리스트 (서명 포함)
             // - 비밀유지서약서 (서명 포함)
-            const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+            const today = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
 
             const agreementsSection = `
                 <div style="page-break-before: always; padding: 40px; font-family: sans-serif;">

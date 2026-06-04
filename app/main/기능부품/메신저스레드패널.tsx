@@ -110,8 +110,8 @@ export function ThreadPanel({
                       {staff?.name || '이름 없음'} {staff?.position || ''}
                     </span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
-                      {createdAt.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}{' '}
-                      {createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      {createdAt.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' })}{' '}
+                      {createdAt.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                   <p className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap break-words">
@@ -126,7 +126,7 @@ export function ThreadPanel({
                         url={attachmentUrl}
                         name={attachmentName}
                         kind={attachmentKind}
-                        meta={`${staff?.name || '이름 없음'} · ${createdAt.toLocaleDateString('ko-KR')} ${createdAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`}
+                        meta={`${staff?.name || '이름 없음'} · ${createdAt.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })} ${createdAt.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}`}
                         onPreview={() => onPreviewAttachment(message)}
                         onReply={() => onReplyMessage(message)}
                         replyTestId={`chat-attachment-reply-${message.id}`}

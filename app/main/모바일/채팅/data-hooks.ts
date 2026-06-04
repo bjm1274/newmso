@@ -36,8 +36,10 @@ import {
   getRoomDisplayName,
   isGroupChatRoom,
   getGroupChatRoomBadgeText,
+  toChatDate,
   type MessageRetryPayload,
 } from '@/app/main/기능부품/메신저유틸';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { fetchReactionsForMessages, mergeReactionsIntoMessages } from './반응';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
@@ -51,18 +53,19 @@ type StaffDirectoryEntry = Pick<
   'id' | 'name' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
 >;
 
-export function useChatStaffDirectory(company?: string | null) {
+export function useChatStaffDirectory(_company?: string | null) {
+  // 채팅 디렉터리는 회사 격리 대상이 아니다 — MSO 특성상 1:1·그룹 대화 상대가
+  // 다른 회사일 수 있어, 회사로 필터하면 상대 이름/발신자가 '알 수 없음'으로 깨진다.
+  // (PC 메신저도 staff_members 전체를 로드한다. `_company`는 호환용으로만 유지.)
   const [staffs, setStaffs] = useState<StaffDirectoryEntry[]>([]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        let q = supabase
+        const { data, error } = await supabase
           .from('staff_members')
           .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
-        if (company && company !== '전체') q = (q as typeof q).eq('company', company);
-        const { data, error } = await q;
         if (!active) return;
         if (error || !Array.isArray(data)) {
           setStaffs([]);
@@ -77,7 +80,7 @@ export function useChatStaffDirectory(company?: string | null) {
     return () => {
       active = false;
     };
-  }, [company]);
+  }, []);
 
   return staffs;
 }
@@ -458,37 +461,35 @@ export function getRoomKind(room: ChatRoom): string {
   return '1:1';
 }
 
+// 채팅 시각은 모두 KST(Asia/Seoul) 기준으로 표기한다. D1(SQLite) CURRENT_TIMESTAMP는
+// timezone 없는 UTC 문자열이므로 toChatDate로 보정해 파싱하고, 표시도 timeZone을 명시한다.
+// (PC 메신저유틸과 동일 규칙 — raw new Date()는 디바이스 타임존에 의존해 최대 9시간 어긋났다.)
+const CHAT_TIME_ZONE = 'Asia/Seoul';
+
 export function formatChatTimestamp(value: string | null | undefined): string {
   if (!value) return '';
-  const dt = new Date(value);
+  const dt = toChatDate(value);
   if (Number.isNaN(dt.getTime())) return '';
-  const now = new Date();
-  const sameDay =
-    dt.getFullYear() === now.getFullYear() &&
-    dt.getMonth() === now.getMonth() &&
-    dt.getDate() === now.getDate();
-  if (sameDay) {
+  const dayKey = formatKoreanDateKey(dt);
+  if (dayKey === getKoreanTodayString()) {
     return dt.toLocaleTimeString('ko-KR', {
+      timeZone: CHAT_TIME_ZONE,
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
     });
   }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    dt.getFullYear() === yesterday.getFullYear() &&
-    dt.getMonth() === yesterday.getMonth() &&
-    dt.getDate() === yesterday.getDate();
-  if (isYesterday) return '어제';
-  return `${dt.getMonth() + 1}/${dt.getDate()}`;
+  const yesterdayKey = formatKoreanDateKey(new Date(Date.now() - 86_400_000));
+  if (dayKey === yesterdayKey) return '어제';
+  return `${Number(dayKey.slice(5, 7))}/${Number(dayKey.slice(8, 10))}`;
 }
 
 export function formatBubbleTimestamp(value: string | null | undefined): string {
   if (!value) return '';
-  const dt = new Date(value);
+  const dt = toChatDate(value);
   if (Number.isNaN(dt.getTime())) return '';
   return dt.toLocaleTimeString('ko-KR', {
+    timeZone: CHAT_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -497,22 +498,22 @@ export function formatBubbleTimestamp(value: string | null | undefined): string 
 
 export function formatBubbleDateLabel(value: string | null | undefined): string {
   if (!value) return '';
-  const dt = new Date(value);
+  const dt = toChatDate(value);
   if (Number.isNaN(dt.getTime())) return '';
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${days[dt.getDay()]}요일)`;
+  const dayKey = formatKoreanDateKey(dt);
+  const weekday = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: CHAT_TIME_ZONE,
+    weekday: 'long',
+  }).format(dt);
+  return `${Number(dayKey.slice(5, 7))}월 ${Number(dayKey.slice(8, 10))}일 (${weekday})`;
 }
 
 export function isSameDay(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
-  const da = new Date(a);
-  const db = new Date(b);
+  const da = toChatDate(a);
+  const db = toChatDate(b);
   if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
-  return (
-    da.getFullYear() === db.getFullYear() &&
-    da.getMonth() === db.getMonth() &&
-    da.getDate() === db.getDate()
-  );
+  return formatKoreanDateKey(da) === formatKoreanDateKey(db);
 }
 
 export type { StaffDirectoryEntry };

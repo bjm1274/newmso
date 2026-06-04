@@ -9,6 +9,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getKoreanMonthString } from '@/lib/seoul-time';
+import { getMonthBoundaries } from '@/lib/date-utils';
 import {
   calculateMonthlyAttendance,
   type MonthlyAttendance,
@@ -27,8 +29,8 @@ export function useMonthlyAttendance(staffId: string | null | undefined) {
   const fetcher = useCallback(async () => {
     if (!staffId) return;
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
+    const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
     try {
       const { data: rows, error } = await supabase
         .from('attendance')

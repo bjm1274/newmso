@@ -78,7 +78,7 @@ export function MediaArchivePanel({
                   name={attachmentName}
                   kind={previewKind}
                   summary={message.content || null}
-                  meta={new Date(message.created_at || 0).toLocaleDateString()}
+                  meta={new Date(message.created_at || 0).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
                   onPreview={() => onPreviewMessage(message)}
                   onReply={() => onReplyMessage(message)}
                   replyTestId={`chat-media-reply-${message.id}`}

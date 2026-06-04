@@ -104,7 +104,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         }
       }
       const name = isDirect
-        ? defaultDirectName(staffs, otherIds[0], user.name as string | undefined)
+        ? defaultDirectName(staffs, otherIds[0])
         : defaultGroupName(staffs, memberIds, user.name as string | undefined);
 
       const result = await createOrUpsertChatRoom({
@@ -444,10 +444,10 @@ function groupByDepartment(
 function defaultDirectName(
   staffs: StaffDirectoryEntry[],
   peerId: string,
-  myName: string | undefined,
 ): string {
-  const peer = staffs.find((s) => String(s.id) === String(peerId))?.name || '구성원';
-  return myName ? `${myName}, ${peer}` : peer;
+  // 1:1 방 이름은 "상대방 이름"만 저장한다. 과거 "생성자, 상대" 형식은 비생성자에게
+  // 본인 이름이 섞여 보였다. 실제 표시는 getRoomDisplayName이 뷰어별로 동적 해석한다.
+  return staffs.find((s) => String(s.id) === String(peerId))?.name || '구성원';
 }
 
 function defaultGroupName(

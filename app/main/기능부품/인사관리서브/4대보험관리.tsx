@@ -170,7 +170,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
                         </button>
                     )}
                     {r.status === '신고완료' && r.reported_at && (
-                        <span className="text-[11px] text-[var(--toss-gray-3)]">{new Date(r.reported_at).toLocaleDateString()}</span>
+                        <span className="text-[11px] text-[var(--toss-gray-3)]">{new Date(r.reported_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</span>
                     )}
                 </>
             ),

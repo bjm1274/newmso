@@ -291,7 +291,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
                 <p className="text-[11px] text-[var(--toss-gray-3)]">
                   {cert.staff_members?.name || '-'} ·{' '}
                   {cert.issued_at
-                    ? new Date(cert.issued_at).toLocaleDateString('ko-KR')
+                    ? new Date(cert.issued_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
                     : '-'}
                 </p>
                 {cert.serial_no && (

@@ -113,7 +113,7 @@ export function OpCheckPrintModal({
           )}
 
           <div className="mt-6 text-right text-xs text-gray-400">
-            출력일시: {new Date().toLocaleString('ko-KR')}
+            출력일시: {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
           </div>
         </div>
       </div>

@@ -54,6 +54,7 @@ function formatHoursAgo(dateString: string) {
 
 function formatDateLabel(dateString: string) {
   return new Date(dateString).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -752,7 +753,7 @@ export default function MessengerOperationsCenter({
                               {job.status === 'sent' ? '발송 완료' : job.status === 'cancelled' ? '취소됨' : '예약중'}
                             </span>
                             <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                              {new Date(job.sendAt).toLocaleString('ko-KR')}
+                              {new Date(job.sendAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                             </span>
                             <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                               리마인드 {job.reminderMinutes.join(', ')}분

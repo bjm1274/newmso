@@ -346,6 +346,7 @@ function fmtHm(iso: string | null): string {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return '—';
   return parsed.toLocaleTimeString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,

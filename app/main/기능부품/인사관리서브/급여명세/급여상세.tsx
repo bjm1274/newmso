@@ -26,7 +26,7 @@ function formatDateLabel(value?: string | null) {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR');
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 function InfoItem({
@@ -495,7 +495,7 @@ export default function SalaryDetail({
   const rowCount = Math.max(renderedPaymentRows.length, renderedDeductionRows.length);
   const rowDensity: RowDensity =
     rowCount > 28 ? 'ultra' : rowCount > 18 ? 'dense' : rowCount > 12 ? 'compact' : 'regular';
-  const issueDate = new Date().toLocaleDateString('ko-KR');
+  const issueDate = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
   const summaryPaymentTotal = isAdvancePay ? advancePayAmount : calc.totalPayment;
   const summaryDeductionTotal = isAdvancePay ? 0 : calc.totalDeduction;
 

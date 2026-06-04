@@ -389,7 +389,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
                   </td>
                   <td className="px-4 py-3 text-[var(--toss-gray-4)]">{row.actor}</td>
                   <td className="px-4 py-3 text-[var(--toss-gray-4)]">
-                    {new Date(row.createdAt).toLocaleString('ko-KR')}
+                    {new Date(row.createdAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                   </td>
                 </tr>
               ))}

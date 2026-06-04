@@ -104,7 +104,7 @@ export function MessageEditHistoryModal({
                     <p className="text-sm font-semibold text-foreground">{entry.editorName}</p>
                     <p className="text-[11px] text-[var(--toss-gray-3)]">
                       {entry.editedAt
-                        ? new Date(entry.editedAt).toLocaleString('ko-KR')
+                        ? new Date(entry.editedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
                         : '시간 정보 없음'}
                     </p>
                   </div>

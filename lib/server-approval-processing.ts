@@ -496,7 +496,9 @@ export async function processFinalApprovalEffects(
 
   if (item.type === '양식요청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
     try {
-      const serialNo = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+      // 증명서 일련번호의 연·월은 KST 기준 (서버 UTC면 월말/연말 자정 부근 어긋남)
+      const certYearMonth = getKoreanTodayString().slice(0, 7).replace('-', '');
+      const serialNo = `CERT-${certYearMonth}-${String(Date.now()).slice(-6)}`;
       const certRow = {
         staff_id: itemMetaData.target_staff as string,
         cert_type: itemMetaData.form_type as string,

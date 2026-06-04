@@ -1,5 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { getKoreanMonthString } from '@/lib/seoul-time';
+import { getMonthBoundaries } from '@/lib/date-utils';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 // 2026-05-27 회귀 방지: 일부 chunk가 isMobile 변수를 참조하는 stale 컴파일 잔재 — 안전 정의 유지
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -221,8 +223,8 @@ function MyPageMain({
     const userId = user?.id;
     if (!userId) return; // JM5: user.id 없으면 skip
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
+    const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
     try {
       const { data, error } = await supabase
         .from('attendance')
@@ -309,7 +311,7 @@ function MyPageMain({
       const { encryptContract } = await import('@/lib/contract-crypto');
       const encryptedContractText = await encryptContract(contractText);
       await supabase.from('document_repository').insert({
-        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString()})`,
+        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         category: '계약서',
         content: encryptedContractText,
         company_name: (user?.company as string) || '전체',

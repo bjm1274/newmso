@@ -37,7 +37,7 @@ const ACCURACY_WARN_M = 200;
 function formatHHmm(iso: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function formatClock(now: Date) {

@@ -353,7 +353,7 @@ export default function DocumentRepository({
                             </p>
                             <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
                               v{String(d.version ?? '')} ·{' '}
-                              {new Date(String(d.updated_at ?? '')).toLocaleDateString('ko-KR')}
+                              {new Date(String(d.updated_at ?? '')).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
                             </p>
                           </button>
                         </div>

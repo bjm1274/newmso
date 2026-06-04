@@ -13,6 +13,7 @@ type Props = {
 export default function LaborContractViewer({ doc, content, selectedCo }: Props) {
   const cleanedText = content.replace(/┌[─┬┐\s\S]*?┘/g, '');
   const updatedDate = new Date(String(doc.updated_at ?? '')).toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

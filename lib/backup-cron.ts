@@ -8,6 +8,7 @@
  * 반드시 D1에서 직접 읽는다.
  */
 import 'server-only';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { FULL_BACKUP_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
 import { uploadToR2, isR2ChatStorageEnabled } from '@/lib/object-storage';
 import { getD1Binding } from '@/lib/db';
@@ -53,7 +54,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   const data: Record<string, unknown[]> = {};
   const now = new Date();
   const iso = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const dateOnly = now.toISOString().slice(0, 10);
+  const dateOnly = formatKoreanDateKey(now);
 
   for (const table of tables) {
     if (!TABLE_NAME_RE.test(table)) {

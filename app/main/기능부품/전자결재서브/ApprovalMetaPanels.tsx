@@ -72,7 +72,7 @@ export function formatLeaveDateLabel(value: unknown) {
   if (!raw) return '-';
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleDateString('ko-KR');
+  return parsed.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 export function getLeaveRequestSummary(metaData: ApprovalMetaData) {

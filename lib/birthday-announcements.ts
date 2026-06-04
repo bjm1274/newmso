@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
   messages as messagesTable,
@@ -28,8 +29,8 @@ export async function processBirthdayAnnouncements(now = new Date()): Promise<Bi
   }
   const db = getD1Drizzle(d1);
 
-  // KST date today
-  const kstDateStr = new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // KST date today (정본 헬퍼 사용 — 하드코딩 +9h 오프셋 대체)
+  const kstDateStr = formatKoreanDateKey(now);
   const [yearStr, monthStr, dayStr] = kstDateStr.split('-');
   const kstMonth = Number(monthStr);
   const kstDay = Number(dayStr);

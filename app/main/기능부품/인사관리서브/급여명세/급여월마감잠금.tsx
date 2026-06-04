@@ -255,7 +255,7 @@ export default function PayrollLockPanel({
       {lockRow && (
         <div className="mt-4 space-y-4">
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3 text-sm text-[var(--foreground)]">
-            <p>잠금 시각: {lockRow.locked_at ? new Date(lockRow.locked_at).toLocaleString('ko-KR') : '-'}</p>
+            <p>잠금 시각: {lockRow.locked_at ? new Date(lockRow.locked_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-'}</p>
             {supportsReopenWorkflow ? (
               <>
                 <p>재오픈 상태: {lockRow.reopen_request_status || '요청 없음'}</p>

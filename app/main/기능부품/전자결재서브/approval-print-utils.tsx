@@ -157,6 +157,7 @@ window.onload = () => window.print();
     const date = new Date(String(value));
     if (Number.isNaN(date.getTime())) return '';
     return date.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
@@ -295,7 +296,7 @@ window.onload = () => window.print();
     if (!created) return '';
     const date = new Date(String(created));
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('ko-KR');
+    return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
   })();
   const senderNameText = String(item?.sender_name || '').trim();
   const metaBoxes = [

@@ -125,7 +125,7 @@ function formatDateTime(value?: string | null) {
   if (!value) return '기록 없음';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '기록 없음';
-  return date.toLocaleString('ko-KR');
+  return date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 export default function DataReseter(props: { onRefresh: () => void }) {

@@ -30,10 +30,10 @@ export function sanitizeFilename(value: string) {
 }
 
 function formatDateLabel(value?: string | null) {
-  if (!value) return new Date().toLocaleDateString('ko-KR');
+  if (!value) return new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR');
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 // ─────────────────────────────────────────────

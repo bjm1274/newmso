@@ -58,7 +58,7 @@ interface CheckInSuccessModalProps {
 
 export function CheckInSuccessModal({ checkInTime, weather, onClose }: CheckInSuccessModalProps) {
   const timeStr = checkInTime
-    ? checkInTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    ? checkInTime.toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })
     : '-';
 
   return (

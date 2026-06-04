@@ -339,7 +339,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
 // ─── 소멸 권고 알림 ────────────────────────────────────────────────
 export async function sendExpiryAlert(staffId: string, remaining: number, expiryDate: string | null) {
   const expiryLabel = expiryDate
-    ? new Date(expiryDate).toLocaleDateString('ko-KR')
+    ? new Date(expiryDate).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
     : '연말';
   const { error } = await supabase.from('notifications').insert({
     user_id: staffId,

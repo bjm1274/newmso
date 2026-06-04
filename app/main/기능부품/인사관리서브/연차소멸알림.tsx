@@ -106,7 +106,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
       await supabase.from('notifications').insert({
         user_id: info.staff.id,
         title: '연차 소멸 예정 알림',
-        body: `보유 연차 ${info.remaining}일이 ${info.expiryDate.toLocaleDateString('ko-KR')}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,
+        body: `보유 연차 ${info.remaining}일이 ${info.expiryDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,
         type: 'attendance',
         read_at: null,
         created_at: new Date().toISOString(),
@@ -180,7 +180,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
                 <div>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">만료일</p>
                   <p className="text-sm font-bold">
-                    {info.expiryDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    {info.expiryDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
                 <div>

@@ -136,7 +136,7 @@ export default function AttendanceScheduleView({
               <div key={req.id} className="bg-[var(--card)] dark:bg-zinc-800 border border-amber-200/50 dark:border-zinc-700 rounded-lg p-3 flex flex-col md:flex-row md:items-center gap-3">
                 <div className="flex-1 text-[11px]">
                   <p className="font-bold text-foreground">{req.team_name || '전체'} · {req.year_month}</p>
-                  <p className="text-[var(--toss-gray-4)] mt-0.5">요청: {req.requested_by_name} · {new Date(req.created_at).toLocaleDateString('ko-KR')}</p>
+                  <p className="text-[var(--toss-gray-4)] mt-0.5">요청: {req.requested_by_name} · {new Date(req.created_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
                   <p className="text-[var(--toss-gray-3)] mt-0.5">{(req.assignments || []).length}건 배정</p>
                 </div>
                 <div className="flex gap-2 shrink-0">

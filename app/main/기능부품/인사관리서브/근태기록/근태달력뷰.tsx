@@ -103,8 +103,8 @@ export default function AttendanceCalendarView({
       label: '출퇴근 시간',
       render: (s) => {
         const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
-        const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
-        const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
+        const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }) : '-';
+        const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }) : '-';
         return <span className="font-mono text-sm font-bold text-foreground">{checkIn} / {checkOut}</span>;
       },
     },

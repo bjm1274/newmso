@@ -22,7 +22,7 @@ function formatDateLabel(value?: string | null) {
   if (!value) return '현재';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR');
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 function buildSerialNo() {

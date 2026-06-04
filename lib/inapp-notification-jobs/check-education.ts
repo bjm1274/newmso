@@ -5,6 +5,7 @@
  * dedupe key: `education:{record_id}`
  */
 import 'server-only';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -35,10 +36,9 @@ type EducationRow = {
 
 export async function checkEducationDeadline(): Promise<CheckJobResult> {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const horizon = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const todayIso = today.toISOString().slice(0, 10);
-  const horizonIso = horizon.toISOString().slice(0, 10);
+  // 교육 마감 비교는 KST 기준 날짜 키 — 서버(UTC)에서 toISOString을 쓰면 자정 부근 하루 어긋난다.
+  const todayIso = getKoreanTodayString(now);
+  const horizonIso = formatKoreanDateKey(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000));
   const d1 = await getD1Binding();
   if (!d1) return { detected: 0, created: 0, errors: ['[check-education] D1 binding not available'] };
   const db = getD1Drizzle(d1);

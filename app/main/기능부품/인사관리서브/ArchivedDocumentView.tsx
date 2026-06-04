@@ -16,7 +16,7 @@ function formatDisplayDate(value: unknown): string {
   if (!raw) return '';
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+  return d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 /**

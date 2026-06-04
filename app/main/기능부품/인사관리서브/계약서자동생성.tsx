@@ -182,7 +182,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
       </div>
 
       <div className="pt-8 space-y-4">
-        <p className="text-center text-sm">작성일: {new Date().toLocaleDateString('ko-KR')}</p>
+        <p className="text-center text-sm">작성일: {new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center space-y-5">
             <p className="font-bold">갑 (사용자)</p>

@@ -1,4 +1,5 @@
 import { asRecord, asNullableString, asNumber } from './data-normalizer';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -68,9 +69,10 @@ const asMetaData = asRecord;
 
 function normalizeDateStamp(value?: string | Date | null) {
   const date = value instanceof Date ? value : value ? new Date(value) : new Date();
+  // 문서번호 날짜는 KST 기준 — 서버(UTC)에서 toISOString을 쓰면 자정 부근 하루 어긋난다.
   return Number.isNaN(date.getTime())
-    ? new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    : date.toISOString().slice(0, 10).replace(/-/g, '');
+    ? getKoreanTodayString().replace(/-/g, '')
+    : formatKoreanDateKey(date).replace(/-/g, '');
 }
 
 function normalizeDateStampByMode(value: string | Date | null | undefined, mode: ApprovalDocNumberDateMode) {

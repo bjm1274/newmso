@@ -29,7 +29,7 @@ function formatDate(value?: string | null) {
     if (!value) return '-';
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('ko-KR');
+    return parsed.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 // SEC: 미리보기 창에 document.write 로 주입되는 사용자 제어 값(title/content)을

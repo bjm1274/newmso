@@ -725,7 +725,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       await supabase.from('document_repository').insert({
         title: `[근무표] ${request.team_name || '전체'} ${request.year_month} 승인`,
         category: '규정',
-        content: `승인일: ${new Date().toLocaleDateString('ko-KR')}\n승인자: ${user?.name || ''}\n요청자: ${request.requested_by_name || ''}\n\n직원명\t근무일\t근무형태\n${docContent}`,
+        content: `승인일: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}\n승인자: ${user?.name || ''}\n요청자: ${request.requested_by_name || ''}\n\n직원명\t근무일\t근무형태\n${docContent}`,
         company_name: companyName || '전체',
         created_by: user?.id,
         version: 1,

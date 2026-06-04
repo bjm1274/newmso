@@ -98,7 +98,7 @@ function formatMessageMeta(message: ChatMessage) {
   const createdAt = new Date(message.created_at || 0);
   const dateLabel = Number.isNaN(createdAt.getTime())
     ? '-'
-    : createdAt.toLocaleDateString('ko-KR');
+    : createdAt.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
   return `${senderName} · ${dateLabel}`;
 }
 
@@ -499,6 +499,7 @@ function MessengerDrawerImpl({
                   '알 수 없음';
                 const latestAtLabel = thread.latestActivityAt
                   ? new Date(thread.latestActivityAt).toLocaleString('ko-KR', {
+                      timeZone: 'Asia/Seoul',
                       month: 'numeric',
                       day: 'numeric',
                       hour: '2-digit',

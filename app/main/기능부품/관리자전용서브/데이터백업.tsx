@@ -353,7 +353,7 @@ function DataBackupDesktop({ user }: Props) {
 
       downloadJsonFile(`mso-backup-${exportedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`, payload);
 
-      setLastExport(new Date().toLocaleString());
+      setLastExport(new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }));
       setExportSummary({
         exportedAt,
         tableCount: Object.keys(backupTables).length,
@@ -717,7 +717,7 @@ function DataBackupDesktop({ user }: Props) {
               </div>
               {restorePreview.meta?.exported_at ? (
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                  내보낸 시각: {new Date(restorePreview.meta.exported_at).toLocaleString()}
+                  내보낸 시각: {new Date(restorePreview.meta.exported_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                 </p>
               ) : null}
             </div>
@@ -787,7 +787,7 @@ function DataBackupDesktop({ user }: Props) {
                     <div>
                       <p className="text-sm font-black text-[var(--foreground)]">{run.file_name}</p>
                       <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                        {new Date(run.started_at).toLocaleString('ko-KR')}
+                        {new Date(run.started_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                         {run.requested_by_name ? ` · ${run.requested_by_name}` : ''}
                       </p>
                     </div>
@@ -802,7 +802,7 @@ function DataBackupDesktop({ user }: Props) {
                       실패 {failedTables.length.toLocaleString('ko-KR')}개
                     </span>
                     <span>
-                      종료 {run.finished_at ? new Date(run.finished_at).toLocaleString('ko-KR') : '진행 중'}
+                      종료 {run.finished_at ? new Date(run.finished_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '진행 중'}
                     </span>
                   </div>
                   {rollbackFileName ? (

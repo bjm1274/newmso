@@ -159,7 +159,7 @@ export default function CompanyPayrollTab() {
 
       // 저장된 id를 로컬에 반영해 다음 저장도 동일 행을 갱신하도록 한다.
       setRules(payload.map((p) => ({ id: p.id, label: p.rule_label, value: p.rule_value })));
-      setSavedAt(new Date().toLocaleTimeString('ko-KR'));
+      setSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }));
     } catch (e) {
       console.error('[CompanyPayrollTab] save error:', e);
       setSavedAt('저장 실패 — 다시 시도해 주세요');

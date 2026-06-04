@@ -165,7 +165,7 @@ export default function InsuranceEDI({
 
     const lines: string[] = [];
     lines.push(`[4대보험 EDI 파일 - ${yearMonth}]`);
-    lines.push(`생성일시: ${new Date().toLocaleString('ko-KR')}`);
+    lines.push(`생성일시: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
     lines.push(`사업체: ${selectedCompanyLabel}`);
     lines.push(`산재보험 업종: ${industrialAccidentInfo.industryLabel}`);
     lines.push(`급여확정 대상: ${rows.length}명`);

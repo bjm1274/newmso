@@ -454,6 +454,7 @@ export function useApprovalSubmit({
     const docNumber = String(metaData?.doc_number || '').trim();
     const createdAt = duplicate.created_at
       ? new Date(String(duplicate.created_at)).toLocaleString('ko-KR', {
+          timeZone: 'Asia/Seoul',
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',

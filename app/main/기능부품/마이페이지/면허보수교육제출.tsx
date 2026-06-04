@@ -271,7 +271,7 @@ export default function LicenseCESubmit({ user }: Props) {
                         {meta.label}
                       </span>
                       <span className="text-[10px] text-[var(--toss-gray-3)]">
-                        {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('ko-KR') : '-'}
+                        {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-'}
                       </span>
                     </div>
                     <p className="mt-0.5 text-[11px] text-[var(--foreground)] truncate">

@@ -144,11 +144,11 @@ export default function CompanyBasicTab() {
       
       // Update local state list
       setCompanies(prev => prev.map(c => c.id === info.id ? { ...info } : c));
-      setSavedAt(new Date().toLocaleTimeString('ko-KR'));
+      setSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }));
     } catch (e) {
       console.warn('[CompanyBasicTab] Update failed, fallback to state:', e);
       setCompanies(prev => prev.map(c => c.id === info.id ? { ...info } : c));
-      setSavedAt(new Date().toLocaleTimeString('ko-KR') + ' (임시)');
+      setSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }) + ' (임시)');
     } finally {
       setSaving(false);
     }

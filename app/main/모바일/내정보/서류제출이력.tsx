@@ -106,7 +106,7 @@ export default function SubmissionHistory({ rows, loading, onRefresh }: Submissi
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
                   {row.submitted_at
-                    ? new Date(row.submitted_at).toLocaleDateString('ko-KR')
+                    ? new Date(row.submitted_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
                     : '날짜 없음'}
                   {row.reason ? ` · ${row.reason}` : ''}
                 </div>

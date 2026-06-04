@@ -487,12 +487,14 @@ export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: St
   if (isSelfChatRoom(room, currentUserId)) return SELF_ROOM_NAME;
 
   const members = normalizeMemberIds(room.members);
-  if (room.type === 'direct' && members.length <= 2) {
-    const otherStaff = staffs.find(
-      (staff: StaffMember) =>
-        members.includes(String(staff.id)) &&
-        String(staff.id) !== String(currentUserId)
-    );
+  // 2인 대화는 type 표기(direct/null/legacy)와 무관하게 "나 아닌 상대"를 항상 우선 해석한다.
+  // staff.id를 멤버 순서대로 직접 매칭한다. 방 이름(room.name)은 생성 시점의 생성자 관점으로
+  // 박제("생성자, 상대")되어 비생성자에게는 본인 이름처럼 보이므로 폴백을 최소화한다.
+  if (!isGroupChatRoom(room) && members.length > 0 && members.length <= 2) {
+    const normalizedCurrentUserId = String(currentUserId || '');
+    const otherId =
+      members.find((memberId) => memberId !== normalizedCurrentUserId) ?? members[0];
+    const otherStaff = staffs.find((staff: StaffMember) => String(staff.id) === String(otherId));
     if (otherStaff?.name) return otherStaff.name;
   }
   return room.name || '채팅방';

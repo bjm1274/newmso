@@ -14,6 +14,7 @@
  */
 
 import { useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MIcon from '../공통/MIcon';
@@ -77,7 +78,7 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
     dept: '경영지원팀',
     role: '사원',
     type: '정규직',
-    start: new Date().toLocaleDateString('en-CA').replaceAll('-', '.'),
+    start: getKoreanTodayString().replaceAll('-', '.'),
     salary: '',
     auth: 'employee',
   });

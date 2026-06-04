@@ -2970,7 +2970,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             <span className="w-10 h-10 rounded-full bg-[var(--toss-blue-light)] text-[var(--accent)] flex items-center justify-center font-bold">{req.user_name?.[0]}</span>
                             <div>
                               <p className="font-bold text-[var(--foreground)] text-sm">{req.user_name} <span className="text-xs font-medium text-[var(--toss-gray-3)] ml-1">님의 변경 요청</span></p>
-                              <p className="text-[10px] text-[var(--toss-gray-3)]">{new Date(req.created_at).toLocaleString()}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-3)]">{new Date(req.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
                             </div>
                           </div>
                         </div>
@@ -3018,7 +3018,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         tone={pendingEssAction?.type === 'reject' ? 'danger' : 'success'}
         items={[
           { label: '처리 결과', value: pendingEssAction?.type === 'approve' ? '직원 기본정보에 반영' : '요청 반려 및 대기함 제거', tone: pendingEssAction?.type === 'reject' ? 'danger' : 'success' },
-          { label: '요청 일시', value: pendingEssAction?.request.created_at ? new Date(String(pendingEssAction.request.created_at)).toLocaleString() : '-' },
+          { label: '요청 일시', value: pendingEssAction?.request.created_at ? new Date(String(pendingEssAction.request.created_at)).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-' },
         ]}
         changes={pendingEssAction ? getEssReviewChanges(pendingEssAction.request) : []}
         impacts={[

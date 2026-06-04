@@ -531,7 +531,7 @@ export default function EslManager({ user }: { user?: any }) {
               {/* 마지막 업데이트 */}
               {binding?.lastUpdated && (
                 <p className="text-[10px] text-[var(--toss-gray-3)]">
-                  마지막 전송: {new Date(binding.lastUpdated).toLocaleString('ko-KR')}
+                  마지막 전송: {new Date(binding.lastUpdated).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                 </p>
               )}
 

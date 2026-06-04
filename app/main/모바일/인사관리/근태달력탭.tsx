@@ -7,6 +7,7 @@
  */
 
 import { useMemo } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import MIcon from '../공통/MIcon';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import type { AttendanceDailyRow } from './data-hooks';
@@ -40,7 +41,7 @@ export function CalTab({
   const m = cursor.getMonth();
   const firstDow = new Date(y, m, 1).getDay();
   const lastDate = new Date(y, m + 1, 0).getDate();
-  const todayStr = new Date().toLocaleDateString('en-CA');
+  const todayStr = getKoreanTodayString();
 
   return (
     <div style={{ padding: '14px 16px 0' }}>

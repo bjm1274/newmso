@@ -290,7 +290,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
                   </h4>
                   <p className="text-xs text-[var(--toss-gray-3)]">
                     {cert.serial_no || '발급번호 미발급'} ·{' '}
-                    {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : ''}
+                    {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }) : ''}
                   </p>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">

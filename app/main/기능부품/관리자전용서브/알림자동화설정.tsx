@@ -197,7 +197,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
 
         const stageLabel = stepToday === 1 ? '1차' : '2차';
         const title = `📅 연차사용촉진 ${stageLabel} 통보 및 계획 제출 요청`;
-        const expiryLabel = schedule.expiryDate.toLocaleDateString('ko-KR');
+        const expiryLabel = schedule.expiryDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
         const body =
           stepToday === 1
             ? `${s.name}님, 미사용 연차 ${remain}일에 대해 근로기준법에 따라 ${stageLabel} 촉진합니다. [전자결재 > 작성하기 > 연차계획서]를 통해 계획을 제출해 주세요.`
@@ -491,6 +491,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                     </td>
                     <td className="px-3 py-2.5 text-[var(--toss-gray-4)] font-mono">
                       {new Date(log.notifiedAt).toLocaleString('ko-KR', {
+                        timeZone: 'Asia/Seoul',
                         month: 'numeric',
                         day: 'numeric',
                         hour: '2-digit',

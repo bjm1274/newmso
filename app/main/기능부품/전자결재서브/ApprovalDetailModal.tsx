@@ -252,7 +252,7 @@ export default function ApprovalDetailModal({
                       : detailDelegateSnapshot.delegatedToName}
                   </span>
                   {detailDelegateSnapshot.delegatedAt && (
-                    <span className="text-[var(--toss-gray-3)]">{new Date(detailDelegateSnapshot.delegatedAt).toLocaleDateString('ko-KR')}</span>
+                    <span className="text-[var(--toss-gray-3)]">{new Date(detailDelegateSnapshot.delegatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</span>
                   )}
                 </div>
               )}
@@ -261,7 +261,7 @@ export default function ApprovalDetailModal({
                   <span className="font-semibold text-rose-600 shrink-0">지연</span>
                   <span>기준 {detailDelaySnapshot.thresholdHours}시간{detailDelaySnapshot.elapsedHours > 0 ? ` · 경과 ${detailDelaySnapshot.elapsedHours}시간` : ''}</span>
                   {detailDelaySnapshot.notificationCount > 0 && (
-                    <span className="text-[var(--toss-gray-3)]">알림 {detailDelaySnapshot.notificationCount}회{detailDelaySnapshot.lastNotifiedAt ? ` · ${new Date(detailDelaySnapshot.lastNotifiedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}</span>
+                    <span className="text-[var(--toss-gray-3)]">알림 {detailDelaySnapshot.notificationCount}회{detailDelaySnapshot.lastNotifiedAt ? ` · ${new Date(detailDelaySnapshot.lastNotifiedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}</span>
                   )}
                 </div>
               )}
@@ -269,7 +269,7 @@ export default function ApprovalDetailModal({
                 <div className="flex items-center gap-1.5 text-[10px] text-[var(--toss-gray-4)]">
                   <span className="font-semibold text-[var(--foreground)] shrink-0">개정 {detailLockSnapshot.revision ?? 1}</span>
                   {detailLockSnapshot.lockedByName && <span>{detailLockSnapshot.lockedByName}</span>}
-                  <span className="text-[var(--toss-gray-3)]">{new Date(detailLockSnapshot.lockedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-[var(--toss-gray-3)]">{new Date(detailLockSnapshot.lockedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               )}
             </div>

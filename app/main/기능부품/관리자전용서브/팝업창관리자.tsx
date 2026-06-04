@@ -353,7 +353,7 @@ function PopupManagerDesktop() {
                           {popup.media_type === 'video' ? '동영상' : '이미지'} · {popup.width}x{popup.height}
                         </p>
                         <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                          등록일 {popup.created_at ? new Date(popup.created_at).toLocaleString('ko-KR') : '-'}
+                          등록일 {popup.created_at ? new Date(popup.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-'}
                         </p>
                       </div>
                       <button

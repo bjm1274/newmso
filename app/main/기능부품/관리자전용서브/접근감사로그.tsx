@@ -145,7 +145,7 @@ function AccessAuditLogDesktop({ user: _user }: Props) {
   const handleCsvDownload = () => {
     const header = ['시각', '직원명', '소속', '메뉴', '액션', 'IP'];
     const rows = filtered.map(l => [
-      new Date(l.created_at).toLocaleString('ko-KR'),
+      new Date(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       l.user_name, l.company, l.menu, l.action, l.ip_address,
     ]);
     const csv = [header, ...rows].map(r => r.join(',')).join('\n');

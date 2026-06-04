@@ -2,6 +2,7 @@
 
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -61,10 +62,9 @@ const ASSIGNEE_OPTIONS: Array<{ value: TodoAssigneeKind; label: string }> = [
 ];
 
 function getToday() {
-  // 로컬 시간대 기준 오늘 날짜(YYYY-MM-DD). 'en-CA' 로캘은 ISO 형식을 보장한다.
-  // (이전 구현은 now+9h 후 toISOString 으로, 런타임이 이미 KST면 이중 가산되어
-  //  자정 부근에서 날짜가 하루 밀리는 위험이 있었다 → 같은 파일 내 다른 곳과 통일)
-  return new Date().toLocaleDateString('en-CA');
+  // KST(Asia/Seoul) 기준 오늘 날짜(YYYY-MM-DD). Intl 기반 정본 헬퍼라 디바이스
+  // 타임존과 무관하게 항상 한국 날짜이며 +9h 이중 가산 위험도 없다.
+  return getKoreanTodayString();
 }
 
 function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
@@ -143,6 +143,7 @@ function formatReminder(value: unknown) {
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
