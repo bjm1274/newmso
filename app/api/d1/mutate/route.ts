@@ -289,47 +289,62 @@ export async function POST(request: Request) {
         }, new Set()),
       );
       const colsSql = sql.join(allCols.map((c) => sql.identifier(c)), sql`, `);
-      const valuesSql = sql.join(
-        serializedValues.map((row) =>
-          sql`(${sql.join(allCols.map((c) => sql`${row[c] ?? null}`), sql`, `)})`,
-        ),
-        sql`, `,
-      );
       const returningSql = buildReturningSql(payload.returning);
 
-      let stmt: SQL;
-      if (payload.conflict) {
-        // 복합 ON CONFLICT(...) DO UPDATE/NOTHING
-        const conflictColsSql = sql.join(
-          payload.conflict.columns.map((c) => sql.identifier(c)),
-          sql`, `,
-        );
-        const conflictSet = new Set(payload.conflict.columns);
-        // PK(id)는 conflict UPDATE 대상에서 제외 — 기존 행의 기본키를 덮어쓰지 않도록.
-        const updateCols = allCols.filter((c) => !conflictSet.has(c) && c !== 'id');
-        const shouldUpdate =
-          payload.conflict.action === 'update' && updateCols.length > 0;
-        const onConflictClause = shouldUpdate
-          ? sql` ON CONFLICT(${conflictColsSql}) DO UPDATE SET ${sql.join(
-              updateCols.map((c) => sql`${sql.identifier(c)} = excluded.${sql.identifier(c)}`),
-              sql`, `,
-            )}`
-          : sql` ON CONFLICT(${conflictColsSql}) DO NOTHING`;
-        stmt = sql`INSERT INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${onConflictClause}${returningSql}`;
-      } else {
-        // 기존 INSERT / INSERT OR REPLACE / INSERT OR IGNORE
-        const verb = payload.onConflict === 'replace'
-          ? sql.raw('INSERT OR REPLACE')
-          : payload.onConflict === 'ignore'
-            ? sql.raw('INSERT OR IGNORE')
-            : sql.raw('INSERT');
-        stmt = sql`${verb} INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${returningSql}`;
+      // Cloudflare D1 has a limit of 100 bound parameters per query.
+      // We dynamically calculate a safe chunk size (e.g. max 90 parameters per chunk) to avoid this limit.
+      const maxRowsPerChunk = Math.max(1, Math.floor(90 / allCols.length));
+      const chunks: Record<string, unknown>[][] = [];
+      for (let i = 0; i < serializedValues.length; i += maxRowsPerChunk) {
+        chunks.push(serializedValues.slice(i, i + maxRowsPerChunk));
       }
 
-      const result = await db.run(stmt);
-      const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+      const allResults: Record<string, unknown>[] = [];
+
+      for (const chunk of chunks) {
+        const valuesSql = sql.join(
+          chunk.map((row) =>
+            sql`(${sql.join(allCols.map((c) => sql`${row[c] ?? null}`), sql`, `)})`,
+          ),
+          sql`, `,
+        );
+
+        let stmt: SQL;
+        if (payload.conflict) {
+          // 복합 ON CONFLICT(...) DO UPDATE/NOTHING
+          const conflictColsSql = sql.join(
+            payload.conflict.columns.map((c) => sql.identifier(c)),
+            sql`, `,
+          );
+          const conflictSet = new Set(payload.conflict.columns);
+          // PK(id)는 conflict UPDATE 대상에서 제외 — 기존 행의 기본키를 덮어쓰지 않도록.
+          const updateCols = allCols.filter((c) => !conflictSet.has(c) && c !== 'id');
+          const shouldUpdate =
+            payload.conflict.action === 'update' && updateCols.length > 0;
+          const onConflictClause = shouldUpdate
+            ? sql` ON CONFLICT(${conflictColsSql}) DO UPDATE SET ${sql.join(
+                updateCols.map((c) => sql`${sql.identifier(c)} = excluded.${sql.identifier(c)}`),
+                sql`, `,
+              )}`
+            : sql` ON CONFLICT(${conflictColsSql}) DO NOTHING`;
+          stmt = sql`INSERT INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${onConflictClause}${returningSql}`;
+        } else {
+          // 기존 INSERT / INSERT OR REPLACE / INSERT OR IGNORE
+          const verb = payload.onConflict === 'replace'
+            ? sql.raw('INSERT OR REPLACE')
+            : payload.onConflict === 'ignore'
+              ? sql.raw('INSERT OR IGNORE')
+              : sql.raw('INSERT');
+          stmt = sql`${verb} INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${returningSql}`;
+        }
+
+        const result = await db.run(stmt);
+        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+        allResults.push(...rows);
+      }
+
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
-      return NextResponse.json({ ok: true, data: deserializeRows(payload.table, rows) });
+      return NextResponse.json({ ok: true, data: deserializeRows(payload.table, allResults) });
     }
 
     if (payload.op === 'update') {

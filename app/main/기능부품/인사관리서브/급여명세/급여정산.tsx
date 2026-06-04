@@ -31,7 +31,7 @@ import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
-import { getPayrollInsuranceSettings, resolvePayrollAsOfDate } from '@/lib/payroll-insurance-settings';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
 import RiskActionDialog from '../RiskActionDialog';
 import type {
   SettlementEntry,
@@ -325,8 +325,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       extra_allowance: persistedExtraAllowance,
       overtime_pay: overtimePay,
       bonus: Number(savedRecord?.bonus ?? 0) || 0,
-      apply_tax: savedDeductionDetail.apply_tax !== false && (staff.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
-      apply_insurance: savedDeductionDetail.apply_insurance !== false && (staff.permissions?.insurance as Record<string, unknown>)?.national !== false,
+      apply_tax: (staff.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
+      apply_insurance: hasAnyEmployeePayrollInsurance(getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth))),
       attendance_deduction: Number(savedRecord?.attendance_deduction ?? attendanceDeduction) || 0,
       attendance_deduction_detail:
         savedRecord?.attendance_deduction_detail && typeof savedRecord.attendance_deduction_detail === 'object'

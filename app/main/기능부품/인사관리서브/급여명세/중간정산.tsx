@@ -27,7 +27,7 @@ import {
   resolveWeeklyWorkingHours,
 } from '@/lib/payroll-working-hours';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
-import { getPayrollInsuranceSettings, resolvePayrollAsOfDate } from '@/lib/payroll-insurance-settings';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
@@ -464,9 +464,10 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         (staff.permissions?.tax as Record<string, unknown> | undefined)?.withholding_rate_percent ??
         100) as number | string | null | undefined
     );
+    const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(settlementDate.slice(0, 7)));
     const insuranceSettings = (staff.permissions?.insurance as Record<string, unknown> | undefined) || {};
-    const applyInsurance = insuranceSettings.national !== false;
-    const applyTax = insuranceSettings.income_tax !== false;
+    const applyInsurance = hasAnyEmployeePayrollInsurance(resolvedIns);
+    const applyTax = resolvedIns.incomeTax;
     const isMedicalBenefit = Boolean(staff.permissions?.is_medical_benefit) || false;
 
     let isDuruNuriActive = Boolean(insuranceSettings.duru_nuri) || false;
@@ -476,8 +477,6 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         current >= String(insuranceSettings.duru_nuri_start) &&
         current <= String(insuranceSettings.duru_nuri_end);
     }
-
-    const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(settlementDate.slice(0, 7)));
 
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
     const deductions = calcStatutoryDeductions(totalTaxable, taxInsuranceRates, {

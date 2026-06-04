@@ -1071,3 +1071,90 @@ test('payroll sender falls back to in-app notifications', async ({ page }) => {
 
   await expect(page.getByText('퇴사자 (최근 20명)')).toBeVisible();
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 14: age 60+ (Jo Sook-hyun) deduction calculation logic
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('regular payroll settlement correctly calculates health and employment insurance while national pension is exempted for age 60+ employee (like Jo Sook-hyun)', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const yearMonth = '2026-06';
+  const olderStaff = {
+    ...fakeUser,
+    id: 'staff-older-jo',
+    employee_no: 'OLDER-JO-001',
+    name: '조숙현',
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: '주임',
+    base_salary: 2196040,
+    meal_allowance: 0,
+    night_duty_allowance: 0,
+    vehicle_allowance: 200000,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 32085,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 84665,
+    resident_no: '611003-2654822', // born Oct 3, 1961 (64 years old in June 2026)
+    permissions: {
+      insurance: {
+        national: false,
+        health: true,
+        employment: true,
+        income_tax: true,
+      },
+    },
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [olderStaff],
+    payrollRecords: [
+      {
+        id: 'payroll-older-jo-draft',
+        staff_id: olderStaff.id,
+        year_month: yearMonth,
+        status: '임시저장',
+        base_salary: olderStaff.base_salary,
+        extra_allowance: 32085 + 84665,
+        deduction_detail: {
+          apply_tax: true,
+          apply_insurance: false, // previously saved as false under buggy logic
+          taxable_allowance_breakdown: {
+            position_allowance: 0,
+            overtime_allowance: 32085,
+            night_work_allowance: 0,
+            holiday_work_allowance: 0,
+            annual_leave_pay: 84665,
+            manual_extra_allowance: 0,
+          },
+        },
+      },
+    ],
+  });
+
+  await seedWorkcenterSession(page, olderStaff.company, olderStaff.department);
+  await enterPayrollWorkcenter(page, fakeUser.company);
+  await navigateToSettlementWorkcenter(page);
+
+  await page.getByTestId(`salary-settlement-staff-${olderStaff.id}`).click();
+  await page.getByTestId('salary-settlement-next-button').click();
+
+  const settlementCard = page.getByTestId(`salary-settlement-card-${olderStaff.id}`);
+  await expect(settlementCard).toBeVisible();
+
+  // Verify National Pension is exempted (not present in breakdown items)
+  await expect(settlementCard.getByText('국민연금')).toHaveCount(0);
+
+  // Verify Health and Employment Insurance are calculated and visible
+  await expect(settlementCard.getByText('건강보험')).toBeVisible();
+  await expect(settlementCard.getByText('장기요양')).toBeVisible();
+  await expect(settlementCard.getByText('고용보험')).toBeVisible();
+});
+
