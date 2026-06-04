@@ -120,7 +120,18 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     research: taxFreeLimits.research_limit,
   };
 
-  const filteredStaffs = staffs.filter((s: StaffMember) => selectedCo === '전체' || s.company === selectedCo);
+  const filteredStaffs = staffs.filter((s: StaffMember) => {
+    if (selectedCo !== '전체' && s.company !== selectedCo) return false;
+    
+    // 퇴사 확정 처리된 사람은 퇴사월이 현재 정산년월(yearMonth)과 동일한 경우에만 정산 대상에 포함합니다.
+    // 그 외의 경우(이전 달에 퇴사했거나 퇴사일이 빈 값인 퇴사자)는 정산 대상에서 제외합니다.
+    if (s.status === '퇴사') {
+      const resignMonth = s.resigned_at ? String(s.resigned_at).slice(0, 7) : '';
+      if (resignMonth !== yearMonth) return false;
+    }
+    
+    return true;
+  });
 
   useEffect(() => {
     let active = true;
