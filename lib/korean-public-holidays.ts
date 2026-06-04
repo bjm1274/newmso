@@ -1,4 +1,4 @@
-const KOREAN_PUBLIC_HOLIDAY_DATES = [
+export const KOREAN_PUBLIC_HOLIDAY_DATES = [
   '2024-01-01',
   '2024-02-09',
   '2024-02-10',

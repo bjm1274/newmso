@@ -146,7 +146,9 @@ export default function CompanyPayrollTab() {
       );
 
       const payload = rules.map((r) => ({
-        id: idByLabel.get(r.label) || r.id || crypto.randomUUID(),
+        // idByLabel = 현재 회사의 기존 행 id(정본). '전체' fallback이나 타사 id(r.id)를
+        // 재사용하면 다른 company_name으로 INSERT 시 PK 충돌로 저장 실패 → 신규는 새 UUID.
+        id: idByLabel.get(r.label) || crypto.randomUUID(),
         company_name: selectedCompany,
         rule_label: r.label,
         rule_value: r.value,

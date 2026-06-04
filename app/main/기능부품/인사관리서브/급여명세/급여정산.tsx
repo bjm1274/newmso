@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { getKoreanMonthString } from '@/lib/seoul-time';
+import { KOREAN_PUBLIC_HOLIDAY_DATES } from '@/lib/korean-public-holidays';
 import type { StaffMember } from '@/types';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -399,11 +400,25 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       }
 
       const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
-      const holidaysSet = new Set(
-        companyHolidaysList
+      // 공휴일 근무 휴일수당 산정용 집합.
+      // (1) 법정 공휴일(코드 상수) — DB 미등록이어도 휴일 인정
+      // (2) 회사 커스텀 공휴일(company_holidays) — 'YYYY-MM-DD' 및 'M/D'(연도 없는 형식) 모두 정산연도로 보정
+      const settlementYear = String(startDate || '').slice(0, 4);
+      const normalizeHolidayDate = (raw: unknown): string | null => {
+        const s = String(raw || '').trim();
+        const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+        const md = s.match(/^(\d{1,2})\/(\d{1,2})$/);
+        if (md && settlementYear) return `${settlementYear}-${md[1].padStart(2, '0')}-${md[2].padStart(2, '0')}`;
+        return null;
+      };
+      const holidaysSet = new Set<string>([
+        ...KOREAN_PUBLIC_HOLIDAY_DATES,
+        ...companyHolidaysList
           .filter((h) => h.company_name === '전체' || h.company_name === ruleCompany)
-          .map((h) => String(h.holiday_date).slice(0, 10))
-      );
+          .map((h) => normalizeHolidayDate(h.holiday_date))
+          .filter((d): d is string => Boolean(d)),
+      ]);
 
       const { data: attendances, error: attendanceError } = await supabase
         .from('attendances')

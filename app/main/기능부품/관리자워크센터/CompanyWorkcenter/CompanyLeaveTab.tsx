@@ -29,50 +29,41 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
+function toHolidayItem(r: Record<string, unknown>): HolidayItem {
+  const kindRaw = typeof r.note === 'string' ? r.note : '법정';
+  const kind: HolidayItem['kind'] =
+    kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
+  return {
+    date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
+    name: typeof r.name === 'string' ? r.name : '-',
+    kind,
+  };
+}
+
 async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
+  // 기본(법정) 공휴일은 항상 포함한다. 커스텀 공휴일을 1건이라도 추가하면 DB 행만 반환되어
+  // 기본 공휴일이 통째로 사라지던 문제 방지 → 기본 + 커스텀 병합.
+  const base = FALLBACK_HOLIDAYS;
   try {
-    const { data, error } = await supabase
+    let { data } = await supabase
       .from('company_holidays')
       .select('holiday_date,name,note')
       .eq('company_name', companyName)
       .limit(100);
-    
-    // Fall back to entire holidays if specific company has no holidays configured
-    if (error || !Array.isArray(data) || data.length === 0) {
-      if (companyName !== '전체') {
-        const { data: allData } = await supabase
-          .from('company_holidays')
-          .select('holiday_date,name,note')
-          .eq('company_name', '전체')
-          .limit(100);
-        if (Array.isArray(allData) && allData.length > 0) {
-          return allData.filter(isRecord).map((r): HolidayItem => {
-            const kindRaw = typeof r.note === 'string' ? r.note : '법정';
-            const kind: HolidayItem['kind'] =
-              kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
-            return {
-              date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
-              name: typeof r.name === 'string' ? r.name : '-',
-              kind,
-            };
-          });
-        }
-      }
-      return FALLBACK_HOLIDAYS;
+    if ((!Array.isArray(data) || data.length === 0) && companyName !== '전체') {
+      const res = await supabase
+        .from('company_holidays')
+        .select('holiday_date,name,note')
+        .eq('company_name', '전체')
+        .limit(100);
+      data = res.data;
     }
-    
-    return data.filter(isRecord).map((r): HolidayItem => {
-      const kindRaw = typeof r.note === 'string' ? r.note : '법정';
-      const kind: HolidayItem['kind'] =
-        kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
-      return {
-        date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
-        name: typeof r.name === 'string' ? r.name : '-',
-        kind,
-      };
-    });
+    const custom = (Array.isArray(data) ? data : []).filter(isRecord).map(toHolidayItem);
+    const customDates = new Set(custom.map((c) => c.date));
+    // 기본 + 커스텀 병합 (같은 날짜는 커스텀 우선)
+    return [...base.filter((b) => !customDates.has(b.date)), ...custom];
   } catch {
-    return FALLBACK_HOLIDAYS;
+    return base;
   }
 }
 
