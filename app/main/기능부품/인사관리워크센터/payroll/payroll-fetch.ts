@@ -170,6 +170,9 @@ export async function fetchPayrollWorkcenterData({
         const dbResignedAt = row.resigned_at == null ? null : str(row.resigned_at);
         const resolvedResignDate = dbResignDate || dbResignedAt;
 
+        const permissions = (row.permissions ?? null) as Record<string, any>;
+        const allowances = (permissions?.payroll_allowances ?? {}) as Record<string, any>;
+
         return {
           id: str(row.id),
           name: str(row.name),
@@ -187,21 +190,21 @@ export async function fetchPayrollWorkcenterData({
           employee_no: row.employee_no == null ? null : str(row.employee_no),
           permissions: (row.permissions ?? null) as StaffMember['permissions'],
           base_salary: row.base_salary == null ? 0 : num(row.base_salary),
-          meal_allowance: row.meal_allowance == null ? 0 : num(row.meal_allowance),
-          night_duty_allowance: row.night_duty_allowance == null ? 0 : num(row.night_duty_allowance),
-          vehicle_allowance: row.vehicle_allowance == null ? 0 : num(row.vehicle_allowance),
-          childcare_allowance: row.childcare_allowance == null ? 0 : num(row.childcare_allowance),
-          research_allowance: row.research_allowance == null ? 0 : num(row.research_allowance),
-          other_taxfree: row.other_taxfree == null ? 0 : num(row.other_taxfree),
-          overtime_allowance: row.overtime_allowance == null ? 0 : num(row.overtime_allowance),
-          night_work_allowance: row.night_work_allowance == null ? 0 : num(row.night_work_allowance),
-          holiday_work_allowance: row.holiday_work_allowance == null ? 0 : num(row.holiday_work_allowance),
-          annual_leave_pay: row.annual_leave_pay == null ? 0 : num(row.annual_leave_pay),
-          position_allowance: row.position_allowance == null ? 0 : num(row.position_allowance),
+          meal_allowance: num(row.meal_allowance || allowances.meal_allowance),
+          night_duty_allowance: num(row.night_duty_allowance || allowances.night_duty_allowance),
+          vehicle_allowance: num(row.vehicle_allowance || allowances.vehicle_allowance),
+          childcare_allowance: num(row.childcare_allowance || allowances.childcare_allowance),
+          research_allowance: num(row.research_allowance || allowances.research_allowance),
+          other_taxfree: num(row.other_taxfree || allowances.other_taxfree),
+          overtime_allowance: num(row.overtime_allowance || allowances.overtime_allowance),
+          night_work_allowance: num(row.night_work_allowance || allowances.night_work_allowance),
+          holiday_work_allowance: num(row.holiday_work_allowance || allowances.holiday_work_allowance),
+          annual_leave_pay: num(row.annual_leave_pay || allowances.annual_leave_pay),
+          position_allowance: num(row.position_allowance || allowances.position_allowance),
           bank_name: row.bank_name == null ? null : str(row.bank_name),
           bank_account: row.bank_account == null ? null : str(row.bank_account),
-          agreed_overtime_allowance: row.agreed_overtime_allowance == null ? 0 : num(row.agreed_overtime_allowance),
-          agreed_night_allowance: row.agreed_night_allowance == null ? 0 : num(row.agreed_night_allowance),
+          agreed_overtime_allowance: num(row.agreed_overtime_allowance || allowances.agreed_overtime_allowance),
+          agreed_night_allowance: num(row.agreed_night_allowance || allowances.agreed_night_allowance),
           working_hours_per_week: row.working_hours_per_week == null ? 40 : Number(row.working_hours_per_week),
           working_days_per_week: row.working_days_per_week == null ? 5 : Number(row.working_days_per_week),
           shift_id: row.shift_id == null ? null : str(row.shift_id),
