@@ -102,6 +102,7 @@ const INITIAL_COUNTS: WelfareCounts = {
 // ─── DB row 타입 (KPI 집계용) ───────────────────────────────────────
 interface CondolenceLite {
   event_date: string | null;
+  event_type: string | null;
 }
 interface CheckupLite {
   status: string | null;
@@ -177,7 +178,7 @@ export default function WelfareWorkcenter({
         const [famRes, chkRes, licRes, devRes] = await Promise.all([
           supabase
             .from('congratulations_condolences')
-            .select('event_date')
+            .select('event_date, event_type')
             .gte('event_date', monthStart)
             .lt('event_date', monthEndExclusive),
           supabase
@@ -199,6 +200,39 @@ export default function WelfareWorkcenter({
         const chkRows = (chkRes.data as CheckupLite[] | null) ?? [];
         const licRows = (licRes.data as LicenseLite[] | null) ?? [];
         const devRows = (devRes.data as DeviceLite[] | null) ?? [];
+
+        // 이번달 생일인 재직 직원 수 구하기
+        let birthdayStaffCount = 0;
+        const currentMonth = Number(mm);
+        for (const staff of activeStaffs) {
+          let birthMonth: number | null = null;
+          if (staff.birth_date) {
+            const cleanBirth = String(staff.birth_date).replace(/[^0-9]/g, '');
+            if (cleanBirth.length === 8) {
+              birthMonth = Number(cleanBirth.slice(4, 6));
+            } else if (cleanBirth.length === 4) {
+              birthMonth = Number(cleanBirth.slice(0, 2));
+            } else if (String(staff.birth_date).includes('-')) {
+              const parts = String(staff.birth_date).split('-');
+              if (parts.length === 3) {
+                birthMonth = Number(parts[1]);
+              }
+            }
+          }
+          if (birthMonth === null && staff.resident_no) {
+            const digits = String(staff.resident_no).replace(/[^0-9]/g, '');
+            if (digits.length >= 6) {
+              birthMonth = Number(digits.slice(2, 4));
+            }
+          }
+          if (birthMonth === currentMonth) {
+            birthdayStaffCount += 1;
+          }
+        }
+
+        // 이번달 일반 경조사 건수 (생일 유형 제외)
+        const otherEventsCount = famRows.filter((r) => r.event_type !== '생일').length;
+        const familyThisMonth = otherEventsCount + birthdayStaffCount;
 
         // 면허: D-90 이내 (만료된 것 포함)
         let licenseExpiring = 0;
@@ -223,7 +257,7 @@ export default function WelfareWorkcenter({
         }
 
         setCounts({
-          familyThisMonth: famRows.length,
+          familyThisMonth,
           checkupTarget: activeStaffs.length,
           checkupDone,
           licenseExpiring,

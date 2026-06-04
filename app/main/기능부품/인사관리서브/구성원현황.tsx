@@ -1470,26 +1470,23 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           password: '',
           join_date: dateOrNull(신규직원.입사일),
         };
-        const insertOmittedColumns = new Set<string>(
-          hasFractionalValue(insertPayload.working_hours_per_week) ? ['working_hours_per_week'] : [],
+        const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
+          ? ['working_hours_per_week']
+          : [];
+        let { error: insertErr, data: insertedStaff } = await withMissingColumnsFallback(
+          (omittedColumns) => {
+            const allOmittedColumns = new Set<string>([
+              ...omittedColumns,
+              ...forcedInsertOmittedColumns,
+            ]);
+            return supabase
+              .from('staff_members')
+              .insert([buildStaffMutationPayload(insertPayload, allOmittedColumns)])
+              .select()
+              .single();
+          },
+          [...STAFF_MUTATION_ALLOWANCE_COLUMNS, ...STAFF_MUTATION_WORK_CONDITION_COLUMNS]
         );
-        let { error: insertErr, data: insertedStaff } = await supabase
-          .from('staff_members')
-          .insert([buildStaffMutationPayload(insertPayload, insertOmittedColumns)])
-          .select()
-          .single();
-
-        if (
-          insertErr &&
-          hasFractionalValue(insertPayload.working_hours_per_week) &&
-          isInvalidIntegerInputError(insertErr, insertPayload.working_hours_per_week)
-        ) {
-          ({ error: insertErr, data: insertedStaff } = await supabase
-            .from('staff_members')
-            .insert([buildStaffMutationPayload(insertPayload, new Set(['working_hours_per_week']))])
-            .select()
-            .single());
-        }
 
         if (insertErr) {
           return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
@@ -1604,11 +1601,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       base_salary: (직원.base_salary as number) || 0,
       // DB 컬럼이 없어 permissions.payroll_allowances(JSON)에 저장된 경우도 폴백으로 읽는다.
       // (직접 컬럼만 읽으면 저장 후 재편집 시 0으로 보여 "저장 안 됨"처럼 나타남)
-      meal_allowance: Number((직원.meal_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.meal_allowance ?? 0), night_duty_allowance: Number((직원.night_duty_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.night_duty_allowance ?? 0),
-      vehicle_allowance: Number((직원.vehicle_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.vehicle_allowance ?? 0), childcare_allowance: Number((직원.childcare_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.childcare_allowance ?? 0), research_allowance: Number((직원.research_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.research_allowance ?? 0),
-      other_taxfree: Number((직원.other_taxfree as number) ?? (직원.permissions?.payroll_allowances as any)?.other_taxfree ?? 0), position_allowance: Number((직원.position_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.position_allowance ?? 0),
-      overtime_allowance: Number((직원.overtime_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.overtime_allowance ?? 0), night_work_allowance: Number((직원.night_work_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.night_work_allowance ?? 0),
-      holiday_work_allowance: Number((직원.holiday_work_allowance as number) ?? (직원.permissions?.payroll_allowances as any)?.holiday_work_allowance ?? 0), annual_leave_pay: Number((직원.annual_leave_pay as number) ?? (직원.permissions?.payroll_allowances as any)?.annual_leave_pay ?? 0),
+      meal_allowance: Number(직원.meal_allowance || (직원.permissions?.payroll_allowances as any)?.meal_allowance || 0), night_duty_allowance: Number(직원.night_duty_allowance || (직원.permissions?.payroll_allowances as any)?.night_duty_allowance || 0),
+      vehicle_allowance: Number(직원.vehicle_allowance || (직원.permissions?.payroll_allowances as any)?.vehicle_allowance || 0), childcare_allowance: Number(직원.childcare_allowance || (직원.permissions?.payroll_allowances as any)?.childcare_allowance || 0), research_allowance: Number(직원.research_allowance || (직원.permissions?.payroll_allowances as any)?.research_allowance || 0),
+      other_taxfree: Number(직원.other_taxfree || (직원.permissions?.payroll_allowances as any)?.other_taxfree || 0), position_allowance: Number(직원.position_allowance || (직원.permissions?.payroll_allowances as any)?.position_allowance || 0),
+      overtime_allowance: Number(직원.overtime_allowance || (직원.permissions?.payroll_allowances as any)?.overtime_allowance || 0), night_work_allowance: Number(직원.night_work_allowance || (직원.permissions?.payroll_allowances as any)?.night_work_allowance || 0),
+      holiday_work_allowance: Number(직원.holiday_work_allowance || (직원.permissions?.payroll_allowances as any)?.holiday_work_allowance || 0), annual_leave_pay: Number(직원.annual_leave_pay || (직원.permissions?.payroll_allowances as any)?.annual_leave_pay || 0),
       agreed_overtime_allowance: Number(직원.agreed_overtime_allowance || (직원.permissions?.payroll_allowances as any)?.agreed_overtime_allowance || 0),
       agreed_night_allowance: Number(직원.agreed_night_allowance || (직원.permissions?.payroll_allowances as any)?.agreed_night_allowance || 0),
       고용형태: getStaffEmploymentType(직원),

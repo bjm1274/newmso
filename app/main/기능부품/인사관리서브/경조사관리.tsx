@@ -14,6 +14,7 @@ const AMOUNT_GUIDE: Record<string, string> = {
 
 type CongratRecord = {
     id: string;
+    staff_id?: string;
     staff_name: string;
     department: string;
     event_type: string;
@@ -97,6 +98,18 @@ const COLUMNS: Column<CongratRecord>[] = [
         showOnMobile: false,
         render: (r) => <span>{r.wreath_sent ? '🌸' : '—'}</span>,
     },
+    {
+        key: 'status',
+        label: '상태',
+        align: 'center',
+        render: (r) => (
+            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                r.status === '지급완료' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+                {r.status || '지급대기'}
+            </span>
+        ),
+    },
 ];
 
 export default function CongratulationsCondolences({ staffs = [], selectedCo }: Record<string, unknown>) {
@@ -113,12 +126,84 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
         if (data) setRecords(data as CongratRecord[]);
     };
 
+    const mergedRecords = useMemo(() => {
+        const thisYear = new Date().getFullYear();
+        const thisMonth = new Date().getMonth() + 1; // 1-12
+
+        // 1. Get existing records
+        const list = [...records] as (CongratRecord & { staff_id?: string })[];
+
+        // 2. Parse staff birthdays in the current month
+        const activeStaffs = _staffs.filter((s: any) => s.status === '재직');
+        
+        const virtualBirthdays: CongratRecord[] = [];
+        for (const staff of activeStaffs) {
+            // Get birthday month and day
+            let birthMonth: number | null = null;
+            let birthDay: number | null = null;
+
+            if (staff.birth_date) {
+                const cleanBirth = String(staff.birth_date).replace(/[^0-9]/g, '');
+                if (cleanBirth.length === 8) {
+                    birthMonth = Number(cleanBirth.slice(4, 6));
+                    birthDay = Number(cleanBirth.slice(6, 8));
+                } else if (cleanBirth.length === 4) {
+                    birthMonth = Number(cleanBirth.slice(0, 2));
+                    birthDay = Number(cleanBirth.slice(2, 4));
+                } else if (String(staff.birth_date).includes('-')) {
+                    const parts = String(staff.birth_date).split('-');
+                    if (parts.length === 3) {
+                        birthMonth = Number(parts[1]);
+                        birthDay = Number(parts[2]);
+                    }
+                }
+            }
+
+            if ((birthMonth === null || birthDay === null) && staff.resident_no) {
+                const digits = String(staff.resident_no).replace(/[^0-9]/g, '');
+                if (digits.length >= 6) {
+                    birthMonth = Number(digits.slice(2, 4));
+                    birthDay = Number(digits.slice(4, 6));
+                }
+            }
+
+            if (birthMonth === thisMonth && birthDay !== null) {
+                // Check if there is already a '생일' record for this staff this year
+                const hasExisting = list.some(r => 
+                    r.event_type === '생일' && 
+                    (r.staff_id === staff.id || r.staff_name === staff.name) && 
+                    new Date(r.event_date).getFullYear() === thisYear
+                );
+
+                if (!hasExisting) {
+                    const dateStr = `${thisYear}-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+                    virtualBirthdays.push({
+                        id: `virtual-birthday-${staff.id}`,
+                        staff_id: staff.id,
+                        staff_name: staff.name,
+                        company: staff.company || '전체',
+                        department: staff.department || '',
+                        event_type: '생일',
+                        event_date: dateStr,
+                        relation: '본인',
+                        recipient: staff.name,
+                        amount: 50000,
+                        wreath_sent: false,
+                        status: '지급대기',
+                    } as any);
+                }
+            }
+        }
+
+        return [...list, ...virtualBirthdays].sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
+    }, [records, _staffs]);
+
     const filtered = getScopedActiveStaffs(_staffs, String(selectedCo ?? '전체'));
-    const filteredRecords = useMemo(() => records.filter((r) => {
+    const filteredRecords = useMemo(() => mergedRecords.filter((r) => {
         if (selectedCo !== '전체' && r.company !== selectedCo) return false;
         if (filter !== '전체' && r.event_type !== filter) return false;
         return true;
-    }), [records, selectedCo, filter]);
+    }), [mergedRecords, selectedCo, filter]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -142,9 +227,9 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
         setForm(INITIAL_FORM);
     };
 
-    const totalAmount = useMemo(() => filteredRecords.reduce((sum, r) => sum + (r.amount || 0), 0), [filteredRecords]);
+    const totalAmount = useMemo(() => filteredRecords.filter(r => r.status === '지급완료').reduce((sum, r) => sum + (r.amount || 0), 0), [filteredRecords]);
     const thisYear = useMemo(() => filteredRecords.filter((r) => new Date(r.event_date).getFullYear() === new Date().getFullYear()), [filteredRecords]);
-    const yearTotal = useMemo(() => thisYear.reduce((sum, r) => sum + (r.amount || 0), 0), [thisYear]);
+    const yearTotal = useMemo(() => thisYear.filter(r => r.status === '지급완료').reduce((sum, r) => sum + (r.amount || 0), 0), [thisYear]);
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">

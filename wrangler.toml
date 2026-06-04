@@ -51,3 +51,4 @@ crons = [
 binding = "DB"
 database_name = "pchos-d1"
 database_id = "e6e054c7-2bba-4a97-a740-b39a42906a74"
+migrations_dir = "lib/db/migrations"
