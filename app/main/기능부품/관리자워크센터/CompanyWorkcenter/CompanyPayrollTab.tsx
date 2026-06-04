@@ -145,10 +145,21 @@ export default function CompanyPayrollTab() {
           .map((r) => [String(r.rule_label), String(r.id)] as const),
       );
 
+      const safeUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      };
+
       const payload = rules.map((r) => ({
         // idByLabel = 현재 회사의 기존 행 id(정본). '전체' fallback이나 타사 id(r.id)를
         // 재사용하면 다른 company_name으로 INSERT 시 PK 충돌로 저장 실패 → 신규는 새 UUID.
-        id: idByLabel.get(r.label) || crypto.randomUUID(),
+        id: idByLabel.get(r.label) || safeUUID(),
         company_name: selectedCompany,
         rule_label: r.label,
         rule_value: r.value,

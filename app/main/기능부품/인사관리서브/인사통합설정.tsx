@@ -6,6 +6,8 @@ import LegalStandardsPanel from './급여명세/법정기준패널';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import ShiftPatternManager from './급여명세/교대제스케줄관리';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 type MenuId = 'policy' | 'tax' | 'shift' | 'lock';
 
@@ -117,78 +119,202 @@ function HRPolicies({ companyName }: { companyName: string }) {
         autoConvertOvertimeToLeave: false
     });
 
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    // DB로부터 정책 정보 로드
+    useEffect(() => {
+        let alive = true;
+        setLoading(true);
+        const loadPolicies = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('company_payroll_policies')
+                    .select('rule_label, rule_value')
+                    .eq('company_name', companyName);
+
+                if (error) throw error;
+                if (alive && data && data.length > 0) {
+                    const loaded = { ...policies };
+                    data.forEach((r: any) => {
+                        const val = r.rule_value;
+                        if (r.rule_label === '연차 발생 기준') {
+                            loaded.annualLeaveStandard = val || '입사일';
+                        } else if (r.rule_label === '법정 공휴일 자동 유급 처리') {
+                            loaded.autoHolidayPay = val === 'true';
+                        } else if (r.rule_label === '지각/조퇴 시 분 단위 자동 시급 차감') {
+                            loaded.deductLateArrivals = val === 'true';
+                        } else if (r.rule_label === '포괄임금제 적용 자동화') {
+                            loaded.includeOvertimeInBase = val === 'true';
+                        } else if (r.rule_label === '연장근로 무조건 보상휴가 전환') {
+                            loaded.autoConvertOvertimeToLeave = val === 'true';
+                        }
+                    });
+                    setPolicies(loaded);
+                }
+            } catch (err) {
+                console.warn('Failed to load HR policies from database:', err);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        };
+        void loadPolicies();
+        return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companyName]);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            // PK 충돌 방지를 위해 기존 레코드의 id 조회
+            const { data: existing, error: existingError } = await supabase
+                .from('company_payroll_policies')
+                .select('id, rule_label')
+                .eq('company_name', companyName);
+
+            if (existingError) throw existingError;
+            const idMap = new Map((existing || []).map((r: any) => [r.rule_label, r.id]));
+
+            const safeUUID = () => {
+                if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                    return crypto.randomUUID();
+                }
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                    const r = (Math.random() * 16) | 0;
+                    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                    return v.toString(16);
+                });
+            };
+
+            const payload = [
+                {
+                    id: idMap.get('연차 발생 기준') || safeUUID(),
+                    company_name: companyName,
+                    rule_label: '연차 발생 기준',
+                    rule_value: policies.annualLeaveStandard
+                },
+                {
+                    id: idMap.get('법정 공휴일 자동 유급 처리') || safeUUID(),
+                    company_name: companyName,
+                    rule_label: '법정 공휴일 자동 유급 처리',
+                    rule_value: String(policies.autoHolidayPay)
+                },
+                {
+                    id: idMap.get('지각/조퇴 시 분 단위 자동 시급 차감') || safeUUID(),
+                    company_name: companyName,
+                    rule_label: '지각/조퇴 시 분 단위 자동 시급 차감',
+                    rule_value: String(policies.deductLateArrivals)
+                },
+                {
+                    id: idMap.get('포괄임금제 적용 자동화') || safeUUID(),
+                    company_name: companyName,
+                    rule_label: '포괄임금제 적용 자동화',
+                    rule_value: String(policies.includeOvertimeInBase)
+                },
+                {
+                    id: idMap.get('연장근로 무조건 보상휴가 전환') || safeUUID(),
+                    company_name: companyName,
+                    rule_label: '연장근로 무조건 보상휴가 전환',
+                    rule_value: String(policies.autoConvertOvertimeToLeave)
+                }
+            ];
+
+            const { error } = await supabase
+                .from('company_payroll_policies')
+                .upsert(payload, { onConflict: 'company_name,rule_label' });
+
+            if (error) throw error;
+            toast('인사 정책 설정이 저장되었습니다.', 'success');
+        } catch (err) {
+            console.error('Failed to save HR policies:', err);
+            toast('정책 설정 저장 중 오류가 발생했습니다.', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="max-w-4xl min-w-0 space-y-5 break-keep animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col gap-1 mb-3">
                 <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">인사 정책 설정 (Rules)</h2>
             </div>
 
-            <div className="space-y-4">
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-                        <h3 className="text-[14px] font-bold text-[var(--accent)] uppercase tracking-wider">연차 및 휴일 룰 🏝️</h3>
+            {loading ? (
+                <div className="py-8 text-center text-sm text-[var(--toss-gray-4)]">정책 설정 로드 중…</div>
+            ) : (
+                <>
+                    <div className="space-y-4">
+                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
+                                <h3 className="text-[14px] font-bold text-[var(--accent)] uppercase tracking-wider">연차 및 휴일 룰 🏝️</h3>
+                            </div>
+
+                            <div className="p-0 divide-y divide-[var(--border)]">
+                                <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">법정 공휴일 자동 유급 처리</h4>
+                                        <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">빨간날(대체공휴일 포함)을 근무일에서 자동으로 제외하고 유급 휴일로 계산합니다.</p>
+                                    </div>
+                                    <ToggleSwitch checked={policies.autoHolidayPay} onChange={(v) => setPolicies({ ...policies, autoHolidayPay: v })} />
+                                </div>
+
+                                <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연차 발생 기준</h4>
+                                        <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">연차 부여 시점을 입사일 기준(정확함)으로 할지, 1월 1일 회계연도 기준(일괄부여)으로 할지 선택합니다.</p>
+                                    </div>
+                                    <div className="flex shrink-0 rounded-[var(--radius-md)] bg-[var(--toss-gray-2)] p-1 shadow-inner">
+                                        <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '입사일' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '입사일' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>입사일 기준</button>
+                                        <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '회계연도' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '회계연도' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>회계년도 기준</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden mt-5">
+                            <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
+                                <h3 className="text-[14px] font-bold text-[var(--toss-danger)] uppercase tracking-wider">근태 및 차감 룰 ⏰</h3>
+                            </div>
+
+                            <div className="p-0 divide-y divide-[var(--border)]">
+                                <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">지각/조퇴 시 분 단위 자동 시급 차감</h4>
+                                        <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">출결 기록에서 지각이 확인되면, 한 달치 시급을 합산하여 급여 정산 마법사 구동 시 자동으로 기본급에서 차감합니다.</p>
+                                    </div>
+                                    <ToggleSwitch checked={policies.deductLateArrivals} onChange={(v) => setPolicies({ ...policies, deductLateArrivals: v })} />
+                                </div>
+
+                                <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연장근로 무조건 보상휴가(대휴) 전환</h4>
+                                        <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 &apos;보상 연차&apos; 개수에 자동으로 더해줍니다.</p>
+                                    </div>
+                                    <ToggleSwitch checked={policies.autoConvertOvertimeToLeave} onChange={(v) => setPolicies({ ...policies, autoConvertOvertimeToLeave: v })} />
+                                </div>
+
+                                <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                        <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">포괄임금제 (고정 연장수당) 적용 자동화</h4>
+                                        <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">직원 등록 시 월 20시간 등의 연장수당이 미리 세팅된 경우, 초과근무 발생 시 자동 상계(차감) 처리합니다.</p>
+                                    </div>
+                                    <ToggleSwitch checked={policies.includeOvertimeInBase} onChange={(v) => setPolicies({ ...policies, includeOvertimeInBase: v })} />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="p-0 divide-y divide-[var(--border)]">
-                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1 pr-2">
-                                <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">법정 공휴일 자동 유급 처리</h4>
-                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">빨간날(대체공휴일 포함)을 근무일에서 자동으로 제외하고 유급 휴일로 계산합니다.</p>
-                            </div>
-                            <ToggleSwitch checked={policies.autoHolidayPay} onChange={(v) => setPolicies({ ...policies, autoHolidayPay: v })} />
-                        </div>
-
-                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1 pr-2">
-                                <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연차 발생 기준</h4>
-                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">연차 부여 시점을 입사일 기준(정확함)으로 할지, 1월 1일 회계연도 기준(일괄부여)으로 할지 선택합니다.</p>
-                            </div>
-                            <div className="flex shrink-0 rounded-[var(--radius-md)] bg-[var(--toss-gray-2)] p-1 shadow-inner">
-                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '입사일' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '입사일' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>입사일 기준</button>
-                                <button onClick={() => setPolicies({ ...policies, annualLeaveStandard: '회계연도' })} className={`whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[12px] font-bold transition-all ${policies.annualLeaveStandard === '회계연도' ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-4)]'}`}>회계년도 기준</button>
-                            </div>
-                        </div>
+                    <div className="flex justify-end pt-2">
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-sm rounded-[var(--radius-md)] hover:opacity-90 shadow-sm transition-all disabled:opacity-50"
+                        >
+                            {saving ? '저장 중...' : '저장하기'}
+                        </button>
                     </div>
-                </div>
-
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm overflow-hidden mt-5">
-                    <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-                        <h3 className="text-[14px] font-bold text-[var(--toss-danger)] uppercase tracking-wider">근태 및 차감 룰 ⏰</h3>
-                    </div>
-
-                    <div className="p-0 divide-y divide-[var(--border)]">
-                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1 pr-2">
-                                <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">지각/조퇴 시 분 단위 자동 시급 차감</h4>
-                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">출결 기록에서 지각이 확인되면, 한 달치 시급을 합산하여 급여 정산 마법사 구동 시 자동으로 기본급에서 차감합니다.</p>
-                            </div>
-                            <ToggleSwitch checked={policies.deductLateArrivals} onChange={(v) => setPolicies({ ...policies, deductLateArrivals: v })} />
-                        </div>
-
-                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1 pr-2">
-                                <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연장근로 무조건 보상휴가(대휴) 전환</h4>
-                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 &apos;보상 연차&apos; 개수에 자동으로 더해줍니다.</p>
-                            </div>
-                            <ToggleSwitch checked={policies.autoConvertOvertimeToLeave} onChange={(v) => setPolicies({ ...policies, autoConvertOvertimeToLeave: v })} />
-                        </div>
-
-                        <div className="flex flex-col gap-3 p-4 transition-colors hover:bg-[var(--muted)]/50 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0 flex-1 pr-2">
-                                <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">포괄임금제 (고정 연장수당) 적용 자동화</h4>
-                                <p className="text-[12px] leading-5 text-[var(--toss-gray-4)] break-keep">직원 등록 시 월 20시간 등의 연장수당이 미리 세팅된 경우, 초과근무 발생 시 자동 상계(차감) 처리합니다.</p>
-                            </div>
-                            <ToggleSwitch checked={policies.includeOvertimeInBase} onChange={(v) => setPolicies({ ...policies, includeOvertimeInBase: v })} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-                <button className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-sm rounded-[var(--radius-md)] hover:opacity-90 shadow-sm transition-all">
-                    저장하기
-                </button>
-            </div>
+                </>
+            )}
         </div>
     );
 }
@@ -203,3 +329,4 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
         </div>
     )
 }
+

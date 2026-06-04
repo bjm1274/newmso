@@ -153,7 +153,7 @@ export async function fetchPayrollWorkcenterData({
     const { data, error } = await supabase
       .from('staff_members')
       .select(
-        'id, name, company, department, position, status, hire_date, resign_date, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, agreed_overtime_allowance, agreed_night_allowance, working_hours_per_week, working_days_per_week, shift_id',
+        'id, name, company, department, position, status, hire_date, resign_date, join_date, joined_at, resigned_at, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, agreed_overtime_allowance, agreed_night_allowance, working_hours_per_week, working_days_per_week, shift_id',
       );
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];
@@ -161,6 +161,15 @@ export async function fetchPayrollWorkcenterData({
       .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
       .map((raw) => {
         const row = raw as unknown as Record<string, unknown>;
+        const dbHireDate = row.hire_date == null ? null : str(row.hire_date);
+        const dbJoinDate = row.join_date == null ? null : str(row.join_date);
+        const dbJoinedAt = row.joined_at == null ? null : str(row.joined_at);
+        const resolvedHireDate = dbHireDate || dbJoinedAt || dbJoinDate;
+
+        const dbResignDate = row.resign_date == null ? null : str(row.resign_date);
+        const dbResignedAt = row.resigned_at == null ? null : str(row.resigned_at);
+        const resolvedResignDate = dbResignDate || dbResignedAt;
+
         return {
           id: str(row.id),
           name: str(row.name),
@@ -168,8 +177,11 @@ export async function fetchPayrollWorkcenterData({
           department: row.department == null ? null : str(row.department),
           position: row.position == null ? null : str(row.position),
           status: row.status == null ? null : str(row.status),
-          hire_date: row.hire_date == null ? null : str(row.hire_date),
-          resign_date: row.resign_date == null ? null : str(row.resign_date),
+          hire_date: resolvedHireDate,
+          resign_date: resolvedResignDate,
+          join_date: dbJoinDate,
+          joined_at: dbJoinedAt,
+          resigned_at: dbResignedAt,
           birth_date: row.birth_date == null ? null : str(row.birth_date),
           salary: row.salary == null ? null : Number(row.salary),
           employee_no: row.employee_no == null ? null : str(row.employee_no),
@@ -303,8 +315,7 @@ export async function fetchRecentRetirees(
   try {
     const { data, error } = await supabase
       .from('staff_members')
-      .select('id, name, company, department, hire_date, resign_date, salary, base_salary, meal_allowance, status')
-      .not('resign_date', 'is', null);
+      .select('id, name, company, department, hire_date, resign_date, join_date, joined_at, resigned_at, salary, base_salary, meal_allowance, status');
     if (error) throw new Error(error.message);
     if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
     const rows = Array.isArray(data) ? data : [];
@@ -312,15 +323,17 @@ export async function fetchRecentRetirees(
       .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
       .map((raw) => raw as unknown as Record<string, unknown>)
       .filter((row) => {
+        const hasResign = row.resign_date != null || row.resigned_at != null;
+        if (!hasResign) return false;
         if (selectedCo && selectedCo !== '전체') {
           return row.company === selectedCo;
         }
         return true;
       })
       .map((row) => {
-        const hire = row.hire_date == null ? null : str(row.hire_date);
-        const resign = row.resign_date == null ? null : str(row.resign_date);
-        const tenure = calculateTenureYears(hire, resign ? new Date(resign) : undefined);
+        const hire = str(row.hire_date || row.joined_at || row.join_date || '');
+        const resign = str(row.resign_date || row.resigned_at || '');
+        const tenure = hire && resign ? calculateTenureYears(hire, new Date(resign)) : null;
         const tenureLabel =
           tenure === null
             ? '-'

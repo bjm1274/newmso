@@ -274,17 +274,17 @@ export function SettlementStaffCard({
               <span>연장 {Math.floor((data.auto_overtime_minutes || 0) / 60)}h {(data.auto_overtime_minutes || 0) % 60}m (₩{(data.auto_overtime_pay || 0).toLocaleString()})</span>
             )}
             {Number(data.auto_holiday_hours || 0) > 0 && (
-              <span>휴일 {data.auto_holiday_hours}h (₩{(data.auto_holiday_pay || 0).toLocaleString()})</span>
+              <span>휴일 {data.auto_holiday_hours}h (₩{(data.auto_holiday_pay || 0).toLocaleString()} - 휴일수당에 자동 반영)</span>
             )}
             {Number(data.auto_night_minutes || 0) > 0 && (
               <span>야간 {Math.floor((data.auto_night_minutes || 0) / 60)}h {(data.auto_night_minutes || 0) % 60}m (₩{(data.auto_night_pay || 0).toLocaleString()})</span>
             )}
-            <span>· 추천 <span className="font-extrabold text-blue-600">₩{((data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0) + (data.auto_night_pay || 0)).toLocaleString()}</span></span>
+            <span>· 추천(연장+야간) <span className="font-extrabold text-blue-600">₩{((data.auto_overtime_pay || 0) + (data.auto_night_pay || 0)).toLocaleString()}</span></span>
           </div>
-          {Number(data.overtime_pay || 0) !== ((data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0) + (data.auto_night_pay || 0)) && (
+          {Number(data.overtime_pay || 0) !== ((data.auto_overtime_pay || 0) + (data.auto_night_pay || 0)) && (
             <button
               type="button"
-              onClick={() => onUpdate(s.id, 'overtime_pay', (data.auto_overtime_pay || 0) + (data.auto_holiday_pay || 0) + (data.auto_night_pay || 0))}
+              onClick={() => onUpdate(s.id, 'overtime_pay', (data.auto_overtime_pay || 0) + (data.auto_night_pay || 0))}
               className="text-[9px] font-bold bg-sky-600 text-white px-2 py-0.5 rounded shadow-sm hover:opacity-90 transition-all"
             >
               추천액 연장근로(실적)에 적용

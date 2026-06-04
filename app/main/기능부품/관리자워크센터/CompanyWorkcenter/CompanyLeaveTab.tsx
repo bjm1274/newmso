@@ -33,8 +33,19 @@ function toHolidayItem(r: Record<string, unknown>): HolidayItem {
   const kindRaw = typeof r.note === 'string' ? r.note : '법정';
   const kind: HolidayItem['kind'] =
     kindRaw === '기념일' || kindRaw === '회사' ? kindRaw : '법정';
+  
+  let dbDate = typeof r.holiday_date === 'string' ? r.holiday_date : '-';
+  if (dbDate.includes('-')) {
+    const parts = dbDate.split('-');
+    if (parts.length === 3) {
+      const month = parseInt(parts[1], 10);
+      const day = parseInt(parts[2], 10);
+      dbDate = `${month}/${day}`;
+    }
+  }
+
   return {
-    date: typeof r.holiday_date === 'string' ? r.holiday_date : '-',
+    date: dbDate,
     name: typeof r.name === 'string' ? r.name : '-',
     kind,
   };
@@ -205,26 +216,56 @@ export default function CompanyLeaveTab() {
     if (!newHoliDate.trim()) return alert('공휴일 일자를 입력해주세요. (예: 5/5)');
     
     try {
-      const newId = crypto.randomUUID();
+      const safeUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+          return crypto.randomUUID();
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      };
+
+      const newId = safeUUID();
       const newHoli: HolidayItem = {
         date: newHoliDate,
         name: newHoliName,
         kind: newHoliKind,
       };
 
+      // M/D 형식(예: 10/9)을 DB DATE 요건에 맞는 YYYY-MM-DD 형식으로 변환
+      let dbDate = newHoliDate;
+      if (newHoliDate.includes('/')) {
+        const parts = newHoliDate.split('/');
+        if (parts.length === 2) {
+          const month = parseInt(parts[0], 10);
+          const day = parseInt(parts[1], 10);
+          if (!isNaN(month) && !isNaN(day)) {
+            const year = new Date().getFullYear();
+            const monthStr = month < 10 ? `0${month}` : `${month}`;
+            const dayStr = day < 10 ? `0${day}` : `${day}`;
+            dbDate = `${year}-${monthStr}-${dayStr}`;
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('company_holidays')
         .insert({
           id: newId,
           company_name: selectedCompany,
-          holiday_date: newHoliDate,
+          holiday_date: dbDate,
           name: newHoliName,
           note: newHoliKind,
         });
 
       if (error) throw error;
       
-      setHolidays(prev => [...prev, newHoli]);
+      setHolidays(prev => {
+        const filtered = prev.filter(h => h.date !== newHoliDate);
+        return [...filtered, newHoli];
+      });
       setShowAddHolidayModal(false);
       setNewHoliName('');
     } catch (e) {
@@ -234,7 +275,10 @@ export default function CompanyLeaveTab() {
         name: newHoliName,
         kind: newHoliKind,
       };
-      setHolidays(prev => [...prev, newHoli]);
+      setHolidays(prev => {
+        const filtered = prev.filter(h => h.date !== newHoliDate);
+        return [...filtered, newHoli];
+      });
       setShowAddHolidayModal(false);
     }
   };

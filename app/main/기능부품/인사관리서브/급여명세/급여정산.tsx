@@ -229,9 +229,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       'annual_leave_pay',
     ];
     taxableChangeFields.forEach((field) => {
+      let fallbackVal = staffBreakdown[field];
+      if (field === 'holiday_work_allowance' && autoHolidayHours > 0) {
+        fallbackVal = autoHolidayPay;
+      }
       const result = resolveSalaryAmountForSettlement({
         savedValue: undefined,
-        fallback: staffBreakdown[field],
+        fallback: fallbackVal,
         field,
         yearMonth,
         salaryChanges: staffSalaryChanges,
@@ -267,7 +271,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     const autoHolidayPay  = Math.round(holidayHours8 * calculatedHourlyRate * 1.5 + holidayHoursOver8 * calculatedHourlyRate * 2.0);
     // C-10: 야간근로(22:00~06:00) 0.5배 가산 (근로기준법 §56③, 연장 여부 무관)
     const autoNightPay    = Math.round((autoNightWorkMins / 60) * calculatedHourlyRate * 0.5);
-    const recommendedOvertimePay = autoOvertimePay + autoHolidayPay + autoNightPay;
+    // 휴일수당(autoHolidayPay)은 아래 recommendedOvertimePay(연장근로 실적 필드추천)에서 제외하며,
+    // 대신 holiday_work_allowance(휴일수당 필드)에 자동 세팅됩니다.
+    const recommendedOvertimePay = autoOvertimePay + autoNightPay;
 
     // 만약 이미 저장된 연장수당 정보가 있으면 보존하고, 없을 경우 추천액으로 pre-fill
     const overtimePay = Number(
