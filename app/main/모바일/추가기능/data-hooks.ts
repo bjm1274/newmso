@@ -29,6 +29,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 // ─────────────────────────────────────────────────────────────
 // 공용 유틸
@@ -45,7 +46,7 @@ export function pickTone(seed: string | number | undefined | null): AvatarTone {
 }
 
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getKoreanTodayString();
 }
 
 export function pickText(row: Record<string, unknown>, ...keys: string[]): string {

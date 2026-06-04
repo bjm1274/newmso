@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { TAX_FREE_LEGAL_LIMITS } from '@/lib/tax-free-limits';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
@@ -57,7 +58,7 @@ interface Props {
 }
 
 export default function TaxFreeLimitChecker({ staffs, selectedCo }: Props) {
-  const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [onlyExceeded, setOnlyExceeded] = useState(false);

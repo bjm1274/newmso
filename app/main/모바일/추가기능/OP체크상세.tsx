@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
@@ -136,7 +137,7 @@ export default function OP체크상세({
         table: 'op_patient_checks',
         payload: {
           schedule_post_id: card.scheduleId,
-          schedule_date: new Date().toISOString().slice(0, 10),
+          schedule_date: getKoreanTodayString(),
           prep_items: prepItems as unknown as Record<string, unknown>[],
           updated_by: user.id,
           updated_by_name: user.name ?? null,

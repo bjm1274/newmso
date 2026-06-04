@@ -1,4 +1,5 @@
 // ─── 수술상담 유틸리티 함수 ────────────────────────────────────────────────────
+import { formatKoreanDateKey, getKoreanMonthString } from '@/lib/seoul-time';
 import type { ConsultationResult, SavedRecord, PatientGroup, KpiData } from './수술상담-types';
 import { SECTIONS } from './수술상담-types';
 
@@ -70,8 +71,8 @@ export function groupByPatient(records: SavedRecord[]): PatientGroup[] {
 
 export function deriveKpi(records: SavedRecord[]): KpiData {
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const thisMonth = now.toISOString().slice(0, 7);
+  const todayStr = formatKoreanDateKey(now);
+  const thisMonth = getKoreanMonthString(now);
 
   let todayCount = 0;
   let consentDoneThisMonth = 0;

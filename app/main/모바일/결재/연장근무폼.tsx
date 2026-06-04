@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { ErpUser } from '@/types';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
 import { MFormHeader } from '../인사관리/form-helpers';
@@ -72,7 +73,7 @@ export default function SApprovalOvertimeForm({
       // 최근 120일 연장근무 이력
       const start = new Date();
       start.setDate(start.getDate() - 120);
-      const startStr = start.toISOString().slice(0, 10);
+      const startStr = formatKoreanDateKey(start);
       const { data, error } = await supabase
         .from('attendances')
         .select('work_date, overtime_minutes, check_in_at, check_out_at')

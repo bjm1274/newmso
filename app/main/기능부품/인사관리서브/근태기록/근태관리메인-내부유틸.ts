@@ -6,6 +6,8 @@
 //    근태관리메인.tsx에 있던 원본 구현을 그대로 옮긴 것
 // 따라서 근태유틸.ts로 통합하지 않고 별도 모듈로 분리한다(동작 보존 최우선).
 
+import { formatKoreanDateKey } from '@/lib/seoul-time';
+
 export const ROSTER_CREATOR_POSITIONS = ['간호과장', '간호부장', '실장'];
 export const ROSTER_APPROVER_POSITIONS = ['총무부장', '이사'];
 export const ROSTER_APPROVER_COMPANIES = ['SY INC.'];
@@ -294,7 +296,8 @@ export function buildWeekDates(anchorDate: string) {
   return Array.from({ length: 7 }, (_, index) => {
     const current = new Date(start);
     current.setDate(start.getDate() + index);
-    return current.toISOString().slice(0, 10);
+    // KST 기준 날짜 키 — RosterGrid(formatIsoDate, KST)와 정합 맞춤(UTC 하루 밀림 제거)
+    return formatKoreanDateKey(current);
   });
 }
 

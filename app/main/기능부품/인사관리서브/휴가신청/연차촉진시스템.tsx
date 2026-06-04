@@ -2,6 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import {
   getStaffPromotionSchedule,
@@ -108,7 +109,7 @@ export default function AnnualLeavePromotion({
           return makeTarget(s, totalLeave, usedLeave, remainingLeave, '정상', false, null, null);
         }
 
-        const expiryDateStr = schedule.expiryDate.toISOString().slice(0, 10);
+        const expiryDateStr = formatKoreanDateKey(schedule.expiryDate);
         const step1Ms = schedule.step1Date.getTime();
         const step2Ms = schedule.step2Date.getTime();
         const nowMs = today.getTime();

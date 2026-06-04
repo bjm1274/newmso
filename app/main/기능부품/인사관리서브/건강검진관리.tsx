@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -267,7 +268,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
     };
 
     const markComplete = async (id: string) => {
-        const now = new Date().toISOString().slice(0, 10);
+        const now = getKoreanTodayString();
         const { error } = await supabase.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
         if (error) {
             console.error('health_checkups update failed:', error);

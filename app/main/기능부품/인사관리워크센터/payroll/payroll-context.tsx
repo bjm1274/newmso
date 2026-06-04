@@ -24,6 +24,7 @@ import {
   type PayrollWorkcenterData,
 } from './payroll-fetch';
 import { getPayrollPolicy } from './payroll-policy';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 
 interface PayrollContextValue {
   data: PayrollWorkcenterData | null;
@@ -35,7 +36,7 @@ interface PayrollContextValue {
   reload: () => void;
 }
 
-const initialDate = () => new Date().toISOString().slice(0, 7);
+const initialDate = () => getKoreanMonthString();
 
 const PayrollContext = createContext<PayrollContextValue | null>(null);
 

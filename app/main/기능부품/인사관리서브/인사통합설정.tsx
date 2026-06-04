@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import TaxFreeSettingsPanel from './급여명세/비과세항목설정';
 import LegalStandardsPanel from './급여명세/법정기준패널';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
@@ -97,7 +98,7 @@ export default function IntegratedHRSettings({
                             <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">급여 마감 및 잠금</h2>
                         </div>
                         <div className="bg-[var(--card)] p-4 rounded-[var(--radius-xl)] shadow-sm border border-[var(--border)] border-l-4 border-l-amber-500">
-                            <PayrollLockPanel yearMonth={new Date().toISOString().slice(0, 7)} companyName={companyName} />
+                            <PayrollLockPanel yearMonth={getKoreanMonthString()} companyName={companyName} />
                         </div>
                     </div>
                 )}

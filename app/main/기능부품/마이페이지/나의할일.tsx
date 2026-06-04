@@ -2,7 +2,7 @@
 
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { getKoreanTodayString } from '@/lib/seoul-time';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -169,7 +169,7 @@ function getNextTaskDate(taskDate: string, repeatType: TodoRepeatType | undefine
       return null;
   }
 
-  return baseDate.toISOString().slice(0, 10);
+  return formatKoreanDateKey(baseDate);
 }
 
 function shiftReminderAt(value: string | null | undefined, nextTaskDate: string) {

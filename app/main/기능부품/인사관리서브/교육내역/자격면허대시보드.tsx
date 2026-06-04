@@ -5,6 +5,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import {
   buildFallbackLicenseRows,
@@ -172,7 +173,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `자격면허대시보드_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `자격면허대시보드_${getKoreanTodayString()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

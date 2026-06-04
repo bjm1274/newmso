@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
@@ -1706,7 +1707,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   <div className="space-y-2">
                     {activeTeamTasks.map((task) => {
                       const priorityMeta = getTaskPriorityMeta(task.priority);
-                      const isSoon = !task.isDone && task.dueDate && task.dueDate <= new Date().toISOString().slice(0, 10);
+                      const isSoon = !task.isDone && task.dueDate && task.dueDate <= getKoreanTodayString();
                       return (
                         <div
                           key={task.id}

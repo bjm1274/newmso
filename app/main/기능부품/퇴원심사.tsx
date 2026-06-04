@@ -3,6 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
 import {
@@ -113,7 +114,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     const [gender, setGender] = useState('');
     const [department, setDepartment] = useState('');
     const [admissionDate, setAdmissionDate] = useState('');
-    const [dischargeDate, setDischargeDate] = useState(new Date().toISOString().split('T')[0]);
+    const [dischargeDate, setDischargeDate] = useState(getKoreanTodayString());
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [insuranceType, setInsuranceType] = useState('');
     const [surgeryName, setSurgeryName] = useState('');
@@ -893,7 +894,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                     <div className="max-w-3xl mx-auto space-y-4">
                         {/* KPI 카드 4개 — reviews state 파생, 새 state 없음 */}
                         {!loading && reviews.length > 0 && (() => {
-                            const today = new Date().toISOString().split('T')[0];
+                            const today = getKoreanTodayString();
                             const inProgress = reviews.filter(r => !isDischargeApproved(r.status)).length;
                             const approved = reviews.filter(r => isDischargeApproved(r.status)).length;
                             const avgProgress = reviews.length > 0

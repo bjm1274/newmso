@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
@@ -73,7 +74,7 @@ export default function AttendanceDeductionSimulator({
   staffs,
   selectedCo,
 }: AttendanceDeductionSimulatorProps) {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getKoreanMonthString());
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [baseSalary, setBaseSalary] = useState<number>(0);
   const [rule, setRule] = useState<DeductionRule>(EMPTY_RULE);

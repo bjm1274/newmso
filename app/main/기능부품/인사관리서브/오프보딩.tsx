@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
@@ -163,7 +164,7 @@ export default function OffboardingView({
   }, [filteredStaffs]);
 
   const pendingList = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKoreanTodayString();
     return filteredStaffs.filter((staff) => {
       if (staff.status === '퇴사예정') return true;
       if (isActiveStaff(staff)) return false;
@@ -173,7 +174,7 @@ export default function OffboardingView({
   }, [filteredStaffs]);
 
   const pastList = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKoreanTodayString();
     return filteredStaffs.filter((staff) => {
       if (isActiveStaff(staff)) return false;
       if (!staff.resigned_at) return true;

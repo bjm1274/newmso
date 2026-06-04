@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import SmartDatePicker from '../../공통/SmartDatePicker';
+import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import {
   getAttendanceStatusMeta,
   isProblemAttendanceStatus,
@@ -105,7 +106,7 @@ export type AttendanceBulkEditModalProps = {
 };
 
 function toIsoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return formatKoreanDateKey(d);
 }
 
 function computeDateRange(rangeType: BulkRangeType, startDate: string, endDate: string): { start: string; end: string } {
@@ -153,7 +154,7 @@ export default function AttendanceBulkEditModal({
   approvedLeaves = [],
 }: AttendanceBulkEditModalProps) {
   const [rangeType, setRangeType] = useState<BulkRangeType>('day');
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => getKoreanTodayString(), []);
   const [startDate, setStartDate] = useState(initialDate || today);
   const [endDate, setEndDate] = useState(initialDate || today);
   const [status, setStatus] = useState<BulkStatus>('absent');

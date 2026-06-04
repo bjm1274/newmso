@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
@@ -19,7 +20,7 @@ export default function LaborCostTrend({ selectedCo }: Props) {
         const monthStrings: string[] = [];
         for (let i = 11; i >= 0; i--) {
           const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
-          monthStrings.push(d.toISOString().slice(0, 7));
+          monthStrings.push(getKoreanMonthString(d));
         }
 
         // 12개월 데이터를 단일 쿼리로 가져옴 (N+1 waterfall 방지)

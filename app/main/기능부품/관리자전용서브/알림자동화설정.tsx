@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { toast } from '@/lib/toast';
@@ -158,7 +159,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
     
     try {
       const today = new Date();
-      const todayYmd = today.toISOString().slice(0, 10);
+      const todayYmd = getKoreanTodayString();
       const currentYear = today.getFullYear();
       
       const { getStaffPromotionSchedule } = await import('@/lib/annual-leave-promotion');
@@ -183,8 +184,8 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
         const remain = Math.max(0, total - used);
         if (remain <= 0) continue;
 
-        const step1Key = schedule.step1Date.toISOString().slice(0, 10);
-        const step2Key = schedule.step2Date.toISOString().slice(0, 10);
+        const step1Key = formatKoreanDateKey(schedule.step1Date);
+        const step2Key = formatKoreanDateKey(schedule.step2Date);
 
         let stepToday = 0;
         if (step1Enabled && step1Key === todayYmd && !sentSet.has(`${s.id}_1`)) {
@@ -235,7 +236,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             step: stepToday,
             company_name: s.company || null,
             target_year: schedule.targetYear,
-            expiry_date: schedule.expiryDate.toISOString().slice(0, 10),
+            expiry_date: formatKoreanDateKey(schedule.expiryDate),
             notified_at: new Date().toISOString(),
             sent_at: new Date().toISOString(),
             remaining_days_at_notice: remain,

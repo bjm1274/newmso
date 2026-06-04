@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { filterNonInterimPayrollRecords, getPayrollGrossPay } from '@/lib/payroll-records';
 import {
   calculateEmployeeInsuranceDeductions,
@@ -55,7 +56,7 @@ export default function InsuranceEDI({
   selectedCo: string;
   user: any;
 }) {
-  const [yearMonth, setYearMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState(() => getKoreanMonthString());
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);

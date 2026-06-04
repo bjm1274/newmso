@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { LoadingPanel, StatePanel } from '@/app/components/StatePanel';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -90,9 +91,9 @@ function AccessAuditLogDesktop({ user: _user }: Props) {
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
+    return formatKoreanDateKey(d);
   });
-  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [dateTo, setDateTo] = useState(getKoreanTodayString());
   const [filterUser, setFilterUser] = useState('');
   const [filterMenu, setFilterMenu] = useState('');
   const [filterAction, setFilterAction] = useState('');

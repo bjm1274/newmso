@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { getPayrollGrossPay, filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
@@ -30,7 +31,7 @@ interface CompanyStats {
 }
 
 export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
-  const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
   const [prevMonthYM, setPrevMonthYM] = useState('');
   const [payrollData, setPayrollData] = useState<any[]>([]);
   const [expensesData, setExpensesData] = useState<CompanyExpense[]>([]);

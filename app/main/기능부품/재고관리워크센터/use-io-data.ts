@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { PurchaseOrderRow, StockMoveRow, Tone, VendorCard } from './stock-types';
 import { asString, pickNumber, pickString, toMonthString, toTimeString, type Row } from './data-helpers';
 
@@ -125,7 +126,7 @@ export function useIOData(): IOWorkcenterData {
     const load = async () => {
       try {
         const today = new Date();
-        const todayKey = today.toISOString().slice(0, 10);
+        const todayKey = getKoreanTodayString();
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
         const [logsRes, ordersRes, suppliersRes] = await Promise.all([

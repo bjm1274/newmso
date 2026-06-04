@@ -2,6 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
@@ -29,7 +30,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   const [list, setList] = useState<any[]>([]);
   const [filterCat, setFilterCat] = useState('');
   const [filterCardId, setFilterCardId] = useState('');
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(getKoreanMonthString());
   const [adding, setAdding] = useState(false);
   const [addingCard, setAddingCard] = useState(false);
   const [importing, setImporting] = useState(false);

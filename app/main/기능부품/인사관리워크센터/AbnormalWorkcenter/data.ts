@@ -13,6 +13,7 @@
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type AbnormalKind =
@@ -202,7 +203,7 @@ function build4WeekDays(now: Date): string[] {
   for (let i = 27; i >= 0; i -= 1) {
     const d = new Date(now);
     d.setDate(now.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
+    days.push(formatKoreanDateKey(d));
   }
   return days;
 }
@@ -373,7 +374,7 @@ export async function fetchAbnormalData({
     };
   });
 
-  const today = now.toISOString().slice(0, 10);
+  const today = formatKoreanDateKey(now);
   const todayDetected = records.filter((r) => r.workDate === today && (r.lateMinutes > 0 || r.earlyLeaveMinutes > 0 || (r.hasCheckIn !== r.hasCheckOut))).length;
   const totalDetections = groups.reduce((sum, g) => sum + g.items.length, 0);
 

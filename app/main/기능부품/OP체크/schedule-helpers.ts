@@ -1,6 +1,7 @@
 // OP체크 스케줄 관련 헬퍼 함수
 
 import { normalizeDateValue, normalizeTimeValue, normalizeLookupValue, stripHiddenMetaBlocks } from '../op-check-utils';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { SCHEDULE_META_PREFIX, SCHEDULE_META_SUFFIX, STATUS_OPTIONS } from './constants';
 import type { BoardPost, OpPatientCheck } from '@/types';
 
@@ -122,7 +123,7 @@ export function sortSchedulesForWorkspace(
 
 export function findPreferredScheduleDate(posts: LinkedSchedulePost[]) {
   if (posts.length === 0) return '';
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = getKoreanTodayString();
   const upcoming = posts.find((post) => post.schedule_date && post.schedule_date >= todayKey);
   return upcoming?.schedule_date || posts[0]?.schedule_date || '';
 }

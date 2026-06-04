@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -127,7 +128,7 @@ export default function AttendanceForms({
     try {
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      const dateString = sixtyDaysAgo.toISOString().split('T')[0];
+      const dateString = formatKoreanDateKey(sixtyDaysAgo);
 
       const { data: attendance } = await supabase
         .from('attendance')

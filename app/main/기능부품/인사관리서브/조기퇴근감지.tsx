@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
@@ -36,7 +37,7 @@ interface StaffStat {
 export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Props) {
   const [records, setRecords] = useState<EarlyLeaveRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState<string>(() => getKoreanMonthString());
   const [filterDept, setFilterDept] = useState('전체');
   const [filterApproved, setFilterApproved] = useState<'전체' | '미신청' | '승인'>('전체');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);

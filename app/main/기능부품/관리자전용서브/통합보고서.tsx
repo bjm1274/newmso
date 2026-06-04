@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
 import { supabase } from '@/lib/supabase';
 // recharts(차트)와 XLSX는 모두 dynamic import로 분리 — 번들 사이즈 최적화
@@ -155,7 +156,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `${sheetName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `${sheetName}_${getKoreanTodayString()}.xlsx`);
   };
 
   // ── PDF 다운로드 ──

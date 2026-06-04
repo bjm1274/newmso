@@ -46,6 +46,7 @@ import {
   type AbnormalRule,
   type DetectionGroup,
 } from './AbnormalWorkcenter/data';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 interface AbnormalWorkcenterProps {
   staffs?: StaffMember[];
@@ -63,7 +64,7 @@ const EMPTY_RESULT: AbnormalDataResult = {
 };
 
 function nowIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getKoreanTodayString();
 }
 
 export default function AbnormalWorkcenter({

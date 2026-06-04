@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export default function FinancialDashboard() {
     const [period, setPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | '초기화'>('Q1');
@@ -15,7 +16,7 @@ export default function FinancialDashboard() {
 
     useEffect(() => {
         const fetchFinancials = async () => {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = getKoreanTodayString();
             const { data } = await supabase
                 .from('daily_closures')
                 .select('*')

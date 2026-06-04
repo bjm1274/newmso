@@ -1,6 +1,7 @@
 'use client';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -63,7 +64,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
           .from('attendances')
           .select('staff_id, status, work_date, late_minutes, early_leave_minutes')
           .in('staff_id', staffIds)
-          .gte('work_date', since.toISOString().slice(0, 10));
+          .gte('work_date', formatKoreanDateKey(since));
 
         const records = (data || []).map((record: any) => {
           return {

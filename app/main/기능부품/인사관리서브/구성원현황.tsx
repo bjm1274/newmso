@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
@@ -1679,7 +1680,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 직원삭제 = async (직원: StaffMember) => {
     try {
       const actor = readClientAuditActor();
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getKoreanTodayString();
       const afterStaff = {
         ...직원,
         status: '퇴사',
@@ -3053,13 +3054,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         tone="danger"
         items={[
           { label: '처리 방식', value: '재직 → 퇴사', tone: 'danger' },
-          { label: '퇴사일', value: String(pendingRetirementStaff?.resigned_at || new Date().toISOString().slice(0, 10)) },
+          { label: '퇴사일', value: String(pendingRetirementStaff?.resigned_at || getKoreanTodayString()) },
           { label: '사번', value: String(pendingRetirementStaff?.employee_no || '-') },
           { label: '직함', value: String(pendingRetirementStaff?.position || '-') },
         ]}
         changes={[
           { label: '상태', before: String(pendingRetirementStaff?.status || '재직'), after: '퇴사' },
-          { label: '퇴사일', before: String(pendingRetirementStaff?.resigned_at || '(빈 값)'), after: String(pendingRetirementStaff?.resigned_at || new Date().toISOString().slice(0, 10)) },
+          { label: '퇴사일', before: String(pendingRetirementStaff?.resigned_at || '(빈 값)'), after: String(pendingRetirementStaff?.resigned_at || getKoreanTodayString()) },
         ]}
         impacts={[
           '재직자 목록과 인사관리 기본 필터에서 제외됩니다.',

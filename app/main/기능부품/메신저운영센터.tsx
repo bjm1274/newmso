@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { StaffMember } from '@/types';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { supabase } from '@/lib/supabase';
@@ -157,7 +158,7 @@ export default function MessengerOperationsCenter({
     const load = async () => {
       setLoading(true);
       try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getKoreanTodayString();
         const [noticeRes, fileRes, attendanceRes, shiftRes] = await Promise.all([
           supabase
             .from('messages')

@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember as AppStaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getKoreanMonthString, getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
@@ -56,8 +57,8 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const [viewMode, setViewMode] = useState<AttendanceMainView>(initialView);
   const [calendarDetailView, setCalendarDetailView] = useState<'day' | 'week' | 'month'>('month');
   const [isCalendarDetailOpen, setIsCalendarDetailOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState(getKoreanMonthString());
+  const [selectedDate, setSelectedDate] = useState(getKoreanTodayString());
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   // 버그 B 수정: 승인된 연차/휴가 데이터 — 근태 상태 표시 시 결근 오판 방지
   const [approvedLeaves, setApprovedLeaves] = useState<Array<{

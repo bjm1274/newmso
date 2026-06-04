@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 interface SubmRow {
   id: string;
@@ -105,7 +106,7 @@ export default function DocsSubmSummary() {
             dueDate.setDate(dueDate.getDate() + 7);
           }
 
-          const formattedDueStr = dueDate.toISOString().slice(0, 10);
+          const formattedDueStr = formatKoreanDateKey(dueDate);
           const d = daysUntil(formattedDueStr);
           if (d === null) continue;
 

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -67,7 +68,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
     dept: '',
     item: '인건비' as BudgetItem,
     amount: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: getKoreanTodayString(),
     memo: '',
   });
 

@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { RefreshCw, Clock, MapPin, User } from 'lucide-react';
 import { PullToRefresh } from '@/app/components/PullToRefresh';
 import { EmptyState } from '@/app/components/StatePanel';
@@ -131,7 +132,7 @@ export default function OpCheckMobileBoard({
   user,
 }: OpCheckMobileBoardProps) {
   const [selectedDate, setSelectedDate] = useState<string>(
-    () => date || new Date().toISOString().slice(0, 10),
+    () => date || getKoreanTodayString(),
   );
   const [activeScheduleId, setActiveScheduleId] = useState<string | null>(null);
   const { items, loading, error, refresh } = useOpCheckBoardStream({

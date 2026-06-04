@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { createPortal } from 'react-dom';
 import { EmptyState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
@@ -183,7 +184,7 @@ export default function OperationCheckView({
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => getKoreanTodayString());
   const [hasLoadedInitialDate, setHasLoadedInitialDate] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -1253,7 +1254,7 @@ export default function OperationCheckView({
 
   const handleTodaySelection = useCallback(() => {
     const today = new Date();
-    const todayKey = today.toISOString().slice(0, 10);
+    const todayKey = getKoreanTodayString(today);
     void handleDateFilterChange(todayKey);
   }, [handleDateFilterChange]);
 

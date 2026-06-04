@@ -1,6 +1,7 @@
 'use client';
 
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -116,7 +117,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
     staffId: '',
     assetType: DEFAULT_ASSET_TYPES[0],
     assetName: '',
-    loanedAt: new Date().toISOString().slice(0, 10),
+    loanedAt: getKoreanTodayString(),
   });
 
   const scope = useMemo(() => getSettingScope(selectedCo), [selectedCo]);
@@ -251,7 +252,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
       staffId: '',
       assetType: assetTypes[0] || DEFAULT_ASSET_TYPES[0],
       assetName: '',
-      loanedAt: new Date().toISOString().slice(0, 10),
+      loanedAt: getKoreanTodayString(),
     });
     setAdding(false);
 
@@ -273,7 +274,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
   };
 
   const handleReturn = async (id: string) => {
-    const returnedAt = new Date().toISOString().slice(0, 10);
+    const returnedAt = getKoreanTodayString();
     await supabase.from('asset_loans').update({ returned_at: returnedAt }).eq('id', id);
     setList((prev) => prev.map((row) => (row.id === id ? { ...row, returned_at: returnedAt } : row)));
   };

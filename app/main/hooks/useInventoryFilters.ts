@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { InventoryItem } from '@/types';
 import { getItemQuantity, getItemMinQuantity, isExpirySoon, EXPIRY_SOON_MS } from '@/app/main/inventory-utils';
 import type { InventoryStatusFilter } from '@/app/main/기능부품/재고관리서브/types';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 /**
  * 재고 필터링 로직을 담당하는 훅.
@@ -132,7 +133,7 @@ export function useInventoryFilters({
   );
 
   const todayLogCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getKoreanTodayString();
     return logs.filter((log) => String(log.created_at || '').slice(0, 10) === today).length;
   }, [logs]);
 

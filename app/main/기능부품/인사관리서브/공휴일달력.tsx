@@ -2,6 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -126,7 +127,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const [customHolidays, setCustomHolidays] = useState<CompanyHoliday[]>([]);
   const [loadingCustomHolidays, setLoadingCustomHolidays] = useState(false);
   const [savingCustomHoliday, setSavingCustomHoliday] = useState(false);
-  const [customHolidayDate, setCustomHolidayDate] = useState(today.toISOString().slice(0, 10));
+  const [customHolidayDate, setCustomHolidayDate] = useState(getKoreanTodayString());
   const [customHolidayName, setCustomHolidayName] = useState('');
   const [customHolidayStorageReady, setCustomHolidayStorageReady] = useState(true);
   const holidayScopeCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '전체';

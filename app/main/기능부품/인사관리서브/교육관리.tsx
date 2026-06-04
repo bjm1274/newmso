@@ -13,6 +13,7 @@ import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import EducationList from './교육내역/교육내역명단';
 import EducationStatus from './교육내역/교육이수현황';
@@ -172,7 +173,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
               id: staff.id,
               name: staff.name,
               education: item.name,
-              dueDate: dueDate.toISOString().slice(0, 10),
+              dueDate: formatKoreanDateKey(dueDate),
               daysLeft,
               type: daysLeft <= 14 ? 'URGENT' : 'PENDING',
             }];

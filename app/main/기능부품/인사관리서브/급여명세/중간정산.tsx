@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-upsert';
@@ -273,7 +274,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const _onRefresh = onRefresh as (() => void) | undefined;
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
-  const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [settlementDate, setSettlementDate] = useState(getKoreanTodayString());
   const [reason, setReason] = useState('퇴사');
   const [includeSeverance, setIncludeSeverance] = useState(true);
   const [loading, setLoading] = useState(false);

@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import { submitLeaveRequest, type LeaveStaffRow } from './data';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 const LEAVE_TYPES = ['연차', '연차(부여)', '연차(과거사용)', '오전반차', '오후반차', '경조', '병가', '특별휴가'] as const;
 type LeaveTypeOption = (typeof LEAVE_TYPES)[number];
@@ -26,7 +27,7 @@ interface Props {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getKoreanTodayString();
 }
 
 function computeDays(start: string, end: string, leaveType: LeaveTypeOption): number {

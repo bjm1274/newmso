@@ -1,4 +1,5 @@
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 export { getScopedActiveStaffs } from '@/lib/active-staff';
 
 // 타입 및 상수는 education-types.ts 에서 관리
@@ -234,7 +235,7 @@ export async function upsertEducationCompletionWithFallback(
     staff_id: payload.staff_id,
     education_name: payload.education_name,
     status: '완료',
-    completed_at: new Date().toISOString().slice(0, 10),
+    completed_at: getKoreanTodayString(),
   };
 
   if (existing.data?.id) {

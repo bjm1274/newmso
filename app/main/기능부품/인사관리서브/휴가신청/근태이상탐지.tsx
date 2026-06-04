@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
@@ -76,7 +77,7 @@ function getTone(severity: AttendanceAnomaly['severity']) {
 }
 
 export default function AttendanceAnomalyPanel({ staffs, selectedCo }: AttendanceAnomalyPanelProps) {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(getKoreanMonthString());
   const [policy, setPolicy] = useState<LeavePolicySettings | null>(null);
   const [anomalies, setAnomalies] = useState<AttendanceAnomaly[]>([]);
   const [loading, setLoading] = useState(false);

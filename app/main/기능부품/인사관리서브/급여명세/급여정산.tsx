@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 import type { StaffMember } from '@/types';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -57,7 +58,7 @@ import { Step3Complete } from './급여정산-Step3Complete';
 
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
-  const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
   const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});

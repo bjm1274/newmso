@@ -2,6 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
 
 const INSPECTION_CYCLE = ['월 1회', '분기 1회', '반기 1회', '연 1회', '수시'];
@@ -29,7 +30,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   const [filterStatus, setFilterStatus] = useState<'전체' | '정상' | '점검필요' | '기한초과'>('전체');
 
   const [deviceForm, setDeviceForm] = useState({ name: '', model: '', serial: '', category: DEVICE_CATEGORIES[0], location: '', cycle: INSPECTION_CYCLE[1], next_inspection_date: '', memo: '' });
-  const [inspectForm, setInspectForm] = useState({ inspected_at: new Date().toISOString().split('T')[0], inspector: '', result: '정상', notes: '', next_inspection_date: '' });
+  const [inspectForm, setInspectForm] = useState({ inspected_at: getKoreanTodayString(), inspector: '', result: '정상', notes: '', next_inspection_date: '' });
 
   const fetchDevices = useCallback(async () => {
     const { data } = await supabase.from('medical_devices').select('*').order('next_inspection_date');
@@ -67,7 +68,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
   const openInspect = (d: any) => {
     setSelectedDevice(d);
-    setInspectForm({ inspected_at: new Date().toISOString().split('T')[0], inspector: user?.name || '', result: '정상', notes: '', next_inspection_date: '' });
+    setInspectForm({ inspected_at: getKoreanTodayString(), inspector: user?.name || '', result: '정상', notes: '', next_inspection_date: '' });
     setShowInspectModal(true);
   };
 

@@ -1,5 +1,6 @@
 'use client';
 import { logger } from '@/lib/logger';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -235,7 +236,7 @@ export default function SalaryDetail({
         toNumber(staff?.annual_leave_pay),
       overtime_pay: 0,
       bonus: 0,
-      year_month: new Date().toISOString().slice(0, 7),
+      year_month: getKoreanMonthString(),
       status: null,
     } satisfies SalaryRecord;
   }, [record, staff]);
@@ -317,7 +318,7 @@ export default function SalaryDetail({
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor || '#163b70';
   const borderColor = design.borderColor || '#d8e1ee';
-  const yearMonth = String(data.year_month || new Date().toISOString().slice(0, 7));
+  const yearMonth = String(data.year_month || getKoreanMonthString());
   const [year, month] = yearMonth.split('-');
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
   const advancePayAmount = toNumber(record?.advance_pay);

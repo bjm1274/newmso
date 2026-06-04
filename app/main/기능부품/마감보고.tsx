@@ -3,6 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { canAccessExtraFeature, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -71,7 +72,7 @@ export default function DailyClosurePage({
     const detailCompanyId = editingCompanyId || baseCompanyId;
 
     // Form State
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(getKoreanTodayString());
     const [pettyCashStart, setPettyCashStart] = useState(0);
     const [pettyCashEnd, setPettyCashEnd] = useState(0);
     const [memo, setMemo] = useState('');

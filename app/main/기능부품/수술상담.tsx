@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
@@ -221,7 +222,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   /** YYYYMMDD_HHMM 형식 타임스탬프 */
   const buildTimestamp = () => {
     const now = new Date();
-    const ymd = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const ymd = formatKoreanDateKey(now).replace(/-/g, '');
     const hm = now.toTimeString().slice(0, 5).replace(':', '');
     return `${ymd}_${hm}`;
   };

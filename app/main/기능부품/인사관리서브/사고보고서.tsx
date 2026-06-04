@@ -2,6 +2,7 @@
 
 import { toast } from '@/lib/toast';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -47,7 +48,7 @@ interface Report {
 }
 
 const emptyForm = (): Report => ({
-  incident_date: new Date().toISOString().slice(0, 10),
+  incident_date: getKoreanTodayString(),
   incident_time: '',
   location: '',
   type: INCIDENT_TYPES[0],

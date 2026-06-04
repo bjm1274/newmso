@@ -11,6 +11,7 @@
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type LeaveStatus = '대기' | '승인' | '반려';
@@ -117,7 +118,7 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
     total_days: total,
     used_days: used,
     remaining_days: remaining,
-    expiry_date: expiry.toISOString().slice(0, 10),
+    expiry_date: formatKoreanDateKey(expiry),
     days_until_expiry: daysUntilExpiry,
   };
 }

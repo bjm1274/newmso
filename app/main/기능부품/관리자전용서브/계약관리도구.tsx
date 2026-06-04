@@ -2,6 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { d1 } from '@/lib/supabase';
 import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
@@ -276,7 +277,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                       template,
                       {
                         name: '홍길동',
-                        joined_at: new Date().toISOString().slice(0, 10),
+                        joined_at: getKoreanTodayString(),
                         employment_type: '정규직',
                         probation_months: 3,
                         probation_percent: 90,
@@ -285,7 +286,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                         resident_no: '950101-1234567',
                       },
                       {
-                        contract_start_date: new Date().toISOString().slice(0, 10),
+                        contract_start_date: getKoreanTodayString(),
                         probation_months: 3,
                         probation_percent: 90,
                       },

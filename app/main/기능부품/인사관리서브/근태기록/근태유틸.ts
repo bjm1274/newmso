@@ -1,4 +1,5 @@
 // 근태관리 순수 유틸 함수 및 상수 모음
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 // ⚠️ 주의: 같은 폴더의 근태관리메인-내부유틸.ts에 동명 심볼이 있으나 값/의미가 다르다.
 //  - 이 파일의 LEGACY_ROSTER_APPROVAL_TYPE = 'roster_schedule_approval'
 //  - 내부유틸의 LEGACY_ROSTER_APPROVAL_TYPE = '근무표'
@@ -350,7 +351,7 @@ export function buildWeekDates(anchorDate: string) {
   return Array.from({ length: 7 }, (_, index) => {
     const current = new Date(start);
     current.setDate(start.getDate() + index);
-    return current.toISOString().slice(0, 10);
+    return formatKoreanDateKey(current);
   });
 }
 

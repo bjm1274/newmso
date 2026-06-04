@@ -2,6 +2,7 @@
 
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useMemo } from 'react';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import {
   buildOfficialDocumentApprovalContent,
@@ -19,7 +20,7 @@ type OfficialDocumentFormProps = {
 };
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return getKoreanTodayString();
 }
 
 function readDraft(extraData?: Record<string, unknown> | null): OfficialDocumentDraft {

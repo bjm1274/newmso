@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { useState, useEffect, useMemo } from 'react';
 import { d1 } from '@/lib/supabase';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
@@ -38,7 +39,7 @@ export default function ContractMain({
     position_allowance: 0,   // 직책수당
     research_allowance: 0,   // 연구활동비 (한도 20만)
     other_taxfree: 0,        // 기타 비과세
-    effective_date: new Date().toISOString().split('T')[0],
+    effective_date: getKoreanTodayString(),
     working_hours_per_week: 40,
     working_days_per_week: 5,
     shift_start_time: '09:00',
@@ -145,7 +146,7 @@ export default function ContractMain({
         if (joinDate && probationMonths > 0) {
           const d = new Date(joinDate as string);
           d.setMonth(d.getMonth() + probationMonths);
-          conditionsAppDate = d.toISOString().split('T')[0];
+          conditionsAppDate = formatKoreanDateKey(d);
         }
 
         // 직원의 주근무유형 ID (staff_shift_assignments.is_primary → staff_members.shift_id)

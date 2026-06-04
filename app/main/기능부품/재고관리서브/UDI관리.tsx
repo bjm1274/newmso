@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export default function UDIManagement({ user, inventory, fetchInventory }: Record<string, unknown>) {
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `UDI_공급내역보고_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `UDI_공급내역보고_${getKoreanTodayString()}.csv`;
       link.click();
 
       toast(`UDI 공급내역 보고서가 생성되었습니다.\n대상 품목: ${reportItems.length}개`);

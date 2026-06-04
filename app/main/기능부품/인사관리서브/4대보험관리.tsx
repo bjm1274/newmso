@@ -1,5 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -44,7 +45,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
         type: '취득' as '취득' | '변경' | '상실',
         insurance_type: '국민연금' as typeof INSURANCE_TYPES[number],
         reason: '',
-        effective_date: new Date().toISOString().slice(0, 10),
+        effective_date: getKoreanTodayString(),
         memo: '',
     });
 
@@ -86,7 +87,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
             setRecords([data[0], ...records]);
         }
         setShowForm(false);
-        setForm({ staff_id: '', type: '취득', insurance_type: '국민연금', reason: '', effective_date: new Date().toISOString().slice(0, 10), memo: '' });
+        setForm({ staff_id: '', type: '취득', insurance_type: '국민연금', reason: '', effective_date: getKoreanTodayString(), memo: '' });
     };
 
     const markReported = useCallback(async (id: string) => {
