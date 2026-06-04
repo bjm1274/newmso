@@ -69,7 +69,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [savedRecordsByStaff, setSavedRecordsByStaff] = useState<Record<string, SavedPayrollRecord>>({});
   const [salaryChangesByStaff, setSalaryChangesByStaff] = useState<Record<string, SalaryChangeHistoryRow[]>>({});
   // 회사 급여기준의 원천징수 비율(단일 기본값) — 요청 #4
-  const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(100);
+  const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(80);
 
   useEffect(() => {
     let ok = true;
@@ -104,9 +104,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         const rows = Array.isArray(data) ? (data as { company_name?: string; rule_value?: string }[]) : [];
         const chosen = rows.find((r) => r.company_name === selectedCo) || rows.find((r) => r.company_name === '전체');
         const parsed = chosen ? parseInt(String(chosen.rule_value ?? '').replace(/[^\d]/g, ''), 10) : NaN;
-        setCompanyWithholdingRate(Number.isFinite(parsed) && parsed > 0 ? parsed : 100);
+        setCompanyWithholdingRate(Number.isFinite(parsed) && parsed > 0 ? parsed : 80);
       } catch {
-        if (ok) setCompanyWithholdingRate(100);
+        if (ok) setCompanyWithholdingRate(80);
       }
     })();
     return () => { ok = false; };
@@ -175,9 +175,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
   };
 
-  const getSavedDeductionDetail = (savedRecord?: SavedPayrollRecord | null) =>
+  const getSavedDeductionDetail = (savedRecord?: SavedPayrollRecord | null): Record<string, any> =>
     savedRecord?.deduction_detail && typeof savedRecord.deduction_detail === 'object'
-      ? (savedRecord.deduction_detail as Record<string, unknown>)
+      ? (savedRecord.deduction_detail as Record<string, any>)
       : {};
 
   const buildSettlementEntry = (
@@ -220,31 +220,6 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     const otherTaxfree = resolveAmount('other_taxfree', savedRecord?.other_taxfree, staff.other_taxfree);
 
     const staffBreakdown = getStaffTaxableAllowanceBreakdown(staff);
-    const changeAwareBreakdown: TaxableAllowanceBreakdown = { ...EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN };
-    const taxableChangeFields: Array<Exclude<keyof TaxableAllowanceBreakdown, 'manual_extra_allowance'>> = [
-      'position_allowance',
-      'overtime_allowance',
-      'night_work_allowance',
-      'holiday_work_allowance',
-      'annual_leave_pay',
-    ];
-    taxableChangeFields.forEach((field) => {
-      let fallbackVal = staffBreakdown[field];
-      if (field === 'holiday_work_allowance' && autoHolidayHours > 0) {
-        fallbackVal = autoHolidayPay;
-      }
-      const result = resolveSalaryAmountForSettlement({
-        savedValue: undefined,
-        fallback: fallbackVal,
-        field,
-        yearMonth,
-        salaryChanges: staffSalaryChanges,
-        staff,
-        status: savedRecord?.status,
-      });
-      changeAwareBreakdown[field] = result.amount;
-      if (result.summary) salaryChangeProration.push(result.summary);
-    });
 
     // 통상시급은 월 통상임금 전액 기준, 일할 미적용 (C-08)
     // 중도입사·중도퇴사자도 소정근로에 대한 통상시급은 마스터 원액 기준으로 산정해야
@@ -274,6 +249,32 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     // 휴일수당(autoHolidayPay)은 아래 recommendedOvertimePay(연장근로 실적 필드추천)에서 제외하며,
     // 대신 holiday_work_allowance(휴일수당 필드)에 자동 세팅됩니다.
     const recommendedOvertimePay = autoOvertimePay + autoNightPay;
+
+    const changeAwareBreakdown: TaxableAllowanceBreakdown = { ...EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN };
+    const taxableChangeFields: Array<Exclude<keyof TaxableAllowanceBreakdown, 'manual_extra_allowance'>> = [
+      'position_allowance',
+      'overtime_allowance',
+      'night_work_allowance',
+      'holiday_work_allowance',
+      'annual_leave_pay',
+    ];
+    taxableChangeFields.forEach((field) => {
+      let fallbackVal = staffBreakdown[field];
+      if (field === 'holiday_work_allowance' && autoHolidayHours > 0) {
+        fallbackVal = autoHolidayPay;
+      }
+      const result = resolveSalaryAmountForSettlement({
+        savedValue: undefined,
+        fallback: fallbackVal,
+        field,
+        yearMonth,
+        salaryChanges: staffSalaryChanges,
+        staff,
+        status: savedRecord?.status,
+      });
+      changeAwareBreakdown[field] = result.amount;
+      if (result.summary) salaryChangeProration.push(result.summary);
+    });
 
     // 만약 이미 저장된 연장수당 정보가 있으면 보존하고, 없을 경우 추천액으로 pre-fill
     const overtimePay = Number(
@@ -348,8 +349,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           (staff.permissions?.tax as Record<string, unknown>)?.child_count_8_20 ??
           0,
         ) || 0,
-      // 원천징수 비율: 회사 급여기준의 단일 기본값을 전 직원에 적용 (요청 #4 — 정산 카드 개별 선택 제거)
-      withholding_rate_percent: normalizeWithholdingRatePercent(companyWithholdingRate),
+      // 원천징수 비율: 개별/기존저장 값 우선 적용하고 없을 시 회사 기본값 폴백 (요청 #4 하위호환)
+      withholding_rate_percent: normalizeWithholdingRatePercent(
+        savedDeductionDetail.withholding_rate_percent ??
+          (staff as Record<string, unknown>).withholding_rate_percent ??
+          (staff.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
+          (staff.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
+          companyWithholdingRate
+      ),
       advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
       salary_change_proration: salaryChangeProration,
       saved_status: String(savedRecord?.status || ''),
