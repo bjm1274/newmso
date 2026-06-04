@@ -69,7 +69,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [savedRecordsByStaff, setSavedRecordsByStaff] = useState<Record<string, SavedPayrollRecord>>({});
   const [salaryChangesByStaff, setSalaryChangesByStaff] = useState<Record<string, SalaryChangeHistoryRow[]>>({});
   // 회사 급여기준의 원천징수 비율(단일 기본값) — 요청 #4
-  const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(80);
+  const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(100);
 
   useEffect(() => {
     let ok = true;
@@ -104,9 +104,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         const rows = Array.isArray(data) ? (data as { company_name?: string; rule_value?: string }[]) : [];
         const chosen = rows.find((r) => r.company_name === selectedCo) || rows.find((r) => r.company_name === '전체');
         const parsed = chosen ? parseInt(String(chosen.rule_value ?? '').replace(/[^\d]/g, ''), 10) : NaN;
-        setCompanyWithholdingRate(Number.isFinite(parsed) && parsed > 0 ? parsed : 80);
+        setCompanyWithholdingRate(Number.isFinite(parsed) && parsed > 0 ? parsed : 100);
       } catch {
-        if (ok) setCompanyWithholdingRate(80);
+        if (ok) setCompanyWithholdingRate(100);
       }
     })();
     return () => { ok = false; };

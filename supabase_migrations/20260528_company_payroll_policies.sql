@@ -48,7 +48,8 @@ insert into public.company_payroll_policies (company_name, rule_label, rule_valu
   ('전체', '휴일근로 수당', '통상임금 × 1.5 (8h 이내) / × 2.0 (8h 초과)'),
   ('전체', '주휴수당', '1주 15h 이상 + 출근율 100%'),
   ('전체', '퇴직금', '1년 이상 근속 · 평균임금 30일분'),
-  ('전체', '4대보험', '법정 요율 · 자동 적용')
+  ('전체', '4대보험', '법정 요율 · 자동 적용'),
+  ('전체', '원천징수 비율', '100%')
 on conflict (company_name, rule_label) do nothing;
 
 -- Seed payroll policies for other known companies
@@ -61,6 +62,7 @@ insert into public.company_payroll_policies (company_name, rule_label, rule_valu
   ('박철홍정형외과', '주휴수당', '1주 15h 이상 + 출근율 100%'),
   ('박철홍정형외과', '퇴직금', '1년 이상 근속 · 평균임금 30일분'),
   ('박철홍정형외과', '4대보험', '법정 요율 · 자동 적용'),
+  ('박철홍정형외과', '원천징수 비율', '100%'),
 
   ('수연의원', '급여일', '매월 15일 · 전월 1일~말일 정산'),
   ('수연의원', '시급 계산 기준', '월 209시간 (주 40h × 4.345주)'),
@@ -70,6 +72,7 @@ insert into public.company_payroll_policies (company_name, rule_label, rule_valu
   ('수연의원', '주휴수당', '1주 15h 이상 + 출근율 100%'),
   ('수연의원', '퇴직금', '1년 이상 근속 · 평균임금 30일분'),
   ('수연의원', '4대보험', '법정 요율 · 자동 적용'),
+  ('수연의원', '원천징수 비율', '100%'),
 
   ('MSO 본사', '급여일', '매월 15일 · 전월 1일~말일 정산'),
   ('MSO 본사', '시급 계산 기준', '월 209시간 (주 40h × 4.345주)'),
@@ -79,6 +82,7 @@ insert into public.company_payroll_policies (company_name, rule_label, rule_valu
   ('MSO 본사', '주휴수당', '1주 15h 이상 + 출근율 100%'),
   ('MSO 본사', '퇴직금', '1년 이상 근속 · 평균임금 30일분'),
   ('MSO 본사', '4대보험', '법정 요율 · 자동 적용'),
+  ('MSO 본사', '원천징수 비율', '100%'),
 
   ('지점 A', '급여일', '매월 15일 · 전월 1일~말일 정산'),
   ('지점 A', '시급 계산 기준', '월 209시간 (주 40h × 4.345주)'),
@@ -87,5 +91,6 @@ insert into public.company_payroll_policies (company_name, rule_label, rule_valu
   ('지점 A', '휴일근로 수당', '통상임금 × 1.5 (8h 이내) / × 2.0 (8h 초과)'),
   ('지점 A', '주휴수당', '1주 15h 이상 + 출근율 100%'),
   ('지점 A', '퇴직금', '1년 이상 근속 · 평균임금 30일분'),
-  ('지점 A', '4대보험', '법정 요율 · 자동 적용')
+  ('지점 A', '4대보험', '법정 요율 · 자동 적용'),
+  ('지점 A', '원천징수 비율', '100%')
 on conflict (company_name, rule_label) do nothing;

@@ -207,6 +207,7 @@ export type MockFixtures = {
   leaveRequests?: any[];
   attendanceDeductionRules?: any[];
   taxInsuranceRates?: any[];
+  companyPayrollPolicies?: any[];
 };
 
 type SeedOptions = {
@@ -458,6 +459,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     boardPosts: overrides.boardPosts ?? [],
     boardPostComments: overrides.boardPostComments ?? [],
     boardPostReads: overrides.boardPostReads ?? [],
+    companyPayrollPolicies: overrides.companyPayrollPolicies ?? [],
     boardPostLikes: overrides.boardPostLikes ?? [],
     companies:
       overrides.companies ?? [
@@ -767,6 +769,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let leaveRequests = [...(fixtures.leaveRequests ?? [])];
   let attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
   let taxInsuranceRates = [...fixtures.taxInsuranceRates];
+  let companyPayrollPolicies = [...(fixtures.companyPayrollPolicies ?? [])];
   const legacyAttendanceCorrectionsSchema = fixtures.legacyAttendanceCorrectionsSchema;
   const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
@@ -981,6 +984,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       case 'leave_requests': return leaveRequests;
       case 'attendance_deduction_rules': return attendanceDeductionRules;
       case 'tax_insurance_rates': return taxInsuranceRates;
+      case 'company_payroll_policies': return companyPayrollPolicies;
       default: return [];
     }
   };
@@ -3987,6 +3991,13 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, certificateIssuances);
+    }
+
+    if (path.includes('/company_payroll_policies')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(companyPayrollPolicies, url), wantsObject));
+      }
+      return json(route, []);
     }
 
     if (

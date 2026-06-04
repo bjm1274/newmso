@@ -381,6 +381,13 @@ test('regular payroll settlement defaults withholding rate to 80 percent when no
     staffMembers: [payrollStaff],
     payrollRecords: [],
     attendances: [],
+    companyPayrollPolicies: [
+      {
+        company_name: payrollStaff.company,
+        rule_label: '원천징수 비율',
+        rule_value: '80%',
+      },
+    ],
   });
 
   await seedWorkcenterSession(page, payrollStaff.company, payrollStaff.department);
