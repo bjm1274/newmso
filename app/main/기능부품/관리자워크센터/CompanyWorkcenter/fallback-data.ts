@@ -92,6 +92,7 @@ export const FALLBACK_PAY_RULES: RuleRow[] = [
   { label: '주휴수당', value: '1주 15h 이상 + 출근율 100%' },
   { label: '퇴직금', value: '1년 이상 근속 · 평균임금 30일분' },
   { label: '4대보험', value: '법정 요율 · 자동 적용' },
+  { label: '원천징수 비율', value: '100%' },
 ];
 
 export const FALLBACK_DOCS: DocRow[] = [

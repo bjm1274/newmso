@@ -66,6 +66,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
   const [savedRecordsByStaff, setSavedRecordsByStaff] = useState<Record<string, SavedPayrollRecord>>({});
   const [salaryChangesByStaff, setSalaryChangesByStaff] = useState<Record<string, SalaryChangeHistoryRow[]>>({});
+  // 회사 급여기준의 원천징수 비율(단일 기본값) — 요청 #4
+  const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(100);
 
   useEffect(() => {
     let ok = true;
@@ -84,6 +86,29 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     })();
     return () => { ok = false; };
   }, [selectedCo, yearMonth]);
+
+  // 회사 급여기준(company_payroll_policies)의 '원천징수 비율'을 정산 단일 기본값으로 로드 (요청 #4)
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      try {
+        const scope = selectedCo && selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
+        const { data } = await supabase
+          .from('company_payroll_policies')
+          .select('company_name, rule_value')
+          .eq('rule_label', '원천징수 비율')
+          .in('company_name', scope);
+        if (!ok) return;
+        const rows = Array.isArray(data) ? (data as { company_name?: string; rule_value?: string }[]) : [];
+        const chosen = rows.find((r) => r.company_name === selectedCo) || rows.find((r) => r.company_name === '전체');
+        const parsed = chosen ? parseInt(String(chosen.rule_value ?? '').replace(/[^\d]/g, ''), 10) : NaN;
+        setCompanyWithholdingRate(Number.isFinite(parsed) && parsed > 0 ? parsed : 100);
+      } catch {
+        if (ok) setCompanyWithholdingRate(100);
+      }
+    })();
+    return () => { ok = false; };
+  }, [selectedCo]);
 
   const TAX_FREE_LIMITS = {
     meal: taxFreeLimits.meal_limit,
@@ -315,13 +340,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           (staff.permissions?.tax as Record<string, unknown>)?.child_count_8_20 ??
           0,
         ) || 0,
-      withholding_rate_percent: normalizeWithholdingRatePercent(
-        (savedDeductionDetail.withholding_rate_percent ??
-          (staff as Record<string, unknown>).withholding_rate_percent ??
-          (staff.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
-          (staff.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
-          100) as number | string | null | undefined,
-      ),
+      // 원천징수 비율: 회사 급여기준의 단일 기본값을 전 직원에 적용 (요청 #4 — 정산 카드 개별 선택 제거)
+      withholding_rate_percent: normalizeWithholdingRatePercent(companyWithholdingRate),
       advance_pay: Number(savedRecord?.advance_pay ?? 0) || 0,
       salary_change_proration: salaryChangeProration,
       saved_status: String(savedRecord?.status || ''),
@@ -738,6 +758,24 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     setSettlementData((prev) => {
       const current = prev[id];
       if (!current) return prev;
+
+      // 과세 수당 개별 항목 편집: taxable_allowance_breakdown 하위값 갱신 + extra_allowance(과세수당 합계) 재계산
+      if (field.startsWith('taxable_allowance_breakdown.')) {
+        const subField = field.slice('taxable_allowance_breakdown.'.length) as keyof TaxableAllowanceBreakdown;
+        const numericValue = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
+        const nextBreakdown = { ...current.taxable_allowance_breakdown, [subField]: numericValue };
+        const nextExtra =
+          Number(nextBreakdown.position_allowance || 0) +
+          Number(nextBreakdown.overtime_allowance || 0) +
+          Number(nextBreakdown.night_work_allowance || 0) +
+          Number(nextBreakdown.holiday_work_allowance || 0) +
+          Number(nextBreakdown.annual_leave_pay || 0) +
+          Number(nextBreakdown.manual_extra_allowance || 0);
+        return {
+          ...prev,
+          [id]: { ...current, taxable_allowance_breakdown: nextBreakdown, extra_allowance: nextExtra },
+        };
+      }
 
       const nextEntry = { ...current, [field]: value } as SettlementEntry;
 

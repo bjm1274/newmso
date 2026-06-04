@@ -59,6 +59,16 @@ async function loadCompanyPayRules(companyName: string): Promise<DBPayrollRule[]
   }
 }
 
+// DB에 없는 필수 룰(예: 원천징수 비율)이 누락되지 않도록 FALLBACK 라벨을 병합한다. DB 값이 있으면 우선.
+function ensureRequiredRules(rules: DBPayrollRule[]): DBPayrollRule[] {
+  const have = new Set(rules.map((r) => r.label));
+  const merged = [...rules];
+  for (const fb of FALLBACK_PAY_RULES) {
+    if (!have.has(fb.label)) merged.push({ label: fb.label, value: fb.value });
+  }
+  return merged;
+}
+
 export default function CompanyPayrollTab() {
   const [companiesList, setCompaniesList] = useState<string[]>(['전체', '박철홍정형외과', '수연의원', 'MSO 본사', '지점 A']);
   const [selectedCompany, setSelectedCompany] = useState<string>('박철홍정형외과');
@@ -100,7 +110,7 @@ export default function CompanyPayrollTab() {
 
     void loadCompanyPayRules(selectedCompany).then((d) => {
       if (alive) {
-        setRules(d);
+        setRules(ensureRequiredRules(d));
         setLoading(false);
       }
     });
@@ -122,10 +132,21 @@ export default function CompanyPayrollTab() {
     setSaving(true);
     setSavedAt(null);
     try {
-      // D1 requires primary key 'id' to be provided if it's defined as notNull.
-      // If we don't have id, we generate a fresh crypto.randomUUID()
-      const payload = rules.map(r => ({
-        id: r.id || crypto.randomUUID(),
+      // 기존 행의 id를 라벨 기준으로 재사용한다. onConflict가 D1 경로에서 무시되더라도
+      // 동일 PK 업서트로 안정적으로 갱신되어, 저장이 새로고침 후 리셋되는 문제(#1)를 막는다.
+      const { data: existing, error: existingError } = await supabase
+        .from('company_payroll_policies')
+        .select('id, rule_label')
+        .eq('company_name', selectedCompany);
+      if (existingError) throw existingError;
+      const idByLabel = new Map(
+        (Array.isArray(existing) ? existing : [])
+          .filter(isRecord)
+          .map((r) => [String(r.rule_label), String(r.id)] as const),
+      );
+
+      const payload = rules.map((r) => ({
+        id: idByLabel.get(r.label) || r.id || crypto.randomUUID(),
         company_name: selectedCompany,
         rule_label: r.label,
         rule_value: r.value,
@@ -134,20 +155,14 @@ export default function CompanyPayrollTab() {
       const { error } = await supabase
         .from('company_payroll_policies')
         .upsert(payload, { onConflict: 'company_name,rule_label' });
-
       if (error) throw error;
-      
-      // Update local rules with the generated ids so future saves keep the same id
-      setRules(payload.map(p => ({
-        id: p.id,
-        label: p.rule_label,
-        value: p.rule_value
-      })));
 
+      // 저장된 id를 로컬에 반영해 다음 저장도 동일 행을 갱신하도록 한다.
+      setRules(payload.map((p) => ({ id: p.id, label: p.rule_label, value: p.rule_value })));
       setSavedAt(new Date().toLocaleTimeString('ko-KR'));
     } catch (e) {
       console.error('[CompanyPayrollTab] save error:', e);
-      setSavedAt(new Date().toLocaleTimeString('ko-KR') + ' (로컬 임시저장)');
+      setSavedAt('저장 실패 — 다시 시도해 주세요');
     } finally {
       setSaving(false);
     }
@@ -214,13 +229,26 @@ export default function CompanyPayrollTab() {
                       {r.label}
                     </td>
                     <td className="px-2.5 py-2 align-middle">
-                      <input
-                        type="text"
-                        value={r.value}
-                        onChange={(e) => handleRuleChange(idx, e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-[12px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 font-semibold"
-                        placeholder={`${r.label} 기준을 입력하세요.`}
-                      />
+                      {r.label === '원천징수 비율' ? (
+                        <select
+                          value={String(parseInt(r.value.replace(/[^\d]/g, ''), 10) || 100)}
+                          onChange={(e) => handleRuleChange(idx, `${e.target.value}%`)}
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 font-semibold"
+                          aria-label="원천징수 비율"
+                        >
+                          <option value="80">80%</option>
+                          <option value="100">100%</option>
+                          <option value="120">120%</option>
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={r.value}
+                          onChange={(e) => handleRuleChange(idx, e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 font-semibold"
+                          placeholder={`${r.label} 기준을 입력하세요.`}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
