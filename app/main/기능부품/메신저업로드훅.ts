@@ -301,7 +301,7 @@ export function useChatUploads({
         const hint = message.includes('Unauthorized')
           ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
           : message.includes('버킷') || message.includes('bucket') || message.includes('not found') || message.includes('r2')
-            ? 'Cloudflare R2 또는 Supabase Storage 버킷 구성이 올바른지 확인해 주세요.'
+            ? 'Cloudflare R2 또는 오브젝트 스토리지 버킷 구성이 올바른지 확인해 주세요.'
             : message.includes('413') || message.toLowerCase().includes('entity too large')
               ? '서버 요청 한도를 초과했습니다. 최신 경로가 반영된 상태인지 확인한 뒤 다시 시도해 주세요.'
               : message;

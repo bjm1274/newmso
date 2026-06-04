@@ -280,7 +280,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
       onRefresh();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast("데이터 삭제 중 오류가 발생했습니다.\n\n" + msg + "\n\nSupabase 대시보드에서 RLS 정책 또는 API 권한을 확인해 주세요.", 'error');
+      toast("데이터 삭제 중 오류가 발생했습니다.\n\n" + msg + "\n\n데이터베이스 관리 콘솔에서 RLS 정책 또는 API 권한을 확인해 주세요.", 'error');
     } finally {
       setResetting(null);
     }

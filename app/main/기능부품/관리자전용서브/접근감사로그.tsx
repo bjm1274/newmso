@@ -163,7 +163,7 @@ function AccessAuditLogDesktop({ user: _user }: Props) {
       <div className="p-4 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
         <StatePanel
           title="access_logs 테이블이 없습니다"
-          description="아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요."
+          description="아래 SQL을 데이터베이스 SQL 편집기에서 실행하여 테이블을 생성하세요."
           tone="warning"
           eyebrow="스키마 확인"
         >

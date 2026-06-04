@@ -20,7 +20,9 @@ import {
   getRoomTitle,
   pickAvatarTone,
   useChatStaffDirectory,
+  useChatMessageSearch,
   type MobileChatRoom,
+  type ChatMessageSearchHit,
 } from './data-hooks';
 import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
@@ -50,6 +52,9 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   const company = typeof user.company === 'string' ? user.company : null;
 
   const staffs = useChatStaffDirectory(company);
+  const roomIds = useMemo(() => rooms.map((r) => String(r.id)), [rooms]);
+  // 방 제목·마지막 메시지뿐 아니라 대화 "내용"까지 검색 (PC 전역검색과 동일한 ilike 방식)
+  const { hits: messageHits, loading: messageSearchLoading } = useChatMessageSearch(roomIds, searchQuery);
 
   const loading = rooms.length === 0; // 부모가 loading 상태를 따로 노출하지 않으므로 대략 처리
 
@@ -141,7 +146,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
               ref={searchInputRef}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="방 이름·최근 메시지 검색"
+              placeholder="이름·방·메시지 내용 검색"
               aria-label="채팅방 검색"
               style={{
                 flex: 1,
@@ -220,11 +225,11 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
           <OrgPlaceholder />
         ) : (
           <div style={{ padding: '4px 0 24px' }}>
-            {filtered.length === 0 && !loading && (
+            {!loading && filtered.length === 0 && messageHits.length === 0 && !messageSearchLoading && (
               <EmptyState
                 label={
                   searchQuery
-                    ? `"${searchInput.trim()}"에 해당하는 채팅방이 없습니다.`
+                    ? `"${searchInput.trim()}" 검색 결과가 없습니다.`
                     : emptyLabel(tab)
                 }
               />
@@ -267,6 +272,29 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                 </>
               );
             })()}
+            {searchQuery && (messageSearchLoading || messageHits.length > 0) && (
+              <>
+                <div className="msm-sec"><div className="msm-sec-t">메시지</div></div>
+                {messageHits.length === 0 && messageSearchLoading ? (
+                  <div style={{ padding: '12px 16px', fontSize: 12, color: 'var(--z-500)' }}>
+                    메시지 내용을 검색하고 있어요…
+                  </div>
+                ) : (
+                  messageHits.map((hit, i) => (
+                    <MessageHitRow
+                      key={hit.id}
+                      hit={hit}
+                      rooms={rooms}
+                      staffs={staffs}
+                      userId={userId}
+                      query={searchInput.trim()}
+                      last={i === messageHits.length - 1}
+                      onClick={() => onOpen(hit.roomId)}
+                    />
+                  ))
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -275,6 +303,121 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
 }
 
 // ─── 보조 ───────────────────────────────────────
+
+/** 숨김 메타 블록([[X]]...[[/X]])을 제거하고 공백을 정리한 미리보기 텍스트. */
+function cleanSnippet(content: string): string {
+  return content
+    .replace(/\[\[[^\]]*\]\][\s\S]*?\[\[\/[^\]]*\]\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 검색어가 들어간 위치를 잘라내고 해당 부분을 강조해 보여준다. */
+function renderSnippet(content: string, query: string): React.ReactNode {
+  const text = cleanSnippet(content);
+  const q = query.trim();
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return text;
+  const start = Math.max(0, idx - 24);
+  const head = `${start > 0 ? '…' : ''}${text.slice(start, idx)}`;
+  const match = text.slice(idx, idx + q.length);
+  const tail = text.slice(idx + q.length);
+  return (
+    <>
+      {head}
+      <mark
+        style={{
+          background: 'var(--m-accent-soft, #fde68a)',
+          color: 'var(--m-accent, inherit)',
+          padding: '0 2px',
+          borderRadius: 3,
+          fontWeight: 800,
+        }}
+      >
+        {match}
+      </mark>
+      {tail}
+    </>
+  );
+}
+
+type MessageHitRowProps = {
+  hit: ChatMessageSearchHit;
+  rooms: MobileChatRoom[];
+  staffs: ReturnType<typeof useChatStaffDirectory>;
+  userId: string | null;
+  query: string;
+  last: boolean;
+  onClick: () => void;
+};
+
+function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: MessageHitRowProps) {
+  const room = rooms.find((r) => String(r.id) === hit.roomId);
+  const roomTitle = room ? getRoomTitle(room, staffs, userId) : '대화';
+  const senderName =
+    hit.senderName ||
+    staffs.find((s) => String(s.id) === String(hit.senderId || ''))?.name ||
+    '알 수 없음';
+  const ts = formatChatTimestamp(hit.createdAt);
+  const tone = pickAvatarTone(hit.roomId + roomTitle);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${roomTitle} 대화 열기`}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '40px 1fr auto',
+        gap: 12,
+        alignItems: 'flex-start',
+        padding: '10px 16px',
+        borderBottom: last ? 'none' : '1px solid var(--m-border)',
+        background: 'var(--m-card)',
+        width: '100%',
+        textAlign: 'left',
+      }}
+    >
+      <MAvatar tone={tone}>
+        <span>{roomTitle.charAt(0) || '방'}</span>
+      </MAvatar>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: '0 1 auto',
+              minWidth: 0,
+            }}
+          >
+            {roomTitle}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>{senderName}</span>
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--z-700)',
+            marginTop: 2,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            wordBreak: 'break-word',
+          }}
+        >
+          {renderSnippet(hit.content, query)}
+        </div>
+      </div>
+      <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, flexShrink: 0, marginTop: 2 }}>{ts}</span>
+    </button>
+  );
+}
 
 type ChipBtnProps = { label: string; active: boolean; onClick: () => void };
 function ChipBtn({ label, active, onClick }: ChipBtnProps) {

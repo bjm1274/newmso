@@ -1349,7 +1349,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         if (uploaded.length === 0 && attachmentFiles.length > 0) {
           toast('첨부파일 업로드에 실패했습니다.\n\n' +
             (lastUploadError ? `원인: ${lastUploadError}\n\n` : '') +
-            'Supabase 대시보드 → SQL Editor에서 storage_board_attachments.sql 내용을 실행했는지 확인해 주세요.', 'error');
+            '데이터베이스 관리 콘솔의 SQL 편집기에서 storage_board_attachments.sql 내용을 실행했는지 확인해 주세요.', 'error');
           setLoading(false);
           return;
         }
@@ -1427,7 +1427,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
       );
       if (!error && insertedPost) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
-          logger.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
+          logger.warn('첨부파일이 저장되지 않았을 수 있습니다. 데이터베이스에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
         const normalizedInsertedPost = normalizeBoardPost(insertedPost);
         toast('게시물이 등록되었습니다.', 'success');
@@ -1468,7 +1468,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         }
       } else {
         const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (((error as Record<string, unknown>)?.message as string || "").includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
-          ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
+          ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. 데이터베이스에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
           : '';
         toast(`게시물 등록에 실패했습니다.\n\n${(error as Record<string, unknown>)?.message || ''}${hint}`, 'error');
       }
@@ -1477,7 +1477,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
       const errObj = error as Record<string, unknown>;
       const msg = typeof errObj?.message === 'string' ? errObj.message : '';
       const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
-        ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
+        ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. 데이터베이스에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
         : '';
       toast(`게시물 등록에 실패했습니다.\n\n${msg}${hint}`, 'error');
     } finally {

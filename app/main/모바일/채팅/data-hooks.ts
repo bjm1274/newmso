@@ -40,6 +40,7 @@ import {
   type MessageRetryPayload,
 } from '@/app/main/기능부품/메신저유틸';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
+import { escapeLikePattern } from '@/lib/like-escape';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { fetchReactionsForMessages, mergeReactionsIntoMessages } from './반응';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
@@ -363,6 +364,111 @@ export function useChatMessagesForRoom(
   }, [roomId, userId, messages.length]);
 
   return { messages, loading, loadingOlder, hasMore, refresh, loadOlder };
+}
+
+// ─────────────────────────────────────────────
+// 메시지 본문 검색 — 방 제목·마지막 메시지뿐 아니라 대화 내용 전체를 검색
+// ─────────────────────────────────────────────
+
+export type ChatMessageSearchHit = {
+  id: string;
+  roomId: string;
+  content: string;
+  senderId: string | null;
+  senderName: string | null;
+  createdAt: string | null;
+};
+
+const MESSAGE_SEARCH_LIMIT = 50;
+const MESSAGE_SEARCH_DEBOUNCE_MS = 220;
+const MESSAGE_SEARCH_ROOM_CHUNK = 150;
+const MESSAGE_SEARCH_MIN_LEN = 2;
+
+/**
+ * 사용자가 속한 방들의 messages.content 를 ilike 로 검색한다.
+ * (PC 메신저전역검색과 동일한 ilike 방식. 모바일은 메시지 본문 검색이 없어
+ *  방 제목·마지막 메시지만 매칭돼 "검색이 안 된다"는 문제가 있었다.)
+ * roomIds 는 사용자가 접근 가능한 방으로 한정 — RLS 보강 + 불필요 조회 방지.
+ */
+export function useChatMessageSearch(
+  roomIds: string[],
+  query: string,
+): { hits: ChatMessageSearchHit[]; loading: boolean } {
+  const [hits, setHits] = useState<ChatMessageSearchHit[]>([]);
+  const [loading, setLoading] = useState(false);
+  const roomIdsKey = useMemo(
+    () =>
+      Array.from(new Set(roomIds.map((id) => String(id || '').trim()).filter(Boolean))).join(','),
+    [roomIds],
+  );
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    const ids = roomIdsKey ? roomIdsKey.split(',') : [];
+    if (trimmed.length < MESSAGE_SEARCH_MIN_LEN || ids.length === 0) {
+      setHits([]);
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    const handle = setTimeout(async () => {
+      try {
+        const pattern = `%${escapeLikePattern(trimmed)}%`;
+        const collected = new Map<string, ChatMessageSearchHit>();
+
+        for (let i = 0; i < ids.length; i += MESSAGE_SEARCH_ROOM_CHUNK) {
+          const chunk = ids.slice(i, i + MESSAGE_SEARCH_ROOM_CHUNK);
+          const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
+            ({ omittedColumns, selectClause }) => {
+              let q = supabase
+                .from('messages')
+                .select(selectClause)
+                .in('room_id', chunk)
+                .ilike('content', pattern)
+                .order('created_at', { ascending: false })
+                .limit(MESSAGE_SEARCH_LIMIT);
+              if (!omittedColumns.has('is_deleted')) {
+                q = q.eq('is_deleted', false);
+              }
+              return q as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>;
+            },
+          );
+          if (error) throw error;
+          (Array.isArray(data) ? data : []).forEach((m) => {
+            const id = String(m.id || '');
+            if (!id) return;
+            collected.set(id, {
+              id,
+              roomId: String(m.room_id || ''),
+              content: String(m.content || ''),
+              senderId: (m.sender_id as string | null | undefined) ?? null,
+              senderName: (m.sender_name as string | null | undefined) ?? null,
+              createdAt: (m.created_at as string | null | undefined) ?? null,
+            });
+          });
+        }
+
+        if (!active) return;
+        const sorted = Array.from(collected.values())
+          .sort((a, b) => toChatDate(b.createdAt).getTime() - toChatDate(a.createdAt).getTime())
+          .slice(0, MESSAGE_SEARCH_LIMIT);
+        setHits(sorted);
+      } catch {
+        if (active) setHits([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, MESSAGE_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
+  }, [roomIdsKey, query]);
+
+  return { hits, loading };
 }
 
 // ─────────────────────────────────────────────
