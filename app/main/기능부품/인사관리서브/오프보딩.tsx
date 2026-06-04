@@ -598,6 +598,80 @@ export default function OffboardingView({
     }
   };
 
+  const restoreResignedStaff = async (staff: StaffMember) => {
+    const confirmed = await openConfirm({
+      title: '퇴사 처리 취소 및 복구',
+      description: `[${staff.name}]님의 퇴사 처리를 취소하고 재직 상태로 복구하시겠습니까?\n계정 권한이 다시 활성화됩니다.`,
+      confirmText: '재직 복구',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
+
+    setLoading(true);
+    const actor = readClientAuditActor();
+
+    try {
+      const nextPermissions = { ...(staff.permissions || {}) };
+      delete nextPermissions.offboarding_original_status;
+      delete nextPermissions.offboarding_original_role;
+      delete nextPermissions.offboarding_started_at;
+      delete nextPermissions.offboarding_reason;
+      delete nextPermissions.offboarding_finalized_at;
+
+      const restoredStatus = '재직'; // 복구 시 기본 '재직'으로 세팅
+      const restoredRole = 'staff';  // 복구 시 기본 'staff'로 세팅
+
+      const { error: staffUpdateError } = await supabase
+        .from('staff_members')
+        .update({
+          status: restoredStatus,
+          role: restoredRole,
+          resigned_at: null,
+          permissions: nextPermissions,
+        })
+        .eq('id', staff.id);
+
+      if (staffUpdateError) throw staffUpdateError;
+
+      // 진행 중이던 퇴사 체크리스트가 있으면 삭제
+      await supabase
+        .from('onboarding_checklists')
+        .delete()
+        .eq('staff_id', staff.id)
+        .eq('checklist_type', '퇴사');
+
+      await logAudit(
+        '퇴사복구',
+        'staff_member',
+        String(staff.id),
+        {
+          staff_name: staff.name,
+          ...buildAuditDiff(
+            {
+              status: staff.status || null,
+              role: staff.role || null,
+            },
+            {
+              status: restoredStatus,
+              role: restoredRole,
+            },
+            ['status', 'role'],
+          ),
+        },
+        actor.userId,
+        actor.userName,
+      );
+
+      toast(`${staff.name}님이 재직 상태로 복구되었습니다.`, 'success');
+      onRefresh?.();
+    } catch (error) {
+      console.error('퇴사 복구 실패:', error);
+      toast('퇴사 복구 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const historyColumns = useMemo<Column<StaffMember>[]>(() => [
     {
       key: 'name',
@@ -629,7 +703,22 @@ export default function OffboardingView({
         </span>
       ),
     },
-  ], []);
+    {
+      key: 'actions',
+      label: '관리',
+      render: (s) => (
+        <button
+          type="button"
+          onClick={() => restoreResignedStaff(s)}
+          disabled={loading}
+          className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--tab-bg)] disabled:opacity-50"
+        >
+          재직 복구
+        </button>
+      ),
+    },
+  ], [loading]);
+
 
   return (
     <div className="max-w-6xl space-y-4" data-testid="offboarding-view">
