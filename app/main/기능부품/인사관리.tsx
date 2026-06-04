@@ -509,6 +509,7 @@ export default function HRMainView({
               workcenterId={activeMenu}
               staffs={인사직원목록 as never}
               selectedCo={선택사업체}
+              statusFilter={직원상태필터}
               user={user}
               onRefresh={onRefresh}
               canRegisterNewStaff={canRegisterNewStaff}

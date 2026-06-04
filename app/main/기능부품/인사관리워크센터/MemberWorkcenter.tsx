@@ -50,6 +50,7 @@ const MEMBER_TABS: WorkcenterTab<MemberTabId>[] = [
 interface MemberWorkcenterProps {
   staffs?: StaffMember[];
   selectedCo?: string;
+  statusFilter?: '재직' | '퇴사';
   user?: Record<string, unknown> | null;
   onRefresh?: () => void;
   canRegisterNewStaff?: boolean;
@@ -60,6 +61,7 @@ interface MemberWorkcenterProps {
 export default function MemberWorkcenter({
   staffs = [],
   selectedCo,
+  statusFilter,
   user = null,
   canRegisterNewStaff = false,
   onOpenNewStaff,
@@ -136,6 +138,7 @@ export default function MemberWorkcenter({
                 onDoubleClick={handleEditStaff}
                 onOpenNewStaff={() => setIsRegistering(true)}
                 canRegisterNewStaff={canRegisterNewStaff}
+                statusFilter={statusFilter}
               />
               <StaffDrawer
                 staff={selectedStaff}

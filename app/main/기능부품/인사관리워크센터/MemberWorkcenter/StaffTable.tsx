@@ -42,6 +42,7 @@ interface StaffTableProps {
   onDoubleClick?: (staff: StaffMember) => void;
   onOpenNewStaff?: () => void;
   canRegisterNewStaff?: boolean;
+  statusFilter?: '재직' | '퇴사';
 }
 
 function StaffTableBase({
@@ -51,17 +52,26 @@ function StaffTableBase({
   onDoubleClick,
   onOpenNewStaff,
   canRegisterNewStaff = false,
+  statusFilter = '재직',
 }: StaffTableProps) {
   const [deptFilter, setDeptFilter] = useState<string>('전체');
   const [query, setQuery] = useState('');
 
-  const activeStaffs = useMemo(() => staffs.filter(isActive), [staffs]);
+  const filteredByStatus = useMemo(() => {
+    return staffs.filter((staff) => {
+      const active = isActive(staff);
+      if (statusFilter === '퇴사') {
+        return !active;
+      }
+      return active;
+    });
+  }, [staffs, statusFilter]);
 
-  const departments = useMemo(() => aggregateDepartments(activeStaffs), [activeStaffs]);
+  const departments = useMemo(() => aggregateDepartments(filteredByStatus), [filteredByStatus]);
 
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    return activeStaffs.filter((staff) => {
+    return filteredByStatus.filter((staff) => {
       if (deptFilter !== '전체') {
         const dept = (staff.department ?? '').trim() || '미지정';
         if (dept !== deptFilter) return false;
@@ -72,7 +82,7 @@ function StaffTableBase({
       const position = (staff.position ?? '').toLowerCase();
       return name.includes(trimmed) || empNo.includes(trimmed) || position.includes(trimmed);
     });
-  }, [activeStaffs, deptFilter, query]);
+  }, [filteredByStatus, deptFilter, query]);
 
   return (
     <div className="app-card flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -110,7 +120,7 @@ function StaffTableBase({
         <div role="tablist" aria-label="부서 필터" className="flex flex-wrap gap-1.5">
           <DeptChip
             label="전체"
-            count={activeStaffs.length}
+            count={filteredByStatus.length}
             active={deptFilter === '전체'}
             onClick={() => setDeptFilter('전체')}
           />

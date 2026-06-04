@@ -71,6 +71,7 @@ interface HrWorkcenterRouterProps {
   workcenterId: WorkcenterId;
   staffs?: StaffMember[];
   selectedCo?: string;
+  statusFilter?: '재직' | '퇴사';
   user?: Record<string, unknown> | null;
   onRefresh?: () => void;
   canRegisterNewStaff?: boolean;
@@ -90,6 +91,7 @@ export default function HrWorkcenterRouter({
   workcenterId,
   staffs = [],
   selectedCo,
+  statusFilter,
   user = null,
   onRefresh,
   canRegisterNewStaff = false,
@@ -106,6 +108,7 @@ export default function HrWorkcenterRouter({
           <MemberWorkcenter
             staffs={staffs}
             selectedCo={selectedCo}
+            statusFilter={statusFilter}
             user={user}
             onRefresh={onRefresh}
             canRegisterNewStaff={canRegisterNewStaff}
