@@ -28,6 +28,7 @@ import 오프라인배너 from '../공통/오프라인배너';
 import 오프라인실패배너 from '../공통/오프라인실패배너';
 import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
+import { useChatRoomsForMobile } from '../채팅/data-hooks';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -37,6 +38,11 @@ export type MobileShellProps = {
 export default function MobileShell({ user, onLogout }: MobileShellProps) {
   const [route, setRoute] = useState<MRoute>({ tab: 'mypage' });
   const [dark, setDark] = useState(false);
+
+  const userId = typeof user.id === 'string' ? user.id : null;
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
+  const totalUnread = rooms.reduce((sum, r) => sum + (r.unread_count || 0), 0);
 
   // 시스템 다크모드 동기화
   useEffect(() => {
@@ -89,14 +95,21 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
             />
           )}
           {route.tab === 'addon' && <추가기능 user={user} onBack={goMypage} />}
-          {route.tab === 'chat' && <채팅 user={user} />}
+          {route.tab === 'chat' && (
+            <채팅
+              user={user}
+              rooms={rooms}
+              refreshRooms={refreshRooms}
+              onActiveRoomChange={setActiveRoomId}
+            />
+          )}
           {route.tab === 'board' && <게시판 user={user} onBack={goMypage} />}
           {route.tab === 'approval' && <결재 user={user} />}
           {route.tab === 'hr' && <인사관리 user={user} onExit={goMypage} />}
           {route.tab === 'stock' && <재고관리 user={user} onBack={goMypage} />}
           {route.tab === 'admin' && <관리자 user={user} onBack={goMypage} />}
         </div>
-        <MobileBottomTab active={route.tab} onChange={switchTab} />
+        <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread }} />
       </div>
     </div>
   );

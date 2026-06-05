@@ -1844,6 +1844,24 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     await route.fallback();
   });
 
+  await page.route('**/api/admin/staff-permission', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() || {};
+      const { staffId, updates } = body;
+      if (staffId && updates) {
+        staffMembers = staffMembers.map((staff: any) =>
+          staff.id === staffId ? { ...staff, ...updates } : staff
+        );
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true }),
+      });
+    }
+    await route.fallback();
+  });
+
   await page.route('**/api/auth/session', async (route) => {
     if (route.request().method() === 'DELETE') {
       return route.fulfill({

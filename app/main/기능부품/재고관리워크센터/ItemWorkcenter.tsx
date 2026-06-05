@@ -12,7 +12,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { supabase } from '@/lib/supabase';
 import {
   KpiRow,
   StockChip,
@@ -104,6 +106,33 @@ export default function ItemWorkcenter() {
   const [tab, setTab] = useState<ItemTab>('items');
   const [modal, setModal] = useState<LegacyModal>(null);
   const data = useItemData();
+  const { user } = useAppData();
+
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+
+  const fetchInventory = useCallback(async () => {
+    const { data: inv } = await supabase
+      .from('inventory')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (inv) setInventory(inv);
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    const { data: sups } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+    if (sups) setSuppliers(sups);
+  }, []);
+
+  useEffect(() => {
+    if (modal) {
+      void fetchInventory();
+      void fetchSuppliers();
+    }
+  }, [modal, fetchInventory, fetchSuppliers]);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [
@@ -151,17 +180,31 @@ export default function ItemWorkcenter() {
     <div className="flex flex-col gap-4">
       {modal === 'product' && (
         <LegacyOverlay title="물품 등록" onClose={() => setModal(null)}>
-          <LegacyProductRegistration user={{}} inventory={[]} suppliers={[]} />
+          <LegacyProductRegistration
+            user={user}
+            inventory={inventory}
+            suppliers={suppliers}
+            fetchInventory={fetchInventory}
+            fetchSuppliers={fetchSuppliers}
+          />
         </LegacyOverlay>
       )}
       {modal === 'asset' && (
         <LegacyOverlay title="자산 QR 관리" onClose={() => setModal(null)}>
-          <LegacyQRAssetManager user={{}} inventory={[]} />
+          <LegacyQRAssetManager
+            user={user}
+            inventory={inventory}
+            fetchInventory={fetchInventory}
+          />
         </LegacyOverlay>
       )}
       {modal === 'udi' && (
         <LegacyOverlay title="UDI 관리" onClose={() => setModal(null)}>
-          <LegacyUDIManagement user={{}} inventory={[]} />
+          <LegacyUDIManagement
+            user={user}
+            inventory={inventory}
+            fetchInventory={fetchInventory}
+          />
         </LegacyOverlay>
       )}
       <StockTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="물품·자산 탭" />

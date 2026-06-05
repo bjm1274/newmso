@@ -5,7 +5,13 @@ import { isApprovalLocked } from '@/lib/approval-workflow';
 import { alphaColor } from '../전자결재-utils';
 import ApprovalLineTimeline from './ApprovalLineTimeline';
 import { resolveRejectReason } from './ApprovalRiskReviewDialog';
-import { ApprovalAttachmentsPanel } from './ApprovalMetaPanels';
+import {
+  ApprovalAttachmentsPanel,
+  SupplyRequestItemsPanel,
+  LeaveRequestInfoPanel,
+  ReportInfoPanel,
+  RosterRequestInfoPanel,
+} from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -219,8 +225,12 @@ export default function ApprovalDetailModal({
             />
           </div>
           
-          {/* 샌드박스 아이프레임 바깥 영역에 첨부파일 다운로드 카드 배치 */}
-          <div className="mx-auto mb-3 w-full max-w-[860px]">
+          {/* 샌드박스 아이프레임 바깥 영역에 메타 데이터 패널들 배치 */}
+          <div className="mx-auto mb-3 w-full max-w-[860px] space-y-3">
+            <SupplyRequestItemsPanel metaData={detailMetaData} />
+            <LeaveRequestInfoPanel metaData={detailMetaData} />
+            <ReportInfoPanel metaData={detailMetaData} />
+            <RosterRequestInfoPanel metaData={detailMetaData} />
             <ApprovalAttachmentsPanel metaData={detailMetaData} />
           </div>
 

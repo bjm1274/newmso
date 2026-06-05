@@ -5,7 +5,7 @@ test('legacy admin initial password verifies for protected actions', async ({ pa
   const legacyAdminUser = {
     ...fakeUser,
     id: 'legacy-admin-user',
-    employee_no: '1',
+    employee_no: '99999',
     name: 'Legacy Admin',
     company: 'SY INC.',
     company_id: 'mso-company-id',
@@ -30,7 +30,7 @@ test('legacy admin initial password verifies for protected actions', async ({ pa
         password: 'qkrcjfghd!!',
         userId: 'legacy-admin-user',
         name: 'Legacy Admin',
-        employeeNo: '1',
+        employeeNo: '99999',
       }),
     });
 

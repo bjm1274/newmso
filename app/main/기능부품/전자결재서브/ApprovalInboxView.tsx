@@ -257,6 +257,7 @@ export default function ApprovalInboxView({
           </select>
 
           <select
+            data-testid="approval-status-filter"
             value={approvalStatusFilter}
             onChange={(event) => setApprovalStatusFilter(event.target.value as '전체' | '대기' | '승인' | '반려' | '회수')}
             className="h-8 w-auto min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 pr-7 text-[11px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]/50"
@@ -416,6 +417,23 @@ export default function ApprovalInboxView({
         </div>
       )}
 
+      {(viewMode === '기안함' || viewMode === '참조 문서함') && (
+        <div className="flex flex-wrap items-start justify-between gap-3 px-1">
+          {/* 좌: 제목 + 서브라인 */}
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-[17px] font-extrabold leading-tight text-[var(--foreground)]">
+              {viewMode}
+            </h2>
+            <p className="text-[12px] font-semibold text-[var(--toss-gray-4)]">
+              전체{' '}
+              <span className="font-extrabold text-[var(--accent)]">
+                {listForView.length}건
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
       {viewMode === '결재함' && (
         <div className="flex flex-wrap items-start justify-between gap-3 px-1">
           {/* 좌: 제목 + 서브라인 */}
@@ -447,6 +465,7 @@ export default function ApprovalInboxView({
                 <LucideIcon name="Search" size={13} />
               </span>
               <input
+                data-testid="approval-keyword-filter"
                 type="search"
                 aria-label="결재 문서 검색"
                 value={approvalKeyword}

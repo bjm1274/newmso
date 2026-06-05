@@ -335,7 +335,10 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     let pendingCount = 0;
     let cancelCount = 0;
     rows.forEach((row) => {
-      const depositedDay = row.deposited_at ? row.deposited_at.slice(0, 10) : '';
+      const dateVal = row.deposited_at ? new Date(row.deposited_at) : null;
+      const depositedDay = (dateVal && !isNaN(dateVal.getTime()))
+        ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(dateVal)
+        : '';
       if (row.deposit_status === 'deposited') {
         completedCount += 1;
         if (depositedDay === todayKey) todayTotal += toAmountNumber(row.amount);

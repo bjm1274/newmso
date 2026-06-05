@@ -7,6 +7,7 @@ import {
   validateDocUpload,
 } from '@/lib/document-submission-shared';
 import LicenseCESubmit from './면허보수교육제출';
+import { escapeHtml } from '@/lib/escape-html';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 type ContractRecord = {
@@ -25,23 +26,14 @@ type MyDocumentsProps = {
     onOpenContractSignature?: (contract: ContractRecord) => void;
 };
 
+import { formatDateLabel } from '@/lib/date-formatter';
+
 function formatDate(value?: string | null) {
-    if (!value) return '-';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+    return formatDateLabel(value) || '-';
 }
 
 // SEC: 미리보기 창에 document.write 로 주입되는 사용자 제어 값(title/content)을
-// 이스케이프해 저장형 XSS 를 차단한다. (lib 공통 유틸을 건드리지 않기 위한 지역 함수)
-function escapeHtml(value: unknown): string {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+// 이스케이프해 저장형 XSS 를 차단한다. 공용 유틸 escapeHtml을 사용합니다.
 
 export default function MyDocuments(props: MyDocumentsProps) {
     const user = props.user as { id?: string; name?: string; company?: string } | undefined;

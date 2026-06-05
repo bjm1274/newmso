@@ -91,6 +91,8 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
   const [copying, setCopying] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [permissionReview, setPermissionReview] = useState<PermissionReview | null>(null);
+  const [selectedFormType, setSelectedFormType] = useState<string>('purchase');
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string>('');
 
   // STAFF_LIST_SELECT 모든 컬럼이 STAFF_BOOTSTRAP_COLUMNS에 포함되므로 Context로 대체.
   // update 호출은 그대로 직접 호출 유지 (CRUD는 Context 우회).
@@ -100,10 +102,25 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
   );
 
   useEffect(() => {
-    setStaffs(sortedStaffs);
+    setStaffs((prev) => {
+      return sortedStaffs.map((staff) => {
+        const local = prev.find((p) => p.id === staff.id);
+        if (local && JSON.stringify(local.permissions) !== JSON.stringify(staff.permissions)) {
+          return { ...staff, permissions: local.permissions, role: local.role };
+        }
+        return staff;
+      });
+    });
     setSelectedStaff((current: any) => {
       if (!current?.id) return current;
-      return sortedStaffs.find((staff: any) => staff.id === current.id) ?? current;
+      const matched = sortedStaffs.find((staff: any) => staff.id === current.id);
+      if (matched) {
+        if (JSON.stringify(current.permissions) !== JSON.stringify(matched.permissions)) {
+          return { ...matched, permissions: current.permissions, role: current.role };
+        }
+        return matched;
+      }
+      return current;
     });
     setLoading(false);
   }, [sortedStaffs]);
@@ -256,6 +273,62 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       return true;
     },
     [staffs, updateStaffRecord]
+  );
+
+  const handleAddRecipient = useCallback(
+    async (recipientId: string) => {
+      if (!recipientId || !selectedStaff) return;
+      const recipientStaff = staffs.find((s) => s.id === recipientId);
+      if (!recipientStaff) return;
+
+      const currentPermissions = (selectedStaff.permissions as Record<string, any>) || {};
+      const currentDefaults = currentPermissions.approval_reference_defaults || {};
+      const formDefaults = currentDefaults[selectedFormType] || [];
+
+      if (formDefaults.some((r: any) => r.id === recipientId)) {
+        return;
+      }
+
+      const updatedFormDefaults = [
+        ...formDefaults,
+        { id: recipientStaff.id, name: recipientStaff.name },
+      ];
+
+      const nextPermissions = {
+        ...currentPermissions,
+        approval_reference_defaults: {
+          ...currentDefaults,
+          [selectedFormType]: updatedFormDefaults,
+        },
+      };
+
+      await setPermissions(selectedStaff.id as string, nextPermissions);
+      setSelectedRecipientId('');
+    },
+    [selectedStaff, staffs, selectedFormType, setPermissions]
+  );
+
+  const handleRemoveRecipient = useCallback(
+    async (recipientId: string) => {
+      if (!selectedStaff) return;
+
+      const currentPermissions = (selectedStaff.permissions as Record<string, any>) || {};
+      const currentDefaults = currentPermissions.approval_reference_defaults || {};
+      const formDefaults = currentDefaults[selectedFormType] || [];
+
+      const updatedFormDefaults = formDefaults.filter((r: any) => r.id !== recipientId);
+
+      const nextPermissions = {
+        ...currentPermissions,
+        approval_reference_defaults: {
+          ...currentDefaults,
+          [selectedFormType]: updatedFormDefaults,
+        },
+      };
+
+      await setPermissions(selectedStaff.id as string, nextPermissions);
+    },
+    [selectedStaff, selectedFormType, setPermissions]
   );
 
   const pendingRef = useRef(false);
@@ -562,6 +635,76 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
                       <option value="manager">부서장</option>
                       <option value="admin">시스템 관리자</option>
                     </select>
+                  </div>
+
+                  <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-2.5">
+                    <p className="text-[13px] font-semibold text-[var(--foreground)]">전자결재 기본 참조 설정</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">결재 서식</label>
+                        <select
+                          data-testid="staff-approval-default-form-select"
+                          value={selectedFormType}
+                          onChange={(e) => setSelectedFormType(e.target.value)}
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]"
+                        >
+                          <option value="purchase">물품신청</option>
+                          <option value="leave">휴가신청</option>
+                          <option value="overtime">연장근무</option>
+                          <option value="attendance_fix">근태소명</option>
+                          <option value="generic">일반결재</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">참조 대상자 추가</label>
+                        <select
+                          data-testid="staff-approval-default-recipient-select"
+                          value={selectedRecipientId}
+                          onChange={(e) => handleAddRecipient(e.target.value)}
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2 py-1.5 text-[11px] font-bold text-[var(--foreground)]"
+                        >
+                          <option value="" disabled>직원 선택</option>
+                          {staffs
+                            .filter((s) => s.id !== selectedStaff.id)
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} {s.position ? `(${s.position})` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <label className="block text-[10px] font-bold text-[var(--toss-gray-3)]">기본 참조자 목록</label>
+                        {(() => {
+                          const currentPermissions = (selectedStaff.permissions as Record<string, any>) || {};
+                          const currentDefaults = currentPermissions.approval_reference_defaults || {};
+                          const formDefaults = currentDefaults[selectedFormType] || [];
+
+                          if (formDefaults.length === 0) {
+                            return (
+                              <p className="text-[10px] text-[var(--toss-gray-4)] italic py-1">설정된 참조자가 없습니다.</p>
+                            );
+                          }
+
+                          return formDefaults.map((recipient: any) => (
+                            <div
+                              key={recipient.id}
+                              className="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--muted)] px-2.5 py-1 text-[11px]"
+                            >
+                              <span className="font-medium text-[var(--foreground)]">{recipient.name}</span>
+                              <button
+                                type="button"
+                                data-testid={`staff-approval-default-recipient-remove-${recipient.id}`}
+                                onClick={() => handleRemoveRecipient(recipient.id)}
+                                className="text-[10px] font-bold text-danger hover:underline ml-2"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-2.5">

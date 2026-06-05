@@ -11,7 +11,7 @@ import {
 type ThreadPanelProps = {
   rootMessage: ChatMessage | null;
   messages: ChatMessage[];
-  resolveStaffProfile: (staffId: string | null | undefined) => StaffMember | null;
+  resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null;
   isFollowingThread?: boolean;
   onClose: () => void;
   onToggleFollowThread?: (message: ChatMessage) => void;
@@ -98,7 +98,7 @@ export function ThreadPanel({
           ) : (
             messages.map((message) => {
               const isRoot = message.id === rootMessage.id;
-              const staff = (message.staff as { name?: string; position?: string } | null | undefined) || resolveStaffProfile(message.sender_id);
+              const staff = (message.staff as { name?: string; position?: string } | null | undefined) || resolveStaffProfile(message.sender_id, message.sender_name);
               const createdAt = new Date(message.created_at || 0);
               return (
                 <div

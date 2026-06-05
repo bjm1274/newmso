@@ -245,27 +245,9 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
             color: '#fff',
             position: 'relative',
+            borderRadius: 0,
           }}
         >
-          {/* 수정 버튼 (우상단) */}
-          <button
-            type="button"
-            onClick={() => onSub('edit')}
-            aria-label="정보 수정"
-            style={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              width: 36,
-              height: 36,
-              borderRadius: 12,
-              background: 'rgba(255,255,255,0.15)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
-            <MIcon name="edit" size={18} />
-          </button>
 
           {/* 아바타 — 프로필 사진(없으면 이름 첫글자) */}
           <ProfilePhotoThumbnail

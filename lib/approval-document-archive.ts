@@ -324,6 +324,9 @@ export function mapApprovalToDocumentRepositoryEntry(item: ApprovalArchiveSource
 export async function syncApprovalToDocumentRepository(
   item: ApprovalArchiveSource,
 ) {
+  if (typeof window !== 'undefined') {
+    return;
+  }
   const title = String(item.title || '').trim();
   if (!title) return;
 

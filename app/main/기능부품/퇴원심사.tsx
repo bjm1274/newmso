@@ -18,8 +18,6 @@ import {
 import DischargeRuleAnalysisPanel from './퇴원심사규정패널';
 import DischargeRuleBuilder from './퇴원심사규정빌더';
 import { useIsMobile } from '@/app/components/useIsMobile';
-import 퇴원심사모바일목록 from './퇴원심사/모바일목록';
-import 퇴원심사모바일상세 from './퇴원심사/모바일상세';
 import { stayDays, isDischargeApproved, DISCHARGE_STATUS } from './퇴원심사/공통';
 
 interface ChartLine {
@@ -545,50 +543,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
     const isMobile = useIsMobile();
 
-    // 모바일 분기 — 심사 목록 탭에 한해 모바일 전용 UI 사용.
-    // 신규 등록(new) / 템플릿 설정(template) 탭은 데스크탑 폼을 그대로 사용한다(JM: 단일 책임 유지).
-    if (isMobile && tab === 'reviews') {
-        if (selectedReview) {
-            return (
-                <div className="bg-[var(--page-bg)] min-h-screen p-3" data-testid="discharge-review-view">
-                    {dialog}
-                    <퇴원심사모바일상세
-                        review={selectedReview}
-                        ruleAnalysis={selectedRuleAnalysis}
-                        compareResult={compareResult}
-                        aiResult={aiResult}
-                        aiLoading={aiLoading}
-                        canAutoCompare={templates.length > 0}
-                        onBack={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }}
-                        onToggleItem={(itemId) => toggleItem(selectedReview.id, itemId)}
-                        onToggleAll={(check) => toggleAll(check)}
-                        onApprove={() => approveReview(selectedReview.id)}
-                        onDelete={() => deleteReview(selectedReview.id)}
-                        onAutoCompare={autoCompare}
-                        onRequestAi={requestAiAnalysis}
-                    />
-                </div>
-            );
-        }
-        return (
-            <div className="bg-[var(--page-bg)] min-h-screen p-3" data-testid="discharge-review-view">
-                {dialog}
-                <퇴원심사모바일목록
-                    reviews={reviews}
-                    loading={loading}
-                    onSelect={(id) => {
-                        const target = reviews.find((r) => r.id === id);
-                        if (!target) return;
-                        setSelectedReview(target);
-                        setAiResult(target.ai_analysis || '');
-                        setCompareResult(null);
-                    }}
-                    onCreateNew={() => setTab('new')}
-                    onOpenTemplate={() => setTab('template')}
-                />
-            </div>
-        );
-    }
+
 
     return (
         <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">

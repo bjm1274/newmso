@@ -564,7 +564,7 @@ function MessengerTimelineComponent({
                       (msg.staff as { name?: string } | null | undefined)?.name || null
                     ) || (msg.staff as StaffMember | null | undefined) || null
                   : null;
-              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || '이름 없음';
+              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || msg.sender_name || '이름 없음';
               const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
               const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
               const showWardQuickReplies =

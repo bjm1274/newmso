@@ -75,7 +75,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [staffs, user]);
 
     useEffect(() => {
         if (selectedStaff?.id) {

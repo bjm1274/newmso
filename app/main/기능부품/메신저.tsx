@@ -109,6 +109,7 @@ import {
   readStoredThreadPreferences,
   readStoredStringArray,
   sortChatRoomsWithNoticeFirst,
+  toChatDate,
   writeStoredThreadPreferences,
   writeStoredBookmarks,
   writeStoredPinnedIds,
@@ -1243,7 +1244,7 @@ export default function ChatView({
       });
       return Array.from(merged.values()).sort(
         (left, right) =>
-          new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime(),
+          toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
       );
     });
   }, [retryQueueActorId, selectedRoomId, user]);
@@ -1608,8 +1609,8 @@ export default function ChatView({
         .filter((room: ChatRoom) => isSelfChatRoom(room, currentUserId))
         .sort(
           (a: ChatRoom, b: ChatRoom) =>
-            new Date(b.last_message_at || b.created_at || 0).getTime() -
-            new Date(a.last_message_at || a.created_at || 0).getTime()
+            toChatDate(b.last_message_at || b.created_at || 0).getTime() -
+            toChatDate(a.last_message_at || a.created_at || 0).getTime()
         );
       const existingSelfRoom = existingSelfRooms[0];
 
@@ -2162,7 +2163,7 @@ export default function ChatView({
         .filter((message) => !message.is_deleted && bookmarkedIds.has(String(message.id)))
         .sort(
           (left, right) =>
-            new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime(),
+            toChatDate(right.created_at || 0).getTime() - toChatDate(left.created_at || 0).getTime(),
         ),
     [bookmarkedIds, messages],
   );
@@ -2437,7 +2438,7 @@ export default function ChatView({
       })
       .sort(
         (left, right) =>
-          new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime(),
+          toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
       )[0];
 
     if (!targetMessage?.id) {
@@ -2476,7 +2477,7 @@ export default function ChatView({
         .map((thread) => {
           const latestMessage = thread.latestMessage;
           const latestSender =
-            resolveStaffProfile(latestMessage.sender_id) ||
+            resolveStaffProfile(latestMessage.sender_id, latestMessage.sender_name) ||
             (latestMessage.staff as StaffMember | undefined) ||
             null;
           return {

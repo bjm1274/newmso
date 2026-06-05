@@ -64,6 +64,19 @@ const nextConfig: NextConfig = {
     optimizeCss: false,
     scrollRestoration: true,
   },
+  webpack: (config) => {
+    config.watchOptions = {
+      ...(config.watchOptions || {}),
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/.next/**',
+        '**/.wrangler/**',
+        '**/test-results/**',
+      ],
+    };
+    return config;
+  },
   async headers() {
     return [
       {

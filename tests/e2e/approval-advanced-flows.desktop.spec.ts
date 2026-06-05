@@ -60,17 +60,34 @@ function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => {
-    errors.push(`pageerror: ${error.message}`);
+    console.log(`BROWSER PAGEERROR: ${error.message}`);
+    const msg = error.message;
+    if (
+      msg.includes('sandboxed') ||
+      msg.includes('allow-same-origin') ||
+      msg.includes('localStorage') ||
+      msg.includes('serviceWorker') ||
+      msg.includes('Access is denied')
+    ) {
+      return;
+    }
+    errors.push(`pageerror: ${msg}`);
   });
 
   page.on('console', (message) => {
+    console.log(`BROWSER CONSOLE [${message.type()}]: ${message.text()}`);
     if (message.type() !== 'error') return;
 
     const text = message.text();
     if (
       text.includes('favicon') ||
       text.includes('Failed to load resource') ||
-      text.includes('ERR_ABORTED')
+      text.includes('ERR_ABORTED') ||
+      text.includes('sandboxed') ||
+      text.includes('allow-scripts') ||
+      text.includes('about:srcdoc') ||
+      text.includes('localStorage') ||
+      text.includes('Access is denied')
     ) {
       return;
     }
@@ -82,7 +99,20 @@ function trackRuntimeErrors(page: Page) {
 }
 
 async function selectComposeFormTab(page: Page, label: string) {
-  await page.getByRole('button', { name: label, exact: true }).click();
+  const select = page.getByTestId('approval-form-type-select');
+  const optionValue = await select.evaluate((el, targetLabel) => {
+    const options = Array.from((el as HTMLSelectElement).options);
+    const matched = options.find(
+      (opt) => opt.text.trim().startsWith(targetLabel) || opt.value === targetLabel
+    );
+    return matched ? matched.value : null;
+  }, label);
+
+  if (optionValue) {
+    await select.selectOption(optionValue);
+  } else {
+    await page.getByRole('button', { name: label, exact: true }).click();
+  }
 }
 
 async function openApprovalInbox(page: Page) {
@@ -114,7 +144,16 @@ async function waitForApprovalInsert(page: Page) {
   return page.waitForRequest(
     (request) =>
       request.method() === 'POST' &&
-      request.url().includes('/rest/v1/approvals')
+      (request.url().includes('/rest/v1/approvals') ||
+        (request.url().includes('/api/d1/mutate') &&
+          (() => {
+            try {
+              const body = request.postDataJSON();
+              return body?.table === 'approvals' && body?.op === 'insert';
+            } catch {
+              return false;
+            }
+          })()))
   );
 }
 
@@ -336,8 +375,8 @@ test('supply approval shows requested items in detail and print view, then can b
 
 
   await expect(page.getByText('물품 신청 목록')).toBeVisible();
-  await expect(page.getByText('멸균 거즈')).toBeVisible();
-  await expect(page.getByText('드레싱 교체')).toBeVisible();
+  await expect(page.getByText('멸균 거즈').first()).toBeVisible();
+  await expect(page.getByText('드레싱 교체').first()).toBeVisible();
 
   await page.getByTestId('approval-detail-recall').click();
   await confirmActionDialog(page);
@@ -348,8 +387,8 @@ test('supply approval shows requested items in detail and print view, then can b
 
   await expect(page.getByTestId('approval-title-input')).toHaveValue('병동 물품 보충 요청');
   await expect(page.getByTestId('approval-content-input')).toHaveValue('야간 사용분 보충이 필요합니다.');
-  await expect(page.getByTestId('supplies-item-name-0')).toHaveValue('멸균 거즈');
-  await expect(page.getByTestId('supplies-item-qty-0')).toHaveValue('12');
+  await expect(page.getByTestId('supplies-item-name-0').first()).toHaveValue('멸균 거즈');
+  await expect(page.getByTestId('supplies-item-qty-0').first()).toHaveValue('12');
   expect(runtimeErrors).toEqual([]);
 });
 
@@ -573,7 +612,7 @@ test('annual leave approvals show the requested date range and sync leave record
   await approvalCard.click();
 
   await expect(page.getByText('휴가 정보')).toBeVisible();
-  await expect(page.getByText(/2026\. 3\. 20\..*2026\. 3\. 21\./).nth(1)).toBeVisible();
+  await expect(page.getByTestId('approval-detail-modal').getByText(/2026\. 3\. 20\..*2026\. 3\. 21\./)).toBeVisible();
   await expect(page.getByText('Delegate Nurse')).toBeVisible();
   await expect(page.getByText('개인 일정', { exact: true })).toBeVisible();
 

@@ -37,6 +37,8 @@ import {
   isGroupChatRoom,
   getGroupChatRoomBadgeText,
   toChatDate,
+  getDirectRoomMembersKey,
+  getConversationUnreadCountForRoom,
   type MessageRetryPayload,
 } from '@/app/main/기능부품/메신저유틸';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
@@ -114,6 +116,7 @@ function isRoomVisibleToUser(
 
 export function useChatRoomsForMobile(
   userId: string | null | undefined,
+  activeRoomId?: string | null,
 ): UseChatRoomsResult {
   const [rooms, setRooms] = useState<MobileChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,23 +132,46 @@ export function useChatRoomsForMobile(
     }
     try {
       const { data: roomsData } = await fetchAllChatRooms();
-      const visible = (roomsData || []).filter((room) =>
+      const rawRooms = roomsData || [];
+      const visible = rawRooms.filter((room) =>
         isRoomVisibleToUser(room, currentUserId),
       );
+
+      // PC와 동일한 direct room deduplication 적용
+      const dedupedRooms = new Map<string, ChatRoom>();
+      visible.forEach((room) => {
+        const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
+        const previousRoom = dedupedRooms.get(roomKey);
+        const previousTime = new Date(previousRoom?.last_message_at || previousRoom?.created_at || 0).getTime();
+        const currentTime = new Date(room?.last_message_at || room?.created_at || 0).getTime();
+        if (!previousRoom || currentTime >= previousTime) {
+          dedupedRooms.set(roomKey, room);
+        }
+      });
+
+      if (!dedupedRooms.has(`room:${NOTICE_ROOM_ID}`)) {
+        const noticeRoom = rawRooms.find((room) => String(room.id) === NOTICE_ROOM_ID);
+        if (noticeRoom && isRoomVisibleToUser(noticeRoom, currentUserId)) {
+          dedupedRooms.set(`room:${NOTICE_ROOM_ID}`, noticeRoom);
+        }
+      }
+
+      const dedupedList = Array.from(dedupedRooms.values());
+
       let counts: Record<string, number> = {};
       try {
         counts = await fetchChatUnreadCountsByRoom(supabase, {
-          rooms: visible,
+          rooms: dedupedList,
           userId: currentUserId,
-          activeRoomId: null,
+          activeRoomId: activeRoomId ?? null,
         });
       } catch {
         counts = {};
       }
-      const sorted = sortChatRoomsWithNoticeFirst(visible);
+      const sorted = sortChatRoomsWithNoticeFirst(dedupedList);
       const merged: MobileChatRoom[] = sorted.map((room) => ({
         ...room,
-        unread_count: counts[String(room.id)] ?? 0,
+        unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms),
       }));
       setRooms(merged);
     } catch {
@@ -153,7 +179,7 @@ export function useChatRoomsForMobile(
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeRoomId]);
 
   useEffect(() => {
     void refresh();
@@ -347,18 +373,22 @@ export function useChatMessagesForRoom(
   // 읽음 cursor 업데이트 (조회만, 액션 X 정책상 P0에서도 안전)
   useEffect(() => {
     if (!roomId || !userId) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && String(lastMsg.sender_id) === String(userId)) {
+      return; // 본인이 보낸 마지막 메시지이면 커서 업데이트 스킵 (과거값 가드)
+    }
     const lastReadAt = new Date().toISOString();
     void (async () => {
       try {
-        await supabase
-          .from('room_read_cursors')
-          .upsert(
-            { room_id: roomId, user_id: userId, last_read_at: lastReadAt },
-            { onConflict: 'room_id,user_id' },
-          );
+        await fetch('/api/chat/read-cursors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomIds: [roomId], readAt: lastReadAt }),
+          credentials: 'same-origin',
+        });
         pokeChannel('mobile-chat-rooms-list');
       } catch {
-        // silent — 읽음 미반영은 사용자 메시지로 노출 안 함
+        // silent
       }
     })();
   }, [roomId, userId, messages.length]);

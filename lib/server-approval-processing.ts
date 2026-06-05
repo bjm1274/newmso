@@ -273,7 +273,7 @@ export async function processFinalApprovalEffects(
 
   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
 
-  if (item.type === '물품요청' && itemMetaData?.items) {
+  if (item.type === '물품신청' && itemMetaData?.items) {
     try {
       supplySummary = await prepareSupplyApprovalInventoryWorkflow(item);
       steps.push('inventory_workflow');
@@ -429,6 +429,27 @@ export async function processFinalApprovalEffects(
         }
 
         steps.push('leave_attendance');
+
+        // Immediately dispatch leave notice if the leave starts today or in the past
+        try {
+          const { announceLeaveApprovalIfNeeded } = await import('@/lib/leave-notice-cron');
+          const approvalRow = {
+            id: String(item.id),
+            sender_id: item.sender_id as string | null,
+            sender_name: item.sender_name as string | null,
+            sender_company: item.sender_company as string | null,
+            company_id: item.company_id as string | null,
+            title: item.title as string | null,
+            meta_data: itemMetaData, // Use the latest itemMetaData
+            created_at: item.created_at as string | null,
+          };
+          const announced = await announceLeaveApprovalIfNeeded(leaveDb, approvalRow);
+          if (announced) {
+            steps.push('leave_immediate_announcement');
+          }
+        } catch (annErr) {
+          console.error('[server-approval-processing] Failed to dispatch immediate leave notice:', annErr);
+        }
       } catch (error) {
         warnings.push(`연차/휴가 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
       }
@@ -599,9 +620,39 @@ export async function processFinalApprovalEffects(
     }
   }
 
+  // Before final save, refetch the latest meta_data from DB to avoid overwriting concurrent updates
+  let latestMetaData = itemMetaData || {};
+  try {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const rows = await db
+        .select({ meta_data: approvalsTable.meta_data })
+        .from(approvalsTable)
+        .where(eq(approvalsTable.id, String(item.id)))
+        .limit(1);
+      if (rows[0]?.meta_data) {
+        if (typeof rows[0].meta_data === 'string' && rows[0].meta_data.length > 0) {
+          try {
+            const parsed = JSON.parse(rows[0].meta_data);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              latestMetaData = parsed as Record<string, unknown>;
+            }
+          } catch {
+            // keep old
+          }
+        } else if (typeof rows[0].meta_data === 'object' && rows[0].meta_data !== null) {
+          latestMetaData = rows[0].meta_data as Record<string, unknown>;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[server-approval-processing] Failed to refetch latest meta_data:', err);
+  }
+
   const processedAt = new Date().toISOString();
   const nextMetaData = {
-    ...(itemMetaData || {}),
+    ...latestMetaData,
     server_processing: {
       status: warnings.length > 0 ? 'completed_with_warnings' : 'completed',
       started_at: startedAt,

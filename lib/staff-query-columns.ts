@@ -134,6 +134,78 @@ export function buildStaffBootstrapSelect(omittedColumns: ReadonlySet<string> = 
 
 export const STAFF_BOOTSTRAP_SELECT = buildStaffBootstrapSelect();
 
+const STAFF_LIGHT_BOOTSTRAP_COLUMNS = [
+  'id',
+  'name',
+  'email',
+  'phone',
+  'company',
+  'company_id',
+  'department',
+  'position',
+  'role',
+  'status',
+  'employee_no',
+  'join_date',
+  'joined_at',
+  'resigned_at',
+  'birth_date',
+  'address',
+  'annual_leave_total',
+  'annual_leave_used',
+  'presence_status',
+  'permissions',
+  'avatar_url',
+  'photo_url',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'auth_user_id',
+  'employment_type',
+  'contract_type',
+  'created_at',
+];
+
+export const STAFF_LIGHT_BOOTSTRAP_OPTIONAL_COLUMNS = [
+  'email',
+  'phone',
+  'company_id',
+  'department',
+  'position',
+  'role',
+  'status',
+  'employee_no',
+  'join_date',
+  'joined_at',
+  'hire_date',
+  'resigned_at',
+  'resign_date',
+  'birth_date',
+  'address',
+  'gender',
+  'annual_days',
+  'annual_used',
+  'annual_leave_total',
+  'annual_leave_used',
+  'presence_status',
+  'permissions',
+  'avatar_url',
+  'photo_url',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'extension',
+  'shift_id',
+  'auth_user_id',
+  'employment_type',
+  'contract_type',
+  'updated_at',
+];
+
+export function buildStaffLightBootstrapSelect(omittedColumns: ReadonlySet<string> = new Set()) {
+  return buildSelectClause(STAFF_LIGHT_BOOTSTRAP_COLUMNS, omittedColumns);
+}
+
+export const STAFF_LIGHT_BOOTSTRAP_SELECT = buildStaffLightBootstrapSelect();
+
 const STAFF_SETTLEMENT_COLUMNS = [
   'id',
   'name',

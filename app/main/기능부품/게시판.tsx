@@ -1084,6 +1084,13 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     );
     setPollAnonymous(Boolean(rawPoll?.anonymous));
     setPollMultiple(Boolean(rawPoll?.multiple));
+
+    // 상품 추첨 설정 필드 로드
+    const prize = rawPoll?.prize as { winnerCount?: number; name?: string } | undefined;
+    setPollPrizeEnabled(Boolean(prize));
+    setPollPrizeWinnerCount(prize?.winnerCount ?? 1);
+    setPollPrizeName(prize?.name ?? '');
+
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       const parts = (post.title || '').split(' ');
       if (['좌측', '우측'].includes(parts[0])) {
@@ -1298,6 +1305,13 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         };
         if (pollPrizeEnabled && pollPrizeName.trim() && pollPrizeWinnerCount >= 1) {
           pollData.prize = { winnerCount: pollPrizeWinnerCount, name: pollPrizeName.trim() };
+          if (editingPostId) {
+            const originalPost = posts.find((p) => p.id === editingPostId);
+            const originalPoll = originalPost?.poll as BoardPoll | undefined;
+            if (originalPoll?.prizeWinners) {
+              pollData.prizeWinners = originalPoll.prizeWinners;
+            }
+          }
         }
         postData.poll = pollData;
       } else if (editingPostId) {
@@ -1850,6 +1864,18 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                             className="w-full h-32 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
                           />
                         </div>
+
+                        <div className="flex flex-wrap gap-4 items-center py-2">
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
+                            <input
+                              type="checkbox"
+                              checked={hasPoll}
+                              onChange={(e) => setHasPoll(e.target.checked)}
+                              className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                            />
+                            <span>📊 투표 추가</span>
+                          </label>
+                        </div>
                       </div>
                     ) : activeBoard === '공지사항' ? (
                       // ─── [공지사항 전용 폼] ───
@@ -1882,6 +1908,15 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                                 className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
                               />
                               <span>📌 중요 공지로 등록 (최상단 고정 및 강조)</span>
+                            </label>
+                            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
+                              <input
+                                type="checkbox"
+                                checked={hasPoll}
+                                onChange={(e) => setHasPoll(e.target.checked)}
+                                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                              />
+                              <span>📊 투표 추가</span>
                             </label>
                           </div>
 
@@ -1991,8 +2026,8 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                       </div>
                     )}
                     
-                    {/* 투표 설정 폼 (경조사나 공지사항이 아니고 투표 추가가 켜진 경우에만) */}
-                    {hasPoll && activeBoard !== '경조사' && activeBoard !== '공지사항' && (
+                    {/* 투표 설정 폼 (투표 추가가 켜진 경우에만) */}
+                    {hasPoll && activeBoard !== '익명소리함' && !isScheduleBoardType(activeBoard) && (
                       <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/30 p-4 space-y-3">
                         <p className="text-xs font-bold text-[var(--accent)]">투표 설정</p>
                         <input

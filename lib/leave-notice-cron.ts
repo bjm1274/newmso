@@ -234,8 +234,8 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
     const messageRow = {
       id: messageId,
       room_id: LEAVE_NOTICE_ROOM_ID,
-      sender_id: String(approval.sender_id || '').trim() || null,
-      sender_name: senderName,
+      sender_id: null,
+      sender_name: '공지봇',
       content,
       created_at: nowIso,
     };
@@ -304,3 +304,112 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
     errors,
   };
 }
+
+export async function announceLeaveApprovalIfNeeded(
+  db: D1Db,
+  approval: LeaveApprovalRow,
+  now = new Date()
+): Promise<boolean> {
+  const targetDate = getTimeZoneDateKeyOffset(0, LEAVE_NOTICE_TIMEZONE, now);
+  const metaData =
+    approval.meta_data && typeof approval.meta_data === 'object'
+      ? ({ ...approval.meta_data } as Record<string, unknown>)
+      : {};
+  const leaveMeta = extractLeaveRequestMeta(metaData);
+  if (!leaveMeta) return false;
+
+  // Only announce if the leave starts today or in the past
+  if (leaveMeta.startDate > targetDate) return false;
+
+  const existingTargetDate = String(metaData.leave_notice_target_date || '').trim();
+  const existingAnnouncedAt = String(metaData.leave_notice_announced_at || '').trim();
+  if (existingAnnouncedAt && existingTargetDate === leaveMeta.startDate) {
+    return false; // Already announced
+  }
+
+  const senderId = String(approval.sender_id || '').trim();
+  let staff: StaffRow | undefined;
+  if (senderId) {
+    const staffRows = await db
+      .select({
+        id: staffMembersTable.id,
+        name: staffMembersTable.name,
+        company: staffMembersTable.company,
+        company_id: staffMembersTable.company_id,
+        department: staffMembersTable.department,
+        team: staffMembersTable.team,
+        position: staffMembersTable.position,
+      })
+      .from(staffMembersTable)
+      .where(eq(staffMembersTable.id, senderId))
+      .limit(1);
+    staff = staffRows[0] as StaffRow | undefined;
+  }
+
+  const senderName = String(approval.sender_name || staff?.name || '').trim() || '직원';
+  const departmentLabel = resolveDepartmentLabel(staff, approval);
+  const messageId = buildDeterministicMessageId(String(approval.id), leaveMeta.startDate);
+  const content = formatLeaveNoticeMessage({
+    leaveType: leaveMeta.leaveType,
+    employeeName: senderName,
+    department: departmentLabel,
+    startDate: leaveMeta.startDate,
+    endDate: leaveMeta.endDate,
+    delegateName: leaveMeta.delegateName,
+  });
+
+  const nowIso = now.toISOString();
+  const messageRow = {
+    id: messageId,
+    room_id: LEAVE_NOTICE_ROOM_ID,
+    sender_id: null,
+    sender_name: '공지봇',
+    content,
+    created_at: nowIso,
+  };
+
+  let duplicateMessage = false;
+  try {
+    const inserted = await db
+      .insert(messagesTable)
+      .values(messageRow)
+      .onConflictDoNothing()
+      .returning({ id: messagesTable.id });
+    duplicateMessage = inserted.length === 0;
+  } catch (err) {
+    console.error(`[leave-notice-cron] Failed to insert message for approval ${approval.id}:`, err);
+    return false;
+  }
+
+  if (!duplicateMessage) {
+    try {
+      await updateChatRoomLastMessage(db, {
+        room_id: LEAVE_NOTICE_ROOM_ID,
+        created_at: nowIso,
+        content,
+      });
+    } catch (err) {
+      console.warn('[leave-notice-cron] chat_rooms last_message D1 sync failed', err);
+    }
+  }
+
+  const nextMetaData = {
+    ...metaData,
+    leave_notice_target_date: leaveMeta.startDate,
+    leave_notice_announced_at: nowIso,
+    leave_notice_message_id: messageId,
+  };
+
+  try {
+    await db
+      .update(approvalsTable)
+      .set({ meta_data: JSON.stringify(nextMetaData) })
+      .where(eq(approvalsTable.id, String(approval.id)));
+  } catch (err) {
+    console.error(`[leave-notice-cron] Failed to update approval meta_data for ${approval.id}:`, err);
+    return false;
+  }
+
+  return !duplicateMessage;
+}
+

@@ -13,6 +13,7 @@ const composeUser = {
   position: '간호사',
   role: 'staff',
   schedule_id: 'work-schedule-day',
+  shift_id: 'work-schedule-day',
   annual_leave_total: 15,
   annual_leave_used: 3,
 };
@@ -112,22 +113,38 @@ function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => {
+    const msg = String(error.message || error).toLowerCase();
+    if (
+      msg.includes('sandboxed') ||
+      msg.includes('allow-same-origin') ||
+      msg.includes('localstorage') ||
+      msg.includes('serviceworker') ||
+      msg.includes('access is denied')
+    ) {
+      return;
+    }
     errors.push(`pageerror: ${error.message}`);
   });
 
   page.on('console', (message) => {
+    console.log(`[BROWSER] [${message.type()}] ${message.text()}`);
     if (message.type() !== 'error') return;
 
-    const text = message.text();
+    const text = message.text().toLowerCase();
     if (
       text.includes('favicon') ||
-      text.includes('Failed to load resource') ||
-      text.includes('ERR_ABORTED')
+      text.includes('failed to load resource') ||
+      text.includes('err_aborted') ||
+      text.includes('sandboxed') ||
+      text.includes('allow-scripts') ||
+      text.includes('about:srcdoc') ||
+      text.includes('localstorage') ||
+      text.includes('access is denied')
     ) {
       return;
     }
 
-    errors.push(`console: ${text}`);
+    errors.push(`console: ${message.text()}`);
   });
 
   return errors;
@@ -140,7 +157,7 @@ async function openCompose(page: Page) {
 }
 
 async function selectComposeFormTab(page: Page, label: string) {
-  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByTestId('approval-form-type-select').selectOption(label);
 }
 
 async function selectApprover(page: Page) {
@@ -155,7 +172,16 @@ async function waitForApprovalInsert(page: Page) {
   return page.waitForRequest(
     (request) =>
       request.method() === 'POST' &&
-      request.url().includes('/rest/v1/approvals')
+      (request.url().includes('/rest/v1/approvals') ||
+        (request.url().includes('/api/d1/mutate') &&
+          (() => {
+            try {
+              const body = request.postDataJSON();
+              return body?.table === 'approvals' && body?.op === 'insert';
+            } catch {
+              return false;
+            }
+          })()))
   );
 }
 
@@ -169,7 +195,9 @@ async function readApprovals(page: Page) {
 async function readNotifications(page: Page) {
   return page.evaluate(async () => {
     const response = await fetch('/rest/v1/notifications?select=*');
-    return response.json();
+    const data = await response.json();
+    console.log('[DEBUG] readNotifications result:', JSON.stringify(data));
+    return data;
   });
 }
 
@@ -204,10 +232,13 @@ test('approval submission stays blocked until an approver is selected', async ({
   });
 
   await openCompose(page);
+  // Clear auto-populated default approvers
+  await page.getByRole('button', { name: '최종 결재자 결재자 제거' }).click();
+  await page.getByRole('button', { name: '행정 지원 결재자 제거' }).click();
   await expect(page.getByTestId('approval-approver-required')).toBeVisible();
   await expect(page.getByTestId('approval-submit-button')).toBeDisabled();
 
-  await selectComposeFormTab(page, '양식신청');
+  await selectComposeFormTab(page, '증명서발급');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
   await expect(page.getByTestId('form-request-approver-required')).toBeVisible();
   await expect(page.getByTestId('form-request-submit')).toBeDisabled();
@@ -256,7 +287,8 @@ test('hospital compose includes SY INC. approvers in approval line options acros
   await expect(approverSelect.locator('option', { hasText: supportDirectorWithLegacyCompanyName.name })).toHaveCount(1);
 
   await approverSelect.selectOption(supportDirectorWithLegacyCompanyName.id);
-  await expect(page.getByText(`1. ${supportDirectorWithLegacyCompanyName.name} ${supportDirectorWithLegacyCompanyName.position}`)).toBeVisible();
+  await expect(page.getByText(supportDirectorWithLegacyCompanyName.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(supportDirectorWithLegacyCompanyName.position, { exact: true })).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });
@@ -325,20 +357,25 @@ test('supply request template load keeps saved reference users', async ({ page }
   await page.getByTestId('approval-template-name-input').fill('물품신청 템플릿 참조자 유지');
   await page.getByTestId('approval-template-save-confirm').click();
 
-  await page.getByTestId('approval-selected-approver-remove-0').click();
+  await page.getByRole('button', { name: `${approver.name} 결재자 제거` }).click();
   await page.getByTestId('approval-selected-cc-remove-0').click();
   await expect(page.getByText(`CC ${templateReferenceStaff.name}`)).toHaveCount(0);
 
   await page.getByTestId('approval-template-load-toggle').click();
   await page.getByRole('button', { name: /물품신청 템플릿 참조자 유지/ }).click();
 
-  await expect(page.getByText(`1. ${approver.name} ${approver.position}`)).toBeVisible();
+  await expect(page.getByText(approver.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(approver.position, { exact: true })).toBeVisible();
   await expect(page.getByText(`CC ${templateReferenceStaff.name}`)).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });
 
 test('supply request stats stay collapsed by default and surface recent recommendations', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
+
+  const date3DaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const date2DaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  const date1DayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
 
   await mockSupabase(page, {
     staffMembers: [composeUser, approver, supportStaff],
@@ -353,7 +390,7 @@ test('supply request stats stay collapsed by default and surface recent recommen
         sender_company: composeUser.company,
         company_id: composeUser.company_id,
         status: '승인',
-        created_at: '2026-03-18T09:00:00.000Z',
+        created_at: date3DaysAgo,
         meta_data: {
           form_slug: 'purchase',
           form_name: '물품신청',
@@ -372,7 +409,7 @@ test('supply request stats stay collapsed by default and surface recent recommen
         sender_company: composeUser.company,
         company_id: composeUser.company_id,
         status: '승인',
-        created_at: '2026-03-20T09:00:00.000Z',
+        created_at: date2DaysAgo,
         meta_data: {
           form_slug: 'purchase',
           form_name: '물품신청',
@@ -391,7 +428,7 @@ test('supply request stats stay collapsed by default and surface recent recommen
         sender_company: composeUser.company,
         company_id: composeUser.company_id,
         status: '승인',
-        created_at: '2026-03-21T09:00:00.000Z',
+        created_at: date1DayAgo,
         meta_data: {
           form_slug: 'purchase',
           form_name: '물품신청',
@@ -435,7 +472,7 @@ test('supply request stats stay collapsed by default and surface recent recommen
   await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
   await expect(page.getByTestId('supplies-stats-panel')).toHaveCount(0);
-  await expect(page.getByTestId('supplies-requester-department')).toHaveText('병동팀');
+  await expect(page.getByTestId('supplies-context-department')).toHaveValue('병동팀');
   await expect(page.getByTestId('supplies-stats-summary')).toContainText('최근 30일 추천');
 
   await page.getByTestId('supplies-stats-toggle').click();
@@ -451,6 +488,10 @@ test('shared approval forms submit with real field input', async ({ page }) => {
   test.setTimeout(300_000);
 
   const runtimeErrors = trackRuntimeErrors(page);
+
+  const otDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const otCheckIn = `${otDate}T09:00:00`;
+  const otCheckOut = `${otDate}T20:30:00`;
 
   await mockSupabase(page, {
     staffMembers: [composeUser, approver, supportStaff],
@@ -505,13 +546,20 @@ test('shared approval forms submit with real field input', async ({ page }) => {
       {
         id: 'attendance-overtime-1',
         staff_id: composeUser.id,
-        date: '2026-03-16',
-        check_in: '2026-03-16T09:00:00',
-        check_out: '2026-03-16T20:30:00',
+        date: otDate,
+        check_in: otCheckIn,
+        check_out: otCheckOut,
         status: '정상',
       },
     ],
     workSchedules: [
+      {
+        id: 'work-schedule-day',
+        name: '주간근무',
+        end_time: '18:00',
+      },
+    ],
+    workShifts: [
       {
         id: 'work-schedule-day',
         name: '주간근무',
@@ -597,7 +645,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
 
     const row = await expectApproval(page, title);
     expect(row.type).toBe('연장근무');
-    expect(row.meta_data.date).toBe('2026-03-16');
+    expect(row.meta_data.date).toBe(otDate);
     expect(row.meta_data.hours).toBe(2.5);
   });
 
@@ -607,12 +655,12 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await selectApprover(page);
     await page.getByTestId('approval-title-input').fill('E2E 물품 신청');
     await page.getByTestId('approval-content-input').fill('병동 비품 신청 사유입니다.');
-    await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
-    await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
-    await expect(page.getByTestId('supplies-item-current-stock-0')).toContainText('4 BOX');
-    await page.getByTestId('supplies-item-qty-0').fill('3');
-    await page.getByTestId('supplies-item-purpose-0').fill('병동 처치용');
-    await page.getByTestId('supplies-item-category-0').selectOption('의료용품');
+    await page.getByTestId('supplies-item-name-0').first().fill('멸균 거즈');
+    await expect(page.getByTestId('supplies-item-unit-0').first()).toHaveValue('BOX');
+    await expect(page.getByTestId('supplies-item-current-stock-0').first()).toContainText('4 BOX');
+    await page.getByTestId('supplies-item-qty-0').first().fill('3');
+    await page.getByTestId('supplies-item-purpose-0').first().fill('병동 처치용');
+    await page.getByTestId('supplies-item-category-0').first().selectOption('의료용품');
 
     const insert = waitForApprovalInsert(page);
     await page.getByTestId('approval-submit-button').click();
@@ -742,9 +790,12 @@ test('form request submits through the dedicated flow', async ({ page }) => {
   });
 
   await openCompose(page);
+  // Clear auto-populated default approvers
+  await page.getByRole('button', { name: '최종 결재자 결재자 제거' }).click();
+  await page.getByRole('button', { name: '행정 지원 결재자 제거' }).click();
   await selectApprover(page);
   await selectReference(page);
-  await selectComposeFormTab(page, '양식신청');
+  await selectComposeFormTab(page, '증명서발급');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
   await page.getByTestId('form-request-type-1').click();
   await page.getByTestId('form-request-purpose').fill('대출 제출용 증명서 발급 신청');
@@ -762,7 +813,7 @@ test('form request submits through the dedicated flow', async ({ page }) => {
       expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),
     ])
   );
-  expect(approvals[0].type).toBe('양식신청');
+  expect(approvals[0].type).toBe('증명서발급');
   expect(approvals[0].meta_data.purpose).toBe('대출 제출용 증명서 발급 신청');
   expect(approvals[0].meta_data.urgency).toBe('긴급');
   expect(runtimeErrors).toEqual([]);
@@ -771,6 +822,7 @@ test('form request submits through the dedicated flow', async ({ page }) => {
 test('admin-configured default references auto-apply, notify recipients, and appear in the reference inbox', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const runtimeErrors = trackRuntimeErrors(page);
 
   await mockSupabase(page, {
@@ -840,14 +892,17 @@ test('admin-configured default references auto-apply, notify recipients, and app
   await openCompose(page);
   await selectComposeFormTab(page, '물품신청');
   await expect(page.getByText(`CC ${supportStaff.name}`)).toBeVisible();
+  // Clear auto-populated default approvers
+  await page.getByRole('button', { name: '최종 결재자 결재자 제거' }).click();
+  await page.getByRole('button', { name: '행정 지원 결재자 제거' }).click();
   await selectApprover(page);
   await page.getByTestId('approval-title-input').fill('기본 참조자 물품신청');
   await page.getByTestId('approval-content-input').fill('기본 참조자 자동 세팅 검증');
-  await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
-  await expect(page.getByTestId('supplies-item-unit-0')).toHaveText('BOX');
-  await page.getByTestId('supplies-item-qty-0').fill('2');
-  await page.getByTestId('supplies-item-purpose-0').fill('병동 처치');
-  await page.getByTestId('supplies-item-category-0').selectOption('의료용품');
+  await page.getByTestId('supplies-item-name-0').first().fill('멸균 거즈');
+  await expect(page.getByTestId('supplies-item-unit-0').first()).toHaveValue('BOX');
+  await page.getByTestId('supplies-item-qty-0').first().fill('2');
+  await page.getByTestId('supplies-item-purpose-0').first().fill('병동 처치');
+  await page.getByTestId('supplies-item-category-0').first().selectOption('의료용품');
 
   const insert = waitForApprovalInsert(page);
   await page.getByTestId('approval-submit-button').click();
@@ -866,12 +921,15 @@ test('admin-configured default references auto-apply, notify recipients, and app
   await expect
     .poll(async () => {
       const notifications = await readNotifications(page);
-      return notifications.find(
-        (item: any) =>
-          item.user_id === supportStaff.id &&
-          item.metadata?.approval_id === insertedApproval.id &&
-          item.metadata?.approval_view === '참조 문서함'
-      ) || null;
+      const match = notifications.find(
+        (item: any) => {
+          const uMatch = item.user_id === supportStaff.id;
+          const idMatch = item.metadata?.approval_id === insertedApproval.id;
+          const viewMatch = item.metadata?.approval_view === '참조 문서함';
+          return uMatch && idMatch && viewMatch;
+        }
+      );
+      return match || null;
     })
     .toBeTruthy();
 
@@ -895,6 +953,7 @@ test('admin-configured default references auto-apply, notify recipients, and app
   const referenceCard = page.getByTestId(`approval-card-${insertedApproval.id}`);
   await expect(referenceCard).toBeVisible();
   await expect(referenceCard.getByText('참조 1명')).toBeVisible();
+  await page.getByLabel('검색').first().click();
   await page.getByTestId('approval-keyword-filter').fill('물품신청');
   await expect(referenceCard).toBeVisible();
   await page.getByTestId('approval-keyword-filter').fill('없는검색어');

@@ -15,24 +15,36 @@ import type { ChatRoom, ErpUser } from '@/types';
 import SChatList from './채팅목록';
 import SChatRoom from './채팅방';
 import SFormChat from './새대화';
-import { useChatRoomsForMobile } from './data-hooks';
+import { useChatRoomsForMobile, type MobileChatRoom } from './data-hooks';
 
 type ChatView = 'list' | 'room' | 'new';
 
 export type 채팅Props = {
   user: ErpUser;
   onBack?: () => void;
+  rooms?: MobileChatRoom[];
+  refreshRooms?: () => Promise<void>;
+  onActiveRoomChange?: (roomId: string | null) => void;
 };
 
-export default function 채팅({ user }: 채팅Props) {
+export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange }: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
 
   const userId = typeof user.id === 'string' ? user.id : null;
 
-  // JM2: 채팅 라우터 최상위에서 1회 fetch — SChatList·QuickSwitchBar 공유
-  const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId);
+  // 부모(MobileShell)와 상태 공유 — 부모가 준 값이 있으면 그것을 쓰고 없으면 로컬에서 조회
+  const localHook = useChatRoomsForMobile(propsRooms ? null : userId, propsRooms ? null : selectedRoomId);
+  const rooms = propsRooms ?? localHook.rooms;
+  const refreshRooms = propsRefreshRooms ?? localHook.refresh;
+
+  // 활성 방 변경 시 부모 컴포넌트에 통지
+  useEffect(() => {
+    if (onActiveRoomChange) {
+      onActiveRoomChange(selectedRoomId);
+    }
+  }, [selectedRoomId, onActiveRoomChange]);
 
   // 방 진입 시 rooms 배열에서 room row 찾기 (별도 fetch 불필요)
   useEffect(() => {

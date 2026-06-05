@@ -4,6 +4,7 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import type { StaffMember } from '@/types';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { buildApprovalWorkflowSummary } from './ApprovalRiskReviewDialog';
+import { getLeaveRequestSummary } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -182,6 +183,8 @@ function BoardCard({
   const urgent = isUrgent(item);
   const date = formatBoardDate(item.created_at);
 
+  const leaveRequestSummary = getLeaveRequestSummary(item.meta_data as Record<string, unknown> | null | undefined);
+
   return (
     <button
       type="button"
@@ -193,6 +196,16 @@ function BoardCard({
         {typeLabel}
       </p>
       <p className="mt-1 line-clamp-2 text-[13px] font-bold text-[var(--foreground)]">{title}</p>
+      {leaveRequestSummary && (
+        <div className="mt-0.5 flex flex-wrap gap-0.5 mb-1.5">
+          <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+            {leaveRequestSummary.leaveType}
+          </span>
+          <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">
+            {leaveRequestSummary.dateLabel}
+          </span>
+        </div>
+      )}
       <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--muted-foreground)]">
         <span
           aria-hidden

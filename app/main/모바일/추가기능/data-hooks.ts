@@ -634,6 +634,7 @@ export type SharePost = {
   comments: number;
   tag: string;
   urgent: boolean;
+  company?: string;
 };
 
 export function useTaskShares(opts: { company?: string; pollMs?: number }) {
@@ -722,6 +723,7 @@ export function useTaskGuides(opts: { company?: string }) {
           comments: pickNumber(r, 'comment_count'),
           tag: pickText(r, 'tag', 'category') || '가이드',
           urgent: false,
+          company: pickText(r, 'company') || '공통',
         }));
         setRows(mapped);
       } catch (err) {

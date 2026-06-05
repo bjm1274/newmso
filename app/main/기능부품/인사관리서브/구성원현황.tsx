@@ -1475,7 +1475,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
-        let { error: insertErr, data: insertedStaff } = await withMissingColumnsFallback(
+        const { error: insertErr, data: insertedStaff } = await withMissingColumnsFallback(
           (omittedColumns) => {
             const allOmittedColumns = new Set<string>([
               ...omittedColumns,
@@ -1688,13 +1688,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         status: '퇴사',
         resigned_at: 직원.resigned_at || today,
       };
-      await supabase
+      const { error: updateErr } = await supabase
         .from('staff_members')
         .update({
           status: '퇴사',
           resigned_at: 직원.resigned_at || today,
         })
         .eq('id', 직원.id);
+
+      if (updateErr) throw updateErr;
 
       await logAudit(
         '직원퇴사처리',

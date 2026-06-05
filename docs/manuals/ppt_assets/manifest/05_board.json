@@ -3,7 +3,7 @@
   "title": "게시판 화면",
   "subtitle": "공지사항과 자유게시판 등 게시판 종류를 선택해 사용합니다.",
   "role": "사원",
-  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\05_board.png",
+  "image": "D:\\newmso\\docs\\manuals\\ppt_assets\\raw\\05_board.png",
   "notes": [
     "상단에서 게시판 종류를 바꿉니다.",
     "중앙 목록에서 게시물을 열어 확인합니다.",
@@ -15,10 +15,10 @@
       "label": "공지사항 탭",
       "note": "공식 공지 확인",
       "box": {
-        "x": 72,
-        "y": 12,
-        "width": 143,
-        "height": 30.59375
+        "x": 80,
+        "y": 35.046875,
+        "width": 203,
+        "height": 36.59375
       }
     },
     {

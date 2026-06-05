@@ -6,6 +6,7 @@ import {
   ApprovalProgressSummary,
   buildApprovalWorkflowSummary,
 } from './ApprovalRiskReviewDialog';
+import { getLeaveRequestSummary } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -65,43 +66,56 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
       key: 'title',
       label: '문서 제목',
       primary: true,
-      render: (item) => (
-        <div className="min-w-[220px]" data-testid={`approval-card-${String(item.id || '')}`}>
-          <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
-          <ApprovalProgressSummary
-            item={item}
-            staffs={lookupStaffs}
-            resolveApprovalLineIds={resolveApprovalLineIds}
-            resolveCurrentApproverId={resolveCurrentApproverId}
-            resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
-            compact
-          />
-          {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
-            <div className="mt-2 flex gap-1">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleApproveAction(item);
-                }}
-                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm"
-              >
-                승인
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void handleRejectAction(item);
-                }}
-                className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm"
-              >
-                반려
-              </button>
-            </div>
-          )}
-        </div>
-      ),
+      render: (item) => {
+        const leaveRequestSummary = getLeaveRequestSummary(item.meta_data as Record<string, unknown> | null | undefined);
+        return (
+          <div className="min-w-[220px]" data-testid={`approval-card-${String(item.id || '')}`}>
+            <p className="font-bold text-[var(--foreground)]">{String(item.title || '제목 없음')}</p>
+            {leaveRequestSummary && (
+              <div className="mt-0.5 flex flex-wrap gap-0.5 mb-1.5">
+                <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200">
+                  {leaveRequestSummary.leaveType}
+                </span>
+                <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">
+                  {leaveRequestSummary.dateLabel}
+                </span>
+              </div>
+            )}
+            <ApprovalProgressSummary
+              item={item}
+              staffs={lookupStaffs}
+              resolveApprovalLineIds={resolveApprovalLineIds}
+              resolveCurrentApproverId={resolveCurrentApproverId}
+              resolveApprovalDelaySnapshot={resolveApprovalDelaySnapshot}
+              compact
+            />
+            {canUserApproveItem(item) && String(item.status || '').includes('대기') && (
+              <div className="mt-2 flex gap-1">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleApproveAction(item);
+                  }}
+                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--success)] shadow-sm"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleRejectAction(item);
+                  }}
+                  className="h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--danger)] shadow-sm"
+                >
+                  반려
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'sender_name',

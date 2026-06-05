@@ -124,6 +124,13 @@ export function useApprovalComposeDraft({
   resolveDefaultReferenceUsersForForm,
 }: UseApprovalComposeDraftParams) {
   const hydratedComposeSeedIdRef = useRef<string | null>(null);
+  const approverLineRef = useRef(approverLine);
+  const ccLineRef = useRef(ccLine);
+  const isInitializedRef = useRef(false);
+  useEffect(() => {
+    approverLineRef.current = approverLine;
+    ccLineRef.current = ccLine;
+  }, [approverLine, ccLine]);
 
   useEffect(() => {
     const nextView = resolveAccessibleView(initialView);
@@ -363,29 +370,32 @@ export function useApprovalComposeDraft({
 
   useEffect(() => {
     if (viewMode !== '작성하기') return;
+    if (isInitializedRef.current) return;
 
-    if (ccLine.length === 0) {
-      const company = user?.company;
-      const defaultCc = approvalDirectoryStaffs
-        .filter((s) => isActiveStaff(s) && String(s.id) !== user?.id && s.company === company)
-        .map((s) => ({
-          id: s.id,
-          name: s.name,
-          position: s.position ?? null,
-        }));
-      setCcLine(defaultCc);
+    if (ccLineRef.current.length === 0) {
+      const defaultCc = resolveDefaultReferenceUsersForForm(formType);
+      if (defaultCc.length > 0) {
+        setCcLine(defaultCc);
+      }
     }
 
-    if (approverLine.length === 0) {
+    if (approverLineRef.current.length === 0) {
       const defaultApprovers = approvalDirectoryStaffs
         .filter((s) => isActiveStaff(s) && isDepartmentHeadOrAbove(s) && String(s.id) !== user?.id)
         .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
-      setApproverLine(defaultApprovers);
+      if (defaultApprovers.length > 0) {
+        setApproverLine(defaultApprovers);
+      }
     }
-  }, [ccLine.length, approverLine.length, approvalDirectoryStaffs, user, setCcLine, setApproverLine, viewMode]);
+
+    isInitializedRef.current = true;
+  }, [approvalDirectoryStaffs, user, setCcLine, setApproverLine, viewMode, formType, resolveDefaultReferenceUsersForForm]);
 
   useEffect(() => {
-    if (viewMode !== '작성하기') return;
+    if (viewMode !== '작성하기') {
+      isInitializedRef.current = false;
+      return;
+    }
     if (isHydratingComposeRef.current) {
       isHydratingComposeRef.current = false;
       return;
@@ -394,6 +404,7 @@ export function useApprovalComposeDraft({
     setFormContent('');
     setExtraData({});
     setSupplyInventoryReview(null);
+    isInitializedRef.current = false;
   }, [formType, isHydratingComposeRef, setExtraData, setFormContent, setFormTitle, setSupplyInventoryReview, viewMode]);
 
   const loadLastDraft = useCallback(() => {

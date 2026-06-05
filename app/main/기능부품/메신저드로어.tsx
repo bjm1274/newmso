@@ -16,7 +16,7 @@ import {
 } from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
-import { isSelfChatRoom, NOTICE_ROOM_ID } from './메신저유틸';
+import { isSelfChatRoom, NOTICE_ROOM_ID, toChatDate } from './메신저유틸';
 
 type DrawerSectionKey = 'media' | 'files' | 'links' | 'bookmarks';
 
@@ -84,7 +84,7 @@ const DEFAULT_EXPANDED_SECTIONS: Record<DrawerSectionKey, boolean> = {
 function sortMessagesByRecent(messages: ChatMessage[] | null | undefined) {
   const safeMessages = Array.isArray(messages) ? messages : [];
   return [...safeMessages].sort(
-    (left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime(),
+    (left, right) => toChatDate(right.created_at || 0).getTime() - toChatDate(left.created_at || 0).getTime(),
   );
 }
 

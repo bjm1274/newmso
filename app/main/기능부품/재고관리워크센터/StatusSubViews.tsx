@@ -6,7 +6,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { supabase } from '@/lib/supabase';
 import { StockChip } from './stock-workcenter-common';
 import type { StockStatusRow } from './stock-types';
 
@@ -28,6 +30,31 @@ const PurchaseOrderManagement = dynamic(
 
 /** 발주관리 모달 래퍼 */
 function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
+  const { user } = useAppData();
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+
+  const fetchInventory = useCallback(async () => {
+    const { data: inv } = await supabase
+      .from('inventory')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (inv) setInventory(inv);
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    const { data: sups } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+    if (sups) setSuppliers(sups);
+  }, []);
+
+  useEffect(() => {
+    void fetchInventory();
+    void fetchSuppliers();
+  }, [fetchInventory, fetchSuppliers]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -48,7 +75,13 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="px-4 py-4">
-          <PurchaseOrderManagement user={{}} inventory={[]} suppliers={[]} />
+          <PurchaseOrderManagement
+            user={user}
+            inventory={inventory}
+            suppliers={suppliers}
+            fetchInventory={fetchInventory}
+            fetchSuppliers={fetchSuppliers}
+          />
         </div>
       </div>
     </div>

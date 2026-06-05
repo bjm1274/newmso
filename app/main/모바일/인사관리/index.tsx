@@ -20,6 +20,7 @@ import MobileHeader from '../셸/MobileHeader';
 import MListRow from '../공통/MListRow';
 import MKpi from '../공통/MKpi';
 import MIcon from '../공통/MIcon';
+import MSheet from '../공통/MSheet';
 import 구성원 from './구성원';
 import 근태 from './근태';
 import 연차 from './연차';
@@ -66,7 +67,7 @@ interface HrMenu {
 }
 
 const HR_MENU: HrMenu[] = [
-  { id: 'member', label: '구성원', sub: '명단 · 인사발령 · 교육 · 자격', icon: 'users', tone: 'accent', badge: '27명' },
+  { id: 'member', label: '구성원', sub: '명단 · 인사발령 · 교육 · 자격', icon: 'users', tone: 'accent' },
   { id: 'attend', label: '근태', sub: '대시보드 · 근무표 · 3교대 · 근태이상', icon: 'clock', tone: 'success' },
   { id: 'leave', label: '연차 · 휴가', sub: '잔여 · 신청 내역 · 소멸 알림 · 계획서', icon: 'calendar', tone: 'accent' },
   { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning', badge: '정산 중', badgeTone: 'warning' },
@@ -80,10 +81,12 @@ export default function 인사관리({
   onExit,
 }: 인사관리Props) {
   const [view, setView] = useState<HrView>(initialView);
+  const [selectedCompany, setSelectedCompany] = useState<string | undefined>(
+    typeof user.company === 'string' ? user.company : undefined
+  );
 
   const staffId = typeof user.id === 'string' ? user.id : null;
   const staffName = typeof user.name === 'string' ? user.name : undefined;
-  const company = typeof user.company === 'string' ? user.company : undefined;
 
   const goBack = useCallback(() => {
     // form은 진입 전 화면으로 복귀
@@ -107,13 +110,13 @@ export default function 인사관리({
     case 'member':
       return (
         <구성원
-          company={company}
+          company={selectedCompany}
           onBack={goBack}
           onOpenForm={() => setView('form-member')}
         />
       );
     case 'attend':
-      return <근태 staffId={staffId} company={company} onBack={goBack} />;
+      return <근태 staffId={staffId} company={selectedCompany} onBack={goBack} />;
     case 'leave':
       return (
         <연차 staffId={staffId} onBack={goBack} onApply={() => setView('form-leave')} />
@@ -123,18 +126,25 @@ export default function 인사관리({
     case 'payroll':
       return <급여워크센터 user={user} onBack={goBack} />;
     case 'welfare':
-      return <복지 company={company} onBack={goBack} />;
+      return <복지 company={selectedCompany} onBack={goBack} />;
     case 'docs':
       return <계약문서 staffId={staffId} onBack={goBack} />;
     case 'form-member':
-      return <구성원등록 onBack={goBack} user={user} company={company} />;
+      return <구성원등록 onBack={goBack} user={user} company={selectedCompany} />;
     case 'form-leave':
       return (
         <연차신청 staffId={staffId} staffName={staffName} onBack={goBack} />
       );
     case 'hub':
     default:
-      return <Hub company={company} onExit={onExit} onOpen={(v) => setView(v)} />;
+      return (
+        <Hub
+          company={selectedCompany}
+          onCompanyChange={setSelectedCompany}
+          onExit={onExit}
+          onOpen={(v) => setView(v)}
+        />
+      );
   }
 }
 
@@ -144,14 +154,36 @@ export default function 인사관리({
 
 function Hub({
   company,
+  onCompanyChange,
   onExit,
   onOpen,
 }: {
   company?: string;
+  onCompanyChange: (co: string | undefined) => void;
   onExit: () => void;
   onOpen: (view: HrMenuId) => void;
 }) {
-  const { staffs, loading } = useStaffList({ company, includeResigned: true });
+  // Query all staff to:
+  // 1. Gather all unique companies in the database
+  // 2. Compute accurate stats locally
+  const { staffs: allStaffs, loading } = useStaffList({ includeResigned: true });
+  const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
+
+  // Filter staff by currently selected company
+  const staffs = useMemo(() => {
+    if (!company || company === '전체') return allStaffs;
+    return allStaffs.filter((s) => s.company === company);
+  }, [allStaffs, company]);
+
+  // Extract list of unique companies from all staff
+  const companies = useMemo(() => {
+    const cos = new Set<string>();
+    cos.add('전체');
+    allStaffs.forEach((s) => {
+      if (s.company) cos.add(s.company);
+    });
+    return Array.from(cos);
+  }, [allStaffs]);
 
   // 재직자 목록 분리
   const activeStaffs = useMemo(() => staffs.filter(isActiveStaff), [staffs]);
@@ -204,6 +236,19 @@ function Hub({
     return counts;
   }, [activeStaffs]);
 
+  // 구성원 메뉴 카드에 실제 구성원 인원 수 배지 실연동
+  const menuList = useMemo(() => {
+    return HR_MENU.map((m) => {
+      if (m.id === 'member') {
+        return {
+          ...m,
+          badge: loading ? '—' : `${headcount}명`,
+        };
+      }
+      return m;
+    });
+  }, [headcount, loading]);
+
   return (
     <div className="m-screen">
       <MobileHeader
@@ -217,10 +262,15 @@ function Hub({
         }
       />
       <div className="m-scroll">
-        <div className="m-company-sel">
-          <span className="nm">{company || '박철홍정형외과'}</span>
+        <button
+          type="button"
+          className="m-company-sel"
+          onClick={() => setIsCompanySheetOpen(true)}
+        >
+          <span className="nm">{company || '전체'}</span>
           <MIcon name="chevD" size={18} className="chev" />
-        </div>
+        </button>
+
         {/* KPI — staff_members 실집계(전체 인원·평균 근속). 오늘 근무·평균 잔여연차는 별도 화면 참조. */}
         <div
           style={{
@@ -273,10 +323,10 @@ function Hub({
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">인사관리 메뉴</div>
-            <div className="cnt">{HR_MENU.length}</div>
+            <div className="cnt">{menuList.length}</div>
           </div>
           <div className="m-card flush">
-            {HR_MENU.map((m) => (
+            {menuList.map((m) => (
               <MListRow
                 key={m.id}
                 icon={m.icon}
@@ -293,6 +343,46 @@ function Hub({
         </div>
         <div style={{ height: 24 }} />
       </div>
+
+      {/* 회사 선택 바텀 시트 */}
+      <MSheet
+        open={isCompanySheetOpen}
+        onClose={() => setIsCompanySheetOpen(false)}
+        title="회사 선택"
+      >
+        <div style={{ padding: '0 16px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {companies.map((co) => (
+            <button
+              key={co}
+              type="button"
+              onClick={() => {
+                onCompanyChange(co === '전체' ? undefined : co);
+                setIsCompanySheetOpen(false);
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '14px 16px',
+                borderRadius: 'var(--m-radius-md)',
+                background: (company || '전체') === co ? 'var(--m-muted)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontSize: 14,
+                fontWeight: (company || '전체') === co ? 800 : 600,
+                color: (company || '전체') === co ? 'var(--m-accent)' : 'var(--z-800)',
+              }}
+            >
+              <span>{co}</span>
+              {(company || '전체') === co && (
+                <MIcon name="check" size={16} color="var(--m-accent)" />
+              )}
+            </button>
+          ))}
+        </div>
+      </MSheet>
     </div>
   );
 }

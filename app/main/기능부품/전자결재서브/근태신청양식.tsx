@@ -194,6 +194,7 @@ export default function AttendanceForms({
     const totalAmount = Math.floor((totalMinutes / 60) * 15000);
 
     updateExtraData({
+      date: dates[0] || null,
       selectedDates: dates,
       minutes: totalMinutes,
       hours: totalHours,

@@ -20,6 +20,7 @@ import {
   NOTICE_ROOM_ID,
   readStoredBookmarks,
   sortChatRoomsWithNoticeFirst,
+  toChatDate,
   writeStoredBookmarks,
   writeStoredPinnedIds,
 } from './메신저유틸';
@@ -643,7 +644,7 @@ export function useChatRoomDataSync({
         if (!nextPinnedIds.includes(messageId)) return;
         pinnedLookup.set(messageId, {
           ...message,
-          staff: message.staff || resolveStaffProfile(message.sender_id),
+          staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
         });
       });
 
@@ -665,7 +666,7 @@ export function useChatRoomDataSync({
         (missingPinnedRows || []).forEach((message: ChatMessage) => {
           pinnedLookup.set(String(message.id), {
             ...message,
-            staff: resolveStaffProfile(message.sender_id),
+            staff: resolveStaffProfile(message.sender_id, message.sender_name),
           });
         });
       }
@@ -730,8 +731,8 @@ export function useChatRoomDataSync({
 
   const compareMessagesChronologically = useCallback(
     (left: ChatMessage, right: ChatMessage) => {
-      const leftTime = new Date(left.created_at || 0).getTime();
-      const rightTime = new Date(right.created_at || 0).getTime();
+      const leftTime = toChatDate(left.created_at || 0).getTime();
+      const rightTime = toChatDate(right.created_at || 0).getTime();
       if (leftTime !== rightTime) {
         return leftTime - rightTime;
       }
@@ -1051,7 +1052,7 @@ export function useChatRoomDataSync({
                 if (!nextPinnedIds.includes(messageId)) return;
                 pinnedLookup.set(messageId, {
                   ...message,
-                  staff: message.staff || resolveStaffProfile(message.sender_id),
+                  staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
                 });
               });
 
@@ -1073,7 +1074,7 @@ export function useChatRoomDataSync({
                 (missingPinnedRows || []).forEach((message: ChatMessage) => {
                   pinnedLookup.set(String(message.id), {
                     ...message,
-                    staff: resolveStaffProfile(message.sender_id),
+                    staff: resolveStaffProfile(message.sender_id, message.sender_name),
                   });
                 });
               }
@@ -1449,7 +1450,7 @@ export function useChatRoomDataSync({
     if (msgs) {
       const enrichedMessages = loadedMessages.map((message: ChatMessage) => ({
         ...message,
-        staff: message.staff || resolveStaffProfile(message.sender_id),
+        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
       }));
       setMessages((prev) => {
         const localOnly = prev.filter((message: ChatMessage) => {
@@ -1599,7 +1600,7 @@ export function useChatRoomDataSync({
           if (!nextPinnedIds.includes(messageId)) return;
           pinnedLookup.set(messageId, {
             ...message,
-            staff: message.staff || resolveStaffProfile(message.sender_id),
+            staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
           });
         });
 
@@ -1620,7 +1621,7 @@ export function useChatRoomDataSync({
           (pinnedRows || []).forEach((message: ChatMessage) => {
             pinnedLookup.set(String(message.id), {
               ...message,
-              staff: resolveStaffProfile(message.sender_id),
+              staff: resolveStaffProfile(message.sender_id, message.sender_name),
             });
           });
         }

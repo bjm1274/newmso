@@ -1,7 +1,24 @@
 'use client';
 
-import { useRef, useEffect, type ReactNode } from 'react';
+import React, { useRef, useEffect, type ReactNode, isValidElement, cloneElement } from 'react';
 import { EmptyState } from '@/app/components/StatePanel';
+
+function modifyMobileNode(node: ReactNode): ReactNode {
+  if (!isValidElement(node)) {
+    return node;
+  }
+  const props = { ...(node.props as Record<string, any>) };
+  if (props['data-testid']) {
+    props['data-testid'] = `${String(props['data-testid'])}-mobile`;
+  }
+  if (props.children) {
+    props.children = React.Children.map(props.children, (child) => {
+      if (child === null || child === undefined) return child;
+      return modifyMobileNode(child);
+    });
+  }
+  return cloneElement(node, props);
+}
 
 export type Column<T> = {
   key: keyof T | string;
@@ -195,7 +212,16 @@ export function ResponsiveTable<T>({
           const key = rowKeyValue(row);
           const isSelected = selection ? selection.selected.has(key) : false;
           const canSelect = isRowSelectable(key);
-          const CardEl = onRowClick ? 'button' : 'div';
+          const isInteractive = Boolean(onRowClick || onRowDoubleClick);
+          const handleKeyDown = isInteractive
+            ? (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (onRowClick) onRowClick(row);
+                }
+              }
+            : undefined;
+
           return (
             <div
               key={key}
@@ -218,24 +244,25 @@ export function ResponsiveTable<T>({
                   />
                 </label>
               )}
-              <CardEl
-                type={onRowClick || onRowDoubleClick ? 'button' : undefined}
-                role={onRowClick || onRowDoubleClick ? undefined : 'listitem'}
+              <div
+                role={isInteractive ? 'button' : 'listitem'}
+                tabIndex={isInteractive ? 0 : undefined}
                 aria-selected={selection ? isSelected : undefined}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
+                onKeyDown={handleKeyDown}
                 className={[
-                  'block w-full px-4 py-3 text-left',
+                  'block w-full px-4 py-3 text-left focus:outline-none',
                   selection && canSelect ? 'pl-12' : '',
-                  onRowClick
-                    ? 'cursor-pointer rounded-[var(--radius-lg)] transition-colors hover:bg-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]'
+                  isInteractive
+                    ? 'cursor-pointer rounded-[var(--radius-lg)] transition-colors hover:bg-[var(--muted)] focus:ring-2 focus:ring-[var(--accent)]'
                     : '',
                 ].join(' ')}
               >
                 {/* primary 컬럼 */}
                 {primaryCol ? (
                   <div className="mb-2 text-base font-black text-[var(--foreground)]">
-                    {getCellValue(row, primaryCol)}
+                    {modifyMobileNode(getCellValue(row, primaryCol))}
                   </div>
                 ) : null}
 
@@ -252,12 +279,12 @@ export function ResponsiveTable<T>({
                           alignClass[col.align ?? 'left'],
                         ].join(' ')}
                       >
-                        {getCellValue(row, col)}
+                        {modifyMobileNode(getCellValue(row, col))}
                       </dd>
                     </div>
                   ))}
                 </dl>
-              </CardEl>
+              </div>
             </div>
           );
         })}

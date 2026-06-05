@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
       await db.insert(messagesTable).values({
         id: messageId,
         room_id: NOTICE_ROOM_ID,
-        sender_id: sessionUserId,
-        sender_name: senderName,
+        sender_id: null,
+        sender_name: '공지봇',
         content: chatContent,
       });
     } catch (err) {
@@ -242,7 +242,6 @@ export async function POST(request: NextRequest) {
       pushResult = await dispatchChatPushForMessage({
         roomId: NOTICE_ROOM_ID,
         messageId,
-        expectedSenderId: sessionUserId,
       });
     } catch (err) {
       pushError = String((err as Error)?.message || err);

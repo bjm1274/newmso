@@ -339,7 +339,6 @@ export default function ApprovalFlowCard({
           onChange={(event) => {
             const staff = approverCandidates.find((candidate) => candidate.id === event.target.value);
             if (staff) handlePickApprover(staff);
-            event.target.value = '';
           }}
           aria-label="결재자 선택 (보조)"
           className="sr-only"
@@ -358,7 +357,7 @@ export default function ApprovalFlowCard({
         <span className="lbl">참조자 ({ccLine.length}명)</span>
         {ccLine.map((cc, index) => (
           <span key={`${cc.id}-${index}`} className="ap-ref-chip">
-            {cc.name}
+            CC {cc.name}
             <button
               type="button"
               data-testid={`approval-selected-cc-remove-${index}`}
@@ -403,7 +402,6 @@ export default function ApprovalFlowCard({
               (candidate) => String(candidate.id) === event.target.value,
             );
             if (staff) handlePickCc(staff);
-            event.target.value = '';
           }}
           aria-label="참조자 선택 (보조)"
           className="sr-only"

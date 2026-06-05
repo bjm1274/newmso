@@ -8,15 +8,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
-import {
-  buildStaffBootstrapSelect,
-  STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
-} from '@/lib/staff-query-columns';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { getStaffsCached } from '@/lib/use-staff-cache';
 import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
 import { performClientLogout, unsubscribePushOnLogout } from '@/lib/client-logout';
 import { useIsMobile } from '@/app/components/useIsMobile';
-import MobileShell from './모바일/셸/MobileShell';
+import dynamic from 'next/dynamic';
+
+const MobileShell = dynamic(() => import('./모바일/셸/MobileShell'), { ssr: false });
 import {
   canAccessAdminSection,
   canAccessApprovalSection,
@@ -869,18 +867,7 @@ function MainPageContent() {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const { data: staffData, error: staffError } =
-        await withMissingColumnsFallback<StaffMember[]>(
-          (omittedColumns) =>
-            supabase
-              .from('staff_members')
-              .select(buildStaffBootstrapSelect(omittedColumns))
-              .order('employee_no', { ascending: true })
-              .returns<StaffMember[]>(),
-          STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
-        );
-
-      if (staffError) throw staffError;
+      const staffData = await getStaffsCached(true);
 
       const normalizedStaffData = Array.isArray(staffData)
         ? staffData.map((staff: StaffMember) => normalizeProfileUser(staff))

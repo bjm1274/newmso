@@ -59,6 +59,8 @@ export const approval_form_types = sqliteTable("approval_form_types", {
 	description: text(),
 	sort_order: integer().default(0),
 	is_active: integer().default(1),
+	base_slug: text(),
+	company_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 },

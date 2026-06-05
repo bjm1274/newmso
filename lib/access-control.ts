@@ -67,6 +67,8 @@ const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
   MRI일정: { read: 'board_MRI일정_read', write: 'board_MRI일정_write' },
   수술일정: { read: 'board_수술일정_read', write: 'board_수술일정_write' },
   업무가이드: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
+  익명소리함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
+  직원제안함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
 };
 
 const APPROVAL_PERMISSION_KEYS: Record<string, string> = {

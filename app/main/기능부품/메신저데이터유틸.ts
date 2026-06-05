@@ -36,7 +36,6 @@ type UnreadMessageCountRow = {
   created_at?: string | null;
 };
 
-const UNREAD_COUNT_ROOM_CHUNK_SIZE = 80;
 const UNREAD_COUNT_PAGE_SIZE = 1000;
 
 function chunkValues<T>(values: T[], size: number): T[][] {
@@ -57,61 +56,6 @@ function normalizeRoomIds(roomIds: string[]): string[] {
   );
 }
 
-function getTimestamp(value: string | null | undefined): number {
-  const time = new Date(String(value || '')).getTime();
-  return Number.isFinite(time) ? time : Number.NaN;
-}
-
-function pickEarliestTimestamp(values: Array<string | null | undefined>): string | null {
-  let selected: string | null = null;
-  let selectedTime = Number.POSITIVE_INFINITY;
-  values.forEach((value) => {
-    const time = getTimestamp(value);
-    if (Number.isFinite(time) && time < selectedTime) {
-      selected = String(value);
-      selectedTime = time;
-    }
-  });
-  return selected;
-}
-
-async function fetchUnreadCandidateRows(
-  client: ChatDataClient,
-  roomIds: string[],
-  userId: string,
-  afterCreatedAt: string | null,
-): Promise<UnreadMessageCountRow[]> {
-  const rows: UnreadMessageCountRow[] = [];
-
-  for (const roomIdChunk of chunkValues(roomIds, UNREAD_COUNT_ROOM_CHUNK_SIZE)) {
-    let offset = 0;
-    for (;;) {
-      let query = client
-        .from('messages')
-        .select('room_id, created_at')
-        .in('room_id', roomIdChunk)
-        .neq('sender_id', userId)
-        .eq('is_deleted', false);
-
-      if (afterCreatedAt) {
-        query = query.gt('created_at', afterCreatedAt);
-      }
-
-      const { data, error } = await query
-        .order('created_at', { ascending: true })
-        .range(offset, offset + UNREAD_COUNT_PAGE_SIZE - 1);
-      if (error) throw error;
-
-      const page = (data || []) as UnreadMessageCountRow[];
-      rows.push(...page);
-      if (page.length < UNREAD_COUNT_PAGE_SIZE) break;
-      offset += UNREAD_COUNT_PAGE_SIZE;
-    }
-  }
-
-  return rows;
-}
-
 export async function fetchUnreadCountsForRoomIds(
   client: ChatDataClient,
   params: FetchUnreadCountsForRoomIdsParams,
@@ -122,34 +66,46 @@ export async function fetchUnreadCountsForRoomIds(
 
   if (!normalizedUserId || roomIds.length === 0) return counts;
 
-  const noCursorRoomIds = roomIds.filter((roomId) => !params.cursorMap[roomId]);
-  const withCursorRoomIds = roomIds.filter((roomId) => Boolean(params.cursorMap[roomId]));
+  // D1 query engine has a max filter node limit of 60.
+  // Each cursor term `and(room_id.eq.X,created_at.gt.Y)` occupies 3 nodes.
+  // Chunking at 15 rooms: 15 * 3 = 45 nodes (+1 top-level OR node) = 46 nodes, which is safely below 60.
+  const CHUNK_SIZE = 15;
 
-  if (noCursorRoomIds.length > 0) {
-    const rows = await fetchUnreadCandidateRows(client, noCursorRoomIds, normalizedUserId, null);
-    rows.forEach((row) => {
-      const roomId = String(row.room_id || '').trim();
-      if (roomId && counts[roomId] !== undefined) counts[roomId] += 1;
-    });
-  }
-
-  if (withCursorRoomIds.length > 0) {
-    const earliestCursor = pickEarliestTimestamp(
-      withCursorRoomIds.map((roomId) => params.cursorMap[roomId] || null),
-    );
-    const rows = await fetchUnreadCandidateRows(client, withCursorRoomIds, normalizedUserId, earliestCursor);
-    rows.forEach((row) => {
-      const roomId = String(row.room_id || '').trim();
-      if (!roomId || counts[roomId] === undefined) return;
-      const createdAtTime = getTimestamp(row.created_at || null);
-      const lastReadTime = getTimestamp(params.cursorMap[roomId] || null);
-      if (
-        !Number.isFinite(lastReadTime) ||
-        (Number.isFinite(createdAtTime) && createdAtTime > lastReadTime)
-      ) {
-        counts[roomId] += 1;
+  for (const chunk of chunkValues(roomIds, CHUNK_SIZE)) {
+    const filterTerms = chunk.map((roomId) => {
+      const cursor = params.cursorMap[roomId];
+      if (cursor) {
+        return `and(room_id.eq.${roomId},created_at.gt."${cursor}")`;
+      } else {
+        return `room_id.eq.${roomId}`;
       }
     });
+
+    const filterString = filterTerms.join(',');
+    let offset = 0;
+
+    for (;;) {
+      const { data, error } = await client
+        .from('messages')
+        .select('room_id')
+        .neq('sender_id', normalizedUserId)
+        .eq('is_deleted', false)
+        .or(filterString)
+        .range(offset, offset + UNREAD_COUNT_PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const page = (data || []) as { room_id?: string | null }[];
+      page.forEach((row) => {
+        const roomId = String(row.room_id || '').trim();
+        if (roomId && counts[roomId] !== undefined) {
+          counts[roomId] += 1;
+        }
+      });
+
+      if (page.length < UNREAD_COUNT_PAGE_SIZE) break;
+      offset += UNREAD_COUNT_PAGE_SIZE;
+    }
   }
 
   return counts;

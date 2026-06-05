@@ -60,7 +60,7 @@ test("approval boxes filter documents by month or custom range across all list v
 
   for (const viewName of ["기안함", "결재함", "참조 문서함"] as const) {
     await page.getByRole("button", { name: viewName }).click();
-    await expect(page.getByTestId("approval-card-approval-march")).toBeVisible();
+    await expect(page.getByTestId("approval-card-approval-march").first()).toBeVisible();
     await expect(page.getByTestId("approval-card-approval-feb")).toHaveCount(0);
   }
 
@@ -68,6 +68,6 @@ test("approval boxes filter documents by month or custom range across all list v
   await page.getByTestId("approval-date-from").fill("2026-02-01");
   await page.getByTestId("approval-date-to").fill("2026-03-31");
 
-  await expect(page.getByTestId("approval-card-approval-march")).toBeVisible();
-  await expect(page.getByTestId("approval-card-approval-feb")).toBeVisible();
+  await expect(page.getByTestId("approval-card-approval-march").first()).toBeVisible();
+  await expect(page.getByTestId("approval-card-approval-feb").first()).toBeVisible();
 });

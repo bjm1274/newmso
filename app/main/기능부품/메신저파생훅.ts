@@ -10,7 +10,7 @@ import {
   type AttachmentPreviewItem,
   type AttachmentPreviewKind,
 } from './메신저첨부';
-import { isSelfChatRoom, isActiveChatMember } from './메신저유틸';
+import { isSelfChatRoom, isActiveChatMember, toChatDate } from './메신저유틸';
 
 export type MediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
 
@@ -579,8 +579,8 @@ export function useChatTimelineItems({
     const messageItems = visibleTimelineMessages.map((message) => ({ ...message, type: 'message' as const }));
     const sorted = [...messageItems, ...selectedRoomPollTimelineItems].sort(
       (left, right) =>
-        new Date((left as Record<string, unknown>).created_at as string || 0).getTime() -
-        new Date((right as Record<string, unknown>).created_at as string || 0).getTime(),
+        toChatDate((left as Record<string, unknown>).created_at as string || 0).getTime() -
+        toChatDate((right as Record<string, unknown>).created_at as string || 0).getTime(),
     );
 
     const grouped: Array<Record<string, unknown>> = [];

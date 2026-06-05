@@ -85,6 +85,18 @@ export function ApprovalProgressSummary({
   const delay = resolveApprovalDelaySnapshot?.(item);
   const status = String(item.status || '대기');
 
+  let meta = item.meta_data;
+  if (typeof meta === 'string') {
+    try {
+      meta = JSON.parse(meta);
+    } catch {
+      meta = null;
+    }
+  }
+  const metaObj = meta as Record<string, unknown> | null | undefined;
+  const ccUsers = metaObj && Array.isArray(metaObj.cc_users) ? metaObj.cc_users : [];
+  const ccCount = ccUsers.length;
+
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
       <div className="flex flex-wrap items-center gap-1.5">
@@ -95,6 +107,11 @@ export function ApprovalProgressSummary({
           {summary.isFinalStep ? '최종 결재' : '다음 결재 있음'}
         </span>
         {delay?.overdue && <span className="erp-status erp-status-red">지연</span>}
+        {ccCount > 0 && (
+          <span className="erp-status bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]">
+            참조 {ccCount}명
+          </span>
+        )}
       </div>
       <p className={`${compact ? 'text-[11px]' : 'text-[12px]'} font-semibold text-[var(--muted-foreground)]`}>
         현재 결재자 <span className="font-black text-[var(--foreground)]">{summary.currentApproverName}</span>

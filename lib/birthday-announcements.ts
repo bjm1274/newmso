@@ -121,7 +121,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
       id: messageId,
       room_id: NOTICE_ROOM_ID,
       sender_id: null,
-      sender_name: '시스템',
+      sender_name: '공지봇',
       content,
       created_at: nowIso,
     };

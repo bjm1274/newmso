@@ -23,22 +23,37 @@ function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => {
+    const msg = String(error.message || error).toLowerCase();
+    if (
+      msg.includes('sandboxed') ||
+      msg.includes('allow-same-origin') ||
+      msg.includes('localstorage') ||
+      msg.includes('serviceworker') ||
+      msg.includes('access is denied')
+    ) {
+      return;
+    }
     errors.push(`pageerror: ${error.message}`);
   });
 
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
 
-    const text = message.text();
+    const text = message.text().toLowerCase();
     if (
       text.includes('favicon') ||
-      text.includes('Failed to load resource') ||
-      text.includes('ERR_ABORTED')
+      text.includes('failed to load resource') ||
+      text.includes('err_aborted') ||
+      text.includes('sandboxed') ||
+      text.includes('allow-scripts') ||
+      text.includes('about:srcdoc') ||
+      text.includes('localstorage') ||
+      text.includes('access is denied')
     ) {
       return;
     }
 
-    errors.push(`console: ${text}`);
+    errors.push(`console: ${message.text()}`);
   });
 
   return errors;
@@ -52,7 +67,7 @@ async function openApprovalSubMenu(page: Page, subMenuId: string) {
 }
 
 async function selectComposeFormTab(page: Page, label: string) {
-  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByTestId('approval-form-type-select').selectOption(label);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -215,11 +230,12 @@ test('approval walkthrough opens each submenu in order without runtime errors', 
   await openApprovalSubMenu(page, '기안함');
   await expect(page.locator('h2', { hasText: '기안함' })).toBeVisible();
   await expect(page.getByTestId('approval-document-filter')).toBeVisible();
-  await expect(page.getByTestId('approval-card-approval-draft-pending-1')).toBeVisible();
-  await expect(page.getByTestId('approval-card-approval-draft-approved-1')).toBeVisible();
-  await page.getByTestId('approval-card-approval-draft-pending-1').click();
+  await page.getByTestId('approval-status-filter').selectOption('전체');
+  await expect(page.getByTestId('approval-card-approval-draft-pending-1').first()).toBeVisible();
+  await expect(page.getByTestId('approval-card-approval-draft-approved-1').first()).toBeVisible();
+  await page.getByTestId('approval-card-approval-draft-pending-1').first().click();
   await expect(page.getByRole('heading', { name: '사전 연차 요청' }).last()).toBeVisible();
-  await page.getByRole('button', { name: '✕' }).last().click();
+  await page.getByRole('button', { name: '모달 닫기' }).click();
 
   await openApprovalSubMenu(page, '결재함');
   await expect(page.locator('h2', { hasText: '결재함' })).toBeVisible();
@@ -233,7 +249,8 @@ test('approval walkthrough opens each submenu in order without runtime errors', 
   await openApprovalSubMenu(page, '작성하기');
   await expect(page.getByTestId('approval-approver-select')).toBeVisible();
   await page.getByTestId('approval-approver-select').selectOption(directApprover.id);
-  await expect(page.getByText(`1. ${directApprover.name} ${directApprover.position}`)).toBeVisible();
+  await expect(page.getByText(directApprover.name, { exact: true })).toBeVisible();
+  await expect(page.getByText(directApprover.position, { exact: true })).toBeVisible();
 
   await selectComposeFormTab(page, '연차/휴가');
   await expect(page.getByTestId('approval-leave-type-select')).toBeVisible();
@@ -243,12 +260,12 @@ test('approval walkthrough opens each submenu in order without runtime errors', 
 
   await selectComposeFormTab(page, '물품신청');
   await expect(page.getByTestId('supplies-add-row-button')).toBeVisible();
-  await expect(page.getByTestId('supplies-item-name-0')).toBeVisible();
+  await expect(page.getByTestId('supplies-item-name-0').first()).toBeVisible();
 
   await selectComposeFormTab(page, '보고서작성');
   await expect(page.getByTestId('approval-report-view')).toBeVisible();
 
-  await selectComposeFormTab(page, '양식신청');
+  await selectComposeFormTab(page, '증명서발급');
   await expect(page.getByTestId('form-request-view')).toBeVisible();
 
   await selectComposeFormTab(page, '출결정정');

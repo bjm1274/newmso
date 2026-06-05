@@ -8,6 +8,7 @@ import {
   DEFAULT_CONTRACT_TEMPLATE as DEFAULT_TEMPLATE,
   upgradeLegacyContractTemplate,
 } from '@/lib/contract-template-defaults';
+import { escapeHtml } from '@/lib/escape-html';
 
 const CATEGORY_COLORS: Record<string, string> = {
   근로자: 'bg-blue-500/10 text-blue-700 border-blue-500/20',
@@ -91,8 +92,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
 
   // 에디터에서 {{변수}} 를 하이라이트 표시하기 위해 미리보기 생성
   // XSS 방지: HTML 특수문자를 먼저 이스케이프 후 변수만 하이라이트
-  const escapeHtml = (str: string) =>
-    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
   const highlightedPreview = escapeHtml(templateContent).replace(
     /\{\{([^}]+)\}\}/g,
     (_, key) => `<mark class="bg-blue-500/20 text-blue-800 px-0.5 rounded text-[11px] font-semibold not-italic">{{${key}}}</mark>`

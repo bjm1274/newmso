@@ -116,7 +116,7 @@ export default function LeaveDashboard({
   }, [_staffs, selectedCo]);
 
   const [viewMode, setViewMode] = useState<'dept' | 'personal'>('dept');
-  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [planModalStaffId, setPlanModalStaffId] = useState<string | null>(null);
   const [planDates, setPlanDates] = useState('');
   const [planReason, setPlanReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -146,7 +146,7 @@ export default function LeaveDashboard({
         },
       ]);
       toast('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)', 'success');
-      setShowPlanModal(false);
+      setPlanModalStaffId(null);
       setPlanDates('');
       setPlanReason('');
     } catch {
@@ -346,7 +346,7 @@ export default function LeaveDashboard({
                 </div>
 
                 {/* 연차 사용 계획서 작성 모달 */}
-                {showPlanModal && (
+                {planModalStaffId === staffId && (
                   <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-md bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden border border-[var(--border)] animate-in fade-in slide-in-from-bottom-4">
                       <div className="p-4 border-b border-[var(--border)]">
@@ -385,7 +385,7 @@ export default function LeaveDashboard({
                       <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--border)] flex justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => setShowPlanModal(false)}
+                          onClick={() => setPlanModalStaffId(null)}
                           className="px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                         >
                           취소
@@ -416,7 +416,7 @@ export default function LeaveDashboard({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowPlanModal(true)}
+                        onClick={() => setPlanModalStaffId(staffId)}
                         className="px-3 py-1.5 bg-red-600 text-white font-semibold rounded-lg text-[11px] hover:bg-red-700 transition-colors shrink-0 shadow-sm"
                       >
                         계획서 제출

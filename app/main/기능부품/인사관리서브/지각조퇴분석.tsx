@@ -6,6 +6,7 @@ import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
 interface Props {
   staffs: any[];
@@ -60,11 +61,19 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
           return;
         }
 
-        const { data } = await supabase
-          .from('attendances')
-          .select('staff_id, status, work_date, late_minutes, early_leave_minutes')
-          .in('staff_id', staffIds)
-          .gte('work_date', formatKoreanDateKey(since));
+        const OPTIONAL_COLUMNS = ['late_minutes', 'early_leave_minutes'] as const;
+        const selectCols = (omitted: ReadonlySet<string>) =>
+          ['staff_id', 'status', 'work_date', ...OPTIONAL_COLUMNS.filter(c => !omitted.has(c))].join(', ');
+
+        const { data } = await withMissingColumnsFallback(
+          (omittedColumns) =>
+            supabase
+              .from('attendances')
+              .select(selectCols(omittedColumns))
+              .in('staff_id', staffIds)
+              .gte('work_date', formatKoreanDateKey(since)),
+          [...OPTIONAL_COLUMNS]
+        );
 
         const records = (data || []).map((record: any) => {
           return {

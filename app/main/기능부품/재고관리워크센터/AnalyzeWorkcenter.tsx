@@ -13,7 +13,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { supabase } from '@/lib/supabase';
 import { Check } from 'lucide-react';
 import {
   KpiRow,
@@ -41,7 +43,17 @@ const LegacyInventoryCount = dynamic(
   },
 );
 
-function InventoryCountOverlay({ onClose }: { onClose: () => void }) {
+function InventoryCountOverlay({
+  user,
+  inventory,
+  fetchInventory,
+  onClose,
+}: {
+  user: any;
+  inventory: any[];
+  fetchInventory: () => void;
+  onClose: () => void;
+}) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -62,7 +74,7 @@ function InventoryCountOverlay({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="px-4 py-4">
-          <LegacyInventoryCount user={{}} inventory={[]} fetchInventory={() => {}} />
+          <LegacyInventoryCount user={user} inventory={inventory} fetchInventory={fetchInventory} />
         </div>
       </div>
     </div>
@@ -107,6 +119,23 @@ export default function AnalyzeWorkcenter() {
   const [tab, setTab] = useState<AnalyzeTab>('abc');
   const [showInspect, setShowInspect] = useState(false);
   const data = useAnalyzeData();
+  const { user } = useAppData();
+
+  const [inventory, setInventory] = useState<any[]>([]);
+
+  const fetchInventory = useCallback(async () => {
+    const { data: inv } = await supabase
+      .from('inventory')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (inv) setInventory(inv);
+  }, []);
+
+  useEffect(() => {
+    if (showInspect) {
+      void fetchInventory();
+    }
+  }, [showInspect, fetchInventory]);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [
@@ -141,7 +170,14 @@ export default function AnalyzeWorkcenter() {
 
   return (
     <div className="flex flex-col gap-4">
-      {showInspect && <InventoryCountOverlay onClose={() => setShowInspect(false)} />}
+      {showInspect && (
+        <InventoryCountOverlay
+          user={user}
+          inventory={inventory}
+          fetchInventory={fetchInventory}
+          onClose={() => setShowInspect(false)}
+        />
+      )}
       <StockTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="분석·마감 탭" />
       <KpiRow items={kpiItems} />
 

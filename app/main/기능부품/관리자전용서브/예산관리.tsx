@@ -73,6 +73,8 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   });
 
   const [showExecForm, setShowExecForm] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   // 부서 목록 추출
   const deptList = Array.from(new Set([
@@ -138,10 +140,14 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   // 집행 현황 차트 데이터 생성
   const chartData = deptList.map(dept => {
     const budget = settings
-      .filter(s => s.dept === dept)
+      .filter(s => s.dept === dept && s.year === selectedYear && s.month === selectedMonth)
       .reduce((acc, s) => acc + s.amount, 0);
     const executed = executions
-      .filter(e => e.dept === dept)
+      .filter(e => {
+        if (e.dept !== dept) return false;
+        const [y, m] = e.date.split('-').map(Number);
+        return y === selectedYear && m === selectedMonth;
+      })
       .reduce((acc, e) => acc + e.amount, 0);
     const remaining = Math.max(0, budget - executed);
     return { dept, budget, executed, remaining };
@@ -176,7 +182,28 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
       {/* 액션 */}
       {activeTab === '집행현황' && (
-        <div className="flex items-center justify-end">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--card)] p-3 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-[var(--toss-gray-4)]">조회 기간:</span>
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(Number(e.target.value))}
+              className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)]"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y}>{y}년</option>
+              ))}
+            </select>
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(Number(e.target.value))}
+              className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-xs font-bold text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)]"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>{m}월</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={() => setShowExecForm(true)}
             className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity"

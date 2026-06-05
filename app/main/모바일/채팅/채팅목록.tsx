@@ -23,10 +23,13 @@ import {
   useChatMessageSearch,
   type MobileChatRoom,
   type ChatMessageSearchHit,
+  type StaffDirectoryEntry,
 } from './data-hooks';
 import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
+import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
+import { toast } from '@/lib/toast';
 
 const SEARCH_DEBOUNCE_MS = 150;
 
@@ -52,6 +55,55 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   const company = typeof user.company === 'string' ? user.company : null;
 
   const staffs = useChatStaffDirectory(company);
+
+  const handleStartDirectChat = async (peerId: string, peerName: string) => {
+    if (!userId) {
+      toast('로그인 정보를 찾을 수 없습니다.', 'error');
+      return;
+    }
+    const memberIds = Array.from(new Set([userId, peerId]));
+    
+    // Find existing direct room from the rooms list
+    const existing = rooms.find((room) => {
+      if (room.type !== 'direct') return false;
+      const mIds = Array.isArray(room.members) ? room.members.map(String) : [];
+      return mIds.length === 2 && mIds.includes(userId) && mIds.includes(peerId);
+    });
+
+    if (existing) {
+      onOpen(String(existing.id));
+      return;
+    }
+
+    try {
+      const result = await createOrUpsertChatRoom({
+        name: peerName,
+        type: 'direct',
+        members: memberIds,
+        created_by: userId,
+      });
+      if (result.ok && result.room) {
+        onOpen(String(result.room.id));
+      } else {
+        toast(result.error || '대화방 연결 실패', 'error');
+      }
+    } catch (err) {
+      toast('대화방 연결에 실패했습니다.', 'error');
+    }
+  };
+
+  const matchedStaffs = useMemo(() => {
+    if (!searchQuery) return [];
+    return staffs.filter((s) => {
+      if (s.id === userId) return false;
+      const name = (s.name || '').toLowerCase();
+      const dept = (s.department || '').toLowerCase();
+      const pos = (s.position || '').toLowerCase();
+      return name.includes(searchQuery) || dept.includes(searchQuery) || pos.includes(searchQuery);
+    });
+  }, [staffs, searchQuery, userId]);
+
+  const orgGroups = useMemo(() => groupByDept(staffs), [staffs]);
   const roomIds = useMemo(() => rooms.map((r) => String(r.id)), [rooms]);
   // 방 제목·마지막 메시지뿐 아니라 대화 "내용"까지 검색 (PC 전역검색과 동일한 ilike 방식)
   const { hits: messageHits, loading: messageSearchLoading } = useChatMessageSearch(roomIds, searchQuery);
@@ -222,9 +274,36 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
       </div>
       <div className="m-scroll" ref={scrollContainerRef} style={{ overscrollBehaviorY: 'contain' }}>
         {tab === 'org' ? (
-          <OrgPlaceholder />
+          <OrgBrowseTab groups={orgGroups} onStartChat={handleStartDirectChat} />
         ) : (
           <div style={{ padding: '4px 0 24px' }}>
+            {searchQuery && matchedStaffs.length > 0 && (
+              <>
+                <div className="msm-sec"><div className="msm-sec-t">직원 ({matchedStaffs.length})</div></div>
+                <div className="m-card flush" style={{ margin: '0 16px 12px' }}>
+                  {matchedStaffs.map((staff) => {
+                    const name = staff.name || '직원';
+                    const tone = pickAvatarTone(String(staff.id) + name);
+                    return (
+                      <button
+                        key={String(staff.id)}
+                        type="button"
+                        className="m-list-row"
+                        onClick={() => handleStartDirectChat(String(staff.id), name)}
+                        style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                      >
+                        <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
+                        <div>
+                          <div className="lbl">{name}</div>
+                          <div className="sub">{staff.department} · {staff.position || '직원'}</div>
+                        </div>
+                        <MIcon name="chat" size={18} color="var(--m-accent)" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
             {!loading && filtered.length === 0 && messageHits.length === 0 && !messageSearchLoading && (
               <EmptyState
                 label={
@@ -556,6 +635,112 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
       </div>
     </button>
   );
+}
+
+function OrgBrowseTab({
+  groups,
+  onStartChat,
+}: {
+  groups: { department: string; members: StaffDirectoryEntry[] }[];
+  onStartChat: (peerId: string, peerName: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggle = (dept: string) => {
+    setExpanded((prev) => ({ ...prev, [dept]: !prev[dept] }));
+  };
+
+  if (groups.length === 0) {
+    return (
+      <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--z-500)' }}>
+        조직원 목록이 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '8px 0 24px' }}>
+      {groups.map((g) => {
+        const isExpanded = expanded[g.department] !== false;
+        return (
+          <div key={g.department} style={{ marginBottom: 6 }}>
+            <button
+              type="button"
+              onClick={() => toggle(g.department)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: 'var(--m-card)',
+                border: 'none',
+                borderBottom: '1px solid var(--m-border)',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-800)' }}>
+                  {g.department}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+                  {g.members.length}명
+                </span>
+              </div>
+              <MIcon name={isExpanded ? 'chevU' : 'chevD'} size={16} color="var(--z-400)" />
+            </button>
+            
+            {isExpanded && (
+              <div className="m-card flush" style={{ margin: '4px 16px 12px', borderTop: 'none' }}>
+                {g.members.map((m) => {
+                  const name = m.name || '직원';
+                  const tone = pickAvatarTone(String(m.id) + name);
+                  return (
+                    <button
+                      key={String(m.id)}
+                      type="button"
+                      className="m-list-row"
+                      onClick={() => onStartChat(String(m.id), name)}
+                      style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                    >
+                      <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
+                      <div>
+                        <div className="lbl">{name}</div>
+                        <div className="sub">
+                          {g.department} · {m.position || '직원'}
+                        </div>
+                      </div>
+                      <MIcon name="chat" size={18} color="var(--m-accent)" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function groupByDept(staffs: StaffDirectoryEntry[]): { department: string; members: StaffDirectoryEntry[] }[] {
+  const byDept = new Map<string, StaffDirectoryEntry[]>();
+  staffs.forEach((staff) => {
+    if (!staff || !staff.name) return;
+    if (staff.status && String(staff.status).includes('퇴사')) return;
+    const department = (staff.department && String(staff.department)) || '기타';
+    const arr = byDept.get(department) || [];
+    arr.push(staff);
+    byDept.set(department, arr);
+  });
+  const result: { department: string; members: StaffDirectoryEntry[] }[] = [];
+  byDept.forEach((members, department) => {
+    members.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    result.push({ department, members });
+  });
+  result.sort((a, b) => a.department.localeCompare(b.department));
+  return result;
 }
 
 function OrgPlaceholder() {

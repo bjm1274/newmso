@@ -80,8 +80,9 @@ export function deriveKpi(records: SavedRecord[]): KpiData {
   let reconsultRequest = 0;
 
   for (const rec of records) {
-    const recDay = rec.created_at.slice(0, 10);
-    const recMonth = rec.created_at.slice(0, 7);
+    const recDate = new Date(rec.created_at);
+    const recDay = isNaN(recDate.getTime()) ? rec.created_at.slice(0, 10) : formatKoreanDateKey(recDate);
+    const recMonth = recDay.slice(0, 7);
     const consentItems = rec.result.consent_required ?? [];
     const hasConsent = consentItems.length > 0;
 
