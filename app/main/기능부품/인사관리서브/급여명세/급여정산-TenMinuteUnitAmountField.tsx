@@ -12,6 +12,7 @@ export function TenMinuteUnitAmountField({
   labelClassName,
   inputClassName,
   allowManualAmountInput = false,
+  multiplier,
 }: {
   label: string;
   value: number | '';
@@ -21,6 +22,7 @@ export function TenMinuteUnitAmountField({
   labelClassName: string;
   inputClassName: string;
   allowManualAmountInput?: boolean;
+  multiplier?: number;
 }) {
   const amount = parsePayrollWonInput(value);
   const [inputValue, setInputValue] = useState(
@@ -40,7 +42,7 @@ export function TenMinuteUnitAmountField({
   const openedByHoldRef = useRef(false);
   const [unitInputOpen, setUnitInputOpen] = useState(false);
   const [unitInputValue, setUnitInputValue] = useState('');
-  const stepAmount = Math.round(parsePayrollWonInput(hourlyRate) * (PAYROLL_TIME_STEP_MINUTES / 60));
+  const stepAmount = Math.round(parsePayrollWonInput(hourlyRate) * (PAYROLL_TIME_STEP_MINUTES / 60) * (multiplier ?? 1));
   const stepLabel = `${PAYROLL_TIME_STEP_MINUTES}분`;
 
   const clearHoldTimer = () => {

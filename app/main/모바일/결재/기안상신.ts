@@ -10,10 +10,12 @@
 
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
-import type { ErpUser } from '@/types';
+import type { ErpUser, StaffMember } from '@/types';
 import { generateMobileDocNumber } from './data-hooks';
 import type { ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
+import { supabase } from '@/lib/supabase';
+import { isActiveStaff } from '@/lib/active-staff';
 
 export type SubmitApprovalArgs = {
   user: ErpUser;
@@ -65,12 +67,31 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
       (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null,
   });
 
+  // Fetch active staff in the company for cc_users
+  let ccUsers: Array<{ id: string; name: string }> = [];
+  try {
+    const { data: staffData } = await supabase
+      .from('staff_members')
+      .select('id, name, status, company, hire_date, resign_date')
+      .eq('company', company);
+    if (staffData) {
+      ccUsers = (staffData as StaffMember[])
+        .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
+        .map((s: StaffMember) => ({
+          id: String(s.id),
+          name: s.name || '이름 없음',
+        }));
+    }
+  } catch (err) {
+    console.error('[mobile-approval] failed to fetch cc_users candidates', err);
+  }
+
   const meta: Record<string, unknown> = {
     form_slug: formSlug,
     form_name: formName,
     content,
     cc_departments: [],
-    cc_users: [],
+    cc_users: ccUsers,
     approver_line: approverLine.map((a) => String(a.id)),
     approver_line_details: approverLine.map((a) => ({
       id: String(a.id || ''),

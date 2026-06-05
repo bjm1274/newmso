@@ -19,9 +19,8 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser, StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
+import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
-import { APPROVER_POSITIONS } from '../../기능부품/전자결재서브/approval-constants';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
@@ -69,22 +68,18 @@ export default function SApprovalGenericForm({
     (async () => {
       setApproverLoading(true);
       try {
-        let q = supabase
+        const { data, error } = await supabase
           .from('staff_members')
-          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone');
-        if (company) {
-          q = q.eq('company', company);
-        }
-        const { data, error } = await q;
+          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
         if (cancelled) return;
-        const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(String(s.position || '').trim());
         const candidates = ((data ?? []) as StaffMember[])
           .filter((s) => isActiveStaff(s))
-          .filter((s) => APPROVER_POSITIONS.includes(String(s.position || '').trim()))
+          .filter((s) => isDepartmentHeadOrAbove(s))
           .filter((s) => String(s.id) !== staffId)
-          .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
-        const picks = candidates.slice(0, 3).map(toApproverPick);
+          .filter((s) => s.company === company || s.company === 'SY INC.')
+          .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
+        const picks = candidates.map(toApproverPick);
         setApproverDefaults(picks);
         if (!approverManual) {
           setApproverLine(picks);

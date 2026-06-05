@@ -19,9 +19,8 @@ import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import type { ErpUser, StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
+import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
-import { APPROVER_POSITIONS } from '../../기능부품/전자결재서브/approval-constants';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
@@ -80,24 +79,18 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     (async () => {
       setApproverLoading(true);
       try {
-        let q = supabase
+        const { data, error } = await supabase
           .from('staff_members')
-          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone');
-        if (company) {
-          q = q.eq('company', company);
-        }
-        const { data, error } = await q;
+          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
         if (cancelled) return;
-        const order = (s: StaffMember) =>
-          APPROVER_POSITIONS.indexOf(String(s.position || '').trim());
         const candidates = ((data ?? []) as StaffMember[])
           .filter((s) => isActiveStaff(s))
-          .filter((s) => APPROVER_POSITIONS.includes(String(s.position || '').trim()))
+          .filter((s) => isDepartmentHeadOrAbove(s))
           .filter((s) => String(s.id) !== staffId)
-          .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
-        // 1차/2차/최종 = 직급 위계 하위→상위 3명까지
-        const picks = candidates.slice(0, 3).map(toApproverPick);
+          .filter((s) => s.company === company || s.company === 'SY INC.')
+          .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
+        const picks = candidates.map(toApproverPick);
         setApproverDefaults(picks);
         // 수동 변경 전이면 기본값으로 라인 채움
         if (!approverManual) {
@@ -197,6 +190,25 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null,
       });
 
+      // Fetch active staff in the company for cc_users
+      let ccUsers: Array<{ id: string; name: string }> = [];
+      try {
+        const { data: staffData } = await supabase
+          .from('staff_members')
+          .select('id, name, status, company, hire_date, resign_date')
+          .eq('company', senderCompany);
+        if (staffData) {
+          ccUsers = (staffData as StaffMember[])
+            .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
+            .map((s: StaffMember) => ({
+              id: String(s.id),
+              name: s.name || '이름 없음',
+            }));
+        }
+      } catch (err) {
+        console.error('[mobile-approval] failed to fetch cc_users candidates', err);
+      }
+
       const meta: Record<string, unknown> = {
         vType: leaveTypeLabel,
         leaveType: leaveTypeLabel,
@@ -206,7 +218,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         form_slug: 'leave',
         form_name: '연차/휴가',
         cc_departments: ['행정팀'],
-        cc_users: [],
+        cc_users: ccUsers,
         approver_line: approverLine.map((a) => String(a.id)),
         approver_line_details: approverLine.map((a) => ({
           id: String(a.id || ''),

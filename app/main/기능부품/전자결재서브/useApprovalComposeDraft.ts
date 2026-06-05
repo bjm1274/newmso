@@ -2,6 +2,7 @@ import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
 import { isApprovalLocked } from '@/lib/approval-workflow';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { useCallback,useEffect,useRef,type Dispatch,type MutableRefObject,type SetStateAction } from 'react';
 import {
@@ -361,12 +362,27 @@ export function useApprovalComposeDraft({
   }, [fetchMyLastApproval, formType, setLastDraftByType, user?.id, viewMode]);
 
   useEffect(() => {
-    if (viewMode !== '작성하기' || ccLine.length > 0) return;
-    const defaults = resolveDefaultReferenceUsersForForm(formType);
-    if (defaults.length > 0) {
-      setCcLine(defaults);
+    if (viewMode !== '작성하기') return;
+
+    if (ccLine.length === 0) {
+      const company = user?.company;
+      const defaultCc = approvalDirectoryStaffs
+        .filter((s) => isActiveStaff(s) && String(s.id) !== user?.id && s.company === company)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          position: s.position ?? null,
+        }));
+      setCcLine(defaultCc);
     }
-  }, [ccLine.length, formType, resolveDefaultReferenceUsersForForm, setCcLine, viewMode]);
+
+    if (approverLine.length === 0) {
+      const defaultApprovers = approvalDirectoryStaffs
+        .filter((s) => isActiveStaff(s) && isDepartmentHeadOrAbove(s) && String(s.id) !== user?.id)
+        .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
+      setApproverLine(defaultApprovers);
+    }
+  }, [ccLine.length, approverLine.length, approvalDirectoryStaffs, user, setCcLine, setApproverLine, viewMode]);
 
   useEffect(() => {
     if (viewMode !== '작성하기') return;

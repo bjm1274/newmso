@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
+import { isActiveStaff, isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -82,13 +82,11 @@ export default function SApprovalApproverPicker({
     setLoading(true);
     (async () => {
       try {
-        let q = supabase
+        const { data, error } = await supabase
           .from('staff_members')
           .select(
-            'id, name, company, department, position, status, hire_date, resign_date, email, phone'
+            'id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions'
           );
-        if (company) q = q.eq('company', company);
-        const { data, error } = await q;
         if (error) throw error;
         const rows = ((data ?? []) as StaffMember[]).filter((s) => isActiveStaff(s));
         setStaffRows(rows);
@@ -100,11 +98,11 @@ export default function SApprovalApproverPicker({
         inflightRef.current = false;
       }
     })();
-  }, [open, staffRows, company]);
+  }, [open, staffRows]);
 
   const selectedIds = useMemo(() => new Set(line.map((p) => p.id)), [line]);
 
-  // 검색 + 본인·기선택 제외
+  // 검색 + 본인·기선택 제외 + 부서장 이상
   const filtered: StaffMember[] = useMemo(() => {
     const list = staffRows ?? [];
     const q = query.trim().toLowerCase();
@@ -112,6 +110,7 @@ export default function SApprovalApproverPicker({
       const id = String(s.id || '');
       if (selfId && id === selfId) return false; // 본인 제외
       if (selectedIds.has(id)) return false; // 이미 결재선
+      if (!isDepartmentHeadOrAbove(s)) return false; // 부서장 이상만 표시!
       if (!q) return true;
       const hay = [s.name, s.department, s.position, s.company]
         .map((v) => String(v || '').toLowerCase())

@@ -312,8 +312,10 @@ function calculateSalaryAmountWithChanges({
     const hireYear = hireDate.getFullYear();
     const hireMonth = hireDate.getMonth() + 1;
     if (hireYear === bounds.start.getFullYear() && hireMonth === (bounds.start.getMonth() + 1)) {
-      effectiveStart = maxPayrollDate(effectiveStart, hireDate);
-      isMidMonthEmployed = true;
+      if (hireDate.getTime() > bounds.start.getTime()) {
+        effectiveStart = maxPayrollDate(effectiveStart, hireDate);
+        isMidMonthEmployed = true;
+      }
     }
   }
 
@@ -322,8 +324,10 @@ function calculateSalaryAmountWithChanges({
     const resignYear = lastEmployedDate.getFullYear();
     const resignMonth = lastEmployedDate.getMonth() + 1;
     if (resignYear === bounds.end.getFullYear() && resignMonth === (bounds.end.getMonth() + 1)) {
-      effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
-      isMidMonthEmployed = true;
+      if (lastEmployedDate.getTime() < bounds.end.getTime()) {
+        effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
+        isMidMonthEmployed = true;
+      }
     }
   }
 
@@ -531,8 +535,10 @@ export function getEmploymentProratedBaseForMonth(
     hireDate.getFullYear() === bounds.start.getFullYear() &&
     hireDate.getMonth() === bounds.start.getMonth()
   ) {
-    effectiveStart = maxPayrollDate(effectiveStart, hireDate);
-    isMidMonthEmployed = true;
+    if (hireDate.getTime() > bounds.start.getTime()) {
+      effectiveStart = maxPayrollDate(effectiveStart, hireDate);
+      isMidMonthEmployed = true;
+    }
   }
   if (resignDate) {
     const lastEmployedDate = shiftPayrollDate(resignDate, -1);
@@ -540,8 +546,10 @@ export function getEmploymentProratedBaseForMonth(
       lastEmployedDate.getFullYear() === bounds.end.getFullYear() &&
       lastEmployedDate.getMonth() === bounds.end.getMonth()
     ) {
-      effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
-      isMidMonthEmployed = true;
+      if (lastEmployedDate.getTime() < bounds.end.getTime()) {
+        effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
+        isMidMonthEmployed = true;
+      }
     }
   }
 

@@ -47,3 +47,29 @@ export function getScopedActiveStaffs<T extends StaffLike>(
     return companyMatched && isActiveStaff(staff);
   });
 }
+
+export const APPROVER_POSITIONS = [
+  '팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장',
+  '이사', '병원장', '원장', '대표',
+];
+
+export function isDepartmentHeadOrAbove(staff: { position?: string | null; role?: string | null }): boolean {
+  const role = staff.role;
+  if (role === 'manager' || role === 'admin') return true;
+  const position = String(staff.position || '').trim();
+  if (!position) return false;
+  if (position === '부서장') return true;
+  if (position === '팀장' || position === '간호과장' || position === '과장') return false;
+  return APPROVER_POSITIONS.includes(position);
+}
+
+export function getPositionOrder(position: string | null | undefined, role?: string | null): number {
+  const p = String(position || '').trim();
+  const idx = APPROVER_POSITIONS.indexOf(p);
+  if (idx !== -1) return idx;
+  if (p === '부서장') return APPROVER_POSITIONS.indexOf('부장');
+  if (role === 'admin') return APPROVER_POSITIONS.indexOf('대표');
+  if (role === 'manager') return APPROVER_POSITIONS.indexOf('부장');
+  return 999;
+}
+

@@ -3,7 +3,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
-import { isActiveStaff } from '@/lib/active-staff';
+import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import { supabase } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/supabase-compat';
@@ -490,16 +490,10 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
   const allCompaniesApproverCandidates = useMemo(() => {
     const list = Array.isArray(staffs) ? staffs : [];
-    const positionOrder = (staff: StaffMember) =>
-      APPROVER_POSITIONS.indexOf(String(staff.position || '').trim());
     return list
-      .filter(
-        (staff) =>
-          isActiveStaff(staff) &&
-          APPROVER_POSITIONS.includes(String(staff.position || '').trim())
-      )
+      .filter((staff) => isActiveStaff(staff) && isDepartmentHeadOrAbove(staff))
       .sort((a, b) => {
-        const order = positionOrder(a) - positionOrder(b);
+        const order = getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role);
         if (order !== 0) return order;
         const companyDiff = String(a.company || '').localeCompare(String(b.company || ''));
         if (companyDiff !== 0) return companyDiff;

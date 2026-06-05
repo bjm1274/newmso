@@ -21,9 +21,6 @@ interface SalaryCalcResult {
 // 과세 수당(통상임금 산입) — taxable_allowance_breakdown 내 항목
 const TAXABLE_FIELDS: { key: keyof TaxableAllowanceBreakdown; label: string }[] = [
   { key: 'position_allowance', label: '직책수당' },
-  { key: 'overtime_allowance', label: '고정연장' },
-  { key: 'night_work_allowance', label: '고정야간' },
-  { key: 'holiday_work_allowance', label: '휴일수당' },
   { key: 'annual_leave_pay', label: '연차수당' },
   { key: 'manual_extra_allowance', label: '기타과세' },
 ];
@@ -195,6 +192,39 @@ export function SettlementStaffCard({
               testId={`salary-settlement-taxable-${f.key}-${s.id}`}
             />
           ))}
+          <TenMinuteUnitAmountField
+            label="고정연장"
+            value={Number(breakdown.overtime_allowance) || 0}
+            hourlyRate={hourlyRate}
+            onChange={(nextValue) => onUpdate(s.id, 'taxable_allowance_breakdown.overtime_allowance', nextValue)}
+            dataTestId={`salary-settlement-taxable-overtime_allowance-${s.id}`}
+            labelClassName="text-[var(--toss-gray-4)]"
+            inputClassName="text-[var(--foreground)]"
+            allowManualAmountInput
+            multiplier={1.5}
+          />
+          <TenMinuteUnitAmountField
+            label="고정야간"
+            value={Number(breakdown.night_work_allowance) || 0}
+            hourlyRate={hourlyRate}
+            onChange={(nextValue) => onUpdate(s.id, 'taxable_allowance_breakdown.night_work_allowance', nextValue)}
+            dataTestId={`salary-settlement-taxable-night_work_allowance-${s.id}`}
+            labelClassName="text-[var(--toss-gray-4)]"
+            inputClassName="text-[var(--foreground)]"
+            allowManualAmountInput
+            multiplier={1.5}
+          />
+          <TenMinuteUnitAmountField
+            label="휴일수당"
+            value={Number(breakdown.holiday_work_allowance) || 0}
+            hourlyRate={hourlyRate}
+            onChange={(nextValue) => onUpdate(s.id, 'taxable_allowance_breakdown.holiday_work_allowance', nextValue)}
+            dataTestId={`salary-settlement-taxable-holiday_work_allowance-${s.id}`}
+            labelClassName="text-[var(--toss-gray-4)]"
+            inputClassName="text-[var(--foreground)]"
+            allowManualAmountInput
+            multiplier={1.5}
+          />
         </div>
       </div>
 
@@ -230,17 +260,21 @@ export function SettlementStaffCard({
         <p className="text-[9px] font-black text-[var(--toss-gray-3)] uppercase tracking-wide ml-0.5">변동 · 공제</p>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
           <TenMinuteUnitAmountField
-            label="연장/상여"
-            value={Number(data.overtime_pay) + Number(data.bonus)}
+            label="연장근무수당"
+            value={Number(data.overtime_pay) || 0}
             hourlyRate={hourlyRate}
-            onChange={(nextValue) => {
-              onUpdate(s.id, 'overtime_pay', nextValue);
-              onUpdate(s.id, 'bonus', 0);
-            }}
-            dataTestId={`salary-settlement-overtime-total-${s.id}`}
+            onChange={(nextValue) => onUpdate(s.id, 'overtime_pay', nextValue)}
+            dataTestId={`salary-settlement-overtime-pay-${s.id}`}
             labelClassName="text-[var(--toss-gray-4)]"
             inputClassName="text-[var(--foreground)]"
             allowManualAmountInput
+            multiplier={1.5}
+          />
+          <CompactAmountField
+            label="상여금"
+            value={data.bonus === '' ? '' : Number(data.bonus || 0)}
+            onChange={(v) => onUpdate(s.id, 'bonus', v)}
+            testId={`salary-settlement-bonus-${s.id}`}
           />
           <TenMinuteUnitAmountField
             label="근태/기타차감"
@@ -251,20 +285,6 @@ export function SettlementStaffCard({
             labelClassName="text-orange-600"
             inputClassName="text-orange-700"
             allowManualAmountInput
-          />
-          <CompactAmountField
-            label="선지급금"
-            tone="deduction"
-            value={data.advance_pay === '' ? '' : Number(data.advance_pay || 0)}
-            onChange={(v) => onUpdate(s.id, 'advance_pay', v)}
-            testId={`salary-settlement-advance-pay-${s.id}`}
-          />
-          <CompactAmountField
-            label="기타 공제"
-            tone="deduction"
-            value={data.custom_deduction === '' ? '' : Number(data.custom_deduction || 0)}
-            onChange={(v) => onUpdate(s.id, 'custom_deduction', v)}
-            testId={`salary-settlement-custom-deduction-${s.id}`}
           />
           <div className="space-y-0.5">
             <label className="block text-[9px] font-bold ml-0.5 text-sky-700">원천징수 비율</label>
