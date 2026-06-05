@@ -17,7 +17,21 @@ type StaffLike = {
  */
 export function isActiveStaff(staff: StaffLike): boolean {
   const status = String(staff?.status ?? staff?.상태 ?? '').trim();
-  return status !== '퇴사' && status !== '퇴직';
+  if (status === '퇴사' || status === '퇴직') return false;
+
+  const resignDate = (staff as any)?.resigned_at || (staff as any)?.resign_date;
+  if (typeof resignDate === 'string' && resignDate.trim()) {
+    const todayStr = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date()); // YYYY-MM-DD KST
+    if (resignDate.trim() <= todayStr) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

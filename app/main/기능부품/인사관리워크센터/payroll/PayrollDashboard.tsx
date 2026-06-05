@@ -58,23 +58,22 @@ function formatMonthLabel(ym: string): string {
 }
 
 function deriveSettlementSteps(
-  cur: number,
-  prev: number,
+  hasRecord: boolean,
+  allConfirmed: boolean,
+  payrollDay = 15,
+  yearMonth = '',
 ): {
   steps: { id: number; label: string; date: string; state: SettlementStepState }[];
   done: number;
 } {
-  const month = new Date();
-  const ym = `${month.getMonth() + 1}`;
-  // record 가 있으면 1·2 단계 done, 결재/지급/원천징수는 보수적으로 추정
-  const hasRecord = cur > 0;
-  const fullyPaid = cur > 0 && Math.abs(cur - prev) / Math.max(prev, 1) < 0.5;
+  const [, mStr] = yearMonth.split('-');
+  const ym = `${parseInt(mStr || '0', 10)}`;
   const steps: { id: number; label: string; date: string; state: SettlementStepState }[] = [
     { id: 1, label: '근태 마감',     date: `${ym}/3`,  state: hasRecord ? 'done' : 'on' },
     { id: 2, label: '수당·공제',     date: `${ym}/7`,  state: hasRecord ? 'done' : 'pending' },
-    { id: 3, label: '결재 상신',     date: `${ym}/10`, state: hasRecord ? (fullyPaid ? 'done' : 'on') : 'pending' },
-    { id: 4, label: '지급 처리',     date: `예정 ${ym}/15`, state: fullyPaid ? 'done' : (hasRecord ? 'on' : 'pending') },
-    { id: 5, label: '원천징수 신고', date: `예정 ${ym}/20`, state: 'pending' },
+    { id: 3, label: '결재 상신',     date: `${ym}/10`, state: allConfirmed ? 'done' : (hasRecord ? 'on' : 'pending') },
+    { id: 4, label: '지급 처리',     date: `예정 ${ym}/${payrollDay}`, state: allConfirmed ? 'on' : 'pending' },
+    { id: 5, label: '원천징수 신고', date: `예정 ${ym}/20`, state: allConfirmed ? 'on' : 'pending' },
   ];
   const done = steps.filter((s) => s.state === 'done').length;
   return { steps, done };
@@ -87,9 +86,12 @@ export default function PayrollDashboard({ onPick }: Props) {
 
   const kpis = useMemo(() => calculateKpis(data), [data]);
   const alerts = useMemo(() => detectAlerts(data), [data]);
+  const hasRecord = data.records.length > 0;
+  const allConfirmed = hasRecord && data.records.every((r) => r.status === '확정' || r.status === 'CONFIRMED');
+  const payrollDay = data.payrollDay ?? 15;
   const { steps, done } = useMemo(
-    () => deriveSettlementSteps(kpis.netPaySum, kpis.prevNetPaySum),
-    [kpis.netPaySum, kpis.prevNetPaySum],
+    () => deriveSettlementSteps(hasRecord, allConfirmed, payrollDay, yearMonth),
+    [hasRecord, allConfirmed, payrollDay, yearMonth],
   );
 
   const grossSum = kpis.baseSalarySum + kpis.allowanceSum;
@@ -119,6 +121,12 @@ export default function PayrollDashboard({ onPick }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {data.isLocked && (
+        <div className="bg-[var(--warning-light)] border border-[var(--warning)] text-[var(--warning-dark)] px-3 py-2.5 rounded-[var(--radius-md)] text-[12.5px] font-semibold flex items-center gap-2">
+          <span>⚠️</span>
+          <span>해당 월의 급여 정산이 마감(잠금)되어 데이터를 수정하거나 추가적인 정산 단계를 진행할 수 없습니다.</span>
+        </div>
+      )}
       {/* error chips (JM3 inline) */}
       {data.errors.length > 0 && (
         <div role="alert" className="rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-light)] p-3 text-[12px]">
@@ -198,7 +206,7 @@ export default function PayrollDashboard({ onPick }: Props) {
             <span className="ml-1 text-[14px] font-semibold text-[var(--zinc-300)]">원</span>
           </div>
           <div className="text-[11px] text-[var(--zinc-400)]">
-            {kpis.headcount}명{diffPct !== null && (
+            {data.records.length}명{diffPct !== null && (
               <>
                 {' '}· 전월 대비{' '}
                 <span className={`font-bold ${diffPct >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
@@ -211,6 +219,7 @@ export default function PayrollDashboard({ onPick }: Props) {
             <button
               type="button"
               data-testid="run-payroll-regular-button"
+              disabled={data.isLocked}
               onClick={() => handlePick('settlement')}
               className="
                 px-3.5 py-2
@@ -218,6 +227,7 @@ export default function PayrollDashboard({ onPick }: Props) {
                 bg-[var(--accent)] hover:bg-[var(--accent-hover)]
                 text-white text-[12px] font-bold
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white
+                disabled:opacity-50 disabled:cursor-not-allowed
               "
             >
               정산 시작 →

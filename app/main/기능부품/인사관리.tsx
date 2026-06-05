@@ -22,6 +22,7 @@ import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { ChevronDown } from 'lucide-react';
 import HrWorkcenterRouter, { type WorkcenterId } from './인사관리워크센터';
+import { useCompany } from '@/app/main/contexts/CompanyContext';
 
 // ─── 타입 ────────────────────────────────────────────────────────────
 type HrMenuId = WorkcenterId;
@@ -196,6 +197,7 @@ export default function HRMainView({
   initialMenu,
   selectedCo: mainSelectedCo,
 }: HRMainViewProps) {
+  const { selectedCo: globalSelectedCo, setSelectedCo: setGlobalSelectedCo } = useCompany();
   const [현재메뉴, 메뉴설정] = useState<HrMenuId>(() => getInitialHrMenuState(initialMenu));
   const [선택사업체, 사업체설정] = useState('전체');
   const [subNavCollapsed, setSubNavCollapsed] = useState(false);
@@ -265,11 +267,18 @@ export default function HRMainView({
 
   // 사업체 동기화
   useEffect(() => {
-    if (사업체목록.includes(선택사업체)) return;
-    const fallback =
-      mainSelectedCo && 사업체목록.includes(mainSelectedCo) ? mainSelectedCo : '전체';
-    사업체설정(fallback);
-  }, [mainSelectedCo, 선택사업체, 사업체목록]);
+    const targetCo = globalSelectedCo || mainSelectedCo || '전체';
+    if (사업체목록.includes(targetCo)) {
+      사업체설정(targetCo);
+    }
+  }, [globalSelectedCo, mainSelectedCo, 사업체목록]);
+
+  const handleCompanyChange = (val: string) => {
+    사업체설정(val);
+    if (setGlobalSelectedCo) {
+      setGlobalSelectedCo(val === '전체' ? null : val);
+    }
+  };
 
   // 메뉴 적용
   const 적용입장메뉴 = (requestedMenu?: string | null) => {
@@ -303,6 +312,17 @@ export default function HRMainView({
       // 무시 — storage 접근 차단 환경 (사파리 시크릿 등)
     }
   }, [initialMenu, user?.id]);
+
+  useEffect(() => {
+    const handleHrMenuChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail && HR_TAB_IDS.includes(customEvent.detail as HrMenuId)) {
+        메뉴설정(customEvent.detail as HrMenuId);
+      }
+    };
+    window.addEventListener('hr-menu-change', handleHrMenuChange);
+    return () => window.removeEventListener('hr-menu-change', handleHrMenuChange);
+  }, []);
 
   // 권한 변경으로 현재 메뉴가 사라진 경우 fallback
   const visibleHrTabIdsKey = visibleHrTabIds.join(',');
@@ -451,7 +471,7 @@ export default function HRMainView({
               aria-label="사업체 선택"
               data-testid="hr-company-select"
               value={선택사업체}
-              onChange={(event) => 사업체설정(event.target.value)}
+              onChange={(event) => handleCompanyChange(event.target.value)}
               className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--foreground)] outline-none"
             >
               {사업체목록.map((회사명) => (

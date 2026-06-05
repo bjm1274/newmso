@@ -89,6 +89,18 @@ function PayrollWorkcenterInner({ initialModule, user }: { initialModule?: strin
       // ignore
     }
   }, [initialModule]);
+
+  useEffect(() => {
+    const handleModuleChange = (e: Event) => {
+      const customEvent = e as CustomEvent<PayrollModuleId | null>;
+      if (customEvent.detail === null || MODULE_COMPONENTS[customEvent.detail]) {
+        setCurrent(customEvent.detail);
+      }
+    };
+    window.addEventListener('payroll-module-change', handleModuleChange);
+    return () => window.removeEventListener('payroll-module-change', handleModuleChange);
+  }, []);
+
   const handlePick = useCallback((id: PayrollModuleId) => {
     setCurrent(id);
   }, []);

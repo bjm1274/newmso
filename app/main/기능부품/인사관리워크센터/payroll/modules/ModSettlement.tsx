@@ -5,8 +5,14 @@ import { useMemo, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
 import { calculateKpis } from '../payroll-kpi';
 import type { StaffMember } from '@/types';
+import { toast } from '@/lib/toast';
 
-type SalarySettlementProps = { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void };
+type SalarySettlementProps = {
+  staffs: StaffMember[];
+  selectedCo: string;
+  onRefresh?: () => void;
+  initialStep?: number;
+};
 
 const LegacySalarySettlement = dynamic<SalarySettlementProps>(
   () => import('../../../인사관리서브/급여명세/급여정산'),
@@ -47,11 +53,14 @@ export default function ModSettlement() {
   const kpis = useMemo(() => calculateKpis(data), [data]);
   const [advancing, setAdvancing] = useState(false);
   const [showLegacy, setShowLegacy] = useState(false);
+  const [initialStep, setInitialStep] = useState(1);
 
   const hasRecord = data.records.length > 0;
   const allConfirmed =
     hasRecord && data.records.every((r) => r.status === '확정' || r.status === 'CONFIRMED');
   const [y, m] = data.yearMonth.split('-');
+  const isLocked = data.isLocked;
+  const payrollDay = data.payrollDay ?? 15;
 
   const steps: StepDef[] = [
     {
@@ -84,13 +93,13 @@ export default function ModSettlement() {
       body: `은행 이체 파일(.txt) 생성 · 총 ${kpis.netPaySum.toLocaleString()}원 지급.`,
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '이체 파일 다운로드',
-      date: `예정 ${m}/15`,
+      date: `예정 ${m}/${payrollDay}`,
     },
     {
       id: 5,
       label: '원천징수 신고',
       body: '국세청 제출 파일 생성 · 지방세 포함 · 간이세액 적용.',
-      state: 'pending',
+      state: allConfirmed ? 'on' : 'pending',
       actionLabel: '신고 파일 생성',
       date: `예정 ${m}/20`,
     },
@@ -98,14 +107,64 @@ export default function ModSettlement() {
 
   const doneCount = steps.filter((s) => s.state === 'done').length;
 
+  const downloadTransferFile = () => {
+    const confirmedRecords = data.records.filter(r => (r.status === '확정' || r.status === 'CONFIRMED') && r.net_pay > 0);
+    if (confirmedRecords.length === 0) {
+      toast('확정된 급여 내역이 없습니다. 먼저 급여 정산을 완료하여 확정해 주세요.', 'warning');
+      return;
+    }
+
+    let fileContent = '은행명\t계좌번호\t예금주\t이체금액\r\n';
+    confirmedRecords.forEach(record => {
+      const staff = data.staffs.find(s => String(s.id) === String(record.staff_id));
+      const bankName = (staff?.bank_name || '미지정').trim();
+      const bankAccount = (staff?.bank_account || '미지정').trim();
+      const name = (staff?.name || '미지정').trim();
+      const amount = record.net_pay;
+      fileContent += `${bankName}\t${bankAccount}\t${name}\t${amount}\r\n`;
+    });
+
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `급여이체내역_${data.yearMonth}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast('급여 이체 파일 다운로드가 시작되었습니다.', 'success');
+  };
+
   const handleAdvance = () => {
+    if (isLocked) return;
+    setInitialStep(1);
     setAdvancing(true);
     setShowLegacy(true);
     setTimeout(() => setAdvancing(false), 300);
   };
 
+  const handleStepAction = (stepId: number) => {
+    if (stepId === 1) {
+      window.dispatchEvent(new CustomEvent('hr-menu-change', { detail: 'attend' }));
+    } else if (stepId === 2 || stepId === 3) {
+      setInitialStep(2);
+      setShowLegacy(true);
+    } else if (stepId === 4) {
+      downloadTransferFile();
+    } else if (stepId === 5) {
+      window.dispatchEvent(new CustomEvent('payroll-module-change', { detail: 'withholding' }));
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      {isLocked && (
+        <div className="bg-[var(--warning-light)] border border-[var(--warning)] text-[var(--warning-dark)] px-3 py-2.5 rounded-[var(--radius-md)] text-[12.5px] font-semibold flex items-center gap-2">
+          <span>⚠️</span>
+          <span>해당 월의 급여 정산이 마감(잠금)되어 데이터를 수정하거나 추가적인 정산 단계를 진행할 수 없습니다.</span>
+        </div>
+      )}
       {showLegacy && (
         <div className="app-card overflow-hidden">
           <div className="flex items-center justify-between p-3 border-b border-[var(--border)]">
@@ -123,6 +182,7 @@ export default function ModSettlement() {
               staffs={data.staffs}
               selectedCo={selectedCo}
               onRefresh={reload}
+              initialStep={initialStep}
             />
           </div>
         </div>
@@ -131,7 +191,7 @@ export default function ModSettlement() {
         <div className="app-card p-3">
           <div className="text-[11px] text-[var(--toss-gray-4)]">정산 진행 단계</div>
           <div className="text-[20px] font-extrabold">{doneCount}<span className="text-[12px] font-medium ml-0.5">/5</span></div>
-          <div className="text-[10px] text-[var(--warning)]">지급 예정 {m}/15</div>
+          <div className="text-[10px] text-[var(--warning)]">지급 예정 {m}/{payrollDay}</div>
         </div>
         <div className="app-card p-3">
           <div className="text-[11px] text-[var(--toss-gray-4)]">정산 대상자</div>
@@ -156,9 +216,9 @@ export default function ModSettlement() {
           <button
             type="button"
             data-testid="mod-settlement-start-button"
-            disabled={advancing || doneCount >= 5}
+            disabled={advancing || doneCount >= 5 || isLocked}
             onClick={handleAdvance}
-            aria-disabled={advancing || doneCount >= 5}
+            aria-disabled={advancing || doneCount >= 5 || isLocked}
             className="text-[11px] font-bold px-2.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {advancing ? '진행 중…' : doneCount >= 5 ? '정산 완료' : '다음 단계 시작'}
@@ -186,7 +246,9 @@ export default function ModSettlement() {
               {step.state !== 'pending' && (
                 <button
                   type="button"
-                  className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]"
+                  onClick={() => handleStepAction(step.id)}
+                  disabled={isLocked && step.id !== 1 && step.id !== 4}
+                  className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {step.actionLabel}
                 </button>

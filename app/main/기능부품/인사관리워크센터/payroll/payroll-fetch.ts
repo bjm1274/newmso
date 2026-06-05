@@ -124,6 +124,8 @@ export interface PayrollWorkcenterData {
   yearMonthPrev: string;
   selectedCo: string;
   errors: { source: string; message: string }[];
+  isLocked: boolean;
+  payrollDay?: number;
 }
 
 function shiftYearMonth(ym: string, deltaMonths: number): string {
@@ -147,6 +149,68 @@ export async function fetchPayrollWorkcenterData({
   const policy = getPayrollPolicy();
   const errors: { source: string; message: string }[] = [];
   const yearMonthPrev = shiftYearMonth(yearMonth, -1);
+
+  // Check lock status
+  let isLocked = false;
+  try {
+    const { data: lockRows } = await supabase
+      .from('payroll_locks')
+      .select('company_name')
+      .eq('year_month', yearMonth);
+    if (Array.isArray(lockRows) && lockRows.length > 0) {
+      if (selectedCo === '전체') {
+        isLocked = true;
+      } else {
+        isLocked = lockRows.some(row => row.company_name === '전체' || row.company_name === selectedCo);
+      }
+    }
+  } catch (e) {
+    console.warn('[payroll] lock check failed:', e);
+  }
+
+  let payrollDay = 15;
+  try {
+    const { data: coRows } = await supabase
+      .from('companies')
+      .select('name, payment_day')
+      .neq('name', '전체');
+    
+    if (Array.isArray(coRows) && coRows.length > 0) {
+      if (selectedCo && selectedCo !== '전체') {
+        const match = coRows.find((c) => c.name === selectedCo);
+        if (match && match.payment_day != null) {
+          payrollDay = Number(match.payment_day);
+        }
+      } else {
+        const firstCo = coRows.find((c) => c.payment_day != null);
+        if (firstCo) {
+          payrollDay = Number(firstCo.payment_day);
+        }
+      }
+    } else {
+      const scope = selectedCo && selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
+      const { data: policyRows } = await supabase
+        .from('company_payroll_policies')
+        .select('company_name, rule_value')
+        .eq('rule_label', '급여일')
+        .in('company_name', scope);
+      
+      if (Array.isArray(policyRows) && policyRows.length > 0) {
+        const chosen = policyRows.find((r) => r.company_name === selectedCo) || policyRows.find((r) => r.company_name === '전체');
+        if (chosen && chosen.rule_value) {
+          const match = String(chosen.rule_value).match(/\d+/);
+          if (match) {
+            const parsedDay = parseInt(match[0], 10);
+            if (parsedDay >= 1 && parsedDay <= 31) {
+              payrollDay = parsedDay;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[payroll] fetch payroll day failed:', e);
+  }
 
   let staffs: StaffMember[] = [];
   try {
@@ -186,7 +250,7 @@ export async function fetchPayrollWorkcenterData({
           joined_at: dbJoinedAt,
           resigned_at: dbResignedAt,
           birth_date: row.birth_date == null ? null : str(row.birth_date),
-          salary: row.salary == null ? null : Number(row.salary),
+          salary: row.salary == null || Number(row.salary) === 0 ? (row.base_salary == null ? null : Number(row.base_salary)) : Number(row.salary),
           employee_no: row.employee_no == null ? null : str(row.employee_no),
           permissions: (row.permissions ?? null) as StaffMember['permissions'],
           base_salary: row.base_salary == null ? 0 : num(row.base_salary),
@@ -214,9 +278,11 @@ export async function fetchPayrollWorkcenterData({
         if (selectedCo && selectedCo !== '전체' && s.company !== selectedCo) return false;
         if (isActiveStaff(s)) return true;
         // R-1: 중도퇴사자도 정산월에 재직했다면 최종 월급·중간정산 대상에 포함한다.
-        //      (status를 '퇴사'/'퇴직'으로 바꾼 뒤에도 그 달 급여를 정산할 수 있어야 함.
-        //       resign_date(YYYY-MM)가 정산월 이상이면 그 달에 재직한 것으로 본다.)
         const resignYm = s.resign_date ? String(s.resign_date).slice(0, 7) : '';
+        if (s.resign_date && s.resign_date.endsWith('-01')) {
+          // 퇴사일이 1일인 경우 실제 근로종료일은 이전 달 말이므로 퇴사월에는 제외
+          return resignYm > yearMonth;
+        }
         return resignYm !== '' && resignYm >= yearMonth;
       });
   } catch (e) {
@@ -273,6 +339,8 @@ export async function fetchPayrollWorkcenterData({
     yearMonthPrev,
     selectedCo,
     errors,
+    isLocked,
+    payrollDay,
   };
 }
 

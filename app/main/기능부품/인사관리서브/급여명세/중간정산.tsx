@@ -270,6 +270,77 @@ function InterimTenMinuteUnitField({
   );
 }
 
+function calculateRetirementTax(severance: number, workDays: number): { tax: number; localTax: number } {
+  if (severance <= 0 || workDays <= 0) return { tax: 0, localTax: 0 };
+  
+  // 1. 근속연수 계산 (1년 미만은 1년으로 봄)
+  const years = Math.max(1, Math.ceil(workDays / 365.25));
+  
+  // 2. 근속연수공제 계산
+  let serviceYearDeduction = 0;
+  if (years <= 5) {
+    serviceYearDeduction = 1000000 * years;
+  } else if (years <= 10) {
+    serviceYearDeduction = 5000000 + 2000000 * (years - 5);
+  } else if (years <= 20) {
+    serviceYearDeduction = 15000000 + 2500000 * (years - 10);
+  } else {
+    serviceYearDeduction = 40000000 + 3000000 * (years - 20);
+  }
+  
+  // 3. 과세표준 계산
+  const taxBase = Math.max(0, severance - serviceYearDeduction);
+  if (taxBase <= 0) return { tax: 0, localTax: 0 };
+  
+  // 4. 환산급여 계산 (과세표준 / 근속연수 * 12)
+  const translatedSalary = (taxBase / years) * 12;
+  
+  // 5. 환산급여공제 계산
+  let translatedDeduction = 0;
+  if (translatedSalary <= 8000000) {
+    translatedDeduction = translatedSalary;
+  } else if (translatedSalary <= 70000000) {
+    translatedDeduction = 8000000 + 0.6 * (translatedSalary - 8000000);
+  } else if (translatedSalary <= 120000000) {
+    translatedDeduction = 45200000 + 0.55 * (translatedSalary - 70000000);
+  } else if (translatedSalary <= 300000000) {
+    translatedDeduction = 72700000 + 0.5 * (translatedSalary - 120000000);
+  } else {
+    translatedDeduction = 162700000 + 0.45 * (translatedSalary - 300000000);
+  }
+  
+  // 6. 환산과세표준
+  const translatedTaxBase = Math.max(0, translatedSalary - translatedDeduction);
+  
+  // 7. 환산산출세액 (기본 소득세율 적용)
+  let translatedCalculatedTax = 0;
+  if (translatedTaxBase <= 14000000) {
+    translatedCalculatedTax = translatedTaxBase * 0.06;
+  } else if (translatedTaxBase <= 50000000) {
+    translatedCalculatedTax = 840000 + 0.15 * (translatedTaxBase - 14000000);
+  } else if (translatedTaxBase <= 88000000) {
+    translatedCalculatedTax = 6240000 + 0.24 * (translatedTaxBase - 50000000);
+  } else if (translatedTaxBase <= 150000000) {
+    translatedCalculatedTax = 15360000 + 0.35 * (translatedTaxBase - 88000000);
+  } else if (translatedTaxBase <= 300000000) {
+    translatedCalculatedTax = 37060000 + 0.38 * (translatedTaxBase - 150000000);
+  } else if (translatedTaxBase <= 500000000) {
+    translatedCalculatedTax = 94060000 + 0.4 * (translatedTaxBase - 300000000);
+  } else if (translatedTaxBase <= 1000000000) {
+    translatedCalculatedTax = 174060000 + 0.42 * (translatedTaxBase - 500000000);
+  } else {
+    translatedCalculatedTax = 384060000 + 0.45 * (translatedTaxBase - 1000000000);
+  }
+  
+  // 8. 결정산출세액 (환산산출세액 / 12 * 근속연수)
+  const calculatedTax = (translatedCalculatedTax / 12) * years;
+  
+  const tax = Math.floor(calculatedTax / 10) * 10;
+  const localTax = Math.floor((tax * 0.1) / 10) * 10;
+  
+  return { tax, localTax };
+}
+
 export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }: Record<string, unknown>) {
   const { dialog, openConfirm } = useActionDialog();
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
@@ -369,6 +440,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
     let severance = 0;
     let workDays = 0;
+    let retirementTax = 0;
+    let retirementLocalTax = 0;
     if (includeSeverance && reason === '퇴사') {
       const joined = staff.joined_at || staff.join_date || staff.hire_date;
       const resigned = staff.resigned_at || staff.resign_date || settlementDate;
@@ -378,6 +451,11 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         workDays = Math.max(0, Math.floor((r.getTime() - j.getTime()) / (1000 * 60 * 60 * 24)));
         const monthlyAvgWage = base + (mealAllowance || 0);
         severance = calculateDcRetirementBenefitFromMonthlyWage(monthlyAvgWage, workDays);
+        if (severance > 0) {
+          const taxCalc = calculateRetirementTax(severance, workDays);
+          retirementTax = taxCalc.tax;
+          retirementLocalTax = taxCalc.localTax;
+        }
       }
     }
 
@@ -518,7 +596,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       ? Math.max(0, familyAdjustedIncomeTax - preRatioIncomeTax)
       : calculateQualifyingChildTaxCredit(qualifyingChildCount);
 
-    const deduction = deductions.national_pension + deductions.health_insurance + deductions.long_term_care + deductions.employment_insurance + deductions.income_tax + deductions.local_tax;
+    const deduction = deductions.national_pension + deductions.health_insurance + deductions.long_term_care + deductions.employment_insurance + deductions.income_tax + deductions.local_tax + retirementTax + retirementLocalTax;
     const deductionDetail = {
       national_pension: nationalPension,
       health_insurance: healthInsurance,
@@ -526,6 +604,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       employment_insurance: employmentInsurance,
       income_tax: incomeTax,
       local_tax: localTax,
+      retirement_income_tax: retirementTax,
+      retirement_local_tax: retirementLocalTax,
       dependent_count: dependentCount,
       child_count_8_20: qualifyingChildCount,
       withholding_rate_percent: withholdingRatePercent,
@@ -628,8 +708,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         health_insurance: calc.deductionDetail.health_insurance,
         long_term_care: calc.deductionDetail.long_term_care,
         employment_insurance: calc.deductionDetail.employment_insurance,
-        income_tax: calc.deductionDetail.income_tax,
-        local_tax: calc.deductionDetail.local_tax,
+        income_tax: calc.deductionDetail.income_tax + (calc.deductionDetail.retirement_income_tax || 0),
+        local_tax: calc.deductionDetail.local_tax + (calc.deductionDetail.retirement_local_tax || 0),
         deduction_detail: calc.deductionDetail,
         net_pay: calc.net,
         attendance_deduction: calc.allowanceDeduction + calc.attendanceDeduction,
@@ -897,6 +977,18 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   <div className="flex justify-between text-xs font-medium text-emerald-700">
                     <span>퇴직급여 {result.retirementBenefitBasis} 기준 (재직 {formatWorkPeriod(result.workDays)})</span>
                     <span>{result.severance.toLocaleString()}원</span>
+                  </div>
+                )}
+                {result.deduction - (result.deductionDetail.retirement_income_tax || 0) - (result.deductionDetail.retirement_local_tax || 0) > 0 && (
+                  <div className="flex justify-between text-xs font-medium text-[var(--toss-gray-4)]">
+                    <span>근로소득세 및 4대보험</span>
+                    <span>{(result.deduction - (result.deductionDetail.retirement_income_tax || 0) - (result.deductionDetail.retirement_local_tax || 0)).toLocaleString()}원</span>
+                  </div>
+                )}
+                {(result.deductionDetail.retirement_income_tax || 0) > 0 && (
+                  <div className="flex justify-between text-xs font-medium text-rose-500">
+                    <span>퇴직소득세 (지방세 포함)</span>
+                    <span>-{(result.deductionDetail.retirement_income_tax + result.deductionDetail.retirement_local_tax).toLocaleString()}원</span>
                   </div>
                 )}
                 <div className="flex justify-between text-xs font-medium text-rose-600 pt-1">

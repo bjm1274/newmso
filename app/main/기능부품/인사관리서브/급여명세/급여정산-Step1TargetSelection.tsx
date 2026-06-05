@@ -14,6 +14,7 @@ export function Step1TargetSelection({
   onToggleStaff,
   onNext,
   loading,
+  isLocked,
 }: {
   hasExactTaxTable: boolean;
   yearMonth: string;
@@ -25,6 +26,7 @@ export function Step1TargetSelection({
   onToggleStaff: (staff: StaffMember) => void;
   onNext: () => void;
   loading: boolean;
+  isLocked?: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -72,7 +74,7 @@ export function Step1TargetSelection({
           </div>
         ))}
       </div>
-      <button data-testid="salary-settlement-next-button" onClick={onNext} disabled={loading} className="w-full py-3.5 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
+      <button data-testid="salary-settlement-next-button" onClick={onNext} disabled={loading || isLocked} className="w-full py-3.5 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : isLocked ? '정산 불가 (마감 잠금됨)' : '다음: 수당 설정 및 정산'}</button>
     </div>
   );
 }

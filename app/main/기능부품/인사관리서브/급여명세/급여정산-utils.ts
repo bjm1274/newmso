@@ -318,10 +318,11 @@ function calculateSalaryAmountWithChanges({
   }
 
   if (resignDate) {
-    const resignYear = resignDate.getFullYear();
-    const resignMonth = resignDate.getMonth() + 1;
+    const lastEmployedDate = shiftPayrollDate(resignDate, -1);
+    const resignYear = lastEmployedDate.getFullYear();
+    const resignMonth = lastEmployedDate.getMonth() + 1;
     if (resignYear === bounds.end.getFullYear() && resignMonth === (bounds.end.getMonth() + 1)) {
-      effectiveEnd = minPayrollDate(effectiveEnd, resignDate);
+      effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
       isMidMonthEmployed = true;
     }
   }
@@ -336,8 +337,11 @@ function calculateSalaryAmountWithChanges({
       if (hireDate && hireDate.getFullYear() === bounds.start.getFullYear() && (hireDate.getMonth() + 1) === (bounds.start.getMonth() + 1)) {
         reasonParts.push('중도 입사');
       }
-      if (resignDate && resignDate.getFullYear() === bounds.end.getFullYear() && (resignDate.getMonth() + 1) === (bounds.end.getMonth() + 1)) {
-        reasonParts.push('중도 퇴사');
+      if (resignDate) {
+        const lastEmployedDate = shiftPayrollDate(resignDate, -1);
+        if (lastEmployedDate.getFullYear() === bounds.end.getFullYear() && (lastEmployedDate.getMonth() + 1) === (bounds.end.getMonth() + 1)) {
+          reasonParts.push('중도 퇴사');
+        }
       }
       const reason = reasonParts.join(' 및 ') + ' 일할 정산';
 
@@ -530,13 +534,15 @@ export function getEmploymentProratedBaseForMonth(
     effectiveStart = maxPayrollDate(effectiveStart, hireDate);
     isMidMonthEmployed = true;
   }
-  if (
-    resignDate &&
-    resignDate.getFullYear() === bounds.end.getFullYear() &&
-    resignDate.getMonth() === bounds.end.getMonth()
-  ) {
-    effectiveEnd = minPayrollDate(effectiveEnd, resignDate);
-    isMidMonthEmployed = true;
+  if (resignDate) {
+    const lastEmployedDate = shiftPayrollDate(resignDate, -1);
+    if (
+      lastEmployedDate.getFullYear() === bounds.end.getFullYear() &&
+      lastEmployedDate.getMonth() === bounds.end.getMonth()
+    ) {
+      effectiveEnd = minPayrollDate(effectiveEnd, lastEmployedDate);
+      isMidMonthEmployed = true;
+    }
   }
 
   if (!isMidMonthEmployed) return base;

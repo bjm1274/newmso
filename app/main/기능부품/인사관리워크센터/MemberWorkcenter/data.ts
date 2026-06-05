@@ -43,9 +43,11 @@ export function formatTenure(iso?: string | null, now = Date.now()): string {
   return `${years.toFixed(1)}년`;
 }
 
+import { isActiveStaff } from '@/lib/active-staff';
+
 /** 재직자 여부 (퇴사 외 모두 active 로 간주) */
 export function isActive(staff: StaffMember): boolean {
-  return String(staff.status ?? '').trim() !== '퇴사';
+  return isActiveStaff(staff);
 }
 
 /** 입사일을 안전하게 추출 (hire_date 우선, joined_at 보조) */

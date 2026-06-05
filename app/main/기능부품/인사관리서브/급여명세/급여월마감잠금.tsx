@@ -227,6 +227,24 @@ export default function PayrollLockPanel({
     }
   };
 
+  const deleteLock = async () => {
+    if (!lockRow) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('payroll_locks').delete().eq('id', lockRow.id);
+      if (error) throw error;
+
+      setLockRow(null);
+      toast('급여 마감 잠금을 해제했습니다.', 'success');
+      onLockChange?.();
+    } catch (error) {
+      console.error('payroll lock delete failed:', error);
+      toast(formatLockError(error), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -246,9 +264,21 @@ export default function PayrollLockPanel({
             {loading ? '처리 중...' : '마감 잠금'}
           </button>
         ) : (
-          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
-            잠금됨
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+              잠금됨
+            </span>
+            {canApproveReopen && (
+              <button
+                type="button"
+                onClick={deleteLock}
+                disabled={loading}
+                className="rounded-[var(--radius-md)] bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {loading ? '처리 중...' : '잠금 해제'}
+              </button>
+            )}
+          </div>
         )}
       </div>
 

@@ -252,6 +252,9 @@ export function calculateMonthlyIncomeTax(
   const childTaxCredit = calculateQualifyingChildTaxCredit(qualifyingChildCount);
 
   if (hasFamilyTable) {
+    if (brackets.length > 0 && monthlyTaxable < brackets[0].min) {
+      return 0;
+    }
     const matched =
       brackets.find((entry) => monthlyTaxable >= entry.min && monthlyTaxable < (entry.max ?? Number.POSITIVE_INFINITY)) ??
       brackets[brackets.length - 1];
@@ -283,6 +286,9 @@ export function calculateMonthlyIncomeTax(
   }
 
   const annualTaxable = monthlyTaxable * 12;
+  if (brackets.length > 0 && annualTaxable < brackets[0].min) {
+    return 0;
+  }
   const matched =
     brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY)) ??
     brackets[brackets.length - 1];
@@ -312,6 +318,9 @@ export function calculateAnnualIncomeTax(
   if (annualTaxable <= 0) return 0;
 
   const brackets = resolveIncomeTaxBracket(rates);
+  if (brackets.length > 0 && annualTaxable < brackets[0].min) {
+    return 0;
+  }
   const matched =
     brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY)) ??
     brackets[brackets.length - 1];

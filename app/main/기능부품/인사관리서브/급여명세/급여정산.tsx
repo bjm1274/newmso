@@ -57,9 +57,20 @@ import { Step1TargetSelection } from './급여정산-Step1TargetSelection';
 import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
 import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
 import { Step3Complete } from './급여정산-Step3Complete';
+import { isActiveStaff } from '@/lib/active-staff';
 
-export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
-  const [step, setStep] = useState(1);
+export default function SalarySettlement({
+  staffs,
+  selectedCo,
+  onRefresh,
+  initialStep = 1,
+}: {
+  staffs: StaffMember[];
+  selectedCo: string;
+  onRefresh?: () => void;
+  initialStep?: number;
+}) {
+  const [step, setStep] = useState(initialStep);
   const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
   const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
@@ -71,6 +82,68 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const [salaryChangesByStaff, setSalaryChangesByStaff] = useState<Record<string, SalaryChangeHistoryRow[]>>({});
   // 회사 급여기준의 원천징수 비율(단일 기본값) — 요청 #4
   const [companyWithholdingRate, setCompanyWithholdingRate] = useState<number>(100);
+  const [isLocked, setIsLocked] = useState(false);
+
+  // 마감 잠금 여부 조회
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      try {
+        const { data: lockRows } = await supabase
+          .from('payroll_locks')
+          .select('company_name')
+          .eq('year_month', yearMonth);
+        if (ok) {
+          if (Array.isArray(lockRows) && lockRows.length > 0) {
+            if (selectedCo === '전체') {
+              setIsLocked(true);
+            } else {
+              setIsLocked(lockRows.some((row: any) => row.company_name === '전체' || row.company_name === selectedCo));
+            }
+          } else {
+            setIsLocked(false);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check lock state:', e);
+        if (ok) setIsLocked(false);
+      }
+    })();
+    return () => { ok = false; };
+  }, [selectedCo, yearMonth]);
+
+  // initialStep이 변경되면 step도 업데이트
+  useEffect(() => {
+    setStep(initialStep);
+  }, [initialStep]);
+
+  // initialStep이 2이고 selectedStaffs가 비어있을 때, 필터링된 모든 직원을 자동 선택하도록 처리
+  useEffect(() => {
+    if (initialStep === 2 && selectedStaffs.length === 0 && staffs.length > 0) {
+      const activeStaffs = staffs.filter((s: StaffMember) => {
+        if (selectedCo !== '전체' && s.company !== selectedCo) return false;
+        
+        const isRetired = !isActiveStaff(s);
+        if (isRetired) {
+          const resignDate = s.resigned_at || s.resign_date;
+          if (typeof resignDate === 'string' && resignDate.trim()) {
+            const resignMonth = resignDate.trim().slice(0, 7);
+            if (resignDate.trim().endsWith('-01')) {
+              const [y, m] = resignMonth.split('-').map(Number);
+              const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+              if (prevMonth !== yearMonth) return false;
+            } else {
+              if (resignMonth !== yearMonth) return false;
+            }
+          } else {
+            return false;
+          }
+        }
+        return true;
+      });
+      setSelectedStaffs(activeStaffs);
+    }
+  }, [initialStep, staffs, selectedCo, yearMonth]);
 
   useEffect(() => {
     let ok = true;
@@ -123,11 +196,22 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   const filteredStaffs = staffs.filter((s: StaffMember) => {
     if (selectedCo !== '전체' && s.company !== selectedCo) return false;
     
-    // 퇴사 확정 처리된 사람은 퇴사월이 현재 정산년월(yearMonth)과 동일한 경우에만 정산 대상에 포함합니다.
-    // 그 외의 경우(이전 달에 퇴사했거나 퇴사일이 빈 값인 퇴사자)는 정산 대상에서 제외합니다.
-    if (s.status === '퇴사') {
-      const resignMonth = s.resigned_at ? String(s.resigned_at).slice(0, 7) : '';
-      if (resignMonth !== yearMonth) return false;
+    const isRetired = !isActiveStaff(s);
+    if (isRetired) {
+      const resignDate = s.resigned_at || s.resign_date;
+      if (typeof resignDate === 'string' && resignDate.trim()) {
+        const resignMonth = resignDate.trim().slice(0, 7);
+        // 만약 퇴사일이 정산월의 1일이면, 실제 마지막 근무일은 이전 달의 말일이므로 이전 달 정산 대상입니다.
+        if (resignDate.trim().endsWith('-01')) {
+          const [y, m] = resignMonth.split('-').map(Number);
+          const prevMonth = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+          if (prevMonth !== yearMonth) return false;
+        } else {
+          if (resignMonth !== yearMonth) return false;
+        }
+      } else {
+        return false;
+      }
     }
     
     return true;
@@ -384,6 +468,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const handleNextStep = async () => {
+    if (isLocked) {
+      toast("해당 월의 급여 정산이 마감(잠금)되어 진행할 수 없습니다.", "error");
+      return;
+    }
     if (selectedStaffs.length === 0) return toast("정산 대상을 선택해 주세요.", 'warning');
 
     // 기본급여가 설정되지 않은 직원은 명세서를 생성하지 못하도록 1단계에서 차단
@@ -1007,16 +1095,24 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     setLoading(true);
     try {
       // E-1: 마감 잠금된 월은 임시저장·확정을 모두 차단한다(클라이언트 가드).
-      // 잠금 스코프는 '전체' 또는 선택 회사. 조회 실패(컬럼/테이블 미적용 등) 시 막지 않음(fail-open).
-      const lockScopes = selectedCo && selectedCo !== '전체' ? ['전체', selectedCo] : ['전체'];
+      // 잠금 스코프는 '전체' 또는 선택 회사. 조회 실패 시 막지 않음(fail-open).
       const { data: lockRows, error: lockError } = await supabase
         .from('payroll_locks')
         .select('year_month, company_name')
-        .eq('year_month', yearMonth)
-        .in('company_name', lockScopes);
+        .eq('year_month', yearMonth);
+      
+      let isSaveLocked = false;
+      if (lockRows && lockRows.length > 0) {
+        if (selectedCo === '전체') {
+          isSaveLocked = true;
+        } else {
+          isSaveLocked = lockRows.some((row: any) => row.company_name === '전체' || row.company_name === selectedCo);
+        }
+      }
+
       if (lockError) {
         console.error('payroll lock check failed:', lockError);
-      } else if (Array.isArray(lockRows) && lockRows.length > 0) {
+      } else if (isSaveLocked) {
         toast(
           `${yearMonth} 급여가 마감 잠금되어 저장할 수 없습니다.\n재오픈 승인 후 다시 시도해 주세요.`,
           'error',
@@ -1364,6 +1460,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         </div>
       </div>
 
+      {isLocked && (
+        <div className="bg-red-500/10 border-b border-red-500/20 text-red-700 px-4 py-2.5 text-[12.5px] font-semibold flex items-center gap-2">
+          <span>⚠️</span>
+          <span>해당 월의 급여 정산이 마감(잠금)되어 데이터를 수정하거나 추가적인 정산 단계를 진행할 수 없습니다.</span>
+        </div>
+      )}
+
       <div className="p-4">
         {step === 1 && (
           <Step1TargetSelection
@@ -1377,6 +1480,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
             onToggleStaff={toggleStaff}
             onNext={handleNextStep}
             loading={loading}
+            isLocked={isLocked}
           />
         )}
 
@@ -1415,12 +1519,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
               <button
                 data-testid="salary-settlement-draft-save-button"
                 onClick={handleDraftSave}
-                disabled={loading}
+                disabled={loading || isLocked}
                 className="flex-1 py-3 bg-amber-500 text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
               >
                 {loading ? '처리 중...' : '임시 저장'}
               </button>
-              <button data-testid="salary-settlement-finalize-button" onClick={() => setShowFinalizeReview(true)} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="salary-settlement-finalize-button" onClick={() => setShowFinalizeReview(true)} disabled={loading || isLocked || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>

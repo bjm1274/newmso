@@ -49,6 +49,8 @@ const EMPTY_DATA = (yearMonth: string, selectedCo: string): PayrollWorkcenterDat
   yearMonthPrev: yearMonth,
   selectedCo,
   errors: [],
+  isLocked: false,
+  payrollDay: 15,
 });
 
 export function PayrollProvider({
