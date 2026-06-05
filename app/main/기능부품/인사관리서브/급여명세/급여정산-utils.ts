@@ -471,7 +471,10 @@ export function resolveSalaryAmountForSettlement({
   status?: string | null;
 }) {
   const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges, staff });
-  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation, status });
+  let amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation, status });
+  if (field === 'base_salary') {
+    amount = calculation.amount;
+  }
   return {
     amount,
     summary: calculation.summary ? { ...calculation.summary, amount } : null,
