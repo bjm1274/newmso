@@ -27,6 +27,7 @@ export type MessageBubbleProps = {
   staffs: StaffDirectoryEntry[];
   fallbackMyName: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onImageLoad?: () => void;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -54,6 +55,7 @@ export default function MessageBubble({
   staffs,
   fallbackMyName,
   onToggleReaction,
+  onImageLoad,
 }: MessageBubbleProps) {
   const ts = formatBubbleTimestamp(message.created_at);
   const senderName =
@@ -91,6 +93,7 @@ export default function MessageBubble({
 
   return (
     <div
+      data-testid={`chat-message-row-${message.id}`}
       style={{
         display: 'flex',
         gap: 8,
@@ -145,6 +148,7 @@ export default function MessageBubble({
 
 
           <div
+            data-testid={`chat-message-${message.id}`}
             style={{
               padding: (imageMode || isEmoticonOrSticker) ? 0 : '10px 14px',
               borderRadius: 16,
@@ -176,6 +180,7 @@ export default function MessageBubble({
                 <img
                   src={String(message.file_url)}
                   alt={fileName}
+                  onLoad={onImageLoad}
                   style={{
                     display: 'block',
                     maxWidth: 220,

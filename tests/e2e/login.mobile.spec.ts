@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('로그인 페이지가 렌더링된다', async ({ page }) => {
+  await mockSupabase(page);
   await page.goto('/');
   // 로그인 페이지: 직원번호 입력 또는 /login 리다이렉트
   await expect(page).toHaveURL(/\/(login|$)/);
@@ -62,8 +63,10 @@ test('모바일 MobileShell에서 더보기 메뉴 버튼이 존재한다', asyn
 
   // 더보기 탭 버튼 확인 (role=button + 텍스트 '더보기' or testid)
   const moreBtn =
-    page.getByTestId('sidebar-menu-more-mobile').or(
-      page.getByRole('button', { name: /더보기|more/i })
+    page.getByTestId('sidebar-menu-extra-mobile').or(
+      page.getByTestId('sidebar-menu-more-mobile')
+    ).or(
+      page.getByRole('button', { name: /더보기|more|추가기능/i })
     );
   await expect(moreBtn.first()).toBeVisible();
 });

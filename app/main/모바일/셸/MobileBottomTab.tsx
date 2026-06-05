@@ -103,13 +103,25 @@ export type MobileBottomTabProps = {
   dots?: Partial<Record<MTab, boolean>>;
 };
 
-function MobileBottomTabBase({ active, onChange, badges, dots }: MobileBottomTabProps) {
+function MobileBottomTabBase({
+  active,
+  onChange,
+  badges,
+  dots,
+}: MobileBottomTabProps) {
   return (
-    <nav className="m-bottom-tab" aria-label="주 네비게이션">
+    <nav className="m-bottom-tab" aria-label="주 네비게이션" data-testid="mobile-tabbar">
       {TABS.map((t) => {
         const on = t.id === active;
         const badgeCount = badges?.[t.id];
         const showDot = dots?.[t.id] ?? (t.hasDot && t.id === 'notif');
+        
+        // E2E test-id mapping for mobile menu items
+        let testId = `sidebar-menu-${t.id}-mobile`;
+        if (t.id === 'mypage') testId = 'sidebar-menu-home-mobile';
+        if (t.id === 'addon') testId = 'sidebar-menu-extra-mobile';
+        if (t.id === 'stock') testId = 'sidebar-menu-inventory-mobile';
+
         return (
           <button
             key={t.id}
@@ -118,6 +130,7 @@ function MobileBottomTabBase({ active, onChange, badges, dots }: MobileBottomTab
             onClick={() => onChange(t.id)}
             aria-current={on ? 'page' : undefined}
             aria-label={t.label}
+            data-testid={testId}
           >
             <div className="ico-wrap">
               <svg

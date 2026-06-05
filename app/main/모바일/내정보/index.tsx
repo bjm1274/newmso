@@ -23,14 +23,18 @@ export type 내정보Props = {
   onSwitchTab?: (tab: MTab) => void;
 };
 
+import React from 'react';
+
 export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: 내정보Props) {
   const onBack = () => onSub(undefined);
+
+  let contentElement: React.ReactNode;
 
   if (sub === 'attend') {
     const staffId = typeof user.id === 'string' ? user.id : null;
     const staffName = typeof user.name === 'string' ? user.name : undefined;
     const company = typeof user.company === 'string' ? user.company : undefined;
-    return (
+    contentElement = (
       <SAttend
         staffId={staffId}
         staffName={staffName}
@@ -38,18 +42,21 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
         onBack={onBack}
       />
     );
+  } else if (sub === 'leave') {
+    contentElement = <연차 user={user} onBack={onBack} />;
+  } else if (sub === 'payslip') {
+    contentElement = <급여명세 user={user} onBack={onBack} />;
+  } else if (sub === 'cert') {
+    contentElement = <증명서 user={user} onBack={onBack} />;
+  } else if (sub === 'edit') {
+    contentElement = <정보수정 user={user} onBack={onBack} />;
+  } else {
+    contentElement = <SHome user={user} onSub={onSub} onLogout={onLogout} onSwitchTab={onSwitchTab} />;
   }
-  if (sub === 'leave') {
-    return <연차 user={user} onBack={onBack} />;
-  }
-  if (sub === 'payslip') {
-    return <급여명세 user={user} onBack={onBack} />;
-  }
-  if (sub === 'cert') {
-    return <증명서 user={user} onBack={onBack} />;
-  }
-  if (sub === 'edit') {
-    return <정보수정 user={user} onBack={onBack} />;
-  }
-  return <SHome user={user} onSub={onSub} onLogout={onLogout} onSwitchTab={onSwitchTab} />;
+
+  return (
+    <div data-testid="mypage-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {contentElement}
+    </div>
+  );
 }

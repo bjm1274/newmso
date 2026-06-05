@@ -29,6 +29,7 @@ import 오프라인실패배너 from '../공통/오프라인실패배너';
 import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
 import { useChatRoomsForMobile } from '../채팅/data-hooks';
+import { useNavigation } from '../../contexts/NavigationContext';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -36,13 +37,58 @@ export type MobileShellProps = {
 };
 
 export default function MobileShell({ user, onLogout }: MobileShellProps) {
-  const [route, setRoute] = useState<MRoute>({ tab: 'mypage' });
+  const { mainMenu, setMainMenu, subView, setSubView } = useNavigation();
+
+  const getTabFromMenu = (menu: string): MTab => {
+    const menuMap: Record<string, MTab> = {
+      '알림': 'notif', 'notif': 'notif',
+      '내정보': 'mypage', 'mypage': 'mypage',
+      '추가기능': 'addon', 'addon': 'addon', 'extra': 'addon',
+      '채팅': 'chat', 'chat': 'chat',
+      '게시판': 'board', 'board': 'board',
+      '전자결재': 'approval', 'approval': 'approval',
+      '인사관리': 'hr', 'hr': 'hr',
+      '재고관리': 'stock', 'stock': 'stock', 'inventory': 'stock',
+      '관리자': 'admin', 'admin': 'admin'
+    };
+    return menuMap[menu] || 'mypage';
+  };
+
+  const [route, setRoute] = useState<MRoute>(() => ({
+    tab: getTabFromMenu(mainMenu)
+  }));
   const [dark, setDark] = useState(false);
 
   const userId = typeof user.id === 'string' ? user.id : null;
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
   const totalUnread = rooms.reduce((sum, r) => sum + (r.unread_count || 0), 0);
+
+  // Synchronize route.tab when global mainMenu changes
+  useEffect(() => {
+    const targetTab = getTabFromMenu(mainMenu);
+    if (targetTab !== route.tab) {
+      setRoute({ tab: targetTab });
+    }
+  }, [mainMenu]);
+
+  // URL query parameter synchronization on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const menu = params.get('open_menu');
+    const board = params.get('open_board');
+    if (menu) {
+      const targetTab = getTabFromMenu(menu);
+      setRoute({ tab: targetTab });
+      if (setMainMenu) {
+        setMainMenu(menu);
+      }
+      if (targetTab === 'board' && board && setSubView) {
+        setSubView(board);
+      }
+    }
+  }, [setMainMenu, setSubView]);
 
   // 시스템 다크모드 동기화
   useEffect(() => {
@@ -68,6 +114,21 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
 
   const switchTab = (tab: MTab) => {
     setRoute({ tab });
+    const menuMap: Record<MTab, string> = {
+      notif: '알림',
+      mypage: '내정보',
+      addon: '추가기능',
+      chat: '채팅',
+      board: '게시판',
+      approval: '전자결재',
+      hr: '인사관리',
+      stock: '재고관리',
+      admin: '관리자'
+    };
+    const targetMenu = menuMap[tab];
+    if (targetMenu && setMainMenu) {
+      setMainMenu(targetMenu);
+    }
   };
 
   const setHomeSub = (sub: MHomeSub | undefined) => {
@@ -79,7 +140,7 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
   const containerClass = 'mso-mobile' + (dark ? ' dark' : '');
 
   return (
-    <div className={containerClass}>
+    <div className={containerClass} data-testid="main-shell">
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'absolute', inset: 0 }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <오프라인실패배너 />
@@ -103,7 +164,7 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
               onActiveRoomChange={setActiveRoomId}
             />
           )}
-          {route.tab === 'board' && <게시판 user={user} onBack={goMypage} />}
+          {route.tab === 'board' && <게시판 user={user} onBack={goMypage} subView={subView} setSubView={setSubView} />}
           {route.tab === 'approval' && <결재 user={user} />}
           {route.tab === 'hr' && <인사관리 user={user} onExit={goMypage} />}
           {route.tab === 'stock' && <재고관리 user={user} onBack={goMypage} />}

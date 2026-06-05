@@ -204,6 +204,7 @@ function PostCard({
     return (
       <div
         className="m-card"
+        data-variant="mobile"
         style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}
       >
         <button
@@ -293,6 +294,7 @@ function PostCard({
   return (
     <div
       className="m-card"
+      data-variant="mobile"
       style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}
     >
       <button
@@ -410,7 +412,7 @@ function SBoardBase({
   }
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" data-variant="mobile">
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="게시판"

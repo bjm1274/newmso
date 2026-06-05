@@ -21,6 +21,7 @@ export type BubbleListProps = {
   userName: string;
   staffs: StaffDirectoryEntry[];
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onImageLoad?: () => void;
 };
 
 export default function BubbleList({
@@ -29,6 +30,7 @@ export default function BubbleList({
   userName,
   staffs,
   onToggleReaction,
+  onImageLoad,
 }: BubbleListProps) {
   const items = useMemo(() => {
     const out: Array<
@@ -66,6 +68,7 @@ export default function BubbleList({
             staffs={staffs}
             fallbackMyName={userName}
             onToggleReaction={onToggleReaction}
+            onImageLoad={onImageLoad}
           />
         );
       })}

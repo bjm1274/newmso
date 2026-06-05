@@ -145,6 +145,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     }
   }, [messages.length, loadingOlder]);
 
+  const scrollToBottom = useCallback(() => {
+    const node = scrollRef.current;
+    if (node) {
+      node.scrollTop = node.scrollHeight;
+    }
+  }, []);
+
   // 무한 스크롤 — 상단 도달 감지
   const handleScroll = useCallback(() => {
     const node = scrollRef.current;
@@ -330,6 +337,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         ref={scrollRef}
         className="m-scroll"
         onScroll={handleScroll}
+        data-testid="chat-message-list"
         style={{ background: 'var(--m-bg)', padding: '12px 12px 6px' }}
       >
         {hasMore && loadingOlder && (
@@ -391,6 +399,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           userName={userName}
           staffs={staffs}
           onToggleReaction={handleToggleReaction}
+          onImageLoad={scrollToBottom}
         />
       </div>
 
@@ -469,6 +478,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               onKeyDown={onKeyDown}
               placeholder={placeholder}
               aria-label={placeholder}
+              data-testid="chat-message-input"
               style={{
                 flex: 1,
                 padding: '8px 4px',

@@ -17,9 +17,10 @@ export type MAvatarProps = {
   size?: MAvatarSize;
   children: ReactNode;
   className?: string;
+  'data-testid'?: string;
 };
 
-function MAvatarBase({ tone = 'blue', size = 'default', children, className }: MAvatarProps) {
+function MAvatarBase({ tone = 'blue', size = 'default', children, className, 'data-testid': dataTestId }: MAvatarProps) {
   const classes = [
     'm-avatar',
     size !== 'default' ? size : '',
@@ -28,7 +29,7 @@ function MAvatarBase({ tone = 'blue', size = 'default', children, className }: M
   ]
     .filter(Boolean)
     .join(' ');
-  return <div className={classes} aria-hidden="true" style={{ overflow: 'hidden' }}>{children}</div>;
+  return <div className={classes} aria-hidden="true" style={{ overflow: 'hidden' }} data-testid={dataTestId}>{children}</div>;
 }
 
 const MAvatar = memo(MAvatarBase);

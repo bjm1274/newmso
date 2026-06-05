@@ -10,12 +10,13 @@
  * JM(단일 책임 — 분기만), JM2(rooms 1회 fetch), JM4(any 금지).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { ChatRoom, ErpUser } from '@/types';
 import SChatList from './채팅목록';
 import SChatRoom from './채팅방';
 import SFormChat from './새대화';
 import { useChatRoomsForMobile, type MobileChatRoom } from './data-hooks';
+import { useSheetHistory } from '@/app/hooks/useSheetHistory';
 
 type ChatView = 'list' | 'room' | 'new';
 
@@ -79,6 +80,8 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
     setSelectedRoom(null);
   }, []);
 
+  useSheetHistory(view === 'room' || view === 'new', backToList);
+
   const openNew = useCallback(() => {
     setView('new');
   }, []);
@@ -88,14 +91,14 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
     setView('room');
   }, []);
 
-  if (view === 'new') {
-    return <SFormChat user={user} onBack={backToList} onCreated={handleCreated} />;
-  }
+  let contentElement: React.ReactNode;
 
-  if (view === 'room' && selectedRoomId) {
+  if (view === 'new') {
+    contentElement = <SFormChat user={user} onBack={backToList} onCreated={handleCreated} />;
+  } else if (view === 'room' && selectedRoomId) {
     const roomForRender: ChatRoom = selectedRoom ??
       ({ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom);
-    return (
+    contentElement = (
       <SChatRoom
         user={user}
         room={roomForRender}
@@ -104,15 +107,21 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
         onSwitchRoom={openRoom}
       />
     );
+  } else {
+    contentElement = (
+      <SChatList
+        user={user}
+        rooms={rooms}
+        onOpen={openRoom}
+        onNew={openNew}
+        onRefresh={refreshRooms}
+      />
+    );
   }
 
   return (
-    <SChatList
-      user={user}
-      rooms={rooms}
-      onOpen={openRoom}
-      onNew={openNew}
-      onRefresh={refreshRooms}
-    />
+    <div data-testid="chat-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {contentElement}
+    </div>
   );
 }

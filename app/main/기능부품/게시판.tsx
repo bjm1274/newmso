@@ -2323,7 +2323,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
             </div>
           )}
           {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && isMobile && (
-            <div data-testid="board-post-list" className="space-y-2">
+            <div data-testid="board-post-list" className="space-y-2" data-variant="mobile">
               {loading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 5 }).map((_, i) => (

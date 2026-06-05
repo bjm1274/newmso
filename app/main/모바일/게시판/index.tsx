@@ -12,7 +12,7 @@
  * export default 함수명: 게시판
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import SBoard from './게시판목록';
@@ -29,18 +29,34 @@ import { useMyLikes } from './좋아요훅';
 export type 게시판Props = {
   user: ErpUser;
   onBack: () => void;
+  subView?: string | null;
+  setSubView?: (v: string | null) => void;
 };
 
 type View = 'home' | 'list' | 'detail' | 'write';
 
-export default function 게시판({ user, onBack }: 게시판Props) {
+export default function 게시판({ user, onBack, subView, setSubView }: 게시판Props) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : null;
   const userCompany = typeof user.company === 'string' ? user.company : null;
   const userCompanyId = typeof user.company_id === 'string' ? user.company_id : null;
 
-  const [view, setView] = useState<View>('home');
-  const [cat, setCat] = useState<BoardCatId>('all');
+  const [view, setView] = useState<View>(() => {
+    if (subView) return 'list';
+    return 'home';
+  });
+  const [cat, setCat] = useState<BoardCatId>(() => {
+    if (subView) return subView as BoardCatId;
+    return 'all';
+  });
+
+  // Synchronize category and view when global subView changes
+  useEffect(() => {
+    if (subView) {
+      setCat(subView as BoardCatId);
+      setView('list');
+    }
+  }, [subView]);
   const [postId, setPostId] = useState<string | null>(null);
   const [overridePosts, setOverridePosts] = useState<BoardListPost[] | null>(null);
 
@@ -121,8 +137,10 @@ export default function 게시판({ user, onBack }: 게시판Props) {
     [likeSet, setLikeSet, fetched, overridePosts],
   );
 
+  let contentElement: React.ReactNode;
+
   if (view === 'write') {
-    return (
+    contentElement = (
       <SFormPost
         user={{ id: userId, name: userName, company: userCompany, company_id: userCompanyId }}
         canAdmin={canAdmin}
@@ -131,11 +149,9 @@ export default function 게시판({ user, onBack }: 게시판Props) {
         onCreated={handleCreated}
       />
     );
-  }
-
-  if (view === 'detail') {
+  } else if (view === 'detail') {
     const currentIsLiked = postId ? likeSet.has(postId) : false;
-    return (
+    contentElement = (
       <SBoardDetail
         post={post}
         comments={comments}
@@ -150,23 +166,29 @@ export default function 게시판({ user, onBack }: 게시판Props) {
         onLikedChange={handleLikedChange}
       />
     );
+  } else {
+    contentElement = (
+      <SBoard
+        posts={posts}
+        loading={loading}
+        cat={cat}
+        onCat={setCat}
+        onOpen={handleOpen}
+        onWrite={handleWrite}
+        onBack={view === 'list' ? handleBackToHome : onBack}
+        userId={userId}
+        onStarChanged={handleStarChanged}
+        onRefresh={refetch}
+        showHome={view === 'home'}
+        onOpenCategory={handleOpenCategory}
+        company={userCompany ?? ''}
+      />
+    );
   }
 
   return (
-    <SBoard
-      posts={posts}
-      loading={loading}
-      cat={cat}
-      onCat={setCat}
-      onOpen={handleOpen}
-      onWrite={handleWrite}
-      onBack={view === 'list' ? handleBackToHome : onBack}
-      userId={userId}
-      onStarChanged={handleStarChanged}
-      onRefresh={refetch}
-      showHome={view === 'home'}
-      onOpenCategory={handleOpenCategory}
-      company={userCompany ?? ''}
-    />
+    <div data-testid="board-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {contentElement}
+    </div>
   );
 }

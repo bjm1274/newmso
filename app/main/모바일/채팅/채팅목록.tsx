@@ -553,6 +553,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
       type="button"
       onClick={onClick}
       aria-label={`${title} 채팅방 열기`}
+      data-testid={`chat-room-${room.id}`}
       style={{
         display: 'grid',
         gridTemplateColumns: '52px 1fr auto',
@@ -565,7 +566,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
         textAlign: 'left',
       }}
     >
-      <MAvatar tone={tone}>
+      <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
         {isNotice ? (
           <MIcon name="bell" size={16} color="#fff" />
         ) : peerPhotoUrl ? (
