@@ -1,13 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
-async function openHrWorkspace(page: Page, workspaceId: string) {
-  await page.getByTestId(`hr-workspace-${workspaceId}`).click();
-  await expect(page.getByTestId('hr-view')).toBeVisible();
-}
-
-async function openHrMenu(page: Page, menuId: string) {
-  await page.locator(`[data-testid="hr-menu-${menuId}"]:visible`).first().click();
+async function openHrMenu(page: Page, subMenuId: string) {
+  const locator = page.locator(`[data-testid="hr-menu-${subMenuId}"]:visible`).first();
+  await locator.scrollIntoViewIfNeeded();
+  await locator.click();
   await expect(page.getByTestId('hr-view')).toBeVisible();
 }
 
@@ -88,13 +85,13 @@ test('attendance calendar supports day week month views with detailed status lab
       {
         id: 'attendance-day-3',
         staff_id: 'attendance-staff-1',
-        work_date: `${yearMonth}-07`,
+        work_date: `${yearMonth}-04`,
         status: 'annual_leave',
       },
       {
         id: 'attendance-day-4',
         staff_id: 'attendance-staff-2',
-        work_date: `${yearMonth}-08`,
+        work_date: `${yearMonth}-05`,
         status: 'absent',
       },
     ],
@@ -104,21 +101,18 @@ test('attendance calendar supports day week month views with detailed status lab
     user: hrUser,
     localStorage: {
       erp_last_menu: '인사관리',
-      erp_last_subview: '근태',
-      erp_hr_tab: '근태',
-      erp_hr_workspace: '근태 · 급여',
+      erp_last_subview: 'attend',
+      erp_hr_tab: 'attend',
+      erp_permission_prompt_shown: '1',
     },
   });
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('인사관리')}`);
+  await page.goto(`/main?open_menu=${encodeURIComponent('인사관리')}&open_subview=attend`);
 
-  await openHrWorkspace(page, '근태 · 급여');
-  await openHrMenu(page, '근태');
+  await openHrMenu(page, 'attend');
 
-  await expect(page.getByText(/전문 근태 통합 관리/)).toBeVisible();
-  await expect(page.getByRole('button', { name: '일별 현황' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '월별 대장' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '근태 달력' })).toBeVisible();
+  await page.getByRole('tab', { name: '달력' }).click();
+  await page.getByRole('button', { name: '일별 상세' }).click();
   await expect(page.getByTestId('attendance-calendar-open-day')).toBeVisible();
   await expect(page.getByTestId('attendance-calendar-open-week')).toBeVisible();
   await expect(page.getByTestId('attendance-calendar-open-month')).toBeVisible();

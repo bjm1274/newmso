@@ -116,6 +116,7 @@ export function TabBar<T extends string>({
             key={tab.id}
             type="button"
             role="tab"
+            data-testid={`company-manager-tab-${tab.id}`}
             aria-selected={on}
             onClick={() => onChange(tab.id)}
             className={`shrink-0 whitespace-nowrap rounded-[var(--radius-md)] px-3 py-1.5 text-[11.5px] font-bold transition-colors ${

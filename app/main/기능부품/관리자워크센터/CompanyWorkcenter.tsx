@@ -25,21 +25,21 @@ import CompanyPayrollTab from './CompanyWorkcenter/CompanyPayrollTab';
 import CompanyDocsTab from './CompanyWorkcenter/CompanyDocsTab';
 
 const TABS: { id: CompanyTabId; label: string }[] = [
-  { id: 'info', label: '기본 정보' },
+  { id: 'company', label: '기본 정보' },
   { id: 'shift', label: '근무 형태' },
   { id: 'card', label: '법인카드' },
-  { id: 'ctpl', label: '계약 템플릿' },
-  { id: 'hol', label: '휴가·경조사·공휴일' },
-  { id: 'pay', label: '급여 기준' },
+  { id: 'contract', label: '계약 템플릿' },
+  { id: 'leavePolicy', label: '휴가·경조사·공휴일' },
+  { id: 'payrollPolicy', label: '급여 기준' },
   { id: 'docs', label: '문서 보관' },
 ];
 
 export default function CompanyWorkcenter() {
   const meta = ADMIN_WORKCENTERS.company;
-  const [tab, setTab] = useState<CompanyTabId>('info');
+  const [tab, setTab] = useState<CompanyTabId>('company');
 
   return (
-    <>
+    <div className="space-y-4 animate-in fade-in duration-300" data-testid="company-manager-view">
       <WorkcenterHeader
         title={meta.label}
         subtitle="기본정보·근무형태·법인카드·계약·휴가·급여·문서 7개 화면 통합"
@@ -51,14 +51,14 @@ export default function CompanyWorkcenter() {
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
       <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
-        {tab === 'info' && <CompanyBasicTab />}
+        {tab === 'company' && <CompanyBasicTab />}
         {tab === 'shift' && <ShiftManagement selectedCo="전체" />}
         {tab === 'card' && <CompanyCardTab />}
-        {tab === 'ctpl' && <CompanyTemplateTab />}
-        {tab === 'hol' && <CompanyLeaveTab />}
-        {tab === 'pay' && <CompanyPayrollTab />}
+        {tab === 'contract' && <CompanyTemplateTab />}
+        {tab === 'leavePolicy' && <CompanyLeaveTab />}
+        {tab === 'payrollPolicy' && <CompanyPayrollTab />}
         {tab === 'docs' && <CompanyDocsTab />}
       </div>
-    </>
+    </div>
   );
 }

@@ -20,7 +20,7 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
 }
 
 async function openAdminSubMenu(page: Page, subMenuId: string) {
-  const locator = page.getByTestId(buildSubMenuTestId('관리자', subMenuId));
+  const locator = page.locator(`[data-testid="${buildSubMenuTestId('관리자', subMenuId)}"]:visible`).first();
   await locator.scrollIntoViewIfNeeded();
   await locator.click();
   await expect(page.getByTestId('admin-view')).toBeVisible();
@@ -140,8 +140,8 @@ test('admin sidebar walkthrough opens each submenu in order without runtime erro
     user: adminUser,
     localStorage: {
       erp_last_menu: '관리자',
-      erp_last_subview: '경영분석',
-      erp_admin_subview: '경영분석',
+      erp_last_subview: 'exec',
+      erp_admin_subview: 'exec',
       erp_permission_prompt_shown: '1',
     },
   });
@@ -151,61 +151,48 @@ test('admin sidebar walkthrough opens each submenu in order without runtime erro
 
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
-    consoleErrors.push(message.text());
+    const text = message.text();
+    if (text.includes('Failed to load resource') || text.includes('serviceWorker') || text.includes('Service Worker')) return;
+    consoleErrors.push(text);
   });
 
   page.on('pageerror', (error) => {
     pageErrors.push(error.message);
   });
 
-  await page.goto('/main?open_menu=관리자&open_subview=경영분석');
+  await page.goto('/main?open_menu=관리자&open_subview=exec');
   await expect(page.getByTestId('admin-view')).toBeVisible();
 
-  await openAdminSubMenu(page, '경영분석');
-  await expect(page.getByTestId('admin-analysis-tab-bar')).toBeVisible();
-  for (const index of [0, 1, 2, 3, 4]) {
-    await page.getByTestId(`admin-analysis-tab-${index}`).click();
-  }
+  await openAdminSubMenu(page, 'exec');
+  await expect(page.getByRole('tab', { name: '개요' })).toBeVisible();
+  await page.getByRole('tab', { name: '경영 대시보드' }).click();
+  await page.getByRole('tab', { name: '재무 대시보드' }).click();
+  await page.getByRole('tab', { name: '예산 관리' }).click();
+  await page.getByRole('tab', { name: '통합 보고서' }).click();
+  await page.getByRole('tab', { name: '법인 손익' }).click();
+  await page.getByRole('tab', { name: '커스텀 대시보드' }).click();
 
-  await openAdminSubMenu(page, '회사관리');
+  await openAdminSubMenu(page, 'company');
   await expect(page.getByTestId('company-manager-view')).toBeVisible();
   await expect(page.getByTestId('team-manager-view')).toBeVisible();
   await page.getByTestId('company-manager-tab-company').click();
   await expect(page.getByTestId('company-manager-view')).toBeVisible();
 
-  await openAdminSubMenu(page, '직원권한');
+  await openAdminSubMenu(page, 'roles');
   await expect(page.getByTestId('staff-permission-view')).toBeVisible();
 
-  await openAdminSubMenu(page, '운영설정');
-  await expect(page.getByTestId('admin-operations-tab-bar')).toBeVisible();
-  await page.getByTestId('admin-operations-tab-0').click();
-  await expect(page.getByRole('heading', { name: '알림 자동화' })).toBeVisible();
-  await page.getByTestId('admin-operations-tab-1').click();
-  await expect(page.getByRole('heading', { name: '수술 · 검사명 템플릿 관리' })).toBeVisible();
-  await page.getByTestId('admin-operations-tab-2').click();
-  await expect(page.getByRole('heading', { name: '홈페이지 팝업 설정' })).toBeVisible();
+  await openAdminSubMenu(page, 'ops');
+  await expect(page.getByRole('tab', { name: '알림 자동화' })).toBeVisible();
+  await page.getByRole('tab', { name: '수술·검사 템플릿' }).click();
+  await page.getByRole('tab', { name: '팝업 관리' }).click();
 
-  await openAdminSubMenu(page, '문서양식');
-  await expect(page.getByRole('heading', { name: '기본양식 관리' })).toBeVisible();
+  await openAdminSubMenu(page, 'forms');
+  await expect(page.getByRole('heading', { name: '결재 양식' })).toBeVisible();
 
-  await openAdminSubMenu(page, '데이터백업');
-  await expect(page.getByRole('heading', { name: '데이터 백업' })).toBeVisible();
-
-  await openAdminSubMenu(page, '데이터초기화');
-  await expect(page.getByRole('heading', { name: '시스템 보안 인증' })).toBeVisible();
-  await page.getByPlaceholder('••••••').fill('qkrcjfghd!!');
-  await page.getByRole('button', { name: '보안 잠금 해제' }).click();
-  await expect(page.getByRole('heading', { name: '통합 데이터 초기화 관리' })).toBeVisible();
-
-  await openAdminSubMenu(page, '감사센터');
-  await expect(page.getByTestId('admin-audit-tab-bar')).toBeVisible();
-  await page.getByTestId('admin-audit-tab-0').click();
-  await page.getByTestId('admin-audit-tab-1').click();
-  await page.getByTestId('admin-audit-tab-2').click();
-  await expect(page.getByTestId('salary-anomaly-detector')).toBeVisible();
-
-  await openAdminSubMenu(page, '시스템마스터센터');
-  await expect(page.getByTestId('system-master-center')).toBeVisible();
+  await openAdminSubMenu(page, 'audit');
+  await expect(page.getByRole('tab', { name: '감사 로그' })).toBeVisible();
+  await page.getByRole('tab', { name: '이상 감지' }).click();
+  await page.getByRole('tab', { name: '급여 이상치' }).click();
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

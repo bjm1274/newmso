@@ -4,12 +4,12 @@
  */
 
 export type CompanyTabId =
-  | 'info'
+  | 'company'
   | 'shift'
   | 'card'
-  | 'ctpl'
-  | 'hol'
-  | 'pay'
+  | 'contract'
+  | 'leavePolicy'
+  | 'payrollPolicy'
   | 'docs';
 
 export type ChipTone = 'success' | 'warn' | 'danger' | 'muted' | 'accent';
