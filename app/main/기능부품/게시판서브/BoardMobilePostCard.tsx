@@ -143,10 +143,13 @@ export default function BoardMobilePostCard({
                   )}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-[var(--toss-gray-3)] md:hidden">
-                  <span className={`rounded-[var(--radius-md)] px-2 py-0.5 ${getBoardStatusTone(normalizedPostStatus)}`}>
+                  <span
+                    data-testid={`board-post-status-pill-${post.id}`}
+                    className={`rounded-[var(--radius-md)] px-2 py-0.5 ${getBoardStatusTone(normalizedPostStatus)}`}
+                  >
                     {normalizedPostStatus}
                   </span>
-                  <span>{postDateLabel}</span>
+                  <span data-testid={`board-post-date-${post.id}`}>{postDateLabel}</span>
                   <span>조회 {(post.views as number) ?? 0}</span>
                   {hasAttachments && <span>첨부 있음</span>}
                 </div>
@@ -179,7 +182,6 @@ export default function BoardMobilePostCard({
             )}
           </div>
           <div
-            data-testid={`board-post-date-${post.id}`}
             className="hidden w-20 shrink-0 pt-1 text-center text-[11px] font-bold text-[var(--toss-gray-3)] md:block"
           >
             {postDateLabel}

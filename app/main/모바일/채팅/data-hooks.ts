@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { bindMockChatMessageInsert } from '@/app/main/기능부품/메신저테스트이벤트';
 import {
   pokeChannel,
   subscribeRealtime,
@@ -369,6 +370,21 @@ export function useChatMessagesForRoom(
     return unsubscribe;
     // userId는 송신자 표시 등에 영향이 없어 deps에 안 넣음 — refresh가 안정 ref라 OK
   }, [roomId, refresh]);
+
+  // E2E 모의 실시간 메시지 추가 이벤트 바인딩
+  useEffect(() => {
+    if (!roomId) return;
+    const unbind = bindMockChatMessageInsert((detail) => {
+      const inserted = detail.row;
+      if (inserted && String(inserted.room_id) === String(roomId)) {
+        setMessages((prev) => {
+          if (prev.some((m) => String(m.id) === String(inserted.id))) return prev;
+          return [...prev, inserted];
+        });
+      }
+    });
+    return unbind;
+  }, [roomId]);
 
   // 읽음 cursor 업데이트 (조회만, 액션 X 정책상 P0에서도 안전)
   useEffect(() => {

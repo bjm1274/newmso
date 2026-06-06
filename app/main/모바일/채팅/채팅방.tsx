@@ -19,6 +19,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useLayoutEffect,
   type ChangeEvent,
 } from 'react';
 import type { ChatRoom, ErpUser } from '@/types';
@@ -111,22 +112,34 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const composerInputRef = useRef<HTMLInputElement | null>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const prevMessageCountRef = useRef(0);
   const prevScrollHeightRef = useRef(0);
 
   // 새 메시지 도착 시 하단 스크롤. 단, 무한스크롤로 prepend된 경우는 스크롤 위치 유지.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
     const next = messages.length;
     const prev = prevMessageCountRef.current;
     prevMessageCountRef.current = next;
 
+    const alignToBottom = () => {
+      node.scrollTop = Math.max(0, node.scrollHeight - node.clientHeight);
+    };
+
     if (prev === 0) {
       // 초기 로드
-      node.scrollTop = node.scrollHeight;
-      return;
+      alignToBottom();
+      const frameId = window.requestAnimationFrame(alignToBottom);
+      const nudgeTimers = [
+        window.setTimeout(alignToBottom, 80),
+        window.setTimeout(alignToBottom, 240)
+      ];
+      return () => {
+        window.cancelAnimationFrame(frameId);
+        nudgeTimers.forEach(window.clearTimeout);
+      };
     }
     // 무한스크롤로 prepend 됐을 때 — 사용자가 보고 있던 메시지 유지
     if (loadingOlder) return;
@@ -181,17 +194,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         return;
       }
       setDraft('');
+      void refresh();
     } finally {
       setSending(false);
     }
-  }, [draft, room.id, sending, userId]);
+  }, [draft, room.id, sending, userId, refresh]);
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      void handleSendText();
-    }
-  };
+
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -471,20 +480,24 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
           <label style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
             <span style={{ position: 'absolute', left: -9999, top: -9999 }}>메시지 입력</span>
-            <input
+            <textarea
               ref={composerInputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={onKeyDown}
               placeholder={placeholder}
               aria-label={placeholder}
               data-testid="chat-message-input"
               style={{
                 flex: 1,
-                padding: '8px 4px',
+                padding: '4px 4px',
                 fontSize: 14,
                 fontFamily: 'inherit',
                 width: '100%',
+                resize: 'none',
+                height: 24,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
               }}
               disabled={composerDisabled}
             />
@@ -510,6 +523,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           <button
             type="button"
             aria-label="전송"
+            data-testid="chat-send-button"
             onClick={() => void handleSendText()}
             disabled={composerDisabled || !draft.trim()}
             style={{

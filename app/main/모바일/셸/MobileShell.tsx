@@ -58,6 +58,7 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
     tab: getTabFromMenu(mainMenu)
   }));
   const [dark, setDark] = useState(false);
+  const [chatResetToken, setChatResetToken] = useState(0);
 
   const userId = typeof user.id === 'string' ? user.id : null;
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -113,6 +114,9 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
   }, []);
 
   const switchTab = (tab: MTab) => {
+    if (tab === 'chat' && route.tab === 'chat') {
+      setChatResetToken((prev) => prev + 1);
+    }
     setRoute({ tab });
     const menuMap: Record<MTab, string> = {
       notif: '알림',
@@ -162,13 +166,30 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
               rooms={rooms}
               refreshRooms={refreshRooms}
               onActiveRoomChange={setActiveRoomId}
+              resetToken={chatResetToken}
             />
           )}
           {route.tab === 'board' && <게시판 user={user} onBack={goMypage} subView={subView} setSubView={setSubView} />}
-          {route.tab === 'approval' && <결재 user={user} />}
-          {route.tab === 'hr' && <인사관리 user={user} onExit={goMypage} />}
-          {route.tab === 'stock' && <재고관리 user={user} onBack={goMypage} />}
-          {route.tab === 'admin' && <관리자 user={user} onBack={goMypage} />}
+          {route.tab === 'approval' && (
+            <div data-testid="approval-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <결재 user={user} />
+            </div>
+          )}
+          {route.tab === 'hr' && (
+            <div data-testid="hr-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <인사관리 user={user} onExit={goMypage} />
+            </div>
+          )}
+          {route.tab === 'stock' && (
+            <div data-testid="inventory-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <재고관리 user={user} onBack={goMypage} />
+            </div>
+          )}
+          {route.tab === 'admin' && (
+            <div data-testid="admin-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <관리자 user={user} onBack={goMypage} />
+            </div>
+          )}
         </div>
         <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread }} />
       </div>

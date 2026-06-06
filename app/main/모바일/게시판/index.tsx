@@ -21,6 +21,8 @@ import SFormPost from './글작성';
 import {
   type BoardCatId,
   type BoardListPost,
+  BOARD_CATS,
+  boardTypeToCat,
   useBoardDetail,
   useBoardPosts,
 } from './data-hooks';
@@ -46,14 +48,18 @@ export default function 게시판({ user, onBack, subView, setSubView }: 게시�
     return 'home';
   });
   const [cat, setCat] = useState<BoardCatId>(() => {
-    if (subView) return subView as BoardCatId;
+    if (subView) {
+      const isCatId = BOARD_CATS.some((c) => c.id === subView);
+      return isCatId ? (subView as BoardCatId) : boardTypeToCat(subView);
+    }
     return 'all';
   });
 
   // Synchronize category and view when global subView changes
   useEffect(() => {
     if (subView) {
-      setCat(subView as BoardCatId);
+      const isCatId = BOARD_CATS.some((c) => c.id === subView);
+      setCat(isCatId ? (subView as BoardCatId) : boardTypeToCat(subView));
       setView('list');
     }
   }, [subView]);

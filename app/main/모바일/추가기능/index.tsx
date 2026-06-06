@@ -96,70 +96,97 @@ export default function 추가기능({ user, onBack }: 추가기능Props) {
   const goDischargeList = useCallback(() => setView({ kind: 'discharge-list' }), []);
   const goOpBoard = useCallback(() => setView({ kind: 'opboard' }), []);
 
+  let contentElement: React.ReactNode = null;
+
   switch (view.kind) {
     case 'hub':
-      return (
+      contentElement = (
         <허브
           user={user}
           onBack={onBack}
           onOpen={(key: AddonModuleKey) => setView(MODULE_TO_VIEW[key])}
         />
       );
+      break;
     case 'org':
-      return <조직도 user={user} onBack={goHub} />;
+      contentElement = <조직도 user={user} onBack={goHub} />;
+      break;
     case 'inventory':
-      return <부서재고 user={user} onBack={goHub} />;
+      contentElement = <부서재고 user={user} onBack={goHub} />;
+      break;
     case 'worknow':
-      return <근무현황 user={user} onBack={goHub} />;
+      contentElement = <근무현황 user={user} onBack={goHub} />;
+      break;
     case 'handoff':
-      return <인계노트 user={user} onBack={goHub} />;
+      contentElement = <인계노트 user={user} onBack={goHub} />;
+      break;
     case 'eval':
-      return <직원평가 user={user} onBack={goHub} />;
+      contentElement = <직원평가 user={user} onBack={goHub} />;
+      break;
     case 'discharge-list':
-      return (
+      contentElement = (
         <퇴원심사목록
           user={user}
           onBack={goHub}
           onOpenDetail={(id) => setView({ kind: 'discharge-detail', id })}
         />
       );
+      break;
     case 'discharge-detail':
-      return <퇴원심사상세 user={user} reviewId={view.id} onBack={goDischargeList} />;
+      contentElement = <퇴원심사상세 user={user} reviewId={view.id} onBack={goDischargeList} />;
+      break;
     case 'consult':
-      return <수술상담 user={user} onBack={goHub} />;
+      contentElement = <수술상담 user={user} onBack={goHub} />;
+      break;
     case 'opboard':
-      return (
+      contentElement = (
         <OP체크보드
           user={user}
           onBack={goHub}
           onOpenDetail={(card) => setView({ kind: 'opdetail', card })}
         />
       );
+      break;
     case 'opdetail':
-      return <OP체크상세 user={user} card={view.card} onBack={goOpBoard} />;
+      contentElement = <OP체크상세 user={user} card={view.card} onBack={goOpBoard} />;
+      break;
     case 'deposit':
-      return <입금조회 user={user} onBack={goHub} />;
+      contentElement = <입금조회 user={user} onBack={goHub} />;
+      break;
     case 'closing':
-      return <마감보고 user={user} onBack={goHub} />;
+      contentElement = <마감보고 user={user} onBack={goHub} />;
+      break;
     case 'parking':
-      return <외부주차 user={user} onBack={goHub} />;
+      contentElement = <외부주차 user={user} onBack={goHub} />;
+      break;
     case 'webfax':
-      return <외부웹팩스 user={user} onBack={goHub} />;
+      contentElement = <외부웹팩스 user={user} onBack={goHub} />;
+      break;
     case 'mri':
-      return <MRI일정 user={user} onBack={goHub} />;
+      contentElement = <MRI일정 user={user} onBack={goHub} />;
+      break;
     case 'share-list':
-      return (
+      contentElement = (
         <업무공유목록
           user={user}
           onBack={goHub}
           onOpenDetail={(id) => setView({ kind: 'share-detail', id })}
         />
       );
+      break;
     case 'share-detail':
-      return <업무공유상세 user={user} postId={view.id} onBack={goShareList} />;
+      contentElement = <업무공유상세 user={user} postId={view.id} onBack={goShareList} />;
+      break;
     case 'guide':
-      return <업무가이드 user={user} onBack={goHub} />;
+      contentElement = <업무가이드 user={user} onBack={goHub} />;
+      break;
     default:
-      return null;
+      contentElement = null;
   }
+
+  return (
+    <div data-testid="extra-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {contentElement}
+    </div>
+  );
 }

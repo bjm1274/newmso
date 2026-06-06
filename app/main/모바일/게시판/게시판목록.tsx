@@ -305,10 +305,32 @@ function PostCard({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           {isPinned && <MIcon name="pin" size={12} color="var(--m-accent)" />}
-          <MChip tone={catDef?.tone || ''}>{catDef?.label ?? '기타'}</MChip>
-          {isImportant && <MChip tone="danger">중요</MChip>}
+          <span
+            data-testid={`board-post-status-pill-${post.id}`}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 6px',
+              borderRadius: 4,
+              background: 'var(--accent-tint)',
+              color: 'var(--m-accent)'
+            }}
+          >
+            {post.status || '게시중'}
+          </span>
+          {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
+            <span
+              data-testid={`board-post-attachment-indicator-${post.id}`}
+              style={{ fontSize: 12, color: 'var(--z-400)' }}
+            >
+              📎
+            </span>
+          )}
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+          <span
+            data-testid={`board-post-date-${post.id}`}
+            style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}
+          >
             {formatShortDate(post.created_at as string | null)}
           </span>
         </div>

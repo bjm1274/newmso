@@ -26,9 +26,10 @@ export type 채팅Props = {
   rooms?: MobileChatRoom[];
   refreshRooms?: () => Promise<void>;
   onActiveRoomChange?: (roomId: string | null) => void;
+  resetToken?: number;
 };
 
-export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange }: 채팅Props) {
+export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken }: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -81,6 +82,12 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
   }, []);
 
   useSheetHistory(view === 'room' || view === 'new', backToList);
+
+  useEffect(() => {
+    if (resetToken !== undefined && resetToken > 0) {
+      backToList();
+    }
+  }, [resetToken, backToList]);
 
   const openNew = useCallback(() => {
     setView('new');
