@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 import { createRequire } from "module";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
-// next dev에서 Cloudflare 바인딩(D1 등)을 사용 가능하게 함 (프로덕션 빌드엔 무영향)
-initOpenNextCloudflareForDev();
+// next dev에서 Cloudflare 바인딩(D1 등)을 사용 가능하게 함 (프로덕션 빌드 및 CI/E2E 테스트엔 무영향)
+if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && !process.env.PLAYWRIGHT_TEST && !process.env.CI) {
+  initOpenNextCloudflareForDev();
+}
 
 const r2PublicBaseUrl = (
   process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL ||
