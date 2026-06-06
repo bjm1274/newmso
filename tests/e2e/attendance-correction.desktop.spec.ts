@@ -8,7 +8,9 @@ test.beforeEach(async ({ page }) => {
 test('attendance correction submit works with the legacy attendance_corrections schema', async ({
   page,
 }) => {
-  const correctionDate = '2026-03-10';
+  const d = new Date();
+  d.setDate(d.getDate() - 5);
+  const correctionDate = d.toISOString().slice(0, 10);
 
   await mockSupabase(page, {
     approvals: [],
@@ -40,7 +42,7 @@ test('attendance correction submit works with the legacy attendance_corrections 
   await page.getByTestId('sidebar-menu-approval').click();
   await expect(page.getByTestId('approval-view')).toBeVisible();
   await page.getByRole('button', { name: '작성하기' }).click();
-  await page.getByRole('button', { name: '출결정정', exact: true }).click();
+  await page.getByTestId('approval-form-type-select').selectOption({ label: '출결정정' });
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
   await expect(
@@ -59,7 +61,9 @@ test('attendance correction submit works with the legacy attendance_corrections 
 test('attendance correction form keeps pending items out of the compose screen and uses request/status views only', async ({
   page,
 }) => {
-  const correctionDate = '2026-03-09';
+  const d = new Date();
+  d.setDate(d.getDate() - 6);
+  const correctionDate = d.toISOString().slice(0, 10);
   const adminUser = {
     ...fakeUser,
     id: 'admin-user-id',
@@ -94,7 +98,7 @@ test('attendance correction form keeps pending items out of the compose screen a
   await page.getByTestId('sidebar-menu-approval').click();
   await expect(page.getByTestId('approval-view')).toBeVisible();
   await page.getByRole('button', { name: '작성하기' }).click();
-  await page.getByRole('button', { name: '출결정정', exact: true }).click();
+  await page.getByTestId('approval-form-type-select').selectOption({ label: '출결정정' });
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
   await expect(page.getByRole('button', { name: '결재 대기' })).toHaveCount(0);
