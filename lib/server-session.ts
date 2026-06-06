@@ -60,7 +60,7 @@ function getCryptoApi() {
 function getSessionSecret() {
   const secret = process.env.SESSION_SECRET?.trim();
   if (secret) return secret;
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' || process.env.PLAYWRIGHT_TEST || process.env.CI) {
     return 'dev-only-session-secret-change-this';
   }
   throw new Error('SESSION_SECRET 환경변수가 설정되지 않았습니다.');
