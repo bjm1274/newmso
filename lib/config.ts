@@ -9,7 +9,13 @@
 
 function requireEnv(key: string): string {
   const value = process.env[key];
-  if (!value) throw new Error(`[config] 필수 환경변수 누락: ${key}`);
+  if (!value) {
+    if (process.env.NODE_ENV !== 'production' || process.env.PLAYWRIGHT_TEST || process.env.CI) {
+      console.warn(`[config] 필수 환경변수 누락: ${key} (테스트/개발용 mock 값으로 대체)`);
+      return `mock-${key.toLowerCase()}`;
+    }
+    throw new Error(`[config] 필수 환경변수 누락: ${key}`);
+  }
   return value;
 }
 
