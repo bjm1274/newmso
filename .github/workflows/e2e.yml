@@ -53,8 +53,17 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Run E2E tests (mobile)
-        run: npm run test:e2e -- --project=mobile-chromium --project=mobile-android-chromium
+        run: npm run test:e2e -- --project=mobile-chromium --project=mobile-android-chromium > test_run.log 2>&1
         continue-on-error: false
+
+      - name: Push logs on failure
+        if: failure()
+        run: |
+          git config --global user.name "CI Bot"
+          git config --global user.email "ci@example.com"
+          git add test_run.log
+          git commit -m "chore: upload CI E2E logs on failure"
+          git push origin main
 
       - name: Run E2E tests (desktop)
         run: npm run test:e2e -- --project=desktop-chromium
