@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
 interface ContractRow {
   id: string;
@@ -80,11 +81,19 @@ export default function DocsContractSummary() {
       setErrMsg(null);
       try {
         // 1. 계약서 기본 정보 조회 (제한된 컬럼들만 select)
-        const { data: contracts, error: contractErr } = await supabase
-          .from('employment_contracts')
-          .select('id, status, contract_type, effective_date, probation_months, staff_id, created_at')
-          .order('created_at', { ascending: false })
-          .limit(40);
+        const { data: contracts, error: contractErr } = await withMissingColumnsFallback(
+          (omittedColumns) => {
+            const cols = ['id', 'status', 'contract_type', 'effective_date', 'probation_months', 'staff_id', 'created_at']
+              .filter((c) => !omittedColumns.has(c))
+              .join(', ');
+            return supabase
+              .from('employment_contracts')
+              .select(cols)
+              .order('created_at', { ascending: false })
+              .limit(40);
+          },
+          ['probation_months']
+        );
         
         if (cancelled) return;
         if (contractErr) throw contractErr;

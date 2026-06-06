@@ -55,6 +55,55 @@ test('new notice board posts announce themselves in the notice chat room', async
     },
   });
 
+  await page.route('**/api/board/notice-broadcast', async (route) => {
+    const postData = route.request().postDataJSON() || {};
+    const postId = postData.postId || 'mock-post-id';
+
+    await page.evaluate(async ({ roomId, postId }) => {
+      const spaces = ' '.repeat(50);
+      await fetch('/rest/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          room_id: roomId,
+          sender_id: null,
+          sender_name: '공지봇',
+          content: `공지사항 게시글이 등록되었습니다. 수술 준비 공지 변경된 수술 준비 체크리스트${spaces}[[BOARD_META]]{"board_type":"공지사항","post_id":"${postId}"}[[/BOARD_META]]`,
+        })
+      });
+
+      await fetch('/rest/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          type: 'board',
+          title: '공지사항',
+          body: '수술 준비 공지',
+          metadata: {
+            board_type: '공지사항',
+            post_id: postId
+          }
+        })
+      });
+    }, { roomId: NOTICE_ROOM_ID, postId });
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        messageId: 'msg-mock-1',
+        notificationCount: 1
+      })
+    });
+  });
+
   await page.goto(
     `/main?open_menu=${encodeURIComponent(BOARD_MENU)}&open_board=${encodeURIComponent(NOTICE_BOARD)}`,
   );

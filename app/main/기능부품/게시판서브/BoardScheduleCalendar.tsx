@@ -74,7 +74,7 @@ export default function BoardScheduleCalendar({
               }
               className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
             >
-              이전달
+              이전 달
             </button>
             <button
               type="button"
@@ -92,13 +92,13 @@ export default function BoardScheduleCalendar({
               }
               className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
             >
-              다음달
+              다음 달
             </button>
           </div>
           {canCreatePost && (
             <button
               type="button"
-              data-testid="board-schedule-new"
+              data-testid="board-toggle-new-post"
               onClick={onToggleNewPost}
               className="inline-flex items-center justify-center whitespace-nowrap rounded-[var(--radius-md)] bg-[var(--accent)] px-3.5 py-1.5 text-[12px] font-bold text-white shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
               aria-label={showNewPost ? '일정 등록 취소' : (activeBoard === '수술일정' ? '+ 새 수술일정 등록' : '+ 새 MRI일정 등록')}

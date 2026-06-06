@@ -197,6 +197,7 @@ function MessengerTimelineComponent({
   onMediaLoad,
   onOpenDateJump,
   onOpenStaffProfile,
+  onOpenBoardPost,
 }: MessengerTimelineProps) {
   const isMobile = useIsMobile();
 
@@ -685,6 +686,26 @@ function MessengerTimelineComponent({
                             onClick={(event) => {
                               if (isDeletedMessage) return;
                               event.stopPropagation();
+
+                              if (msg.content && msg.content.includes('[[BOARD_META]]')) {
+                                const start = msg.content.indexOf('[[BOARD_META]]');
+                                const end = msg.content.indexOf('[[/BOARD_META]]');
+                                if (start >= 0 && end > start) {
+                                  try {
+                                    const jsonStr = msg.content.slice(start + 14, end);
+                                    const meta = JSON.parse(jsonStr);
+                                    const boardType = meta.board_type || meta.boardId || meta.board_id || '';
+                                    const postId = meta.post_id || meta.postId || '';
+                                    if (boardType && postId && onOpenBoardPost) {
+                                      onOpenBoardPost(boardType, postId);
+                                      return;
+                                    }
+                                  } catch (e) {
+                                    console.error('Failed to parse board meta', e);
+                                  }
+                                }
+                              }
+
                               if (isMobile) {
                                 const customEvent = new MouseEvent('contextmenu', {
                                   bubbles: true,
@@ -717,7 +738,27 @@ function MessengerTimelineComponent({
                             tabIndex={isDeletedMessage ? -1 : 0}
                             onKeyDown={(event) => {
                               if (isDeletedMessage) return;
-                              if (event.key === 'Enter') onMarkMessageRead(msg);
+                              if (event.key === 'Enter') {
+                                if (msg.content && msg.content.includes('[[BOARD_META]]')) {
+                                  const start = msg.content.indexOf('[[BOARD_META]]');
+                                  const end = msg.content.indexOf('[[/BOARD_META]]');
+                                  if (start >= 0 && end > start) {
+                                    try {
+                                      const jsonStr = msg.content.slice(start + 14, end);
+                                      const meta = JSON.parse(jsonStr);
+                                      const boardType = meta.board_type || meta.boardId || meta.board_id || '';
+                                      const postId = meta.post_id || meta.postId || '';
+                                      if (boardType && postId && onOpenBoardPost) {
+                                        onOpenBoardPost(boardType, postId);
+                                        return;
+                                      }
+                                    } catch (e) {
+                                      console.error('Failed to parse board meta', e);
+                                    }
+                                  }
+                                }
+                                onMarkMessageRead(msg);
+                              }
                             }}
                             aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
                           >

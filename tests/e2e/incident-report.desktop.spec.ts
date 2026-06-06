@@ -27,12 +27,24 @@ function trackRuntimeErrors(page: Page) {
 }
 
 async function openHrWorkspace(page: Page, workspaceId: string) {
-  await page.getByTestId(`hr-workspace-${workspaceId}`).click();
-  await expect(page.getByTestId('hr-view')).toBeVisible();
+  // Workspaces were removed in the redesign; menus are directly available.
 }
 
 async function openHrMenu(page: Page, menuId: string) {
-  await page.locator(`[data-testid="hr-menu-${menuId}"]:visible`).first().click();
+  const mapping: Record<string, string> = {
+    '구성원': 'member',
+    '인사변동': 'member',
+    '입퇴사·교육센터': 'member',
+    '근태': 'attend',
+    '연차/휴가': 'leave',
+    '급여': 'payroll',
+    '자격·안전센터': 'welfare',
+    '경조사': 'welfare',
+    '계약': 'docs',
+    '문서센터': 'docs',
+  };
+  const targetId = mapping[menuId] || menuId;
+  await page.locator(`[data-testid="hr-menu-${targetId}"]:visible`).first().click();
   await expect(page.getByTestId('hr-view')).toBeVisible();
 }
 
@@ -142,11 +154,8 @@ test('incident report allows editing and deleting existing reports', async ({ pa
   await expect(page.getByTestId('incident-report-card-incident-1')).toContainText('4층 수술실');
   await expect(page.getByTestId('incident-report-card-incident-1')).toContainText('수정된 사고 경위입니다.');
 
-  page.removeAllListeners('dialog');
-  page.once('dialog', async (dialog) => {
-    await dialog.accept();
-  });
   await page.getByTestId('incident-report-delete-incident-1').click();
+  await page.getByRole('dialog').getByRole('button', { name: '삭제', exact: true }).click();
 
   await expect(page.getByText('사고 보고서를 삭제했습니다.')).toBeVisible();
   await expect(page.getByTestId('incident-report-card-incident-1')).toHaveCount(0);

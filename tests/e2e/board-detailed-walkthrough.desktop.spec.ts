@@ -1,4 +1,4 @@
-﻿import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 const BOARD_MENU = '\uAC8C\uC2DC\uD310';
@@ -304,10 +304,21 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
+        provider: 'r2',
+        path: 'mock-path',
+        signedUrl: 'http://127.0.0.1:3000/mock-upload-put-url',
         fileName: 'joint-guide.pdf',
         type: 'file',
         url: 'http://127.0.0.1:3000/mock/joint-guide.pdf',
       }),
+    });
+  });
+
+  await page.route('**/mock-upload-put-url', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/plain',
+      body: 'ok',
     });
   });
 
@@ -352,6 +363,9 @@ test('guide board uploads and displays onboarding materials for new staff', asyn
   await expect(page.getByTestId('guide-detail')).toContainText(selectedTeamLabel);
   await expect(page.getByTestId('guide-detail')).toContainText('joint-guide.pdf');
   await expect(page.getByRole('link', { name: /joint-guide\.pdf/i })).toBeVisible();
+
+  await page.getByTestId('guide-detail-close').click();
+  await page.getByTestId('guide-tab-task').click();
 
   await page.getByTestId('guide-task-title-input').fill('\uC218\uC220 \uC7A5\uBE44 \uD655\uC778');
   await page.getByTestId('guide-task-due-date-input').fill('2026-04-03');

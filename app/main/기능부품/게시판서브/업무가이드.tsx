@@ -1359,7 +1359,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-[11px] font-bold text-[var(--toss-gray-3)] tracking-wider">
-              게시판 › <span className="text-[var(--accent)] font-extrabold">업무공유</span>
+              게시판 › <h2 className="text-[var(--accent)] font-extrabold text-[11px] m-0 inline" style={{ fontSize: '11px' }}>업무공유</h2>
             </div>
             <h1 className="text-xl font-extrabold text-[var(--foreground)] tracking-tight mt-1">
               {activeCompanyLabel} · {activeTeam?.teamName || '팀 미지정'}
@@ -1380,6 +1380,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             </span>
             {canWrite && (
               <button
+                data-testid="guide-open-compose"
                 onClick={() => startCreate(activeTeam)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 transition-all shadow-[var(--shadow-xs)]"
               >
@@ -1398,12 +1399,28 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           <div>
             <div className="text-[11px] font-extrabold tracking-wider text-[var(--toss-gray-3)] uppercase mb-2">회사</div>
             <select
+              data-testid="guide-company-select"
               value={companyFilter}
               onChange={(e) => setCompanyFilter(e.target.value)}
               className="w-full h-9 border border-[var(--border)] rounded-xl bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
             >
               {companyOptions.map((c) => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-extrabold tracking-wider text-[var(--toss-gray-3)] uppercase mb-2">팀 선택</div>
+            <select
+              data-testid="guide-team-filter-select"
+              value={selectedTeamKey}
+              onChange={(e) => { setSelectedTeamKey(e.target.value); setSelectedResourceId(null); }}
+              className="w-full h-9 border border-[var(--border)] rounded-xl bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            >
+              <option value="">팀을 선택하세요</option>
+              {companyTeams.map((t) => (
+                <option key={t.key} value={t.key}>{t.teamName}</option>
               ))}
             </select>
           </div>
@@ -1458,6 +1475,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4 shrink-0">
             <div className="inline-flex p-1 bg-[var(--muted)]/60 rounded-xl gap-1">
               <button
+                data-testid="guide-tab-res"
                 onClick={() => { setActiveTab('res'); setSelectedResourceId(null); }}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   activeTab === 'res' ? 'bg-white text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'
@@ -1466,6 +1484,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 업무자료·인수인계 <span className="text-[10px] opacity-60 ml-0.5">{activeTeamResourceCount}</span>
               </button>
               <button
+                data-testid="guide-tab-task"
                 onClick={() => { setActiveTab('task'); setSelectedResourceId(null); }}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   activeTab === 'task' ? 'bg-white text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'
@@ -1541,6 +1560,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                     {filteredResources.map((resource) => (
                       <button
                         key={resource.id}
+                        data-testid={`guide-card-board-post-${String(resource.id).replace('board-post-', '')}`}
                         onClick={() => setSelectedResourceId(resource.id)}
                         className={`group relative text-left border rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${
                           resource.kind === 'handover' ? 'hover:border-amber-400' : 'hover:border-[var(--accent)]'
@@ -1615,25 +1635,28 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               </>
             ) : (
               /* 팀 할일 탭 뷰 */
-              <div className="space-y-4 pb-4">
+              <div data-testid="guide-team-task-board" className="space-y-4 pb-4">
                 
                 {/* 빠른 등록 바 */}
                 {canWrite && activeTeam && (
                   <div className="grid gap-2 border border-[var(--border)] bg-[var(--muted)]/20 rounded-2xl p-4 shadow-inner">
                     <div className="grid gap-2 md:grid-cols-[1fr_160px_140px]">
                       <input
+                        data-testid="guide-task-title-input"
                         value={taskTitle}
                         onChange={(event) => setTaskTitle(event.target.value)}
                         placeholder={`${activeTeam.teamName} 팀의 새로운 할일 등록...`}
                         className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all"
                       />
                       <input
+                        data-testid="guide-task-due-date-input"
                         type="date"
                         value={taskDueDate}
                         onChange={(event) => setTaskDueDate(event.target.value)}
                         className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all font-mono"
                       />
                       <select
+                        data-testid="guide-task-priority-select"
                         value={taskPriority}
                         onChange={(event) => setTaskPriority(normalizeGuideTaskPriority(event.target.value))}
                         className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold outline-none focus:border-[var(--accent)] transition-all"
@@ -1645,6 +1668,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       </select>
                     </div>
                     <textarea
+                      data-testid="guide-task-note-input"
                       value={taskNote}
                       onChange={(event) => setTaskNote(event.target.value)}
                       rows={2}
@@ -1663,6 +1687,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       )}
                       <button
                         type="button"
+                        data-testid="guide-task-save"
                         disabled={savingTask}
                         onClick={() => void saveTask()}
                         className="px-4 h-8 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/95 shadow-sm"
@@ -1711,6 +1736,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       return (
                         <div
                           key={task.id}
+                          data-testid={`guide-task-card-board-post-${String(task.id).replace('board-post-', '')}`}
                           className={`rounded-xl border p-3.5 transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
                             task.isDone ? 'border-[var(--success)]/20 bg-emerald-50/5' : 'border-[var(--border)] bg-white hover:border-[var(--border-strong)]'
                           }`}
@@ -1766,6 +1792,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                           <div className="flex shrink-0 gap-1.5 self-end sm:self-start">
                             {canWrite && (
                               <button
+                                data-testid={`guide-task-toggle-board-post-${String(task.id).replace('board-post-', '')}`}
                                 onClick={() => void toggleTask(task)}
                                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-black text-white ${
                                   task.isDone ? 'bg-zinc-700 hover:bg-zinc-800' : 'bg-emerald-500 hover:bg-emerald-600'
@@ -1814,6 +1841,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           <div className="relative w-full max-w-2xl max-h-[85vh] bg-[var(--card)] rounded-2xl shadow-2xl border border-[var(--border)] overflow-y-auto flex flex-col z-10 custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
             {/* 상단 X 닫기 단추 */}
             <button
+              data-testid="guide-detail-close"
               onClick={() => setSelectedResourceId(null)}
               className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full border border-[var(--border)] bg-white flex items-center justify-center text-[var(--toss-gray-4)] hover:bg-[var(--muted)]/50 transition-all shadow-sm"
               title="닫기"
@@ -1851,7 +1879,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
             className="absolute inset-0 bg-zinc-900/40 backdrop-blur-[2px] transition-all"
           />
           {/* 컴포저 폼 컨테이너 */}
-          <div className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-[var(--border)] flex flex-col overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+          <div data-testid="guide-form" className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-[var(--border)] flex flex-col overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
             
             {/* 헤더 */}
             <div className="flex items-center justify-between border-b border-[var(--border)] p-5 shrink-0 bg-gradient-to-br from-[var(--accent-light)]/20 via-transparent to-transparent">
@@ -1887,6 +1915,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">팀 <span className="text-red-500">*</span></span>
                   <select
+                    data-testid="guide-team-select"
                     value={teamName}
                     onChange={(event) => {
                       const nextTeam = companyTeams.find((team) => team.teamName === event.target.value) || null;
@@ -1910,6 +1939,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">제목 <span className="text-red-500">*</span></span>
                   <input
+                    data-testid="guide-title-input"
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                     placeholder="예: 수술실 장비 신규 세팅 가이드"
@@ -1933,6 +1963,15 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               {/* 공유 유형 라디오 카드 덱 (수려한 디자인) */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">공유 유형</span>
+                <select
+                  data-testid="guide-kind-select"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value as any)}
+                  className="sr-only"
+                >
+                  <option value="education">education</option>
+                  <option value="handover">handover</option>
+                </select>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -1981,6 +2020,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">대상 직원</span>
                   <select
+                    data-testid="guide-audience-select"
                     value={audience}
                     onChange={(event) => setAudience(normalizeGuideAudience(event.target.value))}
                     className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
@@ -2007,6 +2047,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                       </span>
                     ))}
                     <input
+                      data-testid="guide-keywords-input"
                       value={keywordInput}
                       onChange={(e) => setKeywordInput(e.target.value)}
                       onKeyDown={handleKeywordKeyDown}
@@ -2022,6 +2063,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">설명 / 프로세스 <span className="text-red-500">*</span></span>
                 <textarea
+                  data-testid="guide-description-input"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   rows={6}
@@ -2045,6 +2087,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   <span className="text-[10px] text-[var(--toss-gray-3)]">PDF · 이미지 · 문서 (개당 20MB 이하, 최대 10개)</span>
                 </div>
                 <input
+                  data-testid="guide-file-input"
                   ref={fileInputRef}
                   type="file"
                   multiple
@@ -2117,6 +2160,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 </button>
                 <button
                   type="button"
+                  data-testid="guide-save"
                   disabled={savingResource}
                   onClick={() => void saveResource()}
                   className="px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"

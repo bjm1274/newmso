@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { supabase } from '@/lib/supabase';
 import {
   WorkcenterKpiRow,
   WorkcenterShell,
@@ -79,6 +80,29 @@ export default function AbnormalWorkcenter({
   const [selectedKind, setSelectedKind] = useState<AbnormalKind | null>(null);
   const [resolvedLog, setResolvedLog] = useState<AbnormalActionEntry[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const [earlyLeaveRecords, setEarlyLeaveRecords] = useState<any[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const fetchEarlyLeave = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('early_leave_records')
+          .select('*')
+          .order('work_date', { ascending: false });
+        if (error) throw error;
+        if (alive) {
+          setEarlyLeaveRecords(data || []);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch early_leave_records:', err);
+      }
+    };
+    void fetchEarlyLeave();
+    return () => {
+      alive = false;
+    };
+  }, [reloadKey]);
 
   const canEditRules = useMemo(
     () => isNamedSystemMasterAccount(user as Record<string, unknown> | null),
@@ -240,53 +264,100 @@ export default function AbnormalWorkcenter({
 
   return (
     <WorkcenterShell headerExtra={<WorkcenterKpiRow items={kpis} />}>
-      {errMsg && (
-        <div
-          role="alert"
-          className="rounded-[var(--radius-md)] border border-[#EF4444]/40 bg-[#EF4444]/10 px-3 py-2 text-[12px] font-semibold text-[#DC2626]"
-        >
-          {errMsg}
-        </div>
-      )}
-
-      <section className="app-card p-3 md:p-4">
-        <header className="mb-2 flex items-center justify-between">
-          <h3 className="text-[13px] font-bold text-[var(--foreground)]">
-            패턴 자동 감지 · 최근 4주
-          </h3>
-          <span className="badge badge-gray">
-            {loading ? '로딩...' : `총 ${data.unresolved}건`}
-          </span>
-        </header>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-          {data.groups.map((group) => (
-            <AbnormalDetectionCard
-              key={group.kind}
-              group={group}
-              active={selectedKind === group.kind}
-              onSelect={handleSelect}
-            />
-          ))}
-        </div>
-        {selectedGroup && (
-          <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
-            "{selectedGroup.label}" 카드를 다시 누르면 상세를 닫습니다.
-          </p>
+      <div data-testid="attendance-analysis-issue-suite" className="flex flex-col gap-3">
+        {errMsg && (
+          <div
+            role="alert"
+            className="rounded-[var(--radius-md)] border border-[#EF4444]/40 bg-[#EF4444]/10 px-3 py-2 text-[12px] font-semibold text-[#DC2626]"
+          >
+            {errMsg}
+          </div>
         )}
-      </section>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <AbnormalRuleConfig
-          rules={rules}
-          canEdit={canEditRules}
-          onSave={handleSaveRules}
-        />
-        <AbnormalActionLog
-          group={selectedGroup}
-          log={resolvedLog}
-          onActionResolve={handleResolve}
-          onActionReason={handleReason}
-        />
+        <section className="app-card p-3 md:p-4">
+          <header className="mb-2 flex items-center justify-between">
+            <h3 className="text-[13px] font-bold text-[var(--foreground)]">
+              패턴 자동 감지 · 최근 4주
+            </h3>
+            <span className="badge badge-gray">
+              {loading ? '로딩...' : `총 ${data.unresolved}건`}
+            </span>
+          </header>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+            {data.groups.map((group) => (
+              <AbnormalDetectionCard
+                key={group.kind}
+                group={group}
+                active={selectedKind === group.kind}
+                onSelect={handleSelect}
+              />
+            ))}
+          </div>
+          {selectedGroup && (
+            <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
+              "{selectedGroup.label}" 카드를 다시 누르면 상세를 닫습니다.
+            </p>
+          )}
+        </section>
+
+        {/* 조기퇴근 감지 및 통합 현황 */}
+        <section data-testid="attendance-analysis-early-leaving" className="app-card p-3 md:p-4">
+          <header className="mb-3 flex items-center justify-between border-b border-[var(--border)] pb-2">
+            <h3 className="text-[13px] font-bold text-[var(--foreground)]">
+              근태 이상 통합 분석
+            </h3>
+          </header>
+          {earlyLeaveRecords.length === 0 ? (
+            <div className="py-4 text-center text-[11px] text-[var(--toss-gray-4)]">
+              최근 감지된 조기퇴근 기록이 없습니다.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[11px]">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-[var(--toss-gray-4)]">
+                    <th className="pb-1.5 font-semibold">날짜</th>
+                    <th className="pb-1.5 font-semibold">직원</th>
+                    <th className="pb-1.5 font-semibold">부서</th>
+                    <th className="pb-1.5 font-semibold">조기 시간</th>
+                    <th className="pb-1.5 font-semibold">사유 / 비고</th>
+                    <th className="pb-1.5 font-semibold">상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {earlyLeaveRecords.map((rec) => (
+                    <tr key={rec.id} className="border-b border-[var(--border)] last:border-0">
+                      <td className="py-2 font-medium">{rec.work_date}</td>
+                      <td className="py-2 font-bold">{rec.staff_name}</td>
+                      <td className="py-2 text-[var(--toss-gray-4)]">{rec.dept}</td>
+                      <td className="py-2 text-red-500 font-bold">{rec.early_minutes}분</td>
+                      <td className="py-2">{rec.note || '-'}</td>
+                      <td className="py-2">
+                        <span className={`badge ${rec.is_approved ? 'badge-green' : 'badge-red'}`}>
+                          {rec.is_approved ? '승인' : '미승인'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <AbnormalRuleConfig
+            rules={rules}
+            canEdit={canEditRules}
+            onSave={handleSaveRules}
+          />
+          <AbnormalActionLog
+            group={selectedGroup}
+            log={resolvedLog}
+            onActionResolve={handleResolve}
+            onActionReason={handleReason}
+          />
+        </div>
       </div>
     </WorkcenterShell>
   );

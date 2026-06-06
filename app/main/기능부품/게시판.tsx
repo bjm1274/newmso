@@ -1527,6 +1527,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-4 space-y-4 md:space-y-4 pb-24 md:pb-8">
+          <h2 className="text-xl font-bold text-[var(--foreground)]">{activeBoard}</h2>
           {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) */}
           {showNewPost && activeBoard !== '업무가이드' && (
             <div data-testid="board-new-post-form" className="bg-[var(--card)] p-4 md:p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">

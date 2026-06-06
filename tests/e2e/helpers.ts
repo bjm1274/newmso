@@ -787,6 +787,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         ? {
             ...room,
             last_message_at: createdAt || new Date().toISOString(),
+            last_message: content || null,
             last_message_preview: (content || '📎 파일').slice(0, 80),
           }
         : room

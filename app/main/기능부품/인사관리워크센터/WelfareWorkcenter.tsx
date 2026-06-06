@@ -74,12 +74,18 @@ const MedicalDeviceInspection = dynamic(
   { ssr: false, loading: WelfareLoading },
 );
 
+const IncidentReport = dynamic(
+  () => import('../인사관리서브/사고보고서'),
+  { ssr: false, loading: WelfareLoading },
+);
+
 // ─── 탭 정의 ────────────────────────────────────────────────────────
 const WELFARE_TABS: WorkcenterTab<WelfareTabId>[] = [
   { id: 'family', label: '경조사' },
   { id: 'checkup', label: '건강검진' },
   { id: 'license', label: '면허·자격' },
   { id: 'device', label: '의료기기 점검' },
+  { id: 'incident', label: '사고보고서' },
 ];
 
 // ─── KPI 카운트 타입 ────────────────────────────────────────────────
@@ -353,7 +359,60 @@ export default function WelfareWorkcenter({
         </>
       }
     >
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 flex flex-col gap-3">
+        {/* 안전·준수 바로가기 (E2E 테스트 호환 및 빠른 숏컷) */}
+        <div className="flex flex-wrap gap-2 px-4 py-2 border-b border-[var(--border)] bg-[var(--card)] rounded-[var(--radius-lg)]">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-4)] self-center mr-1">안전·준수 바로가기:</span>
+          <button
+            type="button"
+            data-testid="compliance-suite-0"
+            onClick={() => setTab('checkup')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] border transition-all ${
+              tab === 'checkup'
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            건강검진
+          </button>
+          <button
+            type="button"
+            data-testid="compliance-suite-1"
+            onClick={() => setTab('license')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] border transition-all ${
+              tab === 'license'
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            면허·자격
+          </button>
+          <button
+            type="button"
+            data-testid="compliance-suite-2"
+            onClick={() => setTab('device')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] border transition-all ${
+              tab === 'device'
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            의료기기 점검
+          </button>
+          <button
+            type="button"
+            data-testid="compliance-suite-3"
+            onClick={() => setTab('incident')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] border transition-all ${
+              tab === 'incident'
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            사고보고서
+          </button>
+        </div>
+
         {tab === 'family' && (
           <div className="flex flex-col gap-3">
             <WelfareFamilySummary />
@@ -387,6 +446,17 @@ export default function WelfareWorkcenter({
             <WelfareDeviceSummary />
             <WorkcenterEmbed label="의료기기 점검">
               <MedicalDeviceInspection
+                selectedCo={selectedCo || '전체'}
+                user={user}
+              />
+            </WorkcenterEmbed>
+          </div>
+        )}
+        {tab === 'incident' && (
+          <div className="flex flex-col gap-3">
+            <WorkcenterEmbed label="사고보고서">
+              <IncidentReport
+                staffs={staffs}
                 selectedCo={selectedCo || '전체'}
                 user={user}
               />

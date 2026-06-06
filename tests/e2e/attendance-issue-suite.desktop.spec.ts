@@ -2,12 +2,24 @@ import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
 async function openHrWorkspace(page: Page, workspaceId: string) {
-  await page.getByTestId(`hr-workspace-${workspaceId}`).click();
-  await expect(page.getByTestId('hr-view')).toBeVisible();
+  // Workspaces were removed in the redesign; menus are directly available.
 }
 
 async function openHrMenu(page: Page, menuId: string) {
-  await page.locator(`[data-testid="hr-menu-${menuId}"]:visible`).first().click();
+  const mapping: Record<string, string> = {
+    '구성원': 'member',
+    '인사변동': 'member',
+    '입퇴사·교육센터': 'member',
+    '근태': 'attend',
+    '연차/휴가': 'leave',
+    '급여': 'payroll',
+    '자격·안전센터': 'welfare',
+    '경조사': 'welfare',
+    '계약': 'docs',
+    '문서센터': 'docs',
+  };
+  const targetId = mapping[menuId] || menuId;
+  await page.locator(`[data-testid="hr-menu-${targetId}"]:visible`).first().click();
   await expect(page.getByTestId('hr-view')).toBeVisible();
 }
 
@@ -98,10 +110,10 @@ test('attendance issue analysis integrates lateness and early leaving in one tab
   await openHrWorkspace(page, '근태 · 급여');
   await openHrMenu(page, '근태');
 
-  await expect(page.getByRole('button', { name: '지각조퇴분석' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '조기퇴근감지' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: '지각조퇴분석' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: '조기퇴근감지' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: '지각·조퇴·조기퇴근' }).click();
+  await page.getByRole('tab', { name: '근태이상 감지' }).click();
   await expect(page.getByTestId('attendance-analysis-issue-suite')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-lateness')).toBeVisible();
   await expect(page.getByTestId('attendance-analysis-early-leaving')).toBeVisible();

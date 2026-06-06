@@ -3,7 +3,7 @@
   "title": "관리자 화면",
   "subtitle": "경영분석, 감사센터, 직접 운영 탭을 통해 시스템을 관리합니다.",
   "role": "관리자",
-  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\09_admin.png",
+  "image": "D:\\newmso\\docs\\manuals\\ppt_assets\\raw\\09_admin.png",
   "notes": [
     "상단 분석 영역은 경영대시보드, 재무대시보드, 예산관리 등을 확인하는 곳입니다.",
     "좌측 사이드바의 관리자 하위 메뉴와 현재 본문 화면을 함께 이해해야 합니다.",
@@ -37,10 +37,10 @@
       "label": "관리자 메인 메뉴",
       "note": "MSO 전용 진입 메뉴",
       "box": {
-        "x": 6,
-        "y": 443.5,
-        "width": 51,
-        "height": 52.5
+        "x": 7.5,
+        "y": 611,
+        "width": 56,
+        "height": 58
       }
     }
   ]

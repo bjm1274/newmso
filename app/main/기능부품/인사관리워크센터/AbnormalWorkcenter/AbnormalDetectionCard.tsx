@@ -36,6 +36,7 @@ function AbnormalDetectionCardInner({ group, active, onSelect }: Props) {
   return (
     <button
       type="button"
+      data-testid={group.kind === 'late' ? 'attendance-analysis-lateness' : undefined}
       onClick={() => onSelect(group.kind)}
       aria-pressed={active}
       aria-label={`${group.label} 자동 감지 ${group.count}건 — 상세 보기`}
