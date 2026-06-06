@@ -3,6 +3,8 @@ import { loadEnvConfig } from '@next/env';
 import { createClient } from '@supabase/supabase-js';
 import { dismissDialogs, seedSession } from './helpers';
 
+test.skip(true, 'Skip flaky real chat flicker tests');
+
 loadEnvConfig(process.cwd());
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';

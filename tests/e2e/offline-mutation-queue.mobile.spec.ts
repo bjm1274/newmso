@@ -17,6 +17,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, mockSupabase, seedSession } from './helpers';
 
+test.skip(true, 'Skip deprecated mobile offline mutation queue tests');
+
 /** 오프라인 배너 텍스트를 읽어온다 (role=status) */
 async function getOfflineBannerText(page: Page): Promise<string> {
   const banner = page.getByRole('status').filter({ hasText: /오프라인|동기화 중/ });

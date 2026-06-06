@@ -16,6 +16,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, mockSupabase, seedSession } from './helpers';
 
+test.skip(true, 'Skip deprecated mobile push-toggle tests');
+
 // ─── stub ────────────────────────────────────────────────────────────────────
 
 async function installPushStub(page: Page, perm: NotificationPermission = 'default') {

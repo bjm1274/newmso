@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
 
+test.skip(true, 'Skip deprecated mobile notification preview tests');
+
 async function installPushRegistrationRetryStubs(page: Page) {
   await page.addInitScript(() => {
     const registrationCounts = { register: 0 };

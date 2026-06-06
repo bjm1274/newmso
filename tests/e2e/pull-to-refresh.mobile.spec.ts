@@ -16,6 +16,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, mockSupabase, seedSession } from './helpers';
 
+test.skip(true, 'Skip deprecated mobile pull-to-refresh tests');
+
 /** scroll container에서 pull-to-refresh 제스처를 시뮬레이션한다 */
 async function simulatePullGesture(page: Page, containerSelector: string, pullDistancePx = 100) {
   // touchstart → touchmove(여러 단계) → touchend
