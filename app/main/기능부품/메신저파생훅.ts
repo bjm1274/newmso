@@ -10,7 +10,7 @@ import {
   type AttachmentPreviewItem,
   type AttachmentPreviewKind,
 } from './메신저첨부';
-import { isSelfChatRoom, isActiveChatMember, toChatDate } from './메신저유틸';
+import { isSelfChatRoom, isActiveChatMember, toChatDate, extractPollMetaFromQuestion } from './메신저유틸';
 
 export type MediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
 
