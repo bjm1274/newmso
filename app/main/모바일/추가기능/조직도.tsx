@@ -19,7 +19,7 @@ import { pickTone, useOrgDepartments } from './data-hooks';
 type View = 'tree' | 'card' | 'org';
 
 export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () => void }) {
-  const company = typeof user.company === 'string' ? user.company : undefined;
+  const company = '전체';
   const { groups, loading } = useOrgDepartments(company);
   const [view, setView] = useState<View>('tree');
   const [search, setSearch] = useState('');
@@ -191,7 +191,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                   fontWeight: 800,
                 }}
               >
-                {company ?? '본사'}
+                {company === '전체' ? 'MSO 전체' : company ?? '본사'}
               </div>
               <div aria-hidden="true" style={{ width: 1, height: 14, background: 'var(--z-300)' }} />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>

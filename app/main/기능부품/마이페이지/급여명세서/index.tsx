@@ -315,6 +315,10 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
             employee_no: typeof mobileStaff.employee_no === 'string' ? mobileStaff.employee_no : undefined,
             department: typeof mobileStaff.department === 'string' ? mobileStaff.department : undefined,
             position: typeof mobileStaff.position === 'string' ? mobileStaff.position : undefined,
+            base_salary: typeof mobileStaff.base_salary === 'number' ? mobileStaff.base_salary : undefined,
+            working_hours_per_week: typeof mobileStaff.working_hours_per_week === 'number' ? mobileStaff.working_hours_per_week : undefined,
+            shift_type: typeof mobileStaff.shift_type === 'string' ? mobileStaff.shift_type : undefined,
+            isAlternateDayShift: typeof mobileStaff.isAlternateDayShift === 'boolean' ? mobileStaff.isAlternateDayShift : undefined,
           }}
           record={salaryData}
           availableMonths={availableMonths}

@@ -106,7 +106,9 @@ export function useOrgDepartments(company: string | undefined) {
         const list = ((data ?? []) as StaffMember[]).filter(isActiveStaff);
         const byDept = new Map<string, OrgMember[]>();
         for (const s of list) {
-          const dept = (s.department ?? '미지정').trim() || '미지정';
+          const comp = (s.company ?? '미지정').trim();
+          const rawDept = (s.department ?? '미지정').trim() || '미지정';
+          const dept = company && company !== '전체' ? rawDept : `[${comp}] ${rawDept}`;
           const prev = byDept.get(dept) ?? [];
           prev.push({
             id: s.id,
@@ -298,15 +300,15 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
           if (since.length >= 16) since = since.slice(11, 16);
         }
         if (state === 'unknown') state = 'working';
-        return {
-          id: s.id,
-          name: s.name ?? '',
-          department: s.department ?? '미지정',
-          state,
-          stateLabel: STATE_LABEL[state],
-          location,
-          since,
-        };
+          return {
+            id: s.id,
+            name: s.name ?? '',
+            department: company && company !== '전체' ? (s.department ?? '미지정') : `[${(s.company ?? '미지정').trim()}] ${(s.department ?? '미지정').trim()}`,
+            state,
+            stateLabel: STATE_LABEL[state],
+            location,
+            since,
+          };
       });
       setMembers(list);
       setLastSync(new Date());

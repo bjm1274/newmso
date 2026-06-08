@@ -16,6 +16,7 @@
 
 import { useMemo } from 'react';
 import { Share2, Printer } from 'lucide-react';
+import { calculateHourlyRateFromMonthlySalary, resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 
 type StaffInfo = {
   company?: string;
@@ -23,6 +24,10 @@ type StaffInfo = {
   employee_no?: string;
   department?: string;
   position?: string;
+  base_salary?: number;
+  working_hours_per_week?: number;
+  shift_type?: string;
+  isAlternateDayShift?: boolean;
 };
 
 type SalaryRecord = {
@@ -116,6 +121,12 @@ export default function MobileSalarySlip({
   );
   const netPay = Number(record?.net_pay ?? totalPayment - totalDeduction) || 0;
 
+  const hourlyRate = useMemo(() => {
+    const weeklyHours = resolveWeeklyWorkingHours(staff as any, 40);
+    const isAlternateDayShift = !!(staff?.isAlternateDayShift || staff?.shift_type === '1일근무1일휴무');
+    return calculateHourlyRateFromMonthlySalary(Number(staff.base_salary || 0), weeklyHours, 'ceil', isAlternateDayShift);
+  }, [staff]);
+
   const handleShare = async () => {
     const monthLabel = formatYearMonthLabel(selectedYearMonth);
     const text = `${monthLabel} 급여명세서\n지급: ${money(totalPayment)}원\n공제: ${money(totalDeduction)}원\n실지급: ${money(netPay)}원`;
@@ -167,6 +178,10 @@ export default function MobileSalarySlip({
           <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-1.5">
             <p className="text-[10px] text-[var(--toss-gray-3)]">직위</p>
             <p className="truncate font-bold text-[var(--foreground)]">{staff.position || '-'}</p>
+          </div>
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2 py-1.5 col-span-2 mt-1">
+            <p className="text-[10px] text-[var(--toss-gray-3)]">통상시급</p>
+            <p className="truncate font-bold text-[var(--foreground)]">{hourlyRate > 0 ? `${hourlyRate.toLocaleString('ko-KR')}원` : '-'}</p>
           </div>
         </div>
       </header>

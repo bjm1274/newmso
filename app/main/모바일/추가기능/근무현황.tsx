@@ -26,7 +26,7 @@ function syncLabel(date: Date): string {
 }
 
 export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: () => void }) {
-  const company = typeof user.company === 'string' ? user.company : undefined;
+  const company = '전체';
   const { members, kpi, loading, lastSync, refresh } = useWorkNow({ company, pollMs: 30000 });
   const [filter, setFilter] = useState<Filter>('all');
 

@@ -556,7 +556,7 @@ export default function SalaryDetail({
           <InfoItem label="부서" value={staff?.department} />
           <InfoItem label="직위" value={staff?.position} />
           <InfoItem label="지급월" value={monthLabel} />
-          <InfoItem label="시급 환산" value={`${hourlyRate.toLocaleString('ko-KR')}원`} highlight colSpanClass="col-span-3" />
+          <InfoItem label="통상시급" value={`${hourlyRate.toLocaleString('ko-KR')}원`} highlight colSpanClass="col-span-3" />
         </div>
 
         <div className="salary-print-avoid mb-4 grid grid-cols-3 overflow-hidden border border-slate-300 print:mb-2">
