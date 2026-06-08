@@ -46,6 +46,7 @@ type SlashCommandModalProps = {
 
 export function PollComposerModal({
   open,
+  roomMembers,
   question,
   options,
   deadlineAt,
