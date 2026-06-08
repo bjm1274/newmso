@@ -114,14 +114,15 @@ export default function ModSettlement() {
       return;
     }
 
-    let fileContent = '은행명\t계좌번호\t예금주\t이체금액\r\n';
+    let fileContent = '이름\t은행명\t계좌번호\t이체금액\r\n';
     confirmedRecords.forEach(record => {
       const staff = data.staffs.find(s => String(s.id) === String(record.staff_id));
-      const bankName = (staff?.bank_name || '미지정').trim();
-      const bankAccount = (staff?.bank_account || '미지정').trim();
+      const perms = staff?.permissions;
       const name = (staff?.name || '미지정').trim();
+      const bankName = (staff?.bank_name || perms?.bank_name || '미지정').toString().trim();
+      const bankAccount = (staff?.bank_account || perms?.bank_account || '미지정').toString().trim();
       const amount = record.net_pay;
-      fileContent += `${bankName}\t${bankAccount}\t${name}\t${amount}\r\n`;
+      fileContent += `${name}\t${bankName}\t${bankAccount}\t${amount}\r\n`;
     });
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });

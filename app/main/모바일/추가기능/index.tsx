@@ -97,7 +97,17 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
     return { kind: 'hub' };
   });
 
+  const enteredViaInitialView = Boolean(initialView && MODULE_TO_VIEW[initialView]);
+
   const goHub = useCallback(() => setView({ kind: 'hub' }), []);
+  /** initialView로 직접 진입했으면 뒤로가기=이전 탭, 아니면 허브로 */
+  const goBackOrHub = useCallback(() => {
+    if (enteredViaInitialView && onBack) {
+      onBack();
+    } else {
+      setView({ kind: 'hub' });
+    }
+  }, [enteredViaInitialView, onBack]);
   const goShareList = useCallback(() => setView({ kind: 'share-list' }), []);
   const goDischargeList = useCallback(() => setView({ kind: 'discharge-list' }), []);
   const goOpBoard = useCallback(() => setView({ kind: 'opboard' }), []);
@@ -115,25 +125,25 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       );
       break;
     case 'org':
-      contentElement = <조직도 user={user} onBack={goHub} />;
+      contentElement = <조직도 user={user} onBack={goBackOrHub} />;
       break;
     case 'inventory':
-      contentElement = <부서재고 user={user} onBack={goHub} />;
+      contentElement = <부서재고 user={user} onBack={goBackOrHub} />;
       break;
     case 'worknow':
-      contentElement = <근무현황 user={user} onBack={goHub} />;
+      contentElement = <근무현황 user={user} onBack={goBackOrHub} />;
       break;
     case 'handoff':
-      contentElement = <인계노트 user={user} onBack={goHub} />;
+      contentElement = <인계노트 user={user} onBack={goBackOrHub} />;
       break;
     case 'eval':
-      contentElement = <직원평가 user={user} onBack={goHub} />;
+      contentElement = <직원평가 user={user} onBack={goBackOrHub} />;
       break;
     case 'discharge-list':
       contentElement = (
         <퇴원심사목록
           user={user}
-          onBack={goHub}
+          onBack={goBackOrHub}
           onOpenDetail={(id) => setView({ kind: 'discharge-detail', id })}
         />
       );
@@ -142,13 +152,13 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       contentElement = <퇴원심사상세 user={user} reviewId={view.id} onBack={goDischargeList} />;
       break;
     case 'consult':
-      contentElement = <수술상담 user={user} onBack={goHub} />;
+      contentElement = <수술상담 user={user} onBack={goBackOrHub} />;
       break;
     case 'opboard':
       contentElement = (
         <OP체크보드
           user={user}
-          onBack={goHub}
+          onBack={goBackOrHub}
           onOpenDetail={(card) => setView({ kind: 'opdetail', card })}
         />
       );
@@ -157,25 +167,25 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       contentElement = <OP체크상세 user={user} card={view.card} onBack={goOpBoard} />;
       break;
     case 'deposit':
-      contentElement = <입금조회 user={user} onBack={goHub} />;
+      contentElement = <입금조회 user={user} onBack={goBackOrHub} />;
       break;
     case 'closing':
-      contentElement = <마감보고 user={user} onBack={goHub} />;
+      contentElement = <마감보고 user={user} onBack={goBackOrHub} />;
       break;
     case 'parking':
-      contentElement = <외부주차 user={user} onBack={goHub} />;
+      contentElement = <외부주차 user={user} onBack={goBackOrHub} />;
       break;
     case 'webfax':
-      contentElement = <외부웹팩스 user={user} onBack={goHub} />;
+      contentElement = <외부웹팩스 user={user} onBack={goBackOrHub} />;
       break;
     case 'mri':
-      contentElement = <MRI일정 user={user} onBack={goHub} />;
+      contentElement = <MRI일정 user={user} onBack={goBackOrHub} />;
       break;
     case 'share-list':
       contentElement = (
         <업무공유목록
           user={user}
-          onBack={goHub}
+          onBack={goBackOrHub}
           onOpenDetail={(id) => setView({ kind: 'share-detail', id })}
         />
       );
@@ -184,7 +194,7 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       contentElement = <업무공유상세 user={user} postId={view.id} onBack={goShareList} />;
       break;
     case 'guide':
-      contentElement = <업무가이드 user={user} onBack={goHub} />;
+      contentElement = <업무가이드 user={user} onBack={goBackOrHub} />;
       break;
     default:
       contentElement = null;
