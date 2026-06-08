@@ -246,40 +246,64 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
     }
 
     try {
-      // 1) 만 N년차 응당일 → 연차 부여 (set)
-      const dueYear = getDueAnnualYear(hireKey, todayKey);
-      if (dueYear !== null) {
-        const days = annualLeaveDaysForTenure(dueYear);
-        const periodKey = `annual:${dueYear}`;
-        const ok = await tryInsertAccrual(db, {
-          staffId: s.id,
-          companyId: s.company_id,
-          kind: 'annual',
-          periodKey,
-          days,
-          year: targetYear,
-          sourceDate: todayKey,
-          note: `만 ${dueYear}년차 연차 ${days}일 자동부여`,
-        });
-        if (ok) {
-          // 신규 연차연도 → 총량을 해당 연차로 설정(replace)
-          await db
-            .update(staffMembersTable)
-            .set({ annual_leave_total: days, annual_leave_used: 0 })
-            .where(eq(staffMembersTable.id, s.id));
-          await recalculateLeaveBalance(s.id, targetYear);
-          result.granted.push({
-            staffId: s.id,
-            staffName: s.name,
-            kind: 'annual',
-            days,
-            periodKey,
-            note: `만 ${dueYear}년차 ${days}일`,
-          });
-        } else {
-          result.skipped += 1;
+      // 1) 만 N년차 연차 부여 (멱등성 소급 적용 포함)
+      const maxYears = tenureYears(hireKey, todayKey);
+      if (maxYears >= 1) {
+        // 이미 부여된 연차 목록 조회
+        const existingAccruals = await db
+          .select({ period_key: leaveAccrualsTable.period_key })
+          .from(leaveAccrualsTable)
+          .where(
+            and(
+              eq(leaveAccrualsTable.staff_id, s.id),
+              eq(leaveAccrualsTable.kind, 'annual')
+            )
+          );
+        const existingAnnualKeys = new Set(existingAccruals.map((a) => a.period_key));
+
+        let hasGranted = false;
+        for (let n = 1; n <= maxYears; n += 1) {
+          const periodKey = `annual:${n}`;
+          if (!existingAnnualKeys.has(periodKey)) {
+            const days = annualLeaveDaysForTenure(n);
+            const ok = await tryInsertAccrual(db, {
+              staffId: s.id,
+              companyId: s.company_id,
+              kind: 'annual',
+              periodKey,
+              days,
+              year: targetYear,
+              sourceDate: todayKey,
+              note: `만 ${n}년차 연차 ${days}일 자동부여`,
+            });
+            if (ok) {
+              if (n === maxYears) {
+                // 신규 연차연도 또는 가장 최근의 연도만 셋팅
+                await db
+                  .update(staffMembersTable)
+                  .set({ annual_leave_total: days, annual_leave_used: 0 })
+                  .where(eq(staffMembersTable.id, s.id));
+              }
+              await recalculateLeaveBalance(s.id, targetYear);
+              result.granted.push({
+                staffId: s.id,
+                staffName: s.name,
+                kind: 'annual',
+                days,
+                periodKey,
+                note: `만 ${n}년차 ${days}일`,
+              });
+              hasGranted = true;
+            }
+          }
         }
-        continue; // 응당일엔 월차 발생 안 함
+        if (hasGranted || maxYears >= 1) {
+          // 이미 1년이 지났으므로 월차 발생 로직(2번)은 건너뜁니다.
+          if (!hasGranted) {
+            result.skipped += 1;
+          }
+          continue;
+        }
       }
 
       // 2) 1년 미만 월 만근 → +1일

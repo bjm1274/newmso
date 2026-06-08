@@ -29,6 +29,7 @@ export default function ContractMain({
   const [contractSubType, setContractSubType] = useState<'신규' | '변경'>('신규'); // 신규/변경계약서용
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const [showSignatureReview, setShowSignatureReview] = useState(false);
+  const [requestedDate, setRequestedDate] = useState(getKoreanTodayString());
 
   // 확장된 비과세 항목 상태 (근로계약서·변경계약서·연봉계약서 공통)
   const [salaryInfo, setSalaryInfo] = useState({
@@ -118,6 +119,14 @@ export default function ContractMain({
       const includeTaxFree = activeTab === '연봉계약갱신' || activeTab === '신규/변경계약서';
       const contractType = getContractType();
 
+      let parsedRequestedAt = new Date().toISOString();
+      if (requestedDate) {
+        const d = new Date(requestedDate);
+        if (!isNaN(d.getTime())) {
+          parsedRequestedAt = d.toISOString();
+        }
+      }
+
       // 선택된 직원들의 주근무유형 배치 조회 (staff_shift_assignments.is_primary → staff_members.shift_id 폴백)
       const checkedStaffIds = checkedIds;
       const primaryShiftByStaff = await getPrimaryShiftBatch(checkedStaffIds);
@@ -177,7 +186,7 @@ export default function ContractMain({
         return {
           staff_id: staffId,
           status: '서명대기',
-          requested_at: new Date().toISOString(),
+          requested_at: parsedRequestedAt,
           contract_type: contractType,
           working_hours_per_week: resolveWeeklyWorkingHours(s, salaryInfo.working_hours_per_week || 40),
           working_days_per_week: workingDaysPerWeek,
@@ -197,7 +206,7 @@ export default function ContractMain({
       const staffIdList = checkedIds;
       await d1
         .from('employment_contracts')
-        .update({ status: '서명대기', requested_at: new Date().toISOString() })
+        .update({ status: '서명대기', requested_at: parsedRequestedAt })
         .in('staff_id', staffIdList)
         .eq('contract_type', contractType)
         .in('status', ['미발송', '반려']);
@@ -337,7 +346,16 @@ export default function ContractMain({
                   <span className="text-[13px] font-bold text-[var(--foreground)]">직원 선택</span>
                   <button onClick={() => setMobileListOpen(false)} className="text-[var(--toss-gray-3)] text-lg leading-none px-1">✕</button>
                 </div>
-                <div className="p-4 flex-1">
+                <div className="p-4 flex-1 space-y-4">
+                  {activeTab !== '양식 편집' && (
+                    <div className="p-4 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-[var(--radius-lg)] space-y-3 text-left">
+                      <h3 className="text-xs font-bold text-[var(--toss-gray-4)]">계약 발송 공통 설정</h3>
+                      <label className="space-y-1 block">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-5)]">계약체결 및 서류 작성일</span>
+                        <input type="text" value={requestedDate} onChange={(e) => setRequestedDate(e.target.value)} className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] font-bold text-xs outline-none focus:border-[var(--accent)] text-[var(--foreground)]" placeholder="YYYY-MM-DD" />
+                      </label>
+                    </div>
+                  )}
                   {activeTab === '신규/변경계약서' && (
                     <div className="mb-4 p-4 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-3 animate-in slide-in-from-top-4 duration-500">
                       <div className="flex flex-col gap-2">
@@ -414,7 +432,16 @@ export default function ContractMain({
 
           {/* 데스크탑 좌측 패널 */}
           <div className="hidden md:block md:w-1/3 lg:w-1/4 border-r border-[var(--border)] bg-[var(--card)] overflow-y-auto custom-scrollbar">
-            <div className="p-4">
+            <div className="p-4 space-y-4">
+              {activeTab !== '양식 편집' && (
+                <div className="p-4 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-[var(--radius-lg)] space-y-3">
+                  <h3 className="text-xs font-bold text-[var(--toss-gray-4)]">계약 발송 공통 설정</h3>
+                  <label className="space-y-1 block">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-5)]">계약체결 및 서류 작성일</span>
+                    <input type="text" value={requestedDate} onChange={(e) => setRequestedDate(e.target.value)} className="w-full px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] font-bold text-xs outline-none focus:border-[var(--accent)]" placeholder="YYYY-MM-DD" />
+                  </label>
+                </div>
+              )}
               {activeTab === '신규/변경계약서' && (
                 <div className="mb-4 p-5 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] shadow-sm space-y-4 animate-in slide-in-from-top-4 duration-500">
                   <div className="flex flex-col gap-3">
@@ -507,6 +534,7 @@ export default function ContractMain({
         items={[
           { label: '계약 유형', value: getContractType() },
           { label: '대상자', value: selectedContractStaffs.length > 0 ? selectedContractStaffs.slice(0, 4).map((staff: any) => staff.name).join(', ') + (selectedContractStaffs.length > 4 ? ` 외 ${selectedContractStaffs.length - 4}명` : '') : '-' },
+          { label: '계약체결 및 서류 작성일', value: requestedDate },
           { label: '적용일', value: salaryInfo.effective_date || '직원 입사일 기준' },
           { label: '기본급', value: activeTab === '계약현황' ? '직원 현재 기본급 사용' : formatWon(salaryInfo.base_salary) },
           { label: '주당 근무', value: activeTab === '계약현황' ? '직원별 현재 근무유형 사용' : `${salaryInfo.working_hours_per_week}시간 · ${salaryInfo.working_days_per_week}일` },

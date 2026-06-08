@@ -23,13 +23,19 @@ import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import { useMonthlyAttendance } from './data-hooks';
-import { resolveCheckInStatus } from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
+import {
+  resolveCheckInStatus,
+  syncToAttendances,
+  resolveLateThreshold,
+  calculateEarlyLeaveMinutes,
+} from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
 
 type OpenLog = {
   id: string;
   date: string;
   check_in: string | null;
   check_out: string | null;
+  status?: string | null;
 };
 
 const ACCURACY_WARN_M = 200;
@@ -86,7 +92,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         //  '퇴근하기'로 표시되고 어제 출근시각이 오늘 것처럼 보이는 버그가 생긴다.)
         const { data: todayData } = await supabase
           .from('attendance')
-          .select('id, date, check_in, check_out')
+          .select('id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
           .eq('date', today)
           .maybeSingle();
@@ -155,6 +161,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
           if (row) setOpenLog(row);
+          try {
+            await syncToAttendances(staffId, today, nowIso, null, checkInStatus);
+          } catch (syncErr) {
+            console.error('syncToAttendances fail', syncErr);
+          }
           toast(
             checkInStatus === '지각' ? '지각 처리되었습니다.' : '출근 체크인이 완료되었습니다.',
             checkInStatus === '지각' ? 'warning' : 'success',
@@ -162,22 +173,47 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         }
       } else if (state === 'in') {
         const dateKey = openLog?.date ?? today;
+        const checkInIso = openLog?.check_in ?? null;
+
+        // 지각 기준시간 구하고 조퇴 여부 판정
+        let finalStatus = openLog?.status || '정상';
+        let earlyLeaveMinutes = 0;
+        try {
+          const lateThreshold = await resolveLateThreshold(staffId, dateKey, { company });
+          earlyLeaveMinutes = calculateEarlyLeaveMinutes(dateKey, nowIso, lateThreshold);
+          if (earlyLeaveMinutes > 0) {
+            finalStatus = '조퇴';
+          }
+        } catch {/* 판정 실패 시 기존 상태 유지 */}
+
         const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
           kind: 'update',
           table: 'attendance',
-          payload: { check_out: nowIso },
+          payload: { check_out: nowIso, status: finalStatus },
           match: { staff_id: staffId, date: dateKey },
         });
         if (error) throw new Error(error);
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
-          if (openLog) setOpenLog({ ...openLog, check_out: nowIso });
+          if (openLog) setOpenLog({ ...openLog, check_out: nowIso, status: finalStatus });
           toast('오프라인 — 퇴근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
           if (row) setOpenLog(row);
           else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
-          toast('퇴근 체크아웃이 완료되었습니다.', 'success');
+          
+          try {
+            await syncToAttendances(staffId, dateKey, checkInIso, nowIso, finalStatus, { earlyLeaveMinutes });
+          } catch (syncErr) {
+            console.error('syncToAttendances fail', syncErr);
+          }
+
+          toast(
+            finalStatus === '조퇴'
+              ? `조퇴로 처리되었습니다. 정해진 퇴근 시간보다 ${earlyLeaveMinutes}분 일찍 퇴근하셨습니다.`
+              : '퇴근 체크아웃이 완료되었습니다.',
+            finalStatus === '조퇴' ? 'warning' : 'success'
+          );
         }
       }
       void refetch();

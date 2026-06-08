@@ -45,8 +45,8 @@ export default function ContractClosingBlock(props: Props) {
     return (
         <div className="mt-5 space-y-3 break-inside-avoid">
             <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-3 break-inside-avoid">
-                <div className="rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--card)]">
-                    <div className="px-3 py-2 bg-slate-800 text-white text-center">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--card)]">
+                    <div className="px-3 py-2 bg-slate-800 text-white text-center rounded-t-xl">
                         <span className="text-[10px] font-black tracking-[0.2em]">사 용 자</span>
                     </div>
                     <div className="divide-y divide-[var(--border-subtle)]">
@@ -58,16 +58,20 @@ export default function ContractClosingBlock(props: Props) {
                         )}
                         {renderRow('소재지', companyAddress)}
                         {renderRow('연락처', companyPhone)}
-                        <div className="flex items-stretch text-[11.5px] min-h-[36px]">
-                            <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">대표자</span>
-                            <span className="flex-1 min-w-0 px-2.5 text-[var(--foreground)] font-semibold leading-snug flex items-center justify-between gap-2">
+                        <div className="flex items-stretch text-[11.5px] min-h-[36px] overflow-visible">
+                            <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold rounded-bl-xl">대표자</span>
+                            <span className="relative flex-1 min-w-0 px-2.5 text-[var(--foreground)] font-semibold leading-snug flex items-center justify-between gap-2 rounded-br-xl overflow-visible">
                                 <span className="truncate" title={companyCeo || ''}>{companyCeo || '-'}</span>
                                 {sealUrl ? (
                                     <img
                                         src={sealUrl}
                                         alt="직인"
-                                        className="w-8 h-8 object-contain select-none pointer-events-none shrink-0"
-                                        style={{ mixBlendMode: 'multiply' }}
+                                        className="absolute right-4 w-16 h-16 object-contain select-none pointer-events-none z-10"
+                                        style={{
+                                            mixBlendMode: 'multiply',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                        }}
                                     />
                                 ) : (
                                     <span className="inline-flex items-center justify-center px-2 py-0.5 text-red-500 font-black text-[10px] shrink-0">

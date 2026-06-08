@@ -315,7 +315,7 @@ window.onload = () => window.print();
   <title>${escapeHtml(templateMeta.name || '결재문서')}</title>
   <style>
     *,*::before,*::after{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-    @page{size:A4;margin:0}
+    @page{size:A4;margin:15mm 12mm}
     body{font-family:'Malgun Gothic',sans-serif;background:#f5f7fb;margin:0;padding:16px;color:#111827}
     .sheet{position:relative;max-width:820px;margin:0 auto;background:#fff;border:1px solid ${escapeHtml(design.borderColor || '#d7e3ff')};border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(15,23,42,.10)}
     .sheet::before{content:'';position:absolute;inset:0;background:url('${escapeHtml(design.backgroundLogoUrl || DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoUrl)}') center 52% / 72px 72px no-repeat;opacity:${escapeHtml(String(design.backgroundLogoOpacity ?? DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoOpacity))};pointer-events:none;mix-blend-mode:multiply;z-index:0}
@@ -355,7 +355,7 @@ window.onload = () => window.print();
     .seal-trailing{margin-left:auto}
     @media print{
       html,body{background:#fff;padding:0;margin:0}
-      .sheet{box-shadow:none;border-radius:0;max-width:none;border:none;padding:10mm 8mm;overflow:visible;background:transparent !important}
+      .sheet{box-shadow:none;border-radius:0;max-width:none;border:none;padding:0;overflow:visible;background:transparent !important}
       .sheet::before{display:none}
       body::before{content:'';position:fixed;top:50%;left:50%;width:160px;height:160px;transform:translate(-50%,-50%);background:url('${escapeHtml(design.backgroundLogoUrl || DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoUrl)}') center / contain no-repeat;opacity:0.12;pointer-events:none;z-index:0}
       .sheet > *{position:relative;z-index:1}

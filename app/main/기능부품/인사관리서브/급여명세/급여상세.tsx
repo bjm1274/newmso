@@ -380,7 +380,7 @@ export default function SalaryDetail({
     resolvedAgreedOvertime +
     resolvedAgreedNight;
 
-  const hourlyRate = calculateHourlyRateFromMonthlySalary(fixedMonthlySalary, weeklyHours, 'ceil', isAlternateDayShift);
+  const hourlyRate = calculateHourlyRateFromMonthlySalary(toNumber(data.base_salary), weeklyHours, 'ceil', isAlternateDayShift);
   const settlementAmount = isAdvancePay ? advancePayAmount : calc.net;
 
   const fixedTaxableAllowanceTotal =

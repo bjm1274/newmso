@@ -10,7 +10,7 @@
  * JM6: aria-live 등은 자식 화면에서 처리
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { ErpUser } from '@/types';
 import '../tokens.css';
 import MobileBottomTab from './MobileBottomTab';
@@ -30,6 +30,9 @@ import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
 import { useChatRoomsForMobile } from '../채팅/data-hooks';
 import { useNavigation } from '../../contexts/NavigationContext';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
+import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/계약문서/전자서명모달';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -59,6 +62,123 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
   }));
   const [dark, setDark] = useState(false);
   const [chatResetToken, setChatResetToken] = useState(0);
+
+  const [pendingContract, setPendingContract] = useState<any | null>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+
+  const checkPendingContracts = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('employment_contracts')
+        .select('*')
+        .eq('staff_id', user.id as string)
+        .eq('status', '서명대기')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setPendingContract(data);
+        setShowSignaturePad(true);
+      } else {
+        setPendingContract(null);
+        setShowSignaturePad(false);
+      }
+    } catch (e) {
+      console.error('[mobile-hr] checkPendingContracts failed', e);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void checkPendingContracts();
+  }, [checkPendingContracts]);
+
+  useEffect(() => {
+    const handleTriggerSignature = () => {
+      void checkPendingContracts();
+    };
+    window.addEventListener('erp-mobile-trigger-signature', handleTriggerSignature);
+    return () => {
+      window.removeEventListener('erp-mobile-trigger-signature', handleTriggerSignature);
+    };
+  }, [checkPendingContracts]);
+
+  const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
+    const currentUserId = typeof user?.id === 'string' ? user.id : null;
+    if (!pendingContract || !currentUserId) return;
+    try {
+      await supabase
+        .from('employment_contracts')
+        .update({
+          status: '서명완료',
+          signed_at: new Date().toISOString(),
+          signature_data: signatureDataUrl
+        })
+        .eq('id', pendingContract.id);
+
+      const { data: checklistRows } = await supabase
+        .from('onboarding_checklists')
+        .select('id, checklist_type, items, target_date')
+        .eq('staff_id', currentUserId);
+
+      const { isChecklistComplete, normalizeChecklistItems, syncChecklistWithContract } = await import('@/lib/hr-checklists');
+      const entryChecklistRow = Array.isArray(checklistRows)
+        ? checklistRows.find((row) => String(row?.checklist_type ?? '').trim() === '입사') ?? null
+        : null;
+      const signedAt = new Date().toISOString();
+      const syncedItems = syncChecklistWithContract(
+        normalizeChecklistItems(entryChecklistRow?.items ?? null, '입사'),
+        '입사',
+        {
+          status: '서명완료',
+          requestedAt: (pendingContract.requested_at as string) || null,
+          signedAt,
+        },
+      );
+      await supabase.from('onboarding_checklists').upsert(
+        {
+          staff_id: currentUserId,
+          checklist_type: '입사',
+          items: syncedItems,
+          target_date: entryChecklistRow?.target_date ?? null,
+          completed_at: isChecklistComplete(syncedItems) ? signedAt : null,
+        },
+        { onConflict: 'staff_id,checklist_type' },
+      );
+
+      // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
+      const { encryptContract } = await import('@/lib/contract-crypto');
+      const encryptedContractText = await encryptContract(contractText);
+      await supabase.from('document_repository').insert({
+        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
+        category: '계약서',
+        content: encryptedContractText,
+        company_name: (user?.company as string) || '전체',
+        created_by: currentUserId,
+        version: 1
+      });
+
+      // HR에게 알림 전송
+      await supabase.from('notifications').insert({
+        user_id: 'system_admin',
+        title: '계약서 서명 완료',
+        body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
+        type: 'SUCCESS',
+        read_at: null
+      });
+
+      toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
+      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
+      setPendingContract(null);
+      setShowSignaturePad(false);
+    } catch (e) {
+      console.error('[모바일셸] 근로계약서 서명 저장 실패:', e);
+      toast('서명 저장 중 오류가 발생했습니다.', 'error');
+    }
+  };
 
   const userId = typeof user.id === 'string' ? user.id : null;
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -145,6 +265,14 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
 
   return (
     <div className={containerClass} data-testid="main-shell">
+      {pendingContract && showSignaturePad && (
+        <ContractSignatureModal
+          contract={pendingContract}
+          user={user}
+          onClose={() => setShowSignaturePad(false)}
+          onSuccess={handleSignComplete}
+        />
+      )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'absolute', inset: 0 }}>
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <오프라인실패배너 />

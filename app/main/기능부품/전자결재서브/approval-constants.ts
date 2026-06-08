@@ -22,6 +22,8 @@ export const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'generic', name: '증명서발급' },
   { slug: 'attendance_fix', name: '출결정정' },
   { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
+  { slug: 'probation_evaluation', name: '수습직원평가서' },
+  { slug: 'salary_increase_evaluation', name: '급여인상평가서' },
 ] as const;
 
 export const BUILTIN_FORM_TYPE_NAMES = BUILTIN_FORM_TYPE_DEFINITIONS.map((item) => item.name);

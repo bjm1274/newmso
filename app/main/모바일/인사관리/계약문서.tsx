@@ -235,12 +235,24 @@ function ContractTab({ staffId }: { staffId: string | null }) {
       <div className="m-card flush">
         {rows.map((r) => {
           const isCurrent = (r.status ?? '').includes('적용') || r.status === 'active';
+          const isPending = r.status === '서명대기';
           return (
-            <div key={r.id} className="m-list-row">
-              <div className={'ico-tile ' + (isCurrent ? 'tone-accent' : '')}>
+            <div
+              key={r.id}
+              className="m-list-row cursor-pointer"
+              onClick={() => {
+                if (isPending) {
+                  window.dispatchEvent(new CustomEvent('erp-mobile-trigger-signature'));
+                } else if (r.status === '서명완료') {
+                  toast('이미 서명이 완료된 계약서입니다. 문서보관함에서 확인하실 수 있습니다.', 'info');
+                }
+              }}
+              style={{ textAlign: 'left', width: '100%', cursor: 'pointer' }}
+            >
+              <div className={'ico-tile ' + (isCurrent ? 'tone-accent' : isPending ? 'tone-warning' : '')}>
                 <MIcon name="fileText" size={18} />
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="lbl">{r.title}</div>
                 <div className="sub">
                   {r.start_date ?? '-'}
@@ -248,6 +260,7 @@ function ContractTab({ staffId }: { staffId: string | null }) {
                 </div>
               </div>
               {isCurrent && <MChip tone="accent">현재</MChip>}
+              {isPending && <MChip tone="warning">서명대기</MChip>}
             </div>
           );
         })}

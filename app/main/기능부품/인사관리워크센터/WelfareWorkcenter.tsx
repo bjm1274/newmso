@@ -42,6 +42,7 @@ import {
 } from './workcenter-common';
 import WelfareExpiryBoard from './WelfareWorkcenter/WelfareExpiryBoard';
 import type { WelfareTabId } from './WelfareWorkcenter/types';
+import WelfareCalendar from './WelfareWorkcenter/WelfareCalendar';
 
 // ─── lazy import (활성 탭만 마운트 — JM2) ───────────────────────────
 const WelfareLoading = () => (
@@ -81,6 +82,7 @@ const IncidentReport = dynamic(
 
 // ─── 탭 정의 ────────────────────────────────────────────────────────
 const WELFARE_TABS: WorkcenterTab<WelfareTabId>[] = [
+  { id: 'calendar', label: '달력' },
   { id: 'family', label: '경조사' },
   { id: 'checkup', label: '건강검진' },
   { id: 'license', label: '면허·자격' },
@@ -148,7 +150,7 @@ export default function WelfareWorkcenter({
   staffs = [],
   selectedCo,
   user = null,
-  initialTab = 'family',
+  initialTab = 'calendar',
 }: WelfareWorkcenterProps) {
   const [tab, setTab] = useState<WelfareTabId>(initialTab);
   const [counts, setCounts] = useState<WelfareCounts>(INITIAL_COUNTS);
@@ -413,6 +415,9 @@ export default function WelfareWorkcenter({
           </button>
         </div>
 
+        {tab === 'calendar' && (
+          <WelfareCalendar staffs={staffs} selectedCo={selectedCo} />
+        )}
         {tab === 'family' && (
           <div className="flex flex-col gap-3">
             <WelfareFamilySummary />

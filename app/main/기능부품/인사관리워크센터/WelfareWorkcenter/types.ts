@@ -4,4 +4,4 @@
  * JM4: any 금지. 탭 ID는 literal union.
  */
 
-export type WelfareTabId = 'family' | 'checkup' | 'license' | 'device' | 'incident';
+export type WelfareTabId = 'calendar' | 'family' | 'checkup' | 'license' | 'device' | 'incident';

@@ -11,6 +11,7 @@ import RepairRequestForm from './수리요청서양식';
 import AnnualLeavePlanForm from './연차사용계획서양식';
 import OfficialDocumentDispatchForm from './공문발송양식';
 import ReportApprovalForm from './ReportApprovalForm';
+import EmployeeEvaluationForm from './직원평가양식';
 import type { ApprovalCcUser, ApproverTemplate } from '../전자결재-types';
 import { normalizeComposeFormType } from '../전자결재-utils';
 import { LucideIcon } from '../조직도서브/조직도측면창';
@@ -384,6 +385,13 @@ export default function ApprovalComposerView({
                 setExtraData={setExtraData}
                 setFormTitle={setFormTitle}
                 setFormContent={setFormContent}
+              />
+            ) : ['수습직원평가서', '급여인상평가서'].includes(formType) ? (
+              <EmployeeEvaluationForm
+                staffs={staffs as any}
+                formType={formType}
+                setExtraData={setExtraData}
+                setFormTitle={setFormTitle}
               />
             ) : (
               <AdminForms

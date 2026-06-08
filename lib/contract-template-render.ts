@@ -47,7 +47,7 @@ function formatDate(value?: unknown) {
 function formatWon(value?: unknown) {
   if (typeof value === 'boolean') return '';
   const numberValue = Number(value);
-  if (!Number.isFinite(numberValue) || numberValue === 0) return '';
+  if (!Number.isFinite(numberValue)) return '0';
 
   try {
     return numberValue.toLocaleString('ko-KR');
@@ -156,7 +156,12 @@ function resolveWorkDayMode(
 
   if (explicitMode === 'all_days' || explicitMode.includes('월~일')) return 'all_days';
   if (explicitMode === 'weekdays' || explicitMode.includes('월~금')) return 'weekdays';
-  if (shiftRecord.is_weekend_work === true || Number(shiftRecord.weekly_work_days) >= 7) return 'all_days';
+  if (
+    shiftRecord.is_weekend_work === true ||
+    shiftRecord.is_weekend_work === 1 ||
+    String(shiftRecord.is_weekend_work) === 'true' ||
+    Number(shiftRecord.weekly_work_days) >= 7
+  ) return 'all_days';
   if (workingDaysPerWeek >= 7) return 'all_days';
 
   return 'weekdays';
@@ -182,7 +187,7 @@ function buildWorkDayText(
   }
 
   const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
-  if (workDayMode === 'all_days') return '월요일~일요일 중 근무표에 따름';
+  if (workDayMode === 'all_days') return '근무표에 따른 요일';
   if (workingDaysPerWeek >= 6) return '월요일~토요일';
   if (workingDaysPerWeek === 5) return '월요일~금요일';
 
@@ -204,7 +209,7 @@ function buildWeeklyHolidayText(
   if (explicitHoliday) return explicitHoliday;
 
   const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
-  if (workDayMode === 'all_days') return '근무표에 따른 주 1회 이상 휴일';
+  if (workDayMode === 'all_days') return '근무표에 따른 휴일(주 1회 이상)';
 
   return '일요일';
 }
@@ -213,34 +218,7 @@ function removeAllowanceLinesWithoutAmounts(
   content: string,
   allowanceValues: Record<string, number>,
 ) {
-  let nextContent = content.replace(/\r\n/g, '\n');
-
-  OPTIONAL_ALLOWANCE_FIELDS.forEach(({ token }) => {
-    if ((allowanceValues[token] || 0) > 0) return;
-    nextContent = nextContent
-      .split('\n')
-      .filter((line) => !line.includes(token))
-      .join('\n');
-  });
-
-  nextContent = nextContent
-    .split('\n')
-    .filter((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return true;
-
-      const matchedField = OPTIONAL_ALLOWANCE_FIELDS.find(({ labels }) =>
-        labels.some((label) => trimmed.startsWith(label))
-      );
-      if (!matchedField) return true;
-
-      if ((allowanceValues[matchedField.token] || 0) > 0) return true;
-
-      return /\d[\d,]*\s*원/.test(trimmed);
-    })
-    .join('\n');
-
-  return nextContent.replace(/\n{3,}/g, '\n\n').trim();
+  return content.replace(/\r\n/g, '\n').trim();
 }
 
 export function fillEmploymentContractTemplate(
@@ -389,7 +367,7 @@ export function fillEmploymentContractTemplate(
     contract_start: formatDate(safeContract.contract_start_date || safeUser.joined_at || salarySource.join_date),
     contract_end: contractEndDate || (isFixedTerm ? '계약만료일' : '정년도달시'),
     conditions_applied_at: formatDate(safeContract.conditions_applied_at || salarySource.effective_date),
-    today: formatDate(new Date()),
+    today: formatDate(safeContract.requested_at || new Date()),
   };
 
   const probationMonthsNum = getStaffProbationMonths(
@@ -423,6 +401,10 @@ export function fillEmploymentContractTemplate(
   vars.probation_end = probationEnd;
 
   let transformedTemplate = template;
+
+  // Replace "{{break_start}} ~ {{break_end}}" or similar with "{{break_time_range}}" dynamically
+  transformedTemplate = transformedTemplate.replace(/\{\{\s*break_start\s*\}\}\s*(?:~|-)\s*\{\{\s*break_end\s*\}\}/g, '{{break_time_range}}');
+  transformedTemplate = transformedTemplate.replace(/\{\{\s*shift_start\s*\}\}\s*(?:~|-)\s*\{\{\s*shift_end\s*\}\}/g, '{{shift_time_range}}');
 
   if (isFixedTerm) {
     // 계약직인 경우: 기간의 정함이 없는 -> 지정된 계약종료일까지 계약

@@ -176,7 +176,11 @@ export function buildShiftContractVariables(
   const breakStarts = valuesFor('break_start_time', fallbackBreakStart);
   const breakEnds = valuesFor('break_end_time', fallbackBreakEnd);
   const shiftTimeRanges = shiftStarts.map((start, index) => formatRange(start, shiftEnds[index] || ''));
-  const breakTimeRanges = breakStarts.map((start, index) => formatRange(start, breakEnds[index] || ''));
+  const breakTimeRanges = breakStarts.map((start, index) => {
+    const s = start ? String(start).trim() : '';
+    const e = breakEnds[index] ? String(breakEnds[index]).trim() : '';
+    return s && e ? `${s}~${e}` : s || e || '';
+  });
   const shiftNames = rotationShifts
     .map((shift, index) => {
       const name = String(shift?.name || '').trim();

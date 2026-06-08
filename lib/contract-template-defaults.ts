@@ -95,6 +95,9 @@ const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 기본급: 금 {{base_salary}}원
 식대: 금 {{meal_allowance}}원
 직책수당: 금 {{position_allowance}}원
+자가운전보조금: 금 {{vehicle_allowance}}원
+보육수당: 금 {{childcare_allowance}}원
+연구활동비: 금 {{research_allowance}}원
 기타수당: 금 {{other_taxfree}}원
 합계: 금 {{total_salary}}원
 ② 임금은 매월 1일부터 말일까지 산정하여 익월 {{payday}}일 근로자 명의의 계좌로 지급한다. 지급일이 휴일인 경우에는 전일 또는 익영업일에 지급할 수 있다.
