@@ -549,7 +549,7 @@ function MessengerTimelineComponent({
                   : null;
               const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || msg.sender_name || '이름 없음';
               const isSystemSender = String(msg.sender_id) === 'system' || senderName === '시스템';
-              const displayedReadStatusSummary = (isMine || isGroupChat) && !isSystemInvite && !isSystemSender ? readStatusSummary : null;
+              const displayedReadStatusSummary = (isMine || isGroupChat) && !isSystemInvite ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {
