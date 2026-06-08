@@ -54,6 +54,10 @@ type UseChatWorkflowDraftsResult = {
   setPrizeEnabled: Dispatch<SetStateAction<boolean>>;
   setPrizeWinnerCount: Dispatch<SetStateAction<number>>;
   setPrizeName: Dispatch<SetStateAction<string>>;
+  isKickPoll: boolean;
+  setIsKickPoll: Dispatch<SetStateAction<boolean>>;
+  kickTargetId: string;
+  setKickTargetId: Dispatch<SetStateAction<string>>;
   openPollModal: () => void;
   closePollModal: () => void;
   handleCreatePoll: () => Promise<void>;
@@ -90,6 +94,8 @@ export function useChatWorkflowDrafts({
   const [prizeEnabled, setPrizeEnabled] = useState(false);
   const [prizeWinnerCount, setPrizeWinnerCount] = useState(1);
   const [prizeName, setPrizeName] = useState('');
+  const [isKickPoll, setIsKickPoll] = useState(false);
+  const [kickTargetId, setKickTargetId] = useState('');
   const [slashCommand, setSlashCommand] = useState<SlashCommandType>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
   const [slashForm, setSlashForm] = useState<SlashCommandForm>({
@@ -110,6 +116,8 @@ export function useChatWorkflowDrafts({
     setPrizeEnabled(false);
     setPrizeWinnerCount(1);
     setPrizeName('');
+    setIsKickPoll(false);
+    setKickTargetId('');
   }, []);
 
   const handleCreatePoll = useCallback(async () => {
@@ -136,6 +144,8 @@ export function useChatWorkflowDrafts({
         question: buildPollQuestionContent(pollQuestion, {
           deadlineAt: pollDeadlineAt,
           prize: prizeMeta,
+          isKickPoll,
+          kickTargetId: isKickPoll ? kickTargetId : undefined,
         }),
         options,
       };
@@ -163,6 +173,8 @@ export function useChatWorkflowDrafts({
         question: buildPollQuestionContent(pollQuestion, {
           deadlineAt: pollDeadlineAt,
           prize: prizeMeta,
+          isKickPoll,
+          kickTargetId: isKickPoll ? kickTargetId : undefined,
         }),
         options,
       };
@@ -174,9 +186,11 @@ export function useChatWorkflowDrafts({
       setPrizeEnabled(false);
       setPrizeWinnerCount(1);
       setPrizeName('');
+      setIsKickPoll(false);
+      setKickTargetId('');
       setShowPollModal(false);
     }
-  }, [effectiveChatUserId, pollDeadlineAt, pollOptions, pollQuestion, prizeEnabled, prizeName, prizeWinnerCount, selectedRoomId, user?.id]);
+  }, [effectiveChatUserId, isKickPoll, kickTargetId, pollDeadlineAt, pollOptions, pollQuestion, prizeEnabled, prizeName, prizeWinnerCount, selectedRoomId, user?.id]);
 
   const handlePollOptionChange = useCallback((index: number, value: string) => {
     setPollOptions((prev) => prev.map((option, optionIndex) => (optionIndex === index ? value : option)));
@@ -223,11 +237,45 @@ export function useChatWorkflowDrafts({
         return { ...prev, [pollId]: next };
       });
 
+      const poll = polls.find((p) => p.id === pollId);
+      if (poll) {
+        const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question);
+        if (isKickPoll && kickTargetId && poll.options[optionIndex] === '찬성') {
+          const { data: voteRows } = await supabase.from('poll_votes').select('user_id').eq('poll_id', pollId).eq('option_index', optionIndex);
+          const agreeCount = voteRows?.length || 0;
+          
+          const { data: roomData } = await supabase.from('chat_rooms').select('members').eq('id', poll.room_id).single();
+          if (roomData && Array.isArray(roomData.members)) {
+            const members = roomData.members as string[];
+            const threshold = Math.floor((members.length - 1) / 2) + 1; // 과반수 찬성
+            if (agreeCount >= threshold && members.includes(kickTargetId)) {
+              const nextMembers = members.filter((m) => m !== kickTargetId);
+              await supabase.from('chat_rooms').update({ members: nextMembers }).eq('id', poll.room_id);
+              
+              const targetName = user?.name ? `${user.name} 외에 의해` : '투표에 의해';
+              await insertChatMessageWithFallback(supabase, {
+                room_id: String(poll.room_id),
+                sender_id: null,
+                content: `강퇴 투표가 과반수를 넘어 대상자가 강퇴되었습니다.`,
+                file_url: null,
+                file_name: null,
+                file_size_bytes: null,
+                file_kind: null,
+                reply_to_id: null,
+                album_id: null,
+                album_index: null,
+                album_total: null,
+              });
+            }
+          }
+        }
+      }
+
       void fetchData();
     } catch {
       // ignore poll vote failures here; room refresh will reconcile later
     }
-  }, [effectiveChatUserId, fetchData, user?.id]);
+  }, [effectiveChatUserId, fetchData, polls, user?.id]);
 
   const handleDrawPollPrize = useCallback(async (pollId: string) => {
     const poll = polls.find((p) => p.id === pollId);
@@ -487,6 +535,10 @@ export function useChatWorkflowDrafts({
     setPrizeEnabled,
     setPrizeWinnerCount,
     setPrizeName,
+    isKickPoll,
+    setIsKickPoll,
+    kickTargetId,
+    setKickTargetId,
     openPollModal,
     closePollModal,
     handleCreatePoll,

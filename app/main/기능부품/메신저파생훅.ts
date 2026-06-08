@@ -543,6 +543,7 @@ type UseChatTimelineItemsParams = {
   selectedRoomId: string | null;
   deferredChatSearch: string;
   transientHighlightQuery: string;
+  effectiveChatUserId?: string | null;
 };
 
 export function useChatTimelineItems({
@@ -551,6 +552,7 @@ export function useChatTimelineItems({
   selectedRoomId,
   deferredChatSearch,
   transientHighlightQuery,
+  effectiveChatUserId,
 }: UseChatTimelineItemsParams) {
   const visibleTimelineMessages = useMemo(() => {
     if (!deferredChatSearch.trim()) return messages;
@@ -570,9 +572,16 @@ export function useChatTimelineItems({
   const selectedRoomPollTimelineItems = useMemo(
     () =>
       polls
-        .filter((poll) => poll.room_id === selectedRoomId)
+        .filter((poll) => {
+          if (poll.room_id !== selectedRoomId) return false;
+          const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question);
+          if (isKickPoll && kickTargetId && String(kickTargetId) === String(effectiveChatUserId)) {
+            return false;
+          }
+          return true;
+        })
         .map((poll) => ({ ...poll, type: 'poll', created_at: poll.created_at || new Date().toISOString() })),
-    [polls, selectedRoomId],
+    [polls, selectedRoomId, effectiveChatUserId],
   );
 
   const combinedTimeline = useMemo(() => {

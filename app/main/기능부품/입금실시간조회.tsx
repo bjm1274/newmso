@@ -158,7 +158,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      loadDeposits({ silent: true });
+      if (!document.hidden) loadDeposits({ silent: true });
     }, POLLING_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);

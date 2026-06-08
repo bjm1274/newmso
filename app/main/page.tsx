@@ -814,7 +814,7 @@ function MainPageContent() {
 
     const intervalId = window.setInterval(() => {
       if (!isCancelled) updatePresence('online');
-    }, 30_000);
+    }, 120_000);
 
     const handleFocus = () => updatePresence('online');
     const handleBlur = () => updatePresence('away');

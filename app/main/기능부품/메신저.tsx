@@ -1324,6 +1324,10 @@ export default function ChatView({
     setPrizeEnabled,
     setPrizeWinnerCount,
     setPrizeName,
+    isKickPoll,
+    setIsKickPoll,
+    kickTargetId,
+    setKickTargetId,
     slashCommand,
     showSlashModal,
     slashForm,
@@ -2884,6 +2888,7 @@ export default function ChatView({
     selectedRoomId,
     deferredChatSearch,
     transientHighlightQuery,
+    effectiveChatUserId,
   });
   const failedMessageIdsInSelectedRoom = useMemo(
     () =>
@@ -3276,12 +3281,15 @@ export default function ChatView({
 
       <PollComposerModal
         open={showPollModal}
+        roomMembers={roomMembers}
         question={pollQuestion}
         options={pollOptions}
         deadlineAt={pollDeadlineAt}
         prizeEnabled={prizeEnabled}
         prizeWinnerCount={prizeWinnerCount}
         prizeName={prizeName}
+        isKickPoll={isKickPoll}
+        kickTargetId={kickTargetId}
         onQuestionChange={setPollQuestion}
         onDeadlineAtChange={setPollDeadlineAt}
         onOptionChange={handlePollOptionChange}
@@ -3290,6 +3298,8 @@ export default function ChatView({
         onPrizeEnabledChange={setPrizeEnabled}
         onPrizeWinnerCountChange={setPrizeWinnerCount}
         onPrizeNameChange={setPrizeName}
+        onIsKickPollChange={setIsKickPoll}
+        onKickTargetIdChange={setKickTargetId}
         onClose={closePollModal}
         onSubmit={handleCreatePoll}
       />

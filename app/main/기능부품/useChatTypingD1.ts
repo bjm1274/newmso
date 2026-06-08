@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 
-const POLL_INTERVAL_MS = 2500;
+const POLL_INTERVAL_MS = 5000;
 const EMIT_DEBOUNCE_MS = 3000;
 const TYPING_CLEAR_MS = 1800;
 

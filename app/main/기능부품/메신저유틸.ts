@@ -514,6 +514,8 @@ export type PollMeta = {
   deadlineAt?: string | null;
   prize?: PollPrize | null;
   prizeWinners?: PollPrizeWinner[] | null;
+  isKickPoll?: boolean | null;
+  kickTargetId?: string | null;
 };
 
 export function buildPollQuestionContent(
@@ -524,7 +526,9 @@ export function buildPollQuestionContent(
   const hasMeta =
     (meta?.deadlineAt && String(meta.deadlineAt).trim()) ||
     meta?.prize ||
-    meta?.prizeWinners;
+    meta?.prizeWinners ||
+    meta?.isKickPoll ||
+    meta?.kickTargetId;
 
   if (!hasMeta) return normalizedQuestion;
 
@@ -533,6 +537,8 @@ export function buildPollQuestionContent(
   if (deadlineAt) metaObj.deadlineAt = deadlineAt;
   if (meta?.prize) metaObj.prize = meta.prize;
   if (meta?.prizeWinners) metaObj.prizeWinners = meta.prizeWinners;
+  if (meta?.isKickPoll) metaObj.isKickPoll = meta.isKickPoll;
+  if (meta?.kickTargetId) metaObj.kickTargetId = meta.kickTargetId;
 
   return `${normalizedQuestion}${normalizedQuestion ? '\n' : ''}${POLL_META_PREFIX}${JSON.stringify(metaObj)}${POLL_META_SUFFIX}`;
 }
@@ -542,13 +548,15 @@ export function extractPollMetaFromQuestion(value: unknown): {
   deadlineAt: string;
   prize: PollPrize | null;
   prizeWinners: PollPrizeWinner[] | null;
+  isKickPoll: boolean;
+  kickTargetId: string | null;
 } {
   const raw = String(value || '');
   const start = raw.indexOf(POLL_META_PREFIX);
   const end = raw.indexOf(POLL_META_SUFFIX);
 
   if (start === -1 || end === -1 || end <= start) {
-    return { displayQuestion: raw.trim(), deadlineAt: '', prize: null, prizeWinners: null };
+    return { displayQuestion: raw.trim(), deadlineAt: '', prize: null, prizeWinners: null, isKickPoll: false, kickTargetId: null };
   }
 
   const displayQuestion = raw.slice(0, start).trim();
@@ -561,6 +569,8 @@ export function extractPollMetaFromQuestion(value: unknown): {
       deadlineAt: String(parsed?.deadlineAt || '').trim(),
       prize: parsed?.prize ?? null,
       prizeWinners: parsed?.prizeWinners ?? null,
+      isKickPoll: parsed?.isKickPoll ?? false,
+      kickTargetId: parsed?.kickTargetId ?? null,
     };
   } catch {
     return {
@@ -568,6 +578,8 @@ export function extractPollMetaFromQuestion(value: unknown): {
       deadlineAt: '',
       prize: null,
       prizeWinners: null,
+      isKickPoll: false,
+      kickTargetId: null,
     };
   }
 }

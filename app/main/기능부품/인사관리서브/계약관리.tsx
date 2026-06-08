@@ -515,6 +515,7 @@ export default function ContractMain({
                   <ContractPreview
                     staff={staffList.find((s: any) => s.id === selectedStaffId)}
                     contract={contracts.find((c: any) => c.staff_id === selectedStaffId)}
+                    requestedDate={requestedDate}
                   />
                 );
               })()}

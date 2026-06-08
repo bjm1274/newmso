@@ -60,7 +60,6 @@ const ALLOWED_TABLES = new Set<string>([
   'shift_assignments',
   'staff_shift_assignments',
   'backup_restore_runs',
-  'staff_evaluations',
 ]);
 
 // 변경 감지에 사용할 timestamp 컬럼명 — 대부분 created_at, 일부 예외.

@@ -729,7 +729,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
       {/* ── 비밀번호 게이트 모달 ──────────────────────────── */}
       {pwGate && (
         <div
-          className="msm-pw-scrim"
+          className="msm-pw-scrim on"
           style={{
             position: 'absolute',
             inset: 0,

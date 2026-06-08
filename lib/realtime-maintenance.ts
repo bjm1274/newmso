@@ -50,6 +50,7 @@ export function bindPageRefresh(
   };
 }
 
+/** @deprecated Phase 5에서 channel()이 no-op 스텁으로 변경되어 이 함수는 동작하지 않음. 호출부 제거 후 삭제 예정. */
 export function bindChannelHealthcheck(channels: ChannelLike[], intervalMs = 30_000) {
   const interval = window.setInterval(() => {
     channels.forEach((channel) => {

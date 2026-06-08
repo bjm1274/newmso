@@ -28,6 +28,7 @@ type Props = {
   templateOverride?: string;
   sealUrlOverride?: string | null;
   showToolbar?: boolean;
+  requestedDate?: string;
 };
 
 export default function ContractPreview({
@@ -36,6 +37,7 @@ export default function ContractPreview({
   templateOverride,
   sealUrlOverride,
   showToolbar = true,
+  requestedDate,
 }: Props) {
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -157,16 +159,20 @@ export default function ContractPreview({
       return;
     }
 
+    const resolvedContract = contract
+      ? { ...contract, requested_at: contract.requested_at || requestedDate }
+      : { requested_at: requestedDate };
+
     setText(
       fillEmploymentContractTemplate(
         upgradeLegacyContractTemplate(nextTemplate),
         staff,
-        contract,
+        resolvedContract,
         shift,
         company,
       ),
     );
-  }, [staff, contract, shift, company, templateSource, templateOverride, hasTemplateOverride]);
+  }, [staff, contract, shift, company, templateSource, templateOverride, hasTemplateOverride, requestedDate]);
 
   if (!staff) {
     return (
@@ -448,9 +454,20 @@ export default function ContractPreview({
   const companyName = (company?.name as string) || staff.company || '';
   const isHospital = companyName.match(/병원|의원|정형외과|내과|소아과|치과/);
   const ceoTitle = isHospital ? '대표원장' : '대표이사';
-  const contractDateText = contract?.requested_at
-    ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
-    : `${new Date().getFullYear()}년        월        일`;
+  const contractDateText = (() => {
+    const rawDate = contract?.requested_at || requestedDate;
+    if (rawDate) {
+      const match = String(rawDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        return `${match[1]}년 ${match[2]}월 ${match[3]}일`;
+      }
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}년 ${String(d.getMonth() + 1).padStart(2, '0')}월 ${String(d.getDate()).padStart(2, '0')}일`;
+      }
+    }
+    return `${new Date().getFullYear()}년        월        일`;
+  })();
 
   return (
     <div className="flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar bg-slate-100 print:bg-white print:border-none print:h-auto print:overflow-visible">

@@ -1,4 +1,5 @@
 'use client';
+import type { StaffMember } from '@/types';
 
 type SlashCommandForm = {
   startDate: string;
@@ -10,6 +11,7 @@ type SlashCommandForm = {
 
 type PollComposerModalProps = {
   open: boolean;
+  roomMembers: StaffMember[];
   question: string;
   options: string[];
   deadlineAt: string;
@@ -24,6 +26,10 @@ type PollComposerModalProps = {
   onPrizeEnabledChange: (value: boolean) => void;
   onPrizeWinnerCountChange: (value: number) => void;
   onPrizeNameChange: (value: string) => void;
+  isKickPoll: boolean;
+  onIsKickPollChange: (value: boolean) => void;
+  kickTargetId: string;
+  onKickTargetIdChange: (value: string) => void;
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
 };
@@ -54,6 +60,10 @@ export function PollComposerModal({
   onPrizeEnabledChange,
   onPrizeWinnerCountChange,
   onPrizeNameChange,
+  isKickPoll,
+  onIsKickPollChange,
+  kickTargetId,
+  onKickTargetIdChange,
   onClose,
   onSubmit,
 }: PollComposerModalProps) {
@@ -61,7 +71,7 @@ export function PollComposerModal({
 
   return (
     <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={onClose}>
-      <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={(event) => event.stopPropagation()}>
+      <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)] max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
           질문과 선택지를 입력해 주세요. 선택지는 항목별로 따로 입력합니다.
@@ -159,6 +169,44 @@ export function PollComposerModal({
                     />
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="poll-kick-enabled"
+                checked={isKickPoll}
+                onChange={(event) => {
+                  onIsKickPollChange(event.target.checked);
+                  if (event.target.checked && roomMembers.length > 0) {
+                    onKickTargetIdChange(String(roomMembers[0].id));
+                  }
+                }}
+                className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+              />
+              <label htmlFor="poll-kick-enabled" className="text-xs font-semibold text-[var(--foreground)] cursor-pointer select-none">
+                강퇴 투표 진행
+              </label>
+            </div>
+            {isKickPoll && (
+              <div className="mt-3 space-y-2 pl-1">
+                <label htmlFor="poll-kick-target" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">강퇴 대상 선택</label>
+                <select
+                  id="poll-kick-target"
+                  value={kickTargetId}
+                  onChange={(event) => onKickTargetIdChange(event.target.value)}
+                  className="w-full p-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="" disabled>대상을 선택하세요</option>
+                  {roomMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name} ({member.department})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
           </div>

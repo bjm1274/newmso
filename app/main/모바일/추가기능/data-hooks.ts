@@ -321,7 +321,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
     let alive = true;
     void load();
     const timer = setInterval(() => {
-      if (alive) void load();
+      if (alive && !document.hidden) void load();
     }, pollMs);
     return () => {
       alive = false;
@@ -405,7 +405,7 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
     let alive = true;
     void load();
     const timer = setInterval(() => {
-      if (alive) void load();
+      if (alive && !document.hidden) void load();
     }, pollMs);
     return () => {
       alive = false;
@@ -681,7 +681,7 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
     let alive = true;
     void load();
     const timer = setInterval(() => {
-      if (alive) void load();
+      if (alive && !document.hidden) void load();
     }, pollMs);
     return () => {
       alive = false;
@@ -770,7 +770,7 @@ function normalizeOpState(value: string | null | undefined): OpCheckCardState {
 }
 
 export function useOpBoard(opts: { company?: string; date?: string; pollMs?: number }) {
-  const { company, pollMs = 5000 } = opts;
+  const { company, pollMs = 15000 } = opts;
   const date = opts.date ?? todayISO();
   const [cards, setCards] = useState<OpCheckCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -835,7 +835,7 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
     aliveRef.current = true;
     void load();
     const timer = setInterval(() => {
-      if (aliveRef.current) void load();
+      if (aliveRef.current && !document.hidden) void load();
     }, pollMs);
     return () => {
       aliveRef.current = false;
