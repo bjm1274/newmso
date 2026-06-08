@@ -86,10 +86,16 @@ const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
 export type 추가기능Props = {
   user: ErpUser;
   onBack?: () => void;
+  initialView?: AddonModuleKey;
 };
 
-export default function 추가기능({ user, onBack }: 추가기능Props) {
-  const [view, setView] = useState<View>({ kind: 'hub' });
+export default function 추가기능({ user, onBack, initialView }: 추가기능Props) {
+  const [view, setView] = useState<View>(() => {
+    if (initialView && MODULE_TO_VIEW[initialView]) {
+      return MODULE_TO_VIEW[initialView];
+    }
+    return { kind: 'hub' };
+  });
 
   const goHub = useCallback(() => setView({ kind: 'hub' }), []);
   const goShareList = useCallback(() => setView({ kind: 'share-list' }), []);

@@ -99,7 +99,7 @@ async function selectMessageReactionRows(messageIds: string[]) {
   for (const chunk of chunkArray(messageIds)) {
     const { data, error } = await supabase
       .from('message_reactions')
-      .select('message_id, emoji, user_id')
+      .select('message_id, emoji, user_id, staff_members(id, name, company, department, position, photo_url)')
       .in('message_id', chunk);
     if (error) throw error;
     rows.push(...(data || []));
@@ -556,24 +556,27 @@ export function useChatRoomDataSync({
         if (!reactionUsersMap[messageId][emoji]) reactionUsersMap[messageId][emoji] = [];
         if (!reactionUserId) return;
 
+        const dbStaff = reaction.staff_members as Record<string, any> | null;
         const resolvedReactionUser = resolveStaffProfile(reactionUserId) || {
           id: reactionUserId,
-          name: 'Unknown',
-          company: '',
-          department: '',
-          position: '',
-          photo_url: null,
+          name: dbStaff?.name || 'Unknown',
+          company: dbStaff?.company || '',
+          department: dbStaff?.department || '',
+          position: dbStaff?.position || '',
+          photo_url: dbStaff?.photo_url || null,
         };
 
         if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
           reactionUsersMap[messageId][emoji].push({
             ...resolvedReactionUser,
             id: String(resolvedReactionUser.id || reactionUserId),
-            name: String(resolvedReactionUser.name || 'Unknown'),
-            company: String(resolvedReactionUser.company || ''),
-            department: String(resolvedReactionUser.department || ''),
-            position: String(resolvedReactionUser.position || ''),
-            photo_url: resolvedReactionUser.photo_url ?? null,
+            name: String(resolvedReactionUser.name && resolvedReactionUser.name !== 'Unknown' && resolvedReactionUser.name !== '알 수 없음'
+              ? resolvedReactionUser.name
+              : (dbStaff?.name || resolvedReactionUser.name || 'Unknown')),
+            company: String(resolvedReactionUser.company || dbStaff?.company || ''),
+            department: String(resolvedReactionUser.department || dbStaff?.department || ''),
+            position: String(resolvedReactionUser.position || dbStaff?.position || ''),
+            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
           });
         }
       });
@@ -994,24 +997,27 @@ export function useChatRoomDataSync({
             if (!reactionUsersMap[messageId][emoji]) reactionUsersMap[messageId][emoji] = [];
             if (!reactionUserId) return;
 
+            const dbStaff = reaction.staff_members as Record<string, any> | null;
             const resolvedReactionUser = resolveStaffProfile(reactionUserId) || {
               id: reactionUserId,
-              name: 'Unknown',
-              company: '',
-              department: '',
-              position: '',
-              photo_url: null,
+              name: dbStaff?.name || 'Unknown',
+              company: dbStaff?.company || '',
+              department: dbStaff?.department || '',
+              position: dbStaff?.position || '',
+              photo_url: dbStaff?.photo_url || null,
             };
 
             if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
               reactionUsersMap[messageId][emoji].push({
                 ...resolvedReactionUser,
                 id: String(resolvedReactionUser.id || reactionUserId),
-                name: String(resolvedReactionUser.name || 'Unknown'),
-                company: String(resolvedReactionUser.company || ''),
-                department: String(resolvedReactionUser.department || ''),
-                position: String(resolvedReactionUser.position || ''),
-                photo_url: resolvedReactionUser.photo_url ?? null,
+                name: String(resolvedReactionUser.name && resolvedReactionUser.name !== 'Unknown' && resolvedReactionUser.name !== '알 수 없음'
+                  ? resolvedReactionUser.name
+                  : (dbStaff?.name || resolvedReactionUser.name || 'Unknown')),
+                company: String(resolvedReactionUser.company || dbStaff?.company || ''),
+                department: String(resolvedReactionUser.department || dbStaff?.department || ''),
+                position: String(resolvedReactionUser.position || dbStaff?.position || ''),
+                photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
               });
             }
           });
@@ -1660,24 +1666,27 @@ export function useChatRoomDataSync({
         if (!reactionUsersMap[messageId][emoji]) reactionUsersMap[messageId][emoji] = [];
         if (!reactionUserId) return;
 
+        const dbStaff = reaction.staff_members as Record<string, any> | null;
         const resolvedReactionUser = resolveStaffProfile(reactionUserId) || {
           id: reactionUserId,
-          name: '알 수 없음',
-          company: '',
-          department: '',
-          position: '',
-          photo_url: null,
+          name: dbStaff?.name || '알 수 없음',
+          company: dbStaff?.company || '',
+          department: dbStaff?.department || '',
+          position: dbStaff?.position || '',
+          photo_url: dbStaff?.photo_url || null,
         };
 
         if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
           reactionUsersMap[messageId][emoji].push({
             ...resolvedReactionUser,
             id: String(resolvedReactionUser.id || reactionUserId),
-            name: String(resolvedReactionUser.name || '알 수 없음'),
-            company: String(resolvedReactionUser.company || ''),
-            department: String(resolvedReactionUser.department || ''),
-            position: String(resolvedReactionUser.position || ''),
-            photo_url: resolvedReactionUser.photo_url ?? null,
+            name: String(resolvedReactionUser.name && resolvedReactionUser.name !== '알 수 없음' && resolvedReactionUser.name !== 'Unknown'
+              ? resolvedReactionUser.name
+              : (dbStaff?.name || resolvedReactionUser.name || '알 수 없음')),
+            company: String(resolvedReactionUser.company || dbStaff?.company || ''),
+            department: String(resolvedReactionUser.department || dbStaff?.department || ''),
+            position: String(resolvedReactionUser.position || dbStaff?.position || ''),
+            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
           });
         }
       });

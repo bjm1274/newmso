@@ -22,6 +22,8 @@ import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import MIcon from '../공통/MIcon';
 import { useTodayCounts } from './data-hooks';
 import type { MHomeSub, MTab } from '../셸/m-routes';
+import { useActionDialog } from '@/app/components/useActionDialog';
+import { toast } from '@/lib/toast';
 
 /* ─── 유틸 ────────────────────────────────────────────────── */
 function getInitial(name?: string | null) {
@@ -134,7 +136,7 @@ export type SHomeProps = {
   user: ErpUser;
   onSub: (sub: MHomeSub) => void;
   onLogout: () => void;
-  onSwitchTab?: (tab: MTab) => void;
+  onSwitchTab?: (tab: MTab, sub?: string) => void;
 };
 
 /* ─── 컴포넌트 ────────────────────────────────────────────── */
@@ -142,6 +144,87 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const staffId = typeof user.id === 'string' ? user.id : null;
   const active = isActiveStaff(user);
   const counts = useTodayCounts(staffId);
+
+  const { dialog, openPrompt } = useActionDialog();
+
+  const [notifEnabled, setNotifEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('m_notif_enabled') !== 'false';
+    }
+    return true;
+  });
+
+  const handleToggleNotif = useCallback(() => {
+    setNotifEnabled((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('m_notif_enabled', String(next));
+      }
+      toast(next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', 'success');
+      return next;
+    });
+  }, []);
+
+  const handleChangePassword = useCallback(async () => {
+    const currentPassword = await openPrompt({
+      title: '비밀번호 변경',
+      description: '현재 비밀번호를 먼저 입력해 주세요.',
+      confirmText: '다음',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '현재 비밀번호',
+    });
+    if (!currentPassword) return;
+
+    const nextPassword = await openPrompt({
+      title: '새 비밀번호',
+      description: '앞으로 로그인할 때 사용할 새 비밀번호를 입력해 주세요.',
+      confirmText: '다음',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '새 비밀번호',
+      helperText: '4자 이상 입력해 주세요.',
+    });
+    if (!nextPassword) return;
+    if (nextPassword.trim().length < 4) {
+      toast('새 비밀번호는 4자 이상 입력해 주세요.', 'warning');
+      return;
+    }
+
+    const nextPasswordConfirm = await openPrompt({
+      title: '새 비밀번호 확인',
+      description: '새 비밀번호를 한 번 더 입력해 주세요.',
+      confirmText: '변경',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '새 비밀번호 확인',
+    });
+    if (!nextPasswordConfirm) return;
+
+    if (nextPassword !== nextPasswordConfirm) {
+      toast('새 비밀번호가 서로 일치하지 않습니다.', 'warning');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword: nextPassword }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        toast(payload?.error || '비밀번호 변경에 실패했습니다.', 'error');
+        return;
+      }
+      toast('비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용해 주세요.', 'success');
+    } catch {
+      toast('비밀번호 변경 중 오류가 발생했습니다.', 'error');
+    }
+  }, [openPrompt]);
 
   // 프로필 사진 — PC 프로필카드와 동일 패턴(getProfilePhotoUrl: path/url/version 처리)
   const photoUrl = getProfilePhotoUrl(user);
@@ -224,7 +307,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
       return;
     }
     if (item.tab && onSwitchTab) {
-      onSwitchTab(item.tab);
+      onSwitchTab(item.tab, item.id);
     }
   }, [onSub, onSwitchTab]);
 
@@ -526,12 +609,52 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 <MIcon name="bell" size={18} />
               </div>
               <div style={{ fontSize: 14, fontWeight: 700 }}>알림 설정</div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--z-500)' }}>켜짐</span>
+              <button
+                type="button"
+                onClick={handleToggleNotif}
+                aria-label="알림 설정 토글"
+                style={{
+                  background: 'transparent',
+                  border: 0,
+                  padding: 0,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 600, color: notifEnabled ? 'var(--m-accent)' : 'var(--z-400)', marginRight: 6 }}>
+                  {notifEnabled ? '켜짐' : '꺼짐'}
+                </span>
+                <div
+                  style={{
+                    width: 36,
+                    height: 20,
+                    borderRadius: 99,
+                    background: notifEnabled ? 'var(--m-accent)' : 'var(--z-300)',
+                    position: 'relative',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      background: '#fff',
+                      position: 'absolute',
+                      top: 2,
+                      left: notifEnabled ? 18 : 2,
+                      transition: 'left 0.2s',
+                    }}
+                  />
+                </div>
+              </button>
             </div>
 
             {/* 비밀번호 변경 */}
             <button
               type="button"
+              onClick={handleChangePassword}
               aria-label="비밀번호 변경"
               style={{
                 width: '100%',
@@ -728,6 +851,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           </div>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

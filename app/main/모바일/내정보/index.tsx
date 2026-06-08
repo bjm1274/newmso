@@ -20,7 +20,7 @@ export type 내정보Props = {
   sub?: MHomeSub;
   onSub: (sub: MHomeSub | undefined) => void;
   onLogout: () => void;
-  onSwitchTab?: (tab: MTab) => void;
+  onSwitchTab?: (tab: MTab, sub?: string) => void;
 };
 
 import React from 'react';

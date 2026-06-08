@@ -113,11 +113,11 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
     return stop;
   }, []);
 
-  const switchTab = (tab: MTab) => {
+  const switchTab = (tab: MTab, sub?: string) => {
     if (tab === 'chat' && route.tab === 'chat') {
       setChatResetToken((prev) => prev + 1);
     }
-    setRoute({ tab });
+    setRoute({ tab, sub } as any);
     const menuMap: Record<MTab, string> = {
       notif: '알림',
       mypage: '내정보',
@@ -159,7 +159,13 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
               onSwitchTab={switchTab}
             />
           )}
-          {route.tab === 'addon' && <추가기능 user={user} onBack={goMypage} />}
+          {route.tab === 'addon' && (
+            <추가기능
+              user={user}
+              onBack={goMypage}
+              initialView={(route as any).sub}
+            />
+          )}
           {route.tab === 'chat' && (
             <채팅
               user={user}

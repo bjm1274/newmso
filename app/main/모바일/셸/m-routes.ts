@@ -11,7 +11,7 @@ export type MHomeSub = 'attend' | 'leave' | 'payslip' | 'cert' | 'edit';
 export type MRoute =
   | { tab: 'notif' }
   | { tab: 'mypage'; sub?: MHomeSub }
-  | { tab: 'addon' }
+  | { tab: 'addon'; sub?: string }
   | { tab: 'chat' }
   | { tab: 'board' }
   | { tab: 'approval' }
