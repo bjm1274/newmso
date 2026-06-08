@@ -538,10 +538,18 @@ function MessengerTimelineComponent({
                 : '';
               const readStatusSummary = totalRecipients > 0 && unreadRecipients > 0 ? `${unreadRecipients}` : null;
               const canOpenReadStatus = deliveryState === 'sent' && totalRecipients > 0;
-              // 1:1 채팅(roomMembers 2명)에서는 상대방 메시지에 읽음 표시 불필요(의미 없음)
-              // 그룹 채팅(3명+)에서는 상대방 메시지에도 미읽음 수 표시
               const isGroupChat = roomMembers.length >= 3;
-              const displayedReadStatusSummary = (isMine || isGroupChat) ? readStatusSummary : null;
+              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
+              const senderProfile =
+                !isMine
+                  ? resolveStaffProfile(
+                      String(msg.sender_id || ''),
+                      (msg.staff as { name?: string } | null | undefined)?.name || null
+                    ) || (msg.staff as StaffMember | null | undefined) || null
+                  : null;
+              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || msg.sender_name || '이름 없음';
+              const isSystemSender = String(msg.sender_id) === 'system' || senderName === '시스템';
+              const displayedReadStatusSummary = (isMine || isGroupChat) && !isSystemInvite && !isSystemSender ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {
@@ -555,17 +563,8 @@ function MessengerTimelineComponent({
               const dateKey = formatTimelineDateKey(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
               if (showDateDivider) lastDateLabel = dateLabel;
-              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
               const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[초대\]\s*/, '') : '';
               const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
-              const senderProfile =
-                !isMine
-                  ? resolveStaffProfile(
-                      String(msg.sender_id || ''),
-                      (msg.staff as { name?: string } | null | undefined)?.name || null
-                    ) || (msg.staff as StaffMember | null | undefined) || null
-                  : null;
-              const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || msg.sender_name || '이름 없음';
               const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
               const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
               const showWardQuickReplies =

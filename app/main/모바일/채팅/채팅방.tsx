@@ -32,6 +32,7 @@ import {
   pickAvatarTone,
   sendMobileTextMessage,
   useChatMessagesForRoom,
+  useMobileChatReadCounts,
   useChatStaffDirectory,
   type MobileChatRoom,
   type StaffDirectoryEntry,
@@ -97,6 +98,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
   const peerPhotoUrl = peer ? peer.photo_url || peer.avatar_url : null;
   const peerName = peer ? peer.name : '';
+  const readCounts = useMobileChatReadCounts(String(room.id), messages, memberIds);
 
   const memberProfiles = useMemo(() => {
     return memberIds
@@ -407,6 +409,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           userId={userId}
           userName={userName}
           staffs={staffs}
+          readCounts={readCounts}
           onToggleReaction={handleToggleReaction}
           onImageLoad={scrollToBottom}
         />

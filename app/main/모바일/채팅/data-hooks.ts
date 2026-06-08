@@ -223,6 +223,49 @@ type UseChatMessagesResult = {
   loadOlder: () => Promise<void>;
 };
 
+export function useMobileChatReadCounts(
+  roomId: string | null,
+  messages: ChatMessage[],
+  memberIds: string[]
+) {
+  const [readCounts, setReadCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!roomId || !messages.length || !memberIds.length) {
+      setReadCounts({});
+      return;
+    }
+    const fetchCursors = async () => {
+      const { data } = await supabase
+        .from('room_read_cursors')
+        .select('user_id, last_read_at')
+        .eq('room_id', roomId)
+        .in('user_id', memberIds);
+
+      const counts: Record<string, number> = {};
+      const cursors = data || [];
+
+      messages.forEach((msg) => {
+        const msgTime = new Date(msg.created_at || 0).getTime();
+        let readers = 0;
+        cursors.forEach((c: any) => {
+          if (new Date(c.last_read_at).getTime() >= msgTime) {
+            readers++;
+          }
+        });
+        counts[String(msg.id)] = readers;
+      });
+      setReadCounts(counts);
+    };
+
+    void fetchCursors();
+    const interval = setInterval(fetchCursors, 3000);
+    return () => clearInterval(interval);
+  }, [roomId, messages, memberIds]);
+
+  return readCounts;
+}
+
 export function useChatMessagesForRoom(
   roomId: string | null,
   userId: string | null | undefined,

@@ -26,6 +26,7 @@ export type MessageBubbleProps = {
   myUserId: string | null;
   staffs: StaffDirectoryEntry[];
   fallbackMyName: string;
+  readCount?: number;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onImageLoad?: () => void;
 };
@@ -54,6 +55,7 @@ export default function MessageBubble({
   myUserId,
   staffs,
   fallbackMyName,
+  readCount = 0,
   onToggleReaction,
   onImageLoad,
 }: MessageBubbleProps) {
@@ -134,16 +136,31 @@ export default function MessageBubble({
           }}
         >
           {mine && (
-            <span
-              style={{
-                fontSize: 10,
-                color: 'var(--z-400)',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {ts}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              {readCount > 0 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--m-green)',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '2px',
+                  }}
+                >
+                  {readCount}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: 10,
+                  color: 'var(--z-400)',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ts}
+              </span>
+            </div>
           )}
 
 
@@ -241,16 +258,31 @@ export default function MessageBubble({
 
 
           {!mine && (
-            <span
-              style={{
-                fontSize: 10,
-                color: 'var(--z-400)',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {ts}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+              {readCount > 0 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--m-green)',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '2px',
+                  }}
+                >
+                  {readCount}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: 10,
+                  color: 'var(--z-400)',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ts}
+              </span>
+            </div>
           )}
         </div>
 

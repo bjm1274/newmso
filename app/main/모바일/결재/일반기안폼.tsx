@@ -14,20 +14,15 @@
  * ※ 데이터 레이어는 현재 Supabase — 최종 D1 전환 배치에서 연차폼과 함께 이관.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useCallback, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
-import type { ErpUser, StaffMember } from '@/types';
-import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
-import { appendApprovalHistory } from '@/lib/approval-workflow';
-import MIcon from '../공통/MIcon';
+import type { ErpUser } from '@/types';
 import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
 import { MFormHeader, MField, MInput, useFieldIdPrefix } from '../인사관리/form-helpers';
-import { generateMobileDocNumber } from './data-hooks';
-import SApprovalApproverPicker, { toApproverPick, type ApproverPick } from './결재선피커';
-import AttachmentPicker, { type AttachmentEntry } from './AttachmentPicker';
+import SApprovalApproverPicker from './결재선피커';
+import AttachmentPicker from './AttachmentPicker';
+import { useApprovalFormBase } from './useApprovalFormBase';
 
 export type SApprovalGenericFormProps = {
   user: ErpUser;
@@ -50,55 +45,15 @@ export default function SApprovalGenericForm({
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [attachments, setAttachments] = useState<AttachmentEntry[]>([]);
-  const [approverDefaults, setApproverDefaults] = useState<ApproverPick[]>([]);
-  const [approverLine, setApproverLine] = useState<ApproverPick[]>([]);
-  const [approverLoading, setApproverLoading] = useState(true);
-  const [approverManual, setApproverManual] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
-  // 결재선 자동 매핑 — 본인 회사의 APPROVER_POSITIONS 보유자 1~3명, 직급 위계순 (연차폼과 동일)
-  useEffect(() => {
-    if (!staffId) {
-      setApproverLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setApproverLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('staff_members')
-          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
-        if (error) throw error;
-        if (cancelled) return;
-        const candidates = ((data ?? []) as StaffMember[])
-          .filter((s) => isActiveStaff(s))
-          .filter((s) => isDepartmentHeadOrAbove(s))
-          .filter((s) => String(s.id) !== staffId)
-          .filter((s) => s.company === company || s.company === 'SY INC.')
-          .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
-        const picks = candidates.map(toApproverPick);
-        setApproverDefaults(picks);
-        if (!approverManual) {
-          setApproverLine(picks);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-approval] approver candidates load failed', err);
-          setApproverDefaults([]);
-          if (!approverManual) setApproverLine([]);
-        }
-      } finally {
-        if (!cancelled) setApproverLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // approverManual은 의도적으로 의존성 제외 — manual 토글로 재fetch하면 안 됨
-  }, [staffId, company]); // eslint-disable-line react-hooks/exhaustive-deps
+  const base = useApprovalFormBase({ user, staffId, company });
+  const {
+    submitting, setSubmitting,
+    attachments, setAttachments,
+    approverDefaults, approverLine, approverLoading, approverManual,
+    pickerOpen, setPickerOpen,
+    handleApproverApply, submitApproval, queuedAttachmentCount,
+  } = base;
 
   const canSubmit = Boolean(staffId) && title.trim() !== '' && approverLine.length > 0;
 
@@ -117,99 +72,20 @@ export default function SApprovalGenericForm({
     }
 
     setSubmitting(true);
-    const senderName = String(user.name || '').trim() || '이름 없음';
-    const senderDepartment = String(user.department || '').trim();
-    const senderCompany = company;
-    const firstApproverId = String(approverLine[0]?.id || '');
-
     try {
-      // doc_number — 회사·일자 시퀀스 생성 (실패 시 silent fallback)
-      const docNumber = await generateMobileDocNumber({
-        formSlug,
+      const { queued } = await submitApproval({
         typeName: formName,
-        companyName: senderCompany || null,
-        companyId: user.company_id != null ? String(user.company_id) : null,
-        departmentName: senderDepartment || null,
-        userPermissions:
-          (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null,
-      });
-
-      const meta: Record<string, unknown> = {
-        form_slug: formSlug,
-        form_name: formName,
-        content,
-        cc_departments: [],
-        cc_users: [],
-        approver_line: approverLine.map((a) => String(a.id)),
-        approver_line_details: approverLine.map((a) => ({
-          id: String(a.id || ''),
-          name: a.name || '',
-          position: a.position || null,
-          department: a.department || null,
-          company: a.company || null,
-        })),
-        approver_line_source: approverManual ? 'mobile_manual' : 'mobile_auto',
-        revision: 1,
-        source_approval_id: null,
-        previous_doc_number: null,
-        client_origin: 'mobile',
-      };
-
-      const uploadedAttachments = attachments
-        .filter((a) => a.state === 'done' && a.fileUrl)
-        .map((a) => ({
-          name: a.file.name,
-          url: a.fileUrl as string,
-          mimeType: a.file.type || null,
-          size: Number.isFinite(a.file.size) ? a.file.size : null,
-          uploadedAt: new Date().toISOString(),
-        }));
-      if (uploadedAttachments.length > 0) {
-        meta.attachments = uploadedAttachments;
-      }
-      if (docNumber) {
-        meta.doc_number = docNumber;
-      }
-
-      const row: Record<string, unknown> = {
-        sender_id: staffId,
-        sender_name: senderName,
-        sender_company: senderCompany,
-        sender_department: senderDepartment || null,
-        current_approver_id: firstApproverId,
-        approver_line: approverLine.map((a) => String(a.id)),
-        type: formName,
         title: title.trim(),
         content,
-        meta_data: appendApprovalHistory(meta, {
-          action: 'created',
-          actor_id: staffId,
-          actor_name: senderName,
-          note: '모바일 최초 상신',
-          current_approver_id: firstApproverId,
-          revision: 1,
-        }),
-        status: '대기',
-      };
-      if (docNumber) {
-        row.doc_number = docNumber;
-      }
-      if (user.company_id != null) {
-        row.company_id = user.company_id;
-      }
-
-      const { queued, error } = await enqueueSupabaseMutation({
-        kind: 'insert',
-        table: 'approvals',
-        payload: row,
+        formSlug,
+        formDisplayName: formName,
+        extraMeta: { content },
       });
-      if (error) throw new Error(error);
 
-      const queuedAttachments = attachments.filter((a) => a.state === 'queued').length;
       if (queued) {
         toast('오프라인 — 기안이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
-      } else if (queuedAttachments > 0) {
-        toast(`기안이 상신되었습니다. 첨부 ${queuedAttachments}개는 온라인 복귀 시 자동 업로드됩니다.`, 'warning');
+      } else if (queuedAttachmentCount > 0) {
+        toast(`기안이 상신되었습니다. 첨부 ${queuedAttachmentCount}개는 온라인 복귀 시 자동 업로드됩니다.`, 'warning');
       } else {
         toast('기안이 결재선에 올라갔습니다.', 'success');
       }
@@ -225,14 +101,13 @@ export default function SApprovalGenericForm({
     staffId,
     title,
     content,
-    attachments,
     approverLine,
-    approverManual,
-    user,
-    company,
     formSlug,
     formName,
     onSubmitted,
+    submitApproval,
+    setSubmitting,
+    queuedAttachmentCount,
   ]);
 
   return (
@@ -367,13 +242,7 @@ export default function SApprovalGenericForm({
         company={company || null}
         current={approverLine}
         defaultLine={approverDefaults}
-        onApply={(next) => {
-          setApproverLine(next);
-          const sameAsDefault =
-            next.length === approverDefaults.length &&
-            next.every((p, i) => p.id === approverDefaults[i]?.id);
-          setApproverManual(!sameAsDefault);
-        }}
+        onApply={handleApproverApply}
       />
     </div>
   );

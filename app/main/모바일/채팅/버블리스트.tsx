@@ -20,6 +20,7 @@ export type BubbleListProps = {
   userId: string | null;
   userName: string;
   staffs: StaffDirectoryEntry[];
+  readCounts?: Record<string, number>;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onImageLoad?: () => void;
 };
@@ -29,6 +30,7 @@ export default function BubbleList({
   userId,
   userName,
   staffs,
+  readCounts = {},
   onToggleReaction,
   onImageLoad,
 }: BubbleListProps) {
@@ -66,6 +68,7 @@ export default function BubbleList({
             mine={String(item.message.sender_id || '') === String(userId || '')}
             myUserId={userId}
             staffs={staffs}
+            readCount={readCounts[String(item.message.id)] || 0}
             fallbackMyName={userName}
             onToggleReaction={onToggleReaction}
             onImageLoad={onImageLoad}

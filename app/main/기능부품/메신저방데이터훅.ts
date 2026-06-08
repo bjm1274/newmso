@@ -1,13 +1,10 @@
 'use client';
 
-import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { POLL_SELECT } from '@/lib/chat-query-columns';
-import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
-import {
-  fetchUnreadCountsForRoomIds,
-  selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback,
-} from './메신저데이터유틸';
+import type { ChatMessage, ChatRoom } from '@/types';
+import { fetchUnreadCountsForRoomIds } from './메신저데이터유틸';
 import { fetchAllChatRooms } from './chatQueryService';
 import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
 import {
@@ -24,136 +21,21 @@ import {
   writeStoredBookmarks,
   writeStoredPinnedIds,
 } from './메신저유틸';
-
-type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
-
-type RoomSummary = {
-  last_message: string | null;
-  last_message_preview: string | null;
-  last_message_at: string | null;
-};
-
-type LoadedMessageCursor = {
-  id: string;
-  createdAt: string;
-};
-
-type MessageJumpLoadResult =
-  | { ok: true; messageId: string }
-  | { ok: false; reason: 'no-room' | 'not-found' | 'failed' | 'room-changed'; error?: unknown };
-
-const CHAT_METADATA_QUERY_CHUNK_SIZE = 100;
-const MESSAGE_PAGE_SIZE = 50;
-const DATE_JUMP_CONTEXT_BEFORE = 24;
-const DATE_JUMP_CONTEXT_AFTER = 36;
-const CHAT_METADATA_REFRESH_TTL_MS = 60_000;
-
-function normalizeMessageCursorTime(value: string | null | undefined) {
-  const rawValue = String(value || '').trim();
-  if (!rawValue) return '';
-  const parsedTime = new Date(rawValue).getTime();
-  return Number.isNaN(parsedTime) ? rawValue : new Date(rawValue).toISOString();
-}
-
-type SelectChatMessagesWithFallback = <TData>(
-  execute: (selectClause: string) => PromiseLike<{ data: TData | null; error: unknown }>,
-) => Promise<{ data: TData | null; error: unknown }>;
-
-const defaultLegacySelectChatMessagesWithFallback: SelectChatMessagesWithFallback = (execute) =>
-  defaultSelectChatMessagesWithFallback(({ selectClause }) => execute(selectClause));
-
-function chunkArray<T>(items: T[], chunkSize = CHAT_METADATA_QUERY_CHUNK_SIZE) {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += chunkSize) {
-    chunks.push(items.slice(index, index + chunkSize));
-  }
-  return chunks;
-}
-
-function describeQueryError(error: unknown) {
-  if (!error) return '알 수 없는 오류';
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object') {
-    const record = error as Record<string, unknown>;
-    const pieces = [
-      record.message,
-      record.details,
-      record.hint,
-      record.code ? `code=${record.code}` : null,
-      record.status ? `status=${record.status}` : null,
-    ].filter(Boolean);
-    if (pieces.length > 0) return pieces.join(' / ');
-    try {
-      const serialized = JSON.stringify(error);
-      return serialized && serialized !== '{}' ? serialized : '응답 메타데이터 조회 실패';
-    } catch {
-      return '응답 메타데이터 조회 실패';
-    }
-  }
-  return String(error);
-}
-
-async function selectMessageReactionRows(messageIds: string[]) {
-  const rows: Record<string, unknown>[] = [];
-  for (const chunk of chunkArray(messageIds)) {
-    const { data, error } = await supabase
-      .from('message_reactions')
-      .select('message_id, emoji, user_id, staff_members(id, name, company, department, position, photo_url)')
-      .in('message_id', chunk);
-    if (error) throw error;
-    rows.push(...(data || []));
-  }
-  return rows;
-}
-
-async function selectMessageBookmarkRows(userId: string, messageIds: string[]) {
-  const rows: Record<string, unknown>[] = [];
-  for (const chunk of chunkArray(messageIds)) {
-    const { data, error } = await supabase
-      .from('message_bookmarks')
-      .select('message_id')
-      .eq('user_id', userId)
-      .in('message_id', chunk);
-    if (error) throw error;
-    rows.push(...(data || []));
-  }
-  return rows;
-}
-
-type UseChatRoomDataSyncParams = {
-  selectedRoomId: string | null;
-  selectedRoomIdRef: MutableRefObject<string | null>;
-  chatRoomsRef: MutableRefObject<ChatRoom[]>;
-  messagesRef: MutableRefObject<ChatMessage[]>;
-  pendingBottomAlignRoomIdRef: MutableRefObject<string | null>;
-  fetchDataRequestSeqRef: MutableRefObject<number>;
-  deliveryStatesRef: MutableRefObject<Record<string, { status?: string } | undefined>>;
-  effectiveChatUserId: string | null | undefined;
-  effectiveTodoUserId: string | null | undefined;
-  userId: string | null | undefined;
-  requestBottomAlignmentHold?: (roomId: string | null, holdMs?: number) => void;
-  setRoom: (roomId: string | null) => void;
-  resolveStaffProfile: (staffId: string | null | undefined, fallbackName?: string | null) => StaffMember | null;
-  getEffectiveRoomMemberIds: (room: ChatRoom | null | undefined) => string[];
-  isRoomAccessibleToCurrentUser: (room: ChatRoom | null | undefined) => boolean;
-  repairDirectRooms: (rooms: ChatRoom[]) => Promise<ChatRoom[]>;
-  selectChatMessagesWithFallback?: SelectChatMessagesWithFallback;
-  setChatRooms: Dispatch<SetStateAction<ChatRoom[]>>;
-  setRoomUnreadCounts: Dispatch<SetStateAction<Record<string, number>>>;
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  setLoadingRoomId?: Dispatch<SetStateAction<string | null>>;
-  setTimelineRoomId?: Dispatch<SetStateAction<string | null>>;
-  setRoomReadCursorMap: Dispatch<SetStateAction<Record<string, string>>>;
-  setReadCounts: Dispatch<SetStateAction<Record<string, number>>>;
-  setBookmarkedIds: Dispatch<SetStateAction<Set<string>>>;
-  setPinnedIds: Dispatch<SetStateAction<string[]>>;
-  setPersistedPinnedMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  setReactions: Dispatch<SetStateAction<Record<string, Record<string, number>>>>;
-  setReactionUsersByMessage: Dispatch<SetStateAction<ReactionUsersByMessage>>;
-  setPolls: Dispatch<SetStateAction<any[]>>;
-  setPollVotes: Dispatch<SetStateAction<Record<string, Record<number, number>>>>;
-};
+import type {
+  LoadedMessageCursor,
+  MessageJumpLoadResult,
+  ReactionUsersByMessage,
+  RoomSummary,
+  UseChatRoomDataSyncParams,
+} from './메신저방데이터-types';
+import {
+  CHAT_METADATA_REFRESH_TTL_MS,
+  DATE_JUMP_CONTEXT_AFTER,
+  DATE_JUMP_CONTEXT_BEFORE,
+  MESSAGE_PAGE_SIZE,
+} from './메신저방데이터-types';
+import { defaultLegacySelectChatMessagesWithFallback, describeQueryError, normalizeMessageCursorTime } from './메신저방데이터-utils';
+import { selectMessageBookmarkRows, selectMessageReactionRows } from './메신저방데이터-queries';
 
 export function useChatRoomDataSync({
   selectedRoomId,

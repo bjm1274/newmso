@@ -324,7 +324,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           className="msm-hero"
           style={{
             margin: '0',
-            padding: '32px 24px 24px',
+            padding: '20px 20px 16px',
             background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
             color: '#fff',
             position: 'relative',
@@ -332,93 +332,95 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           }}
         >
 
-          {/* 아바타 — 프로필 사진(없으면 이름 첫글자) */}
-          <ProfilePhotoThumbnail
-            src={photoUrl}
-            name={name}
-            previewDisabled
-            className="msm-hero-av"
-            fallback={<span>{initial}</span>}
-            imageClassName="rounded-[22px]"
-          />
-          <style>{`.mso-mobile .msm-hero .msm-hero-av{width:72px;height:72px;border-radius:22px;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.3);display:grid;place-items:center;font-size:26px;font-weight:800;margin:0 auto;overflow:hidden;}`}</style>
+          {/* 아바타 + 텍스트 가로 배치 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {/* 아바타 — 왼쪽 */}
+            <ProfilePhotoThumbnail
+              src={photoUrl}
+              name={name}
+              previewDisabled
+              className="msm-hero-av"
+              fallback={<span>{initial}</span>}
+              imageClassName="rounded-[16px]"
+            />
+            <style>{`.mso-mobile .msm-hero .msm-hero-av{width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,0.2);border:2.5px solid rgba(255,255,255,0.3);display:grid;place-items:center;font-size:22px;font-weight:800;overflow:hidden;flex-shrink:0;}`}</style>
 
-          {/* 이름 + 직책 */}
-          <div
-            className="msm-hero-nm"
-            style={{
-              textAlign: 'center',
-              marginTop: 14,
-              fontSize: 22,
-              fontWeight: 800,
-              letterSpacing: '-0.03em',
-            }}
-          >
-            {name}
-          </div>
-          {(position || department) && (
-            <div
-              className="msm-hero-role"
-              style={{
-                textAlign: 'center',
-                marginTop: 4,
-                fontSize: 13,
-                fontWeight: 600,
-                opacity: 0.75,
-              }}
-            >
-              {department}{position ? ` · ${position}` : ''}
-            </div>
-          )}
-
-          {/* 칩 */}
-          <div
-            className="msm-hero-chips"
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 6,
-              marginTop: 14,
-            }}
-          >
-            <span
-              style={{
-                padding: '3px 10px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: active ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
-                color: '#fff',
-              }}
-            >
-              {active ? '재직중' : '퇴사'}
-            </span>
-            <span
-              style={{
-                padding: '3px 10px',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: 'rgba(255,255,255,0.15)',
-                color: '#fff',
-              }}
-            >
-              {employmentType}
-            </span>
-            {hireYears > 0 && (
-              <span
+            {/* 이름 + 소속 + 칩 — 오른쪽 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                className="msm-hero-nm"
                 style={{
-                  padding: '3px 10px',
-                  borderRadius: 999,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: 'rgba(255,255,255,0.15)',
-                  color: '#fff',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  letterSpacing: '-0.03em',
                 }}
               >
-                입사 {hireYears}년차
-              </span>
-            )}
+                {name}
+              </div>
+              {(position || department) && (
+                <div
+                  className="msm-hero-role"
+                  style={{
+                    marginTop: 2,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    opacity: 0.8,
+                  }}
+                >
+                  {department}{position ? ` · ${position}` : ''}
+                </div>
+              )}
+
+              {/* 칩 */}
+              <div
+                className="msm-hero-chips"
+                style={{
+                  display: 'flex',
+                  gap: 5,
+                  marginTop: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: active ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)',
+                    color: '#fff',
+                  }}
+                >
+                  {active ? '재직중' : '퇴사'}
+                </span>
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: 'rgba(255,255,255,0.15)',
+                    color: '#fff',
+                  }}
+                >
+                  {employmentType}
+                </span>
+                {hireYears > 0 && (
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: 'rgba(255,255,255,0.15)',
+                      color: '#fff',
+                    }}
+                  >
+                    입사 {hireYears}년차
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* 통계 3분할 */}
@@ -428,9 +430,9 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: 1,
-              marginTop: 20,
+              marginTop: 14,
               background: 'rgba(255,255,255,0.1)',
-              borderRadius: 14,
+              borderRadius: 12,
               overflow: 'hidden',
             }}
           >
@@ -442,15 +444,15 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               <div
                 key={st.label}
                 style={{
-                  padding: '14px 8px',
+                  padding: '10px 8px',
                   textAlign: 'center',
                   background: 'rgba(255,255,255,0.05)',
                 }}
               >
-                <div style={{ fontSize: 18, fontWeight: 800, fontFeatureSettings: '"tnum"' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, fontFeatureSettings: '"tnum"' }}>
                   {st.value}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.65, marginTop: 2 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.65, marginTop: 1 }}>
                   {st.label}
                 </div>
               </div>

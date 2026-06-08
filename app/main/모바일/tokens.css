@@ -495,11 +495,7 @@
   border-radius: 18px; padding: 18px; color: #fff;
   position: relative; overflow: hidden;
 }
-.mso-mobile .msm-hero::after {
-  content: ""; position: absolute; right: -30px; top: -30px;
-  width: 130px; height: 130px; border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-}
+/* ::after 장식 동그라미 제거됨 — 색 번짐 유발 */
 .mso-mobile .msm-hero-top { display: flex; align-items: center; gap: 13px; position: relative; z-index: 1; }
 .mso-mobile .msm-hero-av {
   width: 54px; height: 54px; border-radius: 999px;
