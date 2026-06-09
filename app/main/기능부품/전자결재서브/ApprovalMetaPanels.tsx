@@ -495,6 +495,19 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
     return 'day';
   };
 
+  const getShortLabel = (shift: string, band: string) => {
+    const s = String(shift || '').trim();
+    if (band === 'off') return 'OFF';
+    if (s === 'D' || s === '데이' || s === 'd · 데이') return 'D';
+    if (s === 'E' || s === '이브닝' || s === 'e · 이브닝') return 'E';
+    if (s === 'N' || s === '나이트' || s === 'n · 나이트') return 'N';
+    if (s.length > 4) {
+      if (s.includes('/')) return s.split('/')[0];
+      return s.slice(0, 4);
+    }
+    return s;
+  };
+
   const getStyleForBand = (band: string) => {
     switch (band) {
       case 'day': return 'background:#ecfdf5;color:#047857;border-color:#a7f3d0;';
@@ -521,7 +534,7 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
       const band = resolveBand(shift);
       resolvedBands.add(band);
       const style = getStyleForBand(band);
-      const shortLabel = band === 'day' ? 'D' : band === 'evening' ? 'E' : band === 'night' ? 'N' : 'OFF';
+      const shortLabel = getShortLabel(shift, band);
       return `<td style="text-align:center;padding:4px 2px;font-size:9px;border:1px solid #cbd5e1;font-weight:bold;${style}" title="${escapeHtml(shift)}">
         ${shortLabel}
       </td>`;
@@ -650,6 +663,19 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
     return 'day';
   };
 
+  const getShortLabel = (shift: string, band: string) => {
+    const s = String(shift || '').trim();
+    if (band === 'off') return 'OFF';
+    if (s === 'D' || s === '데이' || s === 'd · 데이') return 'D';
+    if (s === 'E' || s === '이브닝' || s === 'e · 이브닝') return 'E';
+    if (s === 'N' || s === '나이트' || s === 'n · 나이트') return 'N';
+    if (s.length > 4) {
+      if (s.includes('/')) return s.split('/')[0];
+      return s.slice(0, 4);
+    }
+    return s;
+  };
+
   const resolvedBands = new Set<string>();
   staffRows.forEach((row: { staffName: string; cells: Record<number, string> }) => {
     daysArray.forEach((d: number) => {
@@ -698,7 +724,7 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
                   const shift = row.cells[d] || '휴무';
                   const band = resolveBand(shift);
                   const styleCls = getStyleForBand(band);
-                  const shortLabel = band === 'day' ? 'D' : band === 'evening' ? 'E' : band === 'night' ? 'N' : 'OFF';
+                  const shortLabel = getShortLabel(shift, band);
                   return (
                     <td key={d} className={`px-1 py-2 text-center border-r border-[var(--border)] font-bold text-[10px] border-l-0 border-t-0 border-b-0 ${styleCls}`} title={shift}>
                       {shortLabel}
