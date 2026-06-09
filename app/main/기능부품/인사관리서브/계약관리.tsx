@@ -40,6 +40,7 @@ export default function ContractMain({
     position_allowance: 0,   // 직책수당
     research_allowance: 0,   // 연구활동비 (한도 20만)
     other_taxfree: 0,        // 기타 비과세
+    agreed_overtime_allowance: 0, // 연장근로수당(약정)
     effective_date: getKoreanTodayString(),
     working_hours_per_week: 40,
     working_days_per_week: 5,
@@ -171,6 +172,7 @@ export default function ContractMain({
             position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
             research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
             other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
+            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance ?? s?.agreed_overtime_allowance ?? 0,
             effective_date: conditionsAppDate
           }
           : {
@@ -181,6 +183,7 @@ export default function ContractMain({
             position_allowance: s?.position_allowance ?? 0,
             research_allowance: s?.research_allowance ?? 0,
             other_taxfree: s?.other_taxfree ?? 0,
+            agreed_overtime_allowance: s?.agreed_overtime_allowance ?? 0,
             effective_date: conditionsAppDate
           };
         return {
@@ -270,7 +273,8 @@ export default function ContractMain({
             childcare_allowance: salaryInfo.childcare_allowance ?? s?.childcare_allowance ?? 0,
             position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
             research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
-            other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0
+            other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
+            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance ?? s?.agreed_overtime_allowance ?? 0
           }).eq('id', id);
         }));
       }
@@ -375,6 +379,10 @@ export default function ContractMain({
                           <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                         </label>
                         <label className="space-y-1 block">
+                          <span className="text-[11px] font-bold">연장근로(약정)</span>
+                          <input type="number" value={salaryInfo.agreed_overtime_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, agreed_overtime_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                        </label>
+                        <label className="space-y-1 block">
                           <span className="text-[11px] font-bold">적용일자</span>
                           <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white selection:bg-[var(--card)]/30" placeholder="0000-00-00" />
                         </label>
@@ -459,6 +467,10 @@ export default function ContractMain({
                     <label className="space-y-1 block">
                       <span className="text-[11px] font-bold">식대 (한도 20만)</span>
                       <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, meal_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
+                    </label>
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] font-bold">연장근로(약정)</span>
+                      <input type="number" value={salaryInfo.agreed_overtime_allowance} onChange={(e) => setSalaryInfo({ ...salaryInfo, agreed_overtime_allowance: Number(e.target.value) })} className="w-full px-3 py-2.5 bg-[var(--card)]/10 border border-white/20 rounded-[var(--radius-md)] font-bold text-xs outline-none focus:bg-[var(--card)]/20 text-white" />
                     </label>
                     <label className="space-y-1 block">
                       <span className="text-[11px] font-bold">적용일자</span>

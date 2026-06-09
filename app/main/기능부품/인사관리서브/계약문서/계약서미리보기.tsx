@@ -248,6 +248,7 @@ export default function ContractPreview({
       { label: '보육수당', amount: Number(src.childcare_allowance || staff?.childcare_allowance || 0), note: '비과세', taxable: false },
       { label: '연구활동비', amount: Number(src.research_allowance || staff?.research_allowance || 0), note: '비과세 (월 20만 한도)', taxable: false },
       { label: '기타 비과세', amount: Number(src.other_taxfree || staff?.other_taxfree || 0), note: '비과세', taxable: false },
+      { label: '연장근로수당(약정)', amount: Number(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || 0), note: '포괄산정 연장수당', taxable: true },
     ].filter(item => item.amount > 0);
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);

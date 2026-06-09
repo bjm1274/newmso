@@ -188,10 +188,16 @@ function buildWorkDayText(
 
   const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
   if (workDayMode === 'all_days') return '근무표에 따른 요일';
-  if (workingDaysPerWeek >= 6) return '월요일~토요일';
-  if (workingDaysPerWeek === 5) return '월요일~금요일';
 
-  return `주 ${workingDaysPerWeek}일`;
+  let effectiveDays = workingDaysPerWeek;
+  if (shiftRecord && typeof shiftRecord.weekly_work_days === 'number') {
+    effectiveDays = shiftRecord.weekly_work_days;
+  }
+
+  if (effectiveDays >= 6 || (shiftRecord && shiftRecord.is_weekend_work)) return '월요일~토요일 (또는 근무표에 따른 요일)';
+  if (effectiveDays === 5) return '월요일~금요일';
+
+  return `주 ${effectiveDays}일`;
 }
 
 function buildWeeklyHolidayText(
@@ -218,7 +224,17 @@ function removeAllowanceLinesWithoutAmounts(
   content: string,
   allowanceValues: Record<string, number>,
 ) {
-  return content.replace(/\r\n/g, '\n').trim();
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const resultLines = lines.filter(line => {
+    // Check if the line contains any allowance token
+    const matchingTokens = Object.keys(allowanceValues).filter(token => line.includes(token));
+    if (matchingTokens.length === 0) return true; // No allowance token, keep line
+    
+    // If it contains allowance tokens, check if AT LEAST ONE has a non-zero value
+    const hasValue = matchingTokens.some(token => allowanceValues[token] > 0);
+    return hasValue;
+  });
+  return resultLines.join('\n').trim();
 }
 
 export function fillEmploymentContractTemplate(
@@ -236,13 +252,14 @@ export function fillEmploymentContractTemplate(
   const salarySource = contract || user || {};
   const getSalaryAmount = (fieldName: string) =>
     toMoneyNumber(salarySource[fieldName] ?? safeUser[fieldName] ?? 0);
-  const allowanceValues = {
+  const allowanceValues: Record<string, number> = {
     '{{position_allowance}}': getSalaryAmount('position_allowance'),
     '{{meal_allowance}}': getSalaryAmount('meal_allowance'),
     '{{vehicle_allowance}}': getSalaryAmount('vehicle_allowance'),
     '{{childcare_allowance}}': getSalaryAmount('childcare_allowance'),
     '{{research_allowance}}': getSalaryAmount('research_allowance'),
     '{{other_taxfree}}': getSalaryAmount('other_taxfree'),
+    '{{agreed_overtime_allowance}}': getSalaryAmount('agreed_overtime_allowance'),
   };
 
   const weeklyWorkHours = resolveWeeklyWorkingHours(
@@ -263,6 +280,7 @@ export function fillEmploymentContractTemplate(
     getSalaryAmount('childcare_allowance'),
     getSalaryAmount('research_allowance'),
     getSalaryAmount('other_taxfree'),
+    getSalaryAmount('agreed_overtime_allowance'),
   ];
   const totalMonthlyWage = salaryItems.reduce((sum, amount) => sum + amount, 0);
   const monthlyWorkHours = getMonthlyWorkingHours(weeklyWorkHours);
@@ -337,6 +355,7 @@ export function fillEmploymentContractTemplate(
     childcare_allowance: formatWon(getSalaryAmount('childcare_allowance')),
     research_allowance: formatWon(getSalaryAmount('research_allowance')),
     other_taxfree: formatWon(getSalaryAmount('other_taxfree')),
+    agreed_overtime_allowance: formatWon(getSalaryAmount('agreed_overtime_allowance')),
     total_monthly: formatWon(totalMonthlyWage),
     total_salary: formatWon(totalMonthlyWage),
     annual_salary: formatWon(totalMonthlyWage * 12),
