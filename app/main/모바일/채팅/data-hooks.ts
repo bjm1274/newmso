@@ -248,9 +248,14 @@ export function useMobileChatReadCounts(
       messages.forEach((msg) => {
         const msgTime = new Date(msg.created_at || 0).getTime();
         let readers = 0;
-        cursors.forEach((c: any) => {
-          if (new Date(c.last_read_at).getTime() >= msgTime) {
+        memberIds.forEach((mId) => {
+          if (mId === String(msg.sender_id)) {
             readers++;
+          } else {
+            const cursor = cursors.find((c: any) => String(c.user_id) === mId);
+            if (cursor && new Date(cursor.last_read_at).getTime() >= msgTime) {
+              readers++;
+            }
           }
         });
         counts[String(msg.id)] = readers;

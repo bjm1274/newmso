@@ -100,6 +100,10 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const peerName = peer ? peer.name : '';
   const readCounts = useMobileChatReadCounts(String(room.id), messages, memberIds);
 
+  const attachments = useMemo(() => {
+    return messages.filter(m => !!m.file_url).reverse();
+  }, [messages]);
+
   const memberProfiles = useMemo(() => {
     return memberIds
       .map((id) => staffs.find((s) => String(s.id) === String(id)))
@@ -676,11 +680,23 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
           {/* Section 5: 공유된 사진 및 파일 */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>공유된 사진 및 파일</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>공유된 사진 및 파일 ({attachments.length})</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
-              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
-              <div style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', display: 'grid', placeItems: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>비어있음</div>
+              {attachments.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>첨부된 항목이 없습니다.</div>
+              )}
+              {attachments.slice(0, 9).map((att) => (
+                <div key={att.id} style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', overflow: 'hidden', position: 'relative' }}>
+                  {/\.(png|jpg|jpeg|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(att.file_url!) ? (
+                    <img src={att.file_url!} alt="첨부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(att.file_url!, '_blank')} />
+                  ) : (
+                    <div onClick={() => window.open(att.file_url!, '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--m-accent)' }}>
+                      <MIcon name="file" size={24} />
+                      <span style={{ fontSize: 9, marginTop: 4, width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{att.file_name || '파일'}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 

@@ -300,11 +300,11 @@ export default function MessageBubble({
         </>
       )}
 
-      {/* ── 메시지 본체 (스와이프로 이동) ─────────────── */}
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={{
           display: 'flex',
           gap: 8,
@@ -313,6 +313,7 @@ export default function MessageBubble({
           transition: swiping ? 'none' : 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
           zIndex: isRevealed ? 11 : 1,
+          touchAction: 'pan-y',
         }}
       >
         {!mine && (

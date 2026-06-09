@@ -160,7 +160,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           toast('오프라인 — 출근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
-          if (row) setOpenLog(row);
+          setOpenLog(row || { id: 'upserted', date: today, check_in: nowIso, check_out: null, status: checkInStatus });
           try {
             await syncToAttendances(staffId, today, nowIso, null, checkInStatus);
           } catch (syncErr) {
@@ -200,6 +200,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
           if (row) setOpenLog(row);
+          else if (openLog) setOpenLog({ ...openLog, check_out: nowIso, status: finalStatus });
           else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
           
           try {
