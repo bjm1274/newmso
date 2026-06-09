@@ -6,7 +6,7 @@ export async function selectMessageReactionRows(messageIds: string[]) {
   for (const chunk of chunkArray(messageIds)) {
     const { data, error } = await supabase
       .from('message_reactions')
-      .select('message_id, emoji, user_id, staff_members(id, name, company, department, position, photo_url)')
+      .select('message_id, emoji, user_id')
       .in('message_id', chunk);
     if (error) throw error;
     rows.push(...(data || []));
