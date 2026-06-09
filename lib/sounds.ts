@@ -18,8 +18,26 @@ class NotificationSoundEngine {
         return this.ctx;
     }
 
-    private playTone(freq: number, startTime: number, duration: number, volume: number = 0.2) {
+    /**
+     * AudioContext 는 사용자 제스처 밖에서 생성되면 'suspended' 상태로 시작해
+     * osc.start() 가 무음이 된다. 재생 직전·제스처 시 resume() 으로 깨운다.
+     * (이미 running 이면 resume() 는 무해한 no-op.)
+     */
+    private ensureRunning() {
         const ctx = this.initContext();
+        if (ctx && ctx.state === 'suspended') {
+            void ctx.resume().catch(() => {});
+        }
+        return ctx;
+    }
+
+    /** 최초 사용자 제스처에서 호출해 오디오 잠금을 해제한다(이후 비동기 알림음이 정상 재생). */
+    public prime() {
+        this.ensureRunning();
+    }
+
+    private playTone(freq: number, startTime: number, duration: number, volume: number = 0.2) {
+        const ctx = this.ensureRunning();
         if (!ctx) return;
 
         const osc = ctx.createOscillator();
@@ -44,7 +62,7 @@ class NotificationSoundEngine {
      * 높은 주파수에서 낮은 주파수로 빠르게 전이되어 경쾌한 느낌 제공
      */
     public playTalk() {
-        const ctx = this.initContext();
+        const ctx = this.ensureRunning();
         if (!ctx) return;
 
         const now = ctx.currentTime;
@@ -58,7 +76,7 @@ class NotificationSoundEngine {
      * 기분 좋은 시스템 알림음 (동글동글한 소리)
      */
     public playSystem() {
-        const ctx = this.initContext();
+        const ctx = this.ensureRunning();
         if (!ctx) return;
 
         const now = ctx.currentTime;
@@ -70,7 +88,7 @@ class NotificationSoundEngine {
      * 경고/에러 알림음 (부드러운 하향음)
      */
     public playAlert() {
-        const ctx = this.initContext();
+        const ctx = this.ensureRunning();
         if (!ctx) return;
 
         const now = ctx.currentTime;

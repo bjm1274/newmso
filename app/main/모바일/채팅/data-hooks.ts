@@ -46,6 +46,7 @@ import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { escapeLikePattern } from '@/lib/like-escape';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { fetchReactionsForMessages, mergeReactionsIntoMessages } from './반응';
+import { triggerMobileChatPush } from './푸시트리거';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 // ─────────────────────────────────────────────
@@ -621,6 +622,8 @@ export async function sendMobileTextMessage(
     }
     pokeChannel(`mobile-chat-room-${input.roomId}`);
     pokeChannel('mobile-chat-rooms-list');
+    // PC와 동일하게 전송 직후 수신자 푸시를 즉시 트리거 (모바일 누락 버그 수정).
+    triggerMobileChatPush(input.roomId, String((data as ChatMessage).id || ''));
     return { ok: true, message: data as ChatMessage };
   } catch (err) {
     const message = err instanceof Error ? err.message : '메시지 전송 실패';

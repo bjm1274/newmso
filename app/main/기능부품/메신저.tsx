@@ -1131,6 +1131,7 @@ export default function ChatView({
       const response = await fetch('/api/notifications/chat-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
         body: JSON.stringify({ roomId, messageId }),
       });
 

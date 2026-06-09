@@ -634,18 +634,48 @@ export async function initNotificationService(options?: InitNotificationServiceO
               },
             });
           }
-          await syncPushSubscriptionOnServer(staffId, { ...j, fcm_token: fcmToken });
-          window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
-          setPushSubscriptionActiveState(staffId, true);
-          recordPushDebug({
-            source: 'app',
-            stage: 'subscription-active',
-            message: '푸시 구독이 활성화되었습니다.',
-            detail: {
-              endpoint: j.endpoint,
-              hasFcmToken: Boolean(fcmToken),
-            },
-          });
+          // 서버 저장 실패가 init 전체를 throw로 중단시키지 않도록 격리(JM3).
+          // 실패 시: 브라우저 구독은 살아있으나 서버 push_subscriptions 미저장 → active=false 로 두고
+          // ① 8초 후 1회 재시도 ② focus/visibilitychange resync(아래 effect)로 자가 복구.
+          try {
+            await syncPushSubscriptionOnServer(staffId, { ...j, fcm_token: fcmToken });
+            window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
+            setPushSubscriptionActiveState(staffId, true);
+            recordPushDebug({
+              source: 'app',
+              stage: 'subscription-active',
+              message: '푸시 구독이 활성화되었습니다.',
+              detail: {
+                endpoint: j.endpoint,
+                hasFcmToken: Boolean(fcmToken),
+              },
+            });
+          } catch (syncErr) {
+            setPushSubscriptionActiveState(staffId, false);
+            recordPushDebug({
+              source: 'app',
+              stage: 'subscription-sync-failed',
+              message: '구독 서버 저장에 실패해 재시도를 예약했습니다.',
+              detail: {
+                error: String((syncErr as { message?: string } | null)?.message || syncErr || ''),
+              },
+            });
+            const retrySubscription = sub;
+            window.setTimeout(() => {
+              const retryJson = retrySubscription?.toJSON() as
+                | (PushSubscriptionJSON & { fcm_token?: string | null })
+                | undefined;
+              if (!retryJson?.endpoint || !retryJson.keys?.p256dh || !retryJson.keys?.auth) return;
+              void syncPushSubscriptionOnServer(staffId, { ...retryJson, fcm_token: fcmToken })
+                .then(() => {
+                  window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
+                  setPushSubscriptionActiveState(staffId, true);
+                })
+                .catch(() => {
+                  // 여전히 실패 — focus/visibilitychange resync 가 다음 기회에 복구한다.
+                });
+            }, 8000);
+          }
         }
       } else {
         setPushSubscriptionActiveState(staffId, false);
@@ -1907,6 +1937,29 @@ export default function NotificationSystem({
       window.removeEventListener('erp-chat-sync', handleChatSync as EventListener);
     };
   }, [effectiveUserId]);
+
+  // 오디오 잠금 해제 — 최초 사용자 제스처에서 AudioContext.resume() (알림음 무음 방지).
+  // suspended 상태로 시작한 컨텍스트는 제스처 전 도착 알림이 무음이 되므로 첫 상호작용에 깨운다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let primed = false;
+    const prime = () => {
+      if (primed) return;
+      primed = true;
+      window.removeEventListener('pointerdown', prime, true);
+      window.removeEventListener('keydown', prime, true);
+      window.removeEventListener('touchstart', prime, true);
+      void import('@/lib/sounds').then(({ sound }) => sound.prime()).catch(() => {});
+    };
+    window.addEventListener('pointerdown', prime, true);
+    window.addEventListener('keydown', prime, true);
+    window.addEventListener('touchstart', prime, true);
+    return () => {
+      window.removeEventListener('pointerdown', prime, true);
+      window.removeEventListener('keydown', prime, true);
+      window.removeEventListener('touchstart', prime, true);
+    };
+  }, []);
 
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 

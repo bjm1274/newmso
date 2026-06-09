@@ -187,18 +187,35 @@ export async function sendFcmNotification(
       const body = await res.json().catch(() => ({})) as Record<string, unknown>;
       const errorObj = body?.error as Record<string, unknown> | undefined;
       const errorStatus = String(errorObj?.status || '');
-      const errorCode = String(errorObj?.code || '');
-      // FCM v1: status=NOT_FOUND(토큰 무효), INVALID_ARGUMENT(토큰 형식 오류), code=404/400
-      // HTTP 400/404 응답도 토큰 만료/무효로 판정
-      if (
-        errorStatus === 'NOT_FOUND' || errorStatus === 'INVALID_ARGUMENT' ||
-        errorCode === '404' || errorCode === '400' ||
-        res.status === 404 || res.status === 400
-      ) {
+      // FCM v1 상세 에러코드(UNREGISTERED 등)는 error.details[].errorCode 에 들어온다.
+      const details = Array.isArray(errorObj?.details)
+        ? (errorObj?.details as Record<string, unknown>[])
+        : [];
+      const fcmErrorCode =
+        details.map((d) => String(d?.errorCode || '')).find((code) => code) || '';
+
+      // 토큰이 '영구 무효'(삭제/무효화 대상)임을 뜻하는 신호로만 expired 판정 — 보수적으로 좁힌다.
+      //   - HTTP 404/410, status=NOT_FOUND          → 등록 해제된 토큰
+      //   - FcmError.errorCode=UNREGISTERED          → 앱 삭제/토큰 만료
+      // ⚠️ HTTP 400 / INVALID_ARGUMENT 는 '토큰 무효'보다 '메시지 페이로드 오류'인 경우가 더 흔하다.
+      //    이를 expired 로 오판하면 batch 한 번의 페이로드 문제로 정상 토큰까지 null 처리되어
+      //    해당 기기(FCM 우선 정책상 WebPush 에서도 제외됨)의 푸시가 영구 중단된다.
+      const isUnregistered =
+        errorStatus === 'NOT_FOUND' ||
+        fcmErrorCode === 'UNREGISTERED' ||
+        res.status === 404 ||
+        res.status === 410;
+      if (isUnregistered) {
         return { ok: false, reason: 'expired' };
       }
-      // 5xx·기타 → 일시 오류, 토큰 유지
-      console.error('[FCM HTTP v1] send failed:', res.status, body);
+      // 400(페이로드)·5xx·기타 → 일시/구성 오류로 보고 토큰은 유지(다음 시도/다른 채널 폴백 여지).
+      console.error(
+        '[FCM HTTP v1] send failed (token retained):',
+        res.status,
+        errorStatus,
+        fcmErrorCode,
+        body,
+      );
       return { ok: false, reason: 'error' };
     }
 

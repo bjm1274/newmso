@@ -248,6 +248,7 @@ export function useChatRealtimeSubscriptions({
       [{ table: 'messages' }],
       () => {
         void fetchDataLatestRef.current({ force: true });
+      },
       { pollIntervalMs: 2000 },
     );
     return () => {

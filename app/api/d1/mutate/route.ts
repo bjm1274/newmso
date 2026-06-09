@@ -367,6 +367,30 @@ export async function POST(request: Request) {
         allResults.push(...rows);
       }
 
+      // 채팅 메시지 INSERT 시 chat_push_jobs 큐에 적재 — 즉시발송(triggerChatPush)이
+      // 실패하거나 호출되지 않아도(오프라인 큐 재생 등) cron/flush 가 회수해 푸시를 보낸다.
+      // 과거 Supabase messages AFTER INSERT 트리거의 D1 대체. 실패는 INSERT 응답을 막지 않는다(JM3).
+      if (payload.table === 'messages' && allResults.length > 0) {
+        try {
+          const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
+          await Promise.all(
+            allResults.map((r) => {
+              const row = r as Record<string, unknown>;
+              const messageId = String(row.id ?? '');
+              const roomId = String(row.room_id ?? '');
+              if (!messageId || !roomId) return Promise.resolve();
+              return enqueueChatPushJob({
+                messageId,
+                roomId,
+                senderId: (row.sender_id as string | null) ?? null,
+              });
+            }),
+          );
+        } catch (enqueueErr) {
+          console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
+        }
+      }
+
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
       return NextResponse.json({ ok: true, data: deserializeRows(payload.table, allResults) });
     }

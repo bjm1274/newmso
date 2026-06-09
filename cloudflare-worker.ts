@@ -68,7 +68,10 @@ async function callCronRoute(
 }
 
 const worker = {
-  fetch: openNextHandler.fetch,
+  // OpenNext 가 생성한 fetch 핸들러로 위임 (this 바인딩 보존을 위해 래핑 호출).
+  fetch(request: Request, env: WorkerEnv, context: WorkerExecutionContext) {
+    return openNextHandler.fetch(request, env, context);
+  },
 
   async scheduled(
     controller: ScheduledControllerLike,
@@ -78,11 +81,18 @@ const worker = {
     const routes = CRON_ROUTES_BY_SCHEDULE[controller.cron] || [];
     if (routes.length === 0) return;
 
-    const tasks = routes.map((route) => callCronRoute(route, controller.cron, env, context));
-    for (const task of tasks) {
-      context.waitUntil?.(task);
-    }
-    await Promise.all(tasks);
+    // allSettled: 한 라우트 실패가 같은 cron 의 다른 라우트 실행을 막지 않도록 격리(JM3).
+    const results = await Promise.allSettled(
+      routes.map((route) => callCronRoute(route, controller.cron, env, context)),
+    );
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(
+          `[cron ${controller.cron}] route ${routes[index]} failed:`,
+          result.reason,
+        );
+      }
+    });
   },
 };
 

@@ -157,6 +157,7 @@ async function dispatchSingleUser(
   });
 
   if (fcmToken) {
+    let fcmDelivered = false;
     try {
       const fcmResult = await sendFcmBatch([fcmToken], {
         title: row.title,
@@ -164,6 +165,7 @@ async function dispatchSingleUser(
         data,
       });
       result.fcmSent += fcmResult.success.length;
+      fcmDelivered = fcmResult.success.length > 0;
       if (fcmResult.expired.length > 0) {
         result.fcmExpired += fcmResult.expired.length;
         await invalidateExpiredFcmTokens(d1, fcmResult.expired);
@@ -173,8 +175,9 @@ async function dispatchSingleUser(
       result.errors.push(`fcm:${row.user_id}:${msg}`);
       console.error('[notification-push-dispatch] FCM send failed for', row.user_id, err);
     }
-    // FCM 토큰이 있으면 WebPush는 건너뜀 — 동일 기기 이중 발송 방지
-    return;
+    // FCM 으로 실제 전달됐으면 WebPush 생략(동일 기기 이중 발송 방지).
+    // FCM 이 일시 실패/만료했으면 같은 사용자의 WebPush 구독으로 폴백한다(아래로 진행).
+    if (fcmDelivered) return;
   }
 
   if (!webPushEnabled) return;

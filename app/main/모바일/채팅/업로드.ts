@@ -14,6 +14,7 @@
 import { supabase } from '@/lib/supabase';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { pokeChannel } from '@/lib/realtime-bus';
+import { triggerMobileChatPush } from './푸시트리거';
 import {
   buildChatMessageInsertPayload,
   type MessageRetryPayload,
@@ -275,6 +276,8 @@ export async function sendMobileFileMessage(
     }
     pokeChannel(`mobile-chat-room-${input.roomId}`);
     pokeChannel('mobile-chat-rooms-list');
+    // 전송 직후 수신자 푸시 즉시 트리거 (모바일 파일 메시지도 PC와 동일하게).
+    triggerMobileChatPush(input.roomId, String((data as ChatMessage).id || ''));
     return { ok: true, message: data as ChatMessage };
   } catch (err) {
     const message = err instanceof Error ? err.message : '메시지 저장 실패';

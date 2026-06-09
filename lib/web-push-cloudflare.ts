@@ -205,7 +205,7 @@ export async function sendWebPushNotification(
     headers: {
       'Content-Type': 'application/octet-stream',
       'Content-Encoding': 'aes128gcm',
-      'Content-Length': String(body.byteLength),
+      // Content-Length 는 fetch forbidden header — 런타임이 본문 길이로 자동 설정하므로 명시 불필요.
       Authorization: `vapid t=${jwt}, k=${bytesToB64url(publicKeyBytes)}`,
       TTL: '60',
       Urgency: 'high',

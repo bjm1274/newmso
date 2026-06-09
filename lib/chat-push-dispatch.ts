@@ -832,17 +832,19 @@ export async function dispatchChatPushForMessage(params: {
     {},
   );
 
+  // FCM batch 결과를 바깥에서 참조해 WebPush 폴백 대상 계산에 사용한다.
+  let fcmResult: { success: string[]; expired: string[]; error: string[] } | null = null;
   const fcmPromise = (async () => {
     if (uniqueFcmTokens.length === 0) return;
     try {
-      const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
+      fcmResult = await sendFcmBatch(uniqueFcmTokens, {
         title,
         body: previewBody,
         data: fcmPayloadData,
       });
       sent += fcmResult.success.length;
-      // error 토큰(5xx·네트워크 실패)은 유효할 수 있으므로 무효화하지 않는다.
-      // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
+      // error 토큰(400 페이로드·5xx·네트워크·OAuth 실패)은 유효할 수 있으므로 무효화하지 않는다.
+      // expired 토큰(UNREGISTERED·NOT_FOUND·404·410)만 DB에서 null 처리.
       if (fcmResult.expired.length > 0) {
         const d1b = await getD1Binding();
         if (d1b) {
@@ -857,6 +859,8 @@ export async function dispatchChatPushForMessage(params: {
       }
     } catch (fcmErr) {
       console.error('[FCM] batch send failed, falling back to web push where possible:', fcmErr);
+      // batch 자체가 throw(예: 설정/OAuth 오류) → 모든 FCM 토큰을 미전달로 간주해 WebPush 폴백 대상에 포함.
+      fcmResult = { success: [], expired: [], error: [...uniqueFcmTokens] };
     }
   })();
 
@@ -864,11 +868,31 @@ export async function dispatchChatPushForMessage(params: {
   // 동일 기기로 FCM + Web Push가 중복 발송되지 않는다.
   await fcmPromise;
 
+  // ── FCM 미전달(error/expired) 기기에 대한 WebPush 폴백 ──
+  // FCM 우선 정책으로 WebPush 에서 제외했던 기기라도, FCM 이 일시 실패(또는 토큰 만료)했고
+  // 같은 구독행에 유효한 WebPush 키가 있으면 그 기기에 한해 WebPush 로 폴백한다.
+  // (성공한 FCM 토큰의 기기는 제외 → 동일 메시지 이중발송 방지. 설령 겹쳐도 SW가 tag 로 중복 차단.)
+  const webPushTargets = new Map<string, PushSubscriptionRow>(uniqueSubscriptions);
+  if (fcmResult) {
+    const settled: { success: string[]; expired: string[]; error: string[] } = fcmResult;
+    const undeliveredFcmTokens = new Set<string>([...settled.error, ...settled.expired]);
+    if (undeliveredFcmTokens.size > 0) {
+      for (const row of subscriptions) {
+        if (!row.fcm_token || !undeliveredFcmTokens.has(String(row.fcm_token))) continue;
+        if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
+        if (!row.p256dh || !row.auth || !/^https?:\/\//i.test(String(row.endpoint))) continue;
+        if (!webPushTargets.has(row.endpoint)) {
+          webPushTargets.set(row.endpoint, row);
+        }
+      }
+    }
+  }
+
   const webPushPromise = (async () => {
     if (pushDisabled) return;
     const payload = webPushPayload;
 
-    const targets = Array.from(uniqueSubscriptions.values());
+    const targets = Array.from(webPushTargets.values());
 
     if (targets.length === 0) return;
 
@@ -906,7 +930,7 @@ export async function dispatchChatPushForMessage(params: {
     }
   }
 
-  const hasUndeliveredWebPushTargets = uniqueSubscriptions.size > 0;
+  const hasUndeliveredWebPushTargets = webPushTargets.size > 0;
 
   if (pushDisabled && hasUndeliveredWebPushTargets) {
     await updateChatPushJobByMessageId(params.messageId, {

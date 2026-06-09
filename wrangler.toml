@@ -1,7 +1,10 @@
 name = "erp-pchos"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-main = ".open-next/worker.js"
+# main 은 OpenNext 가 생성한 .open-next/worker.js 를 감싸는 래퍼(cloudflare-worker.ts).
+# 래퍼가 fetch 는 그대로 위임하고 scheduled() 를 추가해 [triggers] crons 가 실제로 동작하게 한다.
+# (이전에는 .open-next/worker.js 직접 지정 → scheduled 핸들러 부재로 cron 5개 전부 무동작 버그)
+main = "cloudflare-worker.ts"
 account_id = "e4d2c3499fac63baef7f4a9d10de7ba4"
 
 
