@@ -6,6 +6,7 @@ import { usePayroll, usePayrollData } from '../payroll-context';
 import { calculateKpis } from '../payroll-kpi';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
+import { supabase } from '@/lib/supabase';
 
 type SalarySettlementProps = {
   staffs: StaffMember[];
@@ -116,13 +117,44 @@ export default function ModSettlement() {
 
     try {
       const XLSX = await import('xlsx');
+      const staffIds = Array.from(new Set(confirmedRecords.map(r => String(r.staff_id))));
+
+      const { data: dbStaffs, error: dbError } = await supabase
+        .from('staff_members')
+        .select('id, name, bank_name, bank_account, permissions')
+        .in('id', staffIds);
+
+      if (dbError) {
+        throw new Error(dbError.message);
+      }
+
+      const staffMap = new Map<string, any>();
+      if (dbStaffs) {
+        dbStaffs.forEach((s: any) => {
+          staffMap.set(String(s.id), s);
+        });
+      }
 
       const excelData = confirmedRecords.map(record => {
-        const staff = data.staffs.find(s => String(s.id) === String(record.staff_id));
-        const perms = staff?.permissions;
+        const staffIdStr = String(record.staff_id);
+        const dbStaff = staffMap.get(staffIdStr);
+        const fallbackStaff = data.staffs.find(s => String(s.id) === staffIdStr);
+        
+        const staff = dbStaff || fallbackStaff;
+        const perms = staff?.permissions as Record<string, any> | undefined;
         const name = (staff?.name || '미지정').trim();
-        const bankName = (staff?.bank_name || perms?.bank_name || '미지정').toString().trim();
-        const bankAccount = (staff?.bank_account || perms?.bank_account || '미지정').toString().trim();
+        const bankName = (
+          staff?.bank_name || 
+          perms?.bank_name || 
+          (perms?.payroll_allowances as Record<string, any> | undefined)?.bank_name || 
+          '미지정'
+        ).toString().trim();
+        const bankAccount = (
+          staff?.bank_account || 
+          perms?.bank_account || 
+          (perms?.payroll_allowances as Record<string, any> | undefined)?.bank_account || 
+          '미지정'
+        ).toString().trim();
         const amount = record.net_pay;
         return {
           '이름': name,
