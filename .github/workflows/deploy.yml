@@ -37,8 +37,8 @@ jobs:
       - name: Guard - 배포 Secret 설정 여부 확인
         id: guard
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$DOTENV_LOCAL" ]; then
-            echo "::warning::배포 Secret(CLOUDFLARE_API_TOKEN / DOTENV_LOCAL)이 아직 설정되지 않아 배포를 건너뜁니다. 저장소 Settings → Secrets and variables → Actions 에서 추가하면 다음 푸시부터 자동 배포됩니다."
+          if [ -z "$DOTENV_LOCAL" ]; then
+            echo "::warning::배포 Secret(DOTENV_LOCAL)이 아직 설정되지 않아 배포를 건너뜁니다. 저장소 Settings → Secrets and variables → Actions 에서 .env.local 파일 전체 내용을 DOTENV_LOCAL 로 추가하면 다음 푸시부터 자동 배포됩니다. (Cloudflare 토큰은 .env.local 안의 값을 자동 사용)"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -65,7 +65,18 @@ jobs:
 
       - name: Deploy to Cloudflare
         if: steps.guard.outputs.skip == 'false'
-        run: npm run deploy:cloudflare
+        run: |
+          # 토큰: 명시적 CLOUDFLARE_API_TOKEN secret 이 있으면 사용,
+          # 없으면 방금 복원한 .env.local 안의 값을 자동 추출(로컬 deploy.mjs 와 동일 방식).
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            CLOUDFLARE_API_TOKEN=$(grep -m1 '^CLOUDFLARE_API_TOKEN=' .env.local | cut -d= -f2- | tr -d '\r' | sed 's/^"//; s/"$//')
+            export CLOUDFLARE_API_TOKEN
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::.env.local 에서 CLOUDFLARE_API_TOKEN 을 찾지 못했습니다."
+            exit 1
+          fi
+          npm run deploy:cloudflare
 
       - name: Cleanup secret file
         if: always()
