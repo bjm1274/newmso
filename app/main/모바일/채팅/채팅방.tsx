@@ -22,7 +22,7 @@ import {
   useLayoutEffect,
   type ChangeEvent,
 } from 'react';
-import type { ChatRoom, ErpUser } from '@/types';
+import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -111,6 +111,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [uploading, setUploading] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -190,12 +191,14 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         roomId: String(room.id),
         senderId: userId,
         content: text,
+        replyToId: replyTo ? String(replyTo.id) : null,
       });
       if (!result.ok) {
         toast(result.error, 'error');
         return;
       }
       setDraft('');
+      setReplyTo(null);
       void refresh();
     } finally {
       setSending(false);
@@ -411,6 +414,10 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           staffs={staffs}
           readCounts={readCounts}
           onToggleReaction={handleToggleReaction}
+          onReply={(msg) => {
+            setReplyTo(msg);
+            setTimeout(() => composerInputRef.current?.focus(), 50);
+          }}
           onImageLoad={scrollToBottom}
         />
       </div>
@@ -422,7 +429,6 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         onSelect={insertEmojiAtCaret}
       />
 
-      {/* 컴포저 */}
       <div
         style={{
           background: 'var(--m-card)',
@@ -430,6 +436,43 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           padding: '8px 12px 12px',
         }}
       >
+        {replyTo && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              marginBottom: 8,
+              background: 'var(--m-bg)',
+              borderRadius: 8,
+              borderLeft: '3px solid var(--m-accent)',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--m-accent)', marginBottom: 2 }}>
+                {replyTo.sender_name || staffs.find((s) => String(s.id) === String(replyTo.sender_id))?.name || '알 수 없음'}에게 답장
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--z-600)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {typeof replyTo.content === 'string' && replyTo.content ? replyTo.content : (replyTo.file_name ? '첨부파일' : '(내용 없음)')}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--z-400)',
+                padding: 4,
+                cursor: 'pointer',
+              }}
+              aria-label="답장 취소"
+            >
+              <MIcon name="x" size={16} />
+            </button>
+          </div>
+        )}
         <div
           style={{
             display: 'flex',

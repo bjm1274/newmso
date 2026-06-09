@@ -22,6 +22,7 @@ export type BubbleListProps = {
   staffs: StaffDirectoryEntry[];
   readCounts?: Record<string, number>;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
 };
 
@@ -32,6 +33,7 @@ export default function BubbleList({
   staffs,
   readCounts = {},
   onToggleReaction,
+  onReply,
   onImageLoad,
 }: BubbleListProps) {
   const items = useMemo(() => {
@@ -71,6 +73,7 @@ export default function BubbleList({
             readCount={readCounts[String(item.message.id)] || 0}
             fallbackMyName={userName}
             onToggleReaction={onToggleReaction}
+            onReply={onReply}
             onImageLoad={onImageLoad}
           />
         );

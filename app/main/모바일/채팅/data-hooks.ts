@@ -568,6 +568,7 @@ export type SendTextMessageInput = {
   roomId: string;
   senderId: string;
   content: string;
+  replyToId?: string | null;
 };
 
 export type SendTextMessageResult =
@@ -592,7 +593,7 @@ export async function sendMobileTextMessage(
     fileName: null,
     fileSizeBytes: null,
     fileKind: null,
-    replyToId: null,
+    replyToId: input.replyToId || null,
     albumId: null,
     albumIndex: null,
     albumTotal: null,

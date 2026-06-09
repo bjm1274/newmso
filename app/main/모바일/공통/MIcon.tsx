@@ -70,6 +70,8 @@ const M_ICON_ALIAS: Record<string, string> = {
   bot: 'Bot',
   heart: 'Heart',
   image: 'ImageIcon',
+  reply: 'Reply',
+  copy: 'Copy',
 };
 
 export type MIconProps = {
