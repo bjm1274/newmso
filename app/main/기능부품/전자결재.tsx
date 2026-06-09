@@ -934,16 +934,12 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       return Boolean(approvalDateFrom || approvalDateTo);
     }
 
-    if (!approvalDateTouched) {
-      return false;
-    }
-
     if (approvalDateMode === 'week') {
       return Boolean(approvalWeekDate);
     }
 
     return Boolean(approvalMonth);
-  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalDateTouched, approvalMonth, approvalWeekDate]);
+  }, [approvalDateFrom, approvalDateMode, approvalDateTo, approvalMonth, approvalWeekDate]);
 
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||

@@ -278,33 +278,15 @@ export function useChatRoomDataSync({
     [setChatRooms],
   );
 
-  const persistRoomSummary = useCallback(
-    async (roomId: string | null | undefined, summary: Pick<RoomSummary, 'last_message_preview' | 'last_message_at'>) => {
-      const targetRoomId = String(roomId || '').trim();
-      if (!targetRoomId) return;
 
-      const { error } = await supabase
-        .from('chat_rooms')
-        .update({
-          last_message_preview: summary.last_message_preview,
-          last_message_at: summary.last_message_at,
-        })
-        .eq('id', targetRoomId);
-      if (error) {
-        console.error('채팅방 미리보기 저장 실패:', error);
-      }
-    },
-    [],
-  );
 
   const syncRoomSummaryFromMessages = useCallback(
     (roomId: string | null | undefined, sourceMessages: ChatMessage[]) => {
       const summary = buildRoomSummaryFromMessages(roomId, sourceMessages);
       applyRoomSummaryToState(roomId, summary);
-      void persistRoomSummary(roomId, summary);
       return summary;
     },
-    [applyRoomSummaryToState, buildRoomSummaryFromMessages, persistRoomSummary],
+    [applyRoomSummaryToState, buildRoomSummaryFromMessages],
   );
 
   const getSelectedConversationContext = useCallback(
@@ -721,15 +703,6 @@ export function useChatRoomDataSync({
       applyRoomSummaryToState(roomIdForFetch, fetchedRoomSummary);
 
       if (includeRoomLevelMeta) {
-        const currentPreviewText =
-          selectedRoomRecord.last_message_preview ?? selectedRoomRecord.last_message ?? null;
-        const currentPreviewAt = selectedRoomRecord.last_message_at ?? null;
-        if (
-          currentPreviewText !== fetchedRoomSummary.last_message_preview ||
-          currentPreviewAt !== fetchedRoomSummary.last_message_at
-        ) {
-          await persistRoomSummary(roomIdForFetch, fetchedRoomSummary);
-        }
         if (!isCurrentRequest()) return;
       }
 
@@ -1040,7 +1013,6 @@ export function useChatRoomDataSync({
     [
       buildRoomSummaryFromMessages,
       applyRoomSummaryToState,
-      persistRoomSummary,
       getEffectiveRoomMemberIds,
       effectiveTodoUserId,
       setRoomUnreadCounts,
@@ -1359,15 +1331,6 @@ export function useChatRoomDataSync({
     const fetchedRoomSummary = buildRoomSummaryFromMessages(roomIdForFetch, loadedMessages);
     applyRoomSummaryToState(roomIdForFetch, fetchedRoomSummary);
 
-    const currentPreviewText =
-      selectedRoomRecord.last_message_preview ?? selectedRoomRecord.last_message ?? null;
-    const currentPreviewAt = selectedRoomRecord.last_message_at ?? null;
-    if (
-      currentPreviewText !== fetchedRoomSummary.last_message_preview ||
-      currentPreviewAt !== fetchedRoomSummary.last_message_at
-    ) {
-      await persistRoomSummary(roomIdForFetch, fetchedRoomSummary);
-    }
     if (!isCurrentRequest()) return;
 
     const [
@@ -1648,7 +1611,6 @@ export function useChatRoomDataSync({
     getEffectiveRoomMemberIds,
     isRoomAccessibleToCurrentUser,
     pendingBottomAlignRoomIdRef,
-    persistRoomSummary,
     requestBottomAlignmentHold,
     repairDirectRooms,
     resolveStaffProfile,

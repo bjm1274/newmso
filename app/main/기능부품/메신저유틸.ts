@@ -209,7 +209,7 @@ export function isMessageReadByCursor(messageCreatedAt: string | null | undefine
   const messageTime = toChatDate(messageCreatedAt).getTime();
   const cursorTime = toChatDate(lastReadAt).getTime();
   if (!Number.isFinite(messageTime) || !Number.isFinite(cursorTime)) return false;
-  return cursorTime >= messageTime;
+  return cursorTime + 1000 >= messageTime;
 }
 
 export function getLatestReadCursor(
@@ -223,7 +223,7 @@ export function getLatestReadCursor(
   const nextTime = toChatDate(nextValue).getTime();
   if (!Number.isFinite(currentTime)) return Number.isFinite(nextTime) ? nextValue : currentValue;
   if (!Number.isFinite(nextTime)) return currentValue;
-  return nextTime >= currentTime ? nextValue : currentValue;
+  return nextTime + 1000 >= currentTime ? nextValue : currentValue;
 }
 
 export function isActiveNoticeMember(staff: StaffMember | null | undefined): boolean {

@@ -211,12 +211,10 @@ export function getDateRangeFromWeek(dateValue: string) {
     return { from: '', to: '' };
   }
 
-  const dayOfWeek = anchorDate.getDay();
-  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const weekStart = new Date(anchorDate);
-  weekStart.setDate(anchorDate.getDate() - diffToMonday);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+  weekStart.setDate(anchorDate.getDate() - 3);
+  const weekEnd = new Date(anchorDate);
+  weekEnd.setDate(anchorDate.getDate() + 3);
 
   return {
     from: toLocalDateKey(weekStart),

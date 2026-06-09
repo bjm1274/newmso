@@ -248,8 +248,7 @@ export function useChatRealtimeSubscriptions({
       [{ table: 'messages' }],
       () => {
         void fetchDataLatestRef.current({ force: true });
-      },
-      { pollIntervalMs: 4000 },
+      { pollIntervalMs: 2000 },
     );
     return () => {
       globalRealtimeHealthyRef.current = false;
@@ -336,7 +335,7 @@ export function useChatRealtimeSubscriptions({
       // 메시지 외 갱신이 사실상 polling으로 안 흐르던 상태였음. whitelist 복구
       // 후엔 1500ms로 환원해 읽음 표시·반응·핀·투표 갱신 체감 즉시.
       // 본인 send 시 pokeChannel로 즉시 트리거하므로 주기에 의존하지 않음.
-      { pollIntervalMs: 1500 },
+      { pollIntervalMs: 1000 },
     );
 
     return () => {

@@ -1607,7 +1607,7 @@ export default function NotificationSystem({
         void syncBadge();
         void broadcastNotificationList();
       },
-      { pollIntervalMs: 30_000 },
+      { pollIntervalMs: 3_000 },
     );
     // initial: fetch once + prime metadata + broadcast 초기 list
     void fetchUnreadNotificationsSince(mountedAt);
