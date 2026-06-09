@@ -59,7 +59,9 @@ export function useApprovalActions({
   }, [resolveCurrentApproverId, user?.id]);
 
   const canUserRecallItem = useCallback((item: ApprovalRecord) => {
-    if (item?.status !== '대기' || !user?.id) return false;
+    if (!user?.id) return false;
+    const status = String(item?.status || '');
+    if (status !== '대기' && !status.includes('반려')) return false;
     return String(item?.sender_id || '') === String(user.id);
   }, [user?.id]);
 

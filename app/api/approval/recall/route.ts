@@ -71,12 +71,12 @@ export async function POST(request: NextRequest) {
     const rowStatus = String(approvalRow.status || '');
     const rowSenderId = String(approvalRow.sender_id || '');
 
-    // ── 4. 권한 검증 — 기안자 본인 + 대기 상태 ──
+    // ── 4. 권한 검증 — 기안자 본인 + 대기/반려 상태 ──
     if (!rowSenderId || rowSenderId !== actorStaffId) {
       return NextResponse.json({ ok: false, error: '기안자 본인만 회수할 수 있습니다.' }, { status: 403 });
     }
-    if (rowStatus !== '대기') {
-      const already = rowStatus === '회수' ? '이미 회수된 문서입니다.' : '대기 상태가 아닌 문서는 회수할 수 없습니다.';
+    if (rowStatus !== '대기' && !rowStatus.includes('반려')) {
+      const already = rowStatus === '회수' ? '이미 회수된 문서입니다.' : '현재 상태에서는 문서를 회수할 수 없습니다.';
       return NextResponse.json({ ok: false, error: already }, { status: 400 });
     }
 

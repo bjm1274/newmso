@@ -285,41 +285,40 @@ export default function ApprovalDetailModal({
             </div>
           )}
         </div>
-        {detailStatus === '대기' && (
-          <div className="border-t border-[var(--border)] safe-area-pb">
-            {canUserApproveItem(item) ? (
-              <div className="px-4 py-3 md:px-4 md:py-3 space-y-2">
-                {/* 주 액션: 승인 / 반려 */}
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={async () => { await handleApproveAction(item); onClose(); }}
-                    className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold hover:opacity-90 transition-opacity"
-                  >
-                    승인
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => { await handleRejectAction(item); onClose(); }}
-                    className="flex-1 py-3 bg-[var(--danger-light)] border border-[var(--danger)]/20 text-[var(--danger)] rounded-[var(--radius-lg)] text-sm font-bold hover:bg-[var(--danger)]/20 transition-all"
-                  >
-                    반려
-                  </button>
-                </div>
-              </div>
-            ) : canUserRecallItem(item) ? (
-              <div className="px-4 py-3 md:px-4 md:py-3">
+        {(detailStatus === '대기' || (detailStatus && detailStatus.includes('반려'))) && (
+          <div className="border-t border-[var(--border)] safe-area-pb px-4 py-3 md:px-4 md:py-3 space-y-2">
+            {canUserApproveItem(item) && (
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  data-testid="approval-detail-recall"
-                  onClick={async () => { await handleRecallAction(item); }}
-                  className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-amber-100 transition-all"
+                  onClick={async () => { await handleApproveAction(item); onClose(); }}
+                  className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold hover:opacity-90 transition-opacity"
                 >
-                  회수 후 수정
+                  승인
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => { await handleRejectAction(item); onClose(); }}
+                  className="flex-1 py-3 bg-[var(--danger-light)] border border-[var(--danger)]/20 text-[var(--danger)] rounded-[var(--radius-lg)] text-sm font-bold hover:bg-[var(--danger)]/20 transition-all"
+                >
+                  반려
                 </button>
               </div>
-            ) : (
-              <p className="px-4 py-3 text-[11px] text-[var(--toss-gray-3)] text-center">결재자 계정에서만 승인·반려할 수 있습니다.</p>
+            )}
+            
+            {canUserRecallItem(item) && (
+              <button
+                type="button"
+                data-testid="approval-detail-recall"
+                onClick={async () => { await handleRecallAction(item); onClose(); }}
+                className="w-full py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-amber-100 transition-all"
+              >
+                회수 후 수정
+              </button>
+            )}
+
+            {!canUserApproveItem(item) && !canUserRecallItem(item) && (
+              <p className="text-[11px] text-[var(--toss-gray-3)] text-center">결재자 계정에서만 승인·반려할 수 있습니다.</p>
             )}
           </div>
         )}
