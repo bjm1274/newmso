@@ -14,7 +14,7 @@
  * JM6: button 시맨틱, aria-label, aria-live
  */
 
-import { memo, useState, useCallback, useRef } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import type { ErpUser } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
@@ -146,6 +146,22 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const counts = useTodayCounts(staffId);
 
   const { dialog, openPrompt } = useActionDialog();
+
+  const [permissionState, setPermissionState] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    const handleFocus = () => {
+      setPermissionState(Notification.permission);
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const [notifEnabled, setNotifEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -641,8 +657,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     style={{
                       width: 16,
                       height: 16,
-                      borderRadius: '50%',
-                      background: '#fff',
+                  background: '#fff',
                       position: 'absolute',
                       top: 2,
                       left: notifEnabled ? 18 : 2,
@@ -652,6 +667,65 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 </div>
               </button>
             </div>
+
+            {/* 알림 권한 경고 및 재설정 영역 */}
+            {permissionState !== 'granted' && (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  background: 'var(--m-danger-soft)',
+                  borderBottom: '1px solid var(--m-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--m-danger)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <MIcon name="alertTri" size={15} />
+                  <span>브라우저 알림 권한이 허용되지 않았습니다.</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--z-600)', lineHeight: 1.5, fontWeight: 500 }}>
+                  {permissionState === 'denied'
+                    ? '알림 권한이 차단되어 있습니다. 실시간 알림을 받으려면 브라우저 또는 기기 설정에서 알림 권한을 "허용"으로 변경해 주세요.'
+                    : '알림 권한 요청을 승인해야 실시간 대화 및 전자결재 알림을 받아보실 수 있습니다.'}
+                </div>
+                {permissionState === 'default' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (typeof window !== 'undefined' && 'Notification' in window) {
+                        try {
+                          const res = await Notification.requestPermission();
+                          setPermissionState(res);
+                          if (res === 'granted') {
+                            toast('알림 권한이 승인되었습니다.', 'success');
+                          } else if (res === 'denied') {
+                            toast('알림 권한이 거부되었습니다. 기기 설정에서 알림을 허용해야 합니다.', 'warning');
+                          }
+                        } catch {
+                          toast('알림 권한 요청 중 오류가 발생했습니다.', 'error');
+                        }
+                      }
+                    }}
+                    style={{
+                      alignSelf: 'flex-start',
+                      padding: '6px 12px',
+                      background: 'var(--m-danger)',
+                      color: '#fff',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      border: 0,
+                      cursor: 'pointer',
+                      marginTop: 2,
+                    }}
+                    aria-label="알림 권한 허용하기"
+                  >
+                    알림 권한 허용하기
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* 비밀번호 변경 */}
             <button

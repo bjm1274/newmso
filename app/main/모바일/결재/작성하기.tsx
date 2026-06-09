@@ -41,6 +41,16 @@ const FORM_CATEGORIES: FormCategory[] = [
     ],
   },
   {
+    g: '인사/징계',
+    items: [
+      { slug: 'probation_evaluation', name: '수습직원평가서' },
+      { slug: 'salary_increase_evaluation', name: '급여인상평가서' },
+      { slug: 'contract_end_notice', name: '계약종료 통보' },
+      { slug: 'dismissal_notice', name: '해고통보' },
+      { slug: 'disciplinary_attendance_request', name: '징계위원회 출석요구서' },
+    ],
+  },
+  {
     g: '문서',
     items: [
       { slug: 'draft_business', name: '업무기안' },

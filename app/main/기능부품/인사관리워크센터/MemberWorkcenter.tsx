@@ -167,13 +167,13 @@ export default function MemberWorkcenter({
 
         {tab === 'appointment' && (
           <WorkcenterEmbed label="인사발령">
-            <AppointmentBoard staffs={filteredStaffs} selectedCo={selectedCo} user={user} />
+            <AppointmentBoard staffs={staffs} selectedCo={selectedCo} user={user} />
           </WorkcenterEmbed>
         )}
 
         {tab === 'disciplinary' && (
           <WorkcenterEmbed label="징계">
-            <DisciplinaryBoard staffs={filteredStaffs} selectedCo={selectedCo} user={user} />
+            <DisciplinaryBoard staffs={staffs} selectedCo={selectedCo} user={user} />
           </WorkcenterEmbed>
         )}
 
@@ -185,7 +185,7 @@ export default function MemberWorkcenter({
 
         {tab === 'accident' && (
           <WorkcenterEmbed label="사고보고서">
-            <IncidentReport staffs={filteredStaffs} selectedCo={selectedCo || '전체'} user={user} />
+            <IncidentReport staffs={staffs} selectedCo={selectedCo || '전체'} user={user} />
           </WorkcenterEmbed>
         )}
 

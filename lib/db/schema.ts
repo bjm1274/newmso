@@ -728,6 +728,7 @@ export const employment_contracts = sqliteTable("employment_contracts", {
 },
 (table) => [
 	index("idx_contracts_staff_id").on(table.staff_id),
+	uniqueIndex("idx_contracts_staff_contract_type").on(table.staff_id, table.contract_type),
 ]);
 
 export const freelancer_payments = sqliteTable("freelancer_payments", {

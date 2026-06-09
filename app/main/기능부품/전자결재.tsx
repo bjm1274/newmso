@@ -1225,7 +1225,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         {viewMode === '작성하기' ? (
           <ApprovalComposerView
             user={user}
-            staffs={scopedStaffs}
+            staffs={staffs.filter(isActiveStaff)}
             draftBanner={draftBanner}
             setDraftBanner={setDraftBanner}
             loadDraftFromStorage={loadDraftFromStorage}

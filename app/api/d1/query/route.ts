@@ -324,7 +324,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // DDD (Disciplinary Table Auto-provisioning)
+    // DDD (Disciplinary Table Auto-provisioning & Unique Index)
     try {
       await d1.exec(`
         CREATE TABLE IF NOT EXISTS \`disciplinary_committees\` (
@@ -341,9 +341,10 @@ export async function POST(request: Request) {
           \`committee_members\` text,
           \`created_at\` text DEFAULT (CURRENT_TIMESTAMP)
         );
+        CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
       `);
     } catch (err) {
-      console.error('Failed to auto-provision disciplinary_committees table:', err);
+      console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
     }
 
     const db = getD1Drizzle(d1);
