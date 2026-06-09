@@ -104,7 +104,7 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   건강검진: 'welfare',
   '면허/자격증': 'welfare',
   의료기기점검: 'welfare',
-  사고보고서: 'welfare',
+  사고보고서: 'member',
   // 계약·문서
   계약: 'docs',
   문서센터: 'docs',

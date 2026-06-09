@@ -90,7 +90,7 @@ export default function ModSettlement() {
     {
       id: 4,
       label: '지급 처리',
-      body: `은행 이체 파일(.txt) 생성 · 총 ${kpis.netPaySum.toLocaleString()}원 지급.`,
+      body: `은행 이체 파일(.xlsx) 생성 · 총 ${kpis.netPaySum.toLocaleString()}원 지급.`,
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '이체 파일 다운로드',
       date: `예정 ${m}/${payrollDay}`,
@@ -107,34 +107,41 @@ export default function ModSettlement() {
 
   const doneCount = steps.filter((s) => s.state === 'done').length;
 
-  const downloadTransferFile = () => {
+  const downloadTransferFile = async () => {
     const confirmedRecords = data.records.filter(r => (r.status === '확정' || r.status === 'CONFIRMED') && r.net_pay > 0);
     if (confirmedRecords.length === 0) {
       toast('확정된 급여 내역이 없습니다. 먼저 급여 정산을 완료하여 확정해 주세요.', 'warning');
       return;
     }
 
-    let fileContent = '이름\t은행명\t계좌번호\t이체금액\r\n';
-    confirmedRecords.forEach(record => {
-      const staff = data.staffs.find(s => String(s.id) === String(record.staff_id));
-      const perms = staff?.permissions;
-      const name = (staff?.name || '미지정').trim();
-      const bankName = (staff?.bank_name || perms?.bank_name || '미지정').toString().trim();
-      const bankAccount = (staff?.bank_account || perms?.bank_account || '미지정').toString().trim();
-      const amount = record.net_pay;
-      fileContent += `${name}\t${bankName}\t${bankAccount}\t${amount}\r\n`;
-    });
+    try {
+      const XLSX = await import('xlsx');
 
-    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `급여이체내역_${data.yearMonth}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast('급여 이체 파일 다운로드가 시작되었습니다.', 'success');
+      const excelData = confirmedRecords.map(record => {
+        const staff = data.staffs.find(s => String(s.id) === String(record.staff_id));
+        const perms = staff?.permissions;
+        const name = (staff?.name || '미지정').trim();
+        const bankName = (staff?.bank_name || perms?.bank_name || '미지정').toString().trim();
+        const bankAccount = (staff?.bank_account || perms?.bank_account || '미지정').toString().trim();
+        const amount = record.net_pay;
+        return {
+          '이름': name,
+          '은행명': bankName,
+          '계좌번호': bankAccount,
+          '이체금액': amount
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '급여이체내역');
+
+      XLSX.writeFile(workbook, `급여이체내역_${data.yearMonth}.xlsx`);
+      toast('급여 이체 파일 다운로드가 시작되었습니다.', 'success');
+    } catch (error) {
+      console.error('Failed to export excel file:', error);
+      toast('엑셀 파일 생성 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   const handleAdvance = () => {

@@ -26,6 +26,7 @@ export type MessageBubbleProps = {
   staffs: StaffDirectoryEntry[];
   fallbackMyName: string;
   readCount?: number;
+  isGroupChat?: boolean;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
@@ -59,10 +60,13 @@ export default function MessageBubble({
   staffs,
   fallbackMyName,
   readCount = 0,
+  isGroupChat = false,
   onToggleReaction,
   onReply,
   onImageLoad,
 }: MessageBubbleProps) {
+  const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
+
   const ts = formatBubbleTimestamp(message.created_at);
   const senderName =
     message.sender_name ||
@@ -350,7 +354,7 @@ export default function MessageBubble({
           >
             {mine && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                {readCount > 0 && (
+                {displayedReadCount > 0 && (
                   <span
                     style={{
                       fontSize: 10,
@@ -360,7 +364,7 @@ export default function MessageBubble({
                       textUnderlineOffset: '2px',
                     }}
                   >
-                    {readCount}
+                    {displayedReadCount}
                   </span>
                 )}
                 <span
@@ -472,7 +476,7 @@ export default function MessageBubble({
 
             {!mine && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-                {readCount > 0 && (
+                {displayedReadCount > 0 && (
                   <span
                     style={{
                       fontSize: 10,
@@ -482,7 +486,7 @@ export default function MessageBubble({
                       textUnderlineOffset: '2px',
                     }}
                   >
-                    {readCount}
+                    {displayedReadCount}
                   </span>
                 )}
                 <span

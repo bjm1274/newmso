@@ -417,7 +417,9 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           userName={userName}
           staffs={staffs}
           readCounts={readCounts}
+          isGroupChat={isGroup}
           onToggleReaction={handleToggleReaction}
+
           onReply={(msg) => {
             setReplyTo(msg);
             setTimeout(() => composerInputRef.current?.focus(), 50);

@@ -87,7 +87,6 @@ const WELFARE_TABS: WorkcenterTab<WelfareTabId>[] = [
   { id: 'checkup', label: '건강검진' },
   { id: 'license', label: '면허·자격' },
   { id: 'device', label: '의료기기 점검' },
-  { id: 'incident', label: '사고보고서' },
 ];
 
 // ─── KPI 카운트 타입 ────────────────────────────────────────────────
@@ -401,18 +400,7 @@ export default function WelfareWorkcenter({
           >
             의료기기 점검
           </button>
-          <button
-            type="button"
-            data-testid="compliance-suite-3"
-            onClick={() => setTab('incident')}
-            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] border transition-all ${
-              tab === 'incident'
-                ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--muted)]'
-            }`}
-          >
-            사고보고서
-          </button>
+
         </div>
 
         {tab === 'calendar' && (
@@ -457,17 +445,7 @@ export default function WelfareWorkcenter({
             </WorkcenterEmbed>
           </div>
         )}
-        {tab === 'incident' && (
-          <div className="flex flex-col gap-3">
-            <WorkcenterEmbed label="사고보고서">
-              <IncidentReport
-                staffs={staffs}
-                selectedCo={selectedCo || '전체'}
-                user={user}
-              />
-            </WorkcenterEmbed>
-          </div>
-        )}
+
       </div>
     </WorkcenterShell>
   );

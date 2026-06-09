@@ -186,6 +186,37 @@ function buildWorkDayText(
     return explicitWorkingDays;
   }
 
+  // 모든 shift 레코드들 모아서 토요일 근무 여부 확인
+  const allShifts: Record<string, unknown>[] = [];
+  if (Array.isArray(shift)) {
+    shift.forEach(s => {
+      if (s && typeof s === 'object') {
+        allShifts.push(s as Record<string, unknown>);
+        const rotation = (s as Record<string, unknown>).weekly_rotation_shifts;
+        if (Array.isArray(rotation)) {
+          rotation.forEach(r => r && typeof r === 'object' && allShifts.push(r as Record<string, unknown>));
+        }
+      }
+    });
+  } else if (shift && typeof shift === 'object') {
+    allShifts.push(shift as Record<string, unknown>);
+    const rotation = (shift as Record<string, unknown>).weekly_rotation_shifts;
+    if (Array.isArray(rotation)) {
+      rotation.forEach(r => r && typeof r === 'object' && allShifts.push(r as Record<string, unknown>));
+    }
+  }
+
+  const hasSaturdayWork = allShifts.some(s => {
+    const isWeekendWork = s.is_weekend_work === true || s.is_weekend_work === 1 || String(s.is_weekend_work) === 'true';
+    const weeklyWorkDays = Number(s.weekly_work_days || 0);
+    const nameIncludesSat = String(s.name || '').includes('토');
+    return isWeekendWork || weeklyWorkDays >= 6 || nameIncludesSat;
+  });
+
+  if (hasSaturdayWork) {
+    return '월요일~토요일 (또는 근무표에 따른 요일)';
+  }
+
   const workDayMode = resolveWorkDayMode(workingDaysPerWeek, shift, contract, user);
   if (workDayMode === 'all_days') return '근무표에 따른 요일';
 

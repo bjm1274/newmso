@@ -2640,5 +2640,21 @@ export const external_integrations = sqliteTable("external_integrations", {
 	uniqueIndex("idx_external_integrations_vendor").on(table.vendor),
 ]);
 
+export const disciplinary_committees = sqliteTable("disciplinary_committees", {
+	id: text().primaryKey().notNull(),
+	company: text(),
+	title: text().notNull(),
+	meeting_date: text(),
+	target_staff_id: text().notNull(),
+	target_staff_name: text().notNull(),
+	status: text().default("대기"),
+	reason: text().notNull(),
+	result_type: text(),
+	result_details: text(),
+	committee_members: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+});
+
+
 
 

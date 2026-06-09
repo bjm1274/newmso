@@ -727,3 +727,236 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
     </div>
   );
 }
+
+// 수습평가 문항 12개
+const PROBATION_QUESTIONS = [
+  { key: 'q1', label: '1. 직무 수행 능력 (기본 직무 역량)' },
+  { key: 'q2', label: '2. 업무 정확성 및 처리 속도' },
+  { key: 'q3', label: '3. 근무 태도 및 근태 관리' },
+  { key: 'q4', label: '4. 협동심 및 대인 관계 (부서 내 융화)' },
+  { key: 'q5', label: '5. 책임감 및 성실성' },
+  { key: 'q6', label: '6. 규정 준수 및 기밀 유지' },
+  { key: 'q7', label: '7. 지시 이행 및 복종도' },
+  { key: 'q8', label: '8. 의사소통 및 업무 보고 방식' },
+  { key: 'q9', label: '9. 발전 가능성 및 적극성' },
+  { key: 'q10', label: '10. 직무 이해도 및 신기술 습득 속도' },
+  { key: 'q11', label: '11. 고객(환자) 응대 친절도 및 자세' },
+  { key: 'q12', label: '12. 애사심 및 소속감' },
+];
+
+// 급여인상평가 문항 8개
+const SALARY_QUESTIONS = [
+  { key: 's1', label: '1. 목표 달성도 (성과 달성률)' },
+  { key: 's2', label: '2. 업무 기여도 및 난이도 수행력' },
+  { key: 's3', label: '3. 위기 대처 및 문제 해결 능력' },
+  { key: 's4', label: '4. 역량 개발 및 교육 이수 성실도' },
+  { key: 's5', label: '5. 근무 성실도 및 규율 준수' },
+  { key: 's6', label: '6. 리더십 및 팀워크 기여도' },
+  { key: 's7', label: '7. 원가 절감 및 생산성 향상 노력' },
+  { key: 's8', label: '8. 고객 만족도 및 대외 평판도' },
+];
+
+export function EmployeeEvaluationPanel({ metaData }: { metaData: ApprovalMetaData }) {
+  if (!metaData || (metaData.evaluationType !== 'probation' && metaData.evaluationType !== 'salary_increase')) {
+    return null;
+  }
+
+  const isProbation = metaData.evaluationType === 'probation';
+  const scores = (metaData.scores as Record<string, number>) || {};
+  const totalScore = metaData.totalScore as number || 0;
+  const targetStaffName = metaData.targetStaffName as string || '';
+  const review = metaData.review as string || '';
+
+  return (
+    <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+      <div className="border-b border-[var(--border)] px-4 py-3">
+        <h4 className="text-sm font-bold text-[var(--foreground)]">
+          {isProbation ? '수습직원 평가 보고서' : '급여 인상 심사 보고서'}
+        </h4>
+      </div>
+      
+      {/* 기본 정보 */}
+      <div className="grid gap-0 divide-y divide-[var(--border)] text-xs border-b border-[var(--border)]">
+        <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+          <span className="font-bold text-[var(--toss-gray-4)]">평가 대상자</span>
+          <span className="font-semibold text-[var(--foreground)]">{targetStaffName || '-'}</span>
+        </div>
+        {isProbation ? (
+          <>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">입사일</span>
+              <span className="font-semibold text-[var(--foreground)]">{metaData.joinDate as string || '-'}</span>
+            </div>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">평가 대상 기간</span>
+              <span className="font-semibold text-[var(--foreground)]">
+                {metaData.periodStart as string || '-'} ~ {metaData.periodEnd as string || '-'}
+              </span>
+            </div>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">최종 판정 의견</span>
+              <span className="font-black text-blue-600">{metaData.decision as string || '-'}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">현재 기본급</span>
+              <span className="font-semibold text-[var(--foreground)]">
+                {typeof metaData.currentSalary === 'number' ? `${metaData.currentSalary.toLocaleString('ko-KR')}원` : '-'}
+              </span>
+            </div>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">인상 비율</span>
+              <span className="font-bold text-blue-600">+{metaData.raisePercent as number || 0}%</span>
+            </div>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">인상 후 기본급</span>
+              <span className="font-black text-[var(--accent)]">
+                {typeof metaData.newSalary === 'number' ? `${metaData.newSalary.toLocaleString('ko-KR')}원` : '-'}
+              </span>
+            </div>
+            <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 px-4 py-3">
+              <span className="font-bold text-[var(--toss-gray-4)]">적용 예정 월</span>
+              <span className="font-semibold text-[var(--foreground)]">{metaData.effectiveMonth as string || '-'}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 평가 항목 테이블 */}
+      <div className="p-4 border-b border-[var(--border)]">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs font-bold text-[var(--foreground)]">평가 요소 상세</span>
+          <span className="text-xs font-black text-blue-600">
+            총점: {totalScore} / {isProbation ? '60' : '80'}점
+          </span>
+        </div>
+        <div className="overflow-hidden border border-[var(--border)] rounded-lg">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold border-b border-[var(--border)]">
+                <th className="px-3 py-2">평가 항목</th>
+                <th className="px-3 py-2 text-right w-24">평가 점수</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)] bg-[var(--card)]">
+              {(isProbation ? PROBATION_QUESTIONS : SALARY_QUESTIONS).map((q) => {
+                const score = scores[q.key] || 0;
+                return (
+                  <tr key={q.key} className="hover:bg-slate-50/50">
+                    <td className="px-3 py-2 text-[var(--foreground)] font-medium">{q.label}</td>
+                    <td className="px-3 py-2 text-right font-black text-blue-600">
+                      {score}점 / {isProbation ? '5' : '10'}점
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 평가 의견 */}
+      <div className="p-4 text-xs">
+        <span className="font-bold text-[var(--toss-gray-4)] block mb-1.5">
+          {isProbation ? '종합 평가 의견' : '심사 및 평가 의견'}
+        </span>
+        <div className="bg-[var(--muted)]/50 p-3 rounded-lg leading-relaxed text-[var(--foreground)] font-medium whitespace-pre-wrap">
+          {review || '의견이 작성되지 않았습니다.'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function renderEmployeeEvaluationHtml(metaData: ApprovalMetaData) {
+  if (!metaData || (metaData.evaluationType !== 'probation' && metaData.evaluationType !== 'salary_increase')) {
+    return '';
+  }
+
+  const isProbation = metaData.evaluationType === 'probation';
+  const scores = (metaData.scores as Record<string, number>) || {};
+  const totalScore = metaData.totalScore as number || 0;
+  const targetStaffName = metaData.targetStaffName as string || '';
+  const review = metaData.review as string || '';
+
+  const basicRows = isProbation
+    ? [
+        ['평가 대상자', targetStaffName],
+        ['입사일', metaData.joinDate as string],
+        ['평가 대상 기간', `${metaData.periodStart as string || '-'} ~ ${metaData.periodEnd as string || '-'}`],
+        ['최종 판정 의견', metaData.decision as string],
+      ]
+    : [
+        ['평가 대상자', targetStaffName],
+        ['현재 기본급', typeof metaData.currentSalary === 'number' ? `${metaData.currentSalary.toLocaleString('ko-KR')}원` : '-'],
+        ['인상 비율', `+${metaData.raisePercent as number || 0}%`],
+        ['인상 후 기본급', typeof metaData.newSalary === 'number' ? `${metaData.newSalary.toLocaleString('ko-KR')}원` : '-'],
+        ['적용 예정 월', metaData.effectiveMonth as string],
+      ];
+
+  const questions = isProbation ? PROBATION_QUESTIONS : SALARY_QUESTIONS;
+  const maxScore = isProbation ? 5 : 10;
+  const totalMaxScore = isProbation ? 60 : 80;
+
+  const basicInfoTableRows = basicRows
+    .filter(([, value]) => value)
+    .map(
+      ([label, value]) => `
+      <tr>
+        <th style="width: 120px; background: rgba(21, 94, 239, 0.08); font-weight: 800; color: #475569; padding: 8px 12px; border-bottom: 1px solid #cbd5e1; text-align: left; vertical-align: top;">${escapeHtml(label)}</th>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #cbd5e1; text-align: left; vertical-align: top;">${escapeHtml(value)}</td>
+      </tr>`
+    )
+    .join('');
+
+  const detailTableRows = questions
+    .map((q) => {
+      const score = scores[q.key] || 0;
+      return `
+      <tr>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #cbd5e1; text-align: left; vertical-align: top;">${escapeHtml(q.label)}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #cbd5e1; text-align: right; vertical-align: top; font-weight: bold; color: #155eef; width: 100px;">${score}점 / ${maxScore}점</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `
+    <div class="section" style="margin-top: 16px;">
+      <div class="section-title" style="margin-size: 14px; font-weight: 800; color: #111827; margin-bottom: 8px;">${isProbation ? '수습직원 평가 보고서' : '급여 인상 심사 보고서'}</div>
+      
+      <table class="supply-table" style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; font-size: 12px; margin-bottom: 12px;">
+        <tbody>
+          ${basicInfoTableRows}
+        </tbody>
+      </table>
+
+      <div style="margin-bottom: 8px; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between;">
+        <span style="color: #111827;">평가 요소 상세</span>
+        <span style="color: #155eef;">총점: ${totalScore} / ${totalMaxScore}점</span>
+      </div>
+
+      <table class="supply-table" style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; font-size: 12px; margin-bottom: 12px;">
+        <thead>
+          <tr style="background: rgba(21, 94, 239, 0.08); color: #475569;">
+            <th style="padding: 8px 12px; text-align: left; font-weight: 800;">평가 항목</th>
+            <th style="padding: 8px 12px; text-align: right; width: 100px; font-weight: 800;">평가 점수</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${detailTableRows}
+        </tbody>
+      </table>
+
+      <table class="supply-table" style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; font-size: 12px;">
+        <tbody>
+          <tr>
+            <th style="width: 120px; background: rgba(21, 94, 239, 0.08); font-weight: 800; color: #475569; padding: 8px 12px; text-align: left; vertical-align: top;">${isProbation ? '종합 평가 의견' : '심사 및 평가 의견'}</th>
+            <td style="padding: 8px 12px; text-align: left; vertical-align: top; white-space: pre-wrap; word-break: break-all;">${escapeHtml(review || '의견이 작성되지 않았습니다.')}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}

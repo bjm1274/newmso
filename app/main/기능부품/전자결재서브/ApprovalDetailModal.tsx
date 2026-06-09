@@ -11,6 +11,7 @@ import {
   LeaveRequestInfoPanel,
   ReportInfoPanel,
   RosterRequestInfoPanel,
+  EmployeeEvaluationPanel,
 } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
@@ -231,6 +232,7 @@ export default function ApprovalDetailModal({
             <LeaveRequestInfoPanel metaData={detailMetaData} />
             <ReportInfoPanel metaData={detailMetaData} />
             <RosterRequestInfoPanel metaData={detailMetaData} />
+            <EmployeeEvaluationPanel metaData={detailMetaData} />
             <ApprovalAttachmentsPanel metaData={detailMetaData} />
           </div>
 

@@ -247,18 +247,20 @@ export function useMobileChatReadCounts(
 
       messages.forEach((msg) => {
         const msgTime = new Date(msg.created_at || 0).getTime();
+        
+        // 발신자 제외 수신자 목록
+        const recipientIds = memberIds.filter((mId) => mId !== String(msg.sender_id));
+        const totalRecipients = recipientIds.length;
+
         let readers = 0;
-        memberIds.forEach((mId) => {
-          if (mId === String(msg.sender_id)) {
+        recipientIds.forEach((mId) => {
+          const cursor = cursors.find((c: any) => String(c.user_id) === mId);
+          if (cursor && new Date(cursor.last_read_at).getTime() >= msgTime) {
             readers++;
-          } else {
-            const cursor = cursors.find((c: any) => String(c.user_id) === mId);
-            if (cursor && new Date(cursor.last_read_at).getTime() >= msgTime) {
-              readers++;
-            }
           }
         });
-        counts[String(msg.id)] = readers;
+
+        counts[String(msg.id)] = Math.max(0, totalRecipients - readers);
       });
       setReadCounts(counts);
     };

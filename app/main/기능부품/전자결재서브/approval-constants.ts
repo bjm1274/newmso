@@ -24,6 +24,9 @@ export const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
   { slug: 'probation_evaluation', name: '수습직원평가서' },
   { slug: 'salary_increase_evaluation', name: '급여인상평가서' },
+  { slug: 'contract_end_notice', name: '계약종료 통보' },
+  { slug: 'dismissal_notice', name: '해고통보' },
+  { slug: 'disciplinary_attendance_request', name: '징계위원회 출석요구서' },
 ] as const;
 
 export const BUILTIN_FORM_TYPE_NAMES = BUILTIN_FORM_TYPE_DEFINITIONS.map((item) => item.name);

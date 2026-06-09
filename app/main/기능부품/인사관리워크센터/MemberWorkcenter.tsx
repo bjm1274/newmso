@@ -37,13 +37,26 @@ import AppointmentBoard from './MemberWorkcenter/AppointmentBoard';
 import EducationBoard from './MemberWorkcenter/EducationBoard';
 import OffboardingView from '../인사관리서브/오프보딩';
 import StaffListManager from '../인사관리서브/구성원현황';
+import dynamic from 'next/dynamic';
 
-type MemberTabId = 'list' | 'appointment' | 'education' | 'offboarding';
+const DisciplinaryBoard = dynamic(
+  () => import('./MemberWorkcenter/DisciplinaryBoard'),
+  { ssr: false, loading: () => <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">로딩 중…</div> }
+);
+
+const IncidentReport = dynamic(
+  () => import('../인사관리서브/사고보고서'),
+  { ssr: false, loading: () => <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">로딩 중…</div> }
+);
+
+type MemberTabId = 'list' | 'appointment' | 'disciplinary' | 'education' | 'accident' | 'offboarding';
 
 const MEMBER_TABS: WorkcenterTab<MemberTabId>[] = [
   { id: 'list', label: '구성원' },
   { id: 'appointment', label: '인사발령' },
+  { id: 'disciplinary', label: '징계' },
   { id: 'education', label: '교육·자격' },
+  { id: 'accident', label: '사고보고서' },
   { id: 'offboarding', label: '오프보딩' },
 ];
 
@@ -158,9 +171,21 @@ export default function MemberWorkcenter({
           </WorkcenterEmbed>
         )}
 
+        {tab === 'disciplinary' && (
+          <WorkcenterEmbed label="징계">
+            <DisciplinaryBoard staffs={filteredStaffs} selectedCo={selectedCo} user={user} />
+          </WorkcenterEmbed>
+        )}
+
         {tab === 'education' && (
           <WorkcenterEmbed label="교육·자격">
             <EducationBoard staffs={filteredStaffs} selectedCo={selectedCo} />
+          </WorkcenterEmbed>
+        )}
+
+        {tab === 'accident' && (
+          <WorkcenterEmbed label="사고보고서">
+            <IncidentReport staffs={filteredStaffs} selectedCo={selectedCo || '전체'} user={user} />
           </WorkcenterEmbed>
         )}
 

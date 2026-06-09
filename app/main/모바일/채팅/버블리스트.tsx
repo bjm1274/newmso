@@ -21,6 +21,7 @@ export type BubbleListProps = {
   userName: string;
   staffs: StaffDirectoryEntry[];
   readCounts?: Record<string, number>;
+  isGroupChat?: boolean;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
@@ -32,6 +33,7 @@ export default function BubbleList({
   userName,
   staffs,
   readCounts = {},
+  isGroupChat = false,
   onToggleReaction,
   onReply,
   onImageLoad,
@@ -71,6 +73,7 @@ export default function BubbleList({
             myUserId={userId}
             staffs={staffs}
             readCount={readCounts[String(item.message.id)] || 0}
+            isGroupChat={isGroupChat}
             fallbackMyName={userName}
             onToggleReaction={onToggleReaction}
             onReply={onReply}

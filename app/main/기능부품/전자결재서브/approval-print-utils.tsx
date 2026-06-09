@@ -8,6 +8,7 @@ import {
   renderReportInfoHtml,
   renderSupplyRequestItemsHtml,
   renderRosterInfoHtml,
+  renderEmployeeEvaluationHtml,
 } from './ApprovalMetaPanels';
 
 type ApprovalTemplateMeta = {
@@ -117,6 +118,7 @@ export function buildApprovalPrintHtml(params: {
   const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
   const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
   const rosterSection = renderRosterInfoHtml(metaData);
+  const employeeEvaluationSection = renderEmployeeEvaluationHtml(metaData);
   const attachmentSection = renderApprovalAttachmentsHtml(metaData);
   const autoPrintScript = options?.autoPrint ? `<script>
 window.onafterprint = () => {
@@ -388,6 +390,7 @@ window.onload = () => window.print();
     ${leaveRequestSection}
     ${supplyItemsSection}
     ${rosterSection}
+    ${employeeEvaluationSection}
     ${attachmentSection}
   </div>
   ${autoPrintScript}

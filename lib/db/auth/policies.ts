@@ -217,6 +217,8 @@ export const POLICY_REGISTRY: Registry = {
   board_post_reads: PUBLIC_ALL('board_post_reads'),
   license_continuing_education: PUBLIC_ALL('license_continuing_education'),
   popups: PUBLIC_ALL('popups'),
+  disciplinary_committees: PUBLIC_ALL('disciplinary_committees'),
+
   // 채팅 메시지: 전송(insert)·조회(select)는 PUBLIC 유지하되, UPDATE(soft-delete)는
   // 작성자 본인 또는 admin만 허용(asyncGuards로 sender_id 확인). 임의 사용자가 남의
   // 메시지를 is_deleted=1로 지우는 권한상승을 차단. hard DELETE는 별도(아래 주석).
