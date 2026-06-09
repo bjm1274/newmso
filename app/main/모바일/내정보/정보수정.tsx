@@ -3,8 +3,9 @@
 /**
  * 정보수정 — 프로필 정보 수정 서브스크린.
  *   - 중앙 아바타 (80px, accent, 이니셜) + 수정 오버레이
- *   - 폼 필드: 이름, 직책/부서, 휴대전화, 이메일, 비상연락처
- *   - '변경사항 저장' 버튼
+ *   - 폼 필드(PC 마이페이지와 동일): 이름·직책/부서(읽기전용), 휴대전화, 이메일,
+ *     내선번호, 거주지(주소), 은행명, 계좌번호
+ *   - '변경사항 저장' → PC와 동일하게 인사변경 요청(ESS_PROFILE_UPDATE_PENDING) 전송 → 인사관리 승인 후 반영
  * JM: 단일 책임 (정보 수정 UI)
  * JM4: any 금지
  * JM6: label 연결, button 시맨틱
@@ -14,12 +15,49 @@ import { memo, useState, useCallback, useEffect } from 'react';
 import type { ErpUser } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import {
+  submitProfileChangeRequest,
+  type ProfileEditableFields,
+  type ProfileChangeUser,
+} from '@/lib/profile-change-request';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 
 function getInitial(name?: string | null) {
   return String(name || '').trim().slice(0, 1) || '나';
 }
+
+function toText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
+function parsePermissions(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* 무시 — 빈 객체 */
+    }
+  }
+  return {};
+}
+
+const EMPTY_FORM: ProfileEditableFields = {
+  email: '',
+  phone: '',
+  extension: '',
+  address: '',
+  bank_name: '',
+  bank_account: '',
+};
 
 export type 정보수정Props = {
   user: ErpUser;
@@ -33,11 +71,20 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
   const department = (user.department || '') as string;
   const initial = getInitial(name);
 
-  const [phone, setPhone] = useState(typeof user.phone === 'string' ? user.phone : '');
-  const [email, setEmail] = useState(typeof user.email === 'string' ? user.email : '');
+  const [form, setForm] = useState<ProfileEditableFields>(() => ({
+    ...EMPTY_FORM,
+    phone: typeof user.phone === 'string' ? user.phone : '',
+    email: typeof user.email === 'string' ? user.email : '',
+  }));
+  const [currentUser, setCurrentUser] = useState<ProfileChangeUser>(() => ({
+    id: staffId,
+    name,
+    email: typeof user.email === 'string' ? user.email : null,
+    phone: typeof user.phone === 'string' ? user.phone : null,
+  }));
   const [saving, setSaving] = useState(false);
 
-  // 최신 연락처를 staff_members에서 로드(세션 user가 stale일 수 있음).
+  // 최신 정보를 staff_members에서 로드(세션 user가 stale일 수 있음).
   useEffect(() => {
     if (!staffId) return;
     let cancelled = false;
@@ -45,36 +92,68 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
       try {
         const { data } = await supabase
           .from('staff_members')
-          .select('phone, email')
+          .select('phone, email, address, extension, bank_name, bank_account, permissions, name')
           .eq('id', staffId)
           .maybeSingle();
         if (cancelled || !data) return;
-        const row = data as { phone?: string | null; email?: string | null };
-        if (typeof row.phone === 'string') setPhone(row.phone);
-        if (typeof row.email === 'string') setEmail(row.email);
-      } catch { /* 세션 값 유지 */ }
+        const row = data as Record<string, unknown>;
+        const permissions = parsePermissions(row.permissions);
+        const bankName = toText(row.bank_name) || toText(permissions.bank_name);
+        const extension = toText(row.extension) || toText(permissions.extension);
+
+        setForm({
+          email: toText(row.email),
+          phone: toText(row.phone),
+          extension,
+          address: toText(row.address),
+          bank_name: bankName,
+          bank_account: toText(row.bank_account),
+        });
+        setCurrentUser({
+          id: staffId,
+          name: toText(row.name) || name,
+          email: toText(row.email) || null,
+          phone: toText(row.phone) || null,
+          address: toText(row.address) || null,
+          bank_account: toText(row.bank_account) || null,
+          bank_name: bankName || null,
+          extension: extension || null,
+          permissions,
+        });
+      } catch {
+        /* 세션 값 유지 */
+      }
     })();
     return () => { cancelled = true; };
-  }, [staffId]);
+  }, [staffId, name]);
 
   const handleSave = useCallback(async () => {
     if (!staffId) { toast('직원 정보를 확인할 수 없습니다.', 'warning'); return; }
     setSaving(true);
     try {
-      // 보안: 본인 연락처(phone/email)만 수정. role/permissions/password 등 권한 컬럼은 건드리지 않음.
-      const { error } = await supabase
-        .from('staff_members')
-        .update({ phone: phone.trim(), email: email.trim() })
-        .eq('id', staffId);
-      if (error) throw new Error(typeof error === 'string' ? error : (error as { message?: string })?.message);
-      toast('연락처가 저장되었습니다.', 'success');
+      const result = await submitProfileChangeRequest(currentUser, form);
+      if (!result.ok) {
+        toast(`저장 실패: ${result.error}`, 'error');
+        return;
+      }
+      if (result.status === 'no-change') {
+        toast('변경된 내용이 없습니다.', 'warning');
+        return;
+      }
+      toast('내정보 변경 요청을 전송했습니다. 인사관리 승인 후 반영됩니다.', 'success');
       onBack();
-    } catch (err) {
-      toast(`저장 실패: ${(err as Error)?.message ?? '알 수 없는 오류'}`, 'error');
     } finally {
       setSaving(false);
     }
-  }, [staffId, phone, email, onBack]);
+  }, [staffId, currentUser, form, onBack]);
+
+  const updateField = useCallback(
+    (key: keyof ProfileEditableFields) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const fieldStyle: React.CSSProperties = {
     width: '100%',
@@ -177,8 +256,8 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
             <input
               id="edit-phone"
               type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              value={form.phone}
+              onChange={updateField('phone')}
               style={fieldStyle}
               placeholder="010-0000-0000"
             />
@@ -190,16 +269,68 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
             <input
               id="edit-email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={form.email}
+              onChange={updateField('email')}
               style={fieldStyle}
               placeholder="example@company.com"
             />
           </div>
+
+          {/* 내선번호 */}
+          <div className="msm-field">
+            <label style={labelStyle} htmlFor="edit-extension">내선번호</label>
+            <input
+              id="edit-extension"
+              type="text"
+              value={form.extension}
+              onChange={updateField('extension')}
+              style={fieldStyle}
+              placeholder="내선번호 입력"
+            />
+          </div>
+
+          {/* 거주지 (주소) */}
+          <div className="msm-field">
+            <label style={labelStyle} htmlFor="edit-address">거주지 (주소)</label>
+            <input
+              id="edit-address"
+              type="text"
+              value={form.address}
+              onChange={updateField('address')}
+              style={fieldStyle}
+              placeholder="도로명 주소를 입력하세요"
+            />
+          </div>
+
+          {/* 계좌정보 */}
+          <div className="msm-field">
+            <div style={labelStyle}>계좌정보</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                type="text"
+                aria-label="은행명"
+                value={form.bank_name}
+                onChange={updateField('bank_name')}
+                style={fieldStyle}
+                placeholder="은행명"
+              />
+              <input
+                type="text"
+                aria-label="계좌번호"
+                value={form.bank_account}
+                onChange={updateField('bank_account')}
+                style={fieldStyle}
+                placeholder="계좌번호"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* 저장 버튼 */}
-        <div style={{ padding: '24px 20px 4px' }}>
+        {/* 안내 + 저장 버튼 */}
+        <div style={{ padding: '16px 20px 4px' }}>
+          <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.5, marginBottom: 12 }}>
+            변경 요청은 인사관리 승인 후 반영됩니다.
+          </div>
           <button
             type="button"
             className="msm-btn-lg accent"
@@ -222,7 +353,7 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
               gap: 8,
             }}
           >
-            {saving ? '저장 중…' : '변경사항 저장'}
+            {saving ? '전송 중…' : '변경사항 저장'}
           </button>
         </div>
       </div>

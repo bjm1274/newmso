@@ -163,22 +163,35 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  const [notifEnabled, setNotifEnabled] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.localStorage.getItem('m_notif_enabled') !== 'false';
+  // 알림 설정 탭 → 실제 브라우저/기기 알림 권한 상태를 확인하고, 미허용이면 요청한다.
+  const checkAndRequestNotif = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast('이 기기는 웹 알림을 지원하지 않습니다.', 'warning');
+      return;
     }
-    return true;
-  });
-
-  const handleToggleNotif = useCallback(() => {
-    setNotifEnabled((prev) => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('m_notif_enabled', String(next));
+    const current = Notification.permission;
+    setPermissionState(current);
+    if (current === 'granted') {
+      toast('알림이 이미 허용되어 있습니다.', 'success');
+      return;
+    }
+    if (current === 'denied') {
+      toast('알림이 차단되어 있습니다. 기기·브라우저 설정에서 알림을 허용해 주세요.', 'warning');
+      return;
+    }
+    try {
+      const res = await Notification.requestPermission();
+      setPermissionState(res);
+      if (res === 'granted') {
+        toast('알림 권한이 승인되었습니다.', 'success');
+      } else if (res === 'denied') {
+        toast('알림 권한이 거부되었습니다. 기기 설정에서 알림을 허용해야 합니다.', 'warning');
+      } else {
+        toast('알림 권한 요청이 취소되었습니다.', 'info');
       }
-      toast(next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', 'success');
-      return next;
-    });
+    } catch {
+      toast('알림 권한 요청 중 오류가 발생했습니다.', 'error');
+    }
   }, []);
 
   const handleChangePassword = useCallback(async () => {
@@ -602,15 +615,23 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               <MIcon name="chevR" size={18} color="var(--z-400)" />
             </button>
 
-            {/* 알림 설정 */}
-            <div
+            {/* 알림 설정 — 탭 시 브라우저/기기 알림 권한 허용 여부 확인 + 요청 */}
+            <button
+              type="button"
+              onClick={() => void checkAndRequestNotif()}
+              aria-label="알림 권한 확인 및 설정"
               style={{
+                width: '100%',
+                textAlign: 'left',
                 display: 'grid',
                 gridTemplateColumns: '40px 1fr auto',
                 alignItems: 'center',
                 gap: 12,
                 padding: '13px 16px',
                 borderBottom: '1px solid var(--m-border)',
+                background: 'transparent',
+                border: 0,
+                cursor: 'pointer',
               }}
             >
               <div
@@ -618,55 +639,42 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   width: 36,
                   height: 36,
                   borderRadius: 10,
-                  background: 'var(--z-100)',
-                  color: 'var(--z-600)',
+                  background: permissionState === 'granted' ? 'var(--m-success-soft)' : 'var(--z-100)',
+                  color: permissionState === 'granted' ? 'var(--m-success)' : 'var(--z-600)',
                   display: 'grid',
                   placeItems: 'center',
                 }}
               >
                 <MIcon name="bell" size={18} />
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>알림 설정</div>
-              <button
-                type="button"
-                onClick={handleToggleNotif}
-                aria-label="알림 설정 토글"
-                style={{
-                  background: 'transparent',
-                  border: 0,
-                  padding: 0,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 600, color: notifEnabled ? 'var(--m-accent)' : 'var(--z-400)', marginRight: 6 }}>
-                  {notifEnabled ? '켜짐' : '꺼짐'}
-                </span>
-                <div
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>알림 설정</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--z-500)', marginTop: 2 }}>
+                  {permissionState === 'granted'
+                    ? '알림이 허용되어 있어요'
+                    : permissionState === 'denied'
+                      ? '알림이 차단되어 있어요'
+                      : '눌러서 알림 허용 여부를 확인하세요'}
+                </div>
+              </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span
                   style={{
-                    width: 36,
-                    height: 20,
-                    borderRadius: 99,
-                    background: notifEnabled ? 'var(--m-accent)' : 'var(--z-300)',
-                    position: 'relative',
-                    transition: 'background 0.2s',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color:
+                      permissionState === 'granted'
+                        ? 'var(--m-success)'
+                        : permissionState === 'denied'
+                          ? 'var(--m-danger)'
+                          : 'var(--m-accent)',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 16,
-                      height: 16,
-                  background: '#fff',
-                      position: 'absolute',
-                      top: 2,
-                      left: notifEnabled ? 18 : 2,
-                      transition: 'left 0.2s',
-                    }}
-                  />
-                </div>
-              </button>
-            </div>
+                  {permissionState === 'granted' ? '허용됨' : permissionState === 'denied' ? '차단됨' : '확인하기'}
+                </span>
+                <MIcon name="chevR" size={18} color="var(--z-400)" />
+              </span>
+            </button>
 
             {/* 알림 권한 경고 및 재설정 영역 */}
             {permissionState !== 'granted' && (

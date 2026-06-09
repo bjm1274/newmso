@@ -27,7 +27,6 @@ import {
   pickAvatarTone,
 } from './data-hooks';
 import { toggleLike } from './좋아요훅';
-import { toggleStarServer } from './별표훅';
 import { useBoardDetailRealtime, useIncrementPostView } from './상세훅';
 import BoardMarkdown from './마크다운';
 import BoardCommentTree from './댓글트리';
@@ -75,7 +74,6 @@ export default function SBoardDetail({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [starBusy, setStarBusy] = useState(false);
   // P2: 답글 대상 (root 댓글 한 명) — null이면 일반 댓글
   const [replyTo, setReplyTo] = useState<BoardComment | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -169,23 +167,6 @@ export default function SBoardDetail({
     setLikeBusy(false);
   }, [post, isLiked, likeBusy, currentUserId, onPatchPost, onLikedChange]);
 
-  const handleStarClick = useCallback(async () => {
-    if (!post || starBusy) return;
-    setStarBusy(true);
-    const postIdStr = String(post.id);
-    const prevStarred = Boolean(post.starred);
-    // 낙관적
-    onPatchPost({ starred: !prevStarred });
-    const res = await toggleStarServer(currentUserId ?? null, postIdStr);
-    if (res.starred !== !prevStarred) {
-      // 실패 롤백
-      onPatchPost({ starred: prevStarred });
-    } else {
-      onPatchPost({ starred: res.starred });
-    }
-    setStarBusy(false);
-  }, [post, starBusy, currentUserId, onPatchPost]);
-
   if (!post && !loading) {
     return (
       <div className="m-screen">
@@ -229,7 +210,6 @@ export default function SBoardDetail({
   const commentCount = comments.length;
   const attachments = getSafeAttachments(post);
   const headerTitle = catDef?.label === '공지' ? '공지사항' : catDef?.label ?? '게시글';
-  const starred = Boolean(post.starred);
   const likesCount = typeof post.likes_count === 'number' ? post.likes_count : 0;
   // 본문에서 [[ATTACHMENTS_META]] 메타 제거 후 markdown 렌더
   // (early return 이후라 useMemo 불가 — 단순 동기 호출. extract 자체가 가볍다.)
@@ -255,16 +235,6 @@ export default function SBoardDetail({
         back={onBack}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => void handleStarClick()}
-              aria-label={starred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-              aria-pressed={starred}
-              disabled={starBusy}
-              style={{ color: starred ? 'var(--m-warning)' : undefined, opacity: starBusy ? 0.5 : 1 }}
-            >
-              <MIcon name="star" size={20} />
-            </button>
             <button type="button" aria-label="공유" onClick={() => void handleShare()}>
               <MIcon name="share" size={20} />
             </button>

@@ -23,7 +23,6 @@ import {
   formatShortDate,
   pickAvatarTone,
 } from './data-hooks';
-import { toggleStarServer } from './별표훅';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 
@@ -179,11 +178,9 @@ function BoardHomeView({
 function PostCard({
   post,
   onOpen,
-  onToggleStar,
 }: {
   post: BoardListPost;
   onOpen: () => void;
-  onToggleStar: () => void;
 }) {
   const cat = boardTypeToCat(post.board_type as string | null);
   const catDef = BOARD_CATS.find((c) => c.id === cat);
@@ -195,7 +192,6 @@ function PostCard({
   const tone = pickAvatarTone(String(post.id ?? authorName));
   const views = typeof post.views === 'number' ? post.views : 0;
   const commentCount = post.comment_count ?? 0;
-  const starred = Boolean(post.starred);
 
   const isSchedule = cat === 'op' || cat === 'mri';
 
@@ -267,25 +263,10 @@ function PostCard({
           )}
         </button>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
-          <span style={{ fontSize: 11, color: 'var(--z-400)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 2 }}>
+          <span style={{ fontSize: 11, color: 'var(--z-400)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <MIcon name="user" size={11} /> {views}
           </span>
-          <button
-            type="button"
-            onClick={onToggleStar}
-            aria-label={starred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-            aria-pressed={starred}
-            style={{
-              width: 28,
-              height: 28,
-              display: 'grid',
-              placeItems: 'center',
-              color: starred ? 'var(--m-warning)' : 'var(--z-400)',
-            }}
-          >
-            <MIcon name="star" size={16} />
-          </button>
         </div>
       </div>
     );
@@ -382,23 +363,6 @@ function PostCard({
           </span>
         </div>
       </button>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-        <button
-          type="button"
-          onClick={onToggleStar}
-          aria-label={starred ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-          aria-pressed={starred}
-          style={{
-            width: 28,
-            height: 28,
-            display: 'grid',
-            placeItems: 'center',
-            color: starred ? 'var(--m-warning)' : 'var(--z-400)',
-          }}
-        >
-          <MIcon name="star" size={16} />
-        </button>
-      </div>
     </div>
   );
 }
@@ -414,8 +378,6 @@ function SBoardBase({
   onOpen,
   onWrite,
   onBack,
-  userId,
-  onStarChanged,
   onRefresh,
   showHome,
   onOpenCategory,
@@ -488,21 +450,6 @@ function SBoardBase({
               key={String(post.id)}
               post={post}
               onOpen={() => onOpen(String(post.id))}
-              onToggleStar={() => {
-                const id = String(post.id);
-                const prev = Boolean(post.starred);
-                // 낙관적
-                onStarChanged(id, !prev);
-                void (async () => {
-                  const res = await toggleStarServer(userId, id);
-                  if (res.starred !== !prev) {
-                    // 롤백
-                    onStarChanged(id, prev);
-                  } else {
-                    onStarChanged(id, res.starred);
-                  }
-                })();
-              }}
             />
           ))}
         </div>
