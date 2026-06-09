@@ -24,6 +24,7 @@ import { useTodayCounts } from './data-hooks';
 import type { MHomeSub, MTab } from '../셸/m-routes';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
+import { initNotificationService } from '@/app/main/기능부품/알림시스템';
 
 /* ─── 유틸 ────────────────────────────────────────────────── */
 function getInitial(name?: string | null) {
@@ -163,36 +164,85 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // 알림 설정 탭 → 실제 브라우저/기기 알림 권한 상태를 확인하고, 미허용이면 요청한다.
+  // 알림 설정 탭 → 알림 권한 확인/요청 + 푸시 구독 생성(앱을 닫아도 알림이 오려면 구독이 필수).
+  const [testing, setTesting] = useState(false);
+
+  // 권한이 허용된 상태에서 실제 푸시 구독(WebPush endpoint + FCM token)을 생성·서버 저장한다.
+  // 이 구독이 있어야 앱/탭을 닫아도 서비스워커가 푸시를 받아 시스템 알림을 띄운다.
+  const ensurePushSubscription = useCallback(async () => {
+    if (!staffId) return;
+    try {
+      await initNotificationService({ staffId, requestPermission: false });
+    } catch {
+      // 구독 생성 실패는 NotificationSystem 의 focus/visibility resync 가 재시도한다.
+    }
+  }, [staffId]);
+
   const checkAndRequestNotif = useCallback(async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       toast('이 기기는 웹 알림을 지원하지 않습니다.', 'warning');
       return;
     }
     const current = Notification.permission;
-    setPermissionState(current);
-    if (current === 'granted') {
-      toast('알림이 이미 허용되어 있습니다.', 'success');
-      return;
-    }
     if (current === 'denied') {
+      setPermissionState('denied');
       toast('알림이 차단되어 있습니다. 기기·브라우저 설정에서 알림을 허용해 주세요.', 'warning');
       return;
     }
-    try {
-      const res = await Notification.requestPermission();
+    if (current === 'default') {
+      // requestPermission 은 사용자 제스처 컨텍스트에서 직접 호출(iOS/Safari 요구사항).
+      let res: NotificationPermission = 'default';
+      try {
+        res = await Notification.requestPermission();
+      } catch {
+        toast('알림 권한 요청 중 오류가 발생했습니다.', 'error');
+        return;
+      }
       setPermissionState(res);
-      if (res === 'granted') {
-        toast('알림 권한이 승인되었습니다.', 'success');
-      } else if (res === 'denied') {
-        toast('알림 권한이 거부되었습니다. 기기 설정에서 알림을 허용해야 합니다.', 'warning');
+      if (res !== 'granted') {
+        toast(
+          res === 'denied'
+            ? '알림 권한이 거부되었습니다. 기기 설정에서 알림을 허용해야 합니다.'
+            : '알림 권한 요청이 취소되었습니다.',
+          res === 'denied' ? 'warning' : 'info',
+        );
+        return;
+      }
+    } else {
+      setPermissionState('granted');
+    }
+    // 권한 허용 상태 → 구독을 즉시 생성·저장해 백그라운드(닫힘) 수신을 보장.
+    await ensurePushSubscription();
+    toast('알림이 허용되었습니다. 앱을 닫아도 알림을 받을 수 있어요.', 'success');
+  }, [ensurePushSubscription]);
+
+  // 테스트 알림 — 현재 기기의 구독으로 실제 푸시를 보낸다(앱을 닫고 도착 여부 확인용).
+  const handleTestPush = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+      toast('먼저 알림을 허용해 주세요.', 'warning');
+      return;
+    }
+    setTesting(true);
+    try {
+      await ensurePushSubscription();
+      const res = await fetch('/api/notifications/push-self-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; reason?: string; summary?: string }
+        | null;
+      if (res.ok && data?.ok) {
+        toast('테스트 알림을 보냈습니다. 앱을 닫아도 알림이 오는지 확인해 보세요.', 'success');
       } else {
-        toast('알림 권한 요청이 취소되었습니다.', 'info');
+        toast(data?.reason || data?.summary || '테스트 알림 발송에 실패했습니다.', 'error');
       }
     } catch {
-      toast('알림 권한 요청 중 오류가 발생했습니다.', 'error');
+      toast('테스트 알림 발송 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setTesting(false);
     }
-  }, []);
+  }, [ensurePushSubscription]);
 
   const handleChangePassword = useCallback(async () => {
     const currentPassword = await openPrompt({
@@ -676,6 +726,53 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               </span>
             </button>
 
+            {/* 테스트 알림 — 권한 허용 시 노출. 앱을 닫고 도착 여부 확인용. */}
+            {permissionState === 'granted' && (
+              <button
+                type="button"
+                onClick={() => void handleTestPush()}
+                disabled={testing}
+                aria-label="테스트 알림 보내기"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  display: 'grid',
+                  gridTemplateColumns: '40px 1fr auto',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '13px 16px',
+                  borderBottom: '1px solid var(--m-border)',
+                  background: 'transparent',
+                  border: 0,
+                  cursor: testing ? 'default' : 'pointer',
+                  opacity: testing ? 0.7 : 1,
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: 'var(--m-accent-soft)',
+                    color: 'var(--m-accent)',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
+                  <MIcon name="send" size={18} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>테스트 알림 보내기</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--z-500)', marginTop: 2 }}>
+                    앱을 닫아도 알림이 오는지 확인해 보세요
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--m-accent)' }}>
+                  {testing ? '보내는 중…' : '보내기'}
+                </span>
+              </button>
+            )}
+
             {/* 알림 권한 경고 및 재설정 영역 */}
             {permissionState !== 'granted' && (
               <div
@@ -700,21 +797,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 {permissionState === 'default' && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (typeof window !== 'undefined' && 'Notification' in window) {
-                        try {
-                          const res = await Notification.requestPermission();
-                          setPermissionState(res);
-                          if (res === 'granted') {
-                            toast('알림 권한이 승인되었습니다.', 'success');
-                          } else if (res === 'denied') {
-                            toast('알림 권한이 거부되었습니다. 기기 설정에서 알림을 허용해야 합니다.', 'warning');
-                          }
-                        } catch {
-                          toast('알림 권한 요청 중 오류가 발생했습니다.', 'error');
-                        }
-                      }
-                    }}
+                    onClick={() => void checkAndRequestNotif()}
                     style={{
                       alignSelf: 'flex-start',
                       padding: '6px 12px',
