@@ -17,7 +17,11 @@ import { supabase } from '@/lib/supabase';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import MIcon from '../공통/MIcon';
 
-const NOTIFICATION_LIST_UPDATED_EVENT = 'NOTIFICATION_LIST_UPDATED_EVENT';
+// 알림시스템.tsx 의 NOTIFICATION_LIST_UPDATED_EVENT(= 'erp-notification-list-updated')와
+// 반드시 동일해야 한다. 과거 값이 변수명 문자열로 잘못 설정돼 모바일 알림탭이 실시간
+// 갱신 이벤트를 전혀 수신하지 못했음. 대형 'use client' 모듈(알림시스템.tsx)을 모바일
+// 번들에 끌어오지 않기 위해 import 대신 동일 문자열로 맞춘다.
+const NOTIFICATION_LIST_UPDATED_EVENT = 'erp-notification-list-updated';
 
 type Tone = 'accent' | 'success' | 'warn' | 'danger' | 'muted';
 
