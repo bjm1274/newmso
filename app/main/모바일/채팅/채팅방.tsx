@@ -203,7 +203,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     } finally {
       setSending(false);
     }
-  }, [draft, room.id, sending, userId, refresh]);
+  }, [draft, room.id, sending, userId, refresh, replyTo]);
 
 
 
