@@ -261,6 +261,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     };
 
     const openContractPrintPreview = (fullContractHTML: string) => {
+        // 모바일 기기(PWA/웹뷰)에서는 window.print() 호출 시 앱이 튕기거나(크래시) 오작동할 수 있으므로 인쇄 미리보기를 생략합니다.
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        if (isMobile) {
+            return;
+        }
+
         try {
             const printWindow = window.open('', '_blank');
             if (!printWindow) return;

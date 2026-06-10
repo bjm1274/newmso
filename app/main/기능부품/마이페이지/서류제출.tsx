@@ -119,7 +119,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
         };
     }, [user?.id]);
 
-    const openRepositoryDocument = (document: any) => {
+    const openRepositoryDocument = async (document: any) => {
         if (document?.file_url) {
             window.open(document.file_url, '_blank');
             return;
@@ -127,13 +127,17 @@ export default function MyDocuments(props: MyDocumentsProps) {
         if (typeof document?.content === 'string' && document.content.trim()) {
             const preview = window.open('', '_blank');
             if (!preview) return;
+            
+            const { decryptContract } = await import('@/lib/contract-crypto');
+            const decryptedContent = await decryptContract(document.content);
+
             preview.document.write(`
               <html>
                 <head>
                   <title>${escapeHtml(document.title || '문서 보기')}</title>
-                  <style>body{font-family:'Noto Sans KR',sans-serif;line-height:1.6;padding:24px;color:#111827;white-space:pre-wrap} img{max-width:100%;height:auto}</style>
+                  <style>body{font-family:'Noto Sans KR',sans-serif;line-height:1.6;padding:24px;color:#111827;} img{max-width:100%;height:auto}</style>
                 </head>
-                <body>${escapeHtml(document.content)}</body>
+                <body>${decryptedContent}</body>
               </html>
             `);
             preview.document.close();
