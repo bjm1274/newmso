@@ -2084,7 +2084,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 >
                   <Upload size={20} className="text-[var(--toss-gray-4)]" />
                   <span className="text-[12px] font-bold text-[var(--toss-gray-4)]">클릭하여 파일 선택 또는 드래그 앤 드롭</span>
-                  <span className="text-[10px] text-[var(--toss-gray-3)]">PDF · 이미지 · 문서 (개당 20MB 이하, 최대 10개)</span>
+                  <span className="text-[10px] text-[var(--toss-gray-3)]">PDF · 이미지 · 문서 (개당 200MB 이하, 최대 10개)</span>
                 </div>
                 <input
                   data-testid="guide-file-input"

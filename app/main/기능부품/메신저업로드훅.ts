@@ -191,7 +191,7 @@ export function useChatUploads({
         }
       } else if (!uploadContentType.startsWith('image/')) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
-          toast('파일 크기는 20MB 이하여야 합니다.');
+          toast('파일 크기는 200MB 이하여야 합니다.');
           return false;
         }
       }

@@ -5,7 +5,7 @@
  *  - sendMobileFileMessage: 파일 → R2 업로드 → messages insert(파일 메시지) 일괄.
  *  - PC의 `/api/chat/upload` 라우트(=`lib/object-storage.ts` + R2 signed upload plan)와
  *    `insertChatMessageWithFallback`를 재사용한다.
- *  - 한도: 이미지 20MB, 동영상 200MB, 기타 20MB (PC와 동일, lib/chat-upload-constants).
+ *  - 한도: 이미지 200MB, 동영상 200MB, 기타 200MB (PC와 동일, lib/chat-upload-constants).
  *
  * 제약: JM(단일 책임 + < 500줄), JM2(불필요 fetch X), JM3(toast는 호출측),
  *      JM4(any 금지), JM5(MIME·size 검증, 파일명 sanitize는 서버 위임).
@@ -82,7 +82,7 @@ export function validateMobileUploadTarget(file: File): { ok: true } | { ok: fal
   const mime = normalizeMimeType(file);
   if (mime.startsWith('image/')) {
     if (file.size > CHAT_MAX_FILE_SIZE_BYTES) {
-      return { ok: false, error: '이미지 크기는 20MB 이하여야 합니다.' };
+      return { ok: false, error: '이미지 크기는 200MB 이하여야 합니다.' };
     }
     return { ok: true };
   }
@@ -93,7 +93,7 @@ export function validateMobileUploadTarget(file: File): { ok: true } | { ok: fal
     return { ok: true };
   }
   if (file.size > CHAT_MAX_FILE_SIZE_BYTES) {
-    return { ok: false, error: '파일 크기는 20MB 이하여야 합니다.' };
+    return { ok: false, error: '파일 크기는 200MB 이하여야 합니다.' };
   }
   return { ok: true };
 }

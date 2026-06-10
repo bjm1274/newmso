@@ -660,7 +660,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                         {uploadFile ? uploadFile.name : '음성 파일을 드래그하거나 클릭해서 선택'}
                       </p>
                       <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
-                        지원 형식: MP3, MP4, WAV, WebM, OGG, M4A · 최대 20MB
+                        지원 형식: MP3, MP4, WAV, WebM, OGG, M4A · 최대 200MB
                       </p>
                       {uploadFile && (
                         <span className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-bold rounded-full">
