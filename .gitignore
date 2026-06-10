@@ -131,3 +131,6 @@ scripts/backfill-d1/.backfill-progress.json
 
 # Generated SQLite binaries (build-sqlite.mjs 산출물 — 재생성 가능)
 *.sqlite
+
+# 완료된 디자인 스크래치(이모티콘 프로토타입) — 인용 0, live는 public/emoticon/ (4차 전수조사 scratch-handoff)
+/scratch_zip/

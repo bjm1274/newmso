@@ -1862,6 +1862,9 @@ export const room_read_cursors = sqliteTable("room_read_cursors", {
 },
 (table) => [
 	index("idx_room_read_cursors_room_user").on(table.room_id, table.user_id),
+	// [4차 전수조사 lib-10] (user_id, room_id) 유니크 — onConflictDoUpdate upsert의 충돌키.
+	// migration 0014에서 중복 제거 후 생성. 적용 전까지 코드의 onConflict는 동작하지 않음.
+	uniqueIndex("room_read_cursors_user_room_uq").on(table.user_id, table.room_id),
 ]);
 
 export const roster_approval_requests = sqliteTable("roster_approval_requests", {

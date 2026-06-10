@@ -1220,7 +1220,23 @@ export function useChatRoomDataSync({
   );
 
   const fetchData = useCallback(async () => {
-    if (!selectedRoomId) return;
+    // 방이 선택되지 않은 상태에서도 채팅방 목록과 읽지 않은 메시지 수는 갱신한다.
+    // (모바일 사이드바 뷰, PC 방 미선택 상태)
+    if (!selectedRoomId) {
+      try {
+        const roomResult = await fetchAllChatRooms({ force: true });
+        if (roomResult.error) {
+          console.error('채팅방 목록 조회 실패 (no room selected):', roomResult.error);
+          return;
+        }
+        const repairedRooms = await repairDirectRooms(roomResult.data || []);
+        const roomList = await syncChatRoomsState(repairedRooms);
+        void updateUnreadForRooms(roomList);
+      } catch (error) {
+        console.error('채팅방 목록 갱신 실패 (no room selected):', error);
+      }
+      return;
+    }
 
     const roomIdForFetch = String(selectedRoomId);
     const requestSeq = fetchDataRequestSeqRef.current + 1;
@@ -1633,6 +1649,7 @@ export function useChatRoomDataSync({
     setRoomUnreadCounts,
     setTimelineRoomId,
     syncChatRoomsState,
+    updateUnreadForRooms,
   ]);
 
   return {

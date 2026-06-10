@@ -27,6 +27,7 @@ import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
+import { sendAdminNotifications } from '@/lib/notification-utils';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
@@ -319,17 +320,14 @@ function MyPageMain({
         version: 1
       });
 
-      // HR에게 알림 전송
-      // NOTE: notifications.user_id 는 staff_members.id 를 참조하는 FK 입니다.
-      // 'system_admin' 은 실제 staff 행이 아닐 수 있어 FK 위반 가능 → 추후 실제 HR 담당자 id 로 교체 필요.
-      const { error } = await supabase.from('notifications').insert({
-        user_id: 'system_admin',
+      // HR에게 알림 전송 — [4차 전수조사 admin-05] 존재하지 않는 user_id='system_admin'
+      // (FK 위반) 대신 HR 담당 부서 staff에게 fan-out + dedupe하는 공통 헬퍼 사용.
+      await sendAdminNotifications([{
+        type: 'SUCCESS',
         title: '계약서 서명 완료',
         body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
-        type: 'SUCCESS',
-        read_at: null
-      });
-      if (error) console.error('[contract-sign-notify]', error);
+        dedupeKey: `contract-signed:${pendingContract.id}`,
+      }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));

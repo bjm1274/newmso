@@ -23,13 +23,6 @@ export interface StockUpdateResult {
   next_qty: number;
 }
 
-export interface StockTransferResult {
-  src_prev: number;
-  src_next: number;
-  dst_prev: number;
-  dst_next: number;
-}
-
 export class StockError extends Error {
   constructor(public readonly code:
     | 'ITEM_NOT_FOUND'
@@ -86,81 +79,9 @@ export async function atomicStockUpdate(
   );
 }
 
-/**
- * atomic_stock_transfer TS 포트.
- *
- * 정책:
- *   - source 또는 dest row가 없으면 SOURCE_NOT_FOUND / DEST_NOT_FOUND
- *   - source 차감 후 < 0 이면 INSUFFICIENT_STOCK
- *
- * SQLite는 data-modifying CTE를 지원하지 않으므로, 현재 수량을 먼저 조회해
- * 검증한 뒤 양쪽을 절대값으로 batch UPDATE한다. D1 batch는 단일 트랜잭션
- * (all-or-nothing)이라 두 UPDATE가 함께 커밋되거나 함께 롤백된다.
- */
-export async function atomicStockTransfer(
-  db: D1Client,
-  sourceId: string,
-  destId: string,
-  quantity: number,
-): Promise<StockTransferResult> {
-  return await db.transaction(async (tx) => {
-    // 1. Decrement source inventory quantity and stock where quantity >= quantity
-    const updatedSrc = await tx
-      .update(inventory)
-      .set({
-        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
-        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
-      })
-      .where(
-        sql`${inventory.id} = ${sourceId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${quantity}`,
-      )
-      .returning({
-        next_qty: inventory.quantity,
-      });
-
-    if (updatedSrc.length === 0) {
-      // Check if source exists at all
-      const foundSrc = await tx
-        .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
-        .from(inventory)
-        .where(eq(inventory.id, sourceId));
-
-      if (foundSrc.length === 0) {
-        throw new StockError('SOURCE_NOT_FOUND');
-      }
-      const prev = Number(foundSrc[0].prev ?? 0);
-      throw new StockError(
-        'INSUFFICIENT_STOCK',
-        `INSUFFICIENT_STOCK: prev=${prev}, qty=${quantity}`,
-      );
-    }
-
-    const srcNext = Number(updatedSrc[0].next_qty ?? 0);
-    const srcPrev = srcNext + quantity;
-
-    // 2. Increment destination inventory quantity and stock
-    const updatedDst = await tx
-      .update(inventory)
-      .set({
-        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
-        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
-      })
-      .where(eq(inventory.id, destId))
-      .returning({
-        next_qty: inventory.quantity,
-      });
-
-    if (updatedDst.length === 0) {
-      // Destination doesn't exist
-      throw new StockError('DEST_NOT_FOUND');
-    }
-
-    const dstNext = Number(updatedDst[0].next_qty ?? 0);
-    const dstPrev = dstNext - quantity;
-
-    return { src_prev: srcPrev, src_next: srcNext, dst_prev: dstPrev, dst_next: dstNext };
-  });
-}
+// [4차 전수조사 sql-04] atomicStockTransfer 제거됨(2026-06-10).
+// 사장 코드 + D1 미지원 db.transaction() 사용으로 호출 시 런타임 throw였음.
+// 실제 재고이관은 app/api/inventory/stock-transfer/route.ts의 자체 db.batch() 구현이 담당.
 
 /**
  * sync_inventory_name_stock 트리거 대체.

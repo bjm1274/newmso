@@ -32,6 +32,7 @@ import { useChatRoomsForMobile } from '../채팅/data-hooks';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { sendAdminNotifications } from '@/lib/notification-utils';
 import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/계약문서/전자서명모달';
 
 export type MobileShellProps = {
@@ -170,14 +171,14 @@ export default function MobileShell({
         version: 1
       });
 
-      // HR에게 알림 전송
-      await supabase.from('notifications').insert({
-        user_id: 'system_admin',
+      // HR에게 알림 전송 — [4차 전수조사 admin-05] FK 위반하는 user_id='system_admin'
+      // 대신 HR 담당 부서 staff fan-out + dedupe 공통 헬퍼 사용.
+      await sendAdminNotifications([{
+        type: 'SUCCESS',
         title: '계약서 서명 완료',
         body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
-        type: 'SUCCESS',
-        read_at: null
-      });
+        dedupeKey: `contract-signed:${pendingContract.id}`,
+      }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));

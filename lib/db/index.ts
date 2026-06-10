@@ -46,12 +46,10 @@ export {
 } from './functions/staff';
 export {
   atomicStockUpdate,
-  atomicStockTransfer,
   atomicStockConsumeWithLog,
   syncInventoryNameStock,
   StockError,
   type StockUpdateResult,
-  type StockTransferResult,
 } from './functions/inventory';
 export {
   incrementAnnualLeaveUsed,

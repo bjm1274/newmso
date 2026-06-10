@@ -241,7 +241,7 @@ export function useChatRealtimeSubscriptions({
     setGlobalRealtimeState('connected');
     globalRealtimeHealthyRef.current = true;
     // 다른 방 신규 메시지 알림(배지)용 백그라운드 폴링.
-    // 2026-05-26 — 8000→4000ms. 활성 방 폴링과 별개로 다른 방 알림 도착 지연을 줄임.
+    // 2026-05-26 — 8000→2000ms. 활성 방 폴링과 별개로 다른 방 알림 도착 지연을 줄임.
     // 본인 send 시 pokeChannel('chat-global-messages')로 즉시 트리거.
     const unsubscribe = subscribeRealtime(
       'chat-global-messages',
