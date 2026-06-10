@@ -19,7 +19,9 @@
 | sql-09 | lib/db/schema.ts:395-403 | 의미없는 | `chat_typing_status`가 라이브 D1의 복합 PK(room_id,user_id) 누락 → schema.ts가 진실원 아님(드리프트). 코드는 동작하나 generate 도구 충돌타깃 오해 |
 | sql-10 | app/api/admin/audit/_shared.ts:224-227 | 코드오류 | 감사 '심야(00~05시)' 판정이 `d.getHours()`=서버 UTC 기준 → KST 09~14시(업무시간)를 심야로 오표시. '비정상 시간' 신호 무의미 |
 
+## ⚠️ 의도된 MSO 설계로 재분류 (결함 아님)
+- ~~**PUBLIC_ALL 테넌트 격리 부재**~~ `policies.ts:179` — `staff_members`·`employment_contracts`·`staff_evaluations` 등에 select/insert/update/delete=PUBLIC(회사 필터 없음, ✅확인). **MSO가 전 회사를 운영 대행하므로 회사 간 CRUD는 의도된 설계**(읽기·쓰기 모두, 2026-06-10 사용자 확인). 보안 결함 아님 → 메모리 `[[mso-cross-company-visibility]]`. (1차 sql 패스의 major 지목은 오판)
+
 ## 1차 Fable5 sql 패스에서만 나온 유효 발견(흡수 — 미검증, Opus 일부 확인)
-- **PUBLIC_ALL 테넌트 격리 부재** `policies.ts:179` — `staff_members`·`employment_contracts`(계약 PII)·`staff_evaluations`·`board_posts` 등에 select/insert/update/delete=PUBLIC, filterByPolicy는 PUBLIC이면 회사 필터 없이 전 행 반환(✅Opus 확인). A회사 사용자가 `/api/d1/query`로 B회사 데이터 CRUD 가능. **모바일 mobile-1/2의 근본 원인.** (주석 613-617도 위험 인지)
-- **미존재 테이블** `leave_policies`(CompanyLeaveTab.tsx:84 → 휴가규칙 항상 폴백), `work_type_change_history`(hr-history-ledger.ts:151 → 인사이력 항상 0건). schema/d1_schema_final.sql 부재 확인. nurse_schedules(hr-01)와 동일 패턴.
-- **POLICY_REGISTRY 죽은 whitelist**: profiles·patient_prescriptions·attendance_records·document_submissions·work_schedules·org_chart_nodes — 실테이블·호출처 0인데 PUBLIC_ALL 자동 부여 → 향후 동명 테이블 생성 시 의도치 않은 공개 위험.
+- **미존재 테이블** `leave_policies`(CompanyLeaveTab.tsx:84 → 휴가규칙 항상 폴백), `work_type_change_history`(hr-history-ledger.ts:151 → 인사이력 항상 0건). schema/d1_schema_final.sql 부재 확인. nurse_schedules(hr-01)와 동일 패턴. **(이건 유효 — 무음 기능불능)**
+- **POLICY_REGISTRY 죽은 whitelist**: profiles·patient_prescriptions·attendance_records·document_submissions·work_schedules·org_chart_nodes — 실테이블·호출처 0인 미사용 등록 항목(정리 권장, 위험도 낮음).

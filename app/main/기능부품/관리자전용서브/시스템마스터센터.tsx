@@ -463,10 +463,11 @@ function SystemMasterCenterDesktop({
   const visibleChatRooms = useMemo(
     () => {
       if (showEmptyRoomsOnly) return emptyChatRooms;
-      if (!showFlaggedOnly) return chatRooms;
-      // 선택검색 + 필터 단어 → 서버 사이드 필터링 결과(chatRooms)를 그대로 사용
-      if (bannedWords.length > 0) return chatRooms;
-      // 폴백: 필터 단어 없을 때는 클라이언트 자체 필터링
+      // 단어 필터(showFlaggedOnly)는 서버 사이드에서 수행된다.
+      //   loadChats가 showFlaggedOnly && bannedWords.length > 0 일 때
+      //   flaggedRoomsOnly=1 + bannedWords 파라미터로 매칭 채팅방만 받아오므로
+      //   여기서는 추가 클라이언트 필터링 없이 chatRooms를 그대로 사용한다.
+      //   (bannedWords가 비어 있으면 서버도 전체를 반환하므로 동일 처리)
       return chatRooms;
     },
     [bannedWords, chatRooms, emptyChatRooms, showEmptyRoomsOnly, showFlaggedOnly],

@@ -1339,7 +1339,6 @@ export default function NotificationSystem({
     const uid = effectiveUserId;
     const mountedAt = mountedAtRef.current;
     void syncBadge();
-    const useServerSideChatNotifications = true;
 
     // insertNoti: 이벤트 → notifications 테이블 INSERT (그러면 nTableChannel이 toast 표시)
     const insertNoti = async (
@@ -1631,7 +1630,8 @@ export default function NotificationSystem({
     // trade-off. 운영 영향 큰 알림은 후속 phase에서 서버 cron 추가 검토.
     let lastNotificationsSeenAt = mountedAt;
     // Phase 5-E — 폴링 비용 절감(2026-05-26).
-    // 알림: 8000→30000ms. 푸시(FCM/WebPush)가 모든 INSERT 직후 즉시 발송되므로
+    // 알림: 8000→3000ms. // TODO: 의도 폴링간격(30s?) 확인 필요
+    // 푸시(FCM/WebPush)가 모든 INSERT 직후 즉시 발송되므로
     // 폴링은 백업 경로로만 사용. GlobalBell·인박스는 NOTIFICATION_LIST_UPDATED_EVENT를
     // listen해 같은 데이터를 공유 — 3중 폴링 → 단일 폴링으로 통합.
     const unsubscribeNotifications = subscribeRealtime(

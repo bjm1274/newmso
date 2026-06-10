@@ -223,7 +223,8 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
     if (!at) continue;
     const d = new Date(at);
     if (!Number.isFinite(d.getTime())) continue;
-    const hour = d.getHours();
+    // KST(UTC+9) 기준 시각으로 보정 — 서버 TZ가 UTC라 getHours()는 KST가 아님.
+    const hour = new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
     if (hour >= 0 && hour < 5) {
       const key = actorKey(row);
       const entry = nightByActor.get(key) || { who: actorLabel(row), count: 0, latest: '' };

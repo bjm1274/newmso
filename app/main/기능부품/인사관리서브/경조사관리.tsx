@@ -218,9 +218,10 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
         };
         const { data, error } = await supabase.from('congratulations_condolences').insert([newRec]).select();
         if (error) {
-            const fallback = { ...(newRec as unknown as CongratRecord), id: crypto.randomUUID() };
-            setRecords([fallback, ...records]);
-        } else if (data) {
+            toast('경조사 기록 저장 실패: ' + (error.message || ''), 'error');
+            return;
+        }
+        if (data) {
             setRecords([data[0] as CongratRecord, ...records]);
         }
         setShowForm(false);

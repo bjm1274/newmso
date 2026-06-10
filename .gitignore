@@ -114,3 +114,20 @@ scripts/backfill-d1/.backfill-progress.json
 /scripts/check_msg_tmpl_cols.js
 
 .claude/scheduled_tasks.lock
+
+# Root-level test/scratch output artifacts (never commit — 4차 전수조사 위생)
+/test_output.txt
+/submissions_output*.txt
+/single_test_output*.txt
+/walkthrough_output.txt
+/test-insert-out.txt
+/__skel.txt
+/_tmp_*.txt
+/test_db.js
+/test_emoticon.js
+/test-insert.mjs
+/query_poll.py
+/query.sql
+
+# Generated SQLite binaries (build-sqlite.mjs 산출물 — 재생성 가능)
+*.sqlite

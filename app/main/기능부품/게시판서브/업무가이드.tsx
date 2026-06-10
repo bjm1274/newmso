@@ -636,6 +636,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   
   const [loading, setLoading] = useState(true);
   const [savingResource, setSavingResource] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [savingTask, setSavingTask] = useState(false);
 
   // B안 신규 상태 제어
@@ -943,8 +944,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const activeTeamTaskCount = activeTeam ? taskCountsByTeamKey[activeTeam.key] || 0 : 0;
   const activeTeamHandoverCount = activeTeam ? handoverCountsByTeamKey[activeTeam.key] || 0 : 0;
 
-  const uploadGuideAttachment = useCallback(async (file: File) => {
-    const uploaded = await uploadBoardAttachmentFile(file, GUIDE_BOARD_TYPE);
+  const uploadGuideAttachment = useCallback(async (file: File, onProgress?: (p: number) => void) => {
+    const uploaded = await uploadBoardAttachmentFile(file, GUIDE_BOARD_TYPE, { onProgress });
     return {
       name: normalizeText(uploaded.name),
       url: normalizeText(uploaded.url),
@@ -1017,10 +1018,22 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
     try {
       setSavingResource(true);
+      setUploadProgress(0);
 
       const uploadedAttachments: AttachmentItem[] = [];
+      const totalSize = pendingFiles.reduce((acc, f) => acc + f.size, 0);
+      let loadedSoFar = 0;
+
       for (const file of pendingFiles) {
-        uploadedAttachments.push(await uploadGuideAttachment(file));
+        uploadedAttachments.push(
+          await uploadGuideAttachment(file, (progress) => {
+            if (totalSize > 0) {
+              const currentFileLoaded = (progress / 100) * file.size;
+              setUploadProgress(Math.round(((loadedSoFar + currentFileLoaded) / totalSize) * 100));
+            }
+          })
+        );
+        loadedSoFar += file.size;
       }
 
       const attachments = [...existingAttachments, ...uploadedAttachments];
@@ -2165,7 +2178,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   onClick={() => void saveResource()}
                   className="px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {savingResource ? '저장 중...' : editingResourceId ? '수정 저장' : '자료 등록'}
+                  {savingResource ? (uploadProgress > 0 && uploadProgress < 100 ? `저장 중 (${uploadProgress}%)...` : '저장 중...') : editingResourceId ? '수정 저장' : '자료 등록'}
                 </button>
               </div>
             </div>

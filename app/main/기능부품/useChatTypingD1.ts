@@ -6,7 +6,7 @@
  * D1 polling 기반 typing 표시 훅.
  * - 입력 중: emitTyping(true) → POST /api/chat/typing (디바운스 3초)
  * - 입력 중단: emitTyping(false) → DELETE /api/chat/typing
- * - 방이 활성(selectedRoomId 존재)인 동안 2.5초마다 GET /api/chat/typing?room_id= 폴링
+ * - 방이 활성(selectedRoomId 존재)인 동안 5초마다 GET /api/chat/typing?room_id= 폴링
  * - 자신의 userId 는 서버에서 자동 제외
  */
 
@@ -150,7 +150,7 @@ export function useChatTypingD1({
     [emitTyping, typingClearRef],
   );
 
-  // ── 폴링: 방이 활성인 동안 2.5초마다 GET ────────────────────────────────
+  // ── 폴링: 방이 활성인 동안 5초마다 GET ──────────────────────────────────
 
   useEffect(() => {
     if (pollIntervalRef.current) {

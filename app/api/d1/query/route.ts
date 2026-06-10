@@ -49,9 +49,14 @@ const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_LIMIT = 1000;
 
+// disciplinary_committees 테이블 + unique index 자동 생성을 isolate당 1회만
+// 실행하도록 가드. 매 요청 DDL은 불필요한 부하 — 첫 요청에서만 프로비저닝한다.
+// (완전 제거는 마이그레이션 의존이라 위험 → 가드만 적용.)
+let provisioned = false;
+
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
-  op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike']),
+  op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike', 'contains']),
   value: z.unknown(),
 });
 
@@ -289,7 +294,10 @@ function buildSelectSql(payload: Payload): SQL {
   const rangeSql = payload.range
     ? sql` LIMIT ${payload.range.to - payload.range.from + 1} OFFSET ${payload.range.from}`
     : sql.raw('');
-  return sql`SELECT ${colsSql} FROM ${tableSql}${whereSql}${orderSql}${limitSql}${rangeSql}`;
+  // range가 있으면 rangeSql만, 없으면 limitSql만 사용한다. 둘을 무조건 연결하면
+  // `LIMIT a LIMIT b ...` 처럼 LIMIT 절이 중복돼 SQL이 깨진다. range가 limit보다 우선.
+  const pageSql = payload.range ? rangeSql : limitSql;
+  return sql`SELECT ${colsSql} FROM ${tableSql}${whereSql}${orderSql}${pageSql}`;
 }
 
 export async function POST(request: Request) {
@@ -325,8 +333,10 @@ export async function POST(request: Request) {
     }
 
     // DDD (Disciplinary Table Auto-provisioning & Unique Index)
-    try {
-      await d1.exec(`
+    // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
+    if (!provisioned) {
+      try {
+        await d1.exec(`
         CREATE TABLE IF NOT EXISTS \`disciplinary_committees\` (
           \`id\` text PRIMARY KEY NOT NULL,
           \`company\` text,
@@ -343,8 +353,10 @@ export async function POST(request: Request) {
         );
         CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
       `);
-    } catch (err) {
-      console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
+        provisioned = true;
+      } catch (err) {
+        console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
+      }
     }
 
     const db = getD1Drizzle(d1);
@@ -355,10 +367,13 @@ export async function POST(request: Request) {
       // 없는 타 회사·타인 row까지 집계된다. row를 읽어 정책 필터를 적용한 뒤 개수를
       // 센다. 정책 평가에 필요한 컬럼이 누락되지 않도록 전체 컬럼을 읽고, limit/range는
       // 무시한다(전체 집계가 목적).
+      // 정책 필터 count는 최대 MAX_LIMIT행까지 근사한다. limit/range를 undefined로
+      // 비우면 정책 평가를 위해 테이블 전 행을 메모리로 적재하게 되어 위험하므로,
+      // MAX_LIMIT 상한을 적용한다(range는 제거해 처음부터 MAX_LIMIT행을 읽는다).
       const countPayload: Payload = {
         ...payload,
         columns: undefined,
-        limit: undefined,
+        limit: MAX_LIMIT,
         range: undefined,
       };
       const countResult = await db.run(buildSelectSql(countPayload));

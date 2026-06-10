@@ -66,7 +66,11 @@ async function uploadViaAppServer(file: File, boardType: string) {
   return normalizeUploadedAttachment(file, payload);
 }
 
-export async function uploadBoardAttachmentFile(file: File, boardType: string): Promise<UploadedBoardAttachment> {
+export async function uploadBoardAttachmentFile(
+  file: File,
+  boardType: string,
+  options?: { onProgress?: (progress: number) => void }
+): Promise<UploadedBoardAttachment> {
   const uploadFileName = getUploadFileName(file);
   const response = await fetch(BOARD_UPLOAD_ENDPOINT, {
     method: 'POST',
@@ -87,10 +91,34 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
   const publicUrl = payload.url || '';
 
   try {
-    const directUploadResponse = await fetch(payload.signedUrl, {
-      method: 'PUT',
-      headers: payload.headers || { 'content-type': getUploadContentType(file) },
-      body: file,
+    const directUploadResponse = await new Promise<Response>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', payload.signedUrl!);
+      
+      const headers = payload.headers || { 'content-type': getUploadContentType(file) };
+      for (const [key, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(key, value);
+      }
+
+      if (options?.onProgress && xhr.upload) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            options.onProgress!(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        resolve(new Response(xhr.response, { status: xhr.status, statusText: xhr.statusText }));
+      };
+      xhr.onerror = () => {
+        reject(new TypeError('Network request failed'));
+      };
+      xhr.onabort = () => {
+        reject(new Error('Upload aborted'));
+      };
+
+      xhr.send(file);
     });
 
     if (!directUploadResponse.ok) {
@@ -98,6 +126,9 @@ export async function uploadBoardAttachmentFile(file: File, boardType: string): 
     }
   } catch (directUploadError) {
     logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
+    if (file.size > 50 * 1024 * 1024) {
+      throw new Error('파일 서버에 직접 업로드할 수 없으며, 서버 우회 한도(50MB)를 초과하여 업로드가 취소되었습니다.');
+    }
     return await uploadViaAppServer(file, boardType);
   }
 

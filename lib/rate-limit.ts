@@ -113,40 +113,34 @@ export async function recordFailedAttempt(key: string, windowMs: number): Promis
 
   try {
     const now = Date.now();
-    const row = await fetchRow(d1, key);
 
     const nowStr = String(now);
     const nowTs = new Date(now).toISOString();
 
-    if (!row) {
-      // 첫 실패 — 새 레코드 삽입
-      await d1
-        .prepare(
-          'INSERT INTO rate_limit_attempts (key, count, window_start, updated_at) VALUES (?, 1, ?, ?)',
-        )
-        .bind(key, nowStr, nowTs)
-        .run();
-      return;
-    }
-
-    const windowStart = parseInt(row.window_start, 10);
-    if (isNaN(windowStart) || now >= windowStart + windowMs) {
-      // 윈도우 만료 — 리셋 후 카운트 1
-      await d1
-        .prepare(
-          'UPDATE rate_limit_attempts SET count = 1, window_start = ?, updated_at = ? WHERE key = ?',
-        )
-        .bind(nowStr, nowTs, key)
-        .run();
-    } else {
-      // 같은 윈도우 — 카운트 증가
-      await d1
-        .prepare(
-          'UPDATE rate_limit_attempts SET count = count + 1, updated_at = ? WHERE key = ?',
-        )
-        .bind(nowTs, key)
-        .run();
-    }
+    // TOCTOU 제거: SELECT 후 분기 INSERT/UPDATE 대신 단일 원자적 upsert.
+    // - 신규 키: count=1, window_start=now
+    // - 같은 윈도우(window_start + windowMs > now): count = count + 1
+    // - 만료된 윈도우(window_start + windowMs <= now): count=1로 리셋, window_start=now
+    //   윈도우 만료 판정은 기존 window_start(TEXT, epoch ms)를 정수로 캐스팅해 비교한다.
+    await d1
+      .prepare(
+        `INSERT INTO rate_limit_attempts (key, count, window_start, updated_at)
+         VALUES (?, 1, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET
+           count = CASE
+             WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
+               THEN 1
+             ELSE rate_limit_attempts.count + 1
+           END,
+           window_start = CASE
+             WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
+               THEN ?
+             ELSE rate_limit_attempts.window_start
+           END,
+           updated_at = ?`,
+      )
+      .bind(key, nowStr, nowTs, windowMs, now, windowMs, now, nowStr, nowTs)
+      .run();
   } catch (err) {
     console.error('[rate-limit] recordFailedAttempt D1 오류:', err);
   }

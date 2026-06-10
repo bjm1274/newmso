@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { normalizeKeywordList } from './filter-helpers';
 
 // ─── 알림 설정 타입 ───
 export interface NotifSettings {
@@ -25,18 +26,6 @@ export const DEFAULT_SETTINGS: NotifSettings = {
     education: true, notification: true, todo: true,
   },
 };
-
-function normalizeKeywordList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return Array.from(
-    new Set(
-      value
-        .map((entry) => String(entry || '').trim().toLowerCase())
-        .filter(Boolean)
-        .slice(0, 30),
-    ),
-  );
-}
 
 export function saveNotifSettings(next: NotifSettings) {
   if (typeof window === 'undefined') return;

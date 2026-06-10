@@ -28,22 +28,6 @@ type SignedUploadResponse = {
   error?: string;
 };
 
-export function isAllowedFile(file: File, mediaType: PopupDraft['media_type']) {
-  const allowedTypes = mediaType === 'video' ? VIDEO_TYPES : IMAGE_TYPES;
-
-  if (!allowedTypes.has(file.type)) {
-    return mediaType === 'video'
-      ? '동영상은 MP4 파일만 업로드할 수 있습니다.'
-      : '이미지는 JPG 또는 PNG 파일만 업로드할 수 있습니다.';
-  }
-
-  if (mediaType === 'video' && file.size > MAX_VIDEO_BYTES) {
-    return '파일 크기는 25MB 이하여야 합니다.';
-  }
-
-  return null;
-}
-
 function validatePopupFileSelection(file: File, mediaType: PopupDraft['media_type']) {
   const allowedTypes = mediaType === 'video' ? VIDEO_TYPES : IMAGE_TYPES;
 

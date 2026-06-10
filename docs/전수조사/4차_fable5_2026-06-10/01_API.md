@@ -3,7 +3,7 @@
 > ✅ = Opus 코드 직접 재확인. [검증] = Fable5 독립 검증자 판정.
 
 ## CRITICAL
-- **api-1 [보안/IDOR]** `app/api/admin/annual-leave/sync/route.ts:5-21` — 세션 검사 전무. body.staffId만으로 `syncAnnualLeaveUsedForStaff`/`recalculateLeaveBalance` 실행. middleware가 `/api` 미보호 → 미인증자가 임의 직원 연차 변조. [검증 confirmed critical] ✅ 라이브 호출처(LeaveWorkcenter·휴가관리메인) 존재.
+- **api-1 [보안/미인증]** `app/api/admin/annual-leave/sync/route.ts:5-21` — 세션 검사 전무. body.staffId만으로 `syncAnnualLeaveUsedForStaff`/`recalculateLeaveBalance` 실행. middleware가 `/api` 미보호 → **비로그인 외부에서도** 임의 staffId로 호출 가능. [검증 confirmed critical] ✅ 라이브 호출처(LeaveWorkcenter·휴가관리메인) 존재. ※ 회사 간 접근은 의도된 MSO 설계라 무관 — 문제는 **익명 접근**(로그인 필수로 수정). `[[mso-cross-company-visibility]]`
 
 ## MAJOR
 - **api-2 [보안]** `ai/roster-recommendation/route.ts:9,1730` — 모듈스코프 `Map` 레이트리밋. Workers isolate 분산으로 전역 차단 불가(같은 repo의 `lib/rate-limit.ts`는 이 이유로 D1 전환). 비싼 Gemini Pro 호출 과소차단. [검증 confirmed major]

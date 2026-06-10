@@ -36,6 +36,11 @@ const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_ROWS_PER_INSERT = 100;
 
+// disciplinary_committees 테이블 + unique index 자동 생성을 isolate당 1회만
+// 실행하도록 가드. 매 요청 DDL은 불필요한 부하 — 첫 요청에서만 프로비저닝한다.
+// (완전 제거는 마이그레이션 의존이라 위험 → 가드만 적용.)
+let provisioned = false;
+
 // RETURNING 컬럼 — 일반 컬럼명 또는 '*'(전체 컬럼). supabase .select('*') 호환.
 const ReturningColSchema = z.string().refine((c) => c === '*' || COLUMN_RE.test(c), {
   message: 'invalid returning column',

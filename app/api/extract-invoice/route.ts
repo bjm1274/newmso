@@ -115,7 +115,8 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ success: true, data: parsedData });
-    } catch {
+    } catch (err) {
+        console.error('[extract-invoice]', err);
         return NextResponse.json(
             { error: '명세서 정보 추출에 실패했습니다.' },
             { status: 500 }
