@@ -304,7 +304,6 @@ export class OfflineQueue {
   // ─────────────────────────────────────────────────────────────
 
   private markAttempted(id: string): void {
-    let movedToFailed = false;
     const next = this.items.flatMap<QueuedAction>((item) => {
       if (item.id !== id) return [item];
       const retryCount = item.retryCount + 1;
@@ -314,14 +313,13 @@ export class OfflineQueue {
         this.failedItems = [...this.failedItems, failedItem];
         storageWriteFailed(this.failedItems);
         this.emitFailed();
-        movedToFailed = true;
         return [];
       }
       return [{ ...item, retryCount, lastAttemptAt: Date.now() }];
     });
     this.items = next;
     void storageWriteQueue(this.items);
-    if (movedToFailed || true) this.emit();
+    this.emit();
   }
 
   private emit(): void {

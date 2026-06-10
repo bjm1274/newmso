@@ -118,7 +118,9 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
           const paidOT = staffPayrolls.reduce((s: number, p: any) => s + ((p.overtime_pay || 0) > 0 ? 1 : 0), 0);
           const paidNight = staffPayrolls.reduce((s: number, p: any) => s + ((p.night_duty_allowance || 0) > 0 ? 1 : 0), 0);
 
-          const baseSalary = staff.base_salary || staff.base || 2000000;
+          // 기본급이 없으면 추정 불가 — 임의 추정(과거 200만원 하드코딩) 대신 해당 직원 skip
+          const baseSalary = Number(staff.base_salary) || Number(staff.base) || 0;
+          if (baseSalary <= 0) continue;
           const hourlyWage = calculateHourlyRateFromMonthlySalary(
             baseSalary,
             resolveWeeklyWorkingHours(staff, 40),

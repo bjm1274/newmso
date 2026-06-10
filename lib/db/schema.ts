@@ -2656,6 +2656,76 @@ export const disciplinary_committees = sqliteTable("disciplinary_committees", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 });
 
+// ── 2026-06-10 무음 실패 복구 (G7) — migration 0013로 D1에 신설된 기능 테이블 5종.
+//    소비처가 supabase.from()으로 호출하나 schema.ts/d1_schema_final.sql 둘 다에
+//    없어 무음 실패하던 기능을 실테이블 신설과 함께 복구. 컬럼은 소비처 코드의
+//    insert/select/upsert/delete 사용 컬럼에서 추출.
+
+// 간호근무표 (인사관리서브 — 간호근무표.tsx)
+export const nurse_schedules = sqliteTable("nurse_schedules", {
+	id: text().primaryKey().notNull(),
+	staff_id: text(),
+	year_month: text(),
+	day: integer(),
+	shift_code: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_nurse_schedules_year_month").on(table.year_month),
+	index("idx_nurse_schedules_staff_id").on(table.staff_id),
+]);
+
+// 연차/휴가 정책 (관리자워크센터 — CompanyLeaveTab.tsx)
+export const leave_policies = sqliteTable("leave_policies", {
+	id: text().primaryKey().notNull(),
+	label: text(),
+	value: text(),
+	company: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_leave_policies_company").on(table.company),
+]);
+
+// 근무유형 변경 이력 (lib/hr-history-ledger.ts)
+export const work_type_change_history = sqliteTable("work_type_change_history", {
+	id: text().primaryKey().notNull(),
+	staff_id: text(),
+	changed_date: text(),
+	previous_type: text(),
+	new_type: text(),
+	reason: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_work_type_change_history_staff_changed").on(table.staff_id, table.changed_date),
+]);
+
+// 교육 이수 (인사관리서브 — 교육내역/education-utils.ts)
+export const education_completions = sqliteTable("education_completions", {
+	id: text().primaryKey().notNull(),
+	staff_id: text(),
+	education_name: text(),
+	certificate_url: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	uniqueIndex("idx_education_completions_staff_education").on(table.staff_id, table.education_name),
+]);
+
+// 이메일 발송 큐 (인사관리서브 — 급여명세/급여명세서발송.tsx)
+export const email_queue = sqliteTable("email_queue", {
+	id: text().primaryKey().notNull(),
+	recipient: text(),
+	subject: text(),
+	body: text(),
+	type: text(),
+	status: text().default("pending"),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_email_queue_status_created").on(table.status, table.created_at),
+]);
 
 
 

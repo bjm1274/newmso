@@ -29,7 +29,7 @@ import {
 } from '../../마이페이지/출퇴근기록/checkin-utils';
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
-import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
+import { NP_INCOME_CEILING, NP_INCOME_FLOOR, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
 import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
 import RiskActionDialog from '../RiskActionDialog';
@@ -972,8 +972,7 @@ export default function SalarySettlement({
     const childcare_taxable = Math.max(0, Number(data.childcare_allowance) - TAX_FREE_LIMITS.childcare);
 
     // nightDuty 비과세 한도 (C-04): 소득세법 시행령 야간근로수당 비과세 한도
-    // TODO: 설정 테이블에 night_duty_limit 컬럼 추가 후 taxFreeLimits에서 읽도록 개선
-    const NIGHT_DUTY_TAX_FREE_LIMIT = 240_000; // 월 24만원 (생산직 야간수당 비과세 한도, 소득세법 시행령 제17조)
+    // 한도 상수는 lib/tax-free-limits 의 NIGHT_DUTY_TAX_FREE_LIMIT(월 24만원) 사용
     const nightDutyRaw = Number(data.night_duty_allowance) || 0;
     const nightDuty_tf = Math.min(nightDutyRaw, NIGHT_DUTY_TAX_FREE_LIMIT);
     const nightDuty_taxable = Math.max(0, nightDutyRaw - NIGHT_DUTY_TAX_FREE_LIMIT);

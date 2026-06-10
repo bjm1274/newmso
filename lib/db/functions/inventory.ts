@@ -190,6 +190,17 @@ export function syncInventoryNameStock<T extends {
   return next;
 }
 
+/**
+ * 재고 차감 + 로그 INSERT.
+ *
+ * D1은 인터랙티브 트랜잭션 미지원 → UPDATE(가드 포함)+로그 INSERT 순차,
+ * 로그 실패는 재고차감을 되돌리지 않음.
+ *
+ *   (a) UPDATE ... RETURNING 으로 가드(WHERE) 포함 원자적 차감
+ *   (b) 0행이면 별도 SELECT로 행 존재 여부 조회해 StockError throw
+ *       (이 read는 차감이 일어나지 않은 경로라 원자성 불필요)
+ *   (c) 차감 성공 시 로그 INSERT 후 반환
+ */
 export async function atomicStockConsumeWithLog(
   db: D1Client,
   itemId: string,
@@ -202,56 +213,54 @@ export async function atomicStockConsumeWithLog(
     notes: string | null;
   }
 ): Promise<StockUpdateResult> {
-  return await db.transaction(async (tx) => {
-    const updated = await tx
-      .update(inventory)
-      .set({
-        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
-        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
-      })
-      .where(
-        sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${consumeAmount}`,
-      )
-      .returning({
-        next_qty: inventory.quantity,
-      });
+  const updated = await db
+    .update(inventory)
+    .set({
+      quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
+      stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
+    })
+    .where(
+      sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${consumeAmount}`,
+    )
+    .returning({
+      next_qty: inventory.quantity,
+    });
 
-    if (updated.length === 0) {
-      const found = await tx
-        .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
-        .from(inventory)
-        .where(eq(inventory.id, itemId));
-      if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
-      const prev = Number(found[0].prev ?? 0);
-      throw new StockError(
-        'INSUFFICIENT_STOCK',
-        `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
-      );
-    }
+  if (updated.length === 0) {
+    const found = await db
+      .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
+      .from(inventory)
+      .where(eq(inventory.id, itemId));
+    if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
+    const prev = Number(found[0].prev ?? 0);
+    throw new StockError(
+      'INSUFFICIENT_STOCK',
+      `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
+    );
+  }
 
-    const next = Number(updated[0].next_qty ?? 0);
-    const prev = next + consumeAmount;
-    const logId = crypto.randomUUID();
+  const next = Number(updated[0].next_qty ?? 0);
+  const prev = next + consumeAmount;
+  const logId = crypto.randomUUID();
 
-    await tx
-      .insert(inventory_logs)
-      .values({
-        id: logId,
-        item_id: itemId,
-        inventory_id: itemId,
-        type: '소모',
-        change_type: '사용',
-        quantity: consumeAmount,
-        prev_quantity: prev,
-        next_quantity: next,
-        actor_name: logRow.actor_name,
-        company: logRow.company,
-        company_id: logRow.company_id ?? null,
-        department: logRow.department,
-        notes: logRow.notes,
-      });
+  await db
+    .insert(inventory_logs)
+    .values({
+      id: logId,
+      item_id: itemId,
+      inventory_id: itemId,
+      type: '소모',
+      change_type: '사용',
+      quantity: consumeAmount,
+      prev_quantity: prev,
+      next_quantity: next,
+      actor_name: logRow.actor_name,
+      company: logRow.company,
+      company_id: logRow.company_id ?? null,
+      department: logRow.department,
+      notes: logRow.notes,
+    });
 
-    return { prev_qty: prev, next_qty: next };
-  });
+  return { prev_qty: prev, next_qty: next };
 }
 

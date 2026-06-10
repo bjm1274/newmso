@@ -28,6 +28,7 @@ import {
 } from '@/lib/payroll-working-hours';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
 import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
+import { NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
@@ -468,9 +469,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     const researchTaxFree = Math.min(research, taxFreeLimits.research_limit);
     const researchTaxable = Math.max(0, research - taxFreeLimits.research_limit);
 
-    // 야간·당직 비과세 한도 (월 24만원, 소득세법 시행령 제17조) — 급여정산.tsx와 동일 기준
-    // TODO: 생산직 요건(월정액급여 210만원 이하 등) 반영 및 설정 테이블화 필요
-    const NIGHT_DUTY_TAX_FREE_LIMIT = 240_000;
+    // 야간·당직 비과세 한도 (월 24만원, 소득세법 시행령 제17조) — lib/tax-free-limits SSOT 사용
     const nightDutyTaxFree = Math.min(nightDuty, NIGHT_DUTY_TAX_FREE_LIMIT);
     const nightDutyTaxable = Math.max(0, nightDuty - NIGHT_DUTY_TAX_FREE_LIMIT);
 

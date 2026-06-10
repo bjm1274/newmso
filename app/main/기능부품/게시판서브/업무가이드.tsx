@@ -2178,7 +2178,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                   onClick={() => void saveResource()}
                   className="px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent)]/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {savingResource ? (uploadProgress > 0 && uploadProgress < 100 ? `저장 중 (${uploadProgress}%)...` : '저장 중...') : editingResourceId ? '수정 저장' : '자료 등록'}
+                  {savingResource ? (uploadProgress > 0 ? `저장 중 (${uploadProgress}%)...` : '저장 중 (0%)...') : editingResourceId ? '수정 저장' : '자료 등록'}
                 </button>
               </div>
             </div>

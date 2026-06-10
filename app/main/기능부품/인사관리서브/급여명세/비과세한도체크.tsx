@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { supabase } from '@/lib/supabase';
-import { TAX_FREE_LEGAL_LIMITS } from '@/lib/tax-free-limits';
+import { TAX_FREE_LEGAL_LIMITS, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface StaffRecord {
@@ -43,7 +43,7 @@ const TAX_FREE_LIMITS: Record<TaxFreeItemKey, { label: string; limit: number }> 
   car: { label: '자가운전보조금', limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit },
   research: { label: '연구활동비', limit: TAX_FREE_LEGAL_LIMITS.research.limit },
   childcare: { label: '출산·보육수당', limit: TAX_FREE_LEGAL_LIMITS.childcare.limit },
-  night: { label: '야간근로수당(생산직)', limit: 240000 },
+  night: { label: '야간근로수당(생산직)', limit: NIGHT_DUTY_TAX_FREE_LIMIT },
   overseas: { label: '국외근로소득(비파견)', limit: 1000000 },
 };
 

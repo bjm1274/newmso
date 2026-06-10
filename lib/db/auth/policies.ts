@@ -625,17 +625,23 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'message_templates',           // 관리자 메시지 템플릿
   'external_integrations',       // 관리자 외부 연동
 
+  // ── 2026-06-10 무음 실패 복구 (G7) — migration 0013로 D1에 신설된 기능 테이블 5종.
+  //    소비처가 supabase.from()으로 호출하나 실테이블이 schema.ts/d1_schema_final.sql
+  //    둘 다에 없어 무음 실패하던 기능을 실테이블 신설과 함께 복구. MSO 설계상 회사
+  //    격리 불필요 — 형제 테이블과 동일하게 PUBLIC_ALL.
+  'nurse_schedules',             // 간호근무표
+  'leave_policies',              // 연차/휴가 정책
+  'work_type_change_history',    // 근무유형 변경 이력
+  'education_completions',       // 교육 이수
+  'email_queue',                 // 이메일 발송 큐
+
   // ── 2026-05-20 확인 — 아래는 클라이언트 코드가 supabase.from()으로
   //    호출하지만 Supabase에 테이블이 실제로 존재하지 않음(probe 결과 PGRST205
   //    + information_schema 부재). 즉 현재도 동작하지 않는 미완성/사장된 기능
   //    참조이며 D1 이관 대상이 아님. whitelist 등록 자체는 무해하고, 향후 해당
   //    기능을 살릴 때 테이블 생성과 함께 정책을 재정비해야 함.
   'org_chart_nodes',
-  'education_completions',
-  'nurse_schedules',
   'profiles',
-  'email_queue',
-  'work_type_change_history',
   'patient_prescriptions',
   'inventory_items',
   'attendance_records',

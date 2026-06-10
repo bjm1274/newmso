@@ -48,7 +48,7 @@ const ReturningColSchema = z.string().refine((c) => c === '*' || COLUMN_RE.test(
 
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
-  op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike']),
+  op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike', 'contains']),
   value: z.unknown(),
 });
 
@@ -140,7 +140,9 @@ function buildWhereSql(where: { field: string; op: string; value: unknown }[]): 
       if (value === null) out.push(sql`${col} IS NOT NULL`);
       else out.push(sql`${col} IS NOT ${value}`);
     } else if (cond.op === 'like' || cond.op === 'ilike') {
-      out.push(sql`${col} LIKE ${value}`);
+      // query/route.ts와 동일하게 ESCAPE '\' 선언 — 클라이언트가 %/_/\ 를
+      // 백슬래시로 이스케이프해 보내면 리터럴로 매칭된다(무회귀).
+      out.push(sql`${col} LIKE ${value} ESCAPE '\\'`);
     } else if (cond.op === 'in') {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) out.push(sql`1 = 0`);
@@ -270,8 +272,10 @@ export async function POST(request: Request) {
     }
 
     // DDD (Disciplinary Table Auto-provisioning & Unique Index)
-    try {
-      await d1.exec(`
+    // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
+    if (!provisioned) {
+      try {
+        await d1.exec(`
         CREATE TABLE IF NOT EXISTS \`disciplinary_committees\` (
           \`id\` text PRIMARY KEY NOT NULL,
           \`company\` text,
@@ -288,8 +292,10 @@ export async function POST(request: Request) {
         );
         CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
       `);
-    } catch (err) {
-      console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
+        provisioned = true;
+      } catch (err) {
+        console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
+      }
     }
 
     const db = getD1Drizzle(d1);

@@ -17,6 +17,13 @@ export const MINIMUM_WAGE_2025 = 10_030;
 export const MINIMUM_WAGE_2026 = 10_320;
 
 /**
+ * 야간근로수당 비과세 한도 (생산직 등)
+ * 월 24만원 — 소득세법 시행령 제17조
+ * TODO: 생산직 요건(월정액급여 210만원 이하 등) 반영 및 설정 테이블화 필요
+ */
+export const NIGHT_DUTY_TAX_FREE_LIMIT = 240_000;
+
+/**
  * 국민연금 기준소득월액 상·하한
  * 2025.7.1 ~ 2026.6.30 기준
  */
