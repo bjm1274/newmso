@@ -45,18 +45,18 @@ export async function insertChatMessageWithFallback<
       }
     }
 
-    client.from('chat_rooms')
-      .update({
-        last_message: content,
-        last_message_at: createdAt,
-      })
-      .eq('id', roomId)
-      .then((updateRes: any) => {
-        if (updateRes?.error) {
-          console.error('Failed to update chat_rooms.last_message', updateRes.error);
-        }
-      })
-      .catch((err: any) => console.error('Failed to update chat_rooms', err));
+    const preview = content.slice(0, 80);
+    try {
+      await client.from('chat_rooms')
+        .update({
+          last_message: content,
+          last_message_preview: preview,
+          last_message_at: createdAt,
+        })
+        .eq('id', roomId);
+    } catch (err) {
+      console.error('Failed to update chat_rooms.last_message', err);
+    }
   }
 
   return result;
