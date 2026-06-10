@@ -87,17 +87,35 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     (async () => {
       try {
         const today = formatLocalDateKey(new Date());
-        // 오늘 날짜의 출퇴근 기록만 조회한다.
-        // (이전 날짜의 미퇴근 기록을 오늘 기록으로 끌어오면, 출근을 안 눌렀는데도
-        //  '퇴근하기'로 표시되고 어제 출근시각이 오늘 것처럼 보이는 버그가 생긴다.)
+        // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
         const { data: todayData } = await supabase
           .from('attendance')
           .select('id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
           .eq('date', today)
-          .maybeSingle();
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-        if (!cancelled) setOpenLog((todayData as OpenLog) ?? null);
+        let activeLog = (todayData?.[0] as OpenLog) ?? null;
+
+        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
+        if (!activeLog?.check_in) {
+          const { data: staleData } = await supabase
+            .from('attendance')
+            .select('id, date, check_in, check_out, status')
+            .eq('staff_id', staffId)
+            .not('check_in', 'is', null)
+            .is('check_out', null)
+            .neq('status', '결근') // 결근 처리된 건 제외
+            .order('date', { ascending: false })
+            .limit(1);
+
+          if (staleData && staleData.length > 0 && staleData[0].date !== today) {
+            activeLog = staleData[0] as OpenLog;
+          }
+        }
+
+        if (!cancelled) setOpenLog(activeLog);
       } catch {/* silent */}
     })();
     return () => { cancelled = true; };

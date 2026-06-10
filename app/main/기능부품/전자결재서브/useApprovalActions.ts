@@ -287,17 +287,20 @@ export function useApprovalActions({
       revision: getApprovalRevision(recalledMetaData),
     });
 
-    const { error } = await supabase
-      .from('approvals')
-      .update({
-        status: '회수',
-        current_approver_id: null,
-        meta_data: recalledHistoryMetaData,
-      })
-      .eq('id', item.id);
+    try {
+      const response = await fetch('/api/approval/recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalId: item.id, note: '회수 후 수정' }),
+      });
+      const payload = await response.json().catch(() => null);
 
-    if (error) {
-      toast(`기안 회수에 실패했습니다. ${error.message || ''}`, 'error');
+      if (!response.ok || !payload?.ok) {
+        toast(`기안 회수에 실패했습니다. ${payload?.error || response.statusText || ''}`, 'error');
+        return;
+      }
+    } catch (err) {
+      toast(`기안 회수 중 오류가 발생했습니다.`, 'error');
       return;
     }
 

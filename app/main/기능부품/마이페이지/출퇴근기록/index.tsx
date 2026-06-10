@@ -379,8 +379,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .select('*')
       .eq('staff_id', userId)
       .eq('date', targetDate)
-      .maybeSingle();
-    setTodayLog(data || null);
+      .order('created_at', { ascending: false })
+      .limit(1);
+    setTodayLog(data?.[0] || null);
   };
 
   const fetchMonthlyLogs = async () => {
