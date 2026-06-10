@@ -206,14 +206,14 @@ export default function ContractMain({
 
         const pay = includeTaxFree
           ? {
-            base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
-            meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
-            vehicle_allowance: salaryInfo.vehicle_allowance ?? s?.vehicle_allowance ?? 0,
-            childcare_allowance: salaryInfo.childcare_allowance ?? s?.childcare_allowance ?? 0,
-            position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
-            research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
-            other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
-            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance ?? s?.agreed_overtime_allowance ?? 0,
+            base_salary: salaryInfo.base_salary || s?.base_salary || 0,
+            meal_allowance: salaryInfo.meal_allowance || s?.meal_allowance || 0,
+            vehicle_allowance: salaryInfo.vehicle_allowance || s?.vehicle_allowance || 0,
+            childcare_allowance: salaryInfo.childcare_allowance || s?.childcare_allowance || 0,
+            position_allowance: salaryInfo.position_allowance || s?.position_allowance || 0,
+            research_allowance: salaryInfo.research_allowance || s?.research_allowance || 0,
+            other_taxfree: salaryInfo.other_taxfree || s?.other_taxfree || 0,
+            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance || s?.agreed_overtime_allowance || 0,
             effective_date: conditionsAppDate
           }
           : {
@@ -308,14 +308,14 @@ export default function ContractMain({
         await Promise.all(checkedIds.map((id: string) => {
           const s = (staffs as any[])?.find((x: any) => String(x.id) === String(id));
           return d1.from('staff_members').update({
-            base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
-            meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
-            vehicle_allowance: salaryInfo.vehicle_allowance ?? s?.vehicle_allowance ?? 0,
-            childcare_allowance: salaryInfo.childcare_allowance ?? s?.childcare_allowance ?? 0,
-            position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
-            research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
-            other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
-            overtime_allowance: salaryInfo.agreed_overtime_allowance ?? s?.agreed_overtime_allowance ?? 0
+            base_salary: salaryInfo.base_salary || s?.base_salary || 0,
+            meal_allowance: salaryInfo.meal_allowance || s?.meal_allowance || 0,
+            vehicle_allowance: salaryInfo.vehicle_allowance || s?.vehicle_allowance || 0,
+            childcare_allowance: salaryInfo.childcare_allowance || s?.childcare_allowance || 0,
+            position_allowance: salaryInfo.position_allowance || s?.position_allowance || 0,
+            research_allowance: salaryInfo.research_allowance || s?.research_allowance || 0,
+            other_taxfree: salaryInfo.other_taxfree || s?.other_taxfree || 0,
+            overtime_allowance: salaryInfo.agreed_overtime_allowance || s?.agreed_overtime_allowance || 0
           }).eq('id', id);
         }));
       }
