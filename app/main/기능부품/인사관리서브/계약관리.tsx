@@ -76,13 +76,53 @@ export default function ContractMain({
   const upsertEmploymentContracts = async (
     requests: Record<string, unknown>[],
     omittedColumns: ReadonlySet<string>,
-  ) =>
-    d1
-      .from('employment_contracts')
-      .upsert(
-        requests.map((request) => omitColumnsFromRecord(request, omittedColumns)),
-        { onConflict: 'staff_id,contract_type' }
-      );
+  ) => {
+    try {
+      const cleanReqs = requests.map((req) => omitColumnsFromRecord(req, omittedColumns));
+      const staffIds = cleanReqs.map(r => String(r.staff_id));
+      const contractType = cleanReqs[0]?.contract_type as string;
+      if (!contractType || staffIds.length === 0) return { error: null, data: [] };
+
+      const { data: existing, error: fetchErr } = await d1
+        .from('employment_contracts')
+        .select('id, staff_id')
+        .in('staff_id', staffIds)
+        .eq('contract_type', contractType);
+      if (fetchErr) return { error: fetchErr, data: null };
+
+      const existingMap = new Map<string, string[]>();
+      for (const row of (existing || [])) {
+        const sid = String(row.staff_id);
+        if (!existingMap.has(sid)) existingMap.set(sid, []);
+        existingMap.get(sid)!.push(row.id);
+      }
+
+      const toInsert = [];
+      for (const req of cleanReqs) {
+        const sid = String(req.staff_id);
+        const existingIds = existingMap.get(sid);
+        if (existingIds && existingIds.length > 0) {
+          const { error } = await d1.from('employment_contracts').update(req).eq('id', existingIds[0]);
+          if (error) return { error, data: null };
+          if (existingIds.length > 1) {
+            for (let i = 1; i < existingIds.length; i++) {
+              await d1.from('employment_contracts').delete().eq('id', existingIds[i]);
+            }
+          }
+        } else {
+          toInsert.push(req);
+        }
+      }
+
+      if (toInsert.length > 0) {
+        const { error } = await d1.from('employment_contracts').insert(toInsert);
+        if (error) return { error, data: null };
+      }
+      return { error: null, data: [] };
+    } catch (err: any) {
+      return { error: { message: err.message }, data: null };
+    }
+  };
 
   const getContractType = () => activeTab === '연봉계약갱신' ? '연봉계약서'
     : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
