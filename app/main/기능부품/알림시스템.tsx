@@ -1412,8 +1412,16 @@ export default function NotificationSystem({
         .order('created_at', { ascending: true })
         .limit(50);
 
+      const now = Date.now();
       rows?.forEach((row: Record<string, unknown>) => {
-        if (!row?.read_at) emitIncomingNotification(row);
+        if (!row?.read_at) {
+          // 방금 생성된 알림(예: 30초 이내)만 토스트/시스템 푸시 발생
+          // (탭 슬립 모드 해제 시 과거 알림이 한꺼번에 쏟아지는 폭탄 방지)
+          const createdAt = new Date(String(row.created_at || '')).getTime();
+          if (now - createdAt < 30_000) {
+            emitIncomingNotification(row);
+          }
+        }
       });
       void syncBadge();
       // 새 알림이 들어왔을 가능성이 있으면 list 전체를 broadcast — 구독 컴포넌트 동기 갱신
