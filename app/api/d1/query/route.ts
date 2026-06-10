@@ -382,8 +382,66 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, count: filtered.length });
     }
 
-    const result = await db.run(buildSelectSql(payload));
-    const rawRows = ((result as { results?: unknown[] }).results ?? []) as Array<Record<string, unknown>>;
+    // ─────────────────────────────────────────────────────────────
+    // D1 바인딩 파라미터 한도(100) 초과 시 IN절 자동 청킹.
+    // WHERE에 IN절이 있고 전체 파라미터가 100을 넘으면 IN절 값을 분할하여
+    // 여러 쿼리로 실행한 뒤 결과를 합친다.
+    // ─────────────────────────────────────────────────────────────
+    const D1_MAX_PARAMS = 100;
+
+    function countBindParams(p: Payload): number {
+      let count = 0;
+      for (const cond of p.where ?? []) {
+        if (cond.op === 'in' && Array.isArray(cond.value)) {
+          count += (cond.value as unknown[]).length;
+        } else {
+          count += 1;
+        }
+      }
+      return count;
+    }
+
+    async function executeWithAutoChunk(p: Payload): Promise<Record<string, unknown>[]> {
+      const totalParams = countBindParams(p);
+      if (totalParams <= D1_MAX_PARAMS) {
+        // 한도 이내 — 단일 쿼리 실행
+        const result = await db.run(buildSelectSql(p));
+        return ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+      }
+
+      // IN절 중 가장 큰 것을 찾아 분할
+      const inConditions = (p.where ?? [])
+        .map((cond, idx) => ({ cond, idx }))
+        .filter((c) => c.cond.op === 'in' && Array.isArray(c.cond.value));
+
+      if (inConditions.length === 0) {
+        // IN절이 없는데 파라미터가 많은 경우 — 그냥 실행 (에러는 caller에서 처리)
+        const result = await db.run(buildSelectSql(p));
+        return ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+      }
+
+      // 가장 큰 IN절을 찾아 분할
+      const largest = inConditions.reduce((a, b) =>
+        (a.cond.value as unknown[]).length >= (b.cond.value as unknown[]).length ? a : b,
+      );
+      const otherParams = totalParams - (largest.cond.value as unknown[]).length;
+      const chunkSize = Math.max(1, D1_MAX_PARAMS - otherParams);
+      const fullArray = largest.cond.value as unknown[];
+
+      const allRows: Record<string, unknown>[] = [];
+      for (let i = 0; i < fullArray.length; i += chunkSize) {
+        const chunk = fullArray.slice(i, i + chunkSize);
+        const chunkedWhere = [...(p.where ?? [])];
+        chunkedWhere[largest.idx] = { ...largest.cond, value: chunk };
+        const chunkedPayload = { ...p, where: chunkedWhere };
+        const result = await db.run(buildSelectSql(chunkedPayload));
+        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+        allRows.push(...rows);
+      }
+      return allRows;
+    }
+
+    const rawRows = await executeWithAutoChunk(payload);
     const filtered = await filterByPolicy(db, claims, payload.table, rawRows);
     // jsonb/배열 컬럼을 TEXT → 객체/배열로 역직렬화 (수정 1)
     const deserialized = deserializeRows(payload.table, filtered);

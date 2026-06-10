@@ -300,7 +300,11 @@ export function useMyLatestPayroll(staffId: string | null | undefined): MyPaysli
 // ─── 증명서: 최근 발급 내역 (certificate_issuances) ───
 export type MyRecentCert = { id: string; title: string; date: string };
 
-export function useMyRecentCerts(staffId: string | null | undefined): { rows: MyRecentCert[]; loading: boolean } {
+export function useMyRecentCerts(
+  staffId: string | null | undefined,
+  /** 값이 바뀌면 재조회한다(발급 직후 목록 갱신용). */
+  reloadToken?: number,
+): { rows: MyRecentCert[]; loading: boolean } {
   const [rows, setRows] = useState<MyRecentCert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -329,7 +333,7 @@ export function useMyRecentCerts(staffId: string | null | undefined): { rows: My
       }
     })();
     return () => { cancelled = true; };
-  }, [staffId]);
+  }, [staffId, reloadToken]);
 
   return { rows, loading };
 }

@@ -34,7 +34,8 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
     '/api/cron/annual-leave-accrual',     // 1년미만 월 만근 +1 / 만N년 연차 자동부여
     '/api/cron/annual-leave-promotion',   // 1차·2차 연차사용촉진 자동 발송
     '/api/cron/annual-leave-expiry',      // 촉진 2회 완료 후 미사용 연차 자동소멸 (★기존 미등록 버그 수정)
-    '/api/cron/substitute-holiday'        // 공휴일 근무 → 대체휴무 자동지급
+    '/api/cron/substitute-holiday',       // 공휴일 근무 → 대체휴무 자동지급
+    '/api/cron/payroll-notice'            // 급여일(payrollDay) 도래 시 HR/관리자에게 급여명세서 발송 확인 리마인더
   ],
 };
 

@@ -133,7 +133,7 @@ export default function 인사관리({
       return <구성원등록 onBack={goBack} user={user} company={selectedCompany} />;
     case 'form-leave':
       return (
-        <연차신청 staffId={staffId} staffName={staffName} onBack={goBack} />
+        <연차신청 staffId={staffId} staffName={staffName} user={user} onBack={goBack} />
       );
     case 'hub':
     default:

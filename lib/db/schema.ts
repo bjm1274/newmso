@@ -2730,5 +2730,42 @@ export const email_queue = sqliteTable("email_queue", {
 	index("idx_email_queue_status_created").on(table.status, table.created_at),
 ]);
 
+// ── 2026-06-10 예산관리 서버화 (G1) — migration 0015로 D1에 신설.
+//    소비처(관리자전용서브/예산관리.tsx)가 localStorage에만 보관하던 예산 설정·집행
+//    데이터를 D1 실테이블로 이관. 컬럼은 BudgetSetting/BudgetExecution 데이터형에서
+//    1:1 추출(코드의 date → exec_date 매핑). MSO 설계상 company 는 선택(NULL 허용),
+//    정책은 PUBLIC_ALL(전사 조회).
+
+// 예산 설정 (BudgetSetting: id, dept, year, month, item, amount, createdAt)
+export const budget_settings = sqliteTable("budget_settings", {
+	id: text().primaryKey().notNull(),
+	company: text(),
+	dept: text(),
+	year: integer(),
+	month: integer(),
+	item: text(),
+	amount: integer(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_budget_settings_year_month").on(table.year, table.month),
+	index("idx_budget_settings_dept").on(table.dept),
+]);
+
+// 예산 집행 (BudgetExecution: id, dept, item, amount, date→exec_date, memo, createdAt)
+export const budget_executions = sqliteTable("budget_executions", {
+	id: text().primaryKey().notNull(),
+	company: text(),
+	dept: text(),
+	item: text(),
+	amount: integer(),
+	exec_date: text(),
+	memo: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_budget_executions_exec_date").on(table.exec_date),
+	index("idx_budget_executions_dept").on(table.dept),
+]);
 
 

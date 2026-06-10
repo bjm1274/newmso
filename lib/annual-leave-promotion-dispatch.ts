@@ -13,6 +13,7 @@
 import { getStaffPromotionSchedule } from '@/lib/annual-leave-promotion';
 import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { loadNotificationAutomationSettings } from '@/lib/notification-automation-settings';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -50,6 +51,13 @@ const PLAN_TYPES = ['연차계획서', '연차사용계획서'];
 export async function dispatchAnnualLeavePromotions(now: Date = new Date()): Promise<PromotionDispatchResult> {
   const result: PromotionDispatchResult = { scanned: 0, sent: [], skipped: 0, errors: [] };
   const todayKey = formatKoreanDateKey(now);
+
+  // 알림자동화설정 토글 존중. 로드 실패 시 DEFAULT(전부 켜짐)으로 폴백 → 회귀 방지.
+  const automation = await loadNotificationAutomationSettings();
+  if (automation.annualLeaveEnabled === false) {
+    console.log('[annual-leave-promotion-dispatch] annualLeaveEnabled=false → 디스패치 스킵');
+    return result;
+  }
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-promotion-dispatch] D1 binding not available');
@@ -111,8 +119,8 @@ export async function dispatchAnnualLeavePromotions(now: Date = new Date()): Pro
     const step2Key = formatKoreanDateKey(schedule.step2Date);
 
     let stage: 1 | 2 | 0 = 0;
-    if (todayKey === step2Key && !sentSet.has(`${s.id}|2|${expiryKey}`)) stage = 2;
-    else if (todayKey === step1Key && !sentSet.has(`${s.id}|1|${expiryKey}`)) stage = 1;
+    if (automation.step2Enabled !== false && todayKey === step2Key && !sentSet.has(`${s.id}|2|${expiryKey}`)) stage = 2;
+    else if (automation.step1Enabled !== false && todayKey === step1Key && !sentSet.has(`${s.id}|1|${expiryKey}`)) stage = 1;
 
     if (stage === 0) {
       result.skipped += 1;

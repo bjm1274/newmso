@@ -56,7 +56,9 @@ export type UseChatRoomDataSyncParams = {
   setPollVotes: Dispatch<SetStateAction<Record<string, Record<number, number>>>>;
 };
 
-export const CHAT_METADATA_QUERY_CHUNK_SIZE = 100;
+// D1(SQLite) bound parameter 한도는 100. IN절 외에 eq/gt 등 추가 WHERE 파라미터를
+// 감안하여 5개 여유분 확보 — 100 → 95.
+export const CHAT_METADATA_QUERY_CHUNK_SIZE = 95;
 export const MESSAGE_PAGE_SIZE = 50;
 export const DATE_JUMP_CONTEXT_BEFORE = 24;
 export const DATE_JUMP_CONTEXT_AFTER = 36;

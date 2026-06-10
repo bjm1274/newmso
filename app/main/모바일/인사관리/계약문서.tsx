@@ -13,7 +13,7 @@
  * JM5: 본인 staff_id만 조회. 권한이 없는 대상은 비노출.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -21,6 +21,13 @@ import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import { toast } from '@/lib/toast';
 import { useMyContractDocs, daysUntil, type MyDocRow } from './data-hooks';
+import { issueAndPrintMyCert } from '../내정보/cert-issue';
+import { uploadMyDocument } from '../내정보/doc-submit';
+import {
+  DOC_ALLOWED_FORMATS_LABEL,
+  DOC_MAX_FILE_SIZE_LABEL,
+  MOBILE_SUBMISSION_TYPES,
+} from '@/lib/document-submission-shared';
 
 export type SHrDocsTab = 'mine' | 'cert' | 'ctr' | 'submit';
 
@@ -60,7 +67,7 @@ export default function 계약문서({ staffId, onBack }: SHrDocsProps) {
 
       <div className="m-scroll">
         {tab === 'mine' && <MineTab staffId={staffId} />}
-        {tab === 'cert' && <CertTab />}
+        {tab === 'cert' && <CertTab staffId={staffId} />}
         {tab === 'ctr' && <ContractTab staffId={staffId} />}
         {tab === 'submit' && <SubmitTab staffId={staffId} />}
       </div>
@@ -123,41 +130,56 @@ function handleOpenDoc(d: MyDocRow) {
 }
 
 // ─── 증명서 ────────────────────────────────────────────────────
+// id 는 certificate_types id 와 일치(certificate_issuances.cert_type 로 저장).
 type IssuableCert = { id: string; title: string; desc: string; icon: string };
 
 const ISSUABLE_CERTS: ReadonlyArray<IssuableCert> = [
-  { id: 'employment', title: '재직증명서', desc: '본인용·국문', icon: 'fileText' },
-  { id: 'career', title: '경력증명서', desc: '입사일 ~ 현재', icon: 'fileText' },
-  {
-    id: 'tax',
-    title: '근로소득원천징수영수증',
-    desc: '연말정산용',
-    icon: 'won',
-  },
-  { id: 'insurance', title: '4대보험 가입증명서', desc: '국문', icon: 'shield' },
+  { id: '재직증명서', title: '재직증명서', desc: '본인용·국문', icon: 'fileText' },
+  { id: '경력증명서', title: '경력증명서', desc: '입사일 ~ 현재', icon: 'fileText' },
+  { id: '원천징수영수증', title: '원천징수영수증', desc: '연말정산용', icon: 'won' },
+  { id: '근무확인서', title: '근무확인서', desc: '근무 기간·부서 확인', icon: 'shield' },
 ];
 
-function CertTab() {
+function CertTab({ staffId }: { staffId: string | null }) {
+  const [issuingId, setIssuingId] = useState<string | null>(null);
+
+  const handleIssue = async (c: IssuableCert) => {
+    if (issuingId) return;
+    setIssuingId(c.id);
+    try {
+      await issueAndPrintMyCert(staffId, c.id);
+    } finally {
+      setIssuingId(null);
+    }
+  };
+
   return (
     <div style={{ padding: '14px 16px 24px' }}>
       <div className="m-section-h" style={{ padding: '0 0 8px' }}>
         <div className="lbl">발급 가능한 증명서</div>
       </div>
       <div className="m-card flush">
-        {ISSUABLE_CERTS.map((c) => (
-          <div key={c.id} className="m-list-row">
-            <div className="ico-tile">
-              <MIcon name={c.icon} size={18} />
+        {ISSUABLE_CERTS.map((c) => {
+          const busy = issuingId === c.id;
+          return (
+            <div key={c.id} className="m-list-row">
+              <div className="ico-tile">
+                <MIcon name={c.icon} size={18} />
+              </div>
+              <div>
+                <div className="lbl">{c.title}</div>
+                <div className="sub">{c.desc}</div>
+              </div>
+              <MBtn
+                disabled={Boolean(issuingId)}
+                onClick={() => void handleIssue(c)}
+                ariaLabel={`${c.title} 발급`}
+              >
+                {busy ? '발급 중…' : '발급'}
+              </MBtn>
             </div>
-            <div>
-              <div className="lbl">{c.title}</div>
-              <div className="sub">{c.desc}</div>
-            </div>
-            <MBtn onClick={() => toast(`${c.title} 발급은 PC에서 진행해주세요.`, 'info')}>
-              발급
-            </MBtn>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -278,9 +300,46 @@ type SubmissionRow = {
   submitted_at: string | null;
 };
 
+// 서류 종류는 공통 모듈(모바일 6종)에서 공유한다.
+const SUBMIT_CATEGORIES = MOBILE_SUBMISSION_TYPES;
+
 function SubmitTab({ staffId }: { staffId: string | null }) {
   const [rows, setRows] = useState<SubmissionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [category, setCategory] = useState<string>(SUBMIT_CATEGORIES[0]);
+  const [uploading, setUploading] = useState(false);
+  const [staffMeta, setStaffMeta] = useState<{ name: string | null; company: string | null }>({
+    name: null,
+    company: null,
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 업로드 제목/회사명 구성을 위한 본인 메타 1건 (JM5: staffId 고정).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!staffId) return;
+      try {
+        const { data } = await supabase
+          .from('staff_members')
+          .select('name, company')
+          .eq('id', staffId)
+          .maybeSingle();
+        if (cancelled || !data) return;
+        const r = data as { name?: unknown; company?: unknown };
+        setStaffMeta({
+          name: typeof r.name === 'string' ? r.name : null,
+          company: typeof r.company === 'string' ? r.company : null,
+        });
+      } catch {
+        // silent — 제목은 '직원'으로 폴백
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [staffId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,17 +382,102 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
     return () => {
       cancelled = true;
     };
-  }, [staffId]);
+  }, [staffId, reloadToken]);
 
-  if (loading) return <Loading />;
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // 같은 파일 재선택 허용을 위해 input 값 초기화
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await uploadMyDocument({
+        staffId,
+        staffName: staffMeta.name,
+        company: staffMeta.company,
+        file,
+        category,
+      });
+      if (result.ok) setReloadToken((t) => t + 1);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadCard = (
+    <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>서류 업로드</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <select
+          aria-label="서류 종류 선택"
+          value={category}
+          onChange={(ev) => setCategory(ev.target.value)}
+          disabled={uploading}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '10px 12px',
+            borderRadius: 'var(--m-radius-md)',
+            border: '1px solid var(--m-border)',
+            background: 'var(--m-card)',
+            fontSize: 13,
+            fontWeight: 700,
+            color: 'var(--z-800)',
+          }}
+        >
+          {SUBMIT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <MBtn
+          variant="primary"
+          icon="upload"
+          disabled={uploading || !staffId}
+          onClick={() => fileInputRef.current?.click()}
+          ariaLabel="파일 선택 후 업로드"
+        >
+          {uploading ? '업로드 중…' : '파일 첨부'}
+        </MBtn>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 8 }}>
+        {DOC_ALLOWED_FORMATS_LABEL} · 최대 {DOC_MAX_FILE_SIZE_LABEL}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf"
+        className="hidden"
+        style={{ display: 'none' }}
+        onChange={(e) => void handleFileChange(e)}
+      />
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div style={{ padding: '14px 16px 24px' }}>
+        {uploadCard}
+        <Loading />
+      </div>
+    );
+  }
+
   if (rows.length === 0) {
-    return <EmptyState text="현재 제출 요청 받은 서류가 없습니다." />;
+    return (
+      <div style={{ padding: '14px 16px 24px' }}>
+        {uploadCard}
+        <EmptyState text="제출한 서류가 없습니다. 위에서 파일을 첨부해 제출하세요." />
+      </div>
+    );
   }
 
   const pending = rows.filter((r) => !r.submitted_at);
 
   return (
     <div style={{ padding: '14px 16px 24px' }}>
+      {uploadCard}
       {pending.length > 0 && (
         <div
           className="m-card"
@@ -392,18 +536,8 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
                 <div className="lbl">{r.title}</div>
                 <div className="sub">{sub}</div>
               </div>
-              {submitted ? (
-                <MChip tone="success">완료</MChip>
-              ) : (
-                <MBtn
-                  variant="primary"
-                  onClick={() =>
-                    toast(`${r.title} 제출은 마이페이지에서 진행해주세요.`, 'info')
-                  }
-                >
-                  제출
-                </MBtn>
-              )}
+              {/* document_repository 업로드 행은 항상 제출 완료 상태로 노출한다. */}
+              <MChip tone={submitted ? 'success' : tone}>완료</MChip>
             </div>
           );
         })}

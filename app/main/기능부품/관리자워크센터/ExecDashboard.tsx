@@ -11,9 +11,11 @@
 
 import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
-import { Card, Chip, KpiGrid, ProgressBar, SmBtn, TabBar, WorkcenterHeader } from './admin-workcenter-common';
+import { Card, Chip, KpiGrid, SmBtn, TabBar, WorkcenterHeader } from './admin-workcenter-common';
 import { ADMIN_WORKCENTERS, type AdminKpi } from './admin-types';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { useExecOverview, type CorpPnlRow } from './useExecOverview';
+import type { StaffMember } from '@/types';
 
 // ─── 실제 서브 컴포넌트 (lazy) ──────────────────────────
 const Loading = () => (
@@ -60,203 +62,173 @@ const TABS: { id: ExecTabId; label: string }[] = [
   { id: 'custom', label: '커스텀 대시보드' },
 ];
 
-// ─── 개요 탭 (기존 더미 시각화 유지) ────────────────────
-const KPI_ITEMS: AdminKpi[] = [
-  { label: '5월 매출', value: '182.4', unit: 'M원', sub: '전월 동기 +4.2%' },
-  { label: '5월 비용', value: '128.7', unit: 'M원', sub: '인건비 94 · 임차 18 · 기타 16' },
-  { label: '영업이익', value: '53.7', unit: 'M원', sub: '이익률 29.4%' },
-  { label: '방문 환자', value: '1,284', unit: '명', sub: '신규 142 · 재진 1,142' },
-  { label: '예산 집행률', value: '42', unit: '%', sub: '5월 누적 / 목표' },
-  { label: '현금 잔고', value: '412', unit: 'M원', sub: '법인 4개 합산' },
-  { label: '미수금', value: '14.2', unit: 'M원', sub: '30일 이상 4건' },
-  { label: '결재 대기', value: '12', unit: '건', sub: '긴급 2 · 일반 10' },
-];
+// ─── 개요 탭 (G2: 실연동 가능 항목만 실데이터, 나머지는 '집계 준비중') ──
+const READY_LABEL = '집계 준비중';
 
-const STEPS: { id: number; label: string; ts: string; state: 'done' | 'on' | 'pending' }[] = [
-  { id: 1, label: '4월 마감', ts: '5/3', state: 'done' },
-  { id: 2, label: '손익 확정', ts: '5/4', state: 'done' },
-  { id: 3, label: '5월 진행', ts: '진행 중', state: 'on' },
-  { id: 4, label: '5월 마감', ts: '예정 6/3', state: 'pending' },
-  { id: 5, label: '분기 보고', ts: '예정 6/30', state: 'pending' },
-];
+/** 원 → 백만원(M) 표기 */
+function toMillionStr(won: number): string {
+  return (Math.round((won / 1_000_000) * 10) / 10).toLocaleString('ko-KR');
+}
 
-const ExecHero = memo(function ExecHero({ onTabChange }: { onTabChange: (t: ExecTabId) => void }) {
+/** 집계 준비중 카드: 매출 의존 지표는 가짜 숫자 대신 준비중으로 표기 */
+function PendingCard({ title, note }: { title: string; note: string }) {
+  return (
+    <div className="app-card px-3 py-2.5">
+      <div className="text-[10.5px] font-semibold text-[var(--toss-gray-4)] mb-1">{title}</div>
+      <div className="text-lg font-bold text-[var(--toss-gray-3)]">{READY_LABEL}</div>
+      <div className="text-[10px] text-[var(--toss-gray-4)] mt-0.5 truncate">{note}</div>
+    </div>
+  );
+}
+
+/** 실연동 KPI (미결재·현금잔고·재직 직원수·전사 인건비) */
+function liveKpiItems(d: ReturnType<typeof useExecOverview>): AdminKpi[] {
+  const totalLabor = d.corpRows.reduce((s, r) => s + r.laborCost, 0);
+  return [
+    {
+      label: '결재 대기',
+      value: d.loading ? '…' : String(d.pendingApprovalCount),
+      unit: '건',
+      sub: '승인 대기 중',
+    },
+    {
+      label: '현금 잔고',
+      value: d.loading ? '…' : toMillionStr(d.cashBalance),
+      unit: 'M원',
+      sub: d.cashCompanyCount > 0 ? `오늘 마감 ${d.cashCompanyCount}개 법인 합산` : '오늘 마감 등록 없음',
+    },
+    {
+      label: '재직 직원',
+      value: d.loading ? '…' : String(d.activeStaffCount),
+      unit: '명',
+      sub: '전사 합산',
+    },
+    {
+      label: `이번 달 인건비`,
+      value: d.loading ? '…' : toMillionStr(totalLabor),
+      unit: 'M원',
+      sub: `${d.yearMonth} 급여명세 기준`,
+    },
+  ];
+}
+
+const ExecHero = memo(function ExecHero({
+  yearMonth,
+  loading,
+  totalLabor,
+  corpCount,
+  onTabChange,
+}: {
+  yearMonth: string;
+  loading: boolean;
+  totalLabor: number;
+  corpCount: number;
+  onTabChange: (t: ExecTabId) => void;
+}) {
   return (
     <div className="rounded-[var(--radius-xl)] bg-[var(--zinc-900,#18181B)] text-white p-5 mb-4 flex items-center gap-4 flex-wrap">
       <div className="flex-1 min-w-[260px]">
         <div className="text-[10.5px] font-semibold text-white/60 mb-1">
-          2026년 5월 (1~11일) · 박철홍정형외과 통합
+          {yearMonth} · 전사 통합 ({corpCount}개 법인)
         </div>
-        <div className="text-base font-bold mb-3">
-          매출 <span className="text-[11px] font-semibold text-white/60 ml-1">5/31 마감 예정</span>
+        <div className="text-base font-bold mb-2">
+          경영 개요 <span className="text-[11px] font-semibold text-white/60 ml-1">실데이터 연동</span>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {STEPS.map((s) => {
-            const cls =
-              s.state === 'done'
-                ? 'bg-emerald-500/30 text-emerald-200 border-emerald-500/40'
-                : s.state === 'on'
-                  ? 'bg-[var(--accent)]/40 text-white border-[var(--accent)]'
-                  : 'bg-white/10 text-white/60 border-white/15';
-            return (
-              <div
-                key={s.id}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] border text-[10.5px] font-semibold ${cls}`}
-              >
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/15 text-[10px]">
-                  {s.state === 'done' ? '✓' : s.id}
-                </span>
-                <span>{s.label}</span>
-                <span className="text-white/50">· {s.ts}</span>
-              </div>
-            );
-          })}
-        </div>
+        <p className="text-[11px] text-white/60 leading-relaxed max-w-md">
+          매출·영업이익 등 수익 지표는 데이터 소스 연동 준비 중입니다. 인건비·현금잔고·결재 현황은 실시간으로 집계됩니다.
+        </p>
       </div>
       <div className="text-right shrink-0">
-        <div className="text-[10.5px] font-semibold text-white/60">5월 누적 매출 (1-11일)</div>
+        <div className="text-[10.5px] font-semibold text-white/60">이번 달 전사 인건비</div>
         <div className="text-2xl font-bold tabular-nums mt-0.5">
-          182,420,000<span className="text-sm font-semibold text-white/60 ml-0.5">원</span>
+          {loading ? '…' : Math.round(totalLabor).toLocaleString('ko-KR')}
+          <span className="text-sm font-semibold text-white/60 ml-0.5">원</span>
         </div>
-        <div className="text-[11px] text-white/60 mt-0.5">
-          전월 동기 <span className="text-emerald-300 font-bold">+4.2%</span> · 목표 달성률 38%
-        </div>
+        <div className="text-[11px] text-white/60 mt-0.5">{yearMonth} 급여명세 합산</div>
         <button
           type="button"
-          onClick={() => onTabChange('report')}
+          onClick={() => onTabChange('pnl')}
           className="mt-2 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-bold hover:opacity-90"
         >
-          전체 보고서 →
+          법인 손익 상세 →
         </button>
       </div>
     </div>
   );
 });
 
-type BarRow = { m: string; rev: number; cost: number; prof: number; partial?: boolean };
-const CHART_DATA: BarRow[] = [
-  { m: '12월', rev: 312, cost: 234, prof: 78 },
-  { m: '1월', rev: 295, cost: 218, prof: 77 },
-  { m: '2월', rev: 318, cost: 232, prof: 86 },
-  { m: '3월', rev: 342, cost: 246, prof: 96 },
-  { m: '4월', rev: 368, cost: 258, prof: 110 },
-  { m: '5월', rev: 182, cost: 128, prof: 54, partial: true },
-];
-const MAX_BAR = Math.max(...CHART_DATA.map((b) => b.rev + b.cost + b.prof));
-
-const PnlChart = memo(function PnlChart() {
+/** 법인별 인건비·직원수 (실데이터) — 매출 의존 지표는 표시하지 않음 */
+const CorpLaborList = memo(function CorpLaborList({ rows }: { rows: CorpPnlRow[] }) {
+  const fmt = (n: number) => Math.round(n).toLocaleString('ko-KR');
+  if (rows.length === 0) {
+    return <p className="text-[12px] text-[var(--toss-gray-3)] py-4 text-center">법인·직원 데이터가 없습니다.</p>;
+  }
   return (
-    <>
-      {/* 스택(누적) 막대: 각 월 1개 컬럼에 매출·비용·이익 순서로 누적 */}
-      <div className="flex items-end gap-2 h-[170px] px-1 pb-1">
-        {CHART_DATA.map((b) => {
-          const total = b.rev + b.cost + b.prof;
-          const totalH = (total / MAX_BAR) * 130;
-          const revH = (b.rev / total) * totalH;
-          const costH = (b.cost / total) * totalH;
-          const profH = totalH - revH - costH;
-          return (
-            <div key={b.m} className="flex-1 flex flex-col items-center justify-end gap-1.5">
-              <div
-                className="w-full flex flex-col-reverse overflow-hidden rounded-t-sm"
-                style={{ height: `${totalH}px` }}
-                role="img"
-                aria-label={`${b.m} 매출 ${b.rev}M 비용 ${b.cost}M 이익 ${b.prof}M`}
-              >
-                {/* 아래부터: 매출 → 비용 → 이익 순으로 쌓임 */}
-                <div
-                  className="w-full bg-[var(--accent)] shrink-0"
-                  style={{ height: `${revH}px` }}
-                />
-                <div
-                  className="w-full bg-rose-400 shrink-0"
-                  style={{ height: `${costH}px` }}
-                />
-                <div
-                  className="w-full bg-emerald-500 shrink-0"
-                  style={{ height: `${profH}px` }}
-                />
-              </div>
-              <div className={`text-[10px] font-semibold ${b.partial ? 'text-amber-600' : 'text-[var(--toss-gray-4)]'}`}>
-                {b.m}
-                {b.partial && <span className="ml-0.5 text-[9px]">(1-11)</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-3 mt-2 text-[10.5px] font-semibold text-[var(--toss-gray-4)]">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[var(--accent)]" />매출
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-rose-400" />비용
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />이익
-        </span>
-      </div>
-    </>
+    <div className="space-y-1.5">
+      {rows.map((p) => (
+        <div
+          key={p.company}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)]"
+        >
+          <Chip tone="accent">{p.headcount}명</Chip>
+          <div className="flex-1 flex items-center gap-1.5 text-[12px] min-w-0">
+            <b className="text-[var(--foreground)] truncate">{p.company}</b>
+          </div>
+          <span className="text-[11px] font-bold tabular-nums text-[var(--foreground)]">
+            인건비 {fmt(p.laborCost)}원
+          </span>
+        </div>
+      ))}
+    </div>
   );
 });
 
-const BUDGET_DATA = [
-  { name: '인건비', plan: 1080, used: 472, pct: 44 },
-  { name: '임차료', plan: 216, used: 108, pct: 50 },
-  { name: '의료소모품', plan: 180, used: 68, pct: 38 },
-  { name: '마케팅', plan: 60, used: 18, pct: 30 },
-  { name: '기타 운영', plan: 120, used: 56, pct: 47 },
-];
-const PNL_BY_CORP: { name: string; delta: string; tone: 'success' | 'warn'; rate: string }[] = [
-  { name: '박철홍정형외과', delta: '+38M', tone: 'success', rate: '이익률 29%' },
-  { name: '수연의원', delta: '+12M', tone: 'success', rate: '이익률 24%' },
-  { name: 'MSO 본사', delta: '-2M', tone: 'warn', rate: '적자 진행' },
-  { name: '지점 A', delta: '+6M', tone: 'success', rate: '이익률 18%' },
-];
+function OverviewTab({ onTabChange, staffs }: { onTabChange: (t: ExecTabId) => void; staffs: StaffMember[] }) {
+  const overview = useExecOverview(staffs);
+  const totalLabor = overview.corpRows.reduce((s, r) => s + r.laborCost, 0);
 
-function OverviewTab({ onTabChange }: { onTabChange: (t: ExecTabId) => void }) {
   return (
     <>
-      <ExecHero onTabChange={onTabChange} />
-      <KpiGrid items={KPI_ITEMS} cols={8} />
+      <ExecHero
+        yearMonth={overview.yearMonth}
+        loading={overview.loading}
+        totalLabor={totalLabor}
+        corpCount={overview.corpRows.length}
+        onTabChange={onTabChange}
+      />
+
+      {/* 실연동 KPI */}
+      <KpiGrid items={liveKpiItems(overview)} cols={4} />
+
+      {/* 매출 의존 지표: 가짜 숫자 대신 집계 준비중 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <PendingCard title="이번 달 매출" note="매출 연동 예정" />
+        <PendingCard title="영업이익 / 이익률" note="매출 연동 예정" />
+        <PendingCard title="미수금" note="미수금 데이터 연동 예정" />
+        <PendingCard title="예산 집행률" note="예산 데이터 연동 예정" />
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        <Card
-          title="월별 매출·비용·이익 (최근 6개월)"
-          action={<SmBtn onClick={() => onTabChange('report')}>상세 보고서</SmBtn>}
-        >
-          <PnlChart />
+        <Card title="월별 매출·비용·이익 추세">
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="text-sm font-bold text-[var(--toss-gray-3)]">{READY_LABEL}</div>
+            <p className="text-[11px] text-[var(--toss-gray-4)] mt-1.5">
+              매출 데이터 소스가 연동되면 최근 6개월 추세 차트가 표시됩니다.
+            </p>
+          </div>
         </Card>
-        <Card title="예산 vs 집행" action={<SmBtn onClick={() => onTabChange('budget')}>예산 관리 →</SmBtn>}>
-          <div className="space-y-2.5">
-            {BUDGET_DATA.map((b) => (
-              <div key={b.name} className="grid grid-cols-[80px_1fr_120px] items-center gap-3">
-                <div className="text-[12px] font-semibold text-[var(--foreground)]">{b.name}</div>
-                <ProgressBar value={b.pct} tone={b.pct > 50 ? 'warn' : 'accent'} />
-                <div className="text-[11px] font-bold text-right tabular-nums text-[var(--foreground)]">
-                  {b.used}/{b.plan}
-                  <span className="text-[10px] font-semibold text-[var(--toss-gray-4)] ml-1">M ({b.pct}%)</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-[var(--border)] mt-4 pt-3">
-            <h4 className="text-[12px] font-bold text-[var(--foreground)] mb-2">법인별 손익 (4법인)</h4>
-            <div className="space-y-1.5">
-              {PNL_BY_CORP.map((p) => (
-                <div
-                  key={p.name}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)]"
-                >
-                  <Chip tone={p.tone}>{p.delta}</Chip>
-                  <div className="flex-1 flex items-center gap-1.5 text-[12px]">
-                    <b className="text-[var(--foreground)]">{p.name}</b>
-                    <span className="text-[10.5px] text-[var(--toss-gray-4)]">· 5월 누적</span>
-                  </div>
-                  <span className="text-[11px] font-bold tabular-nums text-[var(--foreground)]">{p.rate}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <Card
+          title="법인별 인건비·직원수"
+          action={<SmBtn onClick={() => onTabChange('pnl')}>법인 손익 →</SmBtn>}
+        >
+          {overview.loading ? (
+            <p className="text-[12px] text-[var(--toss-gray-3)] py-4 text-center">불러오는 중…</p>
+          ) : (
+            <CorpLaborList rows={overview.corpRows} />
+          )}
+          <p className="text-[10px] text-[var(--toss-gray-4)] mt-3">
+            {overview.yearMonth} 급여명세 기준 · 손익률은 매출 연동 후 제공됩니다.
+          </p>
         </Card>
       </div>
     </>
@@ -286,7 +258,7 @@ export default function ExecDashboard() {
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
-      {tab === 'overview' && <OverviewTab onTabChange={setTab} />}
+      {tab === 'overview' && <OverviewTab onTabChange={setTab} staffs={staffs} />}
       {tab === 'biz' && <BusinessDashboard />}
       {tab === 'fin' && <FinancialDashboard />}
       {tab === 'budget' && <BudgetManagement staffs={staffs} />}

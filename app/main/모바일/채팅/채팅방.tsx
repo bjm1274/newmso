@@ -44,6 +44,8 @@ import {
   getGroupChatRoomBadgeText,
   NOTICE_ROOM_ID,
 } from '@/app/main/기능부품/메신저유틸';
+import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
+import { patchChatRoom } from '@/lib/chat-rooms-client';
 import EmojiPicker from './이모지피커';
 import BubbleList from './버블리스트';
 import {
@@ -117,6 +119,55 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  // 대화방 알림 수신 토글 — PC 자산 재사용(room_notification_settings 서버 push 기준)
+  const { roomNotifyOn, toggleRoomNotify } = useRoomNotificationSetting({
+    selectedRoomId: String(room.id),
+    effectiveChatUserId: userId,
+    userId,
+  });
+
+  // 공지/나와의채팅은 나갈 수 없음
+  const canLeaveRoom = !isNotice && !selfRoom;
+
+  const handleLeaveRoom = useCallback(async () => {
+    if (leaving) return;
+    if (!canLeaveRoom) {
+      setLeaveConfirmOpen(false);
+      onBack();
+      return;
+    }
+    if (!userId) {
+      toast('로그인 정보를 찾을 수 없습니다.', 'error');
+      return;
+    }
+    setLeaving(true);
+    try {
+      const newMembers = memberIds.filter((id) => String(id) !== String(userId));
+      const result = await patchChatRoom(String(room.id), { members: newMembers });
+      if (!result.ok) {
+        toast(result.error || '채팅방 나가기에 실패했습니다.', 'error');
+        return;
+      }
+      // PC handleLeaveRoom과 동일하게 '퇴장' 안내 메시지를 남김(실패해도 나가기는 진행)
+      try {
+        await sendMobileTextMessage({
+          roomId: String(room.id),
+          senderId: userId,
+          content: `[퇴장] ${userName || '알 수 없음'}님이 채팅방을 나갔습니다.`,
+        });
+      } catch (noticeError) {
+        console.error('leave room system message error', noticeError);
+      }
+      setLeaveConfirmOpen(false);
+      setInfoOpen(false);
+      onBack();
+    } finally {
+      setLeaving(false);
+    }
+  }, [canLeaveRoom, leaving, memberIds, onBack, room.id, userId, userName]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -615,15 +666,21 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 2 }}>새 메시지 알림을 받습니다.</div>
             </div>
             <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
-              <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
+              <input
+                type="checkbox"
+                checked={roomNotifyOn}
+                onChange={() => { void toggleRoomNotify(); }}
+                aria-label="대화방 알림 수신"
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
               <span style={{
                 position: 'absolute', inset: 0, borderRadius: 24,
-                background: 'var(--m-accent)', transition: '0.2s',
+                background: roomNotifyOn ? 'var(--m-accent)' : 'var(--z-300)', transition: '0.2s',
               }}>
                 <span style={{
                   position: 'absolute', left: 4, bottom: 4, width: 16, height: 16,
                   borderRadius: '50%', background: '#fff', transition: '0.2s',
-                  transform: 'translateX(20px)',
+                  transform: roomNotifyOn ? 'translateX(20px)' : 'translateX(0)',
                 }} />
               </span>
             </label>
@@ -709,7 +766,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           {/* Section 6: 방 나가기 */}
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => {
+              if (canLeaveRoom) {
+                setLeaveConfirmOpen(true);
+              } else {
+                onBack();
+              }
+            }}
             style={{
               width: '100%',
               padding: '12px',
@@ -723,8 +786,57 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'center',
             }}
           >
-            채팅방 나가기 (목록으로)
+            {canLeaveRoom ? '채팅방 나가기' : '목록으로'}
           </button>
+        </div>
+      </MSheet>
+
+      <MSheet open={leaveConfirmOpen} onClose={() => setLeaveConfirmOpen(false)} title="채팅방 나가기">
+        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.6 }}>
+            이 채팅방에서 나갑니다.
+            <br />
+            대화방 목록에서 사라지고 새 메시지 알림도 받지 않습니다.
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setLeaveConfirmOpen(false)}
+              disabled={leaving}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: 10,
+                background: 'var(--m-bg)',
+                color: 'var(--z-700)',
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: leaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => { void handleLeaveRoom(); }}
+              disabled={leaving}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: 10,
+                background: 'var(--m-danger, #ef4444)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: leaving ? 'not-allowed' : 'pointer',
+                opacity: leaving ? 0.7 : 1,
+              }}
+            >
+              {leaving ? '나가는 중…' : '나가기'}
+            </button>
+          </div>
         </div>
       </MSheet>
     </div>

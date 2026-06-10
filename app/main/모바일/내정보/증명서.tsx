@@ -10,25 +10,29 @@
  * JM6: button 시맨틱, aria-label
  */
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { useMyRecentCerts } from './data-hooks';
+import { issueAndPrintMyCert } from './cert-issue';
 
 type CertDoc = {
   id: string;
   icon: string;
   title: string;
   subtitle: string;
+  /** certificate_types id (certificate_issuances.cert_type 로 저장) */
+  certType: string;
 };
 
-// 발급 가능 서류 카탈로그(정적 목록 — 실제 발급은 인사팀 승인 후 처리).
+// 발급 가능 서류 카탈로그(옵션A 셀프서비스 — 본인 1건 발급).
+// certType 은 lib/certificate-types.ts 의 id 와 일치시킨다.
 const CERT_DOCS: CertDoc[] = [
-  { id: 'c1', icon: 'fileText', title: '재직증명서', subtitle: '현재 재직 상태를 증명하는 서류' },
-  { id: 'c2', icon: 'badge', title: '경력증명서', subtitle: '재직 기간 및 경력을 증명하는 서류' },
-  { id: 'c3', icon: 'receipt', title: '근로소득 원천징수영수증', subtitle: '연말정산용 소득 증빙 서류' },
-  { id: 'c4', icon: 'list', title: '갑종근로소득 지급명세서', subtitle: '근로소득 지급 내역 증빙 서류' },
+  { id: 'c1', icon: 'fileText', title: '재직증명서', subtitle: '현재 재직 상태를 증명하는 서류', certType: '재직증명서' },
+  { id: 'c2', icon: 'badge', title: '경력증명서', subtitle: '재직 기간 및 경력을 증명하는 서류', certType: '경력증명서' },
+  { id: 'c3', icon: 'receipt', title: '원천징수영수증', subtitle: '연말정산용 소득 증빙 서류', certType: '원천징수영수증' },
+  { id: 'c4', icon: 'list', title: '보수지급명세서', subtitle: '급여 지급 내역 증빙 서류', certType: '보수지급명세서' },
 ];
 
 export type 증명서Props = {
@@ -38,7 +42,20 @@ export type 증명서Props = {
 
 function 증명서Base({ user, onBack }: 증명서Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
-  const { rows: recentCerts, loading } = useMyRecentCerts(staffId);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [issuingId, setIssuingId] = useState<string | null>(null);
+  const { rows: recentCerts, loading } = useMyRecentCerts(staffId, reloadToken);
+
+  const handleIssue = async (doc: CertDoc) => {
+    if (issuingId) return;
+    setIssuingId(doc.id);
+    try {
+      const ok = await issueAndPrintMyCert(staffId, doc.certType);
+      if (ok) setReloadToken((t) => t + 1);
+    } finally {
+      setIssuingId(null);
+    }
+  };
   return (
     <div className="m-screen">
       <MobileHeader title="증명서" back={onBack} />
@@ -49,58 +66,65 @@ function 증명서Base({ user, onBack }: 증명서Props) {
             <div className="lbl">발급 가능 서류</div>
           </div>
           <div className="m-card flush">
-            {CERT_DOCS.map((doc) => (
-              <button
-                key={doc.id}
-                type="button"
-                className="msm-row"
-                aria-label={`${doc.title} 발급`}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  display: 'grid',
-                  gridTemplateColumns: '40px 1fr auto',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '14px 16px',
-                  borderBottom: '1px solid var(--m-border)',
-                }}
-              >
-                <div
+            {CERT_DOCS.map((doc) => {
+              const busy = issuingId === doc.id;
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  className="msm-row"
+                  aria-label={`${doc.title} 발급`}
+                  disabled={Boolean(issuingId)}
+                  onClick={() => void handleIssue(doc)}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: 'var(--m-accent-soft)',
-                    color: 'var(--m-accent)',
+                    width: '100%',
+                    textAlign: 'left',
                     display: 'grid',
-                    placeItems: 'center',
+                    gridTemplateColumns: '40px 1fr auto',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 16px',
+                    borderBottom: '1px solid var(--m-border)',
+                    opacity: issuingId && !busy ? 0.5 : 1,
+                    cursor: issuingId ? 'default' : 'pointer',
                   }}
                 >
-                  <MIcon name={doc.icon} size={18} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.012em' }}>
-                    {doc.title}
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: 'var(--m-accent-soft)',
+                      color: 'var(--m-accent)',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}
+                  >
+                    <MIcon name={doc.icon} size={18} />
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 500, marginTop: 2 }}>
-                    {doc.subtitle}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.012em' }}>
+                      {doc.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 500, marginTop: 2 }}>
+                      {doc.subtitle}
+                    </div>
                   </div>
-                </div>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: '4px 12px',
-                    borderRadius: 999,
-                    background: 'var(--m-accent)',
-                    color: '#fff',
-                  }}
-                >
-                  발급
-                </span>
-              </button>
-            ))}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '4px 12px',
+                      borderRadius: 999,
+                      background: 'var(--m-accent)',
+                      color: '#fff',
+                    }}
+                  >
+                    {busy ? '발급 중…' : '발급'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

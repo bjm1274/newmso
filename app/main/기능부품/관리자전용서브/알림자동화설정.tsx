@@ -17,6 +17,12 @@ import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { toast } from '@/lib/toast';
+import {
+  type NotificationAutomationSettings,
+  DEFAULT_NOTIFICATION_AUTOMATION,
+  loadNotificationAutomationSettings,
+  saveNotificationAutomationSettings,
+} from '@/lib/notification-automation-settings';
 
 interface StaffLite {
   id: string;
@@ -55,11 +61,11 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
   const user = userRaw as Record<string, unknown> | undefined;
   
   // ─── 1. 알림 자동화 설정 상태 ───
-  const [payrollEnabled, setPayrollEnabled] = useState(true);
-  const [payrollDay, setPayrollDay] = useState(25);
-  const [annualLeaveEnabled, setAnnualLeaveEnabled] = useState(true);
-  const [step1Enabled, setStep1Enabled] = useState(true);
-  const [step2Enabled, setStep2Enabled] = useState(true);
+  const [payrollEnabled, setPayrollEnabled] = useState(DEFAULT_NOTIFICATION_AUTOMATION.payrollEnabled);
+  const [payrollDay, setPayrollDay] = useState(DEFAULT_NOTIFICATION_AUTOMATION.payrollDay);
+  const [annualLeaveEnabled, setAnnualLeaveEnabled] = useState(DEFAULT_NOTIFICATION_AUTOMATION.annualLeaveEnabled);
+  const [step1Enabled, setStep1Enabled] = useState(DEFAULT_NOTIFICATION_AUTOMATION.step1Enabled);
+  const [step2Enabled, setStep2Enabled] = useState(DEFAULT_NOTIFICATION_AUTOMATION.step2Enabled);
 
   // ─── 2. 데이터 로딩 상태 ───
   const [staffs, setStaffs] = useState<StaffLite[]>([]);
@@ -68,32 +74,45 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
   const [triggering, setTriggering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // ─── 3. 로컬 스토리지에 설정 보존 (D1 미지원 설정 폴백) ───
+  // ─── 3. system_settings 기반 설정 로드 (cron과 토글 공유) ───
   useEffect(() => {
-    try {
-      const pEnabled = localStorage.getItem('mso_auto_payroll_enabled');
-      const pDay = localStorage.getItem('mso_auto_payroll_day');
-      const alEnabled = localStorage.getItem('mso_auto_leave_enabled');
-      const s1 = localStorage.getItem('mso_auto_leave_step1');
-      const s2 = localStorage.getItem('mso_auto_leave_step2');
-
-      if (pEnabled !== null) setPayrollEnabled(pEnabled === 'true');
-      if (pDay !== null) setPayrollDay(parseInt(pDay, 10) || 25);
-      if (alEnabled !== null) setAnnualLeaveEnabled(alEnabled === 'true');
-      if (s1 !== null) setStep1Enabled(s1 === 'true');
-      if (s2 !== null) setStep2Enabled(s2 === 'true');
-    } catch {
-      // 로컬 스토리지 로드 실패 시 기본값 유지
-    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await loadNotificationAutomationSettings();
+        if (cancelled) return;
+        setPayrollEnabled(s.payrollEnabled);
+        setPayrollDay(s.payrollDay);
+        setAnnualLeaveEnabled(s.annualLeaveEnabled);
+        setStep1Enabled(s.step1Enabled);
+        setStep2Enabled(s.step2Enabled);
+      } catch {
+        // 로드 실패 시 기본값(전부 켜짐) 유지 — 회귀 방지
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const saveSettings = (key: string, val: string) => {
-    try {
-      localStorage.setItem(key, val);
-    } catch {
-      // 로컬 스토리지 저장 오류 방어
-    }
-  };
+  // 변경된 부분만 덮어써 전체 설정 객체를 만들고 system_settings에 저장한다.
+  const persistSettings = useCallback(
+    (patch: Partial<NotificationAutomationSettings>) => {
+      const nextSettings: NotificationAutomationSettings = {
+        payrollEnabled,
+        payrollDay,
+        annualLeaveEnabled,
+        step1Enabled,
+        step2Enabled,
+        ...patch,
+      };
+      void saveNotificationAutomationSettings(nextSettings).catch((err) => {
+        console.error('[NotificationAutomation] 설정 저장 실패:', err);
+        toast('설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+      });
+    },
+    [payrollEnabled, payrollDay, annualLeaveEnabled, step1Enabled, step2Enabled],
+  );
 
   // ─── 4. D1 데이터 조회 (직원 + 연차 촉진 발송 이력) ───
   const fetchData = useCallback(async () => {
@@ -296,7 +315,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
               onClick={() => {
                 const next = !payrollEnabled;
                 setPayrollEnabled(next);
-                saveSettings('mso_auto_payroll_enabled', String(next));
+                persistSettings({ payrollEnabled: next });
                 toast(`급여 자동 알림이 ${next ? '활성화' : '비활성화'}되었습니다.`, 'info');
               }}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${
@@ -326,7 +345,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                     onChange={(e) => {
                       const nextDay = parseInt(e.target.value, 10) || 25;
                       setPayrollDay(nextDay);
-                      saveSettings('mso_auto_payroll_day', String(nextDay));
+                      persistSettings({ payrollDay: nextDay });
                     }}
                     className="w-24 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--foreground)] focus:outline-none text-center font-bold"
                   />
@@ -351,7 +370,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
               onClick={() => {
                 const next = !annualLeaveEnabled;
                 setAnnualLeaveEnabled(next);
-                saveSettings('mso_auto_leave_enabled', String(next));
+                persistSettings({ annualLeaveEnabled: next });
                 toast(`연차 촉진 자동화가 ${next ? '활성화' : '비활성화'}되었습니다.`, 'info');
               }}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors ${
@@ -379,7 +398,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                       checked={step1Enabled}
                       onChange={(e) => {
                         setStep1Enabled(e.target.checked);
-                        saveSettings('mso_auto_leave_step1', String(e.target.checked));
+                        persistSettings({ step1Enabled: e.target.checked });
                       }}
                       className="accent-[var(--accent)]"
                     />
@@ -393,7 +412,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                       checked={step2Enabled}
                       onChange={(e) => {
                         setStep2Enabled(e.target.checked);
-                        saveSettings('mso_auto_leave_step2', String(e.target.checked));
+                        persistSettings({ step2Enabled: e.target.checked });
                       }}
                       className="accent-[var(--accent)]"
                     />

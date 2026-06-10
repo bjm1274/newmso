@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { STORAGE_KEYS } from '@/lib/storage-keys';
-import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
+import { supabase } from '@/lib/supabase';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -84,11 +83,44 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   ]));
 
   useEffect(() => {
-    setSettings(readLocalStorage<BudgetSetting[]>(STORAGE_KEYS.BUDGET_SETTINGS, []));
-    setExecutions(readLocalStorage<BudgetExecution[]>(STORAGE_KEYS.BUDGET_EXECUTIONS, []));
+    let alive = true;
+    (async () => {
+      // MSO 설계상 회사 격리 불필요 — 전사 조회(필터 없음).
+      const [{ data: settingRows }, { data: execRows }] = await Promise.all([
+        supabase.from('budget_settings').select('*'),
+        supabase.from('budget_executions').select('*'),
+      ]);
+      if (!alive) return;
+      setSettings(
+        ((settingRows as any[]) ?? []).map(r => ({
+          id: String(r.id),
+          dept: r.dept ?? '',
+          year: Number(r.year),
+          month: Number(r.month),
+          item: r.item as BudgetItem,
+          amount: Number(r.amount) || 0,
+          createdAt: r.created_at ?? '',
+        })),
+      );
+      setExecutions(
+        ((execRows as any[]) ?? []).map(r => ({
+          id: String(r.id),
+          dept: r.dept ?? '',
+          item: r.item as BudgetItem,
+          amount: Number(r.amount) || 0,
+          // DB 컬럼 exec_date → UI 모델 date 로 매핑
+          date: r.exec_date ?? '',
+          memo: r.memo ?? '',
+          createdAt: r.created_at ?? '',
+        })),
+      );
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const handleAddSetting = () => {
+  const handleAddSetting = async () => {
     if (!settingForm.dept?.trim() || !settingForm.amount) return;
     if (Number(settingForm.amount) <= 0) return;
     const newItem: BudgetSetting = {
@@ -100,19 +132,25 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       amount: Number(settingForm.amount),
       createdAt: new Date().toISOString(),
     };
-    const updated = [...settings, newItem];
-    setSettings(updated);
-    writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, updated);
+    setSettings(prev => [...prev, newItem]);
     setSettingForm(f => ({ ...f, amount: '', dept: '' }));
+    await supabase.from('budget_settings').insert({
+      id: newItem.id,
+      company: null,
+      dept: newItem.dept,
+      year: newItem.year,
+      month: newItem.month,
+      item: newItem.item,
+      amount: newItem.amount,
+    });
   };
 
-  const handleDeleteSetting = (id: string) => {
-    const updated = settings.filter(s => s.id !== id);
-    setSettings(updated);
-    writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, updated);
+  const handleDeleteSetting = async (id: string) => {
+    setSettings(prev => prev.filter(s => s.id !== id));
+    await supabase.from('budget_settings').delete().eq('id', id);
   };
 
-  const handleAddExecution = () => {
+  const handleAddExecution = async () => {
     if (!execForm.dept?.trim() || !execForm.amount) return;
     if (Number(execForm.amount) <= 0) return;
     const newExec: BudgetExecution = {
@@ -124,17 +162,24 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       memo: execForm.memo,
       createdAt: new Date().toISOString(),
     };
-    const updated = [...executions, newExec];
-    setExecutions(updated);
-    writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, updated);
+    setExecutions(prev => [...prev, newExec]);
     setExecForm(f => ({ ...f, amount: '', memo: '' }));
     setShowExecForm(false);
+    await supabase.from('budget_executions').insert({
+      id: newExec.id,
+      company: null,
+      dept: newExec.dept,
+      item: newExec.item,
+      amount: newExec.amount,
+      // UI 모델 date → DB 컬럼 exec_date 로 매핑
+      exec_date: newExec.date,
+      memo: newExec.memo,
+    });
   };
 
-  const handleDeleteExecution = (id: string) => {
-    const updated = executions.filter(e => e.id !== id);
-    setExecutions(updated);
-    writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, updated);
+  const handleDeleteExecution = async (id: string) => {
+    setExecutions(prev => prev.filter(e => e.id !== id));
+    await supabase.from('budget_executions').delete().eq('id', id);
   };
 
   // 집행 현황 차트 데이터 생성

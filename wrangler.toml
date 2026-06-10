@@ -47,7 +47,8 @@ crons = [
   "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
   "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements,
-                  #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday
+                  #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday,
+                  #            payroll-notice (급여일 리마인더 — 내부에서 day===payrollDay만 발송)
 ]
 
 # Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)
