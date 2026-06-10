@@ -69,11 +69,11 @@ export async function fetchAllChatRooms(
     };
   }
 
-  if (chatRoomsFetchInFlight) {
+  if (chatRoomsFetchInFlight && !options.force) {
     return chatRoomsFetchInFlight;
   }
 
-  chatRoomsFetchInFlight = (async () => {
+  const fetchPromise = (async () => {
     const result = await withMissingColumnsFallback<ChatRoom[]>(
       (omittedColumns) =>
         supabase.from('chat_rooms').select(buildChatRoomSelect(omittedColumns)) as PromiseLike<{
@@ -96,11 +96,16 @@ export async function fetchAllChatRooms(
       data: [...nextResult.data],
       error: nextResult.error,
     };
-  })().finally(() => {
-    chatRoomsFetchInFlight = null;
+  })();
+
+  chatRoomsFetchInFlight = fetchPromise;
+  fetchPromise.finally(() => {
+    if (chatRoomsFetchInFlight === fetchPromise) {
+      chatRoomsFetchInFlight = null;
+    }
   });
 
-  return chatRoomsFetchInFlight;
+  return fetchPromise;
 }
 
 export function readCachedChatRooms(): ChatRoom[] {

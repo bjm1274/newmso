@@ -36,7 +36,7 @@ type StaffPermissionRow = {
   permissions: string | Record<string, unknown> | null;
 };
 
-const INVENTORY_ADMIN_DEPARTMENTS = new Set(['행정팀', '총무팀', '원무팀', '행정부']);
+const INVENTORY_ADMIN_DEPARTMENTS = new Set(['행정팀', '원무팀', '경영지원팀']);
 
 function parsePermissions(
   value: string | Record<string, unknown> | null,

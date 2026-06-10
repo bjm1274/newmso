@@ -181,7 +181,7 @@ export async function sendAdminNotifications(
     const { data: adminUsers, error: adminError } = await supabase
       .from('staff_members')
       .select('id')
-      .in('department', ['행정팀', '총무팀', '원무팀', '행정부']);
+      .in('department', ['행정팀', '원무팀', '경영지원팀']);
 
     if (adminError) {
       console.warn('[notifications] sendAdminNotifications admin lookup (client):', adminError.message);
@@ -221,9 +221,8 @@ export async function sendAdminNotifications(
     .where(
       or(
         eq(staffMembersTable.department, '행정팀'),
-        eq(staffMembersTable.department, '총무팀'),
         eq(staffMembersTable.department, '원무팀'),
-        eq(staffMembersTable.department, '행정부'),
+        eq(staffMembersTable.department, '경영지원팀'),
       ),
     );
 

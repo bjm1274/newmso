@@ -41,6 +41,7 @@ export async function updateChatRoomLastMessage(
   await db
     .update(chat_rooms)
     .set({
+      last_message: args.content,
       last_message_at: args.created_at,
       last_message_preview: preview,
     })
