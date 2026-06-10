@@ -16,7 +16,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024; // 30 MB (서류 특성상 보수적)
+const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB (서류 특성상 보수적)
 const ALLOWED_MIMES = new Set([
   'image/jpeg',
   'image/png',
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     if (fileSize > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
-        { error: '파일 크기는 30MB 이하여야 합니다.' },
+        { error: '파일 크기는 200MB 이하여야 합니다.' },
         { status: 413 },
       );
     }

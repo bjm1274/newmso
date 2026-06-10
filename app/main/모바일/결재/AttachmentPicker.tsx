@@ -5,7 +5,7 @@
  *
  * - 파일 input (visually-hidden) + 버튼 래퍼 (JM6)
  * - image/*, application/pdf, text/*, application/* 허용
- * - 최대 5개, 파일당 50MB
+ * - 최대 5개, 파일당 200MB
  * - input.change → 즉시 enqueueUpload (JM2)
  * - 업로드 결과(fileUrl/queued)를 부모에게 콜백
  *
@@ -21,7 +21,7 @@ import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
 const ACCEPTED_MIMES =
   'image/*,application/pdf,text/plain,text/csv,application/zip,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -90,7 +90,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
           updateEntries((prev) =>
             prev.map((e) =>
               e.localId === localId
-                ? { ...e, state: 'error', errorMsg: `파일 크기 초과 (최대 50MB, 현재 ${formatBytes(file.size)})` }
+                ? { ...e, state: 'error', errorMsg: `파일 크기 초과 (최대 200MB, 현재 ${formatBytes(file.size)})` }
                 : e,
             ),
           );

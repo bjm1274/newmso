@@ -6,16 +6,16 @@
  * JM: 단일 책임 (validation + 업로드 호출), ~120줄
  * JM3: 실패 시 사용자 메시지·로그 분리
  * JM4: any 금지, AttachmentItem 재사용
- * JM5: type/size 검증 (이미지 25MB, 동영상 200MB, 일반 50MB)
+ * JM5: type/size 검증 (이미지 200MB, 동영상 200MB, 일반 200MB)
  */
 
 import { uploadBoardAttachmentFile, type UploadedBoardAttachment } from '@/app/main/기능부품/게시판업로드';
 import { inferAttachmentType } from '@/app/main/기능부품/게시판공통';
 import { toast } from '@/lib/toast';
 
-const IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const IMAGE_MAX_BYTES = 200 * 1024 * 1024;
 const VIDEO_MAX_BYTES = 200 * 1024 * 1024;
-const FILE_MAX_BYTES = 50 * 1024 * 1024;
+const FILE_MAX_BYTES = 200 * 1024 * 1024;
 
 const BLOCKED_EXT = new Set([
   'exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'cpl', 'app', 'sh', 'ps1',

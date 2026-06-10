@@ -16,7 +16,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
 const ALLOWED_MIME_PREFIXES = ['image/', 'application/pdf', 'text/', 'application/'];
 const BLOCKED_MIMES = new Set([
   'application/x-msdownload',
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     if (fileSize > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
-        { error: '파일 크기는 50MB 이하여야 합니다.' },
+        { error: '파일 크기는 200MB 이하여야 합니다.' },
         { status: 413 },
       );
     }

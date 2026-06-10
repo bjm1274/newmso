@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 
 /** 단일 최대 파일 크기 한도 (30 MB). */
-export const DOC_MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024;
+export const DOC_MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 
 /** 허용 MIME 화이트리스트 (이미지 + PDF). */
 export const DOC_ALLOWED_MIME_TYPES = [

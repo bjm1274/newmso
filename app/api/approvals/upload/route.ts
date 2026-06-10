@@ -5,7 +5,7 @@ import { readSessionFromRequest } from '@/lib/server-session';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 const R2_BUCKET = 'pchos-files';
 
@@ -66,7 +66,7 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   }
 
   if (fileSize > MAX_FILE_SIZE_BYTES) {
-    throw new Error('파일 크기는 50MB 이하여야 합니다.');
+    throw new Error('파일 크기는 200MB 이하여야 합니다.');
   }
 }
 
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const contentLength = Number(request.headers.get('content-length') || '0');
-    if (contentLength > 52_428_800) {
-      return NextResponse.json({ error: '파일 크기가 50MB를 초과합니다.' }, { status: 413 });
+    if (contentLength > 209_715_200) {
+      return NextResponse.json({ error: '파일 크기가 200MB를 초과합니다.' }, { status: 413 });
     }
 
     const formData = await request.formData();

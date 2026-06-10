@@ -1,2 +1,2 @@
-export const CHAT_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;   // 20 MB
+export const CHAT_MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;   // 200 MB
 export const CHAT_MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB

@@ -352,7 +352,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, onCancel
                 <div className="sub">
                   {uploading && uploadProgress
                     ? `업로드 중… ${uploadProgress.done}/${uploadProgress.total} (${uploadProgress.fileName})`
-                    : '사진·동영상·문서 (이미지 25MB / 동영상 200MB / 일반 50MB)'}
+                    : '사진·동영상·문서 (이미지 200MB / 동영상 200MB / 일반 200MB)'}
                 </div>
               </div>
               {uploading ? (
