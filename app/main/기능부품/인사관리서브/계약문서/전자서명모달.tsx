@@ -423,15 +423,17 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     };
 
     return (
-        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-[var(--card)] w-full max-w-2xl border-2 border-[var(--border)] radius-toss-xl shadow-sm overflow-hidden flex flex-col max-h-[90vh]">
+        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-[var(--card)] w-full h-[100dvh] md:h-auto md:max-h-[90vh] max-w-2xl md:border-2 md:border-[var(--border)] md:radius-toss-xl shadow-sm overflow-hidden flex flex-col">
 
                 <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">
                     <div>
                         <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-500/20 rounded-[var(--radius-md)] mb-1 inline-block">전자서명 진행 중</span>
                         <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{contract?.contract_type || '표준근로계약서'}</h2>
                     </div>
-                    <button onClick={onClose} className="p-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors">✕</button>
+                    <button onClick={onClose} className="p-2 -mr-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors" aria-label="닫기">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
                 </div>
 
                 <div className="flex bg-[var(--tab-bg)] h-1.5 shrink-0">
