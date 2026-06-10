@@ -494,8 +494,8 @@ function RoomRow({
             }}
             className={`flex min-h-[28px] min-w-[40px] items-center justify-center rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-bold ${
               isSelected
-                ? 'text-white/80 hover:bg-white/10'
-                : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)]'
+                ? 'bg-white/20 text-white hover:bg-white/30'
+                : 'bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20'
             }`}
             title={isPinned ? '고정 해제' : '상단 고정'}
           >
@@ -511,8 +511,8 @@ function RoomRow({
             }}
             className={`flex min-h-[28px] min-w-[40px] items-center justify-center rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-bold ${
               isSelected
-                ? 'text-white/80 hover:bg-white/10'
-                : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)]'
+                ? 'bg-white/20 text-white hover:bg-white/30'
+                : 'bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20'
             }`}
             title={isHidden ? '숨김 해제' : '대화 숨김'}
           >
