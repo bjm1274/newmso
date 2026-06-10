@@ -125,7 +125,7 @@ export function useChatRoomsForMobile(
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { force?: boolean }) => {
     const currentUserId = userIdRef.current;
     if (!currentUserId) {
       setRooms([]);
@@ -133,7 +133,7 @@ export function useChatRoomsForMobile(
       return;
     }
     try {
-      const { data: roomsData } = await fetchAllChatRooms();
+      const { data: roomsData } = await fetchAllChatRooms({ force: options?.force });
       const rawRooms = roomsData || [];
       const visible = rawRooms.filter((room) =>
         isRoomVisibleToUser(room, currentUserId),
@@ -198,7 +198,7 @@ export function useChatRoomsForMobile(
       'mobile-chat-rooms-list',
       tables,
       () => {
-        void refresh();
+        void refresh({ force: true });
       },
       { pollIntervalMs: ROOM_POLL_INTERVAL_MS },
     );
