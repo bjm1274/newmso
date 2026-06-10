@@ -378,10 +378,31 @@ export async function POST(request: Request) {
         allResults.push(...rows);
       }
 
-      // 채팅 메시지 INSERT 시 chat_push_jobs 큐에 적재 — 즉시발송(triggerChatPush)이
-      // 실패하거나 호출되지 않아도(오프라인 큐 재생 등) cron/flush 가 회수해 푸시를 보낸다.
-      // 과거 Supabase messages AFTER INSERT 트리거의 D1 대체. 실패는 INSERT 응답을 막지 않는다(JM3).
+      // 채팅 메시지 INSERT 시:
+      // 1) chat_rooms.last_message_at/last_message_preview를 갱신 (D1 trigger 대체)
+      // 2) chat_push_jobs 큐에 적재 (푸시 알림)
+      // 실패는 INSERT 응답을 막지 않는다(JM3).
       if (payload.table === 'messages' && allResults.length > 0) {
+        // (1) chat_rooms 갱신 — 클라이언트 fire-and-forget 의존을 서버 보장으로 변경
+        try {
+          const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+          const seenRoomIds = new Set<string>();
+          for (const r of allResults) {
+            const row = r as Record<string, unknown>;
+            const roomId = String(row.room_id ?? '').trim();
+            if (!roomId || seenRoomIds.has(roomId)) continue;
+            seenRoomIds.add(roomId);
+            await updateChatRoomLastMessage(db, {
+              room_id: roomId,
+              created_at: String(row.created_at ?? new Date().toISOString()),
+              content: row.content != null ? String(row.content) : null,
+            });
+          }
+        } catch (triggerErr) {
+          console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
+        }
+
+        // (2) 푸시 알림 큐 적재
         try {
           const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
           await Promise.all(
