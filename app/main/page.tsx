@@ -1224,6 +1224,13 @@ function MainPageContent() {
                 await performClientLogout();
                 window.location.replace('/');
               }}
+              initialOpenPostId={initialOpenPostId}
+              onConsumeOpenPostId={() => setInitialOpenPostId(null)}
+              onOpenBoardPost={(boardId, postId) => {
+                setMainMenu('게시판');
+                if (boardId) setInitialBoardView(boardId);
+                setInitialOpenPostId(postId);
+              }}
             />
           </AppDataProvider>
         </CompanyProvider>

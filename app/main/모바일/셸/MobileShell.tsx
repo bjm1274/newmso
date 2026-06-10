@@ -37,9 +37,18 @@ import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/�
 export type MobileShellProps = {
   user: ErpUser;
   onLogout: () => void;
+  initialOpenPostId?: string | null;
+  onConsumeOpenPostId?: () => void;
+  onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
-export default function MobileShell({ user, onLogout }: MobileShellProps) {
+export default function MobileShell({ 
+  user, 
+  onLogout,
+  initialOpenPostId,
+  onConsumeOpenPostId,
+  onOpenBoardPost
+}: MobileShellProps) {
   const { mainMenu, setMainMenu, subView, setSubView } = useNavigation();
 
   const getTabFromMenu = (menu: string): MTab => {
@@ -301,9 +310,19 @@ export default function MobileShell({ user, onLogout }: MobileShellProps) {
               refreshRooms={refreshRooms}
               onActiveRoomChange={setActiveRoomId}
               resetToken={chatResetToken}
+              onOpenBoardPost={onOpenBoardPost}
             />
           )}
-          {route.tab === 'board' && <게시판 user={user} onBack={goMypage} subView={subView} setSubView={setSubView} />}
+          {route.tab === 'board' && (
+            <게시판 
+              user={user} 
+              onBack={goMypage} 
+              subView={subView} 
+              setSubView={setSubView} 
+              initialPostId={initialOpenPostId}
+              onConsumePostId={onConsumeOpenPostId}
+            />
+          )}
           {route.tab === 'approval' && (
             <div data-testid="approval-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <결재 user={user} />

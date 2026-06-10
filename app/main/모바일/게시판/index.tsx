@@ -33,17 +33,20 @@ export type 게시판Props = {
   onBack: () => void;
   subView?: string | null;
   setSubView?: (v: string | null) => void;
+  initialPostId?: string | null;
+  onConsumePostId?: () => void;
 };
 
 type View = 'home' | 'list' | 'detail' | 'write';
 
-export default function 게시판({ user, onBack, subView, setSubView }: 게시판Props) {
+export default function 게시판({ user, onBack, subView, setSubView, initialPostId, onConsumePostId }: 게시판Props) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : null;
   const userCompany = typeof user.company === 'string' ? user.company : null;
   const userCompanyId = typeof user.company_id === 'string' ? user.company_id : null;
 
   const [view, setView] = useState<View>(() => {
+    if (initialPostId) return 'detail';
     if (subView) return 'list';
     return 'home';
   });
@@ -60,10 +63,22 @@ export default function 게시판({ user, onBack, subView, setSubView }: 게시�
     if (subView) {
       const isCatId = BOARD_CATS.some((c) => c.id === subView);
       setCat(isCatId ? (subView as BoardCatId) : boardTypeToCat(subView));
-      setView('list');
+      if (!initialPostId) {
+        setView('list');
+      }
     }
-  }, [subView]);
-  const [postId, setPostId] = useState<string | null>(null);
+  }, [subView, initialPostId]);
+  const [postId, setPostId] = useState<string | null>(initialPostId || null);
+
+  // Synchronize postId when initialPostId changes (e.g. push notification click while already on the board tab)
+  useEffect(() => {
+    if (initialPostId) {
+      setPostId(initialPostId);
+      setView('detail');
+      onConsumePostId?.();
+    }
+  }, [initialPostId, onConsumePostId]);
+
   const [overridePosts, setOverridePosts] = useState<BoardListPost[] | null>(null);
 
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
