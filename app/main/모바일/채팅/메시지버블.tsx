@@ -30,6 +30,7 @@ export type MessageBubbleProps = {
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
+  onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -64,6 +65,7 @@ export default function MessageBubble({
   onToggleReaction,
   onReply,
   onImageLoad,
+  onOpenBoardPost,
 }: MessageBubbleProps) {
   const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
 
@@ -469,7 +471,7 @@ export default function MessageBubble({
                   <MIcon name="chevR" size={18} />
                 </a>
               ) : (
-                text ? renderMessageContent(text, mine) : <span style={{ opacity: 0.7 }}>(빈 메시지)</span>
+                text ? renderMessageContent(text, mine, '', onOpenBoardPost) : <span style={{ opacity: 0.7 }}>(빈 메시지)</span>
               )}
             </div>
 

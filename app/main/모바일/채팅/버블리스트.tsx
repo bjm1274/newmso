@@ -25,6 +25,7 @@ export type BubbleListProps = {
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
+  onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
 export default function BubbleList({
@@ -37,6 +38,7 @@ export default function BubbleList({
   onToggleReaction,
   onReply,
   onImageLoad,
+  onOpenBoardPost,
 }: BubbleListProps) {
   const items = useMemo(() => {
     const out: Array<
@@ -78,6 +80,7 @@ export default function BubbleList({
             onToggleReaction={onToggleReaction}
             onReply={onReply}
             onImageLoad={onImageLoad}
+            onOpenBoardPost={onOpenBoardPost}
           />
         );
       })}

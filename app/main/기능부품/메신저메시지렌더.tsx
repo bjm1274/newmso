@@ -33,7 +33,7 @@ export function renderHighlightedText(text: string, highlightQuery: string, isMi
   });
 }
 
-function renderFormattedSegments(content: string, isMine: boolean, highlightQuery: string): ReactNode {
+function renderFormattedSegments(content: string, isMine: boolean, highlightQuery: string, onOpenBoardPost?: (boardId: string, postId: string) => void): ReactNode {
   const segments = parseMarkdownSegments(content);
 
   return segments.map((seg, i) => {
@@ -66,7 +66,20 @@ function renderFormattedSegments(content: string, isMine: boolean, highlightQuer
                 ? 'text-white decoration-white/70 hover:text-white/85'
                 : 'text-blue-500 decoration-blue-400/70 hover:text-blue-600'
             }`}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (onOpenBoardPost) {
+                // If it's a board post URL, intercept it
+                const urlObj = new URL(seg.content, window.location.origin);
+                const isBoard = urlObj.searchParams.get('open_menu') === '게시판';
+                const boardId = urlObj.searchParams.get('board_id');
+                const postId = urlObj.searchParams.get('post_id');
+                if (isBoard && boardId && postId) {
+                  event.preventDefault();
+                  onOpenBoardPost(boardId, postId);
+                }
+              }
+            }}
           >
             {seg.content}
           </a>
@@ -163,7 +176,7 @@ const HAS_EMOTICON_TOKEN = /\[(?:emo|stat):[a-z0-9-]+\]/;
 // 토큰을 순회 추출하는 전역 패턴(사용 직전 lastIndex 리셋).
 const INLINE_EMOTICON_TOKEN = /\[(emo|stat):([a-z0-9-]+)\]/g;
 
-function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQuery: string): ReactNode {
+function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQuery: string, onOpenBoardPost?: (boardId: string, postId: string) => void): ReactNode {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let part = 0;
@@ -173,7 +186,7 @@ function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQu
   while ((match = INLINE_EMOTICON_TOKEN.exec(content)) !== null) {
     if (match.index > lastIndex) {
       const chunk = content.slice(lastIndex, match.index);
-      nodes.push(<span key={`t${part}`}>{renderFormattedSegments(chunk, isMine, highlightQuery)}</span>);
+      nodes.push(<span key={`t${part}`}>{renderFormattedSegments(chunk, isMine, highlightQuery, onOpenBoardPost)}</span>);
       part += 1;
     }
 
@@ -190,13 +203,13 @@ function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQu
   }
 
   if (lastIndex < content.length) {
-    nodes.push(<span key={`t${part}`}>{renderFormattedSegments(content.slice(lastIndex), isMine, highlightQuery)}</span>);
+    nodes.push(<span key={`t${part}`}>{renderFormattedSegments(content.slice(lastIndex), isMine, highlightQuery, onOpenBoardPost)}</span>);
   }
 
   return <>{nodes}</>;
 }
 
-export function renderMessageContent(content: string, isMine = false, highlightQuery = ''): ReactNode {
+export function renderMessageContent(content: string, isMine = false, highlightQuery = '', onOpenBoardPost?: (boardId: string, postId: string) => void): ReactNode {
   const visibleContent = stripHiddenMessageMetaBlocks(content);
   if (!visibleContent) return null;
 
@@ -214,8 +227,8 @@ export function renderMessageContent(content: string, isMine = false, highlightQ
 
   // 혼합/연속: 메시지 어디에 있든 이모티콘/스티커 태그를 인라인으로 렌더
   if (HAS_EMOTICON_TOKEN.test(visibleContent)) {
-    return renderWithInlineEmoticons(visibleContent, isMine, highlightQuery);
+    return renderWithInlineEmoticons(visibleContent, isMine, highlightQuery, onOpenBoardPost);
   }
 
-  return renderFormattedSegments(visibleContent, isMine, highlightQuery);
+  return renderFormattedSegments(visibleContent, isMine, highlightQuery, onOpenBoardPost);
 }

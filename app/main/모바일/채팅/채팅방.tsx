@@ -60,11 +60,12 @@ export type SChatRoomProps = {
   /** Quick Switch — 채팅목록에서 패스스루. JM2: 중복 fetch 금지 */
   recentRooms?: MobileChatRoom[];
   onSwitchRoom?: (roomId: string) => void;
+  onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
-export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom }: SChatRoomProps) {
+export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom, onOpenBoardPost }: SChatRoomProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : '';
   const company = typeof user.company === 'string' ? user.company : null;
@@ -425,6 +426,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             setTimeout(() => composerInputRef.current?.focus(), 50);
           }}
           onImageLoad={scrollToBottom}
+          onOpenBoardPost={onOpenBoardPost}
         />
       </div>
 
