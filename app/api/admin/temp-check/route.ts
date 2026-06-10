@@ -8,16 +8,19 @@ export async function GET(request: Request) {
     const d1 = await getD1Binding();
     if (!d1) return NextResponse.json({ error: 'No D1 binding' });
 
-    // 1. Find duplicates
-    const res = await d1.prepare(`
-      SELECT staff_id, contract_type, COUNT(*) as cnt
-      FROM employment_contracts
-      GROUP BY staff_id, contract_type
-      HAVING COUNT(*) > 1
-    `).all();
+    // Test the exact UPDATE query to see the real error
+    const testQuery = `
+      UPDATE "employment_contracts" 
+      SET "status" = '서명대기'
+      WHERE "id" = '1f5497e1-50ee-413d-9758-4264634b44a5'
+      RETURNING *;
+    `;
+    
+    // Let's also check the schema
+    const schema = await d1.prepare(`PRAGMA table_info(employment_contracts);`).all();
 
-    return NextResponse.json({ duplicates: res.results });
+    return NextResponse.json({ schema: schema.results });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message });
+    return NextResponse.json({ error: err.message, stack: err.stack });
   }
 }
