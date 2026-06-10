@@ -312,7 +312,7 @@ function MyPageMain({
       const encryptedContractText = await encryptContract(contractText);
       await supabase.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
-        category: '계약서',
+        category: '근로계약서',
         content: encryptedContractText,
         company_name: (user?.company as string) || '전체',
         created_by: currentUserId,
