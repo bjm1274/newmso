@@ -282,8 +282,10 @@ export function fillEmploymentContractTemplate(
   const safeContract = contract ?? {};
   const safeCompany = company ?? {};
   const salarySource = contract || user || {};
-  const getSalaryAmount = (fieldName: string) =>
-    toMoneyNumber(salarySource[fieldName] ?? safeUser[fieldName] ?? 0);
+  const getSalaryAmount = (fieldName: string) => {
+    const val = toMoneyNumber(salarySource[fieldName]);
+    return val > 0 ? val : toMoneyNumber(safeUser[fieldName]);
+  };
   const allowanceValues: Record<string, number> = {
     '{{position_allowance}}': getSalaryAmount('position_allowance'),
     '{{meal_allowance}}': getSalaryAmount('meal_allowance'),
