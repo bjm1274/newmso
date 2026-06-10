@@ -240,15 +240,22 @@ export default function ContractPreview({
   /** 급여 상세 표 렌더링 (실제 직원 데이터 기반) */
   function renderSalaryTable() {
     const src = contract || staff || {};
+    const parseAmount = (val: any) => {
+      if (!val) return 0;
+      const raw = typeof val === 'string' ? val.replace(/,/g, '').trim() : val;
+      const num = Number(raw);
+      return Number.isFinite(num) ? num : 0;
+    };
+
     const items = [
-      { label: '기본급', amount: Number(src.base_salary || 0), note: '월 고정 지급', taxable: true },
-      { label: '직책수당', amount: Number(src.position_allowance || staff?.position_allowance || 0), note: '직책별 차등', taxable: true },
-      { label: '식대', amount: Number(src.meal_allowance || staff?.meal_allowance || 0), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '자가운전보조금', amount: Number(src.vehicle_allowance || staff?.vehicle_allowance || 0), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '보육수당', amount: Number(src.childcare_allowance || staff?.childcare_allowance || 0), note: '비과세', taxable: false },
-      { label: '연구활동비', amount: Number(src.research_allowance || staff?.research_allowance || 0), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '기타 비과세', amount: Number(src.other_taxfree || staff?.other_taxfree || 0), note: '비과세', taxable: false },
-      { label: '연장근로수당(약정)', amount: Number(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || 0), note: '포괄산정 연장수당', taxable: true },
+      { label: '기본급', amount: parseAmount(src.base_salary), note: '월 고정 지급', taxable: true },
+      { label: '직책수당', amount: parseAmount(src.position_allowance || staff?.position_allowance), note: '직책별 차등', taxable: true },
+      { label: '식대', amount: parseAmount(src.meal_allowance || staff?.meal_allowance), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '자가운전보조금', amount: parseAmount(src.vehicle_allowance || staff?.vehicle_allowance), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '보육수당', amount: parseAmount(src.childcare_allowance || staff?.childcare_allowance), note: '비과세', taxable: false },
+      { label: '연구활동비', amount: parseAmount(src.research_allowance || staff?.research_allowance), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '기타 비과세', amount: parseAmount(src.other_taxfree || staff?.other_taxfree), note: '비과세', taxable: false },
+      { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance), note: '포괄산정 연장수당', taxable: true },
     ].filter(item => item.amount > 0);
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);

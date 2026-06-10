@@ -60,7 +60,8 @@ function toMoneyNumber(value?: unknown) {
   if (typeof value === 'boolean' || value === null || value === undefined || value === '') {
     return 0;
   }
-  const numberValue = Number(value);
+  const raw = typeof value === 'string' ? value.replace(/,/g, '').trim() : value;
+  const numberValue = Number(raw);
   return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
@@ -475,17 +476,17 @@ export function fillEmploymentContractTemplate(
     const probationText = `② 신규 입사자의 경우 입사일로부터 ${probationMonthsNum}개월간(${probationStart} ~ ${probationEnd})을 수습기간으로 하며, 수습기간 중 급여는 기본급의 ${probationPercentNum}%를 지급한다. 사용자는 수습기간 중 근무태도, 업무수행능력, 자질, 건강상태, 조직 적응도 등을 종합적으로 평가할 수 있다.`;
     
     transformedTemplate = transformedTemplate.replace(
-      /②\s*신규\s*입사자의\s*경우\s*입사일로부터\s*(?:3개월간을\s*수습기간으로\s*둘\s*수\s*있다|수습기간을\s*둘\s*수\s*있다)\s*\.?\s*사용자는\s*수습기간\s*중\s*근무태도\s*,\s*업무수행능력\s*,\s*자질\s*,\s*건강상태\s*,\s*조직\s*적응도\s*등을\s*종합적으로\s*평가할\s*수\s*있다\.?/g,
+      /②\s*신규\s*입사자의\s*경우[\s\S]*?종합적으로\s*평가할\s*수\s*있다\.?/g,
       probationText
     );
   } else {
     // 수습기간이 없는 경우: 수습 미적용 문구로 단순화하고 관련 조항 해지 문구(③)를 제거
     transformedTemplate = transformedTemplate.replace(
-      /②\s*신규\s*입사자의\s*경우\s*입사일로부터\s*(?:3개월간을\s*수습기간으로\s*둘\s*수\s*있다|수습기간을\s*둘\s*수\s*있다)\s*\.?\s*사용자는\s*수습기간\s*중\s*근무태도\s*,\s*업무수행능력\s*,\s*자질\s*,\s*건강상태\s*,\s*조직\s*적응도\s*등을\s*종합적으로\s*평가할\s*수\s*있다\.?/g,
+      /②\s*신규\s*입사자의\s*경우[\s\S]*?종합적으로\s*평가할\s*수\s*있다\.?/g,
       '② 본 계약은 별도의 수습기간을 두지 아니한다.'
     );
     transformedTemplate = transformedTemplate.replace(
-      /③\s*수습기간\s*중\s*또는\s*수습기간\s*만료\s*시\s*근로자가\s*담당업무\s*수행에\s*부적합하다고\s*객관적으로\s*판단되는\s*경우\s*,\s*사용자는\s*관계\s*법령\s*및\s*취업규칙에\s*따라\s*본채용을\s*거부하거나\s*근로계약을\s*종료할\s*수\s*있다\.?\n?/g,
+      /③\s*수습기간\s*중\s*또는\s*수습기간\s*만료\s*시[\s\S]*?종료할\s*수\s*있다\.?\n?/g,
       ''
     );
   }
