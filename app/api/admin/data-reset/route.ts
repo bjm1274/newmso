@@ -55,6 +55,7 @@ const VALID_TYPES = [
   'expired_contracts',
   'expired_popups',
   'force_logout',
+  'sync_chat_rooms',
 ] as const;
 
 type DataResetType = (typeof VALID_TYPES)[number];
@@ -162,6 +163,15 @@ export async function POST(req: Request) {
           set: { value: now, description: '전체 로그아웃 시점' },
         });
       return NextResponse.json({ ok: true });
+    }
+
+    if (type === 'sync_chat_rooms') {
+      const { refreshChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+      const rooms = await db.select({ id: chatRoomsTable.id }).from(chatRoomsTable);
+      for (const r of rooms) {
+        await refreshChatRoomLastMessage(db, r.id);
+      }
+      return NextResponse.json({ ok: true, count: rooms.length });
     }
 
     // 여기까지 도달하면 isValidType 검사에서 걸렸어야 하므로 unreachable

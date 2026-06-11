@@ -45,7 +45,8 @@ export async function updateChatRoomLastMessage(
       last_message_at: args.created_at,
       last_message_preview: preview,
     })
-    .where(eq(chat_rooms.id, args.room_id));
+    .where(eq(chat_rooms.id, args.room_id))
+    .run();
 }
 
 /**
@@ -81,7 +82,8 @@ export async function refreshChatRoomLastMessage(
     await db
       .update(chat_rooms)
       .set({ last_message_at: null, last_message_preview: null })
-      .where(eq(chat_rooms.id, roomId));
+      .where(eq(chat_rooms.id, roomId))
+      .run();
     return;
   }
 
@@ -97,7 +99,8 @@ export async function refreshChatRoomLastMessage(
       last_message_at: latest.created_at,
       last_message_preview: preview,
     })
-    .where(eq(chat_rooms.id, roomId));
+    .where(eq(chat_rooms.id, roomId))
+    .run();
 }
 
 /**
