@@ -1310,7 +1310,8 @@ export function useChatRoomDataSync({
           .from('messages')
           .select(selectClause)
           .in('room_id', roomIdsToLoad)
-          .order('created_at', { ascending: true }) as PromiseLike<{
+          .order('created_at', { ascending: false })
+          .limit(200) as PromiseLike<{
             data: ChatMessage[] | null;
             error: unknown;
           }>,
@@ -1324,6 +1325,8 @@ export function useChatRoomDataSync({
 
     const loadedMessages = Array.isArray(msgs) ? msgs : [];
     if (msgs) {
+      // limit(200) + descending → reverse to chronological order
+      loadedMessages.reverse();
       const enrichedMessages = loadedMessages.map((message: ChatMessage) => ({
         ...message,
         staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),

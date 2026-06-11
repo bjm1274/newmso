@@ -73,23 +73,40 @@ export function buildProfilePhotoUrlFromPath(
   return version ? `${basePhotoUrl}?v=${encodeURIComponent(version)}` : basePhotoUrl;
 }
 
+const profilePhotoUrlCache = new Map<string, string | null>();
+
 export function getProfilePhotoUrl(source: any): string | null {
+  const sourceId = cleanString(source?.id);
   const photoUpdatedAt =
     cleanString(source?.profile_photo_updated_at) ||
     cleanString(source?.permissions?.profile_photo_updated_at);
+    
+  const cacheKey = sourceId ? `${sourceId}:${photoUpdatedAt || ''}` : null;
+  if (cacheKey && profilePhotoUrlCache.has(cacheKey)) {
+    return profilePhotoUrlCache.get(cacheKey)!;
+  }
   const photoPath = getProfilePhotoPath(source);
   if (photoPath) {
     const generatedUrl = buildProfilePhotoUrlFromPath(photoPath, photoUpdatedAt);
     if (generatedUrl) return generatedUrl;
   }
 
-  return (
+  const finalUrl =
     cleanString(source?.avatar_url) ||
     cleanString(source?.photo_url) ||
     cleanString(source?.profile_photo_url) ||
     cleanString(source?.permissions?.profile_photo_url) ||
-    null
-  );
+    null;
+
+  if (cacheKey) {
+    if (profilePhotoUrlCache.size > 500) {
+      const firstKey = profilePhotoUrlCache.keys().next().value;
+      if (firstKey) profilePhotoUrlCache.delete(firstKey);
+    }
+    profilePhotoUrlCache.set(cacheKey, finalUrl);
+  }
+
+  return finalUrl;
 }
 
 export function normalizeProfileUser<T>(source: T): T {

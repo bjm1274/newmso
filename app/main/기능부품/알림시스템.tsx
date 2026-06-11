@@ -1113,7 +1113,13 @@ export default function NotificationSystem({
       Notification.permission === 'granted'
     );
 
-    if (!suppressLiveDisplay && !useMobileChatPreview && !suppressByRoomPreference) {
+    // 모바일에서도 Push가 비활성인 경우 토스트를 표시 (알림 누락 방지)
+    const showMobileToastFallback = Boolean(
+      useMobileChatPreview &&
+      !hasPushSubscriptionActive(effectiveUserId) &&
+      !shouldPreferMobileNativePopup
+    );
+    if (!suppressLiveDisplay && (!useMobileChatPreview || showMobileToastFallback) && !suppressByRoomPreference) {
       addToast({
         id: rowId,
         title,
@@ -1140,7 +1146,7 @@ export default function NotificationSystem({
             room_id: rowMetadata.room_id,
             message_id: rowMetadata.message_id || rowMetadata.id || row.id,
             data: rowMetadata,
-            suppress_mobile_banner: suppressLiveDisplay || suppressByRoomPreference || shouldPreferMobileNativePopup,
+            suppress_mobile_banner: suppressLiveDisplay || suppressByRoomPreference,
           },
         }));
       } else if (!suppressLiveDisplay && !suppressByRoomPreference) {
@@ -1411,15 +1417,12 @@ export default function NotificationSystem({
         .order('created_at', { ascending: true })
         .limit(50);
 
-      const now = Date.now();
+      // 30초 컷오프 제거 — shownIdsRef가 이미 중복 방지를 하고 있으므로
+      // 폴링 지연이나 네트워크 지연 시에도 안전하게 모든 unread 알림을 표시.
+      // (emitIncomingNotification 내부의 shownIdsRef.has(displayKey) 체크가 폭탄 방지)
       rows?.forEach((row: Record<string, unknown>) => {
         if (!row?.read_at) {
-          // 방금 생성된 알림(예: 30초 이내)만 토스트/시스템 푸시 발생
-          // (탭 슬립 모드 해제 시 과거 알림이 한꺼번에 쏟아지는 폭탄 방지)
-          const createdAt = new Date(String(row.created_at || '')).getTime();
-          if (now - createdAt < 30_000) {
-            emitIncomingNotification(row);
-          }
+          emitIncomingNotification(row);
         }
       });
       void syncBadge();
@@ -1850,11 +1853,17 @@ export default function NotificationSystem({
       if (document.visibilityState === 'hidden') { lastHiddenRef.current = Date.now(); return; }
       if (!effectiveUserId || Date.now() - lastHiddenRef.current < 2000) return;
       const since = new Date(Date.now() - 90 * 1000).toISOString();
-      supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', effectiveUserId).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
+      const resumeNow = Date.now();
+      supabase.from('notifications').select('id,title,body,type,metadata,read_at,created_at').eq('user_id', effectiveUserId).gte('created_at', since).is('read_at', null).order('created_at', { ascending: false }).limit(20)
         .then(
           ({ data: rows }) => {
+            // 탭 복귀 시 최근 10초 이내 알림만 토스트 표시 (폭탄 방지)
+            // 나머지는 뱃지 카운트만 갱신
             rows?.forEach((row: Record<string, unknown>) => {
-              emitIncomingNotification(row);
+              const createdAt = new Date(String(row.created_at || '')).getTime();
+              if (resumeNow - createdAt < 10_000) {
+                emitIncomingNotification(row);
+              }
             });
             void syncBadge();
             // 다른 알림 컴포넌트도 즉시 갱신되도록 broadcast 트리거

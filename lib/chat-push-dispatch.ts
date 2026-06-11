@@ -699,23 +699,25 @@ export async function dispatchChatPushForMessage(params: {
           if (!d1) return;
           const db = getD1Drizzle(d1);
           try {
-            for (const row of notificationRows) {
-              // metadata는 객체 → JSON.stringify
-              await db
-                .insert(notificationsTable)
-                .values({
-                  ...row,
-                  metadata: JSON.stringify(row.metadata),
-                })
-                .onConflictDoUpdate({
-                  target: notificationsTable.id,
-                  set: {
-                    title: row.title,
-                    body: row.body,
+            // 순차 INSERT → 병렬화: N명 × 50ms RTT → ~50ms 고정
+            await Promise.all(
+              notificationRows.map((row) =>
+                db
+                  .insert(notificationsTable)
+                  .values({
+                    ...row,
                     metadata: JSON.stringify(row.metadata),
-                  },
-                });
-            }
+                  })
+                  .onConflictDoUpdate({
+                    target: notificationsTable.id,
+                    set: {
+                      title: row.title,
+                      body: row.body,
+                      metadata: JSON.stringify(row.metadata),
+                    },
+                  })
+              ),
+            );
           } catch (err) {
             console.error('chat notification D1 insert failed', err);
           }

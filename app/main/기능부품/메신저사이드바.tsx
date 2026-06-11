@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Bell, Pin, PinOff, EyeOff, Eye, Search } from 'lucide-react';
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText, toChatDate } from './메신저유틸';
@@ -183,7 +183,7 @@ export function MessengerSidebar({
       </div>
 
       {/* 방 목록 / 조직도 */}
-      <div className="chat-side-scroll px-2 pb-2 custom-scrollbar">
+      <div className="chat-side-scroll px-2 pb-2 custom-scrollbar" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}>
         {viewMode === 'chat' ? (
           <>
             {/* 숨김 토글 링크 */}
@@ -336,7 +336,7 @@ type RoomRowProps = {
   setActionRoomId: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
-function RoomRow({
+const RoomRow = memo(function RoomRow({
   item,
   actionRoomId,
   isMobile,
@@ -537,7 +537,7 @@ function RoomRow({
   }
 
   return <div key={roomId}>{cardBody}</div>;
-}
+});
 
 // ─── 새 대화 시작 버튼 ──────────────────────────────────────────────────
 
