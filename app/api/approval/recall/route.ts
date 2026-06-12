@@ -109,7 +109,8 @@ export async function POST(request: NextRequest) {
         meta_data: JSON.stringify(nextMeta),
         updated_at: new Date().toISOString(),
       })
-      .where(and(eq(approvalsTable.id, approvalId), eq(approvalsTable.sender_id, rowSenderId)));
+      .where(and(eq(approvalsTable.id, approvalId), eq(approvalsTable.sender_id, rowSenderId)))
+      .run();
 
     // ── 7. 관련 알림 읽음 처리 (실패해도 메인 응답에 영향 없음) ──
     // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
@@ -125,7 +126,8 @@ export async function POST(request: NextRequest) {
             isNull(notificationsTable.read_at),
             sql`json_extract(${notificationsTable.metadata}, '$.approval_id') = ${approvalId}`
           )
-        );
+        )
+        .run();
     } catch (err) {
       console.error('[api/approval/recall] 알림 읽음 처리 실패:', err);
     }

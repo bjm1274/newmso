@@ -1471,6 +1471,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           role: 'staff',
           password: '',
           join_date: dateOrNull(신규직원.입사일),
+          password_reset_required: 1,
         };
         const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
           ? ['working_hours_per_week']

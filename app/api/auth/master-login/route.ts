@@ -369,7 +369,8 @@ export async function POST(request: NextRequest) {
           await db
             .update(staffMembersTable)
             .set({ password_reset_required: 0 })
-            .where(eq(staffMembersTable.id, userRow.id));
+            .where(eq(staffMembersTable.id, userRow.id))
+            .run();
         }
       } catch (flagErr) {
         console.error('[master-login] D1 password_reset_required 플래그 해제 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));

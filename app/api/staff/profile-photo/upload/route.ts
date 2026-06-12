@@ -53,7 +53,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const requestorId = String(session.user.id || '');
     const isAdmin =
       session.user.role === 'admin' ||
-      (session.user as Record<string, unknown>).is_admin === true;
+      (session.user as Record<string, unknown>).is_admin === true ||
+      (session.user as Record<string, unknown>).permissions?.hr === true ||
+      (session.user as Record<string, unknown>).permissions?.mso === true;
     if (requestorId !== staffId && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
