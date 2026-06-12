@@ -170,12 +170,36 @@ export function useChatSidebarState({
           if (roomPrefs[room.id]?.hidden === true) return false;
           return true;
         })
-        .map((room) => ({
-          room,
-          unreadCount: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
-          displayName: roomLabelMap.get(String(room.id)),
-        })),
-    [chatRooms, roomPrefs, roomUnreadCounts, selectedRoomId, visibleRooms, roomLabelMap],
+        .map((room) => {
+          const isGroupRoom = isGroupChatRoom(room);
+          const selfRoom = isSelfChatRoom(room, effectiveChatUserId || '');
+          const members = normalizeMemberIds(room.members);
+          const peer =
+            !isGroupRoom && room.type === 'direct'
+              ? selfRoom
+                ? resolveStaffProfile(effectiveChatUserId)
+                : members
+                    .map((memberId) => allKnownStaffMap.get(memberId))
+                    .find((staff) => Boolean(staff) && String(staff!.id) !== String(effectiveChatUserId || '')) || null
+              : null;
+
+          return {
+            room,
+            unreadCount: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
+            displayName: peer?.name || roomLabelMap.get(String(room.id)),
+          };
+        }),
+    [
+      chatRooms,
+      roomPrefs,
+      roomUnreadCounts,
+      selectedRoomId,
+      visibleRooms,
+      roomLabelMap,
+      effectiveChatUserId,
+      allKnownStaffMap,
+      resolveStaffProfile,
+    ],
   );
 
   const sidebarRoomItems = useMemo<MessengerSidebarRoomItem[]>(() => {
