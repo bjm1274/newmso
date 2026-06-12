@@ -32,32 +32,10 @@ export async function insertChatMessageWithFallback<
     MESSAGE_INSERT_OPTIONAL_COLUMNS,
   );
 
-  // SQLite (D1) trigger fallback: update chat_rooms.last_message(_at) manually
-  if (!result.error && payload.room_id) {
-    const roomId = String(payload.room_id);
-    const content = payload.content != null ? String(payload.content) : '';
-    let createdAt = new Date().toISOString();
-    
-    if (result.data && typeof result.data === 'object' && 'created_at' in result.data) {
-      const dbCreatedAt = (result.data as any).created_at;
-      if (typeof dbCreatedAt === 'string') {
-        createdAt = dbCreatedAt;
-      }
-    }
-
-    const preview = content.slice(0, 80);
-    try {
-      await client.from('chat_rooms')
-        .update({
-          last_message: content,
-          last_message_preview: preview,
-          last_message_at: createdAt,
-        })
-        .eq('id', roomId);
-    } catch (err) {
-      console.error('Failed to update chat_rooms.last_message', err);
-    }
-  }
+  // 서버 측 D1 mutate route가 메시지 INSERT 직후 updateChatRoomLastMessage를
+  // fire-and-forget으로 실행하므로, 클라이언트에서 별도로 chat_rooms를 UPDATE할
+  // 필요가 없다. 전송 훅(PC)과 data-hooks(모바일)에서 setChatRooms로 로컬 상태를
+  // 즉시 갱신하고, 폴링이 DB 값을 회수하는 구조.
 
   return result;
 }

@@ -1460,11 +1460,16 @@ export default function ChatView({
       currentRoom?.last_message_preview || currentRoom?.last_message || ''
     );
 
+    // conversation 그룹에 속한 모든 방 ID를 업데이트하여 사이드바 대표 방의
+    // preview도 반영되도록 한다 (erp-chat-notification 핸들러와 동일 패턴).
+    const targetRoomIdsForPreview = Array.from(
+      new Set([...(conversationRoomIds.length > 0 ? conversationRoomIds : [roomId]), roomId].filter(Boolean)),
+    );
     setChatRooms((prev) => {
-      if (!prev.some((room: ChatRoom) => String(room.id) === roomId)) return prev;
+      if (!prev.some((room: ChatRoom) => targetRoomIdsForPreview.includes(String(room.id)))) return prev;
       return sortChatRoomsWithNoticeFirst(
         prev.map((room: ChatRoom) =>
-          String(room.id) === roomId
+          targetRoomIdsForPreview.includes(String(room.id))
             ? {
                 ...room,
                 last_message: previewText || room.last_message,

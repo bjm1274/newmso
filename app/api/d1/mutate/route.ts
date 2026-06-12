@@ -381,46 +381,51 @@ export async function POST(request: Request) {
       // 채팅 메시지 INSERT 시:
       // 1) chat_rooms.last_message_at/last_message_preview를 갱신 (D1 trigger 대체)
       // 2) chat_push_jobs 큐에 적재 (푸시 알림)
-      // 실패는 INSERT 응답을 막지 않는다(JM3).
+      //
+      // 성능 최적화: 두 작업을 fire-and-forget으로 실행하여 INSERT 응답을 즉시 반환.
+      // - chat_rooms 갱신 실패 → 클라이언트가 setChatRooms로 로컬 상태 갱신 + 폴링이 DB 값 회수
+      // - 푸시 큐 적재 실패 → cron/flush가 messages 테이블에서 회수
       if (payload.table === 'messages' && allResults.length > 0) {
-        // (1) chat_rooms 갱신 — 클라이언트 fire-and-forget 의존을 서버 보장으로 변경
-        try {
-          const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
-          const seenRoomIds = new Set<string>();
-          for (const r of allResults) {
-            const row = r as Record<string, unknown>;
-            const roomId = String(row.room_id ?? '').trim();
-            if (!roomId || seenRoomIds.has(roomId)) continue;
-            seenRoomIds.add(roomId);
-            await updateChatRoomLastMessage(db, {
-              room_id: roomId,
-              created_at: String(row.created_at ?? new Date().toISOString()),
-              content: row.content != null ? String(row.content) : null,
-            });
-          }
-        } catch (triggerErr) {
-          console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
-        }
-
-        // (2) 푸시 알림 큐 적재
-        try {
-          const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
-          await Promise.all(
-            allResults.map((r) => {
+        const bgResults = [...allResults];
+        void (async () => {
+          // (1) chat_rooms 갱신
+          try {
+            const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+            const seenRoomIds = new Set<string>();
+            for (const r of bgResults) {
               const row = r as Record<string, unknown>;
-              const messageId = String(row.id ?? '');
-              const roomId = String(row.room_id ?? '');
-              if (!messageId || !roomId) return Promise.resolve();
-              return enqueueChatPushJob({
-                messageId,
-                roomId,
-                senderId: (row.sender_id as string | null) ?? null,
+              const roomId = String(row.room_id ?? '').trim();
+              if (!roomId || seenRoomIds.has(roomId)) continue;
+              seenRoomIds.add(roomId);
+              await updateChatRoomLastMessage(db, {
+                room_id: roomId,
+                created_at: String(row.created_at ?? new Date().toISOString()),
+                content: row.content != null ? String(row.content) : null,
               });
-            }),
-          );
-        } catch (enqueueErr) {
-          console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
-        }
+            }
+          } catch (triggerErr) {
+            console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
+          }
+          // (2) 푸시 알림 큐 적재
+          try {
+            const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
+            await Promise.all(
+              bgResults.map((r) => {
+                const row = r as Record<string, unknown>;
+                const messageId = String(row.id ?? '');
+                const roomId = String(row.room_id ?? '');
+                if (!messageId || !roomId) return Promise.resolve();
+                return enqueueChatPushJob({
+                  messageId,
+                  roomId,
+                  senderId: (row.sender_id as string | null) ?? null,
+                });
+              }),
+            );
+          } catch (enqueueErr) {
+            console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
+          }
+        })();
       }
 
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)

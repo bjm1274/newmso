@@ -79,6 +79,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     hasMore,
     loadOlder,
     refresh,
+    appendOptimistic,
+    replaceOptimistic,
   } = useChatMessagesForRoom(String(room.id), userId);
 
   const title = getRoomTitle(room, staffs, userId);
@@ -114,7 +116,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   }, [memberIds, staffs]);
 
   const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
+
   const [uploading, setUploading] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -240,26 +242,41 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       return;
     }
     const text = draft.trim();
-    if (!text || sending) return;
-    setSending(true);
-    try {
-      const result = await sendMobileTextMessage({
-        roomId: String(room.id),
-        senderId: userId,
-        content: text,
-        replyToId: replyTo ? String(replyTo.id) : null,
-      });
-      if (!result.ok) {
-        toast(result.error, 'error');
-        return;
-      }
-      setDraft('');
-      setReplyTo(null);
-      void refresh();
-    } finally {
-      setSending(false);
+    if (!text) return;
+
+    // Optimistic UI: 즉시 임시 메시지 표시 + 입력 초기화
+    const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMsg = {
+      id: optimisticId,
+      room_id: String(room.id),
+      sender_id: userId,
+      sender_name: userName,
+      content: text,
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+      reply_to_id: replyTo ? String(replyTo.id) : null,
+      staff: { name: userName, photo_url: null },
+    } as ChatMessage;
+    appendOptimistic(optimisticMsg);
+    setDraft('');
+    const savedReplyTo = replyTo;
+    setReplyTo(null);
+
+    // 백그라운드에서 서버 전송
+    const result = await sendMobileTextMessage({
+      roomId: String(room.id),
+      senderId: userId,
+      content: text,
+      replyToId: savedReplyTo ? String(savedReplyTo.id) : null,
+    });
+    if (!result.ok) {
+      toast(result.error, 'error');
+      // 실패 시 임시 메시지는 다음 refresh에서 제거됨
+      return;
     }
-  }, [draft, room.id, sending, userId, refresh, replyTo]);
+    // 성공: temp → 실제 메시지로 교체
+    replaceOptimistic(optimisticId, result.message);
+  }, [draft, room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic]);
 
 
 
@@ -340,7 +357,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   );
 
   const placeholder = '메시지를 입력하세요.';
-  const composerDisabled = sending || uploading;
+  const composerDisabled = uploading;
 
   return (
     <div className="m-screen">

@@ -222,6 +222,10 @@ type UseChatMessagesResult = {
   hasMore: boolean;
   refresh: () => Promise<void>;
   loadOlder: () => Promise<void>;
+  /** Optimistic UI: 임시 메시지를 즉시 리스트 끝에 추가 */
+  appendOptimistic: (msg: ChatMessage) => void;
+  /** Optimistic UI: tempId를 가진 메시지를 서버 응답으로 교체 */
+  replaceOptimistic: (tempId: string, real: ChatMessage) => void;
 };
 
 export function useMobileChatReadCounts(
@@ -460,7 +464,28 @@ export function useChatMessagesForRoom(
     })();
   }, [roomId, userId, messages.length]);
 
-  return { messages, loading, loadingOlder, hasMore, refresh, loadOlder };
+  const appendOptimistic = useCallback((msg: ChatMessage) => {
+    setMessages((prev) => {
+      if (prev.some((m) => String(m.id) === String(msg.id))) return prev;
+      return [...prev, msg];
+    });
+  }, []);
+
+  const replaceOptimistic = useCallback((tempId: string, real: ChatMessage) => {
+    setMessages((prev) => {
+      const seenIds = new Set<string>();
+      return prev
+        .map((m) => (String(m.id) === tempId ? real : m))
+        .filter((m) => {
+          const id = String(m.id || '');
+          if (seenIds.has(id)) return false;
+          seenIds.add(id);
+          return true;
+        });
+    });
+  }, []);
+
+  return { messages, loading, loadingOlder, hasMore, refresh, loadOlder, appendOptimistic, replaceOptimistic };
 }
 
 // ─────────────────────────────────────────────

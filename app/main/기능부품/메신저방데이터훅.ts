@@ -260,10 +260,16 @@ export function useChatRoomDataSync({
       if (!targetRoomId) return;
 
       setChatRooms((prev) => {
-        if (!prev.some((room: ChatRoom) => String(room.id) === targetRoomId)) return prev;
+        // conversation 그룹의 모든 방 ID를 함께 업데이트하여
+        // 사이드바 대표 방의 preview도 반영한다.
+        const convRoomIds = getConversationRoomIdsByRoomId(targetRoomId, prev);
+        const targetIds = Array.from(
+          new Set([...(convRoomIds.length > 0 ? convRoomIds : [targetRoomId]), targetRoomId].filter(Boolean)),
+        );
+        if (!prev.some((room: ChatRoom) => targetIds.includes(String(room.id)))) return prev;
         return sortChatRoomsWithNoticeFirst(
           prev.map((room: ChatRoom) =>
-            String(room.id) === targetRoomId
+            targetIds.includes(String(room.id))
               ? {
                   ...room,
                   last_message: summary.last_message,

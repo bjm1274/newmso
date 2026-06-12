@@ -12,6 +12,7 @@ import type { SendMessageOptions } from './메신저메시지서비스';
 import {
   NOTICE_ROOM_ID,
   buildChatMessageInsertPayload,
+  getConversationRoomIdsByRoomId,
   shouldTriggerImmediateChatPush,
   sortChatRoomsWithNoticeFirst,
   type MessageRetryPayload,
@@ -243,10 +244,16 @@ export function useChatMessageSending({
         return next;
       });
 
-      setChatRooms((prev) =>
-        sortChatRoomsWithNoticeFirst(
+      // conversation 그룹에 속한 모든 방 ID를 업데이트하여 사이드바
+      // 대표 방의 preview도 즉시 반영되도록 한다.
+      setChatRooms((prev) => {
+        const convRoomIds = getConversationRoomIdsByRoomId(String(roomId), prev);
+        const targetIds = Array.from(
+          new Set([...(convRoomIds.length > 0 ? convRoomIds : [String(roomId)]), String(roomId)].filter(Boolean)),
+        );
+        return sortChatRoomsWithNoticeFirst(
           prev.map((room) =>
-            String(room.id) === String(roomId)
+            targetIds.includes(String(room.id))
               ? {
                   ...room,
                   last_message: getMessageDisplayText(
@@ -265,8 +272,8 @@ export function useChatMessageSending({
                 }
               : room,
           ),
-        ),
-      );
+        );
+      });
 
       broadcastChatSync('message-sent', roomId);
       // 본인 송신 직후 다음 polling 주기를 기다리지 않고 즉시 tail 재조회 트리거.
