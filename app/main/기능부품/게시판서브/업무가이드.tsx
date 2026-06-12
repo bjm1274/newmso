@@ -677,7 +677,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
   const canWrite = canAccessBoard(user, GUIDE_BOARD_TYPE, 'write');
   const isPrivileged = isPrivilegedUser(user);
-  const isCrossCompanyViewer = Boolean(user?.permissions?.mso || user?.role === 'admin' || isPrivileged);
+  const isCrossCompanyViewer = true; // 모든회사 전 직원이 조회 가능하도록 설정
   const currentUserId = normalizeText(user?.id);
   const currentCompanyId = normalizeText(user?.company_id);
   const currentCompanyName = normalizeText(user?.company);
@@ -686,9 +686,9 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     (item?: Pick<GuideRow, 'author_id'> | null) => {
       if (!item) return false;
       if (isPrivileged || isAdminUser(user)) return true;
-      return canWrite && normalizeText(item.author_id) === currentUserId;
+      return normalizeText(item.author_id) === currentUserId;
     },
-    [canWrite, currentUserId, isPrivileged, user],
+    [currentUserId, isPrivileged, user],
   );
 
   const resetComposer = useCallback((nextTeam?: TeamScope | null) => {

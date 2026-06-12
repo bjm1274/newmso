@@ -39,7 +39,6 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
       }}
     >
       <div
-        onClick={onClose}
         style={{ flex: 1, background: 'rgba(0,0,0,0.4)' }}
         aria-hidden="true"
       />

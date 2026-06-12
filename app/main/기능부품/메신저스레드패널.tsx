@@ -43,7 +43,7 @@ export function ThreadPanel({
 
   return (
     <>
-      <div className="absolute inset-0 bg-black/10 z-40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/10 z-40" aria-hidden="true" />
       <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-50 flex flex-col animate-in slide-in-from-right duration-300">
         <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <div className="min-w-0 space-y-2">

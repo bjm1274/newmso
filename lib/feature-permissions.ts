@@ -20,13 +20,32 @@ export const MAIN_MENU_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'menu_전자결재', label: '전자결재' },
   { key: 'menu_인사관리', label: '인사관리' },
   { key: 'menu_재고관리', label: '재고관리' },
+  { key: 'menu_채팅', label: '채팅', hint: '기본 제공 기능이었으나 노출/숨김 제어가 가능합니다.' },
+  { key: 'menu_내정보', label: '내정보 (마이페이지)', hint: '내정보 메뉴 접근 여부' },
   { key: 'menu_관리자', label: '관리자', hint: '민감 기능은 세부 권한과 계정 역할을 함께 확인합니다.' },
+];
+
+export const MYPAGE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
+  { key: 'mypage_수정', label: '내정보 직접 수정', hint: '비활성화 시 정보 열람만 가능합니다.' },
+  { key: 'mypage_급여조회', label: '내 급여명세서 조회' },
+];
+
+export const CHAT_PERMISSION_ITEMS: FeaturePermissionItem[] = [
+  { key: 'chat_접근', label: '채팅 메뉴 접근' },
+  { key: 'chat_방생성', label: '일반 채팅방 생성' },
+  { key: 'chat_공지방생성', label: '공지방 생성', hint: '전파용 공지방을 만들 수 있는 권한' },
+  { key: 'chat_전체메시지', label: '전체 메시지 발송' },
+  { key: 'chat_파일첨부', label: '파일 첨부' },
+  { key: 'chat_내보내기', label: '대화 내용 내보내기' },
+  { key: 'chat_멤버관리', label: '채팅방 멤버 강퇴/관리' },
 ];
 
 export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_조직도', label: '조직도' },
+  { key: 'extra_조직도_다운로드', label: '조직도 다운로드' },
   { key: 'extra_부서별재고', label: '부서별 재고' },
   { key: 'extra_근무현황', label: '근무현황' },
+  { key: 'extra_근무현황_편성', label: '근무현황 편성(스케줄링)' },
   { key: 'extra_인계노트', label: '인계노트' },
   { key: 'extra_퇴원심사', label: '퇴원심사' },
   { key: 'extra_마감보고', label: '마감보고' },
@@ -47,6 +66,8 @@ export const BOARD_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'board_MRI일정_write', label: 'MRI일정 쓰기' },
   { key: 'board_수술일정_read', label: '수술일정 읽기' },
   { key: 'board_수술일정_write', label: '수술일정 쓰기' },
+  { key: 'board_업무가이드_read', label: '업무가이드 읽기' },
+  { key: 'board_업무가이드_write', label: '업무가이드 쓰기' },
 ];
 
 export const APPROVAL_PERMISSION_ITEMS: FeaturePermissionItem[] = [
@@ -54,19 +75,25 @@ export const APPROVAL_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'approval_결재함', label: '결재함' },
   { key: 'approval_참조문서함', label: '참조 문서함' },
   { key: 'approval_작성하기', label: '작성하기' },
+  { key: 'approval_반려권한', label: '강제 반려/회수 (관리자용)', tone: 'warning' },
+  { key: 'approval_양식관리', label: '결재 양식 관리' },
+  { key: 'approval_전체열람', label: '전체 문서 열람 (감사용)', tone: 'critical' },
 ];
 
 export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'hr_직원등록', label: '직원 등록' },
-  { key: 'hr_구성원', label: '구성원' },
+  { key: 'hr_구성원_열람', label: '구성원 열람 (조직도 포함)' },
+  { key: 'hr_구성원_관리', label: '구성원 관리 (정보 수정/인사기록)' },
   { key: 'hr_인사발령', label: '인사발령' },
   { key: 'hr_포상징계', label: '포상 / 징계' },
   { key: 'hr_교육', label: '교육' },
   { key: 'hr_오프보딩', label: '오프보딩' },
-  { key: 'hr_근태', label: '근태' },
+  { key: 'hr_근태_열람', label: '근태 현황 열람' },
+  { key: 'hr_근태_수정', label: '근태/출퇴근 임의 수정' },
   { key: 'hr_근무표생성', label: '근무표 생성' },
   { key: 'hr_연차휴가', label: '연차 / 휴가' },
-  { key: 'hr_급여', label: '급여' },
+  { key: 'hr_급여', label: '급여 (조회/생성)' },
+  { key: 'hr_급여_승인', label: '급여 대장 최종 승인', tone: 'critical' },
   { key: 'hr_건강검진', label: '건강검진' },
   { key: 'hr_경조사', label: '경조사' },
   { key: 'hr_면허자격증', label: '면허 / 자격증' },
@@ -126,8 +153,20 @@ export const FEATURE_PERMISSION_GROUPS: FeaturePermissionGroup[] = [
   {
     id: 'main-menu',
     label: '메인 메뉴 접근',
-    description: '내정보와 채팅은 기본 제공됩니다. 아래 항목만 메인 메뉴 노출을 설정합니다.',
+    description: '사이드바 및 하단 탭바에 메뉴를 노출할지 설정합니다.',
     items: MAIN_MENU_PERMISSION_ITEMS,
+  },
+  {
+    id: 'chat',
+    label: '채팅 세부 권한',
+    description: '메신저 내에서의 생성, 파일 전송 등의 세부 권한입니다.',
+    items: CHAT_PERMISSION_ITEMS,
+  },
+  {
+    id: 'mypage',
+    label: '내정보 세부 권한',
+    description: '마이페이지 내 개인정보 수정, 급여 조회 등 민감 권한입니다.',
+    items: MYPAGE_PERMISSION_ITEMS,
   },
   {
     id: 'extra',

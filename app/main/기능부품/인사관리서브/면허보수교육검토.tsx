@@ -232,7 +232,6 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
       aria-modal="true"
       aria-label="보수교육 이수증 검토"
       className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-5xl max-h-[92vh] overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr]"

@@ -260,7 +260,7 @@ function MessengerDrawerImpl({
 
   return (
     <>
-      <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 z-50 animate-in fade-in duration-200 bg-black/10" aria-hidden="true" />
       <div
         data-testid="chat-room-drawer"
         className="chat-drawer absolute top-0 right-0 bottom-0 z-[60] flex w-full shrink-0 border-l border-[var(--border)] animate-in slide-in-from-right duration-300 md:w-[260px]"

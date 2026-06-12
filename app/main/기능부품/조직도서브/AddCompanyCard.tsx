@@ -72,7 +72,6 @@ export function AddCompanyHintModal({ open, onClose }: AddCompanyHintModalProps)
       aria-labelledby="org-add-company-hint-title"
       data-testid="org-add-company-hint"
       className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 backdrop-blur-sm md:items-center md:p-6"
-      onClick={onClose}
     >
       <div
         className="w-full max-w-sm rounded-t-3xl bg-[var(--card)] p-6 shadow-2xl md:rounded-[var(--radius-xl)]"

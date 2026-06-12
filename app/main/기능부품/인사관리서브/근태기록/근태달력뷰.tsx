@@ -153,7 +153,14 @@ export default function AttendanceCalendarView({
 
   // 일별 패널용 정렬된 직원 목록 (JM2: useMemo로 매 렌더 sort 회피)
   const sortedDayPanelStaffs = useMemo(() => {
-    const next = [...filtered];
+    // 선택된 날짜가 직원의 퇴사일 이후인 경우 목록에서 제외
+    const activeStaffs = filtered.filter((s) => {
+      if (!s.resignation_date) return true;
+      const resDate = String(s.resignation_date).slice(0, 10);
+      return selectedDate <= resDate;
+    });
+    
+    const next = [...activeStaffs];
     const byDeptThenPosThenName = (a: StaffMember, b: StaffMember) => {
       let cmp = nameCollator.compare(a.department || '', b.department || '');
       if (cmp !== 0) return cmp;
@@ -294,10 +301,18 @@ export default function AttendanceCalendarView({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {filtered.map((s: StaffMember) => {
-              let workDays = 0;
-              return (
-                <tr key={`${mode}-${s.id}`} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors">
+            {(() => {
+              const activeStaffsForRange = filtered.filter((s: StaffMember) => {
+                if (!s.resignation_date) return true;
+                const resDate = String(s.resignation_date).slice(0, 10);
+                const rangeStart = mode === 'week' ? weekDates[0] : `${selectedMonth}-01`;
+                return resDate >= rangeStart;
+              });
+
+              return activeStaffsForRange.map((s: StaffMember) => {
+                let workDays = 0;
+                return (
+                  <tr key={`${mode}-${s.id}`} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors">
                   <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 z-10 border-r border-[var(--border)] dark:border-zinc-800">
                     <div className="flex flex-col">
                       <span className="font-bold text-sm text-foreground whitespace-nowrap">{s.name}</span>
@@ -326,7 +341,8 @@ export default function AttendanceCalendarView({
                   <td className="px-4 py-3 text-center bg-blue-500/10/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">{workDays}</td>
                 </tr>
               );
-            })}
+            });
+          })()}
           </tbody>
         </table>
       </div>

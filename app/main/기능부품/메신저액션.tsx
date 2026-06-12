@@ -21,7 +21,6 @@ export function ReactionDetailModal({
     <div
       data-testid="chat-reaction-detail-modal"
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[var(--z-modal)] p-4"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]"

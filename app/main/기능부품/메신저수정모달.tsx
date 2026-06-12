@@ -70,7 +70,6 @@ export function MessageEditHistoryModal({
     <div
       data-testid="chat-message-edit-history-modal"
       className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[116] p-4"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] w-full max-w-xl rounded-2xl p-5 shadow-sm border border-[var(--border)] space-y-4 max-h-[80vh] flex flex-col"

@@ -40,6 +40,7 @@ type MessengerComposerProps = {
   composerRef: RefObject<HTMLTextAreaElement | null>;
   // 부모가 최신 입력값을 동기로 읽기 위한 ref. 컴포저가 onChange마다 동기 갱신.
   inputMsgRef: MutableRefObject<string>;
+  canAttachFile?: boolean;
   showScrollToLatest?: boolean;
   onScrollToLatest?: () => void;
   showMentionList: boolean;
@@ -76,6 +77,7 @@ function MessengerComposerImpl({
   canWriteNotice,
   composerRef,
   inputMsgRef,
+  canAttachFile = true,
   showMentionList,
   mentionCandidates,
   onCloseReply,
@@ -433,23 +435,25 @@ function MessengerComposerImpl({
         {/* 좌측 액션바: +(첨부) / 이모지 — 투표는 채팅방 정보(드로어)에서, 멘션은 @ 입력으로 */}
         <div className="chat-comp-actions shrink-0 pb-0.5">
           {/* 첨부 */}
-          <button
-            type="button"
-            data-testid="chat-attach-button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={fileUploading}
-            aria-label="파일 첨부"
-            title="파일 첨부"
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] disabled:opacity-40"
-          >
-            {fileUploading ? (
-              <span className="animate-pulse text-[10px]">…</span>
-            ) : (
-              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 4v12M4 10h12" />
-              </svg>
-            )}
-          </button>
+          {canAttachFile && (
+            <button
+              type="button"
+              data-testid="chat-attach-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={fileUploading}
+              aria-label="파일 첨부"
+              title="파일 첨부"
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] disabled:opacity-40"
+            >
+              {fileUploading ? (
+                <span className="animate-pulse text-[10px]">…</span>
+              ) : (
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 4v12M4 10h12" />
+                </svg>
+              )}
+            </button>
+          )}
           {/* 이모지 팝오버 */}
           <div className="relative">
             <button

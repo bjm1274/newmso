@@ -111,7 +111,6 @@ export default function ApprovalDetailModal({
     <div
       data-testid="approval-detail-modal"
       className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center md:p-4"
-      onClick={onClose}
     >
       <div
         className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#edf2f7] md:h-[94dvh] md:max-w-5xl md:rounded-[28px] md:border md:border-white/70 md:shadow-[0_36px_120px_-48px_rgba(15,23,42,0.85)]"

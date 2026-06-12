@@ -66,7 +66,7 @@ const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
   경조사: { read: 'board_경조사_read', write: 'board_경조사_write' },
   MRI일정: { read: 'board_MRI일정_read', write: 'board_MRI일정_write' },
   수술일정: { read: 'board_수술일정_read', write: 'board_수술일정_write' },
-  업무가이드: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
+  업무가이드: { read: 'board_업무가이드_read', write: 'board_업무가이드_write' },
   익명소리함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
   직원제안함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
 };
@@ -215,6 +215,8 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   board_경조사_read: ['board_경조사_write'],
   board_MRI일정_read: ['board_MRI일정_write'],
   board_수술일정_read: ['board_수술일정_write'],
+  board_업무가이드_read: ['board_업무가이드_write', 'board_자유게시판_read'],
+  board_업무가이드_write: ['board_자유게시판_write'],
 };
 
 function getPermissions(user?: UserLike | null) {
@@ -364,14 +366,19 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
               ? resolveExplicitMenuAccess('menu_재고관리')
               : menuId === '관리자'
                 ? resolveExplicitMenuAccess('menu_관리자')
-                : null;
+                : menuId === '채팅'
+                  ? resolveExplicitMenuAccess('menu_채팅')
+                  : menuId === '내정보'
+                    ? resolveExplicitMenuAccess('menu_내정보')
+                    : null;
   if (explicitMenuAccess !== null) {
     return explicitMenuAccess;
   }
   switch (menuId as MainMenuId) {
     case '내정보':
-    case '알림':
     case '채팅':
+      return true; // fallback
+    case '알림':
       return true;
     case '조직도':
       return isPrivilegedUser(user) || canAccessExtraFeature(user, '조직도');
@@ -428,6 +435,8 @@ export function canAccessBoard(
 ): boolean {
   if (isPrivilegedUser(user)) return true;
   if (!canAccessMainMenu(user, '게시판')) return false;
+
+  if (boardId === '업무가이드' && action === 'read') return true;
 
   const permissionKeys = BOARD_PERMISSION_KEYS[boardId];
   if (!permissionKeys) return false;

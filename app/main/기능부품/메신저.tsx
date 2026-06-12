@@ -3083,6 +3083,7 @@ export default function ChatView({
           onToggleRoomHidden={toggleRoomHidden}
           onToggleDept={toggleDept}
           onOpenDirectChat={openDirectChat}
+          onOpenGroupModal={user?.permissions?.chat_방생성 !== false ? () => setShowGroupModal(true) : undefined}
         />
 
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--muted)] relative`}>
@@ -3171,6 +3172,7 @@ export default function ChatView({
             <MessengerComposer
               ref={composerControlRef}
               replyTo={replyTo}
+              canAttachFile={user?.permissions?.chat_파일첨부 !== false}
               pendingAlbumFiles={pendingAlbumFiles}
               albumPreviewUrls={albumPreviewUrls}
               pendingAttachmentFiles={pendingAttachmentFiles}

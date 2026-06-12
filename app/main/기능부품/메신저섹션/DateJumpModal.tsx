@@ -19,7 +19,6 @@ export function DateJumpModal({ open, value, error, onValueChange, onClose, onSu
     <div
       data-testid="chat-date-jump-modal"
       className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={onClose}
     >
       <form
         className="w-full max-w-sm rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"

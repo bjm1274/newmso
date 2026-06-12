@@ -144,6 +144,10 @@ export async function sendFcmNotification(
 
     const message: Record<string, unknown> = {
       token: fcmToken,
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      },
       data: messageData,
       webpush: {
         headers: { Urgency: 'high' },

@@ -113,6 +113,8 @@ export const fakeUser = {
     board_MRI일정_write: true,
     board_수술일정_read: true,
     board_수술일정_write: true,
+    board_업무가이드_read: true,
+    board_업무가이드_write: true,
     approval_기안함: true,
     approval_결재함: true,
     approval_참조문서함: true,

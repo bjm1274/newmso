@@ -199,7 +199,6 @@ export function StaffDetailModal({ staff, presence, isLoadingPresence, onClose }
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/45 backdrop-blur-sm md:items-center md:p-6"
-      onClick={onClose}
     >
       <div
         className="w-full max-w-md rounded-t-[32px] bg-[var(--card)] p-6 shadow-2xl md:rounded-[32px] animate-in slide-in-from-bottom md:zoom-in-95 duration-300"

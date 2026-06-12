@@ -144,6 +144,43 @@ export function normalizeProfileUser<T>(source: T): T {
     normalizedPermissions.payroll_allowances = payrollAllowances;
   }
 
+  // --- 권한 마이그레이션 및 기본값 주입 시작 ---
+  // 1. 기본 제공 기능
+  if (normalizedPermissions.menu_채팅 === undefined) normalizedPermissions.menu_채팅 = true;
+  if (normalizedPermissions.menu_내정보 === undefined) normalizedPermissions.menu_내정보 = true;
+  if (normalizedPermissions.chat_접근 === undefined) normalizedPermissions.chat_접근 = true;
+  if (normalizedPermissions.chat_방생성 === undefined) normalizedPermissions.chat_방생성 = true;
+  if (normalizedPermissions.chat_파일첨부 === undefined) normalizedPermissions.chat_파일첨부 = true;
+  if (normalizedPermissions.mypage_수정 === undefined) normalizedPermissions.mypage_수정 = true;
+  if (normalizedPermissions.mypage_급여조회 === undefined) normalizedPermissions.mypage_급여조회 = true;
+
+  // 2. HR 권한 세분화 마이그레이션
+  if (normalizedPermissions.hr_구성원 === true) {
+    if (normalizedPermissions.hr_구성원_열람 === undefined) normalizedPermissions.hr_구성원_열람 = true;
+    if (normalizedPermissions.hr_구성원_관리 === undefined) normalizedPermissions.hr_구성원_관리 = true;
+  }
+  if (normalizedPermissions.hr_근태 === true) {
+    if (normalizedPermissions.hr_근태_열람 === undefined) normalizedPermissions.hr_근태_열람 = true;
+    if (normalizedPermissions.hr_근태_수정 === undefined) normalizedPermissions.hr_근태_수정 = true;
+  }
+  if (normalizedPermissions.hr_급여 === true) {
+    if (normalizedPermissions.hr_급여_승인 === undefined) normalizedPermissions.hr_급여_승인 = true;
+  }
+
+  // 3. 결재 권한 마이그레이션
+  if (normalizedPermissions.approval_작성하기 === true) {
+    // 기존 작성하기 권한이 있는 사람은 양식관리도 할 수 있었던 상황이라면? (일단 안전하게 false 유지)
+  }
+
+  // 4. 추가기능 마이그레이션
+  if (normalizedPermissions.extra_조직도 === true) {
+    if (normalizedPermissions.extra_조직도_다운로드 === undefined) normalizedPermissions.extra_조직도_다운로드 = true;
+  }
+  if (normalizedPermissions.extra_근무현황 === true) {
+    if (normalizedPermissions.extra_근무현황_편성 === undefined) normalizedPermissions.extra_근무현황_편성 = true;
+  }
+  // --- 마이그레이션 끝 ---
+
   const employType =
     cleanString(base.employ_type) ||
     cleanString(base.employment_type) ||

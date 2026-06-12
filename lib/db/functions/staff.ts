@@ -198,6 +198,7 @@ export async function registerStaffFull(
     annual_leave_total: 0,
     annual_leave_used: 0,
     role: s.role ?? 'staff',
+    password_reset_required: 1,
   });
 
   // ─── 2) staff_licenses INSERT (여러 row, ON CONFLICT DO NOTHING)

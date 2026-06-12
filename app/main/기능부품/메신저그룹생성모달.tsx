@@ -29,7 +29,6 @@ export function GroupChatModal({
     <div
       data-testid="chat-group-modal"
       className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] w-full max-w-md rounded-2xl p-5 shadow-sm space-y-5"

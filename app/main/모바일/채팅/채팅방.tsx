@@ -653,6 +653,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             type="button"
             aria-label="전송"
             data-testid="chat-send-button"
+            onPointerDown={(e) => e.preventDefault()}
             onClick={() => void handleSendText()}
             disabled={composerDisabled || !hasText}
             style={{

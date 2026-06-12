@@ -30,7 +30,6 @@ export default function ReadStatusModal({
   return (
     <div
       className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5"
-      onClick={onClose}
     >
       <div
         className="w-full max-w-2xl max-h-[80dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-4 md:p-5 space-y-4 safe-area-pb"

@@ -96,7 +96,6 @@ export function GlobalSearchModal({
     <div
       data-testid="chat-global-search-modal"
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-3xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800"
