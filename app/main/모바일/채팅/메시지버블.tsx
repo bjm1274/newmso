@@ -31,6 +31,7 @@ export type MessageBubbleProps = {
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
+  replyTarget?: ChatMessage;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -66,6 +67,7 @@ export default function MessageBubble({
   onReply,
   onImageLoad,
   onOpenBoardPost,
+  replyTarget,
 }: MessageBubbleProps) {
   const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
 
@@ -190,120 +192,121 @@ export default function MessageBubble({
         overflow: 'visible',
       }}
     >
-      {/* ── 스와이프 뒤에 나타나는 액션 영역 ─────────── */}
-      {isRevealed && (
-        <>
-          {/* 배경 오버레이 — 다른 곳 탭하면 닫힘 */}
-          <div
-            onClick={closeActions}
+      {/* ── 스와이프 뒤에 나타나는 액션 영역 (항상 배경에 존재) ─────────── */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          ...(mine ? { right: 0 } : { left: 0 }),
+          width: SWIPE_MAX,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: mine ? 'flex-end' : 'flex-start',
+          padding: '4px 6px',
+          gap: 5,
+          zIndex: 0,
+          opacity: swiping || actionRevealed ? Math.min(1, Math.abs(swipeX) / (SWIPE_THRESHOLD * 1.5)) : 0,
+          transition: swiping ? 'none' : 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        {/* 빠른 이모지 행 */}
+        <div style={{
+          display: 'flex',
+          gap: 1,
+          background: 'var(--m-card)',
+          border: '1px solid var(--m-border)',
+          borderRadius: 20,
+          padding: '3px 4px',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+        }}>
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              aria-label={`반응 ${emoji}`}
+              onClick={() => handleQuickReaction(emoji)}
+              style={{
+                width: 28,
+                height: 28,
+                fontSize: 15,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '50%',
+                border: 0,
+                background: 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        {/* 액션 버튼 행 */}
+        <div style={{
+          display: 'flex',
+          gap: 4,
+        }}>
+          <button
+            type="button"
+            aria-label="답장"
+            onClick={handleReply}
             style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 9,
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              ...(mine ? { right: 0 } : { left: 0 }),
-              width: SWIPE_MAX,
               display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: mine ? 'flex-end' : 'flex-start',
-              padding: '4px 6px',
-              gap: 5,
-              zIndex: 10,
+              alignItems: 'center',
+              gap: 4,
+              padding: '4px 10px',
+              borderRadius: 14,
+              border: '1px solid var(--m-border)',
+              background: 'var(--m-card)',
+              color: 'var(--z-700)',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
             }}
           >
-            {/* 빠른 이모지 행 */}
-            <div style={{
-              display: 'flex',
-              gap: 1,
-              background: 'var(--m-card)',
-              border: '1px solid var(--m-border)',
-              borderRadius: 20,
-              padding: '3px 4px',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
-            }}>
-              {QUICK_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  aria-label={`반응 ${emoji}`}
-                  onClick={() => handleQuickReaction(emoji)}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    fontSize: 15,
-                    display: 'grid',
-                    placeItems: 'center',
-                    borderRadius: '50%',
-                    border: 0,
-                    background: 'transparent',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            {/* 액션 버튼 행 */}
-            <div style={{
-              display: 'flex',
-              gap: 4,
-            }}>
-              <button
-                type="button"
-                aria-label="답장"
-                onClick={handleReply}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '4px 10px',
-                  borderRadius: 14,
-                  border: '1px solid var(--m-border)',
-                  background: 'var(--m-card)',
-                  color: 'var(--z-700)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                }}
-              >
-                <MIcon name="reply" size={12} />
-                답장
-              </button>
-              {text && (
-                <button
-                  type="button"
-                  aria-label="복사"
-                  onClick={handleCopy}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 10px',
-                    borderRadius: 14,
-                    border: '1px solid var(--m-border)',
-                    background: 'var(--m-card)',
-                    color: 'var(--z-700)',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                  }}
-                >
-                  <MIcon name="copy" size={12} />
-                  복사
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+            <MIcon name="reply" size={12} />
+            답장
+          </button>
+          {text && (
+            <button
+              type="button"
+              aria-label="복사"
+              onClick={handleCopy}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '4px 10px',
+                borderRadius: 14,
+                border: '1px solid var(--m-border)',
+                background: 'var(--m-card)',
+                color: 'var(--z-700)',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+              }}
+            >
+              <MIcon name="copy" size={12} />
+              복사
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 배경 오버레이 — 다른 곳 탭하면 닫힘 */}
+      {isRevealed && (
+        <div
+          onClick={closeActions}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10,
+          }}
+        />
       )}
 
       <div
@@ -386,15 +389,15 @@ export default function MessageBubble({
             <div
               data-testid={`chat-message-${message.id}`}
               style={{
-                padding: (imageMode || isEmoticonOrSticker) ? 0 : '10px 14px',
+                padding: (imageMode || isEmoticonOrSticker) && !replyTarget ? 0 : '10px 14px',
                 borderRadius: 16,
-                background: (imageMode || isEmoticonOrSticker)
+                background: (imageMode || isEmoticonOrSticker) && !replyTarget
                   ? 'transparent'
                   : mine
                     ? 'var(--m-accent)'
                     : 'var(--m-card)',
-                color: mine && !(imageMode || isEmoticonOrSticker) ? '#fff' : 'var(--z-900)',
-                border: mine || imageMode || isEmoticonOrSticker ? 0 : '1px solid var(--m-border)',
+                color: mine && !((imageMode || isEmoticonOrSticker) && !replyTarget) ? '#fff' : 'var(--z-900)',
+                border: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 0 : '1px solid var(--m-border)',
                 borderBottomRightRadius: mine ? 4 : 16,
                 borderBottomLeftRadius: mine ? 16 : 4,
                 fontSize: 14,
@@ -405,6 +408,24 @@ export default function MessageBubble({
                 overflow: 'hidden',
               }}
             >
+              {replyTarget && (
+                <div style={{
+                  background: mine ? 'rgba(255,255,255,0.15)' : 'var(--m-bg)',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  borderLeft: `3px solid ${mine ? 'rgba(255,255,255,0.8)' : 'var(--m-accent)'}`,
+                  color: mine ? 'rgba(255,255,255,0.9)' : 'var(--z-600)',
+                  marginBottom: 8,
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : 'var(--m-accent)' }}>
+                    {replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장
+                  </div>
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9 }}>
+                    {typeof replyTarget.content === 'string' && replyTarget.content ? replyTarget.content : (replyTarget.file_name ? '첨부파일' : '(내용 없음)')}
+                  </div>
+                </div>
+              )}
               {imageMode && message.file_url ? (
                 <a
                   href={String(message.file_url)}

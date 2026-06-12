@@ -71,6 +71,7 @@ export default function BubbleList({
           <MessageBubble
             key={item.key}
             message={item.message}
+            replyTarget={item.message.reply_to_id ? messages.find(m => String(m.id) === String(item.message.reply_to_id)) : undefined}
             mine={String(item.message.sender_id || '') === String(userId || '')}
             myUserId={userId}
             staffs={staffs}
