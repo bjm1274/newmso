@@ -124,7 +124,6 @@ export function BottomSheet({
       {/* 배경 오버레이 */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
         aria-hidden="true"
       />
 

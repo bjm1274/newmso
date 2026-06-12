@@ -28,7 +28,7 @@ export function MediaArchivePanel({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" />
       <aside
         data-testid="chat-media-panel"
         className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300"

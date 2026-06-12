@@ -2080,7 +2080,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
       {/* 등록/수정 모달 - 모바일 최적화 */}
       {(창상태 || 편집모드) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 min-h-screen" onClick={닫기함수}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 min-h-screen">
           <div data-testid="new-staff-modal" className="bg-[var(--card)] w-full max-w-5xl rounded-2xl md:rounded-2xl overflow-hidden shadow-sm flex flex-col h-[90vh] md:h-[85vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)] shrink-0">
@@ -2844,7 +2844,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
       {/* ESS 승인 대기함 모달 */}
       {showEssModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4 min-h-screen" onClick={() => setShowEssModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4 min-h-screen">
           <div className="bg-[var(--page-bg)] w-full max-w-3xl rounded-[var(--radius-xl)] overflow-hidden shadow-sm flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)]">
               <div>

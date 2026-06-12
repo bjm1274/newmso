@@ -30,7 +30,7 @@ export function MessageEditModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[115] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[115] p-4">
       <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-5 shadow-sm border border-[var(--border)] space-y-4" onClick={(event) => event.stopPropagation()}>
         <div className="space-y-1">
           <h3 className="text-lg font-bold text-foreground">메시지 수정</h3>

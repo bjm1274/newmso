@@ -22,7 +22,7 @@ export function ReadStatusModal({
   if (!message) return null;
 
   return (
-    <div data-testid="chat-read-status-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={onClose}>
+    <div data-testid="chat-read-status-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
       <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>

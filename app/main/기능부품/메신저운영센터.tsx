@@ -525,7 +525,7 @@ export default function MessengerOperationsCenter({
   };
 
   return (
-    <div data-testid="chat-ops-center" className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
+    <div data-testid="chat-ops-center" className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4">
       <div
         className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-[var(--card)] p-4 shadow-sm custom-scrollbar"
         onClick={(event) => event.stopPropagation()}

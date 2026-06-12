@@ -161,7 +161,7 @@ export function ApprovalRiskReviewDialog({
   const title = action === 'approve' ? '일괄 승인 위험 리뷰' : '일괄 반려 위험 리뷰';
 
   return (
-    <div className="fixed inset-0 z-[180] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm md:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[180] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm md:items-center">
       <div
         className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.75)]"
         onClick={(event) => event.stopPropagation()}

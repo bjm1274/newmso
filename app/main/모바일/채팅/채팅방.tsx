@@ -115,7 +115,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       .filter(Boolean) as StaffDirectoryEntry[];
   }, [memberIds, staffs]);
 
-  const [draft, setDraft] = useState('');
+  const [hasText, setHasText] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -241,7 +241,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       toast('로그인 정보를 찾을 수 없습니다.', 'error');
       return;
     }
-    const text = draft.trim();
+    const text = composerInputRef.current?.value.trim() || '';
     if (!text) return;
 
     // Optimistic UI: 즉시 임시 메시지 표시 + 입력 초기화
@@ -258,7 +258,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       staff: { name: userName, photo_url: null },
     } as ChatMessage;
     appendOptimistic(optimisticMsg);
-    setDraft('');
+    
+    if (composerInputRef.current) {
+      composerInputRef.current.value = '';
+    }
+    setHasText(false);
     const savedReplyTo = replyTo;
     setReplyTo(null);
 
@@ -276,7 +280,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     }
     // 성공: temp → 실제 메시지로 교체
     replaceOptimistic(optimisticId, result.message);
-  }, [draft, room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic]);
+  }, [room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic]);
 
 
 
@@ -317,20 +321,18 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const insertEmojiAtCaret = useCallback((emoji: string) => {
     const input = composerInputRef.current;
     if (!input) {
-      setDraft((prev) => prev + emoji);
       return;
     }
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     const next = input.value.slice(0, start) + emoji + input.value.slice(end);
-    setDraft(next);
+    input.value = next;
+    setHasText(input.value.trim().length > 0);
     // caret 위치 복구
     requestAnimationFrame(() => {
-      const node = composerInputRef.current;
-      if (!node) return;
-      node.focus();
+      input.focus();
       const caret = start + emoji.length;
-      node.setSelectionRange(caret, caret);
+      input.setSelectionRange(caret, caret);
     });
   }, []);
 
@@ -604,8 +606,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             <span style={{ position: 'absolute', left: -9999, top: -9999 }}>메시지 입력</span>
             <textarea
               ref={composerInputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                const currentText = e.target.value.trim();
+                const currentHasText = currentText.length > 0;
+                if (currentHasText !== hasText) {
+                  setHasText(currentHasText);
+                }
+              }}
               placeholder={placeholder}
               aria-label={placeholder}
               data-testid="chat-message-input"
@@ -647,16 +654,16 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             aria-label="전송"
             data-testid="chat-send-button"
             onClick={() => void handleSendText()}
-            disabled={composerDisabled || !draft.trim()}
+            disabled={composerDisabled || !hasText}
             style={{
               width: 36,
               height: 36,
               borderRadius: '50%',
-              background:
-                composerDisabled || !draft.trim() ? 'var(--z-300)' : 'var(--m-accent)',
+              background: hasText && !composerDisabled ? 'var(--m-accent)' : 'var(--z-300)',
               color: '#fff',
-              display: 'grid',
-              placeItems: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <MIcon name="send" size={16} />

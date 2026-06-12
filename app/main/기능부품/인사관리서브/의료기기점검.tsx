@@ -223,7 +223,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
       {/* 장비 모달 */}
       {showDeviceModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowDeviceModal(false)} role="dialog" aria-modal="true" aria-label={editDeviceId ? '장비 편집' : '장비 등록'}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={editDeviceId ? '장비 편집' : '장비 등록'}>
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editDeviceId ? '장비 편집' : '장비 등록'}</h3>
             <div className="space-y-3">
@@ -266,7 +266,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
 
       {/* 점검 기록 모달 */}
       {showInspectModal && selectedDevice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowInspectModal(false)} role="dialog" aria-modal="true" aria-label="점검 기록 등록">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="점검 기록 등록">
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">점검 기록</h3>
             <p className="text-xs text-[var(--toss-gray-3)] mb-4">{selectedDevice.name as string}</p>

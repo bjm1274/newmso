@@ -71,7 +71,7 @@ export function PollComposerModal({
   if (!open) return null;
 
   return (
-    <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={onClose}>
+    <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
       <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)] max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
@@ -237,7 +237,7 @@ export function SlashCommandModal({
   if (!open || !command) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
       <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={(event) => event.stopPropagation()}>
         <h3 className="text-lg font-semibold text-[var(--foreground)]">
           {command === 'annual_leave' ? '연차 요청 초안 만들기' : '발주 요청 초안 만들기'}

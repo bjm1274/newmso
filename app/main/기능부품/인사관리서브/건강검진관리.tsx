@@ -461,7 +461,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                 </div>
             </div>
             {showStaffSearch && (
-                <div role="dialog" aria-modal="true" aria-label="직원 검색" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeStaffSearch}>
+                <div role="dialog" aria-modal="true" aria-label="직원 검색" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                     <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xl w-full max-w-md max-h-[70vh] flex flex-col gap-3 p-4" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between">
                             <h4 className="text-sm font-bold text-[var(--foreground)]">직원 검색</h4>

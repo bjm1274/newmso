@@ -5,6 +5,7 @@ import type { ChatRoom, StaffMember } from '@/types';
 export type ForwardRoomItem = {
   room: ChatRoom;
   unreadCount: number;
+  displayName?: string;
 };
 
 type ForwardMessageModalProps = {
@@ -36,9 +37,7 @@ export function ForwardMessageModal({
 
   return (
     <div
-      data-testid="chat-forward-modal"
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]"
@@ -50,7 +49,7 @@ export function ForwardMessageModal({
           {targetRooms.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">전달할 수 있는 채팅방이 없습니다.</div>
           ) : (
-            targetRooms.map(({ room, unreadCount }) => (
+            targetRooms.map(({ room, unreadCount, displayName }) => (
               <button
                 data-testid={`chat-forward-target-${room.id}`}
                 key={room.id}
@@ -58,7 +57,7 @@ export function ForwardMessageModal({
                 onClick={() => void onForward(room)}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
               >
-                <span className="truncate">{room.name || '채팅방'}</span>
+                <span className="truncate">{displayName || room.name || '채팅방'}</span>
                 <span className="text-[11px] text-[var(--toss-gray-3)]">{unreadCount ? String(unreadCount) : ''}</span>
               </button>
             ))
@@ -87,9 +86,7 @@ export function AddMemberModal({
 
   return (
     <div
-      data-testid="chat-add-member-modal"
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
-      onClick={onClose}
     >
       <div
         className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]"

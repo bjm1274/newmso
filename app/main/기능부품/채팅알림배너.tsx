@@ -158,8 +158,8 @@ function ChatAlertBanner(props: {
         onKeyDown={handleKeyDown}
         className="pointer-events-auto relative flex w-full max-w-[420px] items-center gap-3 overflow-hidden rounded-[28px] border border-white/80 bg-[color:rgba(255,255,255,0.94)] px-3 py-3 text-left shadow-[0_18px_44px_rgba(15,23,42,0.18)] backdrop-blur-xl transition-transform duration-150 active:scale-[0.985] dark:border-white/10 dark:bg-[color:rgba(15,23,42,0.88)] animate-in slide-in-from-top duration-300"
       >
-        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-[#FEE500] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-          <span className="text-[10px] font-black tracking-[0.16em] text-zinc-900">MSG</span>
+        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--accent-light)] shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] dark:bg-blue-500/20">
+          <span className="text-[15px] font-black text-[var(--accent)] dark:text-blue-200">{initials}</span>
           {pendingCount > 0 && (
             <span
               data-testid="chat-preview-count"
@@ -184,9 +184,6 @@ function ChatAlertBanner(props: {
           </div>
 
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-light)] text-[11px] font-black text-[var(--accent)] dark:bg-blue-500/15 dark:text-blue-200">
-              {initials}
-            </div>
             <p
               data-testid="chat-preview-title"
               className="min-w-0 flex-1 truncate text-[13.5px] font-black text-[var(--foreground)] dark:text-white"

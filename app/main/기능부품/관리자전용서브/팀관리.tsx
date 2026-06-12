@@ -287,7 +287,7 @@ function TeamManagerDesktop({
       </div>
 
       {adding && !disabled && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4" onClick={() => setAdding(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
           <div data-testid="team-manager-add-modal" className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] max-w-sm w-full space-y-3" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="팀 추가">
             <h4 className="font-semibold text-sm">팀 추가</h4>
             <div className="space-y-3">
@@ -347,7 +347,7 @@ function TeamManagerDesktop({
       )}
 
       {editingTeam && !disabled && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4" onClick={() => setEditingTeam(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
           <div data-testid="team-manager-edit-modal" className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] max-w-sm w-full space-y-3" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="팀 수정">
             <h4 className="font-semibold text-sm">팀 수정</h4>
             <div className="space-y-3">

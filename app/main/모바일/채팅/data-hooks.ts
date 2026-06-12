@@ -104,7 +104,7 @@ type UseChatRoomsResult = {
   refresh: () => Promise<void>;
 };
 
-const ROOM_POLL_INTERVAL_MS = 5_000;
+const ROOM_POLL_INTERVAL_MS = 2000;
 
 function isRoomVisibleToUser(
   room: ChatRoom,
@@ -213,7 +213,7 @@ export function useChatRoomsForMobile(
 // ─────────────────────────────────────────────
 
 const MESSAGES_LIMIT = 100;
-const ROOM_MESSAGE_POLL_INTERVAL_MS = 2_000;
+const ROOM_MESSAGE_POLL_INTERVAL_MS = 1000;
 
 type UseChatMessagesResult = {
   messages: ChatMessage[];

@@ -1367,7 +1367,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
       {/* 결재선 템플릿 저장 모달 */}
       {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowTemplateModal(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm p-4 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">결재선 템플릿 저장</h3>
             <p className="text-xs text-[var(--toss-gray-3)] mb-4">

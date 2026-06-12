@@ -539,7 +539,7 @@ export default function LeaveManagement({
 
       {/* 승인 대기 상세 모달 */}
       {showPendingModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={() => setShowPendingModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-[var(--card)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-sm flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)]">
               <div>

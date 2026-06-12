@@ -173,8 +173,9 @@ export function useChatSidebarState({
         .map((room) => ({
           room,
           unreadCount: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
+          displayName: roomLabelMap.get(String(room.id)),
         })),
-    [chatRooms, roomPrefs, roomUnreadCounts, selectedRoomId, visibleRooms],
+    [chatRooms, roomPrefs, roomUnreadCounts, selectedRoomId, visibleRooms, roomLabelMap],
   );
 
   const sidebarRoomItems = useMemo<MessengerSidebarRoomItem[]>(() => {

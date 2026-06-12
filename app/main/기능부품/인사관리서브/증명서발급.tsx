@@ -731,7 +731,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       </div>
 
       {showHistory && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowHistory(false)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
           <div
             className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
             onClick={(event) => event.stopPropagation()}

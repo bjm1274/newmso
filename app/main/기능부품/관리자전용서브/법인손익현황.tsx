@@ -215,7 +215,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
 
       {/* 비용 입력 모달 */}
       {expenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setExpenseModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 max-w-sm w-full mx-4 shadow-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">{expenseModal} 비용 입력 ({yearMonth})</h3>
             {[

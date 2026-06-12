@@ -417,7 +417,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       )}
 
       {adding && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
           <div className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 사용 등록</h4>
             <select value={form.card_id} onChange={(e) => setForm({ ...form, card_id: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
@@ -450,7 +450,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       )}
 
       {addingCard && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAddingCard(false)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
           <div className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 등록</h4>
             <select value={cardForm.company_name} onChange={(e) => setCardForm({ ...cardForm, company_name: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">

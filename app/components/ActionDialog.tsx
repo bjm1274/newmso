@@ -215,9 +215,6 @@ export default function ActionDialog({
   return (
     <div
       className="fixed inset-0 z-[400] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
-      onClick={() => {
-        if (!busy) onCancel();
-      }}
     >
       <div
         role="dialog"

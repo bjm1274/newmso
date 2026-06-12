@@ -63,7 +63,7 @@ export default function RiskActionDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex min-h-screen items-center justify-center bg-black/55 p-4 backdrop-blur-sm" onClick={onCancel}>
+    <div className="fixed inset-0 z-[150] flex min-h-screen items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
       <div
         className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] shadow-sm"
         onClick={(event) => event.stopPropagation()}
