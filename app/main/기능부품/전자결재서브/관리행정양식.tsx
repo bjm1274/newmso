@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 /**
@@ -9,13 +9,248 @@ import SmartDatePicker from '../공통/SmartDatePicker';
  * @param setExtraData - 상위 Approval 컴포넌트로 데이터를 전달하는 함수
  */
 type AdminFormsProps = {
-  staffs: { id: string; name: string; position: string; department?: string; departments?: { name: string } }[];
+  user?: any;
+  staffs: { id: string; name: string; position: string; department?: string; departments?: { name: string }; photo_url?: string | null; avatar_url?: string | null; profile_photo_url?: string | null }[];
   formType: string;
   setExtraData: (updater: (p: Record<string, unknown>) => Record<string, unknown>) => void;
+  setFormTitle?: (val: string) => void;
+  setFormContent?: (val: string) => void;
+  formContent?: string;
+  submitApproval?: () => void;
+  submitDisabled?: boolean;
 };
 
-export default function AdminForms({ staffs, formType, setExtraData }: AdminFormsProps) {
+export default function AdminForms({ user, staffs, formType, setExtraData, setFormTitle, setFormContent, formContent, submitApproval, submitDisabled }: AdminFormsProps) {
   const [localExecutionDate, setLocalExecutionDate] = useState('');
+  const [resignDate, setResignDate] = useState('');
+  const [handoverTarget, setHandoverTarget] = useState('');
+  const [resignReason, setResignReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (formType !== '사직서') return;
+
+    const finalReason = resignReason === '기타' ? customReason : resignReason;
+
+    setExtraData((p) => ({
+      ...p,
+      resignDate,
+      handoverTarget,
+      resignReason: finalReason,
+    }));
+
+    if (setFormTitle) {
+      setFormTitle(`사직서 (${user?.name || ''})`);
+    }
+
+    if (setFormContent) {
+      const name = user?.name || '';
+      const dept = user?.department || user?.departments?.name || '';
+      const pos = user?.position || '';
+      const dateStr = resignDate ? `${resignDate}부` : '[사직예정일]부';
+      const reasonStr = finalReason ? `(${finalReason})` : '';
+
+      const letter = `사 직 서
+
+성 명: ${name}
+부 서: ${dept}
+직 위: ${pos}
+
+상기 본인은 개인 사정${reasonStr}으로 인하여 ${dateStr}로 사직하고자 하오니 승인하여 주시기 바랍니다.
+
+${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+위 신청인: ${name} (인)
+
+귀중`;
+      setFormContent(letter);
+    }
+  }, [formType, resignDate, handoverTarget, resignReason, customReason, user, setExtraData, setFormTitle, setFormContent]);
+
+  // 사직서 양식 전용 렌더링 분기
+  if (formType === '사직서') {
+    const selectedStaff = staffs.find(s => s.name === handoverTarget);
+    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentYear = new Date().getFullYear();
+
+    return (
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
+        <div className="p-6 md:p-8 space-y-6">
+          {/* 사직서 문서 타이틀 및 메타 정보 */}
+          <div className="flex flex-col sm:flex-row justify-between items-start border-b border-[var(--border)] pb-5 gap-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl md:text-3xl font-black text-[var(--foreground)] tracking-tight">사직서</h2>
+              <div className="text-[12px] font-bold text-[var(--muted-foreground)] space-y-1">
+                <p>문서번호 : RS-{currentYear}-1101</p>
+                <p>기안일자 : {todayStr}</p>
+                <p>기안자 : {user?.name || ''} {user?.position || ''}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* 1. 사직 예정일 */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">1. 사직 예정일</label>
+              <SmartDatePicker
+                value={resignDate}
+                onChange={val => setResignDate(val)}
+                className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]"
+              />
+            </div>
+
+            {/* 2. 인수인계자 */}
+            <div className="space-y-2 relative">
+              <label className="text-xs font-bold text-[var(--foreground)] block">2. 인수인계자</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsStaffDropdownOpen(!isStaffDropdownOpen)}
+                  className="w-full px-4 py-2.5 bg-[var(--card)] rounded-[var(--radius-md)] text-xs font-bold text-left border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-slate-100 flex items-center justify-between h-[46px]"
+                >
+                  {selectedStaff ? (
+                    <div className="flex items-center gap-2">
+                      {selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url ? (
+                        <img
+                          src={(selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url) ?? undefined}
+                          alt={selectedStaff.name}
+                          className="w-6 h-6 rounded-full object-cover border border-[var(--border)]/30 shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallbackEl = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallbackEl) fallbackEl.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        style={{ display: (selectedStaff.photo_url || selectedStaff.avatar_url || selectedStaff.profile_photo_url) ? 'none' : 'flex' }}
+                        className="w-6 h-6 rounded-full items-center justify-center font-bold text-[10px] shrink-0 bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)]"
+                      >
+                        {selectedStaff.name?.slice(0, 1)}
+                      </div>
+                      <span className="truncate">
+                        {selectedStaff.name} ({selectedStaff.department || selectedStaff.departments?.name || ''} / {selectedStaff.position || ''})
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[var(--muted-foreground)] font-semibold">직원을 선택하세요</span>
+                  )}
+                  <span className="text-[var(--muted-foreground)]">
+                    <svg className={`w-4 h-4 transition-transform duration-200 ${isStaffDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </button>
+
+                {isStaffDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsStaffDropdownOpen(false)} />
+                    <ul className="absolute z-20 w-full mt-1.5 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <li
+                        onClick={() => {
+                          setHandoverTarget('');
+                          setIsStaffDropdownOpen(false);
+                        }}
+                        className="px-4 py-2 hover:bg-[var(--muted)] text-xs font-bold text-[var(--muted-foreground)] cursor-pointer"
+                      >
+                        선택 없음
+                      </li>
+                      {staffs.map((s) => (
+                        <li
+                          key={s.id}
+                          onClick={() => {
+                            setHandoverTarget(s.name);
+                            setIsStaffDropdownOpen(false);
+                          }}
+                          className={`px-4 py-2 hover:bg-[var(--muted)] text-xs font-bold cursor-pointer flex items-center gap-2 ${
+                            handoverTarget === s.name ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--foreground)]'
+                          }`}
+                        >
+                          {s.photo_url || s.avatar_url || s.profile_photo_url ? (
+                            <img
+                              src={(s.photo_url || s.avatar_url || s.profile_photo_url) ?? undefined}
+                              alt={s.name}
+                              className="w-6 h-6 rounded-full object-cover border border-[var(--border)]/30 shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallbackEl = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallbackEl) fallbackEl.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            style={{ display: (s.photo_url || s.avatar_url || s.profile_photo_url) ? 'none' : 'flex' }}
+                            className="w-6 h-6 rounded-full items-center justify-center font-bold text-[10px] shrink-0 bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)]"
+                          >
+                            {s.name?.slice(0, 1)}
+                          </div>
+                          <span className="truncate">
+                            {s.name} ({s.department || s.departments?.name || ''} / {s.position || ''})
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* 3. 사직 사유 */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">3. 사직 사유</label>
+              <select
+                value={resignReason}
+                className="w-full p-4 bg-[var(--card)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-[var(--border)] focus:ring-2 focus:ring-slate-100 h-[46px]"
+                onChange={e => setResignReason(e.target.value)}
+              >
+                <option value="">사직 사유 선택 또는 직접 입력</option>
+                <option value="개인 사정 (이직 및 충전)">개인 사정 (이직 및 충전)</option>
+                <option value="개인 사정 (건강 문제)">개인 사정 (건강 문제)</option>
+                <option value="개인 사정 (학업 및 커리어 개발)">개인 사정 (학업 및 커리어 개발)</option>
+                <option value="기타">기타 (직접 입력)</option>
+              </select>
+              {resignReason === '기타' && (
+                <input
+                  type="text"
+                  value={customReason}
+                  placeholder="상세 사직 사유를 직접 입력해 주세요"
+                  className="w-full p-4 mt-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-slate-200 h-[46px]"
+                  onChange={e => setCustomReason(e.target.value)}
+                />
+              )}
+            </div>
+
+            {/* 상세 사유 */}
+            <div className="space-y-2 pt-2 border-t border-[var(--border)]">
+              <label className="text-xs font-bold text-[var(--foreground)] block">상세 사유</label>
+              <textarea
+                value={formContent || ''}
+                onChange={(e) => setFormContent?.(e.target.value)}
+                className="w-full h-44 p-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-xs font-semibold leading-relaxed text-[var(--foreground)] outline-none focus:ring-2 focus:ring-slate-100 resize-y"
+                placeholder="상세 사직 사유 및 내용을 입력하세요."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 결재 요청 버튼 */}
+        <div className="p-4 bg-[var(--card)] border-t border-[var(--border)]">
+          <button
+            type="button"
+            onClick={submitApproval}
+            disabled={submitDisabled}
+            className="w-full h-12 rounded-[var(--radius-md)] bg-[#3b4b66] hover:bg-[#2c3a50] text-white font-bold text-sm shadow-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            결재 요청
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // 병원 실무에서 주로 사용하는 본문 가이드라인 정의
   const hospitalGuides: Record<string, string> = {
