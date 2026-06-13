@@ -95,6 +95,19 @@ export function getLeaveRequestSummary(metaData: ApprovalMetaData) {
   };
 }
 
+export function getResignationRequestSummary(metaData: ApprovalMetaData) {
+  if (!metaData) return null;
+  const resignDate = metaData.resignDate ? String(metaData.resignDate) : '';
+  const resignReason = metaData.resignReason ? String(metaData.resignReason) : '';
+  const handoverTarget = metaData.handoverTarget ? String(metaData.handoverTarget) : '';
+  if (!resignDate && !resignReason && !handoverTarget) return null;
+  return {
+    resignDate,
+    resignReason,
+    handoverTarget,
+  };
+}
+
 export function renderSupplyRequestItemsHtml(metaData: ApprovalMetaData) {
   const items = getSupplyRequestItems(metaData);
   if (items.length === 0) return '';
@@ -166,6 +179,33 @@ export function renderLeaveRequestInfoHtml(metaData: ApprovalMetaData) {
             <tr>
               <th>사유</th>
               <td>${escapeHtml(leaveSummary.reason || '-')}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+}
+
+export function renderResignationRequestInfoHtml(metaData: ApprovalMetaData) {
+  const resignSummary = getResignationRequestSummary(metaData);
+  if (!resignSummary) return '';
+
+  return `
+      <div class="section">
+        <div class="section-title">사직 정보</div>
+        <table class="supply-table">
+          <tbody>
+            <tr>
+              <th>사직예정일</th>
+              <td>${escapeHtml(resignSummary.resignDate || '-')}</td>
+            </tr>
+            <tr>
+              <th>사직사유</th>
+              <td>${escapeHtml(resignSummary.resignReason || '-')}</td>
+            </tr>
+            <tr>
+              <th>인수인계자</th>
+              <td>${escapeHtml(resignSummary.handoverTarget || '-')}</td>
             </tr>
           </tbody>
         </table>
@@ -363,6 +403,33 @@ export function LeaveRequestInfoPanel({ metaData }: { metaData: ApprovalMetaData
         <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
           <span className="font-bold text-[var(--toss-gray-4)]">사유</span>
           <span className="text-[var(--toss-gray-4)]">{leaveSummary.reason || '-'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ResignationRequestInfoPanel({ metaData }: { metaData: ApprovalMetaData }) {
+  const resignSummary = getResignationRequestSummary(metaData);
+  if (!resignSummary) return null;
+
+  return (
+    <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+      <div className="border-b border-[var(--border)] px-4 py-3">
+        <h4 className="text-sm font-bold text-[var(--foreground)]">사직 정보</h4>
+      </div>
+      <div className="grid gap-0 divide-y divide-[var(--border)] text-xs">
+        <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+          <span className="font-bold text-[var(--toss-gray-4)]">사직예정일</span>
+          <span className="font-semibold text-[var(--foreground)]">{resignSummary.resignDate || '-'}</span>
+        </div>
+        <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+          <span className="font-bold text-[var(--toss-gray-4)]">사직사유</span>
+          <span className="font-semibold text-[var(--foreground)]">{resignSummary.resignReason || '-'}</span>
+        </div>
+        <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3 px-4 py-3">
+          <span className="font-bold text-[var(--toss-gray-4)]">인수인계자</span>
+          <span className="text-[var(--toss-gray-4)]">{resignSummary.handoverTarget || '-'}</span>
         </div>
       </div>
     </div>

@@ -538,6 +538,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       { name: '연장근무', slug: 'overtime' },
       { name: '비품구매', slug: 'purchase' },
       { name: '출결정정', slug: 'attendance_fix' },
+      { name: '사직서', slug: 'resignation' },
       { name: '증명서발급', slug: 'generic' }
     ];
 

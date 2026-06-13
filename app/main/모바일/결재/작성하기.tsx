@@ -43,6 +43,7 @@ const FORM_CATEGORIES: FormCategory[] = [
   {
     g: '인사/징계',
     items: [
+      { slug: 'resignation', name: '사직서' },
       { slug: 'probation_evaluation', name: '수습직원평가서' },
       { slug: 'salary_increase_evaluation', name: '급여인상평가서' },
       { slug: 'contract_end_notice', name: '계약종료 통보' },

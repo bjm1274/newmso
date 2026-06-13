@@ -30,6 +30,7 @@ export function buildPreviewIdentityRows(templateSlug: string | null): PreviewRo
     draft_business: '경영지원팀',
     cooperation: '원무팀',
     attendance_fix: '검사팀',
+    resignation: '경영지원팀',
     payroll_slip: '인사팀',
     generic: '경영지원팀',
   };
@@ -60,6 +61,8 @@ export function buildPreviewStatement(templateSlug: string | null, templateName:
       return '아래와 같이 부서 협조를 요청하오니 검토하여 주시기 바랍니다.';
     case 'attendance_fix':
       return '아래와 같이 근태 정정을 신청하오니 확인하여 주시기 바랍니다.';
+    case 'resignation':
+      return '본인은 일신상의 사정으로 인하여 사직하고자 하오니 승인하여 주시기 바랍니다.';
     default:
       return `${templateName} 관련 내용을 아래와 같이 제출합니다.`;
   }
@@ -115,6 +118,12 @@ export function buildPreviewDetailRows(templateSlug: string | null): PreviewRow[
         { label: '정정구분', value: '출근 시간 정정' },
         { label: '사유', value: '모바일 출근 등록 누락' },
       ];
+    case 'resignation':
+      return [
+        { label: '사직예정일', value: '2026.07.15' },
+        { label: '사직사유', value: '개인 사정 (이직 및 리프레시)' },
+        { label: '인수인계자', value: '이몽룡 대리' },
+      ];
     default:
       return [
         { label: '문서항목', value: '기본 문서 항목 1' },
@@ -139,6 +148,7 @@ export function buildPreviewDocumentNumber(templateSlug: string | null) {
     draft_business: 'DG',
     cooperation: 'CO',
     attendance_fix: 'AT',
+    resignation: 'RS',
     payroll_slip: 'PS',
     generic: 'DOC',
   };
@@ -344,6 +354,25 @@ export function buildTemplatePreviewSpec(
           { label: '실지급액', value: '3,302,000원' },
         ],
         footerNote: '급여 명세 문서',
+      };
+    case 'resignation':
+      return {
+        badge: '사직서',
+        intro: '사직서 기본양식',
+        summary: '퇴사 의사를 밝히고 업무 인수인계 및 퇴직 예정일을 공유하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '신청자', value: '홍길동 / 외래팀' },
+          { label: '신청일', value: '2026.03.13' },
+          { label: '구분', value: '의원면직' },
+          { label: '승인 단계', value: '팀장 > 부서장 > 인사팀' },
+        ],
+        detailRows: [
+          { label: '사직 예정일', value: '2026.04.13' },
+          { label: '사직 사유', value: '개인 신상 및 이직 준비' },
+          { label: '인수인계 계획', value: '담당 업무 매뉴얼 정리 및 인수인계 파일 전달' },
+          { label: '확인 사항', value: '사직서가 승인되면 퇴사 처리가 진행됩니다.' },
+        ],
+        footerNote: '사직 승인 문서',
       };
     default:
       return genericSpec;

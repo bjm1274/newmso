@@ -58,7 +58,8 @@ async function trySql() {
         ('연장근무', 'overtime', 2),
         ('비품구매', 'purchase', 3),
         ('출결정정', 'attendance_fix', 4),
-        ('양식신청', 'generic', 5)
+        ('양식신청', 'generic', 5),
+        ('사직서', 'resignation', 6)
     ON CONFLICT (slug) DO NOTHING;
     `;
 

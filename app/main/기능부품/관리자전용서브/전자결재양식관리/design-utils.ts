@@ -34,6 +34,7 @@ export const builtinTemplates: TemplateOption[] = [
   { slug: 'cooperation', name: '업무협조', summary: '부서 간 협조 요청을 전달하는 기본양식' },
   { slug: 'generic', name: '증명서발급', summary: '재직·경력 등 각종 증명서 발급을 요청하는 기본양식' },
   { slug: 'attendance_fix', name: '출결정정', summary: '출퇴근 기록 정정 사유를 남기는 기본양식' },
+  { slug: 'resignation', name: '사직서', summary: '퇴사 의사를 밝히고 업무 인수인계 및 퇴직 예정일을 공유하는 기본양식' },
   { slug: 'payroll_slip', name: '급여명세서', summary: '급여 문서 디자인에 쓰는 기본양식' },
 ];
 
@@ -47,6 +48,7 @@ export const BUILTIN_TEMPLATE_DEFAULTS: Record<string, TemplateDesign> = {
   cooperation: { title: '업무 협조 요청서', primaryColor: '#0f766e', borderColor: '#d0e7e2', sealLabel: '협조 확인' },
   generic: { title: '증명서 발급 신청서', primaryColor: '#0369a1', borderColor: '#d0e5f0', sealLabel: '증명서 확인' },
   attendance_fix: { title: '출결 정정 신청서', primaryColor: '#be123c', borderColor: '#f1cfd7', sealLabel: '정정 확인' },
+  resignation: { title: '사직서', primaryColor: '#475569', borderColor: '#e2e8f0', sealLabel: '퇴사 확인' },
   payroll_slip: { title: '급여 명세서', primaryColor: '#163b70', borderColor: '#d8e1ee', sealLabel: '급여 직인' },
 };
 

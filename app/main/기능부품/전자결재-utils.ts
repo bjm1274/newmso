@@ -242,6 +242,7 @@ export function matchesCreatedDateRange(
 export function normalizeComposeFormType(value?: string) {
   if (!value || value === '인사명령') return '연차/휴가';
   if (value === 'attendance_fix' || value === '출결정정' || value === '출결 정정') return '출결정정';
+  if (value === 'resignation' || value === '사직서') return '사직서';
   if (value === '휴가신청' || value === 'leave') return '연차/휴가';
   if (value === 'report' || value === '보고서작성' || value === '보고서 작성') return '보고서작성';
   if (value === 'official_document_dispatch' || value === '공문발송' || value === '공문서대장') return '공문발송';

@@ -217,6 +217,43 @@ export default function AdminForms({ staffs, formType, setExtraData }: AdminForm
           </div>
         )}
 
+        {/* 📄 7. 사직서: 퇴사 의사 피력 및 인수인계 서식 */}
+        {formType === '사직서' && (
+          <div className="space-y-4 animate-in slide-in-from-top-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-slate-600 ml-1 block">사직 예정일</label>
+                <SmartDatePicker
+                  value=""
+                  onChange={val => setExtraData((p) => ({ ...p, resignDate: val }))}
+                  className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-slate-600 ml-1 block">인수인계자</label>
+                <select
+                  className="w-full p-4 bg-[var(--card)] rounded-[var(--radius-md)] text-xs font-bold outline-none border-none focus:ring-2 focus:ring-slate-100 h-[46px]"
+                  onChange={e => setExtraData((p) => ({ ...p, handoverTarget: e.target.value }))}
+                >
+                  <option value="">직원을 선택하세요</option>
+                  {staffs.map((s) => (
+                    <option key={s.id} value={s.name}>{s.name} ({s.position} / {s.department || s.departments?.name || ''})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold text-slate-600 ml-1 block">사직 사유</label>
+              <input
+                type="text"
+                placeholder="예: 개인 사정, 이직 등"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-slate-200 border-none h-[46px]"
+                onChange={e => setExtraData((p) => ({ ...p, resignReason: e.target.value }))}
+              />
+            </div>
+          </div>
+        )}
+
       </div>
       <div className="p-4 bg-[var(--card)] border-t border-[var(--border)] text-center">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">

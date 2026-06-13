@@ -9,6 +9,7 @@ import {
   ApprovalAttachmentsPanel,
   SupplyRequestItemsPanel,
   LeaveRequestInfoPanel,
+  ResignationRequestInfoPanel,
   ReportInfoPanel,
   RosterRequestInfoPanel,
   EmployeeEvaluationPanel,
@@ -229,6 +230,7 @@ export default function ApprovalDetailModal({
           <div className="mx-auto mb-3 w-full max-w-[860px] space-y-3">
             <SupplyRequestItemsPanel metaData={detailMetaData} />
             <LeaveRequestInfoPanel metaData={detailMetaData} />
+            <ResignationRequestInfoPanel metaData={detailMetaData} />
             <ReportInfoPanel metaData={detailMetaData} />
             <RosterRequestInfoPanel metaData={detailMetaData} />
             <EmployeeEvaluationPanel metaData={detailMetaData} />

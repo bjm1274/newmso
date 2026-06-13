@@ -5,6 +5,7 @@ import { normalizeApprovalCcUsers, alphaColor, escapeHtml } from '../전자결�
 import {
   renderApprovalAttachmentsHtml,
   renderLeaveRequestInfoHtml,
+  renderResignationRequestInfoHtml,
   renderReportInfoHtml,
   renderSupplyRequestItemsHtml,
   renderRosterInfoHtml,
@@ -116,6 +117,7 @@ export function buildApprovalPrintHtml(params: {
   const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
   const reportInfoSection = renderReportInfoHtml(metaData);
   const leaveRequestSection = renderLeaveRequestInfoHtml(metaData);
+  const resignationRequestSection = renderResignationRequestInfoHtml(metaData);
   const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
   const rosterSection = renderRosterInfoHtml(metaData);
   const employeeEvaluationSection = renderEmployeeEvaluationHtml(metaData);
@@ -388,6 +390,7 @@ window.onload = () => window.print();
     </div>
     ${reportInfoSection}
     ${leaveRequestSection}
+    ${resignationRequestSection}
     ${supplyItemsSection}
     ${rosterSection}
     ${employeeEvaluationSection}
