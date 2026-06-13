@@ -34,6 +34,7 @@ import {
   resolveCcUserIds,
   type ApprovalRow,
 } from './data-hooks';
+import { buildApprovalPrintHtml } from '../../기능부품/전자결재서브/approval-print-utils';
 
 type DetailTab = 'form' | 'line' | 'comment';
 
@@ -360,7 +361,7 @@ export default function SApprovalDetail({
 
       <div className="m-scroll">
         {tab === 'form' && (
-          <FormTab row={row} title={title} formName={formName} />
+          <FormTab row={row} title={title} formName={formName} staffMap={staffMap} />
         )}
         {tab === 'line' && (
           <LineTab row={row} lineIds={lineIds} currentApproverId={currentApproverId} staffMap={staffMap} staffId={staffId} />
@@ -510,88 +511,63 @@ export default function SApprovalDetail({
 // 하위 — 양식 탭
 // ─────────────────────────────────────────────
 
-function FormTab({ row, title, formName }: { row: ApprovalRow; title: string; formName: string }) {
-  const fields = readFormFields(row);
-  const content = String(row.content || '').trim();
+const resolveApprovalTemplateMeta = (item: Record<string, unknown>) => {
+  const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+  const rawType = String(item?.type || '').trim();
+  const rawSlug = String(metaData?.form_slug || '').trim();
+  const rawName = String(metaData?.form_name || '').trim();
+  return {
+    slug: rawSlug || rawType || 'generic',
+    name: rawName || rawType || '결재 문서',
+  };
+};
+
+const resolveApprovalTemplateDesign = (item: Record<string, unknown>) => {
+  const template = resolveApprovalTemplateMeta(item);
+  const companyName = String(item?.sender_company || '').trim();
+  return {
+    primaryColor: '#155eef',
+    companyLabel: companyName || '오피스 온',
+    sealLabel: `${companyName || '오피스 온'} 직인`,
+    title: template.name || '결재 문서',
+    subtitle: `${template.name || '결재'} 승인 문서`,
+    templateName: template.name || '결재 문서',
+    templateSlug: template.slug || 'generic',
+  };
+};
+
+function FormTab({
+  row,
+  title,
+  formName,
+  staffMap,
+}: {
+  row: ApprovalRow;
+  title: string;
+  formName: string;
+  staffMap: Record<string, StaffMember>;
+}) {
   const docNumber = String(row.doc_number || '').trim();
-  const attachments = useMemo(
-    () => normalizeApprovalAttachments((row.meta_data as Record<string, unknown> | null)?.attachments),
-    [row.meta_data]
-  );
+  const detailPreviewHtml = useMemo(() => {
+    return buildApprovalPrintHtml({
+      item: row as any,
+      approvalDirectoryStaffs: Object.values(staffMap),
+      resolveApprovalTemplateDesign,
+      resolveApprovalTemplateMeta,
+    });
+  }, [row, staffMap]);
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
-      <MCard style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <MChip tone="accent">{formName}</MChip>
-          <MChip>일반</MChip>
-          <div style={{ flex: 1 }} />
-          {docNumber && (
-            <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
-              문서번호 {docNumber}
-            </span>
-          )}
-        </div>
-        <h1 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.022em', lineHeight: 1.35 }}>
-          {title}
-        </h1>
-
-        {fields.length > 0 && (
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {fields.map((f, i) => (
-              <div
-                key={`${f.label}-${i}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '88px 1fr',
-                  gap: 12,
-                  padding: '10px 0',
-                  borderBottom: i < fields.length - 1 ? '1px solid var(--m-border)' : 'none',
-                }}
-              >
-                <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{f.label}</div>
-                <div
-                  className={f.big ? 'm-tnum' : ''}
-                  style={{
-                    fontSize: f.big ? 16 : 13,
-                    fontWeight: f.big ? 800 : 600,
-                    color: 'var(--z-900)',
-                    letterSpacing: f.big ? '-0.02em' : 0,
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {f.value}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {content && (
-          <div
-            style={{
-              marginTop: 14,
-              padding: '10px 12px',
-              background: 'var(--m-bg)',
-              borderRadius: 10,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: 'var(--z-800)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {content}
-          </div>
-        )}
-
-        {fields.length === 0 && !content && (
-          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--z-500)', fontWeight: 600 }}>
-            본문이 비어 있습니다. PC에서 전체 양식을 확인해 주세요.
-          </div>
-        )}
-      </MCard>
-      {attachments.length > 0 && <AttachmentsSection attachments={attachments} />}
+      <div className="mx-auto mb-4 w-full overflow-hidden rounded-[var(--radius-lg)] border border-slate-200 bg-white shadow-[0_28px_80px_-42px_rgba(15,23,42,0.65)]">
+        <iframe
+          title={`${title}${docNumber ? ` (${docNumber})` : ''} 미리보기`}
+          srcDoc={detailPreviewHtml}
+          sandbox=""
+          className="block w-full border-0 bg-white"
+          style={{ height: 'calc(100dvh - 210px)', minHeight: '480px' }}
+        />
+      </div>
       <div style={{ height: 16 }} />
     </div>
   );

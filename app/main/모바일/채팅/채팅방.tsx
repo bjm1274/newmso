@@ -24,6 +24,7 @@ import {
 } from 'react';
 import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
+import { supabase } from '@/lib/supabase';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MSheet from '../공통/MSheet';
@@ -123,6 +124,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [isForwardOpen, setIsForwardOpen] = useState(false);
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
 
   // 대화방 알림 수신 토글 — PC 자산 재사용(room_notification_settings 서버 push 기준)
   const { roomNotifyOn, toggleRoomNotify } = useRoomNotificationSetting({
@@ -358,6 +361,102 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     [refresh, room.id, userId],
   );
 
+  const handleToggleBookmark = useCallback(async (message: ChatMessage) => {
+    if (!userId) return;
+    try {
+      const { data, error: selectErr } = await supabase
+        .from('message_bookmarks')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('message_id', message.id);
+        
+      if (selectErr) throw selectErr;
+      
+      if (data && data.length > 0) {
+        const { error } = await supabase
+          .from('message_bookmarks')
+          .delete()
+          .eq('user_id', userId)
+          .eq('message_id', message.id);
+        if (error) throw error;
+        toast('북마크가 해제되었습니다.', 'success');
+      } else {
+        const { error } = await supabase.from('message_bookmarks').insert([
+          {
+            user_id: userId,
+            message_id: message.id,
+            room_id: room.id,
+          },
+        ]);
+        if (error) throw error;
+        toast('북마크가 추가되었습니다.', 'success');
+      }
+    } catch (err) {
+      toast('북마크 처리 중 오류가 발생했습니다.', 'error');
+    }
+  }, [userId, room.id]);
+
+  const handleAddTask = useCallback(async (message: ChatMessage) => {
+    if (!userId) return;
+    const content = message.content || '첨부 파일 확인';
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .insert([{
+          user_id: userId,
+          content: `[채팅] ${content}`,
+          is_complete: false,
+          task_date: new Date().toISOString().slice(0, 10),
+          source_message_id: message.id,
+          source_room_id: message.room_id,
+        }]);
+      if (error) throw error;
+      toast('할 일(업무)로 등록되었습니다.', 'success');
+    } catch (err) {
+      toast('할 일 등록 중 오류가 발생했습니다.', 'error');
+    }
+  }, [userId]);
+
+  const handleDeleteMessage = useCallback(async (message: ChatMessage) => {
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({ is_deleted: true, content: '삭제된 메시지입니다.' })
+        .eq('id', message.id);
+      if (error) throw error;
+      toast('메시지가 삭제되었습니다.', 'success');
+      void refresh();
+    } catch (err) {
+      toast('메시지 삭제 중 오류가 발생했습니다.', 'error');
+    }
+  }, [refresh]);
+
+  const handleForwardSelectRoom = useCallback(async (targetRoom: MobileChatRoom) => {
+    if (!forwardMessage || !userId) return;
+    try {
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert([{
+          room_id: targetRoom.id,
+          sender_id: userId,
+          sender_name: userName,
+          content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
+          file_url: forwardMessage.file_url || null,
+          file_name: forwardMessage.file_name || null,
+          file_kind: forwardMessage.file_kind || null,
+          file_size_bytes: forwardMessage.file_size_bytes || null,
+          message_type: forwardMessage.message_type || 'text',
+        }]);
+      if (error) throw error;
+      toast(`"${targetRoom.name || '채팅방'}"으로 메시지를 전달했습니다.`, 'success');
+    } catch (err) {
+      toast('메시지 전달 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsForwardOpen(false);
+      setForwardMessage(null);
+    }
+  }, [forwardMessage, userId, userName]);
+
   const placeholder = '메시지를 입력하세요.';
   const composerDisabled = uploading;
 
@@ -490,13 +589,19 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           readCounts={readCounts}
           isGroupChat={isGroup}
           onToggleReaction={handleToggleReaction}
-
           onReply={(msg) => {
             setReplyTo(msg);
             setTimeout(() => composerInputRef.current?.focus(), 50);
           }}
           onImageLoad={scrollToBottom}
           onOpenBoardPost={onOpenBoardPost}
+          onBookmark={handleToggleBookmark}
+          onTask={handleAddTask}
+          onDelete={handleDeleteMessage}
+          onForward={(msg) => {
+            setForwardMessage(msg);
+            setIsForwardOpen(true);
+          }}
         />
       </div>
 
@@ -861,6 +966,53 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             >
               {leaving ? '나가는 중…' : '나가기'}
             </button>
+          </div>
+        </div>
+      </MSheet>
+
+      <MSheet
+        open={isForwardOpen}
+        onClose={() => {
+          setIsForwardOpen(false);
+          setForwardMessage(null);
+        }}
+        title="메시지 전달"
+      >
+        <div style={{ padding: '8px 20px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
+          <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, marginBottom: 12 }}>
+            전달할 채팅방을 선택해 주세요.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recentRooms && recentRooms.length > 0 ? (
+              recentRooms.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => handleForwardSelectRoom(r)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    textAlign: 'left',
+                    background: 'var(--m-card)',
+                    border: '1px solid var(--m-border)',
+                    borderRadius: 12,
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: 'var(--foreground)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span className="truncate" style={{ flex: 1 }}>{r.name || '이름 없는 채팅방'}</span>
+                  <MIcon name="chevR" size={18} color="var(--z-400)" />
+                </button>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--z-400)', textAlign: 'center', padding: '16px 0' }}>
+                전달 가능한 최근 채팅방이 없습니다.
+              </div>
+            )}
           </div>
         </div>
       </MSheet>

@@ -26,6 +26,10 @@ export type BubbleListProps = {
   onReply?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
+  onBookmark: (message: ChatMessage) => void;
+  onTask: (message: ChatMessage) => void;
+  onDelete: (message: ChatMessage) => void;
+  onForward: (message: ChatMessage) => void;
 };
 
 export default function BubbleList({
@@ -39,6 +43,10 @@ export default function BubbleList({
   onReply,
   onImageLoad,
   onOpenBoardPost,
+  onBookmark,
+  onTask,
+  onDelete,
+  onForward,
 }: BubbleListProps) {
   const items = useMemo(() => {
     const out: Array<
@@ -82,6 +90,10 @@ export default function BubbleList({
             onReply={onReply}
             onImageLoad={onImageLoad}
             onOpenBoardPost={onOpenBoardPost}
+            onBookmark={onBookmark}
+            onTask={onTask}
+            onDelete={onDelete}
+            onForward={onForward}
           />
         );
       })}

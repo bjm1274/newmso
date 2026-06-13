@@ -18,6 +18,8 @@ import {
   pickAvatarTone,
   type StaffDirectoryEntry,
 } from './data-hooks';
+import { toast } from '@/lib/toast';
+import MessageActionsHost from '../../기능부품/메신저액션서브/MessageActionsHost';
 
 export type MessageBubbleProps = {
   message: ChatMessage;
@@ -32,6 +34,10 @@ export type MessageBubbleProps = {
   onImageLoad?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
   replyTarget?: ChatMessage;
+  onBookmark: (message: ChatMessage) => void;
+  onTask: (message: ChatMessage) => void;
+  onDelete: (message: ChatMessage) => void;
+  onForward: (message: ChatMessage) => void;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -68,6 +74,10 @@ export default function MessageBubble({
   onImageLoad,
   onOpenBoardPost,
   replyTarget,
+  onBookmark,
+  onTask,
+  onDelete,
+  onForward,
 }: MessageBubbleProps) {
   const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
 
@@ -104,225 +114,33 @@ export default function MessageBubble({
     return /^\[emo:[a-z0-9-]+\]$/.test(trimmed) || /^\[stat:[a-z0-9-]+\]$/.test(trimmed);
   }, [text, hasFile]);
 
-  /* ─── 스와이프 제스처 ─────────────────────────────────── */
-  const [swipeX, setSwipeX] = useState(0);
-  const [swiping, setSwiping] = useState(false);
-  const [actionRevealed, setActionRevealed] = useState(false);
-  const touchRef = useRef({ startX: 0, startY: 0, moved: false, locked: false });
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchRef.current = { startX: touch.clientX, startY: touch.clientY, moved: false, locked: false };
-    setSwiping(true);
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!swiping) return;
-    const touch = e.touches[0];
-    const ref = touchRef.current;
-    const dx = touch.clientX - ref.startX;
-    const dy = touch.clientY - ref.startY;
-
-    // 수직 스크롤 우선 — 세로 이동이 더 크면 스와이프 취소
-    if (!ref.locked && !ref.moved) {
-      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
-        setSwiping(false);
-        setSwipeX(0);
-        return;
-      }
-      if (Math.abs(dx) > 8) {
-        ref.locked = true;
-        ref.moved = true;
-      }
-    }
-
-    if (!ref.locked) return;
-
-    // 내 메시지: 왼쪽(음수)만, 상대 메시지: 오른쪽(양수)만
-    let clamped: number;
-    if (mine) {
-      clamped = Math.max(-SWIPE_MAX, Math.min(0, dx));
-    } else {
-      clamped = Math.max(0, Math.min(SWIPE_MAX, dx));
-    }
-    setSwipeX(clamped);
-  }, [swiping, mine]);
-
-  const handleTouchEnd = useCallback(() => {
-    setSwiping(false);
-    if (Math.abs(swipeX) >= SWIPE_THRESHOLD) {
-      setActionRevealed(true);
-      setSwipeX(mine ? -SWIPE_MAX : SWIPE_MAX);
-    } else {
-      setSwipeX(0);
-      setActionRevealed(false);
-    }
-  }, [swipeX, mine]);
-
-  const closeActions = useCallback(() => {
-    setSwipeX(0);
-    setActionRevealed(false);
-  }, []);
-
-  const handleQuickReaction = useCallback((emoji: string) => {
-    onToggleReaction(String(message.id), emoji);
-    closeActions();
-  }, [message.id, onToggleReaction, closeActions]);
-
-  const handleReply = useCallback(() => {
-    if (onReply) onReply(message);
-    closeActions();
-  }, [message, onReply, closeActions]);
-
   const handleCopy = useCallback(() => {
     if (text) {
       navigator.clipboard?.writeText(text).catch(() => {});
+      toast('메시지가 복사되었습니다.', 'success');
     }
-    closeActions();
-  }, [text, closeActions]);
-
-  const isRevealed = actionRevealed && Math.abs(swipeX) >= SWIPE_THRESHOLD;
+  }, [text]);
 
   return (
-    <div
-      data-testid={`chat-message-row-${message.id}`}
-      style={{
-        marginBottom: 8,
-        position: 'relative',
-        overflow: 'visible',
-      }}
+    <MessageActionsHost
+      mine={mine}
+      canDelete={mine}
+      enableContextMenu={true}
+      testId={`chat-message-row-${message.id}`}
+      onReact={(emoji) => onToggleReaction(String(message.id), emoji)}
+      onReply={() => onReply?.(message)}
+      onCopy={handleCopy}
+      onForward={() => onForward(message)}
+      onBookmark={() => onBookmark(message)}
+      onTask={() => onTask(message)}
+      onDelete={() => onDelete(message)}
     >
-      {/* ── 스와이프 뒤에 나타나는 액션 영역 (항상 배경에 존재) ─────────── */}
       <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          ...(mine ? { right: 0 } : { left: 0 }),
-          width: SWIPE_MAX,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: mine ? 'flex-end' : 'flex-start',
-          padding: '4px 6px',
-          gap: 5,
-          zIndex: 0,
-          opacity: swiping || actionRevealed ? Math.min(1, Math.abs(swipeX) / (SWIPE_THRESHOLD * 1.5)) : 0,
-          transition: swiping ? 'none' : 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
-        {/* 빠른 이모지 행 */}
-        <div style={{
-          display: 'flex',
-          gap: 1,
-          background: 'var(--m-card)',
-          border: '1px solid var(--m-border)',
-          borderRadius: 20,
-          padding: '3px 4px',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
-        }}>
-          {QUICK_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              aria-label={`반응 ${emoji}`}
-              onClick={() => handleQuickReaction(emoji)}
-              style={{
-                width: 28,
-                height: 28,
-                fontSize: 15,
-                display: 'grid',
-                placeItems: 'center',
-                borderRadius: '50%',
-                border: 0,
-                background: 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-        {/* 액션 버튼 행 */}
-        <div style={{
-          display: 'flex',
-          gap: 4,
-        }}>
-          <button
-            type="button"
-            aria-label="답장"
-            onClick={handleReply}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '4px 10px',
-              borderRadius: 14,
-              border: '1px solid var(--m-border)',
-              background: 'var(--m-card)',
-              color: 'var(--z-700)',
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-            }}
-          >
-            <MIcon name="reply" size={12} />
-            답장
-          </button>
-          {text && (
-            <button
-              type="button"
-              aria-label="복사"
-              onClick={handleCopy}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '4px 10px',
-                borderRadius: 14,
-                border: '1px solid var(--m-border)',
-                background: 'var(--m-card)',
-                color: 'var(--z-700)',
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-              }}
-            >
-              <MIcon name="copy" size={12} />
-              복사
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 배경 오버레이 — 다른 곳 탭하면 닫힘 */}
-      {isRevealed && (
-        <div
-          onClick={closeActions}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10,
-          }}
-        />
-      )}
-
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
         style={{
           display: 'flex',
           gap: 8,
           justifyContent: mine ? 'flex-end' : 'flex-start',
-          transform: `translateX(${swipeX}px)`,
-          transition: swiping ? 'none' : 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
-          zIndex: isRevealed ? 11 : 1,
-          touchAction: 'pan-y',
         }}
       >
         {!mine && (
@@ -568,6 +386,6 @@ export default function MessageBubble({
           )}
         </div>
       </div>
-    </div>
+    </MessageActionsHost>
   );
 }
