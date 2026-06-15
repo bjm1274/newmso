@@ -49,6 +49,7 @@ crons = [
   "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements,
                   #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday,
                   #            payroll-notice (급여일 리마인더 — 내부에서 day===payrollDay만 발송)
+  "0 4 * * *",    # KST 13:00 — 임시 재발송 (temp resend)
 ]
 
 # Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)

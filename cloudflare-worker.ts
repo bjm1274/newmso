@@ -37,6 +37,7 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
     '/api/cron/substitute-holiday',       // 공휴일 근무 → 대체휴무 자동지급
     '/api/cron/payroll-notice'            // 급여일(payrollDay) 도래 시 HR/관리자에게 급여명세서 발송 확인 리마인더
   ],
+  '0 4 * * *': ['/api/temp/resend'],      // KST 13:00 — 임시 재발송
 };
 
 async function callCronRoute(
