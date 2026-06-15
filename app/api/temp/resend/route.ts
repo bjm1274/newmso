@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getD1Binding, getD1Drizzle, messages, chat_push_jobs } from '@/lib/db';
 import { eq, like, and, gte } from 'drizzle-orm';
+import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,8 @@ export async function GET(request: Request) {
       enqueued++;
     }
 
-    return NextResponse.json({ ok: true, enqueued, ids: rows.map(r => r.id) });
+    let dispatchResult = await processPendingChatPushJobs(50);
+    return NextResponse.json({ ok: true, enqueued, ids: rows.map(r => r.id), dispatchResult });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
