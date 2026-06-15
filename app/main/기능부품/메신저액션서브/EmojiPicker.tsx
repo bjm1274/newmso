@@ -50,6 +50,14 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const pos = useMemo(() => {
     const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+    if (viewportW <= 768) {
+      // 모바일(768px 이하)인 경우 화면 가로/세로 정중앙 정렬
+      const left = Math.max(8, (viewportW - PICKER_WIDTH) / 2);
+      const top = Math.max(8, (viewportH - PICKER_HEIGHT_APPROX) / 2);
+      return { left, top };
+    }
+
     const left = x + PICKER_WIDTH > viewportW ? Math.max(8, x - PICKER_WIDTH) : x;
     const top = y + PICKER_HEIGHT_APPROX > viewportH ? Math.max(8, y - PICKER_HEIGHT_APPROX) : y;
     return { left, top };
@@ -162,15 +170,23 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   if (!mounted) return null;
 
   return createPortal(
-    <div
-      ref={ref}
-      onKeyDown={handleKey}
-      onClick={stop}
-      style={{ left: pos.left, top: pos.top }}
-      className="emoji-picker fixed z-[100] flex w-[320px] flex-col gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.06)]"
-      role="dialog"
-      aria-label="이모지 선택"
-    >
+    <>
+      <div
+        className="fixed inset-0 z-[99] bg-black/40 md:hidden animate-fade-in"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+      />
+      <div
+        ref={ref}
+        onKeyDown={handleKey}
+        onClick={stop}
+        style={{ left: pos.left, top: pos.top }}
+        className="emoji-picker fixed z-[100] flex w-[320px] flex-col gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--card)] p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.14),0_0_0_1px_rgba(0,0,0,0.06)]"
+        role="dialog"
+        aria-label="이모지 선택"
+      >
       <div className="relative">
         <span aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[var(--toss-gray-4)]">🔍</span>
         <input
@@ -363,7 +379,8 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           <span>이모지를 선택하세요</span>
         )}
       </div>
-    </div>,
+    </div>
+    </>,
     document.body
   );
 }

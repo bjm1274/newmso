@@ -68,6 +68,7 @@ export default function MessageActionsHost({
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMoveRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const localRef = useRef<HTMLDivElement | null>(null);
 
@@ -85,12 +86,29 @@ export default function MessageActionsHost({
     const el = localRef.current;
     if (!el) return;
 
+    const clearLongPressTimer = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
     const onTouchStart = (e: globalThis.TouchEvent) => {
       if (window.innerWidth > 768) return;
       const touch = e.touches[0];
       if (touch) {
         touchStartRef.current = { x: touch.clientX, y: touch.clientY };
         touchMoveRef.current = null;
+
+        clearLongPressTimer();
+        longPressTimerRef.current = setTimeout(() => {
+          if (enableContextMenu) {
+            setCtxMenu({ x: touch.clientX, y: touch.clientY });
+            if (navigator.vibrate) {
+              navigator.vibrate(40);
+            }
+          }
+        }, 500); // 500ms long press threshold
       }
     };
 
@@ -103,6 +121,11 @@ export default function MessageActionsHost({
       const diffX = touch.clientX - touchStartRef.current.x;
       const diffY = touch.clientY - touchStartRef.current.y;
 
+      // Cancel long press if drag distance is more than 10px
+      if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+        clearLongPressTimer();
+      }
+
       if (Math.abs(diffX) > Math.abs(diffY)) {
         if (e.cancelable) {
           e.preventDefault();
@@ -114,6 +137,7 @@ export default function MessageActionsHost({
     };
 
     const onTouchEnd = () => {
+      clearLongPressTimer();
       if (!touchStartRef.current) return;
       setSwipeOffset(0);
 
@@ -133,14 +157,24 @@ export default function MessageActionsHost({
       touchMoveRef.current = null;
     };
 
+    const onTouchCancel = () => {
+      clearLongPressTimer();
+      setSwipeOffset(0);
+      touchStartRef.current = null;
+      touchMoveRef.current = null;
+    };
+
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchCancel, { passive: true });
 
     return () => {
+      clearLongPressTimer();
       el.removeEventListener('touchstart', onTouchStart);
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchCancel);
     };
   }, [enableContextMenu]);
 

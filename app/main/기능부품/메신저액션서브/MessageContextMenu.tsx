@@ -58,6 +58,14 @@ export default function MessageContextMenu({
   const pos = useMemo(() => {
     const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const viewportH = typeof window !== 'undefined' ? window.innerHeight : 800;
+
+    if (viewportW <= 768) {
+      // 모바일(768px 이하)인 경우 화면 가로/세로 정중앙 정렬
+      const left = Math.max(8, (viewportW - MENU_WIDTH) / 2);
+      const top = Math.max(8, (viewportH - MENU_HEIGHT_APPROX) / 2);
+      return { left, top };
+    }
+
     const left = x + MENU_WIDTH > viewportW ? Math.max(8, x - MENU_WIDTH) : x;
     const top = y + MENU_HEIGHT_APPROX > viewportH ? Math.max(8, y - MENU_HEIGHT_APPROX) : y;
     return { left, top };
