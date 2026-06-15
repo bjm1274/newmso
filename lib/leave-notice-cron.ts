@@ -18,6 +18,7 @@ import {
   inArray,
   desc,
 } from '@/lib/db';
+import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
 
 type D1Db = ReturnType<typeof getD1Drizzle>;
 
@@ -264,6 +265,13 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
           created_at: nowIso,
           content,
         });
+        await enqueueChatPushJob({
+          messageId,
+          roomId: LEAVE_NOTICE_ROOM_ID,
+          senderId: null,
+        }).catch((err) => {
+          console.warn('[leave-notice-cron] Failed to enqueue chat push job', err);
+        });
       } catch (err) {
         console.warn('[leave-notice-cron] chat_rooms last_message D1 sync failed', err);
       }
@@ -387,6 +395,13 @@ export async function announceLeaveApprovalIfNeeded(
         room_id: LEAVE_NOTICE_ROOM_ID,
         created_at: nowIso,
         content,
+      });
+      await enqueueChatPushJob({
+        messageId,
+        roomId: LEAVE_NOTICE_ROOM_ID,
+        senderId: null,
+      }).catch((err) => {
+        console.warn('[leave-notice-cron] Failed to enqueue chat push job', err);
       });
     } catch (err) {
       console.warn('[leave-notice-cron] chat_rooms last_message D1 sync failed', err);

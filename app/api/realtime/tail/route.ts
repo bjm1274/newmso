@@ -87,7 +87,7 @@ async function fetchMaxCreatedAtD1(
   const column = TABLE_TIMESTAMP_COLUMN[tableName] ?? 'created_at';
   try {
     const result = await d1
-      .prepare(`SELECT "${column}" AS ts FROM "${tableName}" ORDER BY "${column}" DESC LIMIT 1`)
+      .prepare(`SELECT "${column}" AS ts FROM "${tableName}" ORDER BY REPLACE("${column}", 'T', ' ') DESC LIMIT 1`)
       .first<{ ts: string | null }>();
     return result?.ts ?? null;
   } catch {

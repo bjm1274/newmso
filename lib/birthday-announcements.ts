@@ -10,6 +10,7 @@ import {
   eq,
   sql,
 } from '@/lib/db';
+import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
 
 type D1Db = ReturnType<typeof getD1Drizzle>;
 
@@ -140,6 +141,13 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
           room_id: NOTICE_ROOM_ID,
           created_at: nowIso,
           content,
+        });
+        await enqueueChatPushJob({
+          messageId,
+          roomId: NOTICE_ROOM_ID,
+          senderId: null,
+        }).catch((err) => {
+          console.warn('[birthday-announcements] Failed to enqueue chat push job', err);
         });
         postedToChat += 1;
       }

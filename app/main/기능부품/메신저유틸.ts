@@ -132,8 +132,10 @@ export function extractWardMessageMeta(value: unknown): {
 export function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
   const notice = rooms.find((room: ChatRoom) => room.id === NOTICE_ROOM_ID);
   const others = rooms.filter((room: ChatRoom) => room.id !== NOTICE_ROOM_ID).sort((a: ChatRoom, b: ChatRoom) => {
-    const at = new Date(a.last_message_at || a.created_at || 0).getTime();
-    const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+    const atStr = String(a.last_message_at || a.created_at || 0).replace(' ', 'T');
+    const btStr = String(b.last_message_at || b.created_at || 0).replace(' ', 'T');
+    const at = new Date(atStr).getTime();
+    const bt = new Date(btStr).getTime();
     return bt - at;
   });
   return notice ? [notice, ...others] : others;
@@ -597,8 +599,10 @@ export function sortRoomsForSidebar(
   const rest = rooms
     .filter((room: ChatRoom) => room.id !== NOTICE_ROOM_ID)
     .sort((a: ChatRoom, b: ChatRoom) => {
-      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
-      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      const atStr = String(a.last_message_at || a.created_at || 0).replace(' ', 'T');
+      const btStr = String(b.last_message_at || b.created_at || 0).replace(' ', 'T');
+      const at = new Date(atStr).getTime();
+      const bt = new Date(btStr).getTime();
       return bt - at;
     });
   const pinnedOrderIndex = new Map(
@@ -610,8 +614,10 @@ export function sortRoomsForSidebar(
       const aIndex = pinnedOrderIndex.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER;
       const bIndex = pinnedOrderIndex.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER;
       if (aIndex !== bIndex) return aIndex - bIndex;
-      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
-      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      const atStr = String(a.last_message_at || a.created_at || 0).replace(' ', 'T');
+      const btStr = String(b.last_message_at || b.created_at || 0).replace(' ', 'T');
+      const at = new Date(atStr).getTime();
+      const bt = new Date(btStr).getTime();
       return bt - at;
     });
   const regular = rest.filter((room: ChatRoom) => !prefs[room.id]?.pinned);
