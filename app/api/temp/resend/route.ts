@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getD1Binding, getD1Drizzle, messages, chat_push_jobs } from '@/lib/db';
-import { eq, like, and, gte } from 'drizzle-orm';
+import { eq, like, and, gte, desc } from 'drizzle-orm';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
 
 export const dynamic = 'force-dynamic';
@@ -11,16 +11,15 @@ export async function GET(request: Request) {
     if (!d1) return NextResponse.json({ error: 'No D1 binding' }, { status: 500 });
     const db = getD1Drizzle(d1);
     
-    const recentDate = '2026-06-14';
-
-    // 최근 발송된 생일 공지 메시지 조회
+    // 최근 5개의 생일 공지 메시지 조회 (오늘자 누락분 포함)
     const rows = await db.select({ id: messages.id }).from(messages)
       .where(and(
         eq(messages.room_id, '00000000-0000-0000-0000-000000000000'),
         eq(messages.sender_name, '공지봇'),
-        like(messages.content, '%생일%'),
-        gte(messages.created_at, recentDate)
-      ));
+        like(messages.content, '%생일%')
+      ))
+      .orderBy(desc(messages.created_at))
+      .limit(10);
 
     let enqueued = 0;
     const nowIso = new Date().toISOString();
@@ -38,7 +37,9 @@ export async function GET(request: Request) {
       enqueued++;
     }
 
+    // 처리 후 큐에 들어간 푸시 알림 즉시 발송
     let dispatchResult = await processPendingChatPushJobs(50);
+
     return NextResponse.json({ ok: true, enqueued, ids: rows.map(r => r.id), dispatchResult });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
