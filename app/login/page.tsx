@@ -104,9 +104,10 @@ export default function LoginPage() {
     >
       <div className="mx-auto w-full max-w-[360px]">
         {/* 헤더 */}
-        <div className="mb-7 text-center">
-          <h1 className="text-[22px] font-bold text-[var(--foreground)] tracking-tight">
-            SY INC. 통합 시스템
+        <div className="mb-7 flex flex-col items-center">
+          <img src="/aiierp-logo.png" alt="AIIERP" className="h-[48px] object-contain mb-3 drop-shadow-sm" />
+          <h1 className="text-[17px] font-bold text-[var(--toss-gray-4)] tracking-tight">
+            통합 시스템 로그인
           </h1>
         </div>
 

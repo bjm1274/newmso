@@ -100,7 +100,7 @@ function MainPageFallback() {
         <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full" />
         <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
       </div>
-      <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
+      <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AIIERP 통합 시스템</h2>
       <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
     </div>
   );
@@ -1192,7 +1192,7 @@ function MainPageContent() {
           <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full"></div>
           <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin"></div>
         </div>
-        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
+        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AIIERP 통합 시스템</h2>
         <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
       </div>
     );
