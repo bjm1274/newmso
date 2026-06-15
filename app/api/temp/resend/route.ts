@@ -11,16 +11,15 @@ export async function GET(request: Request) {
     if (!d1) return NextResponse.json({ error: 'No D1 binding' }, { status: 500 });
     const db = getD1Drizzle(d1);
     
-    // KST 기준으로 오늘 날짜 가져오기 (예: '2026-06-15')
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date());
+    const recentDate = '2026-06-14';
 
-    // 오늘 발송된 생일 공지 메시지 조회
+    // 최근 발송된 생일 공지 메시지 조회
     const rows = await db.select({ id: messages.id }).from(messages)
       .where(and(
         eq(messages.room_id, '00000000-0000-0000-0000-000000000000'),
         eq(messages.sender_name, '공지봇'),
         like(messages.content, '%생일%'),
-        gte(messages.created_at, today)
+        gte(messages.created_at, recentDate)
       ));
 
     let enqueued = 0;
