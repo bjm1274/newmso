@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getD1Binding, getD1Drizzle, messages, chat_push_jobs } from '@/lib/db';
 import { eq, like, and, gte, desc } from 'drizzle-orm';
 import { processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
+import { processBirthdayAnnouncements } from '@/lib/birthday-announcements';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,10 @@ export async function GET(request: Request) {
     if (!d1) return NextResponse.json({ error: 'No D1 binding' }, { status: 500 });
     const db = getD1Drizzle(d1);
     
-    // 최근 5개의 생일 공지 메시지 조회 (오늘자 누락분 포함)
+    // 1. 혹시 누락된 메시지가 있다면 생성 (이미 있다면 무시됨)
+    const runResult = await processBirthdayAnnouncements();
+
+    // 2. 가장 최근 생일 공지 10개 조회 (오늘 포함)
     const rows = await db.select({ id: messages.id }).from(messages)
       .where(and(
         eq(messages.room_id, '00000000-0000-0000-0000-000000000000'),
@@ -24,6 +28,7 @@ export async function GET(request: Request) {
     let enqueued = 0;
     const nowIso = new Date().toISOString();
 
+    // 3. 무조건 다시 푸시 큐에 넣거나, 이미 있으면 attempt_count 0으로 리셋
     for (const row of rows) {
       await db.insert(chat_push_jobs).values({
         id: crypto.randomUUID(),
@@ -33,14 +38,21 @@ export async function GET(request: Request) {
         created_at: nowIso,
         next_attempt_at: nowIso,
         attempt_count: 0
-      }).onConflictDoNothing({ target: chat_push_jobs.message_id });
+      }).onConflictDoUpdate({
+        target: chat_push_jobs.message_id,
+        set: {
+          next_attempt_at: nowIso,
+          attempt_count: 0,
+          dead_lettered_at: null
+        }
+      });
       enqueued++;
     }
 
-    // 처리 후 큐에 들어간 푸시 알림 즉시 발송
+    // 4. 대기중인 푸시 큐 즉시 발송 처리
     let dispatchResult = await processPendingChatPushJobs(50);
 
-    return NextResponse.json({ ok: true, enqueued, ids: rows.map(r => r.id), dispatchResult });
+    return NextResponse.json({ ok: true, runResult, enqueued, ids: rows.map(r => r.id), dispatchResult });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
