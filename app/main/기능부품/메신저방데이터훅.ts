@@ -165,14 +165,6 @@ export function useChatRoomDataSync({
                 next[roomId] = 0;
               }
             }
-            if (
-              !openConversationRoomIds.has(roomId) &&
-              roomId !== activeRoomId &&
-              next[roomId] !== undefined &&
-              (prev[roomId] || 0) > (next[roomId] || 0)
-            ) {
-              next[roomId] = prev[roomId];
-            }
           });
           return next;
         });
@@ -185,12 +177,29 @@ export function useChatRoomDataSync({
 
   const applyChatRoomsState = useCallback(
     async (rooms: ChatRoom[]) => {
-      const nextRooms = sortChatRoomsWithNoticeFirst(rooms || []);
+      const prev = chatRoomsRef.current || [];
+      const mergedRooms = (rooms || []).map(dbRoom => {
+        const localRoom = prev.find((p: ChatRoom) => p.id === dbRoom.id);
+        if (localRoom && localRoom.last_message_at && dbRoom.last_message_at) {
+          const localTime = new Date(localRoom.last_message_at).getTime();
+          const dbTime = new Date(dbRoom.last_message_at).getTime();
+          if (localTime > dbTime) {
+            return {
+              ...dbRoom,
+              last_message: localRoom.last_message,
+              last_message_preview: localRoom.last_message_preview,
+              last_message_at: localRoom.last_message_at,
+            };
+          }
+        }
+        return dbRoom;
+      });
+      const nextRooms = sortChatRoomsWithNoticeFirst(mergedRooms);
       setChatRooms(nextRooms);
       await updateUnreadForRooms(nextRooms);
       return nextRooms;
     },
-    [setChatRooms, updateUnreadForRooms],
+    [chatRoomsRef, setChatRooms, updateUnreadForRooms],
   );
 
   const syncChatRoomsState = useCallback(
