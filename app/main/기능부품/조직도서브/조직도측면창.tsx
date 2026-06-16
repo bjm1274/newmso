@@ -968,10 +968,10 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
           <button
             type="button"
             onClick={() => handleMenuClick('내정보')}
-            className="app-shell-logo mb-5 flex h-11 w-11 items-center justify-center transition-transform active:scale-95"
+            className="mb-5 flex h-12 w-12 items-center justify-center transition-transform active:scale-95"
             aria-label="내정보"
           >
-            <img src="/aiierp-logo.png" alt="AllERP" className="w-8 h-8 object-contain" />
+            <img src="/aiierp-logo.png" alt="AllERP" className="w-full h-full object-contain" style={{ mixBlendMode: 'multiply' }} />
           </button>
           {shouldRenderDesktopNotificationCenter && (
               <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />

@@ -932,7 +932,7 @@ export default function NotificationSystem({
   // 탭 타이틀 배지
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const base = document.title.replace(/^\(\d+\)\s*/, '') || 'SY INC. ERP';
+    const base = document.title.replace(/^\(\d+\)\s*/, '') || 'AllERP';
     document.title = unreadCount > 0 ? `(${unreadCount}) ${base}` : base;
   }, [unreadCount]);
 

@@ -84,7 +84,8 @@ export async function processBirthdayAnnouncements(now = new Date()): Promise<Bi
   let addedToWelfare = 0;
   let postedToChat = 0;
   const errors: string[] = [];
-  const nowIso = now.toISOString();
+  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함
+  const nowIso = `${kstDateStr}T00:00:00.000Z`;
 
   for (const staff of birthdayStaffs) {
     const welfareId = buildDeterministicId('welfare', staff.id, yearStr);

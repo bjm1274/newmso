@@ -105,10 +105,7 @@ export default function LoginPage() {
       <div className="mx-auto w-full max-w-[360px]">
         {/* 헤더 */}
         <div className="mb-7 flex flex-col items-center">
-          <img src="/aiierp-logo.png" alt="AllERP" className="h-[48px] object-contain mb-3 drop-shadow-sm" />
-          <h1 className="text-[17px] font-bold text-[var(--toss-gray-4)] tracking-tight">
-            통합 시스템 로그인
-          </h1>
+          <img src="/aiierp-logo.png" alt="AllERP" className="h-[144px] object-contain mb-3 drop-shadow-sm" style={{ mixBlendMode: 'multiply' }} />
         </div>
 
         {/* 로그인 카드 */}
@@ -168,7 +165,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-8 text-center text-[10px] text-[var(--toss-gray-3)] leading-relaxed">
-          © 2026 SY INC. 본 시스템은 인가된 사용자만 접근 가능합니다.
+          © 2026 AllERP. 본 시스템은 인가된 사용자만 접근 가능합니다.
         </p>
       </div>
     </div>

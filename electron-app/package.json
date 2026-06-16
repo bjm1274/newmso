@@ -1,7 +1,7 @@
 {
   "name": "allerp",
   "version": "1.0.0",
-  "description": "AllERP PC Client",
+  "description": "AIIERP PC Client",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,7 +9,7 @@
   },
   "build": {
     "appId": "com.pchos.allerp",
-    "productName": "AllERP",
+    "productName": "AIIERP",
     "win": {
       "target": "nsis",
       "icon": "icon.png"
@@ -18,7 +18,7 @@
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "AllERP"
+      "shortcutName": "AIIERP"
     }
   },
   "author": "SY INC",
