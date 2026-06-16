@@ -22,6 +22,8 @@ export const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'generic', name: '증명서발급' },
   { slug: 'attendance_fix', name: '출결정정' },
   { slug: 'resignation', name: '사직서' },
+  { slug: 'severance_extension_agreement', name: '금품청산 지급기일 연장 동의서' },
+  { slug: 'retirement_pledge', name: '퇴직 서약서' },
   { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
   { slug: 'probation_evaluation', name: '수습직원평가서' },
   { slug: 'salary_increase_evaluation', name: '급여인상평가서' },

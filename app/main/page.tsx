@@ -100,7 +100,7 @@ function MainPageFallback() {
         <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full" />
         <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
       </div>
-      <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AIIERP 통합 시스템</h2>
+      <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AllERP</h2>
       <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
     </div>
   );
@@ -164,6 +164,8 @@ function MainPageContent() {
       openApprovalId: searchParams.get('open_approval_id')?.trim() || null,
       openInventoryView: searchParams.get('open_inventory_view')?.trim() || null,
       openInventoryApproval: searchParams.get('open_inventory_approval')?.trim() || null,
+      openFormType: searchParams.get('open_form_type')?.trim() || null,
+      openTargetStaffId: searchParams.get('open_target_staff_id')?.trim() || null,
       shareId: searchParams.get('share_id')?.trim() || null,
       shareFileCount: Number(searchParams.get('share_file_count') || '0'),
       shareText: searchParams.get('share_text')?.trim() || null,
@@ -729,8 +731,10 @@ function MainPageContent() {
     const openApprovalId = navigationIntent.openApprovalId;
     const openInventoryView = navigationIntent.openInventoryView;
     const openInventoryApproval = navigationIntent.openInventoryApproval;
+    const openFormType = navigationIntent.openFormType;
+    const openTargetStaffId = navigationIntent.openTargetStaffId;
     if (!user) return;
-    if (targetMenu || targetSubView || openMyPageTab || openPost || openApprovalId || openInventoryView || openInventoryApproval) {
+    if (targetMenu || targetSubView || openMyPageTab || openPost || openApprovalId || openInventoryView || openInventoryApproval || openFormType) {
       const savedSubView = getSavedSubViewForMenu(targetMenu);
       const resolvedNavigation = targetMenu
         ? resolveLegacyNavigation(targetMenu, targetSubView ?? savedSubView, user)
@@ -742,7 +746,14 @@ function MainPageContent() {
 
       if (resolvedMenu) setMainMenu(resolvedMenu);
       if (resolvedSubView) setSubView(resolvedSubView);
-      if (isLegacyOfficialDocumentAdminTarget(targetMenu, targetSubView ?? savedSubView)) {
+
+      if (openFormType) {
+        setInitialApprovalIntent({
+          viewMode: '작성하기',
+          formType: openFormType,
+          extraData: openTargetStaffId ? { targetStaffId: openTargetStaffId } : undefined,
+        });
+      } else if (isLegacyOfficialDocumentAdminTarget(targetMenu, targetSubView ?? savedSubView)) {
         setInitialApprovalIntent({
           viewMode: '작성하기',
           formType: '공문발송',
@@ -1192,7 +1203,7 @@ function MainPageContent() {
           <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full"></div>
           <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin"></div>
         </div>
-        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AIIERP 통합 시스템</h2>
+        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">AllERP</h2>
         <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
       </div>
     );

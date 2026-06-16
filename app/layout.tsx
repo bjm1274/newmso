@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AIIERP 통합 관리 시스템",
+  title: "AllERP",
   description: "병원 경영 통합 관리 시스템",
   manifest: "/manifest.json",
   appleWebApp: {

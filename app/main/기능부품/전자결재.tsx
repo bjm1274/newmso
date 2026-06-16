@@ -884,14 +884,19 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         : viewMode === '참조 문서함'
           ? referenceBaseList
           : approvalBaseList;
-    return Array.from(
-      new Set(
-        source
-          .map((item) => String(item?.type || '').trim())
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, 'ko-KR'));
-  }, [approvalBaseList, draftBaseList, referenceBaseList, viewMode]);
+
+    const availableForms = new Set([
+      ...BUILTIN_FORM_TYPES,
+      ...customFormTypes.map((f) => f.name || f.slug),
+    ]);
+
+    source.forEach((item) => {
+      const type = String(item?.type || '').trim();
+      if (type) availableForms.add(type);
+    });
+
+    return Array.from(availableForms).sort((a, b) => a.localeCompare(b, 'ko-KR'));
+  }, [approvalBaseList, draftBaseList, referenceBaseList, viewMode, BUILTIN_FORM_TYPES, customFormTypes]);
 
   const buildApprovalSearchText = useCallback((item: Record<string, unknown>) => {
     const metaData = item.meta_data as Record<string, unknown> | null | undefined;

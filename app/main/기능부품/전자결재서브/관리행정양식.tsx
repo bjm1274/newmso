@@ -9,6 +9,7 @@ import SmartDatePicker from '../공통/SmartDatePicker';
  * @param setExtraData - 상위 Approval 컴포넌트로 데이터를 전달하는 함수
  */
 type AdminFormsProps = {
+  extraData?: Record<string, unknown>;
   user?: any;
   staffs: { id: string; name: string; position: string; department?: string; departments?: { name: string }; photo_url?: string | null; avatar_url?: string | null; profile_photo_url?: string | null }[];
   formType: string;
@@ -20,13 +21,31 @@ type AdminFormsProps = {
   submitDisabled?: boolean;
 };
 
-export default function AdminForms({ user, staffs, formType, setExtraData, setFormTitle, setFormContent, formContent, submitApproval, submitDisabled }: AdminFormsProps) {
+export default function AdminForms({ user, staffs, formType, extraData, setExtraData, setFormTitle, setFormContent, formContent, submitApproval, submitDisabled }: AdminFormsProps) {
   const [localExecutionDate, setLocalExecutionDate] = useState('');
   const [resignDate, setResignDate] = useState('');
   const [handoverTarget, setHandoverTarget] = useState('');
   const [resignReason, setResignReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+
+  const targetStaffId = extraData?.targetStaffId as string | undefined;
+  const targetStaff = staffs.find(s => s.id === targetStaffId);
+  const formUser = targetStaff || user;
+
+  // 금품청산 지급기일 연장 동의서
+  const [employeeRegNumber, setEmployeeRegNumber] = useState('');
+  const [employeeAddress, setEmployeeAddress] = useState('');
+  const [employeeContact, setEmployeeContact] = useState('');
+  const [employeeResignDate, setEmployeeResignDate] = useState('');
+  const [wagePaymentDate, setWagePaymentDate] = useState('');
+  const [severancePaymentDate, setSeverancePaymentDate] = useState('');
+  const [otherPaymentDate, setOtherPaymentDate] = useState('');
+
+  // 퇴직 서약서
+  const [pledgeResignDate, setPledgeResignDate] = useState('');
+  const [pledgePeriod, setPledgePeriod] = useState('');
+
 
   useEffect(() => {
     if (formType !== '사직서') return;
@@ -41,13 +60,13 @@ export default function AdminForms({ user, staffs, formType, setExtraData, setFo
     }));
 
     if (setFormTitle) {
-      setFormTitle(`사직서 (${user?.name || ''})`);
+      setFormTitle(`사직서 (${formUser?.name || ''})`);
     }
 
     if (setFormContent) {
-      const name = user?.name || '';
-      const dept = user?.department || user?.departments?.name || '';
-      const pos = user?.position || '';
+      const name = formUser?.name || '';
+      const dept = formUser?.department || formUser?.departments?.name || '';
+      const pos = formUser?.position || '';
       const dateStr = resignDate ? `${resignDate}부` : '[사직예정일]부';
       const reasonStr = finalReason ? `(${finalReason})` : '';
 
@@ -67,6 +86,93 @@ ${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 
       setFormContent(letter);
     }
   }, [formType, resignDate, handoverTarget, resignReason, customReason, user, setExtraData, setFormTitle, setFormContent]);
+
+
+  if (formType === '금품청산 지급기일 연장 동의서') {
+    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentYear = new Date().getFullYear();
+
+    return (
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
+        <div className="p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start border-b border-[var(--border)] pb-5 gap-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl md:text-3xl font-black text-[var(--foreground)] tracking-tight">금품청산 지급기일 연장 동의서</h2>
+              <div className="text-[12px] font-bold text-[var(--muted-foreground)] space-y-1">
+                <p>문서번호 : SE-{currentYear}-1101</p>
+                <p>기안일자 : {todayStr}</p>
+                <p>대상자 : {formUser?.name || ''} {formUser?.position || ''}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">주민등록번호</label>
+              <input type="text" value={employeeRegNumber} onChange={e => setEmployeeRegNumber(e.target.value)} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all" placeholder="000000-0000000" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">주소</label>
+              <input type="text" value={employeeAddress} onChange={e => setEmployeeAddress(e.target.value)} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all" placeholder="주소를 입력하세요" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">연락처</label>
+              <input type="text" value={employeeContact} onChange={e => setEmployeeContact(e.target.value)} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all" placeholder="010-0000-0000" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">퇴사일</label>
+              <SmartDatePicker value={employeeResignDate} onChange={setEmployeeResignDate} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">임금 지급기일</label>
+              <SmartDatePicker value={wagePaymentDate} onChange={setWagePaymentDate} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">퇴직금 지급기일</label>
+              <SmartDatePicker value={severancePaymentDate} onChange={setSeverancePaymentDate} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">기타 지급기일</label>
+              <SmartDatePicker value={otherPaymentDate} onChange={setOtherPaymentDate} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (formType === '퇴직 서약서') {
+    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentYear = new Date().getFullYear();
+
+    return (
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
+        <div className="p-6 md:p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start border-b border-[var(--border)] pb-5 gap-4">
+            <div className="space-y-2">
+              <h2 className="text-2xl md:text-3xl font-black text-[var(--foreground)] tracking-tight">퇴직 서약서</h2>
+              <div className="text-[12px] font-bold text-[var(--muted-foreground)] space-y-1">
+                <p>문서번호 : RP-{currentYear}-1101</p>
+                <p>기안일자 : {todayStr}</p>
+                <p>서약자 : {formUser?.name || ''} {formUser?.position || ''}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">사직 예정일</label>
+              <SmartDatePicker value={pledgeResignDate} onChange={setPledgeResignDate} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)]" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[var(--foreground)] block">근로기간</label>
+              <input type="text" value={pledgePeriod} onChange={e => setPledgePeriod(e.target.value)} className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs border border-[var(--border)] outline-none focus:ring-2 focus:ring-[var(--accent)] transition-all" placeholder="YYYY.MM.DD ~ YYYY.MM.DD" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 사직서 양식 전용 렌더링 분기
   if (formType === '사직서') {

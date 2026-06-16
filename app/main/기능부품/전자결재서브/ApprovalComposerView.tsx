@@ -170,9 +170,9 @@ export default function ApprovalComposerView({
   const activeFormLabel = currentOption?.label || formType;
   const currentSelectValue = currentOption?.tab ?? '';
 
-  // '증명서발급' 및 '사직서' 양식은 자체 양식 컴포넌트가 본문을 대체하므로 일반 문서 본문/이전 기안 노출 제외
-  const selectedDraft = !['증명서발급', '사직서'].includes(formType) ? lastDraftByType[formType] : null;
-  const showDocumentBody = !['증명서발급', '사직서'].includes(formType);
+  // '증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서' 양식은 자체 양식 컴포넌트가 본문을 대체하므로 일반 문서 본문/이전 기안 노출 제외
+  const selectedDraft = !['증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서'].includes(formType) ? lastDraftByType[formType] : null;
+  const showDocumentBody = !['증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서'].includes(formType);
   const isOfficialDispatch = formType === '공문발송';
   const isEditingApproval = Boolean(editingApproval?.id);
   const contentReady = !showDocumentBody || isOfficialDispatch || Boolean(formTitle.trim());
@@ -398,6 +398,7 @@ export default function ApprovalComposerView({
                 user={user}
                 staffs={staffs as any}
                 formType={formType}
+                extraData={extraData}
                 setExtraData={setExtraData}
                 setFormTitle={setFormTitle}
                 setFormContent={setFormContent}

@@ -10,6 +10,7 @@ import {
   getAttendanceStatusMeta,
   isWeekendDate,
   isWorkedAttendanceStatus,
+  isOffShiftForDate,
   resolveAttendanceStatusWithLeave,
   resolveLeaveStatusForDate,
   type ApprovedLeaveRow,
@@ -34,6 +35,8 @@ type CalendarSummary = {
   totalRecords: number;
 };
 
+type ShiftLookupEntry = { id?: string | null; name?: string | null; start_time?: string | null; end_time?: string | null; shift_type?: string | null; description?: string | null };
+
 type AttendanceCalendarViewProps = {
   filtered: StaffMember[];
   attendanceMap: Map<string, any>;
@@ -49,6 +52,8 @@ type AttendanceCalendarViewProps = {
   syncSelectedDate: (dateStr: string) => void;
   daysArray: number[];
   weekDates: string[];
+  shiftAssignments: Record<string, string | null | undefined>;
+  shiftLookup: Map<string, ShiftLookupEntry>;
 };
 
 export default function AttendanceCalendarView({
@@ -66,6 +71,8 @@ export default function AttendanceCalendarView({
   syncSelectedDate,
   daysArray,
   weekDates,
+  shiftAssignments,
+  shiftLookup,
 }: AttendanceCalendarViewProps) {
   const dayPanelColumns = useMemo((): Column<StaffMember>[] => [
     {
@@ -88,7 +95,11 @@ export default function AttendanceCalendarView({
         const att = attendanceMap.get(buildAttendanceKey(s.id, selectedDate));
         // 버그 B 수정: 승인 연차 반영
         const leaveStatus = resolveLeaveStatusForDate(s.id, selectedDate, approvedLeaves);
-        const status = resolveAttendanceStatusWithLeave(att, leaveStatus, isWeekendDate(selectedDate));
+        let status = resolveAttendanceStatusWithLeave(att, leaveStatus, isWeekendDate(selectedDate));
+        // 스케줄표 OFF 반영: 출퇴근/연차 기록이 없고 스케줄이 OFF이면 off 표시
+        if (!status && isOffShiftForDate(s.id, selectedDate, shiftAssignments, shiftLookup)) {
+          status = 'off';
+        }
         const meta = getAttendanceStatusMeta(status || 'missing');
         return (
           <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${meta.color} ${meta.bg} ${meta.ring}`}>
@@ -120,7 +131,7 @@ export default function AttendanceCalendarView({
         );
       },
     },
-  ], [attendanceMap, selectedDate, approvedLeaves]);
+  ], [attendanceMap, selectedDate, approvedLeaves, shiftAssignments, shiftLookup]);
 
   // 일별 출퇴근 현황 정렬 상태: 기본 부서→직급→이름, 토글로 이름·상태·출근시각 정렬 가능
   type DayPanelSortKey = 'default' | 'name' | 'status' | 'checkIn';
@@ -323,7 +334,11 @@ export default function AttendanceCalendarView({
                     const att = attendanceMap.get(buildAttendanceKey(s.id, column.dateStr));
                     // 버그 B 수정: 승인 연차 반영
                     const leaveStatus = resolveLeaveStatusForDate(s.id, column.dateStr, approvedLeaves);
-                    const status = resolveAttendanceStatusWithLeave(att, leaveStatus, column.isWeekend);
+                    let status = resolveAttendanceStatusWithLeave(att, leaveStatus, column.isWeekend);
+                    // 스케줄표 OFF 반영
+                    if (!status && isOffShiftForDate(s.id, column.dateStr, shiftAssignments, shiftLookup)) {
+                      status = 'off';
+                    }
                     const meta = getAttendanceStatusMeta(status || 'missing');
                     if (isWorkedAttendanceStatus(status)) workDays += 1;
                     return (

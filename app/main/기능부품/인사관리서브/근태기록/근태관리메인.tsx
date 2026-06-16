@@ -103,7 +103,10 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   // 일괄 수정 모달 내부 상태는 AttendanceBulkEditModal에서 자체 관리한다.
 
   const filtered = useMemo(
-    () => selectedCo === '전체' ? staffs : staffs.filter((s: StaffMember) => s.company === selectedCo),
+    () => {
+      const byCompany = selectedCo === '전체' ? staffs : staffs.filter((s: StaffMember) => s.company === selectedCo);
+      return byCompany.filter((s: StaffMember) => isActiveStaff(s));
+    },
     [selectedCo, staffs]
   );
 
@@ -1096,6 +1099,8 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             syncSelectedDate={syncSelectedDate}
             daysArray={daysArray}
             weekDates={weekDates}
+            shiftAssignments={shiftAssignments}
+            shiftLookup={shiftLookup}
           />
         )}
       </main>

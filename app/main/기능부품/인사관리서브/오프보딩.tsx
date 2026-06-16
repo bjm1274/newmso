@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import { useRouter } from 'next/navigation';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
@@ -145,6 +146,7 @@ export default function OffboardingView({
   selectedCo = '전체',
   onRefresh,
 }: Props) {
+  const router = useRouter();
   const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [selectedStaff, setSelectedStaff] = useState('');
@@ -886,6 +888,23 @@ export default function OffboardingView({
                         </div>
                       </div>
                     )}
+
+                    <div className="mb-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/main?open_menu=전자결재&open_subview=작성하기&open_form_type=severance_extension_agreement&open_target_staff_id=${staffId}`)}
+                        className="flex-1 rounded-xl bg-[var(--accent)]/10 px-3 py-2 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
+                      >
+                        📄 금품청산 연장 동의서
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/main?open_menu=전자결재&open_subview=작성하기&open_form_type=retirement_pledge&open_target_staff_id=${staffId}`)}
+                        className="flex-1 rounded-xl bg-[var(--accent)]/10 px-3 py-2 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors"
+                      >
+                        📄 퇴직 서약서
+                      </button>
+                    </div>
 
                     <div className="mb-4 space-y-2">
                       {checklistItems.map((item) => (

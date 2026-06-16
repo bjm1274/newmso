@@ -971,7 +971,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
             className="app-shell-logo mb-5 flex h-11 w-11 items-center justify-center transition-transform active:scale-95"
             aria-label="내정보"
           >
-            <img src="/aiierp-logo.png" alt="AIIERP" className="w-8 h-8 object-contain" />
+            <img src="/aiierp-logo.png" alt="AllERP" className="w-8 h-8 object-contain" />
           </button>
           {shouldRenderDesktopNotificationCenter && (
               <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
