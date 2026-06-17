@@ -8,7 +8,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    icon: path.join(__dirname, 'icon.png'),
+    icon: path.join(__dirname, 'app-icon2.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -62,7 +62,7 @@ if (!gotTheLock) {
     createWindow();
 
     // 트레이 아이콘 설정
-    tray = new Tray(path.join(__dirname, 'icon.png'));
+    tray = new Tray(path.join(__dirname, 'app-icon2.png'));
     const contextMenu = Menu.buildFromTemplate([
       { label: 'AllERP 열기', click: () => { if (mainWindow) mainWindow.show(); } },
       { type: 'separator' },

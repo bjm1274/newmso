@@ -143,3 +143,7 @@ scripts/backfill-d1/.backfill-progress.json
 
 # 완료된 디자인 스크래치(이모티콘 프로토타입) — 인용 0, live는 public/emoticon/ (4차 전수조사 scratch-handoff)
 /scratch_zip/
+
+# Electron packaged app output (regenerable build artifact — do not commit)
+electron-app/AllERP-Windows-Updated/
+electron-app/*-Windows-*/

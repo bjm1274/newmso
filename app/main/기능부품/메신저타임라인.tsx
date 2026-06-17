@@ -14,6 +14,7 @@ import {
   resolveAttachmentKind,
   type AttachmentPreviewKind,
 } from './메신저첨부';
+import { renderWithInlineEmoticons } from './메신저메시지렌더';
 import { MessengerAvatar } from './메신저공통';
 import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS, toChatDate } from './메신저유틸';
 import type { ThreadSummary } from './메신저파생훅';
@@ -779,11 +780,15 @@ function MessengerTimelineComponent({
                                 >
                                   <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
                                   <span className="truncate block mt-0.5">
-                                    {getMessageDisplayText(
-                                      parent.content,
-                                      parent.file_name,
-                                      parent.file_url,
-                                      '첨부 파일'
+                                    {renderWithInlineEmoticons(
+                                      getMessageDisplayText(
+                                        parent.content,
+                                        parent.file_name,
+                                        parent.file_url,
+                                        '첨부 파일'
+                                      ),
+                                      false,
+                                      ''
                                     )}
                                   </span>
                                 </div>

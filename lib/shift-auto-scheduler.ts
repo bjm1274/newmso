@@ -41,14 +41,8 @@ export function generateAutoSchedule(params: AutoScheduleParams): ScheduleMap {
       } else {
         // 전날이 Night면 오늘은 무조건 OFF (또는 이미 휴가면 위에서 걸러짐)
         const prev1 = d > 1 ? newSchedule[sid][d - 1] : 'OFF';
-        const prev2 = d > 2 ? newSchedule[sid][d - 2] : 'OFF';
-        const prev3 = d > 3 ? newSchedule[sid][d - 3] : 'OFF';
         
         if (prev1 === 'N') {
-          newSchedule[sid][d] = 'OFF';
-          currentCounts['OFF']++;
-        } else if (prev1 === 'N' && prev2 === 'N' && prev3 === 'N') {
-          // 최대 연속 나이트는 3일까지만 허용 (방어 코드)
           newSchedule[sid][d] = 'OFF';
           currentCounts['OFF']++;
         } else {

@@ -38,7 +38,6 @@ export default function ContractBodyBlock({ templateText }: Props) {
     }
 
     return (
-    return (
         <>
             {matches.map((sec, si) => {
                 const start = sec.index + sec.full.length;

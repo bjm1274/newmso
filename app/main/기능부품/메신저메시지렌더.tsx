@@ -176,7 +176,7 @@ const HAS_EMOTICON_TOKEN = /\[(?:emo|stat):[a-z0-9-]+\]/;
 // 토큰을 순회 추출하는 전역 패턴(사용 직전 lastIndex 리셋).
 const INLINE_EMOTICON_TOKEN = /\[(emo|stat):([a-z0-9-]+)\]/g;
 
-function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQuery: string, onOpenBoardPost?: (boardId: string, postId: string) => void): ReactNode {
+export function renderWithInlineEmoticons(content: string, isMine: boolean, highlightQuery: string, onOpenBoardPost?: (boardId: string, postId: string) => void): ReactNode {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let part = 0;

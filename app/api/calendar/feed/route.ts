@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       const now = new Date();
       const dtStamp = formatICSDate(now);
 
-      schedules.forEach(sched => {
+      schedules.forEach((sched: { year_month: string | null; day: number | null; shift_code: string | null }) => {
         if (!sched.year_month || !sched.day || !sched.shift_code) return;
         
         // Skip OFF, LEAVE, TRAINING for now, or add them as all-day events

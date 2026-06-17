@@ -48,9 +48,6 @@ export default function SharedCalendar() {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
   };
 
-  // Dummy rows for CalendarTable (month-grid needs at least one row, we can just pass a dummy one)
-  const rows = [{ id: 'all' }];
-
   const copySyncUrl = () => {
     // 실제 환경에서는 현재 로그인한 직원의 ID를 사용 (예시로 user.id 대신 'test-user-id')
     const staffId = 'test-user-id'; // To do: use context to get actual user ID
@@ -90,9 +87,8 @@ export default function SharedCalendar() {
             mode="month-grid"
             startDate={startDate}
             endDate={endDate}
-            rows={rows}
-            renderCell={(row, cellInfo) => {
-              const dayNum = cellInfo.date.getDate();
+            renderCell={(cell) => {
+              const dayNum = cell.date.getDate();
               // Find shifts for this day
               const dayShifts = events.filter(e => e.day === dayNum);
               
