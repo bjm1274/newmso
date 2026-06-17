@@ -307,10 +307,10 @@ window.onload = () => window.print();
 </head>
 <body>
   <main class="sheet" aria-label="${title}">
-    <img class="watermark" src="/logo.png" alt="" aria-hidden="true" />
+    <img class="watermark" src="/sy-logo.png" alt="" aria-hidden="true" />
     <div class="stack">
       <header class="header">
-        <div class="logo-box"><img src="/logo.png" alt="" /></div>
+        <div class="logo-box"><img src="/sy-logo.png" alt="" /></div>
         <h1 class="doc-title">${title}</h1>
       </header>
       <div class="accent-bar" aria-hidden="true"></div>

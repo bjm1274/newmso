@@ -1,6 +1,6 @@
 import type { TemplateDesign, TemplateOption } from './types';
 
-export const DEFAULT_LOGO_URL = '/logo.png';
+export const DEFAULT_LOGO_URL = '/sy-logo.png';
 
 export const DEFAULT_DESIGN: TemplateDesign = {
   title: '전자결재 양식',

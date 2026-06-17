@@ -150,7 +150,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
   const primaryColor = design.primaryColor;
   const borderColor = design.borderColor;
   const surface = alphaColor(primaryColor, 0.08);
-  const watermarkSrc = seals[companyName] || '/logo.png';
+  const watermarkSrc = seals[companyName] || '/sy-logo.png';
   const profilePhotoUrl = getProfilePhotoUrl(selectedStaff) || undefined;
   const joinedAt = selectedStaff?.joined_at || selectedStaff?.join_date;
   const totalPay = Number(selectedStaff?.base_salary || selectedStaff?.base || 0) + Number(selectedStaff?.meal_allowance || selectedStaff?.meal || 0);
@@ -328,7 +328,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               className="flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
               style={{ border: `1px solid ${borderColor}` }}
             >
-              <img src="/logo.png" alt="" className="h-11 w-11 object-contain" />
+              <img src="/sy-logo.png" alt="" className="h-11 w-11 object-contain" />
             </div>
             <div className="min-w-0 flex-1 pt-1">
               <h3 className="mt-1 text-[34px] font-black tracking-[-0.04em] text-[var(--foreground)]">{certificateTitle}</h3>
@@ -590,7 +590,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               >
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--card)]/95 shadow-sm">
-                    <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
+                    <img src="/sy-logo.png" alt="" className="h-12 w-12 object-contain" />
                   </div>
                   <div>
                     <p className="text-[11px] font-black tracking-[0.18em] opacity-80">{companyLabel}</p>

@@ -48,7 +48,7 @@ export const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
   footerText: '전자결재 승인 문서입니다.',
   showSignArea: true,
   showBackgroundLogo: true,
-  backgroundLogoUrl: '/logo.png',
+  backgroundLogoUrl: '/sy-logo.png',
   backgroundLogoOpacity: 0.055,
   showSeal: true,
   sealLabel: 'SY INC. 직인',
