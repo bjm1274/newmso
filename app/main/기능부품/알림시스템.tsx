@@ -736,7 +736,6 @@ export function sendNotification(title: string, options?: NotificationOptions) {
     navigator.serviceWorker.ready
       .then((reg) =>
         reg.showNotification(title, {
-          icon: '/aiierp-logo.png',
           badge: '/badge-72x72.png',
           tag: 'erp-noti',
           requireInteraction: false,

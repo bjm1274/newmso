@@ -1,5 +1,5 @@
 const ERP_PUSH_BADGE_URL = '/badge-72x72.png';
-const ERP_PUSH_ICON_URL = '/sy-logo.png';
+
 const ERP_PUSH_RETRY_DB_NAME = 'erp-push-retry-v1';
 const ERP_PUSH_RETRY_STORE = 'requests';
 const erpRecentlyShownNotifications = new Map();
@@ -455,7 +455,6 @@ function erpBuildNotificationOptions(payload) {
 
   return {
     body: payload.body,
-    icon: ERP_PUSH_ICON_URL,
     badge: ERP_PUSH_BADGE_URL,
     tag: payload.tag,
     requireInteraction: true,
@@ -759,7 +758,6 @@ async function erpHandleNotificationClick(event) {
         // 새 알림을 업데이트해서 답장 완료 표시
         await self.registration.showNotification('답장을 보냈습니다', {
           body: replyText,
-          icon: ERP_PUSH_ICON_URL,
           badge: ERP_PUSH_BADGE_URL,
           tag: `${erpNormalizeString(data.tag || data.room_id)}-reply-sent`,
           data: { room_id: roomId },
