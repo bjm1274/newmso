@@ -16,7 +16,7 @@
     "productName": "AllERP",
     "win": {
       "target": "nsis",
-      "icon": "app-icon2.png"
+      "icon": "icon-new.png"
     },
     "nsis": {
       "oneClick": false,
