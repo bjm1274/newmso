@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const MANIFEST_BASE = {
   name: 'AllERP',
-  short_name: 'MSO',
+  short_name: 'AllERP',
   description: '병원 경영 통합 관리 시스템',
   id: '/',
   start_url: '/',
