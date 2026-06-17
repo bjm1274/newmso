@@ -171,6 +171,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           table: 'attendance',
           payload: { staff_id: staffId, date: today, check_in: nowIso, status: checkInStatus },
           onConflict: 'staff_id,date',
+          // 멱등: (직원,날짜) 행이 이미 있으면 DO NOTHING — 오프라인 큐의 stale 출근 재생이나
+          // 중복 출근이 기존 check_out 을 지우거나 출근시각을 과거로 덮어쓰는 것을 방지.
+          ignoreDuplicates: true,
         });
         if (error) throw new Error(error);
         if (queued) {
