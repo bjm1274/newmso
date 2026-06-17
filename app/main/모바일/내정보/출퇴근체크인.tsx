@@ -90,7 +90,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
         const { data: todayData } = await supabase
           .from('attendance')
-          .select('id, date, check_in, check_out, status')
+          .select('id, staff_id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
           .eq('date', today)
           .order('created_at', { ascending: false })
@@ -102,7 +102,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         if (!activeLog?.check_in) {
           const { data: staleData } = await supabase
             .from('attendance')
-            .select('id, date, check_in, check_out, status')
+            .select('id, staff_id, date, check_in, check_out, status')
             .eq('staff_id', staffId)
             .not('check_in', 'is', null)
             .is('check_out', null)

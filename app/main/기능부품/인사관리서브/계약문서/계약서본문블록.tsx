@@ -38,12 +38,56 @@ export default function ContractBodyBlock({ templateText }: Props) {
     }
 
     return (
+    return (
         <>
             {matches.map((sec, si) => {
                 const start = sec.index + sec.full.length;
                 const end = si + 1 < matches.length ? matches[si + 1].index : raw.length;
                 const body = raw.slice(start, end).replace(/─+/g, '').trim();
                 const lines = body.split('\n').filter((l) => l.trim());
+
+                // 시업시각, 종업시각, 휴게시간 라인들을 파싱해서 하나의 시각적 블록으로 통합하기 위한 전처리
+                type ProcessedLine =
+                    | { type: 'text'; text: string }
+                    | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string };
+
+                const processedLines: ProcessedLine[] = [];
+                let i = 0;
+                while (i < lines.length) {
+                    const t = lines[i].trim();
+                    if (t.startsWith('시업시각:')) {
+                        let startLine = t;
+                        let endLine = '';
+                        let breakLine = '';
+                        let j = i + 1;
+                        while (j < lines.length) {
+                            const nt = lines[j].trim();
+                            if (nt.startsWith('종업시각:')) {
+                                endLine = nt;
+                                j++;
+                            } else if (nt.startsWith('휴게시간:')) {
+                                breakLine = nt;
+                                j++;
+                            } else {
+                                break;
+                            }
+                        }
+                        processedLines.push({ type: 'shift_schedule', startLine, endLine, breakLine });
+                        i = j;
+                    } else {
+                        processedLines.push({ type: 'text', text: lines[i] });
+                        i++;
+                    }
+                }
+
+                function parseShiftTimeString(s: string) {
+                    if (!s) return { label: '근무시간', time: '' };
+                    const match = s.match(/^([^0-9]+?)\s+([0-9:~\s]+)$/);
+                    if (match) {
+                        return { label: match[1].trim(), time: match[2].trim() };
+                    }
+                    return { label: '근무시간', time: s.trim() };
+                }
 
                 return (
                     <div key={si} className="contract-article mb-4 last:mb-0">
@@ -52,7 +96,56 @@ export default function ContractBodyBlock({ templateText }: Props) {
                             제{sec.num}조 [{sec.title}]
                         </h4>
                         <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
-                            {lines.map((line, li) => {
+                            {processedLines.map((item, li) => {
+                                if (item.type === 'shift_schedule') {
+                                    const starts = item.startLine.replace('시업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+                                    const ends = item.endLine.replace('종업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+                                    const breaks = item.breakLine.replace('휴게시간:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+
+                                    const count = Math.max(starts.length, ends.length, breaks.length);
+                                    const cards = [];
+                                    for (let k = 0; k < count; k++) {
+                                        const sParsed = parseShiftTimeString(starts[k] || '');
+                                        const eParsed = parseShiftTimeString(ends[k] || '');
+                                        const bParsed = parseShiftTimeString(breaks[k] || '');
+
+                                        let label = sParsed.label !== '근무시간' ? sParsed.label : eParsed.label;
+                                        if (label === '근무시간' && count > 1) label = `교대 ${k + 1}`;
+
+                                        cards.push({
+                                            label: label,
+                                            start: sParsed.time,
+                                            end: eParsed.time,
+                                            breakTime: bParsed.time
+                                        });
+                                    }
+
+                                    return (
+                                        <div key={li} className="my-5 flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                                            {cards.map((card, idx) => (
+                                                <div key={idx} className="flex-1 min-w-[150px] max-w-[220px] bg-[#f8faff] border border-[#dbeafe] rounded-xl p-3.5 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 flex flex-col justify-between shrink-0">
+                                                    <div className="text-center mb-2.5">
+                                                        <span className="inline-block px-3 py-1 bg-[#2563eb] text-white font-extrabold text-[12px] tracking-wider rounded-full print:bg-slate-500 print:text-white print:border print:border-slate-600">
+                                                            {card.label === '근무시간' ? '기본 근무' : `${card.label} 근무`}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-center gap-1.5 text-slate-800 font-black text-[15px] mb-2.5 tracking-tight print:text-black">
+                                                        <span>{card.start || '-'}</span>
+                                                        <span className="text-slate-400 text-[13px] print:text-slate-500">~</span>
+                                                        <span>{card.end || '-'}</span>
+                                                    </div>
+                                                    {card.breakTime && (
+                                                        <div className="text-center text-[11.5px] font-bold text-slate-600 bg-white py-1.5 rounded-lg border border-blue-100 print:border-slate-300 print:bg-white print:text-slate-700 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                                            휴게 <span className="text-blue-600 print:text-slate-600 ml-0.5">{card.breakTime}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                }
+
+                                const line = item.text;
                                 const t = line.trim();
                                 if (t.startsWith('[') && t.endsWith(']')) {
                                     return (

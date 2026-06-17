@@ -126,8 +126,8 @@ export default function AttendanceCorrectionForm({
         // staff_shift_assignments(is_primary) → staff_members.shift_id 폴백
         primaryShiftId,
       ] = await Promise.all([
-        supabase.from('attendance').select('date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
-        supabase.from('attendances').select('work_date, status, check_in_time, check_out_time').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        supabase.from('attendance').select('staff_id, date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
+        supabase.from('attendances').select('staff_id, work_date, status, check_in_time, check_out_time').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
         withAttendanceCorrectionsFallback<any[]>(
           () => supabase.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
           () => supabase.from('attendance_corrections').select('original_date').eq('staff_id', user.id),

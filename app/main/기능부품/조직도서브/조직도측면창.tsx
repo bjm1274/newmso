@@ -10,6 +10,7 @@ import {
   Briefcase,
   Package,
   Shield,
+  Calendar,
   type LucideProps,
 } from 'lucide-react';
 import { canAccessMainMenu } from '@/lib/access-control';
@@ -85,6 +86,7 @@ const MAIN_MENUS: {
   { id: '추가기능', LucideIcon: LayoutGrid, label: '추가기능', testId: 'sidebar-menu-extra' },
   { id: '채팅', LucideIcon: MessageSquare, label: '채팅', testId: 'sidebar-menu-chat' },
   { id: '게시판', LucideIcon: ClipboardList, label: '게시판', testId: 'sidebar-menu-board' },
+  { id: '공유캘린더', LucideIcon: Calendar, label: '공유캘린더', testId: 'sidebar-menu-calendar' },
   { id: '전자결재', LucideIcon: FileCheck, label: '전자결재', testId: 'sidebar-menu-approval' },
   { id: '인사관리', LucideIcon: Briefcase, label: '인사관리', testId: 'sidebar-menu-hr' },
   { id: '재고관리', LucideIcon: Package, label: '재고관리', testId: 'sidebar-menu-inventory' },

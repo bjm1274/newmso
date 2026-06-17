@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isActiveStaff } from '@/lib/active-staff';
 import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
+import { generateAutoSchedule } from '@/lib/shift-auto-scheduler';
 
 // ─────────────────────── 타입 ───────────────────────
 type StaffMember = {
@@ -257,6 +258,24 @@ export default function NurseSchedule({
     }
   };
 
+  const handleAutoSchedule = () => {
+    const staffIds = visibleStaffs.map(s => String(s.id));
+    if (staffIds.length === 0) {
+      toast('배정할 직원이 없습니다.', 'error');
+      return;
+    }
+    const newSchedule = generateAutoSchedule({
+      yearMonth: ym,
+      staffIds,
+      daysInMonth: days,
+      minStaff: activeMinStaff,
+      existingSchedule: schedule,
+    });
+    setSchedule(newSchedule);
+    setEditMode(true);
+    toast('자동 편성이 완료되었습니다. 내역을 확인 후 저장해주세요.', 'success');
+  };
+
   const cycleRole = (sid: string, day: number) => {
     if (!editMode) return;
     const roles: ShiftRole[] = ['D', 'E', 'N', 'OFF', 'LEAVE', 'TRAINING'];
@@ -345,12 +364,20 @@ export default function NurseSchedule({
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {!editMode ? (
-              <button
-                type="button" onClick={() => setEditMode(true)}
-                className="px-4 py-2 rounded-xl bg-white/10 text-white text-[12px] font-bold hover:bg-white/20 transition-all"
-              >
-                ✏ 수동 편집
-              </button>
+              <>
+                <button
+                  type="button" onClick={handleAutoSchedule}
+                  className="px-4 py-2 rounded-xl bg-blue-500/80 text-white text-[12px] font-bold hover:bg-blue-500 transition-all"
+                >
+                  🤖 자동 편성 실행
+                </button>
+                <button
+                  type="button" onClick={() => setEditMode(true)}
+                  className="px-4 py-2 rounded-xl bg-white/10 text-white text-[12px] font-bold hover:bg-white/20 transition-all"
+                >
+                  ✏ 수동 편집
+                </button>
+              </>
             ) : (
               <>
                 <button

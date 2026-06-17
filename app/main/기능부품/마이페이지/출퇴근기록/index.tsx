@@ -223,7 +223,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         void Promise.resolve(
           supabase
             .from('work_shifts')
-            .select('id, name')
+            .select('id, company_id, name')
             .in('id', shiftIds)
         ).then(({ data: shiftRows }) => {
           if (Array.isArray(shiftRows)) {
@@ -460,10 +460,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (shiftIds.length > 0 || shiftNames.length > 0) {
       const [shiftIdsResult, shiftNamesResult] = await Promise.all([
         shiftIds.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
+          ? supabase.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
           : Promise.resolve({ data: [], error: null }),
         shiftNames.length > 0
-          ? supabase.from('work_shifts').select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
+          ? supabase.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -825,7 +825,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         // 이미 출근 기록이 있으면 중복 처리 방지
         const { data: existingLog } = await supabase
           .from('attendance')
-          .select('id, check_in, check_out')
+          .select('id, staff_id, check_in, check_out')
           .eq('staff_id', userId)
           .eq('date', today)
           .maybeSingle();

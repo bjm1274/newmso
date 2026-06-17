@@ -18,6 +18,7 @@ const loadHRView = () => import('../인사관리');
 const loadInventoryView = () => import('../재고관리통합');
 const loadAdminView = () => import('../관리자전용');
 const loadExtraFeaturesView = () => import('../추가기능');
+const loadSharedCalendarView = () => import('../공유캘린더');
 
 /**
  * 사이드바 호버/포커스 시 해당 메뉴 번들을 on-demand prefetch.
@@ -34,6 +35,7 @@ const MENU_LOADER_MAP: Record<string, () => Promise<unknown>> = {
   재고관리: loadInventoryView,
   관리자: loadAdminView,
   추가기능: loadExtraFeaturesView,
+  공유캘린더: loadSharedCalendarView,
 };
 
 export function prefetchMenuModule(menuId: string) {
@@ -83,6 +85,10 @@ const AdminView = dynamic(loadAdminView, {
 const ExtraFeatures = dynamic(loadExtraFeaturesView, {
   ssr: false,
   loading: () => <MenuViewLoading label="추가기능" />,
+});
+const SharedCalendar = dynamic(loadSharedCalendarView, {
+  ssr: false,
+  loading: () => <MenuViewLoading label="공유캘린더" />,
 });
 
 interface MainContentProps {
@@ -317,6 +323,12 @@ export default function MainContent({
             mris={data.mris}
             setMainMenu={setMainMenu}
           />
+        </div>
+      )}
+
+      {mainMenu === '공유캘린더' && (
+        <div className="min-h-0 flex-1 overflow-x-hidden">
+          <SharedCalendar />
         </div>
       )}
 
