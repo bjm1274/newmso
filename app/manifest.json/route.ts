@@ -14,27 +14,27 @@ const MANIFEST_BASE = {
   orientation: 'portrait-primary',
   icons: [
     { src: '/badge-72x72.png', sizes: '72x72', type: 'image/png', purpose: 'any' },
-    { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-    { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+    { src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/pwa-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
   ],
   shortcuts: [
     {
       name: '채팅',
       short_name: '채팅',
       url: '/main?open_menu=채팅',
-      icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
     },
     {
       name: '게시판',
       short_name: '게시판',
       url: '/main?open_menu=게시판',
-      icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
     },
     {
       name: '전자결재',
       short_name: '결재',
       url: '/main?open_menu=전자결재',
-      icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
     },
   ],
 } as const;
