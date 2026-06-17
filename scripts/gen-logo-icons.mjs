@@ -39,11 +39,11 @@ const m = await sharp(logo).metadata();
 console.log('tight logo bbox:', `${m.width}x${m.height}`);
 
 // 웹 favicon / PWA / 모바일
-await makeSquare(logo, 256, 0.12, path.join(root, 'app', 'icon.png'));
-await makeSquare(logo, 192, 0.14, path.join(root, 'public', 'icon-192x192.png'));
-await makeSquare(logo, 512, 0.14, path.join(root, 'public', 'icon-512x512.png'));
-await makeSquare(logo, 180, 0.12, path.join(root, 'public', 'apple-touch-icon.png'));
-await makeSquare(logo, 72, 0.10, path.join(root, 'public', 'badge-72x72.png'));
+await makeSquare(logo, 256, 0.02, path.join(root, 'app', 'icon.png'));
+await makeSquare(logo, 192, 0.02, path.join(root, 'public', 'icon-192x192.png'));
+await makeSquare(logo, 512, 0.02, path.join(root, 'public', 'icon-512x512.png'));
+await makeSquare(logo, 180, 0.02, path.join(root, 'public', 'apple-touch-icon.png'));
+await makeSquare(logo, 72, 0.02, path.join(root, 'public', 'badge-72x72.png'));
 
 // 로그인 / PC 사이드바 브랜드 로고 (object-contain + mixBlendMode multiply, 흰 배경 필요)
 await makeSquare(logo, 512, 0.08, path.join(root, 'public', 'aiierp-logo.png'));
