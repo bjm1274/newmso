@@ -15,6 +15,11 @@ import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { ErpUser } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
+import {
+  resolveNotificationTarget,
+  toNotificationMetadataRecord,
+} from '@/lib/notification-metadata';
+import { useNavigation } from '@/app/main/contexts/NavigationContext';
 import MIcon from '../공통/MIcon';
 
 // 알림시스템.tsx 의 NOTIFICATION_LIST_UPDATED_EVENT(= 'erp-notification-list-updated')와
@@ -34,6 +39,10 @@ type NotifItem = {
   body: string;
   time: string;
   unread: boolean;
+  /** notifications.type 원본 — 탭 시 목적지 결정에 사용 */
+  type: string;
+  /** notifications.metadata(jsonb) — room_id/approval_id 등 점프 컨텍스트 */
+  metadata: Record<string, unknown>;
 };
 
 const TONE_MAP: Record<Tone, { bg: string; fg: string }> = {
@@ -44,7 +53,7 @@ const TONE_MAP: Record<Tone, { bg: string; fg: string }> = {
   muted:   { bg: 'var(--z-100)', fg: 'var(--z-600)' },
 };
 
-const NOTIFICATION_SELECT = 'id, user_id, type, title, body, read_at, created_at';
+const NOTIFICATION_SELECT = 'id, user_id, type, title, body, metadata, read_at, created_at';
 
 /** notifications.type → 모바일 아이콘/톤 매핑 */
 function mapTypeToVisual(type: string): { icon: string; tone: Tone } {
@@ -81,6 +90,7 @@ type NotificationDbRow = {
   type?: unknown;
   title?: unknown;
   body?: unknown;
+  metadata?: unknown;
   read_at?: unknown;
   created_at?: unknown;
 };
@@ -97,6 +107,8 @@ function normalizeRow(row: NotificationDbRow): NotifItem {
     body: toNotificationText(row.body, ''),
     time: created ? timeAgo(created) : '',
     unread: row.read_at == null,
+    type,
+    metadata: toNotificationMetadataRecord(row.metadata),
   };
 }
 
@@ -106,6 +118,7 @@ export type 알림탭Props = {
 
 function 알림탭Base({ user }: 알림탭Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
+  const { setMainMenu, setSubView } = useNavigation();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(true);
   const cancelledRef = useRef(false);
@@ -156,7 +169,12 @@ function 알림탭Base({ user }: 알림탭Props) {
     } catch { /* 낙관적 업데이트 유지 */ }
   }, [staffId]);
 
-  const handleTapItem = useCallback(async (id: string) => {
+  // 탭 시: (1) 읽음 처리 → (2) 알림 종류에 맞는 모바일 탭/서브뷰로 이동.
+  // PC NotificationInbox와 동일하게 resolveNotificationTarget(type, metadata)로 목적지를 산출하고,
+  // PC의 router.push(href) 대신 모바일 NavigationContext(setMainMenu/setSubView)로 탭을 전환한다.
+  // (MobileShell이 mainMenu 변화를 감지해 route.tab을 동기화한다.)
+  const handleTapItem = useCallback(async (item: NotifItem) => {
+    const { id } = item;
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
     try {
       await supabase
@@ -164,7 +182,37 @@ function 알림탭Base({ user }: 알림탭Props) {
         .update({ read_at: new Date().toISOString() })
         .eq('id', id);
     } catch { /* 낙관적 업데이트 유지 */ }
-  }, []);
+
+    // 목적지 결정 — PC와 동일한 매핑 엔진 재사용.
+    const target = resolveNotificationTarget(item.type, item.metadata);
+    switch (target.kind) {
+      case 'chat':
+        setMainMenu('채팅');
+        break;
+      case 'approval':
+        setMainMenu('전자결재');
+        break;
+      case 'inventory':
+        setMainMenu('재고관리');
+        break;
+      case 'board':
+        setMainMenu('게시판');
+        if (target.boardType) setSubView(target.boardType);
+        break;
+      case 'menu':
+        // target.menu는 이미 한글 메뉴 라벨(채팅/전자결재/게시판/재고관리/내정보/알림/관리자).
+        setMainMenu(target.menu);
+        if (target.subView) setSubView(target.subView);
+        break;
+      case 'my_page':
+        setMainMenu('내정보');
+        break;
+      case 'notifications':
+      default:
+        // 알림 화면 자체이므로 이동하지 않는다(읽음 처리만).
+        break;
+    }
+  }, [setMainMenu, setSubView]);
 
   const unreadCount = notifs.filter((n) => n.unread).length;
 
@@ -233,7 +281,7 @@ function 알림탭Base({ user }: 알림탭Props) {
                 key={n.id}
                 type="button"
                 className="msm-row"
-                onClick={() => handleTapItem(n.id)}
+                onClick={() => { void handleTapItem(n); }}
                 aria-label={`${n.title} — ${n.body}`}
                 style={{
                   width: '100%',

@@ -38,9 +38,11 @@ export type 재고현황Props = {
   company?: string;
   onBack: () => void;
   onPlaceOrder: () => void;
+  /** 입고/출고 등록 화면(입출고 뷰)으로 이동 */
+  onGoInout?: () => void;
 };
 
-export default function 재고현황({ company, onBack, onPlaceOrder }: 재고현황Props) {
+export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout }: 재고현황Props) {
   const data = useStatusData(company);
   const { rows, loading, error, lowCount, zeroCount } = data;
   const [cat, setCat] = useState<StockCatFilter>('all');
@@ -225,10 +227,10 @@ export default function 재고현황({ company, onBack, onPlaceOrder }: 재고�
       </div>
 
       <div className="m-sticky-foot">
-        <MBtn block icon="arrowDown" ariaLabel="입고 등록" disabled title="준비 중">
+        <MBtn block icon="arrowDown" ariaLabel="입고 등록" onClick={onGoInout}>
           입고
         </MBtn>
-        <MBtn block icon="arrowUp" ariaLabel="출고 등록" disabled title="준비 중">
+        <MBtn block icon="arrowUp" ariaLabel="출고 등록" onClick={onGoInout}>
           출고
         </MBtn>
         <MBtn

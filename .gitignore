@@ -128,6 +128,15 @@ scripts/backfill-d1/.backfill-progress.json
 /test-insert.mjs
 /query_poll.py
 /query.sql
+# Lint/typecheck/duplication analysis dumps (재생성 가능 — never commit)
+/_eslint_check.txt
+/_jscpd_check.txt
+/_tsc_check*.txt
+/check-db.mjs
+/check_db.js
+/query-prod.js
+/query_attendance.sql
+/.jscpd-report/
 
 # Generated SQLite binaries (build-sqlite.mjs 산출물 — 재생성 가능)
 *.sqlite

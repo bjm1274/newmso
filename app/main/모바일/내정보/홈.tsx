@@ -626,6 +626,54 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           </div>
         </div>
 
+        {/* ── 바로가기 리스트 ───────────────────────────────── */}
+        <div className="m-section">
+          <div className="m-section-h">
+            <div className="lbl">바로가기</div>
+          </div>
+          <div className="msm-setlist m-card flush">
+            {/* 나의 할 일 — PC 마이페이지 To-Do 풀기능 */}
+            <button
+              type="button"
+              onClick={() => onSub('todo')}
+              aria-label="나의 할 일"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                display: 'grid',
+                gridTemplateColumns: '40px 1fr auto',
+                alignItems: 'center',
+                gap: 12,
+                padding: '13px 16px',
+                background: 'transparent',
+                border: 0,
+                cursor: 'pointer',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: 'var(--m-success-soft)',
+                  color: 'var(--m-success)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <MIcon name="checkCircle" size={18} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>나의 할 일</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--z-500)', marginTop: 2 }}>
+                  오늘 할 일과 우선순위를 관리하세요
+                </div>
+              </div>
+              <MIcon name="chevR" size={18} color="var(--z-400)" />
+            </button>
+          </div>
+        </div>
+
         {/* ── 설정 리스트 ──────────────────────────────────── */}
         <div className="m-section">
           <div className="m-section-h">

@@ -44,9 +44,11 @@ import {
   isSelfChatRoom,
   getGroupChatRoomBadgeText,
   NOTICE_ROOM_ID,
+  WARD_QUICK_REPLY_OPTIONS,
 } from '@/app/main/기능부품/메신저유틸';
 import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
+import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import EmojiPicker from './이모지피커';
 import BubbleList from './버블리스트';
 import {
@@ -55,6 +57,21 @@ import {
   validateMobileUploadTarget,
 } from './업로드';
 import { toggleMobileReaction } from './반응';
+import {
+  editMobileMessage,
+  renameMobileRoom,
+  addMobileRoomMembers,
+  removeMobileRoomMember,
+  createMobilePoll,
+  voteMobilePoll,
+  fetchRoomPolls,
+  type RoomPollsResult,
+} from './메시지액션';
+import { MessageEditSheet } from './수정시트';
+import { ReactionDetailSheet, ReadStatusSheet } from './상세시트';
+import { ThreadSheet } from './스레드시트';
+import { AddMemberSheet } from './멤버관리시트';
+import { PollComposerSheet, PollCard } from './투표';
 
 export type SChatRoomProps = {
   user: ErpUser;
@@ -127,6 +144,28 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [isForwardOpen, setIsForwardOpen] = useState(false);
   const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
 
+  // 메시지 수정 시트
+  const [editTarget, setEditTarget] = useState<ChatMessage | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  // 반응/읽음 상세 시트
+  const [reactionDetailTarget, setReactionDetailTarget] = useState<ChatMessage | null>(null);
+  const [readDetailTarget, setReadDetailTarget] = useState<ChatMessage | null>(null);
+  // 스레드 시트
+  const [threadRoot, setThreadRoot] = useState<ChatMessage | null>(null);
+  const [threadSending, setThreadSending] = useState(false);
+  // 투표
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  const [pollSubmitting, setPollSubmitting] = useState(false);
+  const [pollVoting, setPollVoting] = useState(false);
+  const [pollData, setPollData] = useState<RoomPollsResult>({ polls: [], voteCounts: {}, myVotes: {} });
+  // 방 이름 수정
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+  // 멤버 추가 시트
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [memberMutating, setMemberMutating] = useState(false);
+
   // 대화방 알림 수신 토글 — PC 자산 재사용(room_notification_settings 서버 push 기준)
   const { roomNotifyOn, toggleRoomNotify } = useRoomNotificationSetting({
     selectedRoomId: String(room.id),
@@ -136,6 +175,9 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
   // 공지/나와의채팅은 나갈 수 없음
   const canLeaveRoom = !isNotice && !selfRoom;
+  // 이름 수정·멤버 관리는 그룹 대화방에만 노출(1:1·공지·나와의채팅은 PC와 동일하게 제외)
+  const canRenameRoom = isGroup && !isNotice && !selfRoom;
+  const canManageMembers = isGroup && !isNotice && !selfRoom;
 
   const handleLeaveRoom = useCallback(async () => {
     if (leaving) return;
@@ -361,6 +403,231 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     [refresh, room.id, userId],
   );
 
+  // ── 투표 데이터 로드 (polls + poll_votes 집계) ──
+  // polls는 messages와 별개 테이블이라 메시지 폴링만으로는 타인 생성/투표가 즉시
+  // 반영되지 않는다. 진입 시 1회 + 3s 주기 갱신(읽음 커서와 동일 cadence)으로 라이브 유지.
+  const refreshPolls = useCallback(async () => {
+    const result = await fetchRoomPolls(String(room.id), userId);
+    setPollData(result);
+  }, [room.id, userId]);
+
+  useEffect(() => {
+    void refreshPolls();
+    const interval = setInterval(() => { void refreshPolls(); }, 3000);
+    return () => clearInterval(interval);
+  }, [refreshPolls]);
+
+  const handleCreatePoll = useCallback(
+    async (input: { question: string; options: string[]; deadlineAt: string }) => {
+      if (!userId) {
+        toast('로그인 정보를 찾을 수 없습니다.', 'error');
+        return;
+      }
+      setPollSubmitting(true);
+      try {
+        const result = await createMobilePoll({
+          roomId: String(room.id),
+          creatorId: userId,
+          question: input.question,
+          options: input.options,
+          deadlineAt: input.deadlineAt,
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        toast('투표가 생성되었습니다.', 'success');
+        setPollComposerOpen(false);
+        await refreshPolls();
+      } finally {
+        setPollSubmitting(false);
+      }
+    },
+    [room.id, userId, refreshPolls],
+  );
+
+  const handleVotePoll = useCallback(
+    async (pollId: string, optionIndex: number) => {
+      if (!userId) {
+        toast('로그인 정보를 찾을 수 없습니다.', 'error');
+        return;
+      }
+      setPollVoting(true);
+      try {
+        const result = await voteMobilePoll({
+          pollId,
+          userId,
+          optionIndex,
+          roomId: String(room.id),
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        await refreshPolls();
+      } finally {
+        setPollVoting(false);
+      }
+    },
+    [room.id, userId, refreshPolls],
+  );
+
+  // ── 메시지 수정 ──
+  const handleSaveEdit = useCallback(
+    async (message: ChatMessage, content: string) => {
+      setEditSaving(true);
+      try {
+        const result = await editMobileMessage({
+          messageId: String(message.id),
+          content,
+          roomId: String(room.id),
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        toast('메시지가 수정되었습니다.', 'success');
+        setEditTarget(null);
+        void refresh();
+      } finally {
+        setEditSaving(false);
+      }
+    },
+    [room.id, refresh],
+  );
+
+  // ── 스레드 답글 전송 — 기존 sendMobileTextMessage(replyToId) 재사용 ──
+  const handleSendThreadReply = useCallback(
+    async (rootMessage: ChatMessage, text: string) => {
+      if (!userId) {
+        toast('로그인 정보를 찾을 수 없습니다.', 'error');
+        return;
+      }
+      setThreadSending(true);
+      try {
+        const result = await sendMobileTextMessage({
+          roomId: String(room.id),
+          senderId: userId,
+          content: text,
+          replyToId: String(rootMessage.id),
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        void refresh();
+      } finally {
+        setThreadSending(false);
+      }
+    },
+    [room.id, userId, refresh],
+  );
+
+  // ── 방 이름 수정 ──
+  const handleSaveRename = useCallback(async () => {
+    setRenameSaving(true);
+    try {
+      const result = await renameMobileRoom({ roomId: String(room.id), name: renameDraft });
+      if (!result.ok) {
+        toast(result.error, 'error');
+        return;
+      }
+      toast('채팅방 이름이 변경되었습니다.', 'success');
+      setRenameOpen(false);
+      void refresh();
+    } finally {
+      setRenameSaving(false);
+    }
+  }, [room.id, renameDraft, refresh]);
+
+  // ── 멤버 추가 ──
+  const handleAddMembers = useCallback(
+    async (selected: StaffDirectoryEntry[]) => {
+      if (selected.length === 0) return;
+      setMemberMutating(true);
+      try {
+        const result = await addMobileRoomMembers({
+          roomId: String(room.id),
+          currentMembers: memberIds,
+          addIds: selected.map((s) => String(s.id)),
+          inviterId: userId,
+          inviterName: userName,
+          addedNames: selected.map((s) => s.name),
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        toast('참여자를 추가했습니다.', 'success');
+        setAddMemberOpen(false);
+        void refresh();
+      } finally {
+        setMemberMutating(false);
+      }
+    },
+    [room.id, memberIds, userId, userName, refresh],
+  );
+
+  // ── 멤버 제외 ──
+  const handleRemoveMember = useCallback(
+    async (member: StaffDirectoryEntry) => {
+      if (memberMutating) return;
+      setMemberMutating(true);
+      try {
+        const result = await removeMobileRoomMember({
+          roomId: String(room.id),
+          currentMembers: memberIds,
+          removeId: String(member.id),
+          removerId: userId,
+          removerName: userName,
+          removedName: member.name,
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        toast(`${member.name}님을 채팅방에서 제외했습니다.`, 'success');
+        void refresh();
+      } finally {
+        setMemberMutating(false);
+      }
+    },
+    [room.id, memberIds, userId, userName, refresh, memberMutating],
+  );
+
+  const handleQuickReply = useCallback(
+    async (text: string) => {
+      if (!userId) {
+        toast('로그인 정보를 찾을 수 없습니다.', 'error');
+        return;
+      }
+      const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimisticMsg = {
+        id: optimisticId,
+        room_id: String(room.id),
+        sender_id: userId,
+        sender_name: userName,
+        content: text,
+        created_at: new Date().toISOString(),
+        is_deleted: false,
+        reply_to_id: null,
+        staff: { name: userName, photo_url: null },
+      } as ChatMessage;
+      appendOptimistic(optimisticMsg);
+      const result = await sendMobileTextMessage({
+        roomId: String(room.id),
+        senderId: userId,
+        content: text,
+      });
+      if (!result.ok) {
+        toast(result.error, 'error');
+        return;
+      }
+      replaceOptimistic(optimisticId, result.message);
+    },
+    [room.id, userId, userName, appendOptimistic, replaceOptimistic],
+  );
+
   const handleToggleBookmark = useCallback(async (message: ChatMessage) => {
     if (!userId) return;
     try {
@@ -419,8 +686,10 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
   const handleDeleteMessage = useCallback(async (message: ChatMessage) => {
     try {
+      // PC 메신저액션훅과 동일하게 표준 messages 테이블을 사용한다.
+      // (기존 'chat_messages'는 읽기 경로(messages)와 다른 비표준 테이블이라 삭제가 반영되지 않던 버그)
       const { error } = await supabase
-        .from('chat_messages')
+        .from('messages')
         .update({ is_deleted: true, content: '삭제된 메시지입니다.' })
         .eq('id', message.id);
       if (error) throw error;
@@ -434,19 +703,20 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const handleForwardSelectRoom = useCallback(async (targetRoom: MobileChatRoom) => {
     if (!forwardMessage || !userId) return;
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert([{
-          room_id: targetRoom.id,
-          sender_id: userId,
-          sender_name: userName,
-          content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
-          file_url: forwardMessage.file_url || null,
-          file_name: forwardMessage.file_name || null,
-          file_kind: forwardMessage.file_kind || null,
-          file_size_bytes: forwardMessage.file_size_bytes || null,
-          message_type: forwardMessage.message_type || 'text',
-        }]);
+      // 표준 messages 테이블 + 표준 writer 사용(비표준 chat_messages/message_type 제거).
+      const { error } = await insertChatMessageWithFallback(supabase, {
+        room_id: String(targetRoom.id),
+        sender_id: userId,
+        content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
+        file_url: forwardMessage.file_url || null,
+        file_name: forwardMessage.file_name || null,
+        file_kind: forwardMessage.file_kind || null,
+        file_size_bytes: forwardMessage.file_size_bytes || null,
+        reply_to_id: null,
+        album_id: null,
+        album_index: null,
+        album_total: null,
+      });
       if (error) throw error;
       toast(`"${targetRoom.name || '채팅방'}"으로 메시지를 전달했습니다.`, 'success');
     } catch (err) {
@@ -602,7 +872,23 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             setForwardMessage(msg);
             setIsForwardOpen(true);
           }}
+          onEdit={(msg) => setEditTarget(msg)}
+          onReactionDetail={(msg) => setReactionDetailTarget(msg)}
+          onReadDetail={(msg) => setReadDetailTarget(msg)}
+          onOpenThread={(msg) => setThreadRoot(msg)}
         />
+
+        {/* 투표 카드 — polls 테이블(메시지와 별개) 기준, 생성 시각 오름차순 */}
+        {pollData.polls.map((poll) => (
+          <PollCard
+            key={poll.id}
+            poll={poll}
+            voteCounts={pollData.voteCounts[poll.id] || {}}
+            myVote={pollData.myVotes[poll.id]}
+            voting={pollVoting}
+            onVote={handleVotePoll}
+          />
+        ))}
       </div>
 
       {/* 이모지 피커 (컴포저) */}
@@ -619,6 +905,67 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           padding: '8px 12px 12px',
         }}
       >
+        {/* 빠른 응답 칩 + 투표 만들기 — 가로 스크롤 */}
+        <div
+          role="toolbar"
+          aria-label="빠른 응답 및 투표"
+          style={{
+            display: 'flex',
+            gap: 6,
+            marginBottom: 8,
+            overflowX: 'auto',
+            paddingBottom: 2,
+          }}
+          className="custom-scrollbar"
+        >
+          <button
+            type="button"
+            aria-label="새 투표 만들기"
+            onClick={() => setPollComposerOpen(true)}
+            disabled={composerDisabled}
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 12px',
+              borderRadius: 999,
+              background: 'var(--m-accent-soft)',
+              color: 'var(--m-accent)',
+              fontSize: 12,
+              fontWeight: 800,
+              border: 'none',
+              cursor: composerDisabled ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <MIcon name="list" size={14} />
+            투표
+          </button>
+          {WARD_QUICK_REPLY_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              aria-label={`빠른 응답: ${opt.label}`}
+              onClick={() => void handleQuickReply(opt.text)}
+              disabled={composerDisabled}
+              style={{
+                flexShrink: 0,
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: 'var(--m-bg)',
+                color: 'var(--z-700)',
+                fontSize: 12,
+                fontWeight: 700,
+                border: '1px solid var(--m-border)',
+                cursor: composerDisabled ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         {replyTo && (
           <div
             style={{
@@ -781,7 +1128,36 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Section 1: 대화방 개요 */}
           <div style={{ background: 'var(--m-bg)', padding: '14px', borderRadius: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)' }}>{title}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: 'var(--z-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+              {canRenameRoom && (
+                <button
+                  type="button"
+                  aria-label="채팅방 이름 수정"
+                  onClick={() => {
+                    setRenameDraft(typeof room.name === 'string' ? room.name : title);
+                    setRenameOpen(true);
+                  }}
+                  style={{
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    padding: '5px 10px',
+                    borderRadius: 8,
+                    background: 'var(--m-accent-soft)',
+                    color: 'var(--m-accent)',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <MIcon name="edit" size={13} />
+                  이름 수정
+                </button>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 4, display: 'flex', gap: 8 }}>
               <span>유형: {isGroup ? '그룹 대화방' : '1:1 대화방'}</span>
               <span>·</span>
@@ -833,7 +1209,32 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
           {/* Section 4: 참여자 목록 */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>참여자 ({memberProfiles.length}명)</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>참여자 ({memberProfiles.length}명)</div>
+              {canManageMembers && (
+                <button
+                  type="button"
+                  aria-label="참여자 추가"
+                  onClick={() => setAddMemberOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    padding: '5px 10px',
+                    borderRadius: 8,
+                    background: 'var(--m-accent-soft)',
+                    color: 'var(--m-accent)',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <MIcon name="plus" size={13} />
+                  추가
+                </button>
+              )}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 180, overflowY: 'auto' }} className="custom-scrollbar">
               {memberProfiles.map((member) => {
                 const tone = pickAvatarTone(String(member.id) + member.name);
@@ -861,6 +1262,28 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                         {member.department || '부서 없음'} · {member.position || '직급 없음'}
                       </div>
                     </div>
+                    {canManageMembers && !isMe && (
+                      <button
+                        type="button"
+                        aria-label={`${member.name} 참여자 제외`}
+                        onClick={() => { void handleRemoveMember(member); }}
+                        disabled={memberMutating}
+                        style={{
+                          flexShrink: 0,
+                          width: 30,
+                          height: 30,
+                          display: 'grid',
+                          placeItems: 'center',
+                          borderRadius: 8,
+                          background: 'transparent',
+                          color: 'var(--m-danger, #ef4444)',
+                          border: 'none',
+                          cursor: memberMutating ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <MIcon name="trash" size={15} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -1013,6 +1436,122 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 전달 가능한 최근 채팅방이 없습니다.
               </div>
             )}
+          </div>
+        </div>
+      </MSheet>
+
+      {/* 메시지 수정 시트 */}
+      <MessageEditSheet
+        message={editTarget}
+        saving={editSaving}
+        onClose={() => setEditTarget(null)}
+        onSave={(message, content) => { void handleSaveEdit(message, content); }}
+      />
+
+      {/* 반응 상세 시트 */}
+      <ReactionDetailSheet
+        message={reactionDetailTarget}
+        staffs={staffs}
+        onClose={() => setReactionDetailTarget(null)}
+      />
+
+      {/* 읽음 확인 상세 시트 */}
+      <ReadStatusSheet
+        message={readDetailTarget}
+        roomId={String(room.id)}
+        memberIds={memberIds}
+        staffs={staffs}
+        onClose={() => setReadDetailTarget(null)}
+      />
+
+      {/* 스레드 시트 */}
+      <ThreadSheet
+        rootMessage={threadRoot}
+        messages={messages}
+        staffs={staffs}
+        userId={userId}
+        sending={threadSending}
+        onClose={() => setThreadRoot(null)}
+        onSendReply={(rootMessage, text) => { void handleSendThreadReply(rootMessage, text); }}
+      />
+
+      {/* 투표 만들기 시트 */}
+      <PollComposerSheet
+        open={pollComposerOpen}
+        submitting={pollSubmitting}
+        onClose={() => setPollComposerOpen(false)}
+        onSubmit={(input) => { void handleCreatePoll(input); }}
+      />
+
+      {/* 참여자 추가 시트 */}
+      <AddMemberSheet
+        open={addMemberOpen}
+        submitting={memberMutating}
+        currentMemberIds={memberIds}
+        staffs={staffs}
+        onClose={() => setAddMemberOpen(false)}
+        onSubmit={(selected) => { void handleAddMembers(selected); }}
+      />
+
+      {/* 방 이름 수정 시트 */}
+      <MSheet open={renameOpen} onClose={() => { if (!renameSaving) setRenameOpen(false); }} title="채팅방 이름 수정">
+        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <input
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            placeholder="채팅방 이름을 입력해 주세요"
+            aria-label="채팅방 이름"
+            disabled={renameSaving}
+            style={{
+              width: '100%',
+              padding: '12px',
+              fontSize: 14,
+              fontFamily: 'inherit',
+              background: 'var(--m-bg)',
+              border: '1px solid var(--m-border)',
+              borderRadius: 10,
+              outline: 'none',
+              color: 'var(--z-900)',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setRenameOpen(false)}
+              disabled={renameSaving}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: 10,
+                background: 'var(--m-bg)',
+                color: 'var(--z-700)',
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: renameSaving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => { void handleSaveRename(); }}
+              disabled={renameSaving || !renameDraft.trim()}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: 10,
+                background: renameDraft.trim() ? 'var(--m-accent)' : 'var(--z-300)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: renameSaving || !renameDraft.trim() ? 'not-allowed' : 'pointer',
+                opacity: renameSaving ? 0.7 : 1,
+              }}
+            >
+              {renameSaving ? '저장 중…' : '저장'}
+            </button>
           </div>
         </div>
       </MSheet>

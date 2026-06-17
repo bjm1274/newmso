@@ -31,6 +31,7 @@ import {
   useFieldIdPrefix,
 } from '../인사관리/form-helpers';
 import SApprovalApproverPicker from './결재선피커';
+import SApprovalCcPicker, { type CcPick } from './참조피커';
 import AttachmentPicker from './AttachmentPicker';
 import { useApprovalFormBase } from './useApprovalFormBase';
 
@@ -57,6 +58,9 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState(today);
   const [reason, setReason] = useState('');
+  // 참조(CC) 수동 추가 — 자동 CC(회사 활성 직원 전체)에 더해 명시적으로 지정. 선택 사항.
+  const [manualCcUsers, setManualCcUsers] = useState<CcPick[]>([]);
+  const [ccPickerOpen, setCcPickerOpen] = useState(false);
 
   const base = useApprovalFormBase({ user, staffId, company });
   const {
@@ -151,6 +155,16 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         console.error('[mobile-approval] failed to fetch cc_users candidates', err);
       }
 
+      // 수동 지정 참조자를 자동 CC에 병합 (id 기준 dedup) — 자동 CC를 깨지 않음
+      if (manualCcUsers.length > 0) {
+        const byId = new Map<string, { id: string; name: string }>();
+        for (const c of ccUsers) byId.set(c.id, c);
+        for (const c of manualCcUsers) {
+          if (c.id) byId.set(c.id, { id: c.id, name: c.name || '이름 없음' });
+        }
+        ccUsers = Array.from(byId.values());
+      }
+
       const { queued: apprQueued } = await submitApproval({
         typeName: '연차/휴가',
         title,
@@ -188,7 +202,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     } finally {
       setSubmitting(false);
     }
-  }, [staffId, start, end, kind, days, reason, approverLine, user, company, onSubmitted, submitApproval, setSubmitting, queuedAttachmentCount]);
+  }, [staffId, start, end, kind, days, reason, manualCcUsers, approverLine, user, company, onSubmitted, submitApproval, setSubmitting, queuedAttachmentCount]);
 
   return (
     <div className="m-screen">
@@ -347,6 +361,53 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           </div>
         </div>
 
+        {/* 참조(CC) — 추가 지정. 연차는 행정팀·회사 직원이 기본 참조됩니다. */}
+        <div className="m-section">
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="lbl" style={{ flex: 1 }}>참조 추가 ({manualCcUsers.length})</div>
+            <button
+              type="button"
+              onClick={() => setCcPickerOpen(true)}
+              aria-label="참조자 추가 또는 변경"
+              style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+            >
+              {manualCcUsers.length > 0 ? '변경' : '추가'}
+            </button>
+          </div>
+          <MCard flush>
+            {manualCcUsers.length === 0 ? (
+              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.55 }}>
+                연차 신청은 행정팀과 회사 직원에게 기본 참조됩니다. 추가로 참조할 직원을 지정할 수 있어요.
+              </div>
+            ) : (
+              <ul style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px' }} aria-label="추가 참조자 목록">
+                {manualCcUsers.map((c) => {
+                  const dept = [c.department, c.position].filter(Boolean).join(' / ');
+                  return (
+                    <li
+                      key={c.id}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px 6px 6px',
+                        border: '1px solid var(--m-border)',
+                        borderRadius: 999,
+                      }}
+                    >
+                      <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 800 }}>{c.name}</span>
+                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6 }}>{dept}</span>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </MCard>
+        </div>
+
         {/* 첨부 파일 */}
         <div className="m-section">
           <AttachmentPicker onChange={setAttachments} />
@@ -363,6 +424,15 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         current={approverLine}
         defaultLine={approverDefaults}
         onApply={handleApproverApply}
+      />
+
+      <SApprovalCcPicker
+        open={ccPickerOpen}
+        onClose={() => setCcPickerOpen(false)}
+        selfId={staffId}
+        company={company || null}
+        current={manualCcUsers}
+        onApply={setManualCcUsers}
       />
     </div>
   );

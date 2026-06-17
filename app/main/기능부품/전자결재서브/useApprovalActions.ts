@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import type { StaffMember } from '@/types';
+import { hasPermission } from '@/lib/access-control';
 import type {
   TransitionApprovalsOnServer,
 } from './useApprovalBulkActions';
@@ -175,8 +176,11 @@ export function useApprovalActions({
       return;
     }
     if (String(currentApproverId) !== String(user?.id)) {
-      toast('현재 결재자만 반려할 수 있습니다.');
-      return;
+      // 본인이 현재 결재자가 아닌 경우 = 강제 반려 → approval_반려권한 필요
+      if (!hasPermission(user, 'approval_반려권한')) {
+        toast('현재 결재자만 반려할 수 있습니다.');
+        return;
+      }
     }
 
     const reason = await openPrompt({

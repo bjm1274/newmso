@@ -38,6 +38,16 @@ export type MessageBubbleProps = {
   onTask: (message: ChatMessage) => void;
   onDelete: (message: ChatMessage) => void;
   onForward: (message: ChatMessage) => void;
+  /** 본인 텍스트 메시지 수정 */
+  onEdit?: (message: ChatMessage) => void;
+  /** 이모지별 반응자 상세 */
+  onReactionDetail?: (message: ChatMessage) => void;
+  /** 읽음 상세(누가 읽었나) */
+  onReadDetail?: (message: ChatMessage) => void;
+  /** 스레드(답글 모음) 열기 */
+  onOpenThread?: (message: ChatMessage) => void;
+  /** 이 메시지에 달린 답글 수(스레드) */
+  threadReplyCount?: number;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -78,6 +88,11 @@ export default function MessageBubble({
   onTask,
   onDelete,
   onForward,
+  onEdit,
+  onReactionDetail,
+  onReadDetail,
+  onOpenThread,
+  threadReplyCount = 0,
 }: MessageBubbleProps) {
   const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
 
@@ -113,6 +128,16 @@ export default function MessageBubble({
     const trimmed = text.trim();
     return /^\[emo:[a-z0-9-]+\]$/.test(trimmed) || /^\[stat:[a-z0-9-]+\]$/.test(trimmed);
   }, [text, hasFile]);
+
+  const isSystemMessage = useMemo(() => {
+    const trimmed = text.trim();
+    return /^\[(초대|내보내기|퇴장|전달)\]/.test(trimmed);
+  }, [text]);
+
+  const wasEdited = Boolean(message.edited_at);
+  // 본인이 보낸 일반 텍스트 메시지만 수정 가능(첨부/이모티콘/시스템 메시지 제외)
+  const canEdit =
+    mine && !!onEdit && !hasFile && !isEmoticonOrSticker && !isSystemMessage && !!text;
 
   const handleCopy = useCallback(() => {
     if (text) {
@@ -364,6 +389,12 @@ export default function MessageBubble({
                     type="button"
                     aria-label={`${entry.emoji} ${entry.users.length}명 — ${mineReaction ? '취소' : '추가'}`}
                     onClick={() => onToggleReaction(String(message.id), entry.emoji)}
+                    onContextMenu={(e) => {
+                      if (onReactionDetail) {
+                        e.preventDefault();
+                        onReactionDetail(message);
+                      }
+                    }}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -384,8 +415,84 @@ export default function MessageBubble({
               })}
             </div>
           )}
+
+          {(canEdit || wasEdited || onOpenThread || (onReactionDetail && reactionEntries.length > 0) || (onReadDetail && mine)) && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 3,
+                padding: '0 4px',
+                flexWrap: 'wrap',
+                justifyContent: mine ? 'flex-end' : 'flex-start',
+              }}
+            >
+              {wasEdited && (
+                <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>수정됨</span>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  aria-label="메시지 수정"
+                  onClick={() => onEdit?.(message)}
+                  style={metaBtnStyle}
+                >
+                  수정
+                </button>
+              )}
+              {onReactionDetail && reactionEntries.length > 0 && (
+                <button
+                  type="button"
+                  aria-label="반응 상세 보기"
+                  onClick={() => onReactionDetail(message)}
+                  style={metaBtnStyle}
+                >
+                  반응 상세
+                </button>
+              )}
+              {onReadDetail && mine && (
+                <button
+                  type="button"
+                  aria-label="읽음 확인 상세 보기"
+                  onClick={() => onReadDetail(message)}
+                  style={metaBtnStyle}
+                >
+                  읽음 확인
+                </button>
+              )}
+              {onOpenThread && (
+                <button
+                  type="button"
+                  aria-label={threadReplyCount > 0 ? `스레드 답글 ${threadReplyCount}개 보기` : '스레드 열기'}
+                  onClick={() => onOpenThread(message)}
+                  style={{
+                    ...metaBtnStyle,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    color: threadReplyCount > 0 ? 'var(--m-accent)' : 'var(--z-500)',
+                    fontWeight: threadReplyCount > 0 ? 800 : 600,
+                  }}
+                >
+                  <MIcon name="chat" size={12} />
+                  {threadReplyCount > 0 ? `답글 ${threadReplyCount}` : '스레드'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </MessageActionsHost>
   );
 }
+
+const metaBtnStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  padding: 0,
+  fontSize: 10,
+  fontWeight: 600,
+  color: 'var(--z-500)',
+  cursor: 'pointer',
+};

@@ -10,11 +10,12 @@
  */
 
 import dynamic from 'next/dynamic';
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Card, Chip, KpiGrid, SmBtn, TabBar, WorkcenterHeader } from './admin-workcenter-common';
 import { ADMIN_WORKCENTERS, type AdminKpi } from './admin-types';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { useExecOverview, type CorpPnlRow } from './useExecOverview';
+import { fetchCurrentMonthDepositTotal } from '@/lib/data/dashboard-widgets';
 import type { StaffMember } from '@/types';
 
 // ─── 실제 서브 컴포넌트 (lazy) ──────────────────────────
@@ -79,6 +80,36 @@ function PendingCard({ title, note }: { title: string; note: string }) {
       <div className="text-[10px] text-[var(--toss-gray-4)] mt-0.5 truncate">{note}</div>
     </div>
   );
+}
+
+/** 실데이터 값 카드 (매출 placeholder를 대체하는 정직한 실수치) */
+function ValueCard({ title, value, note }: { title: string; value: string; note: string }) {
+  return (
+    <div className="app-card px-3 py-2.5">
+      <div className="text-[10.5px] font-semibold text-[var(--toss-gray-4)] mb-1">{title}</div>
+      <div className="text-lg font-bold text-[var(--foreground)] tabular-nums">{value}</div>
+      <div className="text-[10px] text-[var(--toss-gray-4)] mt-0.5 truncate">{note}</div>
+    </div>
+  );
+}
+
+/** 이번 달 입금 합계 (virtual_account_deposits 실데이터) */
+function useMonthlyDeposit(): number | null {
+  const [total, setTotal] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurrentMonthDepositTotal()
+      .then((t) => {
+        if (!cancelled) setTotal(t);
+      })
+      .catch(() => {
+        if (!cancelled) setTotal(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return total;
 }
 
 /** 실연동 KPI (미결재·현금잔고·재직 직원수·전사 인건비) */
@@ -186,6 +217,7 @@ const CorpLaborList = memo(function CorpLaborList({ rows }: { rows: CorpPnlRow[]
 function OverviewTab({ onTabChange, staffs }: { onTabChange: (t: ExecTabId) => void; staffs: StaffMember[] }) {
   const overview = useExecOverview(staffs);
   const totalLabor = overview.corpRows.reduce((s, r) => s + r.laborCost, 0);
+  const monthlyDeposit = useMonthlyDeposit();
 
   return (
     <>
@@ -200,9 +232,13 @@ function OverviewTab({ onTabChange, staffs }: { onTabChange: (t: ExecTabId) => v
       {/* 실연동 KPI */}
       <KpiGrid items={liveKpiItems(overview)} cols={4} />
 
-      {/* 매출 의존 지표: 가짜 숫자 대신 집계 준비중 */}
+      {/* 입금은 실데이터(가상계좌). 매출/영업이익 등 별도 소스 없는 지표는 가짜 숫자 대신 집계 준비중 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-        <PendingCard title="이번 달 매출" note="매출 연동 예정" />
+        <ValueCard
+          title="이번 달 입금"
+          value={monthlyDeposit === null ? '집계 중…' : `₩${Math.round(monthlyDeposit).toLocaleString('ko-KR')}`}
+          note="가상계좌 입금 합계"
+        />
         <PendingCard title="영업이익 / 이익률" note="매출 연동 예정" />
         <PendingCard title="미수금" note="미수금 데이터 연동 예정" />
         <PendingCard title="예산 집행률" note="예산 데이터 연동 예정" />

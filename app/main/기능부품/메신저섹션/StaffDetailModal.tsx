@@ -6,6 +6,7 @@
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getStaffExtensionText } from '../조직도서브/org-chart-types';
+import { canViewStaffMeta } from '@/lib/staff-meta';
 import type { StaffMember } from '@/types';
 
 export type PresenceState = 'working' | 'checked_out' | 'before_work';
@@ -192,9 +193,10 @@ interface StaffDetailModalProps {
   presence: PresenceMeta | null;
   isLoadingPresence: boolean;
   onClose: () => void;
+  viewer?: StaffMember | null;
 }
 
-export function StaffDetailModal({ staff, presence, isLoadingPresence, onClose }: StaffDetailModalProps) {
+export function StaffDetailModal({ staff, presence, isLoadingPresence, onClose, viewer }: StaffDetailModalProps) {
   if (!staff) return null;
   return (
     <div
@@ -242,7 +244,9 @@ export function StaffDetailModal({ staff, presence, isLoadingPresence, onClose }
           <ModalInfoRow label="회사" value={getCompanyName(staff)} />
           <ModalInfoRow label="부서" value={getDepartmentName(staff)} />
           <ModalInfoRow label="사번" value={normalizeText(staff.employee_no) || '-'} />
-          <ModalInfoRow label="내선" value={getStaffExtensionText(staff) || normalizeText(staff.extension) || '-'} />
+          {canViewStaffMeta(viewer, staff?.id, viewer?.id) && (
+            <ModalInfoRow label="내선" value={getStaffExtensionText(staff) || normalizeText(staff.extension) || '-'} />
+          )}
         </div>
 
         <button

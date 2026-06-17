@@ -12,6 +12,7 @@ import { getStaffsCached } from '@/lib/use-staff-cache';
 import { getStoredSessionLoginAt, isForceLogoutAfterLogin, normalizeSessionLoginAt } from '@/lib/session-force-logout';
 import { performClientLogout, unsubscribePushOnLogout } from '@/lib/client-logout';
 import { useIsMobile } from '@/app/components/useIsMobile';
+import { usePresenceHeartbeat } from '@/app/main/hooks/usePresenceHeartbeat';
 import dynamic from 'next/dynamic';
 
 const MobileShell = dynamic(() => import('./모바일/셸/MobileShell'), { ssr: false });
@@ -111,6 +112,8 @@ function MainPageContent() {
   const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const [user, setUser] = useState<ErpUser | null>(null);
+  // 온라인 presence heartbeat — 로그인 동안 staff_members.last_seen_at/presence_status 갱신
+  usePresenceHeartbeat(user?.id);
   const [loading, setLoading] = useState(true);
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
@@ -644,7 +647,8 @@ function MainPageContent() {
     checkForcedLogout();
   }, [clearClientSession, router]);
 
-  // 세션 자동 갱신 — 30분마다 GET /api/auth/session 호출 (남은 시간 < 6h이면 서버가 12h로 연장)
+  // 세션 자동 갱신 — 30분 주기 + 포그라운드 복귀 시 GET /api/auth/session 호출
+  // (남은 시간이 절반 미만이면 서버가 만료 기간 전체로 슬라이딩 연장)
   useEffect(() => {
     if (!user) return;
     const refreshSession = async () => {
@@ -691,8 +695,34 @@ function MainPageContent() {
         // 갱신 실패 시 무시 (다음 주기에 재시도)
       }
     };
+    // 30분 setInterval 은 모바일/PWA 백그라운드에서 throttle/suspend 되어 멈춘다.
+    // → 포그라운드 복귀(visibilitychange/focus/pageshow) 시에도 갱신해 "방치 후 만료" 로그아웃을 막는다.
+    let lastForegroundRefresh = 0;
+    const onForeground = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const nowMs = Date.now();
+      if (nowMs - lastForegroundRefresh < 30_000) return; // 동일 복귀 이벤트 중복 호출 방지(30초 쓰로틀)
+      lastForegroundRefresh = nowMs;
+      void refreshSession();
+    };
     const interval = setInterval(refreshSession, 30 * 60 * 1000); // 30분마다
-    return () => clearInterval(interval);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onForeground);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onForeground);
+      window.addEventListener('pageshow', onForeground);
+    }
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onForeground);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', onForeground);
+        window.removeEventListener('pageshow', onForeground);
+      }
+    };
   }, [user, clearClientSession, loginAt, router]);
 
   // Web Share Target: 다른 앱에서 공유하기로 파일/텍스트 수신

@@ -3437,6 +3437,7 @@ export default function ChatView({
         presence={selectedStaffPresence}
         isLoadingPresence={isLoadingPresence}
         onClose={() => setSelectedStaffForModal(null)}
+        viewer={user}
       />
     </div>
   );

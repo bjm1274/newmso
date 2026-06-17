@@ -170,6 +170,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           kind: 'upsert',
           table: 'attendance',
           payload: { staff_id: staffId, date: today, check_in: nowIso, status: checkInStatus },
+          onConflict: 'staff_id,date',
         });
         if (error) throw new Error(error);
         if (queued) {

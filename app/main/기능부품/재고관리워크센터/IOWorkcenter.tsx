@@ -365,8 +365,8 @@ function OrderPanel({
                     <button
                       type="button"
                       className="rounded-[var(--radius-sm)] border border-[var(--border)] px-2 py-0.5 text-[10px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
-                      disabled
-                      title="준비 중"
+                      onClick={onNewOrder}
+                      title="발주 관리에서 상세 보기"
                     >
                       상세
                     </button>

@@ -100,24 +100,6 @@ export function annualLeaveDaysForTenure(years: number): number {
   return Math.min(25, 15 + Math.floor((years - 1) / 2));
 }
 
-/**
- * 오늘(todayKey)이 입사 응당일이면 직전 1개월 구간 반환 (k=1..11).
- * 없으면 null.
- */
-export function getDueMonthlyPeriod(
-  hireKey: string,
-  todayKey: string,
-): { monthIndex: number; startKey: string; endKey: string } | null {
-  for (let k = 1; k <= 11; k += 1) {
-    if (addMonthsKey(hireKey, k) === todayKey) {
-      const startKey = addMonthsKey(hireKey, k - 1);
-      const endKey = addMonthsKey(hireKey, k);
-      if (startKey && endKey) return { monthIndex: k, startKey, endKey };
-    }
-  }
-  return null;
-}
-
 /** 오늘이 만 N년차 응당일이면 N(>=1) 반환, 아니면 null. */
 export function getDueAnnualYear(hireKey: string, todayKey: string): number | null {
   // 합리적 상한 60년
@@ -306,50 +288,68 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
         }
       }
 
-      // 2) 1년 미만 월 만근 → +1일
+      // 2) 1년 미만 월 만근 → +1일 (경과한 모든 월 구간을 소급 부여)
+      // 기존에는 입사 응당일 당일에만 부여해서, cron 이 그 하루를 거르면(배포 공백/CRON_SECRET 미설정 등)
+      // 해당 월 +1일이 영구 누락됐다. 이제 경과한 모든 월 구간 중 미부여분을 매 실행마다 메꾼다(멱등).
       if (tenureYears(hireKey, todayKey) >= 1) {
         result.skipped += 1;
         continue;
       }
-      const period = getDueMonthlyPeriod(hireKey, todayKey);
-      if (!period) {
-        result.skipped += 1;
-        continue;
+
+      // 이미 부여된 월차 period_key 집합 (멱등 + 소급 판정)
+      const existingMonthly = await db
+        .select({ period_key: leaveAccrualsTable.period_key })
+        .from(leaveAccrualsTable)
+        .where(
+          and(
+            eq(leaveAccrualsTable.staff_id, s.id),
+            eq(leaveAccrualsTable.kind, 'monthly'),
+          ),
+        );
+      const existingMonthlyKeys = new Set(existingMonthly.map((a) => a.period_key));
+
+      let monthlyGranted = 0;
+      for (let k = 1; k <= 11; k += 1) {
+        const startKey = addMonthsKey(hireKey, k - 1);
+        const endKey = addMonthsKey(hireKey, k);
+        if (!startKey || !endKey) continue;
+        if (endKey > todayKey) break; // 아직 끝나지 않은 월 구간 → 이후 구간도 모두 미완료
+        const periodKey = startKey.slice(0, 7); // 'YYYY-MM'
+        if (existingMonthlyKeys.has(periodKey)) continue; // 이미 부여됨
+        const fullAttendance = await isFullAttendanceMonth(db, s.id, startKey, endKey);
+        if (!fullAttendance) continue; // 결근 있음 → 미부여
+        const ok = await tryInsertAccrual(db, {
+          staffId: s.id,
+          companyId: s.company_id,
+          kind: 'monthly',
+          periodKey,
+          days: 1,
+          year: targetYear,
+          sourceDate: todayKey,
+          note: `${k}개월차 만근 +1일`,
+        });
+        if (!ok) continue;
+        monthlyGranted += 1;
+        result.granted.push({
+          staffId: s.id,
+          staffName: s.name,
+          kind: 'monthly',
+          days: 1,
+          periodKey,
+          note: `${k}개월차 만근`,
+        });
       }
-      const fullAttendance = await isFullAttendanceMonth(db, s.id, period.startKey, period.endKey);
-      if (!fullAttendance) {
+
+      if (monthlyGranted > 0) {
+        const current = Number(s.annual_leave_total) || 0;
+        await db
+          .update(staffMembersTable)
+          .set({ annual_leave_total: current + monthlyGranted })
+          .where(eq(staffMembersTable.id, s.id));
+        await recalculateLeaveBalance(s.id, targetYear);
+      } else {
         result.skipped += 1;
-        continue; // 결근 있음 → 미부여
       }
-      const periodKey = period.startKey.slice(0, 7); // 'YYYY-MM'
-      const ok = await tryInsertAccrual(db, {
-        staffId: s.id,
-        companyId: s.company_id,
-        kind: 'monthly',
-        periodKey,
-        days: 1,
-        year: targetYear,
-        sourceDate: todayKey,
-        note: `${period.monthIndex}개월차 만근 +1일`,
-      });
-      if (!ok) {
-        result.skipped += 1;
-        continue;
-      }
-      const current = Number(s.annual_leave_total) || 0;
-      await db
-        .update(staffMembersTable)
-        .set({ annual_leave_total: current + 1 })
-        .where(eq(staffMembersTable.id, s.id));
-      await recalculateLeaveBalance(s.id, targetYear);
-      result.granted.push({
-        staffId: s.id,
-        staffName: s.name,
-        kind: 'monthly',
-        days: 1,
-        periodKey,
-        note: `${period.monthIndex}개월차 만근`,
-      });
     } catch (err) {
       result.errors.push(`${s.id}: ${err instanceof Error ? err.message : String(err)}`);
     }

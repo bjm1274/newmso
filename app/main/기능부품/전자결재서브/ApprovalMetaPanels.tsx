@@ -644,11 +644,9 @@ export function renderRosterInfoHtml(metaData: ApprovalMetaData) {
 }
 
 export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaData }) {
-  if (!metaData || (metaData.form_name !== '근무표' && metaData.form_slug !== 'roster' && metaData.roster_request_type !== 'monthly_schedule')) {
-    return null;
-  }
-  const yearMonth = String(metaData.year_month || '').trim();
-  const assignments = Array.isArray(metaData.assignments) ? metaData.assignments : [];
+  // 훅은 어떤 조건부 반환보다도 먼저, 항상 같은 순서로 호출되어야 한다(react-hooks/rules-of-hooks).
+  // metaData가 null이거나 근무표가 아니면 assignments는 빈 배열이 되어 아래 effect는 무동작한다.
+  const assignments = Array.isArray(metaData?.assignments) ? metaData.assignments : [];
 
   const [loadedStaff, setLoadedStaff] = useState<Record<string, string>>({});
   const [loadedShifts, setLoadedShifts] = useState<Record<string, string>>({});
@@ -695,6 +693,10 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
     };
   }, [assignments]);
 
+  if (!metaData || (metaData.form_name !== '근무표' && metaData.form_slug !== 'roster' && metaData.roster_request_type !== 'monthly_schedule')) {
+    return null;
+  }
+  const yearMonth = String(metaData.year_month || '').trim();
   if (!yearMonth || assignments.length === 0) return null;
 
   const [year, month] = yearMonth.split('-').map(Number);

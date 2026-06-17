@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
-import { isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { isAdminUser, isPrivilegedUser, hasPermission } from '@/lib/access-control';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
 type PayrollLockRow = {
@@ -118,7 +118,10 @@ export default function PayrollLockPanel({
     });
   }, [yearMonth, companyScope]);
 
-  const canApproveReopen = useMemo(() => isAdminUser(viewer) || isPrivilegedUser(viewer), [viewer]);
+  const canApproveReopen = useMemo(
+    () => isAdminUser(viewer) || isPrivilegedUser(viewer) || hasPermission(viewer, 'hr_급여_승인'),
+    [viewer]
+  );
   const hasPendingRequest = supportsReopenWorkflow && lockRow?.reopen_request_status === 'pending';
 
   const createLock = async () => {

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { fetchPendingApprovalCount } from '@/lib/data/dashboard-widgets';
+import { fetchPendingApprovalCount, fetchCurrentMonthDepositTotal } from '@/lib/data/dashboard-widgets';
 import { MenuIcon } from '../조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import 경영분석모바일대시보드 from './경영분석/모바일대시보드';
@@ -8,6 +8,7 @@ import 경영분석모바일대시보드 from './경영분석/모바일대시보
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  const [monthlyDeposit, setMonthlyDeposit] = useState<number | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -18,6 +19,13 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
       })
       .catch(() => {
         if (!cancelled) setPendingApprovalCount(0);
+      });
+    fetchCurrentMonthDepositTotal()
+      .then((total) => {
+        if (!cancelled) setMonthlyDeposit(total);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthlyDeposit(null);
       });
     return () => {
       cancelled = true;
@@ -37,9 +45,12 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
 
   const stats = [
     {
-      label: '이번 달 매출',
-      value: '집계 준비중',
-      detail: '매출 연동 예정',
+      label: '이번 달 입금',
+      value:
+        monthlyDeposit === null
+          ? '집계 중…'
+          : `₩${Math.round(monthlyDeposit).toLocaleString('ko-KR')}`,
+      detail: '가상계좌 입금 합계',
       icon: 'analytics',
       tone: 'text-[var(--success)] bg-[var(--success-light)]',
     },

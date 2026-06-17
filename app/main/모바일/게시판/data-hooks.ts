@@ -24,12 +24,23 @@ import {
 } from '@/app/main/기능부품/게시판공통';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { loadStarSet } from './별표훅';
+import { normalizePoll } from './게시판변경';
 
 // ─────────────────────────────────────────────
 // 카테고리 정의 — handoff와 1:1
 // ─────────────────────────────────────────────
 
-export type BoardCatId = 'all' | 'notice' | 'free' | 'event' | 'op' | 'mri' | 'share' | 'meal';
+export type BoardCatId =
+  | 'all'
+  | 'notice'
+  | 'free'
+  | 'voice'
+  | 'event'
+  | 'op'
+  | 'mri'
+  | 'suggest'
+  | 'share'
+  | 'meal';
 
 export type BoardCatDef = {
   id: BoardCatId;
@@ -40,14 +51,16 @@ export type BoardCatDef = {
 };
 
 export const BOARD_CATS: BoardCatDef[] = [
-  { id: 'all',    label: '전체',     tone: '' },
-  { id: 'notice', label: '공지',     boardType: '공지사항', tone: 'accent' },
-  { id: 'free',   label: '자유',     boardType: '자유게시판', tone: '' },
-  { id: 'event',  label: '경조사',   boardType: '경조사', tone: 'warning' },
-  { id: 'op',     label: '수술일정', boardType: '수술일정', tone: 'success' },
-  { id: 'mri',    label: 'MRI일정',  boardType: 'MRI일정', tone: 'success' },
-  { id: 'share',  label: '업무공유', boardType: '업무가이드', tone: 'warning' },
-  { id: 'meal',   label: '식단',     tone: '' }, // 별도 board 없음 → 자유 안의 '식단' 태그
+  { id: 'all',     label: '전체',     tone: '' },
+  { id: 'notice',  label: '공지',     boardType: '공지사항', tone: 'accent' },
+  { id: 'free',    label: '자유',     boardType: '자유게시판', tone: '' },
+  { id: 'voice',   label: '소리함',   boardType: '익명소리함', tone: 'accent' },
+  { id: 'event',   label: '경조사',   boardType: '경조사', tone: 'warning' },
+  { id: 'op',      label: '수술일정', boardType: '수술일정', tone: 'success' },
+  { id: 'mri',     label: 'MRI일정',  boardType: 'MRI일정', tone: 'success' },
+  { id: 'suggest', label: '제안함',   boardType: '직원제안함', tone: 'warning' },
+  { id: 'share',   label: '업무공유', boardType: '업무가이드', tone: 'warning' },
+  { id: 'meal',    label: '식단',     tone: '' }, // 별도 board 없음 → 자유 안의 '식단' 태그
 ];
 
 const LIST_BOARD_TYPES = BOARD_CATS
@@ -298,6 +311,36 @@ export { toggleStarServer, loadStarSet, useStarSet } from './별표훅';
 
 export type PostImportance = 'normal' | 'urgent';
 
+/** board_posts.poll JSONB — PC `게시판서브/board-poll-prize.ts`의 BoardPoll과 동일 형태 */
+export type BoardPollInput = {
+  question: string;
+  options: string[];
+  anonymous: boolean;
+  multiple: boolean;
+  prize?: { winnerCount: number; name: string };
+};
+
+/** 수술/MRI 일정 메타 — PC postData 매핑과 1:1 */
+export type ScheduleMetaInput = {
+  /** 'YYYY-MM-DD' */
+  scheduleDate?: string | null;
+  /** 'HH:mm' */
+  scheduleTime?: string | null;
+  scheduleRoom?: string | null;
+  patientName?: string | null;
+  /** 차트번호 — PC는 content 컬럼에 저장 */
+  chartNo?: string | null;
+  /** '좌' | '우' | '' — title 접두사로 저장 (PC와 동일) */
+  side?: '좌' | '우' | '';
+  fasting?: boolean;
+  inpatient?: boolean;
+  guardian?: boolean;
+  caregiver?: boolean;
+  transfusion?: boolean;
+  /** MRI일정 전용 — 조영제 필요 여부 */
+  contrastRequired?: boolean;
+};
+
 export type CreateBoardPostInput = {
   catId: BoardCatId;
   title: string;
@@ -311,7 +354,21 @@ export type CreateBoardPostInput = {
   importance?: PostImportance;
   /** P2: 예약 발행 — ISO/HTML datetime-local 값 (빈 문자열은 무시) */
   scheduledPublishAt?: string | null;
+  /** P3: 투표/설문 — PC board_posts.poll JSONB */
+  poll?: BoardPollInput | null;
+  /** P3: 수술/MRI 일정 메타 — op/mri 카테고리에서만 의미 있음 */
+  schedule?: ScheduleMetaInput | null;
   user: { id?: string | null; name?: string | null; company?: string | null; company_id?: string | null } | null;
+};
+
+/** 게시글 수정 입력 — board_posts.update 매핑 (제목/본문/첨부/투표) */
+export type UpdateBoardPostInput = {
+  postId: string;
+  title: string;
+  content: string;
+  attachments?: AttachmentItem[];
+  /** null이면 기존 투표 제거 (PC editing 시 poll=null과 동일) */
+  poll?: BoardPollInput | null;
 };
 
 function toIsoOrNull(value: string | null | undefined): string | null {
@@ -326,6 +383,11 @@ function toIsoOrNull(value: string | null | undefined): string | null {
   return d.toISOString();
 }
 
+/** 익명소리함 — 작성 시 항상 익명 (PC: useAnonymous = activeBoard === '익명소리함' || isAnonymous) */
+export function isVoiceBoardType(boardType: string | null | undefined): boolean {
+  return String(boardType ?? '') === '익명소리함';
+}
+
 export async function createBoardPost(input: CreateBoardPostInput): Promise<BoardPost | null> {
   const {
     catId,
@@ -336,10 +398,14 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     pinned = false,
     importance = 'normal',
     scheduledPublishAt = null,
+    poll = null,
+    schedule = null,
     user,
   } = input;
   const cat = BOARD_CATS.find((c) => c.id === catId);
   const boardType = cat?.boardType ?? '자유게시판';
+  // PC와 동일: 익명소리함은 무조건 익명
+  const useAnonymous = isVoiceBoardType(boardType) || anonymous;
   if (!user?.id) {
     toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
     return null;
@@ -358,13 +424,23 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
         .filter((a) => a.name && a.url)
     : [];
 
-  const baseContent = content.trim();
-  const finalContent = normalizedAttachments.length > 0
+  const isSchedule = boardType === '수술일정' || boardType === 'MRI일정';
+
+  // 일정 게시판: PC와 동일하게 content 컬럼에 차트번호를 저장 (본문 입력칸 미사용)
+  const baseContent = isSchedule
+    ? String(schedule?.chartNo ?? '').trim()
+    : content.trim();
+  const finalContent = !isSchedule && normalizedAttachments.length > 0
     ? buildAttachmentMetaContent(baseContent, normalizedAttachments)
     : baseContent;
 
+  // 일정 게시판: title 앞에 좌/우 접두사 (PC sidePrefix)
+  const sidePrefix = schedule?.side === '좌' ? '좌측 ' : schedule?.side === '우' ? '우측 ' : '';
+  const finalTitle = isSchedule ? `${sidePrefix}${title.trim()}` : title.trim();
+
   const scheduledIso = toIsoOrNull(scheduledPublishAt);
   const statusValue = importance === 'urgent' ? '중요' : null;
+  const normalizedPoll = normalizePoll(poll);
 
   type InsertPayload = {
     board_type: string;
@@ -379,22 +455,46 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     is_pinned?: boolean;
     status?: string | null;
     scheduled_publish_at?: string | null;
+    poll?: BoardPollInput | null;
+    schedule_date?: string | null;
+    schedule_time?: string | null;
+    schedule_room?: string | null;
+    patient_name?: string | null;
+    surgery_fasting?: boolean | null;
+    surgery_inpatient?: boolean | null;
+    surgery_guardian?: boolean | null;
+    surgery_caregiver?: boolean | null;
+    surgery_transfusion?: boolean | null;
+    mri_contrast_required?: boolean | null;
   };
   const payload: InsertPayload = {
     board_type: boardType,
-    title: title.trim(),
+    title: finalTitle,
     content: finalContent,
-    // JM5: 익명일 때 author_id 비식별 (PC와 동일)
-    author_id: anonymous ? null : user.id,
-    author_name: anonymous ? '익명' : (user.name ?? '익명'),
-    company: anonymous ? null : (user.company ?? null),
-    company_id: anonymous ? null : (user.company_id ?? null),
-    is_anonymous: anonymous,
+    // JM5: 익명일 때 author_id 비식별 (PC와 동일 — 익명소리함 포함)
+    author_id: useAnonymous ? null : user.id,
+    author_name: useAnonymous ? '익명' : (user.name ?? '익명'),
+    company: useAnonymous ? null : (user.company ?? null),
+    company_id: useAnonymous ? null : (user.company_id ?? null),
+    is_anonymous: useAnonymous,
   };
   if (normalizedAttachments.length > 0) payload.attachments = normalizedAttachments;
   if (pinned) payload.is_pinned = true;
   if (statusValue) payload.status = statusValue;
   if (scheduledIso) payload.scheduled_publish_at = scheduledIso;
+  if (normalizedPoll) payload.poll = normalizedPoll;
+  if (isSchedule && schedule) {
+    payload.schedule_date = schedule.scheduleDate || null;
+    payload.schedule_time = schedule.scheduleTime || null;
+    payload.schedule_room = schedule.scheduleRoom || null;
+    payload.patient_name = schedule.patientName || null;
+    payload.surgery_fasting = Boolean(schedule.fasting);
+    payload.surgery_inpatient = Boolean(schedule.inpatient);
+    payload.surgery_guardian = Boolean(schedule.guardian);
+    payload.surgery_caregiver = Boolean(schedule.caregiver);
+    payload.surgery_transfusion = Boolean(schedule.transfusion);
+    payload.mri_contrast_required = boardType === 'MRI일정' ? Boolean(schedule.contrastRequired) : null;
+  }
 
   try {
     let { data, error } = await supabase
@@ -405,7 +505,12 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     // optional 컬럼이 없는 환경 → 메시지에 등장한 컬럼을 제외하고 재시도 (한 번)
     if (error) {
       const msg = String((error as { message?: string }).message ?? '');
-      const optional: Array<keyof InsertPayload> = ['attachments', 'is_pinned', 'status', 'scheduled_publish_at'];
+      const optional: Array<keyof InsertPayload> = [
+        'attachments', 'is_pinned', 'status', 'scheduled_publish_at', 'poll',
+        'schedule_date', 'schedule_time', 'schedule_room', 'patient_name',
+        'surgery_fasting', 'surgery_inpatient', 'surgery_guardian',
+        'surgery_caregiver', 'surgery_transfusion', 'mri_contrast_required',
+      ];
       const toOmit = optional.filter((k) => new RegExp(String(k), 'i').test(msg));
       if (toOmit.length > 0) {
         const retryPayload: InsertPayload = { ...payload };
@@ -422,6 +527,17 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     return null;
   }
 }
+
+// 변경(mutation) 헬퍼는 게시판변경.ts로 분리 (JM 500줄 이내 유지).
+// createBoardPost가 normalizePoll을 사용하므로 상단에서 import (위 import 블록) 후 재노출.
+export { normalizePoll };
+export {
+  updateBoardPost,
+  deleteBoardPost,
+  deleteBoardComment,
+  togglePollVote,
+  type PollVotes,
+} from './게시판변경';
 
 // ─────────────────────────────────────────────
 // 작성자 아바타 톤(이름 기반 결정)

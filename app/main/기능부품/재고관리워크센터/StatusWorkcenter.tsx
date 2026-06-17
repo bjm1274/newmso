@@ -59,8 +59,13 @@ export default function StatusWorkcenter() {
       user?.permissions?.mso === true,
     [user],
   );
-  const refreshFn = useCallback(async () => {}, []);
-  const fetchLogsFn = useCallback(async () => {}, []);
+  // 재고 현황 데이터 재조회(inventory+logs 동시) — supply 승인 처리 후 호출되어 화면을 갱신한다.
+  const { refresh: refreshStatus } = data;
+  const refreshFn = useCallback(async () => {
+    refreshStatus();
+  }, [refreshStatus]);
+  // status 뷰는 inventory_logs(부서 사용량)도 같은 refresh에서 함께 재조회되므로 동일 핸들러를 사용.
+  const fetchLogsFn = refreshFn;
   const workflow = useSupplyWorkflow({
     user: user ?? undefined,
     isInventoryOpsUser,

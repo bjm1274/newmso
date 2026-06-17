@@ -297,6 +297,70 @@ export function useMyLatestPayroll(staffId: string | null | undefined): MyPaysli
   return state;
 }
 
+// ─── 급여명세: 최근 N개월 실지급 추이 (payroll_records, limit 없이 다건) ───
+export type PayrollTrendPoint = {
+  /** YYYY-MM 원본 */
+  yearMonth: string;
+  /** 'M월' 축 라벨 */
+  label: string;
+  /** 실지급(net_pay) */
+  netPay: number;
+};
+
+export type MyPayrollTrend = {
+  points: PayrollTrendPoint[];
+  loading: boolean;
+};
+
+function trendAxisLabel(ym: string): string {
+  const m = /^(\d{4})-?(\d{2})/.exec(ym);
+  if (m) return `${Number(m[2])}월`;
+  return ym;
+}
+
+/**
+ * useMyPayrollTrend — useMyLatestPayroll과 동일한 payroll_records 테이블/컬럼(year_month, net_pay)을
+ * 사용하되 limit(1) 대신 최근 months개를 가져와 월별 실지급 추이를 만든다.
+ * 차트는 과거→최근 순서(오름차순)로 표시하므로 역순 정렬한다.
+ */
+export function useMyPayrollTrend(
+  staffId: string | null | undefined,
+  months = 6,
+): MyPayrollTrend {
+  const [state, setState] = useState<MyPayrollTrend>({ points: [], loading: true });
+
+  useEffect(() => {
+    if (!staffId) { setState({ points: [], loading: false }); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('payroll_records')
+          .select('year_month, net_pay')
+          .eq('staff_id', staffId)
+          .order('year_month', { ascending: false })
+          .limit(months);
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? (data as PayrollRow[]) : [];
+        // 최신순으로 받아 과거→최근(차트 X축) 순서로 뒤집는다.
+        const points: PayrollTrendPoint[] = rows
+          .map((r) => {
+            const ym = String(r['year_month'] ?? '');
+            return { yearMonth: ym, label: trendAxisLabel(ym), netPay: num(r, 'net_pay') };
+          })
+          .filter((p) => p.yearMonth)
+          .reverse();
+        setState({ points, loading: false });
+      } catch {
+        if (!cancelled) setState({ points: [], loading: false });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [staffId, months]);
+
+  return state;
+}
+
 // ─── 증명서: 최근 발급 내역 (certificate_issuances) ───
 export type MyRecentCert = { id: string; title: string; date: string };
 

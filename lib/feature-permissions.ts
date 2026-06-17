@@ -33,19 +33,13 @@ export const MYPAGE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 export const CHAT_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'chat_접근', label: '채팅 메뉴 접근' },
   { key: 'chat_방생성', label: '일반 채팅방 생성' },
-  { key: 'chat_공지방생성', label: '공지방 생성', hint: '전파용 공지방을 만들 수 있는 권한' },
-  { key: 'chat_전체메시지', label: '전체 메시지 발송' },
   { key: 'chat_파일첨부', label: '파일 첨부' },
-  { key: 'chat_내보내기', label: '대화 내용 내보내기' },
-  { key: 'chat_멤버관리', label: '채팅방 멤버 강퇴/관리' },
 ];
 
 export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_조직도', label: '조직도' },
-  { key: 'extra_조직도_다운로드', label: '조직도 다운로드' },
   { key: 'extra_부서별재고', label: '부서별 재고' },
   { key: 'extra_근무현황', label: '근무현황' },
-  { key: 'extra_근무현황_편성', label: '근무현황 편성(스케줄링)' },
   { key: 'extra_인계노트', label: '인계노트' },
   { key: 'extra_퇴원심사', label: '퇴원심사' },
   { key: 'extra_마감보고', label: '마감보고' },
@@ -121,6 +115,8 @@ export const INVENTORY_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'inventory_카테고리', label: '카테고리' },
   { key: 'inventory_AS반품', label: 'AS반품' },
   { key: 'inventory_소모품통계', label: '소모품통계' },
+  { key: 'inventory_월마감', label: '월마감' },
+  { key: 'inventory_내부서재고', label: '내부서 재고' },
 ];
 
 export const ADMIN_PERMISSION_ITEMS: FeaturePermissionItem[] = [

@@ -94,6 +94,31 @@ export async function fetchActiveStaffLeaves(): Promise<StaffLeaveSnapshot[]> {
   );
 }
 
+/**
+ * 이번 달 입금 합계 (virtual_account_deposits, deposit_status='deposited')
+ *
+ * NOTE: 이 시스템에는 별도의 "매출/수익" 데이터 소스가 없다. 가짜 매출 숫자를
+ * 만들지 않는다는 팀 정책(ExecDashboard PendingCard)을 지키되, 실제 입금 데이터는
+ * 정직한 현금 유입 지표로 노출한다. 라벨은 "매출"이 아니라 "이번 달 입금"이어야 한다.
+ */
+export async function fetchCurrentMonthDepositTotal(): Promise<number> {
+  const ym = getKoreanTodayString().slice(0, 7); // 'YYYY-MM'
+  const monthStart = `${ym}-01`;
+  return fetcher(
+    `dashboard:deposits:sum:${ym}`,
+    async () => {
+      const { data } = await supabase
+        .from('virtual_account_deposits')
+        .select('amount, deposited_at')
+        .eq('deposit_status', 'deposited')
+        .gte('deposited_at', monthStart);
+      const rows = (data ?? []) as Array<{ amount: number | null; deposited_at: string | null }>;
+      return rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+    },
+    { ttl: WIDGET_TTL },
+  );
+}
+
 export type RecentNotificationItem = {
   title: string | null;
   created_at: string | null;

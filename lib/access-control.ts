@@ -146,6 +146,15 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
+  // board 권한을 하나라도 가지면 게시판 메뉴 노출 (결정: board read = 메뉴 노출)
+  menu_게시판: [
+    'board_공지사항_read', 'board_공지사항_write',
+    'board_자유게시판_read', 'board_자유게시판_write',
+    'board_경조사_read', 'board_경조사_write',
+    'board_MRI일정_read', 'board_MRI일정_write',
+    'board_수술일정_read', 'board_수술일정_write',
+    'board_업무가이드_read', 'board_업무가이드_write',
+  ],
   menu_전자결재: ['approval', ...Object.values(APPROVAL_PERMISSION_KEYS), 'admin_공문서대장'],
   menu_인사관리: ['hr', ...Object.values(HR_PERMISSION_KEYS)],
   menu_재고관리: ['inventory', ...Object.values(INVENTORY_PERMISSION_KEYS)],
@@ -156,12 +165,12 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   approval_결재함: ['approval'],
   approval_참조문서함: ['approval'],
   approval_작성하기: ['approval', 'admin_공문서대장'],
-  hr_구성원: ['hr'],
+  hr_구성원: ['hr', 'hr_구성원_열람', 'hr_구성원_관리'],
   hr_인사발령: ['hr_구성원', 'hr'],
   hr_포상징계: ['hr_구성원', 'hr'],
   hr_교육: ['hr_구성원', 'hr'],
   hr_오프보딩: ['hr_구성원', 'hr'],
-  hr_근태: ['hr'],
+  hr_근태: ['hr', 'hr_근태_열람', 'hr_근태_수정'],
   hr_교대근무: ['hr'],
   hr_근무표생성: ['hr_교대근무', 'hr_근태', 'hr'],
   hr_연차휴가: ['hr_근태', 'hr'],
@@ -419,8 +428,11 @@ export function canAccessMyPageTab(user: UserLike | null | undefined, tabId: str
       return true;
     case 'certificates':
       return isPrivilegedUser(user) || hasPermission(user, 'hr_증명서');
-    case 'salary':
+    case 'salary': {
+      const own = getExplicitPermissionState(user, 'mypage_급여조회');
+      if (own !== null) return own;
       return isPrivilegedUser(user) || hasPermission(user, 'hr_급여');
+    }
     case 'documents':
       return isPrivilegedUser(user) || hasPermission(user, 'hr_문서보관함');
     default:
@@ -434,9 +446,9 @@ export function canAccessBoard(
   action: BoardPermissionAction = 'read'
 ): boolean {
   if (isPrivilegedUser(user)) return true;
-  if (!canAccessMainMenu(user, '게시판')) return false;
-
+  // 업무가이드 읽기는 게시판 메뉴 권한과 무관하게 공개 (게이트 순서 교정)
   if (boardId === '업무가이드' && action === 'read') return true;
+  if (!canAccessMainMenu(user, '게시판')) return false;
 
   const permissionKeys = BOARD_PERMISSION_KEYS[boardId];
   if (!permissionKeys) return false;
@@ -483,6 +495,17 @@ export function canAccessInventorySection(
   user: UserLike | null | undefined,
   sectionIdOrPermissionKey: string
 ): boolean {
+  // 워크센터 id → 소속 세분키 OR 합집합 (어느 하나라도 있으면 워크센터 진입 허용)
+  const WORKCENTER_UNIONS: Record<string, string[]> = {
+    status:  ['inventory_현황', 'inventory_이력', 'inventory_내부서재고'],
+    io:      ['inventory_등록', 'inventory_발주', 'inventory_거래처', 'inventory_납품확인서', 'inventory_이관'],
+    item:    ['inventory_자산', 'inventory_스캔', 'inventory_카테고리', 'inventory_UDI'],
+    analyze: ['inventory_월마감', 'inventory_수요예측', 'inventory_재고실사', 'inventory_소모품통계', 'inventory_AS반품'],
+  };
+  const group = WORKCENTER_UNIONS[sectionIdOrPermissionKey];
+  if (group) {
+    return group.some((key) => canAccessDetailedSection(user, '재고관리', key, INVENTORY_PERMISSION_KEYS));
+  }
   return canAccessDetailedSection(user, '재고관리', sectionIdOrPermissionKey, INVENTORY_PERMISSION_KEYS);
 }
 
@@ -521,8 +544,8 @@ export function canAccessExtraFeature(
     return true;
   }
 
-  if (permissionKey === 'extra_ESL') {
-    const explicitESL = getExplicitPermissionState(user, 'extra_ESL');
+  if (permissionKey === 'extra_ESL관리') {
+    const explicitESL = getExplicitPermissionState(user, 'extra_ESL관리');
     if (explicitESL !== null) return explicitESL;
     return isAdminUser(user);
   }

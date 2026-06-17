@@ -33,6 +33,8 @@ export type EnqueueSupabaseMutationOpts<T = unknown> = {
   payload: Record<string, unknown> | Record<string, unknown>[];
   /** update/delete 조건 */
   match?: Record<string, unknown>;
+  /** upsert 충돌 기준 컬럼 (예: 'staff_id,date'). 미지정 시 PK 기준 — 유니크 제약과 다르면 INSERT 충돌. */
+  onConflict?: string;
   retryable?: boolean;
   onSuccess?: (data: T) => void;
   onFailure?: (err: Error) => void;
@@ -50,6 +52,7 @@ type QueuedMutationPayload = {
   table: string;
   data: Record<string, unknown> | Record<string, unknown>[];
   match?: Record<string, unknown>;
+  onConflict?: string;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -82,6 +85,7 @@ async function executeMutation<T>(
   table: string,
   payload: Record<string, unknown> | Record<string, unknown>[],
   match?: Record<string, unknown>,
+  onConflict?: string,
 ): Promise<T | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let q: any;
@@ -101,7 +105,10 @@ async function executeMutation<T>(
       break;
     }
     case 'upsert':
-      q = supabase.from(table).upsert(Array.isArray(payload) ? payload : [payload]).select();
+      q = supabase
+        .from(table)
+        .upsert(Array.isArray(payload) ? payload : [payload], onConflict ? { onConflict } : undefined)
+        .select();
       break;
     case 'delete': {
       if (!match || Object.keys(match).length === 0) {
@@ -135,25 +142,25 @@ async function executeMutation<T>(
 export async function enqueueSupabaseMutation<T = unknown>(
   opts: EnqueueSupabaseMutationOpts<T>,
 ): Promise<MutationResult<T>> {
-  const { kind, table, payload, match, onSuccess, onFailure } = opts;
+  const { kind, table, payload, match, onConflict, onSuccess, onFailure } = opts;
 
   // 오프라인 선조건 — 즉시 큐잉
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     const queueType = `db:${kind}:${table}`;
-    const queuePayload: QueuedMutationPayload = { kind, table, data: payload, match };
+    const queuePayload: QueuedMutationPayload = { kind, table, data: payload, match, onConflict };
     getOfflineQueue().enqueue({ type: queueType, payload: queuePayload });
     return { data: null, queued: true, error: null };
   }
 
   try {
-    const data = await executeMutation<T>(kind, table, payload, match);
+    const data = await executeMutation<T>(kind, table, payload, match, onConflict);
     if (onSuccess && data !== null) onSuccess(data);
     return { data, queued: false, error: null };
   } catch (err) {
     if (isNetworkError(err)) {
       // 네트워크 에러 → 큐잉
       const queueType = `db:${kind}:${table}`;
-      const queuePayload: QueuedMutationPayload = { kind, table, data: payload, match };
+      const queuePayload: QueuedMutationPayload = { kind, table, data: payload, match, onConflict };
       getOfflineQueue().enqueue({ type: queueType, payload: queuePayload });
       return { data: null, queued: true, error: null };
     }
@@ -199,7 +206,7 @@ export function initOfflineQueueFlush(): () => void {
       resolvedData = resolveInjectedPayload(p.data, groupResults) as Record<string, unknown> | Record<string, unknown>[];
     }
 
-    const resData = await executeMutation(p.kind as MutationKind, p.table, resolvedData, p.match);
+    const resData = await executeMutation(p.kind as MutationKind, p.table, resolvedData, p.match, p.onConflict);
 
     if (action.groupId) {
       transactionGroupResults.get(action.groupId)?.push(resData);

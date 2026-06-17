@@ -10,21 +10,19 @@
  * JM(파일당 500줄), JM2(필요한 칼럼만 select·useMemo), JM3(toast), JM6(button 시맨틱)
  */
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
-import MChip from '../공통/MChip';
-import MAvatar from '../공통/MAvatar';
 import {
   BOARD_CATS,
   type BoardCatId,
   type BoardListPost,
   boardTypeToCat,
-  formatShortDate,
-  pickAvatarTone,
 } from './data-hooks';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
+import BoardScheduleCalendar from './일정달력';
+import PostCardMemo from './게시판카드';
 
 // ─── 카테고리 홈 정의 ─────────────────────────────────────
 type BoardCategory = {
@@ -36,12 +34,14 @@ type BoardCategory = {
 };
 
 const HOME_CATEGORIES: BoardCategory[] = [
-  { id: 'notice', label: '공지사항',     subtitle: '병원 공지 · 전달사항',      icon: 'bell',     tone: 'warn' },
-  { id: 'free',   label: '자유게시판',   subtitle: '자유 토론 · 소통',           icon: 'chat',     tone: 'success' },
-  { id: 'event',  label: '경조사 소식',  subtitle: '경조사 안내',                icon: 'bookmark', tone: 'danger' },
-  { id: 'op',     label: '수술 일정',    subtitle: '수술 스케줄 공유',           icon: 'calendar', tone: 'danger' },
-  { id: 'mri',    label: 'MRI 일정',     subtitle: 'MRI 스케줄 · 판독 대기',    icon: 'calendar', tone: 'accent' },
-  { id: 'share',  label: '업무가이드',   subtitle: '응급 · 수술 · 접수 SOP',    icon: 'fileText', tone: 'accent' },
+  { id: 'notice',  label: '공지사항',     subtitle: '병원 공지 · 전달사항',      icon: 'bell',     tone: 'warn' },
+  { id: 'free',    label: '자유게시판',   subtitle: '자유 토론 · 소통',           icon: 'chat',     tone: 'success' },
+  { id: 'voice',   label: '익명소리함',   subtitle: '익명으로 의견 전달',         icon: 'chat',     tone: 'accent' },
+  { id: 'suggest', label: '직원제안함',   subtitle: '개선 · 제안 접수',           icon: 'bookmark', tone: 'warn' },
+  { id: 'event',   label: '경조사 소식',  subtitle: '경조사 안내',                icon: 'bookmark', tone: 'danger' },
+  { id: 'op',      label: '수술 일정',    subtitle: '수술 스케줄 공유',           icon: 'calendar', tone: 'danger' },
+  { id: 'mri',     label: 'MRI 일정',     subtitle: 'MRI 스케줄 · 판독 대기',    icon: 'calendar', tone: 'accent' },
+  { id: 'share',   label: '업무가이드',   subtitle: '응급 · 수술 · 접수 SOP',    icon: 'fileText', tone: 'accent' },
 ];
 
 function countUnread(posts: BoardListPost[], catId: BoardCatId): number {
@@ -174,200 +174,7 @@ function BoardHomeView({
   );
 }
 
-// ─── 게시글 카드 ──────────────────────────────────────────
-function PostCard({
-  post,
-  onOpen,
-}: {
-  post: BoardListPost;
-  onOpen: () => void;
-}) {
-  const cat = boardTypeToCat(post.board_type as string | null);
-  const catDef = BOARD_CATS.find((c) => c.id === cat);
-  const isImportant = (post.status === '중요') ||
-    (Array.isArray(post.tags) && post.tags.map((t) => String(t)).includes('중요'));
-  const isPinned = Boolean(post.is_pinned);
-  const authorName = String(post.author_name ?? '익명');
-  const initial = authorName.charAt(0) || '?';
-  const tone = pickAvatarTone(String(post.id ?? authorName));
-  const views = typeof post.views === 'number' ? post.views : 0;
-  const commentCount = post.comment_count ?? 0;
 
-  const isSchedule = cat === 'op' || cat === 'mri';
-
-  if (isSchedule) {
-    const isOp = cat === 'op';
-    return (
-      <div
-        className="m-card"
-        data-variant="mobile"
-        style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}
-      >
-        <button
-          type="button"
-          onClick={onOpen}
-          aria-label={`${post.title} 상세 보기`}
-          style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)', lineHeight: 1.4 }}>
-                {post.title}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--m-accent)', fontWeight: 800, marginTop: 4 }}>
-                {post.patient_name || '환자명 미지정'}
-                {post.content && (
-                  <span style={{ color: 'var(--z-500)', marginLeft: 6 }}>
-                    | 차트번호: {post.content}
-                  </span>
-                )}
-              </div>
-            </div>
-            <MChip tone={isOp ? 'danger' : 'accent'}>
-              {isOp ? '🏥 수술' : '🔬 MRI'}
-            </MChip>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 8,
-              paddingTop: 10,
-              marginTop: 10,
-              borderTop: '1px solid var(--m-border)',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>날짜</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_date || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>시간</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_time || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>위치</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.schedule_room || '-'}</div>
-            </div>
-          </div>
-
-          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
-              {post.surgery_fasting && <MChip tone="danger">금식</MChip>}
-              {post.surgery_inpatient && <MChip tone="accent">입원</MChip>}
-              {post.surgery_guardian && <MChip tone="success">보호자 동반</MChip>}
-              {post.surgery_caregiver && <MChip tone="warning">간병인</MChip>}
-              {post.surgery_transfusion && <MChip tone="danger">수혈</MChip>}
-            </div>
-          )}
-        </button>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 2 }}>
-          <span style={{ fontSize: 11, color: 'var(--z-400)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MIcon name="user" size={11} /> {views}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="m-card"
-      data-variant="mobile"
-      style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        aria-label={`${post.title} 상세 보기`}
-        style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          {isPinned && <MIcon name="pin" size={12} color="var(--m-accent)" />}
-          <span
-            data-testid={`board-post-status-pill-${post.id}`}
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: 4,
-              background: 'var(--accent-tint)',
-              color: 'var(--m-accent)'
-            }}
-          >
-            {post.status || '게시중'}
-          </span>
-          {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
-            <span
-              data-testid={`board-post-attachment-indicator-${post.id}`}
-              style={{ fontSize: 12, color: 'var(--z-400)' }}
-            >
-              📎
-            </span>
-          )}
-          <div style={{ flex: 1 }} />
-          <span
-            data-testid={`board-post-date-${post.id}`}
-            style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}
-          >
-            {formatShortDate(post.created_at as string | null)}
-          </span>
-        </div>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: '-0.018em',
-            lineHeight: 1.45,
-            color: 'var(--z-900)',
-          }}
-        >
-          {post.title}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            marginTop: 8,
-            fontSize: 11,
-            color: 'var(--z-500)',
-            fontWeight: 600,
-          }}
-        >
-          <MAvatar tone={tone} size="sm">{initial}</MAvatar>
-          <b style={{ color: 'var(--z-700)' }}>{authorName}</b>
-          {post.company && (
-            <>
-              <span style={{ color: 'var(--z-400)' }}>·</span>
-              <span>{String(post.company)}</span>
-            </>
-          )}
-          <div style={{ flex: 1 }} />
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <MIcon name="user" size={11} />
-            {views}
-          </span>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 3,
-              color: commentCount > 0 ? 'var(--m-accent)' : 'var(--z-500)',
-            }}
-          >
-            <MIcon name="chat" size={11} />
-            {commentCount}
-          </span>
-        </div>
-      </button>
-    </div>
-  );
-}
-
-const PostCardMemo = memo(PostCard);
 
 // ─── 메인 컴포넌트 ───────────────────────────────────────
 function SBoardBase({
@@ -383,7 +190,21 @@ function SBoardBase({
   onOpenCategory,
   company,
 }: SBoardProps) {
-  const filtered = useMemo(() => filterByCat(posts, cat), [posts, cat]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  // Phase: op/mri 일정 게시판 — 리스트 ↔ 달력 토글
+  const [calendarView, setCalendarView] = useState(false);
+  const isScheduleCat = cat === 'op' || cat === 'mri';
+  const filtered = useMemo(() => {
+    const byCat = filterByCat(posts, cat);
+    const q = query.trim().toLowerCase();
+    if (!q) return byCat;
+    return byCat.filter((p) =>
+      [p.title, p.content, p.author_name].some((v) =>
+        String(v ?? '').toLowerCase().includes(q),
+      ),
+    );
+  }, [posts, cat, query]);
 
   const { containerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh: onRefresh ?? (() => Promise.resolve()),
@@ -404,7 +225,27 @@ function SBoardBase({
         back={onBack}
         actions={
           <>
-            <button type="button" aria-label="검색">
+            {isScheduleCat && (
+              <button
+                type="button"
+                aria-label={calendarView ? '목록 보기' : '달력 보기'}
+                aria-pressed={calendarView}
+                onClick={() => setCalendarView((v) => !v)}
+              >
+                <MIcon name={calendarView ? 'list' : 'calendar'} size={20} />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="검색"
+              aria-pressed={searchOpen}
+              onClick={() => {
+                setSearchOpen((v) => {
+                  if (v) setQuery('');
+                  return !v;
+                });
+              }}
+            >
               <MIcon name="search" size={20} />
             </button>
             <button type="button" onClick={onWrite} aria-label="새 글 작성">
@@ -413,6 +254,28 @@ function SBoardBase({
           </>
         }
       />
+      {searchOpen && (
+        <div style={{ padding: '8px 16px' }}>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="제목·내용·작성자 검색"
+            aria-label="게시글 검색"
+            autoFocus
+            style={{
+              width: '100%',
+              height: 38,
+              padding: '0 12px',
+              borderRadius: 10,
+              border: '1px solid var(--m-border, #e5e7eb)',
+              background: 'var(--m-card, #fff)',
+              fontSize: 14,
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
       <div className="m-chip-bar">
         {BOARD_CATS.map((c) => (
           <button
@@ -428,6 +291,9 @@ function SBoardBase({
         ))}
       </div>
       <div className="m-scroll" ref={containerRef} style={{ overscrollBehaviorY: 'contain' }}>
+        {isScheduleCat && calendarView ? (
+          <BoardScheduleCalendar posts={filtered} isMri={cat === 'mri'} onOpen={onOpen} />
+        ) : (
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {loading && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
@@ -453,6 +319,7 @@ function SBoardBase({
             />
           ))}
         </div>
+        )}
       </div>
     </div>
   );

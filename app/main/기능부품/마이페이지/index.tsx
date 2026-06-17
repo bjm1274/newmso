@@ -33,7 +33,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
 import { performClientLogout } from '@/lib/client-logout';
 import { LucideIcon } from '../조직도서브/조직도측면창';
-import { canAccessMyPageTab } from '@/lib/access-control';
+import { canAccessMyPageTab, hasPermission } from '@/lib/access-control';
 import {
   FAVORITES_KEY,
   buildMenuEntry,
@@ -630,6 +630,11 @@ function MyPageMain({
       setIsEditingProfile(false);
       return;
     }
+    // mypage_수정 권한 체크 (권한 없으면 편집 진입 차단)
+    if (!hasPermission(user, 'mypage_수정')) {
+      toast('정보 수정 권한이 없습니다. 관리자에게 문의하세요.', 'warning');
+      return;
+    }
 
     const verified = await verifyProfilePassword();
     if (verified) {
@@ -1083,6 +1088,7 @@ function MyPageMain({
                   <LucideIcon name="LogOut" size={15} />
                   로그아웃
                 </button>
+                {hasPermission(user, 'mypage_수정') && (
                 <button
                   type="button"
                   onClick={handleToggleEdit}
@@ -1092,6 +1098,7 @@ function MyPageMain({
                   <LucideIcon name="SquarePen" size={15} />
                   {isEditingProfile ? '수정 취소' : '정보 수정'}
                 </button>
+                )}
               </div>
             </div>
           )}

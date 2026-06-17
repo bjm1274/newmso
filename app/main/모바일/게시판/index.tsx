@@ -80,6 +80,8 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
   }, [initialPostId, onConsumePostId]);
 
   const [overridePosts, setOverridePosts] = useState<BoardListPost[] | null>(null);
+  // 수정 모드 대상 게시글 (write 뷰에서 editPost로 전달)
+  const [editPost, setEditPost] = useState<BoardListPost | null>(null);
 
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
@@ -106,8 +108,29 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
   }, []);
 
   const handleWrite = useCallback(() => {
+    setEditPost(null);
     setView('write');
   }, []);
+
+  // 상세 ⋯ → 수정 모드 (글작성 EDIT)
+  const handleEdit = useCallback((p: BoardListPost) => {
+    setEditPost(p);
+    setView('write');
+  }, []);
+
+  // 상세 삭제 완료 → 목록 복귀 + refetch (낙관적 제거 포함)
+  const handleDeleted = useCallback(
+    (deletedId: string) => {
+      setOverridePosts((prev) => {
+        const base = prev ?? fetched;
+        return base.filter((p) => String(p.id) !== deletedId);
+      });
+      setPostId(null);
+      setView('list');
+      void refetch();
+    },
+    [fetched, refetch],
+  );
 
   const handleBackToHome = useCallback(() => {
     setView('home');
@@ -121,8 +144,13 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
 
   const handleCreated = useCallback(
     (id: string) => {
-      setPostId(id);
-      setView('detail');
+      setEditPost(null);
+      if (id && id !== 'queued') {
+        setPostId(id);
+        setView('detail');
+      } else {
+        setView('list');
+      }
       void refetch();
     },
     [refetch],
@@ -166,7 +194,11 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
         user={{ id: userId, name: userName, company: userCompany, company_id: userCompanyId }}
         canAdmin={canAdmin}
         initialCat={cat}
-        onCancel={() => setView('list')}
+        editPost={editPost}
+        onCancel={() => {
+          setEditPost(null);
+          setView(editPost ? 'detail' : 'list');
+        }}
         onCreated={handleCreated}
       />
     );
@@ -183,8 +215,11 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
         onPatchPost={patchPost}
         currentUserId={userId}
         currentUserName={userName}
+        canAdmin={canAdmin}
         isLiked={currentIsLiked}
         onLikedChange={handleLikedChange}
+        onEdit={handleEdit}
+        onDeleted={handleDeleted}
       />
     );
   } else {

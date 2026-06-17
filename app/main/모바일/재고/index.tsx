@@ -90,6 +90,7 @@ export default function 재고관리({ user, onBack }: 재고관리Props) {
           company={company}
           onBack={goHub}
           onPlaceOrder={() => openForm('form-order', 'stock')}
+          onGoInout={() => setView('io')}
         />
       );
     case 'io':

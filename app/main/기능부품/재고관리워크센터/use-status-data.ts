@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StockStatusRow, Tone } from './stock-types';
 import { pickNumber, pickString, toMonthString, type Row } from './data-helpers';
@@ -70,8 +70,12 @@ const EMPTY: StatusWorkcenterData = {
   error: null,
 };
 
-export function useStatusData(userCompany?: string): StatusWorkcenterData {
+export function useStatusData(
+  userCompany?: string,
+): StatusWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<StatusWorkcenterData>(EMPTY);
+  const [reloadKey, setReloadKey] = useState(0);
+  const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +139,7 @@ export function useStatusData(userCompany?: string): StatusWorkcenterData {
     return () => {
       cancelled = true;
     };
-  }, [userCompany]);
+  }, [userCompany, reloadKey]);
 
-  return state;
+  return { ...state, refresh };
 }

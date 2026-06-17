@@ -51,6 +51,12 @@ export async function submitProfileChangeRequest(
     return { ok: false, error: '직원 정보를 확인할 수 없습니다.' };
   }
 
+  // mypage_수정 권한 방어 (명시 false일 때만 차단, undefined/true는 허용)
+  const perms = currentUser?.permissions;
+  if (perms && typeof perms === 'object' && perms.mypage_수정 === false) {
+    return { ok: false, error: '정보 수정 권한이 없습니다.' };
+  }
+
   const currentPermissions =
     currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
       ? (currentUser.permissions as Record<string, unknown>)

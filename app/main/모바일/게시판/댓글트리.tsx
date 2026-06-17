@@ -12,10 +12,15 @@ import { useMemo } from 'react';
 import MAvatar from '../공통/MAvatar';
 import MIcon from '../공통/MIcon';
 import { type BoardComment, formatShortDate, pickAvatarTone } from './data-hooks';
+import { canDeleteMobileComment } from './권한읽음';
 
 export type BoardCommentTreeProps = {
   comments: BoardComment[];
   onReply: (parent: BoardComment) => void;
+  /** 댓글 삭제 — 작성자/관리자만 노출 (없으면 삭제 버튼 미표시) */
+  onDelete?: (comment: BoardComment) => void;
+  currentUserId?: string | null;
+  canAdmin?: boolean;
 };
 
 type CommentNode = {
@@ -67,16 +72,23 @@ function CommentBody({
   comment,
   isReply,
   onReply,
+  onDelete,
+  currentUserId,
+  canAdmin,
 }: {
   comment: BoardComment;
   isReply: boolean;
   onReply: (c: BoardComment) => void;
+  onDelete?: (c: BoardComment) => void;
+  currentUserId?: string | null;
+  canAdmin?: boolean;
 }) {
   const name = String(comment.author_name ?? '익명');
   const initial = name.charAt(0) || '?';
   const tone = pickAvatarTone(String(comment.author_id ?? name));
   const ts = formatShortDate(comment.created_at);
   const body = String(comment.content ?? '');
+  const canDelete = Boolean(onDelete) && canDeleteMobileComment(comment.author_id, currentUserId, Boolean(canAdmin));
   return (
     <div
       style={{
@@ -123,6 +135,26 @@ function CommentBody({
               답글
             </button>
           )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete?.(comment)}
+              aria-label="댓글 삭제"
+              style={{
+                marginLeft: isReply ? 'auto' : 0,
+                fontSize: 11,
+                color: 'var(--m-danger, #ef4444)',
+                fontWeight: 700,
+                padding: '2px 4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <MIcon name="trash" size={12} />
+              삭제
+            </button>
+          )}
         </div>
         <div
           style={{
@@ -141,7 +173,7 @@ function CommentBody({
   );
 }
 
-export default function BoardCommentTree({ comments, onReply }: BoardCommentTreeProps) {
+export default function BoardCommentTree({ comments, onReply, onDelete, currentUserId, canAdmin }: BoardCommentTreeProps) {
   const tree = useMemo(() => buildTree(comments), [comments]);
 
   if (tree.length === 0) {
@@ -164,9 +196,24 @@ export default function BoardCommentTree({ comments, onReply }: BoardCommentTree
     <>
       {tree.map((node) => (
         <div key={node.comment.id}>
-          <CommentBody comment={node.comment} isReply={false} onReply={onReply} />
+          <CommentBody
+            comment={node.comment}
+            isReply={false}
+            onReply={onReply}
+            onDelete={onDelete}
+            currentUserId={currentUserId}
+            canAdmin={canAdmin}
+          />
           {node.replies.map((r) => (
-            <CommentBody key={r.id} comment={r} isReply onReply={onReply} />
+            <CommentBody
+              key={r.id}
+              comment={r}
+              isReply
+              onReply={onReply}
+              onDelete={onDelete}
+              currentUserId={currentUserId}
+              canAdmin={canAdmin}
+            />
           ))}
         </div>
       ))}

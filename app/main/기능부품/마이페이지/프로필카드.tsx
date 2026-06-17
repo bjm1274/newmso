@@ -14,6 +14,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import type { ProfileCardUser, ProfileCardProps } from './프로필카드/types';
 import { toSafeText } from './프로필카드/format-utils';
 import { EditableItem } from './프로필카드/InfoItems';
+import { hasPermission } from '@/lib/access-control';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -306,6 +307,7 @@ export default function MyProfileCard({
 
   const actionButtons = (
     <>
+      {hasPermission(user, 'mypage_수정') && (
       <button
         type="button"
         onClick={() => { if (isEditing) applyIsEditing(false); else verifyPasswordAndRun(() => applyIsEditing(true)); }}
@@ -317,6 +319,7 @@ export default function MyProfileCard({
       >
         {isEditing ? '수정 취소' : '정보 수정'}
       </button>
+      )}
     </>
   );
 

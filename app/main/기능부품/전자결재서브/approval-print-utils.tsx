@@ -407,51 +407,63 @@ export function openApprovalPrintView(params: {
   buildHtml: (item: Record<string, unknown>, options?: { autoPrint?: boolean }) => string;
 }) {
   const { item, buildHtml } = params;
-  const html = buildHtml(item, { autoPrint: true });
 
-  const isMobilePrintFlow =
-    typeof navigator !== 'undefined' &&
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  // PC·모바일 모두 hidden iframe + srcdoc 으로 인쇄한다.
+  // 데스크톱의 기존 window.open('', '_blank') 경로는 브라우저 팝업 차단 시 null 을 반환하고,
+  // 차단된 about:blank 가 OS 로 핸드오프되어 Windows "이 'about' 링크를 열 앱" 다이얼로그를 띄우는 문제가 있었다.
+  // iframe 방식은 새 창을 열지 않아 팝업 차단·about: 핸드오프를 원천 차단한다.
+  const printViaIframe = (): boolean => {
+    if (typeof document === 'undefined') return false;
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
 
-  if (isMobilePrintFlow) {
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
+      const cleanup = () => {
+        window.setTimeout(() => {
+          iframe.remove();
+        }, 1200);
+      };
 
-    const cleanup = () => {
-      window.setTimeout(() => {
-        iframe.remove();
-      }, 1200);
-    };
-
-    iframe.onload = () => {
-      const frameWindow = iframe.contentWindow;
-      if (!frameWindow) {
+      iframe.onload = () => {
+        const frameWindow = iframe.contentWindow;
+        if (!frameWindow) {
+          cleanup();
+          toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+          return;
+        }
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch {
+          toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+        }
         cleanup();
-        toast('모바일 인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-        return;
-      }
-      frameWindow.focus();
-      frameWindow.print();
-      cleanup();
-    };
+      };
 
-    iframe.srcdoc = buildHtml(item);
-    document.body.appendChild(iframe);
-    return;
-  }
+      // onload 에서 직접 print() 를 호출하므로 autoPrint 스크립트는 넣지 않는다.
+      iframe.srcdoc = buildHtml(item);
+      document.body.appendChild(iframe);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-  const win = window.open('', '_blank');
+  if (printViaIframe()) return;
+
+  // 최후 폴백: iframe 생성 자체가 실패한 환경에서만 새 탭 시도 (autoPrint 스크립트 내장).
+  const win = typeof window !== 'undefined' ? window.open('', '_blank') : null;
   if (!win) {
-    toast('PDF 미리보기를 열 수 없습니다. 팝업 차단을 확인해 주세요.', 'error');
+    toast('인쇄 미리보기를 열 수 없습니다. 팝업 차단을 확인해 주세요.', 'error');
     return;
   }
-  win.document.write(html);
+  win.document.write(buildHtml(item, { autoPrint: true }));
   win.document.close();
 }

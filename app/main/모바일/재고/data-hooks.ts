@@ -20,6 +20,7 @@
  */
 
 import { useMemo } from 'react';
+import { canAccessInventorySection, isMsoUser } from '@/lib/access-control';
 import {
   useStatusData,
   type StatusWorkcenterData,
@@ -90,10 +91,9 @@ export type StockMutateUser = {
 
 export function canPlaceOrder(user: StockMutateUser | null | undefined): boolean {
   if (!user) return false;
-  const perms = (user.permissions ?? {}) as Record<string, unknown>;
-  if (perms.mso === true) return true;
-  if (perms.menu_재고관리 === true) return true;
-  const role = typeof user.role === 'string' ? user.role : '';
-  if (role === '관리자' || role === '매니저') return true;
-  return false;
+  return (
+    isMsoUser(user) ||
+    canAccessInventorySection(user, 'inventory_발주') ||
+    canAccessInventorySection(user, 'inventory_등록')
+  );
 }

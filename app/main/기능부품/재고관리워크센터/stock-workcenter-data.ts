@@ -10,3 +10,4 @@ export { useStatusData, type StatusWorkcenterData } from './use-status-data';
 export { useIOData, type IOWorkcenterData } from './use-io-data';
 export { useItemData, type ItemWorkcenterData } from './use-item-data';
 export { useAnalyzeData, type AnalyzeWorkcenterData } from './use-analyze-data';
+export { useClosingData, type ClosingData } from './use-closing-data';

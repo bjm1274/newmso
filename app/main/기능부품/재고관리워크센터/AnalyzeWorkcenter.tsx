@@ -83,26 +83,10 @@ function InventoryCountOverlay({
 import type {
   AbcGrade,
   AnalyzeTab,
-  CloseHistoryRow,
-  CloseStep,
   ForecastRow,
   InspectRow,
 } from './stock-types';
-import { useAnalyzeData, useEmptyMessage } from './stock-workcenter-data';
-
-// 월마감 단계는 일정 기반 placeholder — closing_snapshots에서 동적 단계화는 후속 작업
-const CLOSE_STEPS: CloseStep[] = [
-  { n: 1, title: '재고 실사', desc: '진행 중', state: 'on' },
-  { n: 2, title: '입출고 확정', desc: '대기', state: 'pending' },
-  { n: 3, title: '차이 조정', desc: '대기', state: 'pending' },
-  { n: 4, title: '재고 평가', desc: '대기', state: 'pending' },
-  { n: 5, title: '마감 보고서', desc: '대기', state: 'pending' },
-];
-
-const CLOSE_HISTORY: CloseHistoryRow[] = [
-  // 실제 closing_snapshots fetch 전 placeholder. 단, dummy 수치는 제거.
-  { month: '최근 마감', amt: '-', diff: '-', tone: 'muted', done: '-' },
-];
+import { useAnalyzeData, useClosingData, useEmptyMessage } from './stock-workcenter-data';
 
 // ─────────────────────────────────────────────────
 // 메인
@@ -522,16 +506,18 @@ function InspectPanel({
 // ─────────────────────────────────────────────────
 
 function ClosePanel() {
-  const monthLabel = `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`;
+  const { history, steps, currentMonthClosed, loading, error } = useClosingData();
+  const now = new Date();
+  const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   return (
     <div className="flex flex-col gap-3">
       <StockDarkBanner
         kicker="MONTHLY CLOSING"
-        title={`${monthLabel} 마감 진행`}
+        title={`${monthLabel} 마감 ${currentMonthClosed ? '완료' : '진행'}`}
         desc="실사 → 입출고 확정 → 차이 조정 → 평가 → 보고서"
       >
         <span className="rounded-[var(--radius-sm)] bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white">
-          진행 중
+          {currentMonthClosed ? '마감 완료' : '진행 중'}
         </span>
       </StockDarkBanner>
 
@@ -541,7 +527,7 @@ function ClosePanel() {
         aria-label="월마감 5단계"
       >
         <ol className="flex flex-col gap-2">
-          {CLOSE_STEPS.map((s) => (
+          {steps.map((s) => (
             <li
               key={s.n}
               className={'flex items-center gap-3 ' + (s.state === 'pending' ? 'opacity-60' : '')}
@@ -571,28 +557,37 @@ function ClosePanel() {
 
       <section className="app-card flex flex-col gap-2 p-3">
         <h3 className="text-[12px] font-bold">최근 마감 결과</h3>
-        <p className="px-2 py-3 text-center text-[11px] text-[var(--toss-gray-4)]">
-          inventory_closing_snapshots 연동은 후속 작업입니다. 현재는 진행 단계만 표시합니다.
-        </p>
-        <ul className="flex flex-col gap-1.5">
-          {CLOSE_HISTORY.map((r) => (
-            <li
-              key={r.month}
-              className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2"
-            >
-              <StockChip tone={r.tone}>{r.diff}</StockChip>
-              <div className="flex-1 min-w-0">
-                <span className="text-[12px] font-bold">{r.month}</span>
-                <span className="ml-2 text-[11px] text-[var(--toss-gray-4)]">
-                  · 재고 평가액 {r.amt}
+        {loading ? (
+          <p className="px-2 py-3 text-center text-[11px] text-[var(--toss-gray-4)]">
+            불러오는 중…
+          </p>
+        ) : error ? (
+          <p className="px-2 py-3 text-center text-[11px] text-[var(--danger)]">{error}</p>
+        ) : history.length === 0 ? (
+          <p className="px-2 py-3 text-center text-[11px] text-[var(--toss-gray-4)]">
+            마감 이력이 없습니다. 월마감을 완료하면 여기에 표시됩니다.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {history.map((r) => (
+              <li
+                key={r.month}
+                className="flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2"
+              >
+                <StockChip tone={r.tone}>{r.diff}</StockChip>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[12px] font-bold">{r.month}</span>
+                  <span className="ml-2 text-[11px] text-[var(--toss-gray-4)]">
+                    · 재고 평가액 {r.amt}
+                  </span>
+                </div>
+                <span className="text-[11px] tabular-nums text-[var(--toss-gray-4)]">
+                  {r.done}
                 </span>
-              </div>
-              <span className="text-[11px] tabular-nums text-[var(--toss-gray-4)]">
-                완료 {r.done}
-              </span>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

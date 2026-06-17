@@ -22,6 +22,7 @@ import {
 } from '@/lib/profile-change-request';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import { hasPermission } from '@/lib/access-control';
 
 function getInitial(name?: string | null) {
   return String(name || '').trim().slice(0, 1) || '나';
@@ -129,6 +130,10 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
 
   const handleSave = useCallback(async () => {
     if (!staffId) { toast('직원 정보를 확인할 수 없습니다.', 'warning'); return; }
+    if (!hasPermission(currentUser, 'mypage_수정')) {
+      toast('정보 수정 권한이 없습니다. 관리자에게 문의하세요.', 'warning');
+      return;
+    }
     setSaving(true);
     try {
       const result = await submitProfileChangeRequest(currentUser, form);

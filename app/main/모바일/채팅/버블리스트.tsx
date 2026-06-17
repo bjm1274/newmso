@@ -30,6 +30,10 @@ export type BubbleListProps = {
   onTask: (message: ChatMessage) => void;
   onDelete: (message: ChatMessage) => void;
   onForward: (message: ChatMessage) => void;
+  onEdit?: (message: ChatMessage) => void;
+  onReactionDetail?: (message: ChatMessage) => void;
+  onReadDetail?: (message: ChatMessage) => void;
+  onOpenThread?: (message: ChatMessage) => void;
 };
 
 export default function BubbleList({
@@ -47,7 +51,21 @@ export default function BubbleList({
   onTask,
   onDelete,
   onForward,
+  onEdit,
+  onReactionDetail,
+  onReadDetail,
+  onOpenThread,
 }: BubbleListProps) {
+  // 각 루트 메시지에 달린 답글(reply_to_id) 수 — 스레드 뱃지
+  const threadCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    messages.forEach((m) => {
+      const parentId = m.reply_to_id ? String(m.reply_to_id) : '';
+      if (parentId) counts[parentId] = (counts[parentId] || 0) + 1;
+    });
+    return counts;
+  }, [messages]);
+
   const items = useMemo(() => {
     const out: Array<
       | { kind: 'date'; label: string; key: string }
@@ -94,6 +112,11 @@ export default function BubbleList({
             onTask={onTask}
             onDelete={onDelete}
             onForward={onForward}
+            onEdit={onEdit}
+            onReactionDetail={onReactionDetail}
+            onReadDetail={onReadDetail}
+            onOpenThread={onOpenThread}
+            threadReplyCount={threadCounts[String(item.message.id)] || 0}
           />
         );
       })}

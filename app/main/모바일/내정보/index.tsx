@@ -14,6 +14,7 @@ import 연차 from './연차';
 import 급여명세 from './급여명세';
 import 증명서 from './증명서';
 import 정보수정 from './정보수정';
+import 나의할일 from './나의할일';
 
 export type 내정보Props = {
   user: ErpUser;
@@ -50,6 +51,8 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
     contentElement = <증명서 user={user} onBack={onBack} />;
   } else if (sub === 'edit') {
     contentElement = <정보수정 user={user} onBack={onBack} />;
+  } else if (sub === 'todo') {
+    contentElement = <나의할일 user={user} onBack={onBack} onSwitchTab={onSwitchTab} />;
   } else {
     contentElement = <SHome user={user} onSub={onSub} onLogout={onLogout} onSwitchTab={onSwitchTab} />;
   }

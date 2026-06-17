@@ -11,7 +11,9 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export const SESSION_COOKIE_NAME = 'erp_session';
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+// 모바일/PWA 백그라운드에서 세션 갱신 타이머가 멈춰도 "방치 후 만료" 로그아웃이 잘 일어나지 않도록
+// 슬라이딩 세션 수명을 30일로 둔다. 사용 중에는 GET /api/auth/session 이 절반 미만일 때 30일로 재연장한다.
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 export type SessionUser = Record<string, unknown> & {
   id: string | null;
@@ -391,6 +393,8 @@ export function getSessionCookieOptions(maxAgeSeconds = SESSION_MAX_AGE_SECONDS)
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: maxAgeSeconds,
+    // 일부 모바일 웹뷰는 Max-Age 만 있으면 세션 쿠키로 취급해 앱 종료 시 소실시킨다 → Expires 동시 지정.
+    expires: new Date(Date.now() + maxAgeSeconds * 1000),
   };
 }
 

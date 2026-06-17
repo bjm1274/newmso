@@ -1,19 +1,20 @@
-'use client';
+﻿'use client';
 
 /**
  * SStockAnalyze — 모바일 재고관리: 분석·마감
  *
  * 핸드오프: m-screens-stock.jsx §SStockAnalyze
  *
- * 6 segment:
- *  - abc: ABC 분류 바 + A 등급 핵심 품목
- *  - forecast: 6월 수요 예측 top 10 + DesktopHint
- *  - count: 실사 진행률 + 위치별 진행 (PC inspect)
- *  - close: 5단계 월마감 진행 (mock — PC와 동기화는 별도 테이블 필요)
- *  - usage: 소모품 사용액 (간이 — PC ABC top 활용)
- *  - rma: AS·반품 KPI + 안내 (실제 데이터는 PC)
+ * 6 segment (모두 실데이터 — PC 동일 테이블/쿼리 미러):
+ *  - abc: ABC 분류 바 + A 등급 핵심 품목 (useAnalyzeData)
+ *  - forecast: 다음 30일 수요 예측 top 10 — 현재고/예측/부족/발주일/신뢰도 (useAnalyzeData)
+ *  - count: 실사 진행률 + 위치별 진행 (useAnalyzeData)
+ *  - close: 5단계 월마감 진행 + 최근 마감 이력 (useClosingData → inventory_closing_snapshots)
+ *  - usage: 부서별·기간별 사용액 (useUsageStats → inventory_logs)
+ *  - rma: AS·반품 실내역 (useReturnsData → inventory_logs change_type='반품')
  *
  * 데이터: useAnalyzeData() — inventory + inventory_logs
+ *        useClosingData()/useUsageStats()/useReturnsData() — inventory_closing_snapshots + inventory_logs
  *
  * JM: ~380줄
  * JM2: 한 번 로드
@@ -23,16 +24,15 @@
 
 import { useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
-import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
-import MKpi from '../공통/MKpi';
-import MBtn from '../공통/MBtn';
 import MListRow from '../공통/MListRow';
 import {
   useAnalyzeData,
   toMTone,
   type AnalyzeWorkcenterData,
 } from './data-hooks';
+// 월마감/소모품통계/AS·반품 패널은 분석마감패널.tsx 로 분리(파일 길이 ≤500줄 유지).
+import { Empty, ClosePane, UsagePane, RmaPane } from './분석마감패널';
 
 export type AnalyzeTab = 'abc' | 'forecast' | 'count' | 'close' | 'usage' | 'rma';
 
@@ -87,52 +87,6 @@ export default function 분석마감({ company, onBack }: 분석마감Props) {
         {!data.loading && !data.error && tab === 'usage' && <UsagePane data={data} />}
         {!data.loading && !data.error && tab === 'rma' && <RmaPane />}
       </div>
-    </div>
-  );
-}
-
-// ─── 빈 메시지 ────────────────────────────────────────────────
-function Empty({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | 'danger' }) {
-  return (
-    <div
-      style={{
-        padding: 24,
-        textAlign: 'center',
-        color: tone === 'danger' ? 'var(--m-danger)' : 'var(--z-500)',
-        fontSize: 13,
-      }}
-    >
-      {msg}
-    </div>
-  );
-}
-
-// ─── 데스크톱 안내 카드 ──────────────────────────────────────
-function DesktopHint({
-  children,
-  tone = 'accent',
-}: {
-  children: React.ReactNode;
-  tone?: 'accent' | 'warning';
-}) {
-  const fg = tone === 'accent' ? 'var(--m-accent)' : 'var(--m-warning)';
-  const bg = tone === 'accent' ? 'var(--m-accent-soft)' : 'var(--m-warning-soft)';
-  return (
-    <div
-      style={{
-        padding: '12px 14px',
-        borderRadius: 'var(--m-radius-md)',
-        background: bg,
-        color: fg,
-        fontSize: 12,
-        fontWeight: 700,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-      }}
-    >
-      <MIcon name="info" size={14} />
-      {children}
     </div>
   );
 }
@@ -251,36 +205,34 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
 
 // ─── 수요예측 탭 ──────────────────────────────────────────────
 function ForecastPane({ data }: { data: AnalyzeWorkcenterData }) {
+  // PC ForecastRow 그대로(use-analyze-data buildForecast): name/stock/pred/gap/when/conf/tone.
+  // 모바일은 현재고·30일 예측·예상 부족·발주 권장일·신뢰도를 모두 노출(데스크톱 전용 메시지 제거).
   return (
     <div style={{ padding: '14px 16px 24px' }}>
-      <DesktopHint>상세 예측 모델 조정은 데스크톱에서</DesktopHint>
-      <div className="m-card" style={{ marginTop: 12, padding: '14px 14px' }}>
-        <div style={{ fontSize: 13, fontWeight: 800 }}>다음 달 수요 예측 (top {data.forecast.length})</div>
+      <div className="m-card" style={{ padding: '14px 14px' }}>
+        <div style={{ fontSize: 13, fontWeight: 800 }}>다음 30일 수요 예측 (top {data.forecast.length})</div>
         <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
-          최근 30일 사용량 기반
+          최근 30일 사용량 기반 · 부족 예상 {data.forecastMissCount}건
         </div>
         {data.forecast.length === 0 ? (
           <Empty msg="예측 가능한 사용 이력이 없습니다." />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
             {data.forecast.map((r, i) => {
               const ratio = r.pred > 0 ? Math.min((r.pred / 600) * 100, 100) : 0;
-              const gapColor =
-                r.gap < 0 ? 'var(--m-danger)' : r.gap < r.pred ? 'var(--m-warning)' : 'var(--m-success)';
+              const gapColor = r.gap < 0 ? 'var(--m-danger)' : 'var(--m-success)';
               return (
                 <div key={`${r.name}-${i}`}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, flex: 1 }}>{r.name}</span>
-                    <span className="m-tnum" style={{ fontSize: 13, fontWeight: 800 }}>
-                      {r.pred}
-                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0 }}>{r.name}</span>
+                    <MChip tone={toMTone(r.tone)}>{r.conf}</MChip>
                     <span
                       className="m-tnum"
                       style={{
                         fontSize: 11,
                         fontWeight: 700,
                         color: gapColor,
-                        width: 48,
+                        width: 52,
                         textAlign: 'right',
                       }}
                     >
@@ -304,6 +256,24 @@ function ForecastPane({ data }: { data: AnalyzeWorkcenterData }) {
                         background: 'var(--m-accent)',
                       }}
                     />
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: 4,
+                      fontSize: 10.5,
+                      color: 'var(--z-500)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span>
+                      현재고 <b className="m-tnum">{r.stock}</b> · 30일 예측{' '}
+                      <b className="m-tnum">{r.pred}</b>
+                    </span>
+                    <span style={{ color: r.when === '즉시' ? 'var(--m-danger)' : 'var(--m-accent)' }}>
+                      발주 {r.when}
+                    </span>
                   </div>
                 </div>
               );
@@ -391,168 +361,3 @@ function CountPane({ data }: { data: AnalyzeWorkcenterData }) {
     </div>
   );
 }
-
-// ─── 마감 탭 (정적 단계 표시) ─────────────────────────────────
-function ClosePane() {
-  const steps: ReadonlyArray<{ t: string; s: '완료' | '진행중' | '대기'; tone: 'success' | 'warning' | '' }> = [
-    { t: '재고 실사', s: '완료', tone: 'success' },
-    { t: '단가 확정', s: '완료', tone: 'success' },
-    { t: '사용액 정산', s: '진행중', tone: 'warning' },
-    { t: '부서 배분', s: '대기', tone: '' },
-    { t: '대표 승인', s: '대기', tone: '' },
-  ];
-  return (
-    <div style={{ padding: '14px 16px 24px' }}>
-      <div
-        className="m-card"
-        style={{
-          padding: '16px 18px',
-          background: 'var(--m-accent-soft)',
-          borderColor: 'transparent',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            color: 'var(--m-accent)',
-            fontWeight: 800,
-            letterSpacing: '0.04em',
-          }}
-        >
-          이번 달 마감 진행
-        </div>
-        <div style={{ fontSize: 18, fontWeight: 800, marginTop: 4, color: 'var(--m-accent)' }}>
-          2 / 5 단계 완료
-        </div>
-      </div>
-
-      <div className="m-card flush" style={{ marginTop: 12 }}>
-        {steps.map((s, i) => (
-          <div
-            key={s.t}
-            className="m-list-row"
-            style={{ gridTemplateColumns: '40px 1fr auto' }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                display: 'grid',
-                placeItems: 'center',
-                background:
-                  s.tone === 'success'
-                    ? 'var(--m-success)'
-                    : s.tone === 'warning'
-                      ? 'var(--m-warning)'
-                      : 'var(--z-200)',
-                color: s.tone ? '#fff' : 'var(--z-500)',
-                fontWeight: 800,
-                fontSize: 13,
-              }}
-            >
-              {s.tone === 'success' ? '✓' : i + 1}
-            </div>
-            <div className="lbl">{s.t}</div>
-            <MChip tone={s.tone === 'success' ? 'success' : s.tone === 'warning' ? 'warning' : ''}>
-              {s.s}
-            </MChip>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ padding: '12px 0 0' }}>
-        <MBtn block variant="primary" icon="check" ariaLabel="대표 승인 요청">
-          대표 승인 요청
-        </MBtn>
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <DesktopHint>상세 정산·승인 흐름은 결재 모듈에서 진행하세요</DesktopHint>
-      </div>
-    </div>
-  );
-}
-
-// ─── 소모품 통계 탭 (ABC top 활용) ────────────────────────────
-function UsagePane({ data }: { data: AnalyzeWorkcenterData }) {
-  // A등급의 examples를 부서별 사용 대용 카드로 사용 — 실제 부서 사용 통계는 PC에서.
-  if (data.grades.length === 0) return <Empty msg="통계할 데이터가 없습니다." />;
-  return (
-    <div style={{ padding: '14px 16px 24px' }}>
-      <div className="m-card" style={{ padding: '14px 14px', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>핵심 소모품 (A 등급)</div>
-        <div
-          className="m-tnum"
-          style={{
-            fontSize: 26,
-            fontWeight: 800,
-            letterSpacing: '-0.025em',
-            color: 'var(--z-900)',
-            marginTop: 4,
-          }}
-        >
-          {data.abcA}
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--z-500)',
-              marginLeft: 6,
-            }}
-          >
-            종 · 매출 기여 70%
-          </span>
-        </div>
-      </div>
-
-      <DesktopHint>부서별·기간별 사용 통계는 데스크톱에서 분석하세요</DesktopHint>
-
-      <div style={{ marginTop: 12 }}>
-        <div className="m-section-h">
-          <div className="lbl">예측 미스 (재고 부족 예상)</div>
-        </div>
-        {data.forecastMissCount === 0 ? (
-          <Empty msg="현재 재고 부족 예상 품목이 없습니다." />
-        ) : (
-          <div className="m-card" style={{ padding: '12px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <MIcon name="alertTri" size={18} color="var(--m-warning)" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 800 }}>
-                  {data.forecastMissCount}개 품목 부족 예상
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 1 }}>
-                  수요예측 탭에서 확인하세요
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── AS·반품 탭 ──────────────────────────────────────────────
-function RmaPane() {
-  return (
-    <div style={{ padding: '14px 16px 24px' }}>
-      <DesktopHint tone="warning">
-        AS·반품 진행 등록·갱신은 데스크톱에서 진행하세요
-      </DesktopHint>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 8,
-          marginTop: 12,
-        }}
-      >
-        <MKpi icon="receipt" label="AS 진행" value="—" sub="모바일 조회 전용" tone="warning" />
-        <MKpi icon="upload" label="반품 진행" value="—" sub="모바일 조회 전용" tone="accent" />
-      </div>
-    </div>
-  );
-}
-

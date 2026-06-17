@@ -13,24 +13,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
-import MChip from '../공통/MChip';
-import MAvatar from '../공통/MAvatar';
 import {
   BOARD_CATS,
   type BoardComment,
   type BoardListPost,
   type SafeAttachment,
   boardTypeToCat,
-  formatLongDate,
-  formatShortDate,
+  deleteBoardComment,
+  deleteBoardPost,
   getSafeAttachments,
   pickAvatarTone,
 } from './data-hooks';
 import { toggleLike } from './좋아요훅';
 import { useBoardDetailRealtime, useIncrementPostView } from './상세훅';
-import BoardMarkdown from './마크다운';
 import BoardCommentTree from './댓글트리';
-import { AttachmentRow, ImageAttachment } from './첨부카드';
+import { extractPoll, parsePollVotes } from './투표뷰';
+import BoardDetailHeader from './상세헤더';
+import ReadStatusSheet from './읽음시트';
+import PostMenuSheet from './상세메뉴';
+import CommentComposer from './댓글입력';
+import {
+  canDeleteMobilePost,
+  canEditMobilePost,
+  isAnonymousReadStatusPost,
+  markBoardPostRead,
+  useReadStatus,
+} from './권한읽음';
+import type { BoardPoll } from '@/app/main/기능부품/게시판서브/board-poll-prize';
 import {
   buildStorageDownloadUrl,
   buildStorageInlineUrl,
@@ -48,10 +57,16 @@ export type SBoardDetailProps = {
   onPatchPost: (patch: Partial<BoardListPost>) => void;
   currentUserId?: string | null;
   currentUserName?: string | null;
+  /** 관리자/시스템 마스터 — 수정·삭제·읽음현황 게이트 */
+  canAdmin?: boolean;
   /** 내 좋아요 상태 */
   isLiked: boolean;
   /** 좋아요 토글 후 부모 상태 동기화 */
   onLikedChange: (postId: string, liked: boolean, likesCount: number) => void;
+  /** ⋯ 메뉴 → 수정 모드 진입 (글작성 EDIT) */
+  onEdit?: (post: BoardListPost) => void;
+  /** 게시글 삭제 완료 → 목록으로 복귀 + refetch */
+  onDeleted?: (postId: string) => void;
 };
 
 // ─────────────────────────────────────────────
@@ -68,8 +83,11 @@ export default function SBoardDetail({
   onPatchPost,
   currentUserId,
   currentUserName,
+  canAdmin = false,
   isLiked,
   onLikedChange,
+  onEdit,
+  onDeleted,
 }: SBoardDetailProps) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -77,6 +95,11 @@ export default function SBoardDetail({
   // P2: 답글 대상 (root 댓글 한 명) — null이면 일반 댓글
   const [replyTo, setReplyTo] = useState<BoardComment | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // ⋯ 더보기 메뉴 / 읽음 현황 시트
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [readOpen, setReadOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { readers, pending, loading: readLoading, load: loadReadStatus } = useReadStatus(post);
 
   const postIdForHook = post ? String(post.id) : null;
   // 조회수 RPC — postId 변경 시 한 번만 +1, ref guard
@@ -87,6 +110,12 @@ export default function SBoardDetail({
   useBoardDetailRealtime(postIdForHook, () => {
     void onRefetchComments();
   });
+
+  // 상세 진입 시 읽음 마킹 (1회, 익명글 제외 — PC markBoardPostRead 미러)
+  useEffect(() => {
+    if (!post) return;
+    void markBoardPostRead(post, currentUserId ?? null);
+  }, [post?.id, currentUserId]);
 
   // sending lock 보호 (composition)
   useEffect(() => {
@@ -167,6 +196,65 @@ export default function SBoardDetail({
     setLikeBusy(false);
   }, [post, isLiked, likeBusy, currentUserId, onPatchPost, onLikedChange]);
 
+  // ⋯ 메뉴 — 수정
+  const handleEditClick = useCallback(() => {
+    if (!post) return;
+    setMenuOpen(false);
+    onEdit?.(post);
+  }, [post, onEdit]);
+
+  // ⋯ 메뉴 — 삭제 (confirm → deleteBoardPost → 목록 복귀)
+  const handleDeleteClick = useCallback(async () => {
+    if (!post || deleting) return;
+    setMenuOpen(false);
+    const ok = typeof window === 'undefined'
+      ? true
+      : window.confirm('이 게시물을 삭제할까요?\n댓글·읽음 상태가 함께 사라질 수 있습니다.');
+    if (!ok) return;
+    setDeleting(true);
+    const success = await deleteBoardPost(String(post.id));
+    setDeleting(false);
+    if (success) {
+      toast('게시물이 삭제되었습니다.', 'success');
+      onDeleted?.(String(post.id));
+    }
+  }, [post, deleting, onDeleted]);
+
+  // 댓글 삭제
+  const handleDeleteComment = useCallback(
+    async (comment: BoardComment) => {
+      const ok = typeof window === 'undefined' ? true : window.confirm('이 댓글을 삭제할까요?');
+      if (!ok) return;
+      const success = await deleteBoardComment(String(comment.id));
+      if (success) {
+        toast('댓글이 삭제되었습니다.', 'success');
+        await onRefetchComments();
+      }
+    },
+    [onRefetchComments],
+  );
+
+  // 읽음 현황 열기
+  const handleOpenReadStatus = useCallback(() => {
+    setMenuOpen(false);
+    setReadOpen(true);
+    void loadReadStatus();
+  }, [loadReadStatus]);
+
+  // 투표 — 부모 post 상태에 poll_votes / poll 동기화
+  const handleVotesChange = useCallback(
+    (votes: Record<string, string[]>) => {
+      onPatchPost({ poll_votes: votes } as Partial<BoardListPost>);
+    },
+    [onPatchPost],
+  );
+  const handlePollChange = useCallback(
+    (nextPoll: BoardPoll) => {
+      onPatchPost({ poll: nextPoll } as Partial<BoardListPost>);
+    },
+    [onPatchPost],
+  );
+
   if (!post && !loading) {
     return (
       <div className="m-screen">
@@ -215,6 +303,13 @@ export default function SBoardDetail({
   // (early return 이후라 useMemo 불가 — 단순 동기 호출. extract 자체가 가볍다.)
   const bodyForRender = extractAttachmentMetaFromContent(String(post.content ?? '')).displayContent;
 
+  // 권한 / 투표 / 읽음
+  const canEdit = canEditMobilePost(post, currentUserId, canAdmin);
+  const canDelete = canDeleteMobilePost(post, currentUserId, canAdmin);
+  const canSeeReadStatus = !isAnonymousReadStatusPost(post);
+  const poll = extractPoll((post as { poll?: unknown }).poll);
+  const pollVotes = parsePollVotes((post as { poll_votes?: unknown }).poll_votes);
+
   const openAttachment = (att: SafeAttachment) => {
     const inline = buildStorageInlineUrl(att.url, att.name);
     if (typeof window !== 'undefined') {
@@ -238,7 +333,13 @@ export default function SBoardDetail({
             <button type="button" aria-label="공유" onClick={() => void handleShare()}>
               <MIcon name="share" size={20} />
             </button>
-            <button type="button" aria-label="더보기">
+            <button
+              type="button"
+              aria-label="더보기"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
               <MIcon name="moreV" size={20} />
             </button>
           </>
@@ -246,259 +347,103 @@ export default function SBoardDetail({
       />
       <div className="m-scroll">
         <div style={{ padding: '16px 16px 0' }}>
-          {/* 메타 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-            <MChip tone={catDef?.tone || ''}>{catDef?.label ?? '기타'}</MChip>
-            {isImportant && <MChip tone="danger">중요</MChip>}
-            <div style={{ flex: 1 }} />
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--z-500)',
-                fontWeight: 600,
-                display: 'inline-flex',
-                gap: 3,
-                alignItems: 'center',
-              }}
-            >
-              <MIcon name="user" size={11} />
-              {views}
-              <MIcon name="chat" size={11} />
-              {commentCount}
-            </span>
-          </div>
-
-          {/* 제목 */}
-          <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.028em', lineHeight: 1.35 }}>
-            {post.title}
-          </h1>
-
-          {/* 작성자 */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginTop: 14,
-              paddingBottom: 14,
-              borderBottom: '1px solid var(--m-border)',
-            }}
-          >
-            {isAnonymousPost ? (
-              <div
-                aria-hidden
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  background: 'var(--z-200)',
-                  color: 'var(--z-500)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: 12,
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}
-              >
-                ?
-              </div>
-            ) : (
-              <MAvatar tone={authorTone} size="sm">{authorName.charAt(0) || '?'}</MAvatar>
-            )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 800 }}>
-                {authorName}
-                {isOwnPost && (
-                  <span style={{ fontSize: 11, color: 'var(--m-accent)', fontWeight: 700 }}>
-                    {' '}(본인)
-                  </span>
-                )}
-                {!isAnonymousPost && post.company && (
-                  <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
-                    {' '}· {String(post.company)}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>
-                {formatLongDate(post.created_at as string | null) || formatShortDate(post.created_at as string | null)}
-                {' · '}조회 {views}
-              </div>
-            </div>
-          </div>
-
-          {/* 본문 — 안전한 markdown 렌더 (JM5: dangerouslySetInnerHTML 금지) */}
-          <div style={{ padding: '16px 0' }}>
-            <BoardMarkdown source={bodyForRender} />
-          </div>
-
-          {/* 첨부 — 이미지 인라인 / 그 외 카드 */}
-          {attachments.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              {attachments.filter((a) => a.kind === 'image').map((att) => (
-                <ImageAttachment
-                  key={att.url}
-                  attachment={att}
-                  onOpen={() => openAttachment(att)}
-                />
-              ))}
-              {attachments.some((a) => a.kind !== 'image') && (
-                <div className="m-card flush">
-                  {attachments.filter((a) => a.kind !== 'image').map((att) => (
-                    <AttachmentRow
-                      key={att.url}
-                      attachment={att}
-                      onOpen={() => openAttachment(att)}
-                      onDownload={() => downloadAttachment(att)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 좋아요 행 */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '12px 0',
-              borderTop: '1px solid var(--m-border)',
-              borderBottom: '1px solid var(--m-border)',
-              marginBottom: 16,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => void handleLikeClick()}
-              aria-label={isLiked ? '좋아요 취소' : '좋아요'}
-              aria-pressed={isLiked}
-              disabled={likeBusy}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                borderRadius: 999,
-                background: isLiked ? 'var(--m-danger-soft)' : 'var(--m-bg)',
-                color: isLiked ? 'var(--m-danger)' : 'var(--z-700)',
-                fontSize: 13,
-                fontWeight: 700,
-                opacity: likeBusy ? 0.5 : 1,
-              }}
-            >
-              <MIcon name="heart" size={16} />
-              좋아요 {likesCount}
-            </button>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
-              조회 {views} · 댓글 {commentCount}
-            </span>
-          </div>
+          <BoardDetailHeader
+            post={post}
+            catLabel={catDef?.label ?? '기타'}
+            catTone={catDef?.tone || ''}
+            isImportant={isImportant}
+            isAnonymousPost={isAnonymousPost}
+            authorName={authorName}
+            authorTone={authorTone}
+            isOwnPost={isOwnPost}
+            views={views}
+            commentCount={commentCount}
+            likesCount={likesCount}
+            isLiked={isLiked}
+            likeBusy={likeBusy}
+            bodyForRender={bodyForRender}
+            attachments={attachments}
+            poll={poll}
+            pollVotes={pollVotes}
+            currentUserId={currentUserId ?? null}
+            currentUserName={currentUserName ?? null}
+            onLike={() => void handleLikeClick()}
+            onOpenAttachment={openAttachment}
+            onDownloadAttachment={downloadAttachment}
+            onVotesChange={handleVotesChange}
+            onPollChange={handlePollChange}
+            onRefetchComments={onRefetchComments}
+          />
 
           {/* 댓글 헤더 */}
-          <div className="m-section-h" style={{ marginBottom: 10 }}>
+          <div className="m-section-h" style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
             <div className="lbl">댓글 {commentCount}</div>
+            {canSeeReadStatus && (
+              <button
+                type="button"
+                onClick={handleOpenReadStatus}
+                aria-label="읽음 현황 보기"
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: 'var(--m-accent)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 6px',
+                }}
+              >
+                <MIcon name="eye" size={13} /> 읽음 현황
+              </button>
+            )}
           </div>
 
-          <BoardCommentTree comments={comments} onReply={handleReplyStart} />
+          <BoardCommentTree
+            comments={comments}
+            onReply={handleReplyStart}
+            onDelete={(c) => void handleDeleteComment(c)}
+            currentUserId={currentUserId}
+            canAdmin={canAdmin}
+          />
 
           <div style={{ height: 20 }} />
         </div>
       </div>
 
       {/* sticky 댓글 입력 */}
-      <div className="m-sticky-foot" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-        {replyTo && (
-          <div
-            role="status"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 10px',
-              background: 'var(--m-accent-soft)',
-              color: 'var(--m-accent)',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-          >
-            <span aria-hidden>↳</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {String(replyTo.author_name ?? '익명')}에게 답글
-            </span>
-            <button
-              type="button"
-              onClick={handleReplyCancel}
-              aria-label="답글 취소"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: 'var(--m-bg)',
-                color: 'var(--z-600)',
-                display: 'grid',
-                placeItems: 'center',
-              }}
-            >
-              <MIcon name="x" size={12} />
-            </button>
-          </div>
-        )}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'var(--m-bg)',
-            borderRadius: 22,
-            padding: '4px 6px 4px 12px',
-          }}
-        >
-          <label htmlFor="board-comment-input" style={{ position: 'absolute', left: -9999 }}>
-            댓글 입력
-          </label>
-          <input
-            id="board-comment-input"
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void handleSubmit();
-              }
-            }}
-            placeholder={
-              replyTo
-                ? `${String(replyTo.author_name ?? '익명')}에게 답글…`
-                : (currentUserName ? `${currentUserName}님, 댓글 입력` : '댓글 입력')
-            }
-            style={{ flex: 1, padding: '8px 0', fontSize: 14, fontFamily: 'inherit' }}
-            disabled={sending}
-          />
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!draft.trim() || sending}
-            aria-label={replyTo ? '답글 등록' : '댓글 등록'}
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: draft.trim() ? 'var(--m-accent)' : 'var(--z-300)',
-              color: '#fff',
-              display: 'grid',
-              placeItems: 'center',
-              opacity: sending ? 0.5 : 1,
-            }}
-          >
-            <MIcon name="send" size={14} />
-          </button>
-        </div>
-      </div>
+      <CommentComposer
+        ref={inputRef}
+        draft={draft}
+        sending={sending}
+        replyTo={replyTo}
+        currentUserName={currentUserName}
+        onDraftChange={setDraft}
+        onSubmit={() => void handleSubmit()}
+        onReplyCancel={handleReplyCancel}
+      />
+
+      {/* ⋯ 더보기 메뉴 (수정/삭제/읽음현황) */}
+      <PostMenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        canSeeReadStatus={canSeeReadStatus}
+        deleting={deleting}
+        onEdit={handleEditClick}
+        onReadStatus={handleOpenReadStatus}
+        onDelete={() => void handleDeleteClick()}
+      />
+
+      {/* 읽음 현황 시트 */}
+      <ReadStatusSheet
+        open={readOpen}
+        onClose={() => setReadOpen(false)}
+        readers={readers}
+        pending={pending}
+        loading={readLoading}
+      />
     </div>
   );
 }

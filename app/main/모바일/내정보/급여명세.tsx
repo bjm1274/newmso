@@ -13,11 +13,52 @@
 
 import { memo } from 'react';
 import type { ErpUser } from '@/types';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
-import { useMyLatestPayroll } from './data-hooks';
+import { useMyLatestPayroll, useMyPayrollTrend } from './data-hooks';
 
 const won = (n: number) => n.toLocaleString('ko-KR');
+
+/** 만원 단위 Y축 라벨 — 모바일 폭에서 자릿수 절약 */
+const manwon = (n: number) => `${Math.round(n / 10000)}만`;
+
+/** recharts Tooltip content props — 버전 간 타입 차이를 피하려 사용 필드만 최소 정의 */
+type TrendTooltipProps = {
+  active?: boolean;
+  payload?: Array<{ value?: number | string; payload?: { yearMonth?: string } }>;
+};
+
+function TrendTooltip({ active, payload }: TrendTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const point = payload[0];
+  const value = typeof point.value === 'number' ? point.value : Number(point.value ?? 0);
+  const label = point.payload?.yearMonth || '';
+  return (
+    <div
+      style={{
+        background: 'var(--m-card)',
+        border: '1px solid var(--m-border)',
+        borderRadius: 10,
+        padding: '8px 12px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--z-500)' }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--m-accent)' }}>
+        {won(value)}원
+      </div>
+    </div>
+  );
+}
 
 function formatYearMonth(ym: string): string {
   const m = /^(\d{4})-?(\d{2})/.exec(ym);
@@ -33,6 +74,7 @@ export type 급여명세Props = {
 function 급여명세Base({ user, onBack }: 급여명세Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const { yearMonth, netPay, payItems, deductItems, payTotal, deductTotal, loading, found } = useMyLatestPayroll(staffId);
+  const { points: trendPoints, loading: trendLoading } = useMyPayrollTrend(staffId, 6);
 
   if (!loading && !found) {
     return (
@@ -82,6 +124,44 @@ function 급여명세Base({ user, onBack }: 급여명세Props) {
             <span style={{ fontSize: 18, fontWeight: 700 }}>원</span>
           </div>
         </div>
+
+        {/* 실지급 추이 — 최근 6개월 net_pay 라인 차트 */}
+        {!trendLoading && trendPoints.length >= 2 && (
+          <div className="m-section" style={{ marginTop: 8 }}>
+            <div className="m-section-h">
+              <div className="lbl">실지급 추이</div>
+            </div>
+            <div className="m-card" style={{ padding: '14px 8px 10px' }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={trendPoints} margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--m-border)" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: 'var(--z-500)' }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'var(--m-border)' }}
+                  />
+                  <YAxis
+                    width={40}
+                    tickFormatter={manwon}
+                    tick={{ fontSize: 10, fill: 'var(--z-400)' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip content={<TrendTooltip />} cursor={{ stroke: 'var(--m-border)' }} />
+                  <Line
+                    type="monotone"
+                    dataKey="netPay"
+                    stroke="var(--m-accent)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: 'var(--m-accent)' }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* 지급 내역 */}
         <div className="m-section" style={{ marginTop: 8 }}>

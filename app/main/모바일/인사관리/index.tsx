@@ -28,10 +28,13 @@ import 근태이상 from './근태이상';
 import 급여워크센터 from './급여워크센터';
 import 복지 from './복지';
 import 계약문서 from './계약문서';
+import 오프보딩 from './오프보딩';
+import 문서보관함 from './문서보관함';
 import 구성원등록 from './구성원등록';
 import 연차신청 from './연차신청';
 import { useStaffList } from './data-hooks';
 import { isActiveStaff } from '@/lib/active-staff';
+import { canAccessHrSection } from '@/lib/access-control';
 
 export type HrView =
   | 'hub'
@@ -42,6 +45,8 @@ export type HrView =
   | 'payroll'
   | 'welfare'
   | 'docs'
+  | 'offboarding'
+  | 'archive'
   | 'form-member'
   | 'form-leave';
 
@@ -52,7 +57,15 @@ export type 인사관리Props = {
   onExit: () => void;
 };
 
-type HrMenuId = 'member' | 'attend' | 'leave' | 'payroll' | 'welfare' | 'docs';
+type HrMenuId =
+  | 'member'
+  | 'attend'
+  | 'leave'
+  | 'payroll'
+  | 'welfare'
+  | 'docs'
+  | 'offboarding'
+  | 'archive';
 
 type HrTone = '' | 'accent' | 'success' | 'warning' | 'danger';
 
@@ -64,6 +77,8 @@ interface HrMenu {
   tone: HrTone;
   badge?: string;
   badgeTone?: HrTone;
+  /** 접근권한 판정 키(미지정 시 항상 노출). PC canAccessHrSection 과 동일 정책. */
+  perm?: string;
 }
 
 const HR_MENU: HrMenu[] = [
@@ -73,6 +88,9 @@ const HR_MENU: HrMenu[] = [
   { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning', badge: '정산 중', badgeTone: 'warning' },
   { id: 'welfare', label: '복지', sub: '경조사 · 건강검진 · 면허/자격 · 의료기기', icon: 'badge', tone: 'accent' },
   { id: 'docs', label: '계약 · 문서', sub: '계약 · 자동생성 · 증명서 · 서류 제출', icon: 'fileText', tone: '' },
+  // 오프보딩·문서보관함은 PC와 동일하게 권한 보유자에게만 노출(퇴사 처리·회사 문서 열람).
+  { id: 'offboarding', label: '오프보딩', sub: '퇴사 처리 · 체크리스트 · 권한 회수', icon: 'out', tone: 'danger', perm: 'hr_오프보딩' },
+  { id: 'archive', label: '문서보관함', sub: '규정 · 양식 · 근로계약서 · 결재 보관', icon: 'box', tone: '', perm: 'hr_문서보관함' },
 ];
 
 export default function 인사관리({
@@ -129,6 +147,10 @@ export default function 인사관리({
       return <복지 company={selectedCompany} onBack={goBack} />;
     case 'docs':
       return <계약문서 staffId={staffId} onBack={goBack} />;
+    case 'offboarding':
+      return <오프보딩 company={selectedCompany} onBack={goBack} />;
+    case 'archive':
+      return <문서보관함 user={user} company={selectedCompany} onBack={goBack} />;
     case 'form-member':
       return <구성원등록 onBack={goBack} user={user} company={selectedCompany} />;
     case 'form-leave':
@@ -139,6 +161,7 @@ export default function 인사관리({
     default:
       return (
         <Hub
+          user={user}
           company={selectedCompany}
           onCompanyChange={setSelectedCompany}
           onExit={onExit}
@@ -153,11 +176,13 @@ export default function 인사관리({
 // ─────────────────────────────────────────────────────────────
 
 function Hub({
+  user,
   company,
   onCompanyChange,
   onExit,
   onOpen,
 }: {
+  user: ErpUser;
   company?: string;
   onCompanyChange: (co: string | undefined) => void;
   onExit: () => void;
@@ -236,9 +261,10 @@ function Hub({
     return counts;
   }, [activeStaffs]);
 
-  // 구성원 메뉴 카드에 실제 구성원 인원 수 배지 실연동
+  // 구성원 메뉴 카드에 실제 구성원 인원 수 배지 실연동 +
+  // 권한 게이팅(perm 미지정 메뉴는 항상 노출, 지정 시 PC와 동일하게 canAccessHrSection 판정).
   const menuList = useMemo(() => {
-    return HR_MENU.map((m) => {
+    return HR_MENU.filter((m) => !m.perm || canAccessHrSection(user, m.perm)).map((m) => {
       if (m.id === 'member') {
         return {
           ...m,
@@ -247,7 +273,7 @@ function Hub({
       }
       return m;
     });
-  }, [headcount, loading]);
+  }, [headcount, loading, user]);
 
   return (
     <div className="m-screen">

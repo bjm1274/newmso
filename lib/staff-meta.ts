@@ -1,3 +1,5 @@
+import { isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -88,4 +90,19 @@ export function getStaffProbationPercent(source: unknown, fallback = 90) {
   if (!isPlainRecord(source)) return fallback;
   const permissions = getStaffPermissions(source);
   return toIntegerOrFallback(source.probation_percent ?? permissions.probation_percent, fallback);
+}
+
+/**
+ * 직원 부가정보(면허번호, 내선번호 등) 열람 권한 체크.
+ * 관리자/시스템마스터만 타인의 부가정보를 볼 수 있다.
+ * 본인 정보는 항상 열람 가능.
+ */
+export function canViewStaffMeta(
+  viewer: { role?: string | null; permissions?: Record<string, any> | null } | null | undefined,
+  targetStaffId?: string | null,
+  viewerId?: string | null
+): boolean {
+  // 본인 정보는 항상 열람 가능
+  if (targetStaffId && viewerId && String(targetStaffId) === String(viewerId)) return true;
+  return isAdminUser(viewer) || isPrivilegedUser(viewer);
 }
