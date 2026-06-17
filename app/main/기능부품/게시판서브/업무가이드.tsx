@@ -600,10 +600,6 @@ function buildCompanyScopes(
 }
 
 function matchesCompanyScope(item: Pick<GuideRow, 'company' | 'company_id'>, companyName: string, companyId: string) {
-  const normalizedCompanyId = normalizeText(item.company_id);
-  if (companyId && normalizedCompanyId) {
-    return normalizedCompanyId === companyId;
-  }
   const normalizedCompany = normalizeText(item.company);
   if (!normalizedCompany) return true;
   return normalizedCompany === companyName;
@@ -788,12 +784,6 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
   const viewerScopedResources = useMemo(() => {
     if (isCrossCompanyViewer) {
-      if (selectedCompanyId) {
-        return resources.filter((item) => !normalizeText(item.company_id) || normalizeText(item.company_id) === selectedCompanyId);
-      }
-      if (selectedCo && selectedCo !== '전체') {
-        return resources.filter((item) => !normalizeText(item.company) || normalizeText(item.company) === selectedCo);
-      }
       return resources;
     }
 
@@ -804,16 +794,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       return resources.filter((item) => !normalizeText(item.company) || normalizeText(item.company) === currentCompanyName);
     }
     return resources;
-  }, [currentCompanyId, currentCompanyName, isCrossCompanyViewer, resources, selectedCo, selectedCompanyId]);
+  }, [currentCompanyId, currentCompanyName, isCrossCompanyViewer, resources]);
 
   const viewerScopedTasks = useMemo(() => {
     if (isCrossCompanyViewer) {
-      if (selectedCompanyId) {
-        return teamTasks.filter((item) => !normalizeText(item.company_id) || normalizeText(item.company_id) === selectedCompanyId);
-      }
-      if (selectedCo && selectedCo !== '전체') {
-        return teamTasks.filter((item) => !normalizeText(item.company) || normalizeText(item.company) === selectedCo);
-      }
       return teamTasks;
     }
 
@@ -824,7 +808,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       return teamTasks.filter((item) => !normalizeText(item.company) || normalizeText(item.company) === currentCompanyName);
     }
     return teamTasks;
-  }, [currentCompanyId, currentCompanyName, isCrossCompanyViewer, selectedCo, selectedCompanyId, teamTasks]);
+  }, [currentCompanyId, currentCompanyName, isCrossCompanyViewer, teamTasks]);
 
   const companyScopes = useMemo(
     () => buildCompanyScopes(orgTeams, staffSeed, viewerScopedResources, viewerScopedTasks),
