@@ -105,7 +105,7 @@ export default function LoginPage() {
       <div className="mx-auto w-full max-w-[360px]">
         {/* 헤더 */}
         <div className="mb-7 flex flex-col items-center">
-          <img src="/AllERP-transparent.png" alt="AllERP" className="h-[144px] object-contain mb-3 drop-shadow-sm" />
+          <img src="/AllERP-transparent-trimmed.png" alt="AllERP" className="w-[280px] h-auto object-contain mb-3 drop-shadow-sm" />
         </div>
 
         {/* 로그인 카드 */}

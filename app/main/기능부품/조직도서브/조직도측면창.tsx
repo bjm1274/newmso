@@ -973,7 +973,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
             className="mb-5 flex h-12 w-12 items-center justify-center transition-transform active:scale-95"
             aria-label="내정보"
           >
-            <img src="/AllERP-transparent.png" alt="AllERP" className="w-full h-full object-contain" />
+            <img src="/AllERP-transparent-trimmed.png" alt="AllERP" className="w-full h-full object-contain p-1" />
           </button>
           {shouldRenderDesktopNotificationCenter && (
               <NotificationCenter user={effectiveUser} onOpenMenu={onMenuChange} />
