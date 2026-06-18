@@ -120,6 +120,7 @@ export function calculateEarlyLeaveMinutes(
 
 export type LateThresholdContext = {
   shiftId?: string | null;
+  shiftIds?: string[];
   department?: string | null;
   company?: string | null;
 };
@@ -151,6 +152,7 @@ export async function fetchLatestStaffShiftContext(
         String(staffRow?.shift_id || '').trim() ||
         fallback.shiftId ||
         '',
+      shiftIds: shifts.map((s) => s.shiftId).filter(Boolean),
       department:
         String(staffRow?.department || '').trim() || fallback.department || undefined,
       company:
@@ -169,6 +171,7 @@ export async function resolveLateThreshold(
   staffId: string,
   workDate: string,
   fallback: LateThresholdContext = {},
+  options?: { checkInIso?: string | null },
 ): Promise<ShiftBoundary> {
   if (!staffId) return buildFallbackShiftBoundary(fallback.department ?? undefined);
 
@@ -201,7 +204,11 @@ export async function resolveLateThreshold(
 
     const shiftIds = Array.from(
       new Set(
-        [String(assignment?.shift_id || '').trim(), String(ctx.shiftId || '').trim()].filter(Boolean),
+        [
+          String(assignment?.shift_id || '').trim(),
+          String(ctx.shiftId || '').trim(),
+          ...(ctx.shiftIds || []),
+        ].filter(Boolean),
       ),
     );
     const shiftNames = Array.from(
@@ -240,8 +247,10 @@ export async function resolveLateThreshold(
     ]);
     const shiftRow = resolveAssignedShift(assignment, lookup, {
       fallbackShiftId: ctx.shiftId || undefined,
+      fallbackShiftIds: ctx.shiftIds,
       preferredCompany: ctx.company || undefined,
       workDate,
+      checkInIso: options?.checkInIso,
     });
     if (!shiftRow) return buildFallbackShiftBoundary(effectiveDepartment);
 
@@ -269,7 +278,7 @@ export async function resolveCheckInStatus(
   checkInIso: string,
   fallback: LateThresholdContext = {},
 ): Promise<'정상' | '지각'> {
-  const boundary = await resolveLateThreshold(staffId, workDate, fallback);
+  const boundary = await resolveLateThreshold(staffId, workDate, fallback, { checkInIso });
   return decideCheckInStatus(boundary, checkInIso);
 }
 

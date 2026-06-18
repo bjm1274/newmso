@@ -198,6 +198,7 @@ export default function MessageBubble({
         <div
           style={{
             maxWidth: '72%',
+            minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: mine ? 'flex-end' : 'flex-start',
@@ -222,10 +223,11 @@ export default function MessageBubble({
               alignItems: 'flex-end',
               gap: 6,
               position: 'relative',
+              minWidth: 0,
             }}
           >
             {mine && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
                 {displayedReadCount > 0 && (
                   <span
                     style={{
@@ -271,8 +273,10 @@ export default function MessageBubble({
                 lineHeight: 1.5,
                 fontWeight: 500,
                 wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
                 whiteSpace: 'pre-wrap',
                 overflow: 'hidden',
+                minWidth: 0,
               }}
             >
               {replyTarget && (
@@ -365,7 +369,7 @@ export default function MessageBubble({
 
 
             {!mine && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, flexShrink: 0 }}>
                 {displayedReadCount > 0 && (
                   <span
                     style={{

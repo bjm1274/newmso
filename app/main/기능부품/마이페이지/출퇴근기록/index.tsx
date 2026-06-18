@@ -486,8 +486,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       const shiftRow = resolveAssignedShift(assignmentByDate.get(dateStr), shiftLookup, {
         fallbackShiftId: defaultShiftId,
+        fallbackShiftIds: shiftIds,
         preferredCompany: effectiveCompany,
         workDate: dateStr,
+        checkInIso: checkInIso,
       });
       const boundary = shiftRow
         ? buildShiftBoundary(
@@ -503,7 +505,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
     const decoratedLogs: CommuteLog[] = monthlyLogs.map((log) => {
       const workDate = String(log.date || '').slice(0, 10);
-      const boundary = resolveBoundaryForDate(workDate);
+      const boundary = resolveBoundaryForDate(workDate, (log.check_in as string | null | undefined) || null);
       const earlyLeaveMinutes = calculateEarlyLeaveMinutes(
         workDate,
         (log.check_out as string | null | undefined) || null,
@@ -776,7 +778,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   );
 
   const resolveLateThreshold = useCallback(
-    async (workDate: string, fallbackDepartment?: string): Promise<ShiftBoundary> => {
+    async (workDate: string, fallbackDepartment?: string, checkInIso?: string | null): Promise<ShiftBoundary> => {
       const userId = effectiveUserId;
       if (!userId) return buildFallbackShiftBoundary(fallbackDepartment);
       const fallbackCompany = String(
@@ -787,11 +789,16 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const fallbackShiftId = String(
         (resolvedUser as Record<string, unknown>)?.shift_id || '',
       ).trim();
-      return resolveLateThresholdHelper(userId, workDate, {
-        department: fallbackDepartment,
-        company: fallbackCompany,
-        shiftId: fallbackShiftId,
-      });
+      return resolveLateThresholdHelper(
+        userId, 
+        workDate, 
+        {
+          department: fallbackDepartment,
+          company: fallbackCompany,
+          shiftId: fallbackShiftId,
+        },
+        { checkInIso }
+      );
     },
     [effectiveUserId, resolvedUser],
   );
@@ -835,7 +842,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           return;
         }
 
-        const lateThreshold = await resolveLateThreshold(today, userDepartment);
+        const lateThreshold = await resolveLateThreshold(today, userDepartment, timeString);
         const nowMin = now.getHours() * 60 + now.getMinutes();
         const startMin = lateThreshold.hour * 60 + lateThreshold.minute;
 

@@ -173,7 +173,6 @@ export function useApprovalList(staffId: string | null, company?: string | null)
             .select(buildApprovalSelect(omittedColumns))
             .order('created_at', { ascending: false })
             .limit(200);
-          if (company && company !== '전체') q = q.eq('sender_company', company);
           return q;
         },
         APPROVAL_OPTIONAL_COLUMNS,

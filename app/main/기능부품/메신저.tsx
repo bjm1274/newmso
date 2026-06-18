@@ -2698,6 +2698,19 @@ export default function ChatView({
     scrollToBottom,
   });
 
+  useEffect(() => {
+    if (!selectedRoomId) return;
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) {
+        return;
+      }
+      handleComposerPaste(event as unknown as React.ClipboardEvent<HTMLTextAreaElement>);
+    };
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [selectedRoomId, handleComposerPaste]);
+
   const groupedStaffs = useChatGroupedStaffs(allKnownStaffs);
   const {
     mediaMessages,

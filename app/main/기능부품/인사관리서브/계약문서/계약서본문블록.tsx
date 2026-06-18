@@ -45,6 +45,10 @@ export default function ContractBodyBlock({ templateText }: Props) {
                 const body = raw.slice(start, end).replace(/─+/g, '').trim();
                 const lines = body.split('\n').filter((l) => l.trim());
 
+                // 근무일 추출 (예: "③ 근무일은 매주 월요일~금요일로 하고")
+                const workDaysMatch = raw.match(/근무일은\s*매주\s*(.+?)로\s*하고/);
+                const workDaysText = workDaysMatch ? workDaysMatch[1].trim() : '';
+
                 // 시업시각, 종업시각, 휴게시간 라인들을 파싱해서 하나의 시각적 블록으로 통합하기 위한 전처리
                 type ProcessedLine =
                     | { type: 'text'; text: string }
@@ -81,7 +85,7 @@ export default function ContractBodyBlock({ templateText }: Props) {
 
                 function parseShiftTimeString(s: string) {
                     if (!s) return { label: '근무시간', time: '' };
-                    const match = s.match(/^([^0-9]+?)\s+([0-9:~\s]+)$/);
+                    const match = s.match(/^(.+?)\s+([0-9]{1,2}:[0-9]{2}.*)$/);
                     if (match) {
                         return { label: match[1].trim(), time: match[2].trim() };
                     }
@@ -134,8 +138,13 @@ export default function ContractBodyBlock({ templateText }: Props) {
                                                         <span>{card.end || '-'}</span>
                                                     </div>
                                                     {card.breakTime && (
-                                                        <div className="text-center text-[11.5px] font-bold text-slate-600 bg-white py-1.5 rounded-lg border border-blue-100 print:border-slate-300 print:bg-white print:text-slate-700 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                                        <div className="text-center text-[11.5px] font-bold text-slate-600 bg-white py-1.5 rounded-lg border border-blue-100 print:border-slate-300 print:bg-white print:text-slate-700 shadow-[0_1px_2px_rgba(0,0,0,0.02)] mb-1">
                                                             휴게 <span className="text-blue-600 print:text-slate-600 ml-0.5">{card.breakTime}</span>
+                                                        </div>
+                                                    )}
+                                                    {workDaysText && (
+                                                        <div className="text-center text-[11px] font-medium text-slate-500 truncate print:text-slate-500">
+                                                            {workDaysText}
                                                         </div>
                                                     )}
                                                 </div>

@@ -110,7 +110,6 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
             .in('board_type', LIST_BOARD_TYPES)
             .order('created_at', { ascending: false })
             .limit(100);
-          if (company && company !== '전체') q = q.eq('company', company);
           const result = await q;
           return result as unknown as { data: BoardPost[] | null; error: unknown };
         },

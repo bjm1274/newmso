@@ -131,17 +131,50 @@ export function resolveAssignedShift(
   options?: {
     preferredCompany?: string | null;
     fallbackShiftId?: string | null;
+    fallbackShiftIds?: string[];
     workDate?: string | null;
+    checkInIso?: string | null;
   },
 ) {
   const resolveFallbackShift = () => {
-    const fallbackShiftId = String(options?.fallbackShiftId || '').trim();
-    if (!fallbackShiftId) return null;
+    const fallbackShiftIds = Array.isArray(options?.fallbackShiftIds) && options!.fallbackShiftIds.length > 0
+      ? options!.fallbackShiftIds.filter(Boolean)
+      : [String(options?.fallbackShiftId || '').trim()].filter(Boolean);
 
-    const fallbackShift = lookup.byId.get(fallbackShiftId) || null;
-    return isShiftScheduledOnDate(fallbackShift, options?.workDate)
-      ? applyDailyScheduleForDate(fallbackShift, options?.workDate)
-      : null;
+    if (fallbackShiftIds.length === 0) return null;
+
+    const candidates = fallbackShiftIds
+      .map((id) => lookup.byId.get(id) || null)
+      .filter((shift) => isShiftScheduledOnDate(shift, options?.workDate))
+      .map((shift) => applyDailyScheduleForDate(shift, options?.workDate))
+      .filter((shift) => shift !== null);
+
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    if (options?.checkInIso) {
+      const checkInDate = new Date(options.checkInIso);
+      const checkInMin = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+
+      let bestCandidate = candidates[0];
+      let minDiff = Infinity;
+
+      for (const candidate of candidates) {
+        if (!candidate?.start_time) continue;
+        const match = String(candidate.start_time).match(/^(\d{1,2}):(\d{2})/);
+        if (match) {
+          const startMin = Number(match[1]) * 60 + Number(match[2]);
+          const diff = Math.abs(startMin - checkInMin);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestCandidate = candidate;
+          }
+        }
+      }
+      return bestCandidate;
+    }
+
+    return candidates[0];
   };
 
   const shiftId = String(assignment?.shift_id || '').trim();

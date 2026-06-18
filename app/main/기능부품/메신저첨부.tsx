@@ -392,10 +392,56 @@ export function AttachmentListCard({
   const bubbleAlignmentClass = tone === 'accent' ? 'items-end text-right' : 'items-start text-left';
   const mediaUrl = kind === 'image' || kind === 'video' ? buildStorageInlineUrl(url, name) || url : url;
 
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (!isHovered || kind !== 'image') return;
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        const selection = document.getSelection()?.toString();
+        if (selection) return; // Prevent hijacking normal text copy
+
+        e.preventDefault();
+        try {
+          const response = await fetch(mediaUrl);
+          const blob = await response.blob();
+          
+          let clipboardBlob = blob;
+          if (blob.type !== 'image/png') {
+            const bitmap = await createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+               ctx.drawImage(bitmap, 0, 0);
+               clipboardBlob = await new Promise<Blob>((resolve, reject) => {
+                 canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png');
+               });
+            }
+          }
+
+          await navigator.clipboard.write([
+            new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })
+          ]);
+          toast('사진이 복사되었습니다.', 'success');
+        } catch (error) {
+          toast('사진 복사에 실패했습니다.', 'error');
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isHovered, kind, mediaUrl]);
+
   if (layout === 'bubble') {
     if (kind === 'image') {
       return (
-        <div className={`inline-flex max-w-full flex-col gap-1 ${bubbleAlignmentClass} ${className}`}>
+        <div 
+          className={`inline-flex max-w-full flex-col gap-1 ${bubbleAlignmentClass} ${className}`}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
           <div className="relative group inline-block">
             <button
               type="button"

@@ -294,6 +294,7 @@ export function fillEmploymentContractTemplate(
     '{{research_allowance}}': getSalaryAmount('research_allowance'),
     '{{other_taxfree}}': getSalaryAmount('other_taxfree'),
     '{{agreed_overtime_allowance}}': getSalaryAmount('agreed_overtime_allowance'),
+    '{{agreed_night_allowance}}': getSalaryAmount('agreed_night_allowance'),
   };
 
   const weeklyWorkHours = resolveWeeklyWorkingHours(
@@ -315,6 +316,7 @@ export function fillEmploymentContractTemplate(
     getSalaryAmount('research_allowance'),
     getSalaryAmount('other_taxfree'),
     getSalaryAmount('agreed_overtime_allowance'),
+    getSalaryAmount('agreed_night_allowance'),
   ];
   const totalMonthlyWage = salaryItems.reduce((sum, amount) => sum + amount, 0);
   const monthlyWorkHours = getMonthlyWorkingHours(weeklyWorkHours);
@@ -390,6 +392,7 @@ export function fillEmploymentContractTemplate(
     research_allowance: formatWon(getSalaryAmount('research_allowance')),
     other_taxfree: formatWon(getSalaryAmount('other_taxfree')),
     agreed_overtime_allowance: formatWon(getSalaryAmount('agreed_overtime_allowance')),
+    agreed_night_allowance: formatWon(getSalaryAmount('agreed_night_allowance')),
     total_monthly: formatWon(totalMonthlyWage),
     total_salary: formatWon(totalMonthlyWage),
     annual_salary: formatWon(totalMonthlyWage * 12),
@@ -462,13 +465,13 @@ export function fillEmploymentContractTemplate(
   if (isFixedTerm) {
     // 계약직인 경우: 기간의 정함이 없는 -> 지정된 계약종료일까지 계약
     transformedTemplate = transformedTemplate.replace(
-      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다\.?/g,
+      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*(?:기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다|정년까지로\s*한다|.*?까지로\s*한다)\.?/g,
       '① 근로자는 {{join_date}}부터 {{contract_end}}까지 근로계약을 체결한 것으로 한다.'
     );
   } else {
     // 정규직인 경우: 기간의 정함이 없는 -> 정년까지로 한다
     transformedTemplate = transformedTemplate.replace(
-      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다\.?/g,
+      /①\s*근로자는\s*(?:\{\{\s*(?:join_date|contract_start)\s*\}\})\s*부터\s*(?:기간의\s*정함이\s*없는\s*근로계약을\s*체결한\s*것으로\s*한다|정년까지로\s*한다|.*?까지로\s*한다)\.?/g,
       '① 근로자는 {{join_date}}부터 정년까지로 한다.'
     );
   }

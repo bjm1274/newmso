@@ -156,13 +156,24 @@ export function buildShiftContractVariables(
   const isBandGroup = rotationShifts.length > 1 && bandLabels.filter(Boolean).length >= 2;
   const baseShiftName = stripShiftBandSuffix(rotationShifts[0]?.name);
   const segmentLabel = (index: number) => {
+    const shift = rotationShifts[index];
+    const name = String(shift?.name || '').trim();
+    if (name) {
+      const cleanName = stripShiftBandSuffix(name) || name;
+      return cleanName;
+    }
     if (isBandGroup) return bandLabels[index] || `${index + 1}번`;
     return `${index + 1}주차`;
   };
 
   const formatSegmentValues = (values: string[]) => {
     if (rotationShifts.length <= 1) {
-      return values.find(Boolean) || '';
+      const val = values.find(Boolean) || '';
+      const shiftName = String(rotationShifts[0]?.name || '').trim();
+      if (val && shiftName) {
+        return `${stripShiftBandSuffix(shiftName) || shiftName} ${val}`;
+      }
+      return val;
     }
 
     const filled = values
