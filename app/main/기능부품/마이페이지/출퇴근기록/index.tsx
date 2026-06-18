@@ -199,6 +199,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (!userId) {
       return {
         shiftId: fallbackShiftId,
+        shiftIds: [],
         department: fallbackDepartment,
         company: fallbackCompany,
       };
@@ -244,6 +245,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
       return {
         shiftId: resolvedShiftId,
+        shiftIds: shifts.map(s => s.shiftId).filter(Boolean),
         department:
           String(staffRow?.department || '').trim() || fallbackDepartment,
         company:
@@ -253,6 +255,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       logger.warn('최신 근무유형 조회 실패:', error);
       return {
         shiftId: fallbackShiftId,
+        shiftIds: [],
         department: fallbackDepartment,
         company: fallbackCompany,
       };
@@ -399,7 +402,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .order('date', { ascending: false });
 
     const monthlyLogs = ((data || []) as CommuteLog[]).map((log) => ({ ...log }));
-    const [{ shiftId: latestShiftId, department: latestDepartment, company: latestCompany }, assignmentResult] = await Promise.all([
+    const [{ shiftId: latestShiftId, shiftIds: latestShiftIds, department: latestDepartment, company: latestCompany }, assignmentResult] = await Promise.all([
       fetchLatestStaffShiftContext(),
       withMissingColumnFallback(
         () =>
@@ -445,6 +448,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         [
           ...Array.from(assignmentByDate.values()).map((assignment) => String(assignment.shift_id || '').trim()),
           defaultShiftId,
+          ...(latestShiftIds || []),
         ].filter(Boolean)
       )
     );

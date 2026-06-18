@@ -341,7 +341,7 @@ export function fillEmploymentContractTemplate(
   const employeeAddress = firstText(safeUser.address, safeUser.employee_address);
   const workingDaysText = buildWorkDayText(workingDaysPerWeek, shift, safeContract, safeUser);
   const weeklyHolidayText = buildWeeklyHolidayText(workingDaysPerWeek, shift, safeContract, safeUser);
-  const contractEndDate = formatDate(safeContract.contract_end_date);
+  const contractEndDate = formatDate(safeContract.contract_end_date || safeUser.contract_end_date);
   const contractType = firstText(
     salarySource.contract_type,
     getStaffEmploymentType(safeUser),
