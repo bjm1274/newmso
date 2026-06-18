@@ -881,19 +881,10 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           onReactionDetail={(msg) => setReactionDetailTarget(msg)}
           onReadDetail={(msg) => setReadDetailTarget(msg)}
           onOpenThread={(msg) => setThreadRoot(msg)}
+          pollData={pollData}
+          pollVoting={pollVoting}
+          onVotePoll={handleVotePoll}
         />
-
-        {/* 투표 카드 — polls 테이블(메시지와 별개) 기준, 생성 시각 오름차순 */}
-        {pollData.polls.map((poll) => (
-          <PollCard
-            key={poll.id}
-            poll={poll}
-            voteCounts={pollData.voteCounts[poll.id] || {}}
-            myVote={pollData.myVotes[poll.id]}
-            voting={pollVoting}
-            onVote={handleVotePoll}
-          />
-        ))}
       </div>
 
       {/* 이모지 피커 (컴포저) */}

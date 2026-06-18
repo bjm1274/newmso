@@ -14,6 +14,8 @@ import {
   type StaffDirectoryEntry,
 } from './data-hooks';
 import MessageBubble from './메시지버블';
+import { PollCard } from './투표';
+import type { RoomPollsResult } from './메시지액션';
 
 export type BubbleListProps = {
   messages: ChatMessage[];
@@ -35,6 +37,9 @@ export type BubbleListProps = {
   onReadDetail?: (message: ChatMessage) => void;
   onOpenThread?: (message: ChatMessage) => void;
   searchMessageId?: string | null;
+  pollData?: RoomPollsResult;
+  pollVoting?: boolean;
+  onVotePoll?: (pollId: string, optionIndex: number) => void;
 };
 
 export default function BubbleList({
@@ -57,6 +62,9 @@ export default function BubbleList({
   onReadDetail,
   onOpenThread,
   searchMessageId,
+  pollData,
+  pollVoting = false,
+  onVotePoll,
 }: BubbleListProps) {
   // 각 루트 메시지에 달린 답글(reply_to_id) 수 — 스레드 뱃지
   const threadCounts = useMemo(() => {
@@ -71,29 +79,67 @@ export default function BubbleList({
   const items = useMemo(() => {
     const out: Array<
       | { kind: 'date'; label: string; key: string }
-      | { kind: 'msg'; message: ChatMessage; key: string }
+      | { kind: 'msg'; message: ChatMessage; key: string; ts: number }
+      | { kind: 'poll'; poll: RoomPollsResult['polls'][number]; key: string; ts: number }
     > = [];
+    
+    const combined: Array<
+      | { type: 'msg'; data: ChatMessage; ts: number; iso: string | null }
+      | { type: 'poll'; data: RoomPollsResult['polls'][number]; ts: number; iso: string | null }
+    > = [];
+
+    messages.forEach((m) => {
+      const ts = m.created_at ? new Date(m.created_at as string).getTime() : 0;
+      combined.push({ type: 'msg', data: m, ts, iso: (m.created_at as string | null) || null });
+    });
+
+    if (pollData?.polls) {
+      pollData.polls.forEach((p) => {
+        const ts = p.created_at ? new Date(p.created_at as string).getTime() : 0;
+        combined.push({ type: 'poll', data: p, ts, iso: (p.created_at as string | null) || null });
+      });
+    }
+
+    combined.sort((a, b) => a.ts - b.ts);
+
     let prevTimestamp: string | null = null;
-    messages.forEach((message) => {
-      const ts = (message.created_at as string | null | undefined) || null;
-      if (!prevTimestamp || !isSameDay(prevTimestamp, ts || null)) {
+    combined.forEach((item) => {
+      const iso = item.iso;
+      if (!prevTimestamp || !isSameDay(prevTimestamp, iso)) {
         out.push({
           kind: 'date',
-          label: formatBubbleDateLabel(ts),
-          key: `date-${ts || message.id}`,
+          label: formatBubbleDateLabel(iso),
+          key: `date-${iso || item.ts}`,
         });
       }
-      out.push({ kind: 'msg', message, key: String(message.id) });
-      prevTimestamp = ts;
+      if (item.type === 'msg') {
+        out.push({ kind: 'msg', message: item.data, key: String(item.data.id), ts: item.ts });
+      } else {
+        out.push({ kind: 'poll', poll: item.data, key: `poll-${item.data.id}`, ts: item.ts });
+      }
+      prevTimestamp = iso;
     });
     return out;
-  }, [messages]);
+  }, [messages, pollData]);
 
   return (
     <>
       {items.map((item) => {
         if (item.kind === 'date') {
           return <SystemBubble key={item.key} label={item.label} />;
+        }
+        if (item.kind === 'poll') {
+          return (
+            <div key={item.key} style={{ padding: '0 16px' }}>
+              <PollCard
+                poll={item.poll}
+                voteCounts={pollData?.voteCounts[item.poll.id] || {}}
+                myVote={pollData?.myVotes[item.poll.id]}
+                voting={pollVoting}
+                onVote={(pid, opt) => onVotePoll?.(pid, opt)}
+              />
+            </div>
+          );
         }
         return (
           <MessageBubble

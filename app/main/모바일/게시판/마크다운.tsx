@@ -139,7 +139,8 @@ type BlockToken =
   | { kind: 'quote'; text: string }
   | { kind: 'li'; text: string }
   | { kind: 'p'; text: string }
-  | { kind: 'br' };
+  | { kind: 'br' }
+  | { kind: 'tableRow'; cells: string[] };
 
 function tokenizeBlocks(input: string): BlockToken[] {
   const lines = input.replace(/\r\n/g, '\n').split('\n');
@@ -171,6 +172,14 @@ function tokenizeBlocks(input: string): BlockToken[] {
       out.push({ kind: 'li', text: liMatch[1] });
       continue;
     }
+    if (line.startsWith('|') && line.endsWith('|')) {
+      const cells = line
+        .slice(1, -1)
+        .split('|')
+        .map((c) => c.trim());
+      out.push({ kind: 'tableRow', cells });
+      continue;
+    }
     out.push({ kind: 'p', text: line });
   }
   return out;
@@ -183,8 +192,8 @@ export type BoardMarkdownProps = {
 function BoardMarkdownBase({ source }: BoardMarkdownProps) {
   const blocks = tokenizeBlocks(source);
 
-  // li 묶음을 ul로 합치기 위해 group
-  const grouped: Array<BlockToken | { kind: 'ul'; items: string[] }> = [];
+  // li 묶음을 ul로, tableRow 묶음을 table로 합치기 위해 group
+  const grouped: Array<BlockToken | { kind: 'ul'; items: string[] } | { kind: 'table'; rows: string[][] }> = [];
   for (const b of blocks) {
     if (b.kind === 'li') {
       const last = grouped[grouped.length - 1];
@@ -192,6 +201,13 @@ function BoardMarkdownBase({ source }: BoardMarkdownProps) {
         (last as { kind: 'ul'; items: string[] }).items.push(b.text);
       } else {
         grouped.push({ kind: 'ul', items: [b.text] });
+      }
+    } else if (b.kind === 'tableRow') {
+      const last = grouped[grouped.length - 1];
+      if (last && (last as { kind: string }).kind === 'table') {
+        (last as { kind: 'table'; rows: string[][] }).rows.push(b.cells);
+      } else {
+        grouped.push({ kind: 'table', rows: [b.cells] });
       }
     } else {
       grouped.push(b);
@@ -216,6 +232,38 @@ function BoardMarkdownBase({ source }: BoardMarkdownProps) {
                 <li key={i} style={{ margin: '2px 0' }}>{renderInline(tokenizeInline(t))}</li>
               ))}
             </ul>
+          );
+        }
+        if (g.kind === 'table') {
+          // 구분선 행(예: |---|---|) 제거
+          const validRows = g.rows.filter(row => !row.every(cell => /^[-: ]+$/.test(cell)));
+          if (validRows.length === 0) return null;
+          const [header, ...body] = validRows;
+          return (
+            <div key={idx} style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', margin: '12px 0' }}>
+              <table style={{ width: '100%', minWidth: 400, borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--m-card)', borderBottom: '2px solid var(--m-border)' }}>
+                    {header.map((th, i) => (
+                      <th key={i} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        {renderInline(tokenizeInline(th))}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {body.map((tr, ri) => (
+                    <tr key={ri} style={{ borderBottom: '1px solid var(--m-border)' }}>
+                      {tr.map((td, ci) => (
+                        <td key={ci} style={{ padding: '8px 12px', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                          {renderInline(tokenizeInline(td))}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           );
         }
         if (g.kind === 'br') return <div key={idx} style={{ height: 6 }} />;
@@ -256,9 +304,10 @@ function BoardMarkdownBase({ source }: BoardMarkdownProps) {
             </blockquote>
           );
         }
+        if (g.kind === 'tableRow') return null;
         return (
           <p key={idx} style={{ margin: '2px 0' }}>
-            {renderInline(tokenizeInline(g.text))}
+            {renderInline(tokenizeInline((g as { text: string }).text))}
           </p>
         );
       })}

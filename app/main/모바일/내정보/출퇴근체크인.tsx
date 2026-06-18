@@ -10,7 +10,7 @@
  * JM(파일당 500줄), JM3(에러 분기), JM4(any 금지), JM6(button 시맨틱, aria-live)
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGeolocationCheckin } from '@/app/hooks/useGeolocationCheckin';
 import { ALLOWED_DISTANCE_M, WORKPLACE_LOCATION } from '@/lib/location';
 import { calculateDistance } from '@/lib/geo';
@@ -81,45 +81,63 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
+  // 오늘 출퇴근 기록 조회 — useCallback으로 분리해 앱 복귀(포커스/visibility) 시 재호출
+  const fetchTodayLog = useCallback(async () => {
     if (!staffId) { setOpenLog(null); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const today = formatLocalDateKey(new Date());
-        // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
-        const { data: todayData } = await supabase
+    try {
+      const today = formatLocalDateKey(new Date());
+      // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
+      const { data: todayData } = await supabase
+        .from('attendance')
+        .select('id, staff_id, date, check_in, check_out, status')
+        .eq('staff_id', staffId)
+        .eq('date', today)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      let activeLog = (todayData?.[0] as OpenLog) ?? null;
+
+      // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
+      if (!activeLog?.check_in) {
+        const { data: staleData } = await supabase
           .from('attendance')
           .select('id, staff_id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
-          .eq('date', today)
-          .order('created_at', { ascending: false })
+          .not('check_in', 'is', null)
+          .is('check_out', null)
+          .neq('status', '결근') // 결근 처리된 건 제외
+          .order('date', { ascending: false })
           .limit(1);
 
-        let activeLog = (todayData?.[0] as OpenLog) ?? null;
-
-        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
-        if (!activeLog?.check_in) {
-          const { data: staleData } = await supabase
-            .from('attendance')
-            .select('id, staff_id, date, check_in, check_out, status')
-            .eq('staff_id', staffId)
-            .not('check_in', 'is', null)
-            .is('check_out', null)
-            .neq('status', '결근') // 결근 처리된 건 제외
-            .order('date', { ascending: false })
-            .limit(1);
-
-          if (staleData && staleData.length > 0 && staleData[0].date !== today) {
-            activeLog = staleData[0] as OpenLog;
-          }
+        if (staleData && staleData.length > 0 && staleData[0].date !== today) {
+          activeLog = staleData[0] as OpenLog;
         }
+      }
 
-        if (!cancelled) setOpenLog(activeLog);
-      } catch {/* silent */}
-    })();
-    return () => { cancelled = true; };
+      setOpenLog(activeLog);
+    } catch {/* 에러 시 기존 openLog 유지 — 앱 복귀 시 기록이 사라지는 것을 방지 */}
   }, [staffId]);
+
+  useEffect(() => {
+    void fetchTodayLog();
+  }, [fetchTodayLog]);
+
+  // 앱 재진입(포커스·visibility 변경)·출퇴근 이벤트 시 기록 재조회
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResume = () => { void fetchTodayLog(); };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void fetchTodayLog();
+    };
+    window.addEventListener('focus', handleResume);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('erp-attendance-updated', handleResume as EventListener);
+    return () => {
+      window.removeEventListener('focus', handleResume);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('erp-attendance-updated', handleResume as EventListener);
+    };
+  }, [fetchTodayLog]);
 
   const distance = useMemo(() => {
     if (!coords) return null;
@@ -166,14 +184,31 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
             checkInStatus = await resolveCheckInStatus(staffId, today, nowIso, { company });
           } catch {/* 조회 실패 → '정상' 폴백 */}
         }
+
+        // 온라인 시 기존 행 확인 — 이미 출근 기록이 있으면 DB를 덮어쓰지 않고 실제 시각 표시
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          try {
+            const { data: existingRows } = await supabase
+              .from('attendance')
+              .select('id, staff_id, date, check_in, check_out, status')
+              .eq('staff_id', staffId)
+              .eq('date', today)
+              .limit(1);
+            const existingRow = existingRows?.[0] as OpenLog | undefined;
+            if (existingRow?.check_in) {
+              // 이미 출근 기록 존재 — 중복 출근 방지, 실제 DB 시각으로 표시
+              setOpenLog(existingRow);
+              toast('이미 출근 처리된 기록이 있습니다.', 'info');
+              return;
+            }
+          } catch {/* 조회 실패 시 upsert로 진행 */}
+        }
+
         const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
           kind: 'upsert',
           table: 'attendance',
           payload: { staff_id: staffId, date: today, check_in: nowIso, status: checkInStatus },
           onConflict: 'staff_id,date',
-          // 멱등: (직원,날짜) 행이 이미 있으면 DO NOTHING — 오프라인 큐의 stale 출근 재생이나
-          // 중복 출근이 기존 check_out 을 지우거나 출근시각을 과거로 덮어쓰는 것을 방지.
-          ignoreDuplicates: true,
         });
         if (error) throw new Error(error);
         if (queued) {
