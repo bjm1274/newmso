@@ -1,0 +1,15 @@
+{
+  "staffs": [
+    {
+      "id": "1b0bda03-c325-40d1-bc06-5d7db1d0b2d5",
+      "employee_no": "20",
+      "name": "조현준",
+      "company": "박철홍정형외과",
+      "department": "병동팀",
+      "position": "사원",
+      "shift_id": "a62a2bc8-6871-4c99-825e-ec8f73829543"
+    }
+  ],
+  "attendance_june": [],
+  "shift_assignments_june": []
+}

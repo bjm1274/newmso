@@ -130,6 +130,20 @@ export async function detectPayrollAnomalies({
     fetchPayrollRecordsByMonth(previousMonth),
   ]) as [PayrollRow[], PayrollRow[]];
 
+  if (currentRows.length === 0) {
+    // 아직 당월 급여 데이터가 업로드되지 않았으므로 이상치 분석 불가 (급여일 전)
+    return {
+      currentMonth,
+      previousMonth,
+      threshold,
+      allData: [],
+      visibleAnomalies: [],
+      newPayments: [],
+      criticalCount: 0,
+      warningCount: 0,
+    };
+  }
+
   const currentMap = new Map<string, PayrollRow>();
   const previousMap = new Map<string, PayrollRow>();
 

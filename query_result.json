@@ -1,0 +1,347 @@
+{
+  "staffs": [
+    {
+      "id": "1b0bda03-c325-40d1-bc06-5d7db1d0b2d5",
+      "employee_no": "20",
+      "name": "조현준",
+      "company": "박철홍정형외과",
+      "department": "병동팀",
+      "position": "사원",
+      "shift_id": "a62a2bc8-6871-4c99-825e-ec8f73829543"
+    }
+  ],
+  "shift_assignments_today": [],
+  "staff_shift_assignments": [
+    {
+      "id": "aaed4b25-de0e-4f2f-97e9-9c8bcb80b66b",
+      "staff_id": "1b0bda03-c325-40d1-bc06-5d7db1d0b2d5",
+      "shift_id": "a62a2bc8-6871-4c99-825e-ec8f73829543",
+      "is_primary": 1,
+      "priority": 0,
+      "effective_from": null,
+      "effective_to": null,
+      "created_at": "2026-05-11T13:16:57.196641+00:00"
+    }
+  ],
+  "attendance_today": [],
+  "work_shifts": [
+    {
+      "id": "05c5d4de-e756-4281-88fb-c6c8bebcecb4",
+      "name": "물리치료",
+      "start_time": "08:30:00",
+      "end_time": "12:30:00"
+    },
+    {
+      "id": "0ac3c0fc-31dd-48db-b8f7-6d94f209c2d3",
+      "name": "식당/조출",
+      "start_time": "05:30:00",
+      "end_time": "13:30:00"
+    },
+    {
+      "id": "12a9025b-67f6-4651-9b94-b98541ca7b90",
+      "name": "상근",
+      "start_time": "08:30:00",
+      "end_time": "18:00:00"
+    },
+    {
+      "id": "1d3df7bf-a937-4a53-ad89-5e21d45de4a2",
+      "name": "외래 통상",
+      "start_time": "09:00:00",
+      "end_time": "18:00:00"
+    },
+    {
+      "id": "1f0b591c-ed7c-4ca3-a101-e1aaf1844896",
+      "name": "병동 3교대",
+      "start_time": "09:00:00",
+      "end_time": "18:00:00"
+    },
+    {
+      "id": "21a67d2d-aa84-4698-891d-0be922bfbeb7",
+      "name": "관리사",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "22019e28-a6a0-4eda-8943-6338a3440034",
+      "name": "임상병리사",
+      "start_time": "08:20:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "id": "23c85ee5-5411-4312-8428-bbdb9e9b29e6",
+      "name": "3교대/E",
+      "start_time": "14:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "29e84914-db70-4fe7-9c36-61cdf7c7110d",
+      "name": "휴무",
+      "start_time": "00:00:00",
+      "end_time": "00:00:00"
+    },
+    {
+      "id": "2aeb6eb1-6afc-46a9-af86-f76794b02bb7",
+      "name": "병동DE/E (14:00~22:00)",
+      "start_time": "14:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "2c88368b-f8b0-4d3a-8a68-e19c688b179c",
+      "name": "병동3교대/E",
+      "start_time": "15:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "2c9b58d6-b51c-460d-8223-feca2167164a",
+      "name": "간호과장",
+      "start_time": "08:20:00",
+      "end_time": "17:50:00"
+    },
+    {
+      "id": "42edcb78-0eb4-415a-84fb-6e6a9bdb9f20",
+      "name": "외래/2째주월~금",
+      "start_time": "08:20:00",
+      "end_time": "17:50:00"
+    },
+    {
+      "id": "431c52fc-59c2-4026-9eac-827c39956908",
+      "name": "외래B",
+      "start_time": "08:20:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "id": "443d75c9-6a20-403a-882b-0a27e5c60bd0",
+      "name": "외래A",
+      "start_time": "08:20:00",
+      "end_time": "17:50:00"
+    },
+    {
+      "id": "4897d92e-8b2e-4517-b4b8-e4d36510c289",
+      "name": "물리치료",
+      "start_time": "08:30:00",
+      "end_time": "12:20:00"
+    },
+    {
+      "id": "4a980998-e0a3-4ad4-aab3-beed2a0a96fc",
+      "name": "외래A/연장진료",
+      "start_time": "09:20:00",
+      "end_time": "18:50:00"
+    },
+    {
+      "id": "4d39f226-a566-4fc1-85f0-b9e4cce1f42b",
+      "name": "데이이브전담/E",
+      "start_time": "15:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "4e8b1bb8-f6ab-4809-9206-61ecd0f377b2",
+      "name": "식당/후출",
+      "start_time": "10:30:00",
+      "end_time": "18:30:00"
+    },
+    {
+      "id": "53e58a6e-fa91-43b7-8487-08ed1bc2180a",
+      "name": "통상/토",
+      "start_time": "08:20:00",
+      "end_time": "12:10:00"
+    },
+    {
+      "id": "5448bf1c-9616-4c70-ab62-b236cd309ea0",
+      "name": "관리사/월~목",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "573b3e3b-7e8b-4d98-9386-3ae5f623db1c",
+      "name": "상근",
+      "start_time": "08:30:00",
+      "end_time": "18:00:00"
+    },
+    {
+      "id": "58000cf5-8d7f-4080-a05d-47198de36130",
+      "name": "관리사",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "586c25f1-6e37-4275-9419-570ed907200c",
+      "name": "병동/N전담",
+      "start_time": "21:00:00",
+      "end_time": "07:00:00"
+    },
+    {
+      "id": "6b3ed741-af80-4b02-bdbb-c3f6b30eb587",
+      "name": "관리사/금",
+      "start_time": "07:00:00",
+      "end_time": "15:30:00"
+    },
+    {
+      "id": "6d516ae6-9fcf-41a0-a130-adcc4d7e0997",
+      "name": "D병동3교대",
+      "start_time": "07:20:00",
+      "end_time": "15:20:00"
+    },
+    {
+      "id": "80bec0eb-3fa8-47dc-8a43-02980f9419d2",
+      "name": "상근",
+      "start_time": "08:30:00",
+      "end_time": "17:30:00"
+    },
+    {
+      "id": "85299441-af9e-4a0b-9483-06914779bd71",
+      "name": "식당/오전",
+      "start_time": "05:30:00",
+      "end_time": "13:30:00"
+    },
+    {
+      "id": "89251748-ac4a-4c66-b26b-32b37b1b129c",
+      "name": "병동DE/D",
+      "start_time": "07:20:00",
+      "end_time": "15:20:00"
+    },
+    {
+      "id": "8a25a680-c3a0-4e18-9cc0-4f627fb8e40c",
+      "name": "병동3교대/E",
+      "start_time": "14:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "8a4f69f3-8906-4cd2-bb92-75392e4050d9",
+      "name": "방사선사/B",
+      "start_time": "08:20:00",
+      "end_time": "16:50:00"
+    },
+    {
+      "id": "8f23783a-ef13-45e6-9ad0-2ecb496e200f",
+      "name": "외래A",
+      "start_time": "08:20:00",
+      "end_time": "17:50:00"
+    },
+    {
+      "id": "911f47f1-d65b-49e0-93e4-4f5313a4f7a3",
+      "name": "상근",
+      "start_time": "08:30:00",
+      "end_time": "17:30:00"
+    },
+    {
+      "id": "a62a2bc8-6871-4c99-825e-ec8f73829543",
+      "name": "병동3교대/D",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "aeb148f7-b225-4d08-a2db-8c836e95d20b",
+      "name": "외래/1째주토",
+      "start_time": "08:20:00",
+      "end_time": "13:00:00"
+    },
+    {
+      "id": "b1d24d4a-d34e-4d5f-ab0d-54e7a693fe88",
+      "name": "통상/월화",
+      "start_time": "08:10:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "id": "be33ac3d-ef57-4a3b-b1d3-37518f7bc778",
+      "name": "N병동3교대",
+      "start_time": "21:00:00",
+      "end_time": "08:00:00"
+    },
+    {
+      "id": "c8570acd-5fad-4f80-b0ad-06eea8092c71",
+      "name": "수술팀",
+      "start_time": "08:30:00",
+      "end_time": "17:30:00"
+    },
+    {
+      "id": "ca1f71cd-6806-4269-bfa1-10feeeda1d03",
+      "name": "E병동3교대",
+      "start_time": "14:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "cb51d88e-2ce3-4afc-aba9-ebe9aa78e2c8",
+      "name": "데이전담/D",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "cef3bcb1-613d-43ea-aab9-35a2e34f6a39",
+      "name": "외래/1째주월~금",
+      "start_time": "08:20:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "id": "d30b56e9-3708-450b-89ce-36404946384e",
+      "name": "통상/수목금",
+      "start_time": "08:20:00",
+      "end_time": "17:00:00"
+    },
+    {
+      "id": "d40ce945-1476-418f-9158-4c92c0a0e6bc",
+      "name": "데이이브전담/D",
+      "start_time": "07:00:00",
+      "end_time": "15:00:00"
+    },
+    {
+      "id": "d4476a1f-40f6-4ddd-9f62-6a0da873350c",
+      "name": "병동3교대/N",
+      "start_time": "22:00:00",
+      "end_time": "07:00:00"
+    },
+    {
+      "id": "d6b5ab9d-b6b9-4749-9bc8-cabff3a9087c",
+      "name": "삭제하기",
+      "start_time": "23:00:00",
+      "end_time": "07:00:00"
+    },
+    {
+      "id": "ddb1c923-b996-465d-813d-df3c64e003d8",
+      "name": "관리사/토",
+      "start_time": "07:00:00",
+      "end_time": "11:30:00"
+    },
+    {
+      "id": "e03bcb8f-786e-4d1d-ae4f-956c71098171",
+      "name": "3교대/N",
+      "start_time": "21:00:00",
+      "end_time": "08:00:00"
+    },
+    {
+      "id": "e20509b7-cfcb-474b-b888-5a50bc343817",
+      "name": "관리A",
+      "start_time": "07:00:00",
+      "end_time": "16:00:00"
+    },
+    {
+      "id": "f32b1c6e-bdfb-4aa8-a01d-4a0c62f53113",
+      "name": "3교대/D",
+      "start_time": "07:20:00",
+      "end_time": "15:20:00"
+    },
+    {
+      "id": "f4dea194-4102-4dff-aa4a-21161bf8b989",
+      "name": "식당/오후",
+      "start_time": "10:30:00",
+      "end_time": "18:30:00"
+    },
+    {
+      "id": "f58d0b37-f672-42da-af1e-d2b156663760",
+      "name": "병동DE/E",
+      "start_time": "14:00:00",
+      "end_time": "22:00:00"
+    },
+    {
+      "id": "f6339888-7c92-42e1-abf3-7913612e7ee4",
+      "name": "N전담",
+      "start_time": "22:00:00",
+      "end_time": "07:00:00"
+    },
+    {
+      "id": "fb059768-6e11-4c85-9bad-cfd8dd2d9d16",
+      "name": "방사선사/A",
+      "start_time": "08:20:00",
+      "end_time": "17:50:00"
+    }
+  ]
+}
