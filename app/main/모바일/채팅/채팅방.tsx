@@ -45,6 +45,7 @@ import {
   getGroupChatRoomBadgeText,
   NOTICE_ROOM_ID,
   WARD_QUICK_REPLY_OPTIONS,
+  extractWardMessageMeta,
 } from '@/app/main/기능부품/메신저유틸';
 import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
@@ -134,9 +135,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   }, [memberIds, staffs]);
 
   const [hasText, setHasText] = useState(false);
+  const [composerDisabled, setComposerDisabled] = useState(false);
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
 
-  const [uploading, setUploading] = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
+  // Poll
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
@@ -905,67 +908,53 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           padding: '8px 12px 12px',
         }}
       >
-        {/* 빠른 응답 칩 + 투표 만들기 — 가로 스크롤 */}
-        <div
-          role="toolbar"
-          aria-label="빠른 응답 및 투표"
-          style={{
-            display: 'flex',
-            gap: 6,
-            marginBottom: 8,
-            overflowX: 'auto',
-            paddingBottom: 2,
-          }}
-          className="custom-scrollbar"
-        >
-          <button
-            type="button"
-            aria-label="새 투표 만들기"
-            onClick={() => setPollComposerOpen(true)}
-            disabled={composerDisabled}
-            style={{
-              flexShrink: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '6px 12px',
-              borderRadius: 999,
-              background: 'var(--m-accent-soft)',
-              color: 'var(--m-accent)',
-              fontSize: 12,
-              fontWeight: 800,
-              border: 'none',
-              cursor: composerDisabled ? 'not-allowed' : 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <MIcon name="list" size={14} />
-            투표
-          </button>
-          {WARD_QUICK_REPLY_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-label={`빠른 응답: ${opt.label}`}
-              onClick={() => void handleQuickReply(opt.text)}
-              disabled={composerDisabled}
+        {(() => {
+          const lastMessage = messages[messages.length - 1];
+          const wardMeta = lastMessage && lastMessage.is_deleted !== true && lastMessage.sender_id !== userId
+            ? extractWardMessageMeta(lastMessage.content)
+            : null;
+          const showWardQuickReplies = wardMeta?.meta?.type === 'op_ward_request';
+          
+          if (!showWardQuickReplies) return null;
+          return (
+            <div
+              role="toolbar"
+              aria-label="빠른 응답"
               style={{
-                flexShrink: 0,
-                padding: '6px 12px',
-                borderRadius: 999,
-                background: 'var(--m-bg)',
-                color: 'var(--z-700)',
-                fontSize: 12,
-                fontWeight: 700,
-                border: '1px solid var(--m-border)',
-                cursor: composerDisabled ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap',
+                display: 'flex',
+                gap: 6,
+                marginBottom: 8,
+                overflowX: 'auto',
+                paddingBottom: 2,
               }}
+              className="custom-scrollbar"
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+              {WARD_QUICK_REPLY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-label={`빠른 응답: ${opt.label}`}
+                  onClick={() => void handleQuickReply(opt.text)}
+                  disabled={composerDisabled}
+                  style={{
+                    flexShrink: 0,
+                    padding: '6px 12px',
+                    borderRadius: 999,
+                    background: 'var(--m-bg)',
+                    color: 'var(--z-700)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    border: '1px solid var(--m-border)',
+                    cursor: composerDisabled ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
         {replyTo && (
           <div
             style={{
@@ -1015,8 +1004,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         >
           <button
             type="button"
-            aria-label="첨부 추가"
-            onClick={() => fileInputRef.current?.click()}
+            aria-label="추가 기능"
+            onClick={() => setActionSheetOpen(true)}
             disabled={composerDisabled}
             style={{
               width: 32,
@@ -1123,6 +1112,45 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           </button>
         </div>
       </div>
+
+      <MSheet open={actionSheetOpen} onClose={() => setActionSheetOpen(false)} title="추가 기능">
+        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setActionSheetOpen(false);
+              fileInputRef.current?.click();
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '16px', borderRadius: 16,
+              background: 'var(--m-bg)', border: 'none',
+              color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
+              textAlign: 'left'
+            }}
+          >
+            <MIcon name="image" size={24} style={{ color: 'var(--m-accent)' }} />
+            사진 / 파일 전송
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActionSheetOpen(false);
+              setPollComposerOpen(true);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '16px', borderRadius: 16,
+              background: 'var(--m-bg)', border: 'none',
+              color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
+              textAlign: 'left'
+            }}
+          >
+            <MIcon name="list" size={24} style={{ color: 'var(--m-accent)' }} />
+            새 투표 만들기
+          </button>
+        </div>
+      </MSheet>
 
       <MSheet open={infoOpen} onClose={() => setInfoOpen(false)} title="대화방 상세 정보">
         <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
