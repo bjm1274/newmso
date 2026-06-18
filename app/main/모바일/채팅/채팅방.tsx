@@ -135,11 +135,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   }, [memberIds, staffs]);
 
   const [hasText, setHasText] = useState(false);
-  const [composerDisabled, setComposerDisabled] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
 
   // Poll
-  const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
@@ -1129,7 +1129,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'left'
             }}
           >
-            <MIcon name="image" size={24} style={{ color: 'var(--m-accent)' }} />
+            <MIcon name="image" size={24} color="var(--m-accent)" />
             사진 / 파일 전송
           </button>
           <button
@@ -1146,7 +1146,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'left'
             }}
           >
-            <MIcon name="list" size={24} style={{ color: 'var(--m-accent)' }} />
+            <MIcon name="list" size={24} color="var(--m-accent)" />
             새 투표 만들기
           </button>
         </div>
