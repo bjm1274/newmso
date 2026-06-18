@@ -34,6 +34,7 @@ export type BubbleListProps = {
   onReactionDetail?: (message: ChatMessage) => void;
   onReadDetail?: (message: ChatMessage) => void;
   onOpenThread?: (message: ChatMessage) => void;
+  searchMessageId?: string | null;
 };
 
 export default function BubbleList({
@@ -55,6 +56,7 @@ export default function BubbleList({
   onReactionDetail,
   onReadDetail,
   onOpenThread,
+  searchMessageId,
 }: BubbleListProps) {
   // 각 루트 메시지에 달린 답글(reply_to_id) 수 — 스레드 뱃지
   const threadCounts = useMemo(() => {
@@ -117,6 +119,7 @@ export default function BubbleList({
             onReadDetail={onReadDetail}
             onOpenThread={onOpenThread}
             threadReplyCount={threadCounts[String(item.message.id)] || 0}
+            searchMessageId={searchMessageId}
           />
         );
       })}

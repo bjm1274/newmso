@@ -9,7 +9,7 @@
  * 제약: JM(< 500줄, 단일 책임), JM4(any 금지), JM6(button + aria-label).
  */
 
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import MIcon from '../공통/MIcon';
@@ -48,6 +48,8 @@ export type MessageBubbleProps = {
   onOpenThread?: (message: ChatMessage) => void;
   /** 이 메시지에 달린 답글 수(스레드) */
   threadReplyCount?: number;
+  /** 검색을 통해 이동한 메시지인지 여부 (강조 및 스크롤용) */
+  searchMessageId?: string | null;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -93,7 +95,24 @@ export default function MessageBubble({
   onReadDetail,
   onOpenThread,
   threadReplyCount = 0,
+  searchMessageId,
 }: MessageBubbleProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [swiping, setSwiping] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
+
+  useEffect(() => {
+    if (searchMessageId && String(message.id) === String(searchMessageId)) {
+      setHighlighted(true);
+      setTimeout(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+      setTimeout(() => {
+        setHighlighted(false);
+      }, 3000);
+    }
+  }, [searchMessageId, message.id]);
+
   const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
 
   const ts = formatBubbleTimestamp(message.created_at);
@@ -161,11 +180,16 @@ export default function MessageBubble({
       onDelete={() => onDelete(message)}
     >
       <div
+        ref={containerRef}
         style={{
           display: 'flex',
           gap: 8,
           justifyContent: mine ? 'flex-end' : 'flex-start',
           position: 'relative',
+          padding: '4px 0',
+          opacity: swiping ? 0.9 : 1,
+          transition: 'opacity 0.2s, background-color 0.5s',
+          backgroundColor: highlighted ? 'var(--m-accent-soft, rgba(0,0,0,0.05))' : 'transparent',
         }}
       >
         {!mine && (

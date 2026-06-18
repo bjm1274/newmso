@@ -82,11 +82,12 @@ export type SChatRoomProps = {
   recentRooms?: MobileChatRoom[];
   onSwitchRoom?: (roomId: string) => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
+  searchMessageId?: string | null;
 };
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
-export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom, onOpenBoardPost }: SChatRoomProps) {
+export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom, onOpenBoardPost, searchMessageId }: SChatRoomProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : '';
   const company = typeof user.company === 'string' ? user.company : null;
@@ -861,6 +862,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           staffs={staffs}
           readCounts={readCounts}
           isGroupChat={isGroup}
+          searchMessageId={searchMessageId}
           onToggleReaction={handleToggleReaction}
           onReply={(msg) => {
             setReplyTo(msg);

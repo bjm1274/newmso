@@ -33,6 +33,7 @@ export type 채팅Props = {
 export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
 
   const userId = typeof user.id === 'string' ? user.id : null;
@@ -71,14 +72,16 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
     }
   }, [view, selectedRoomId, selectedRoom, rooms.length, refreshRooms]);
 
-  const openRoom = useCallback((roomId: string) => {
+  const openRoom = useCallback((roomId: string, messageId?: string) => {
     setSelectedRoomId(roomId);
+    setSearchMessageId(messageId || null);
     setView('room');
   }, []);
 
   const backToList = useCallback(() => {
     setView('list');
     setSelectedRoomId(null);
+    setSearchMessageId(null);
     setSelectedRoom(null);
   }, []);
 
@@ -114,6 +117,7 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
         recentRooms={rooms}
         onSwitchRoom={openRoom}
         onOpenBoardPost={onOpenBoardPost}
+        searchMessageId={searchMessageId}
       />
     );
   } else {

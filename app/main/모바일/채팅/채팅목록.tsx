@@ -39,7 +39,7 @@ export type SChatListProps = {
   user: ErpUser;
   /** JM2: 부모에서 fetch한 rooms — 중복 fetch 금지 */
   rooms: MobileChatRoom[];
-  onOpen: (roomId: string) => void;
+  onOpen: (roomId: string, searchMessageId?: string) => void;
   onNew: () => void;
   /** PTR 콜백 — 부모 refresh 함수 전달 */
   onRefresh: () => Promise<void>;
@@ -368,7 +368,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                       userId={userId}
                       query={searchInput.trim()}
                       last={i === messageHits.length - 1}
-                      onClick={() => onOpen(hit.roomId)}
+                      onClick={() => onOpen(hit.roomId, hit.id)}
                     />
                   ))
                 )}
