@@ -480,7 +480,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     const shiftLookup = buildShiftLookup(shiftRows);
 
     const boundaryByDate = new Map<string, ShiftBoundary>();
-    const resolveBoundaryForDate = (dateStr: string) => {
+    const resolveBoundaryForDate = (dateStr: string, checkInIso: string | null = null) => {
       const cached = boundaryByDate.get(dateStr);
       if (cached) return cached;
 
