@@ -473,6 +473,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
                 src={activeViewUrl}
                 alt={activeItem.name || '미리보기'}
                 data-testid="chat-attachment-preview-image"
+                crossOrigin="anonymous"
                 className="rounded-xl object-contain shadow-sm select-none"
                 style={{
                   maxWidth: '100%',
@@ -527,7 +528,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
                   aria-label={`${idx + 1}번째 파일로 이동`}
                 >
                   {item.kind === 'image' ? (
-                    <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                    <img src={thumbUrl} alt="" crossOrigin="anonymous" className="w-full h-full object-cover" />
                   ) : item.kind === 'video' ? (
                     <div className="w-full h-full bg-white/15 flex items-center justify-center text-white text-lg">▶</div>
                   ) : (

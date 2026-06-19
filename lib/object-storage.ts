@@ -251,9 +251,6 @@ export function isAllowedPublicStorageUrl(url: string): boolean {
 
   try {
     const candidate = new URL(url);
-    if (candidate.hostname === 'rtleqrtcqucntnygzudv.supabase.co') {
-      return true;
-    }
     const allowed = new URL(publicBaseUrl);
     if (candidate.hostname !== allowed.hostname) {
       return false;

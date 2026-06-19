@@ -295,7 +295,7 @@ export default function AbnormalWorkcenter({
           </div>
           {selectedGroup && (
             <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
-              "{selectedGroup.label}" 카드를 다시 누르면 상세를 닫습니다.
+              &quot;{selectedGroup.label}&quot; 카드를 다시 누르면 상세를 닫습니다.
             </p>
           )}
         </section>

@@ -8,7 +8,7 @@ import {
 } from '@/app/components/SwipeableKpiCards';
 import { MobileChartWrapper } from '@/app/components/MobileChartWrapper';
 
-export type 경영분석모바일대시보드Props = {
+export type ManagementAnalysisMobileDashboardProps = {
   stats: Array<{
     label: string;
     value: ReactNode;
@@ -35,12 +35,12 @@ export type 경영분석모바일대시보드Props = {
  * - 차트(연차 사용률): MobileChartWrapper
  * - 데스크탑 컴포넌트와 동일한 입력 데이터를 받아 모바일 레이아웃으로 렌더링한다.
  */
-export default function 경영분석모바일대시보드({
+export default function ManagementAnalysisMobileDashboard({
   stats,
   notices,
   quickLinks,
   leaveUsageRate,
-}: 경영분석모바일대시보드Props) {
+}: ManagementAnalysisMobileDashboardProps) {
   const kpiCards = useMemo<KpiCard[]>(
     () =>
       stats.map((s, idx) => ({

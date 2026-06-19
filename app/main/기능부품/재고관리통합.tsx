@@ -1,6 +1,6 @@
 'use client';
 
-import { getStockWorkcenter } from './재고관리워크센터';
+import { StatusWorkcenter, IOWorkcenter, ItemWorkcenter, AnalyzeWorkcenter } from './재고관리워크센터';
 import type { IntegratedInventoryProps } from './재고관리서브/types';
 
 // ── 워크센터 영문 id ──
@@ -16,13 +16,15 @@ export default function IntegratedInventoryManagement({
   initialView,
 }: IntegratedInventoryProps) {
   const resolvedId = isStockWorkcenterEnglishId(initialView) ? initialView : 'status';
-  const StockWorkcenter = getStockWorkcenter(resolvedId);
   return (
     <div
       className="relative flex h-full min-h-0 flex-col overflow-x-hidden app-page"
       data-testid="inventory-view"
     >
-      <StockWorkcenter />
+      {resolvedId === 'status' && <StatusWorkcenter />}
+      {resolvedId === 'io' && <IOWorkcenter />}
+      {resolvedId === 'item' && <ItemWorkcenter />}
+      {resolvedId === 'analyze' && <AnalyzeWorkcenter />}
     </div>
   );
 }

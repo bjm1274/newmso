@@ -344,6 +344,10 @@ export function useChatUploads({
     setPendingAttachmentFiles([]);
   }, []);
 
+  const removePendingAttachmentFile = useCallback((index: number) => {
+    setPendingAttachmentFiles((prev) => prev.filter((_, idx) => idx !== index));
+  }, []);
+
   const handleAlbumFileSelect = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []).filter(isImageFile);
     if (files.length === 0) return;
@@ -533,6 +537,7 @@ export function useChatUploads({
     processFileUpload,
     confirmPendingAttachmentUpload,
     cancelPendingAttachmentUpload,
+    removePendingAttachmentFile,
     handleAlbumFileSelect,
     removeAlbumFile,
     cancelAlbumUpload,

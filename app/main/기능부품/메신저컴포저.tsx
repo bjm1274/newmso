@@ -22,6 +22,71 @@ import EmojiPicker from './메신저액션서브/EmojiPicker';
 
 const QUICK_EMOJIS = ['👍', '😊', '😂', '❤️', '🔥', '✅', '👏', '🎉', '🙏', '😅', '💪', '😄'] as const;
 
+type AttachmentFilePreviewProps = {
+  file: File;
+  onRemove?: () => void;
+};
+
+function AttachmentFilePreview({ file, onRemove }: AttachmentFilePreviewProps) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
+
+  const displayName = getPendingAttachmentDisplayName(file);
+
+  if (previewUrl) {
+    return (
+      <div className="relative flex flex-col items-center gap-1.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-2 w-20 shadow-sm shrink-0">
+        <div className="relative w-16 h-16 rounded-[var(--radius-md)] overflow-hidden shrink-0">
+          <img
+            src={previewUrl}
+            alt={displayName}
+            className="w-full h-full object-cover"
+          />
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`${displayName} 제거`}
+              className="absolute top-0.5 right-0.5 min-h-[20px] min-w-[20px] bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <span className="w-full truncate text-center text-[10px] text-[var(--foreground)] font-semibold px-0.5" title={displayName}>
+          {displayName}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-semibold text-[var(--accent)] max-w-full shadow-sm shrink-0">
+      <span className="truncate" title={displayName}>
+        {displayName}
+      </span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`${displayName} 제거`}
+          className="min-h-[20px] min-w-[20px] flex items-center justify-center text-[var(--toss-gray-3)] hover:text-red-500 text-[11px] font-bold"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 // 부모(메신저.tsx)가 컴포저 내부 value를 imperative하게 갱신하기 위한 핸들.
 // 키 입력마다 발생하던 부모 전체 리렌더를 피하려고 value state를 컴포저로 끌어내림.
 export type MessengerComposerHandle = {
@@ -50,6 +115,7 @@ type MessengerComposerProps = {
   onRemoveAlbumFile: (index: number) => void;
   onSendAlbum: () => void | Promise<unknown>;
   onCancelPendingAttachmentUpload: () => void;
+  onRemovePendingAttachmentFile?: (index: number) => void;
   onConfirmPendingAttachmentUpload: () => void | Promise<unknown>;
   onRetryFailedAttachmentUpload: (entryId: string) => void | Promise<unknown>;
   onRetryAllFailedAttachmentUploads: () => void | Promise<unknown>;
@@ -85,6 +151,7 @@ function MessengerComposerImpl({
   onRemoveAlbumFile,
   onSendAlbum,
   onCancelPendingAttachmentUpload,
+  onRemovePendingAttachmentFile,
   onConfirmPendingAttachmentUpload,
   onRetryFailedAttachmentUpload,
   onRetryAllFailedAttachmentUploads,
@@ -117,7 +184,7 @@ function MessengerComposerImpl({
   // 컴포저 내부에서 value를 관리. 부모 메신저.tsx가 직접 state로 들고 있던
   // 시절엔 모든 키 입력이 3,448줄짜리 부모 함수 전체를 리렌더시켜 입력 지연
   // 주범이었음. 부모는 setInputMsg를 호출하면 controlRef.setValue로 전달됨.
-  // 초기값은 inputMsgRef(부모가 마운트 직전 복원한 draft) 에서 읽는다.
+  // eslint-disable-next-line react-hooks/refs
   const [inputMsg, setInputMsg] = useState<string>(() => inputMsgRef.current || '');
 
   useImperativeHandle(
@@ -312,20 +379,14 @@ function MessengerComposerImpl({
           className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-[12px] text-blue-900"
         >
           <p className="font-semibold">선택한 파일 {pendingAttachmentFiles.length}개를 채팅방에 전송할까요?</p>
-          <div className="flex flex-wrap gap-1.5">
-            {pendingAttachmentFiles.map((file, index) => {
-              const displayName = getPendingAttachmentDisplayName(file);
-              return (
-                <span
-                  key={`${displayName}-${index}`}
-                  data-testid={`chat-pending-upload-file-${index}`}
-                  className="max-w-full truncate rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] font-semibold text-[var(--accent)]"
-                  title={displayName}
-                >
-                  {displayName}
-                </span>
-              );
-            })}
+          <div className="flex flex-wrap gap-2 items-end">
+            {pendingAttachmentFiles.map((file, index) => (
+              <AttachmentFilePreview
+                key={`${file.name}-${index}`}
+                file={file}
+                onRemove={() => onRemovePendingAttachmentFile?.(index)}
+              />
+            ))}
           </div>
           <div className="flex items-center gap-2">
             <button

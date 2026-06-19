@@ -72,6 +72,7 @@ export function DeferredAttachmentImage({
             src={viewSrc}
             alt={alt}
             className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
+            crossOrigin="anonymous"
             onLoad={() => {
               setLoaded(true);
               onLoad?.();
@@ -97,6 +98,7 @@ type AttachmentQuickActionsProps = {
   replyTestId?: string;
   variant?: AttachmentQuickActionsVariant;
   className?: string;
+  kind?: AttachmentPreviewKind;
 };
 
 type AttachmentListCardProps = {
@@ -277,6 +279,39 @@ export function getDeletedMessagePreviewText() {
   return '삭제된 메시지입니다.';
 }
 
+export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    
+    let clipboardBlob = blob;
+    if (blob.type !== 'image/png') {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(bitmap, 0, 0);
+        const pngBlob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), 'image/png');
+        });
+        if (pngBlob) {
+          clipboardBlob = pngBlob;
+        }
+      }
+    }
+
+    await navigator.clipboard.write([
+      new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })
+    ]);
+    return true;
+  } catch (error) {
+    logger.error('Failed to copy image to clipboard:', error);
+    return false;
+  }
+}
+
 export function AttachmentQuickActions({
   url,
   name,
@@ -285,6 +320,7 @@ export function AttachmentQuickActions({
   replyTestId,
   variant = 'pill',
   className = '',
+  kind,
 }: AttachmentQuickActionsProps) {
   const handleShare = async (event: { preventDefault?: () => void; stopPropagation?: () => void }) => {
     event.preventDefault?.();
@@ -295,6 +331,18 @@ export function AttachmentQuickActions({
       toast('공유 링크를 복사했습니다.');
     } catch {
       toast('공유 링크 복사에 실패했습니다.', 'error');
+    }
+  };
+
+  const handleCopyPhoto = async (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const mediaUrl = kind === 'image' ? buildStorageInlineUrl(url, name) || url : url;
+    const success = await copyImageToClipboard(mediaUrl);
+    if (success) {
+      toast('사진이 클립보드에 복사되었습니다.');
+    } else {
+      toast('사진 복사에 실패했습니다.', 'error');
     }
   };
 
@@ -319,6 +367,12 @@ export function AttachmentQuickActions({
   const shareClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
     subtle: `${actionClassByVariant.subtle} text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
+    overlay: actionClassByVariant.overlay,
+  };
+
+  const copyClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
+    pill: `${actionClassByVariant.pill} bg-purple-50 dark:bg-purple-900/30 text-purple-600 hover:text-purple-700`,
+    subtle: `${actionClassByVariant.subtle} text-purple-600 hover:text-purple-700`,
     overlay: actionClassByVariant.overlay,
   };
 
@@ -358,6 +412,15 @@ export function AttachmentQuickActions({
       <button type="button" onClick={handleShare} className={shareClassByVariant[variant]}>
         공유
       </button>
+      {kind === 'image' && (
+        <button
+          type="button"
+          onClick={handleCopyPhoto}
+          className={copyClassByVariant[variant]}
+        >
+          사진 복사
+        </button>
+      )}
       <a
         href={buildDownloadUrl(url, name)}
         onClick={(event) => void handleStorageDownloadLinkClick(event, url, name)}
@@ -402,30 +465,10 @@ export function AttachmentListCard({
         if (selection) return; // Prevent hijacking normal text copy
 
         e.preventDefault();
-        try {
-          const response = await fetch(mediaUrl);
-          const blob = await response.blob();
-          
-          let clipboardBlob = blob;
-          if (blob.type !== 'image/png') {
-            const bitmap = await createImageBitmap(blob);
-            const canvas = document.createElement('canvas');
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-               ctx.drawImage(bitmap, 0, 0);
-               clipboardBlob = await new Promise<Blob>((resolve, reject) => {
-                 canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/png');
-               });
-            }
-          }
-
-          await navigator.clipboard.write([
-            new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })
-          ]);
+        const success = await copyImageToClipboard(mediaUrl);
+        if (success) {
           toast('사진이 복사되었습니다.', 'success');
-        } catch (error) {
+        } else {
           toast('사진 복사에 실패했습니다.', 'error');
         }
       }
@@ -459,7 +502,7 @@ export function AttachmentListCard({
                 className="block h-full w-full object-cover cursor-zoom-in"
               />
             </button>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[var(--radius-md)] pointer-events-none px-2">
+             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40 flex items-center justify-center rounded-[var(--radius-md)] pointer-events-none px-2">
               <AttachmentQuickActions
                 url={url}
                 name={name}
@@ -467,6 +510,7 @@ export function AttachmentListCard({
                 onReply={onReply}
                 replyTestId={replyTestId}
                 variant="overlay"
+                kind={kind}
               />
             </div>
           </div>
@@ -527,6 +571,7 @@ export function AttachmentListCard({
               replyTestId={replyTestId}
               variant="pill"
               className="mt-2"
+              kind={kind}
             />
           </div>
         </div>
@@ -608,6 +653,7 @@ export function AttachmentListCard({
             replyTestId={replyTestId}
             variant={actionVariant}
             className="mt-2"
+            kind={kind}
           />
         </div>
       </div>

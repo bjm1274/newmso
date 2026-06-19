@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { fetchPendingApprovalCount, fetchCurrentMonthDepositTotal } from '@/lib/data/dashboard-widgets';
 import { MenuIcon } from '../조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
-import 경영분석모바일대시보드 from './경영분석/모바일대시보드';
+import ManagementAnalysisMobileDashboard from './경영분석/모바일대시보드';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
@@ -94,7 +94,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
 
   if (isMobile) {
     return (
-      <경영분석모바일대시보드
+      <ManagementAnalysisMobileDashboard
         stats={stats}
         notices={notices}
         quickLinks={quickLinks}

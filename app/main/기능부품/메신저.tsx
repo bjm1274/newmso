@@ -2669,6 +2669,7 @@ export default function ChatView({
     fileUploading,
     confirmPendingAttachmentUpload,
     cancelPendingAttachmentUpload,
+    removePendingAttachmentFile,
     handleAlbumFileSelect,
     removeAlbumFile,
     cancelAlbumUpload,
@@ -3197,6 +3198,7 @@ export default function ChatView({
               onRemoveAlbumFile={removeAlbumFile}
               onSendAlbum={sendAlbum}
               onCancelPendingAttachmentUpload={cancelPendingAttachmentUpload}
+              onRemovePendingAttachmentFile={removePendingAttachmentFile}
               onConfirmPendingAttachmentUpload={confirmPendingAttachmentUpload}
               onRetryFailedAttachmentUpload={retryFailedAttachmentUpload}
               onRetryAllFailedAttachmentUploads={handleRetryAllFailedAttachmentsForRoom}

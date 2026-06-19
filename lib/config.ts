@@ -28,13 +28,6 @@ function optionalEnvWithDefault(key: string, defaultValue: string): string {
 }
 
 export const config = {
-  /** Supabase (lib/supabase.ts 하이브리드 Proxy 유지용 — 계정 해지 전까지 보존) */
-  supabase: {
-    url: requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-    anonKey: requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
-    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  },
-
   /** 세션 */
   session: {
     secret: requireEnv('SESSION_SECRET'),
@@ -90,8 +83,6 @@ export const config = {
 
   /** 모니터링 */
   monitoring: {
-    supabaseTrafficMonitor: optionalEnv('SUPABASE_TRAFFIC_MONITOR'),
-    supabaseTrafficMonitorPublic: optionalEnv('NEXT_PUBLIC_SUPABASE_TRAFFIC_MONITOR'),
     erpPushQuietHoursTimezone: optionalEnvWithDefault('ERP_PUSH_QUIET_HOURS_TIMEZONE', 'Asia/Seoul'),
   },
 
