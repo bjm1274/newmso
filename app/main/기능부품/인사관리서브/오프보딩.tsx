@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
@@ -15,7 +15,7 @@ import {
   withMissingColumnFallback,
   withMissingColumnsFallback,
 } from '@/lib/supabase-compat';
-import { patchChatRoom } from '@/lib/chat-rooms-client';
+import { patchChatRoom } from '@/lib/chat-write-service';
 import {
   countChecklistDone,
   getDefaultChecklist,
@@ -64,21 +64,19 @@ function getDisplayText(value: unknown, fallback = '-') {
 async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
   const cleanupWarnings: Array<{ target: string; error: unknown }> = [];
 
-  const pushByStaffResult = await supabase.from('push_subscriptions').delete().eq('staff_id', staffId);
+  const pushByStaffResult = await db.from('push_subscriptions').delete().eq('staff_id', staffId);
   if (pushByStaffResult.error && !isMissingColumnError(pushByStaffResult.error, 'staff_id')) {
     cleanupWarnings.push({ target: 'push_subscriptions.staff_id', error: pushByStaffResult.error });
   }
 
   const notificationsResult = await withMissingColumnFallback(
     () =>
-      supabase
-        .from('notifications')
+      d1.from('notifications')
         .update({ read_at: readAt })
         .eq('user_id', staffId)
         .is('read_at', null),
     () =>
-      supabase
-        .from('notifications')
+      d1.from('notifications')
         .update({ is_read: true })
         .eq('user_id', staffId)
         .eq('is_read', false),
@@ -91,7 +89,7 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
 
   // 단체 채팅방에서 퇴사자 제거 (1:1 direct 채팅은 보존)
   type ChatRoomRow = { id: string; name: string | null; type: string | null; members: unknown; member_ids: unknown };
-  const chatRoomsResult = await supabase
+  const chatRoomsResult = await db
     .from('chat_rooms')
     .select('id, name, type, members, member_ids') as { data: ChatRoomRow[] | null; error: unknown };
 
@@ -197,7 +195,7 @@ export default function OffboardingView({
       }
 
       const ids = pendingList.map((staff) => String(staff.id));
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('onboarding_checklists')
         .select('staff_id, checklist_type, items, target_date')
         .eq('checklist_type', '퇴사')
@@ -237,7 +235,7 @@ export default function OffboardingView({
           };
         });
 
-        const { data: createdRows, error: createError } = await supabase
+        const { data: createdRows, error: createError } = await db
           .from('onboarding_checklists')
           .upsert(fallbackRows, { onConflict: 'staff_id,checklist_type' })
           .select('staff_id, checklist_type, items, target_date');
@@ -278,7 +276,7 @@ export default function OffboardingView({
       }
 
       const ids = pendingList.map((staff) => String(staff.id));
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('staff_licenses')
         .select('staff_id, license_name, license_type')
         .in('staff_id', ids);
@@ -324,7 +322,7 @@ export default function OffboardingView({
       payload.target_date = targetDate;
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from('onboarding_checklists')
       .upsert(payload, { onConflict: 'staff_id,checklist_type' });
 
@@ -378,7 +376,7 @@ export default function OffboardingView({
         offboarding_reason: reason,
       };
 
-      const { error } = await supabase
+      const { error } = await db
         .from('staff_members')
         .update({
           status: '퇴사예정',
@@ -450,7 +448,7 @@ export default function OffboardingView({
       const restoredStatus = getOriginalStatus(staff);
       const restoredRole = getOriginalRole(staff);
 
-      const { error } = await supabase
+      const { error } = await db
         .from('staff_members')
         .update({
           status: restoredStatus,
@@ -462,7 +460,7 @@ export default function OffboardingView({
 
       if (error) throw error;
 
-      await supabase
+      await db
         .from('onboarding_checklists')
         .delete()
         .eq('staff_id', staff.id)
@@ -554,7 +552,7 @@ export default function OffboardingView({
             payload.force_logout_at = finalizedAt;
           }
 
-          return supabase.from('staff_members').update(payload).eq('id', staffId);
+          return db.from('staff_members').update(payload).eq('id', staffId);
         },
         ['force_logout_at'],
       );
@@ -623,7 +621,7 @@ export default function OffboardingView({
       const restoredStatus = '재직'; // 복구 시 기본 '재직'으로 세팅
       const restoredRole = 'staff';  // 복구 시 기본 'staff'로 세팅
 
-      const { error: staffUpdateError } = await supabase
+      const { error: staffUpdateError } = await db
         .from('staff_members')
         .update({
           status: restoredStatus,
@@ -636,7 +634,7 @@ export default function OffboardingView({
       if (staffUpdateError) throw staffUpdateError;
 
       // 진행 중이던 퇴사 체크리스트가 있으면 삭제
-      await supabase
+      await db
         .from('onboarding_checklists')
         .delete()
         .eq('staff_id', staff.id)

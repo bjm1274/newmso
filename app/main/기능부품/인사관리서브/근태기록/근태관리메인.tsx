@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import type { StaffMember as AppStaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { getKoreanMonthString, getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -86,7 +86,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
 
   useEffect(() => {
     if (viewMode !== 'schedule') return;
-    let query = supabase.from('org_teams').select('*');
+    let query = db.from('org_teams').select('*');
     if (selectedCo !== '전체') {
       query = query.eq('company_name', selectedCo);
     }
@@ -268,13 +268,13 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
 
       // 버그 B 수정: 근태와 연차 데이터를 병렬 조회 (JM2: 단일 왕복)
       const [attendanceResult, leaveResult] = await Promise.all([
-        supabase
+        db
           .from('attendances')
           .select('*')
           .in('staff_id', staffIds)
           .gte('work_date', startDate)
           .lte('work_date', endDate),
-        supabase
+        db
           .from('leave_requests')
           .select('staff_id, start_date, end_date, leave_type, status')
           .in('staff_id', staffIds)
@@ -324,7 +324,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           'is_shift',
         ].filter((column) => !omittedColumns.has(column));
 
-        let query = supabase
+        let query = db
           .from('work_shifts')
           .select(columns.join(', '))
           .eq('is_active', true);
@@ -356,7 +356,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     const lastDay = new Date(y, m, 0).getDate();
     const start = `${selectedMonth}-01`;
     const end = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-    const { data } = await supabase
+    const { data } = await db
       .from('shift_assignments')
       .select('staff_id, work_date, shift_id')
       .in('staff_id', filtered.map((s: StaffMember) => s.id))
@@ -379,7 +379,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     const key = `${staffId}_${workDate}`;
     setShiftAssignments((prev) => ({ ...prev, [key]: shiftId || '' }));
     const companyName = filtered.find((s: StaffMember) => s.id === staffId)?.company;
-    supabase
+    db
       .from('shift_assignments')
       .upsert(
         { staff_id: staffId, work_date: workDate, shift_id: shiftId || null, company_name: companyName },
@@ -466,7 +466,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const handleSwapRequest = async (targetDate: string, reason: string) => {
     if (!swapData || !user) return;
     try {
-      const { error } = await supabase.from('roster_swap_requests').insert({
+      const { error } = await db.from('roster_swap_requests').insert({
         company_name: selectedCo || '본사',
         team_name: rosterTeam,
         requested_by: user.id,
@@ -489,7 +489,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   const handleApproveSwap = async (req: any) => {
     try {
       setAssignment(req.staff_id, req.work_date, null);
-      const { error } = await supabase.from('roster_swap_requests').update({
+      const { error } = await db.from('roster_swap_requests').update({
         status: 'approved',
         approved_by: user?.id,
         approved_at: new Date().toISOString(),
@@ -503,7 +503,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   };
 
   const handleRejectSwap = async (req: any, reason: string) => {
-    await supabase.from('roster_swap_requests').update({
+    await db.from('roster_swap_requests').update({
       status: 'rejected',
       reject_reason: reason,
       rejected_by: user?.id,
@@ -575,7 +575,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
     if (canApproveRoster || canCreateRoster) {
       const userId = String(user?.id || '').trim();
       const loadLegacyPendingApprovals = async () => {
-        let query = supabase
+        let query = db
           .from('approvals')
           .select('id, sender_id, sender_name, sender_company, status, current_approver_id, meta_data, created_at')
           .eq('type', LEGACY_ROSTER_APPROVAL_TYPE)
@@ -596,7 +596,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         setPendingApprovals((data || []).map(mapLegacyApprovalRequest));
       };
 
-      supabase.from('roster_approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(async ({ data, error }) => {
+      db.from('roster_approval_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(async ({ data, error }) => {
         if (error) {
           if (!isMissingRosterWorkflowTableError(error, 'roster_approval_requests')) {
             console.error('근무표 승인 대기 목록 조회 실패:', error);
@@ -609,7 +609,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         setPendingApprovals(data || []);
       });
       // Hypothetical swap requests table
-      supabase.from('roster_swap_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data, error }) => {
+      db.from('roster_swap_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }).then(({ data, error }) => {
         if (error) {
           if (!isMissingRosterWorkflowTableError(error, 'roster_swap_requests')) {
             console.error('근무 교환 요청 조회 실패:', error);
@@ -689,7 +689,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           request?.meta_data && typeof request.meta_data === 'object' && !Array.isArray(request.meta_data)
             ? request.meta_data
             : {};
-        const { error: approvalError } = await supabase.from('approvals').update({
+        const { error: approvalError } = await db.from('approvals').update({
           status: LEGACY_APPROVAL_APPROVED_STATUS,
           current_approver_id: null,
           meta_data: {
@@ -701,7 +701,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         }).eq('id', request.id);
         if (approvalError) throw approvalError;
       } else {
-        const { error: approvalError } = await supabase.from('roster_approval_requests').update({
+        const { error: approvalError } = await db.from('roster_approval_requests').update({
           status: 'approved',
           approved_by: user?.id,
           approved_at: nowIso,
@@ -713,7 +713,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       // 2. Apply to shift_assignments
       const companyName = request.company_name;
       for (const a of (request.assignments || [])) {
-        await supabase.from('shift_assignments').upsert(
+        await db.from('shift_assignments').upsert(
           { staff_id: a.staff_id, work_date: a.work_date, shift_id: a.shift_id, company_name: companyName },
           { onConflict: 'staff_id,work_date' }
         );
@@ -726,7 +726,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         `${staffNames[a.staff_id] || a.staff_id}\t${a.work_date}\t${shiftNames[a.shift_id] || a.shift_id}`
       ).join('\n');
 
-      await supabase.from('document_repository').insert({
+      await db.from('document_repository').insert({
         title: `[근무표] ${request.team_name || '전체'} ${request.year_month} 승인`,
         category: '규정',
         content: `승인일: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}\n승인자: ${user?.name || ''}\n요청자: ${request.requested_by_name || ''}\n\n직원명\t근무일\t근무형태\n${docContent}`,
@@ -736,7 +736,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       });
 
       if (request.requested_by) {
-        await supabase.from('notifications').insert({
+        await d1.from('notifications').insert({
           user_id: request.requested_by,
           type: 'approval',
           title: `📋 근무표 승인 완료: ${request.team_name || '전체'} ${request.year_month}`,
@@ -756,7 +756,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       }
 
       if (false && request.requested_by) {
-        await supabase.from('notifications').insert({
+        await d1.from('notifications').insert({
           user_id: request.requested_by,
           type: 'approval',
           title: `📋 근무표 반려: ${request.team_name || '전체'} ${request.year_month}`,
@@ -794,7 +794,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           request?.meta_data && typeof request.meta_data === 'object' && !Array.isArray(request.meta_data)
             ? request.meta_data
             : {};
-        const { error } = await supabase.from('approvals').update({
+        const { error } = await db.from('approvals').update({
           status: LEGACY_APPROVAL_REJECTED_STATUS,
           current_approver_id: null,
           meta_data: {
@@ -807,7 +807,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         }).eq('id', request.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('roster_approval_requests').update({
+        const { error } = await db.from('roster_approval_requests').update({
           status: 'rejected',
           rejected_by: user?.id,
           rejected_at: nowIso,
@@ -818,7 +818,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       }
 
       if (request.requested_by) {
-        await supabase.from('notifications').insert({
+        await d1.from('notifications').insert({
           user_id: request.requested_by,
           type: 'approval',
           title: `📋 근무표 반려: ${request.team_name || '전체'} ${request.year_month}`,

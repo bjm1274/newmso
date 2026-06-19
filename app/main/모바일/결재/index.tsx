@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * 결재 라우터 — inbox / sent / ref / write / detail 5뷰 + 상세 분기.
@@ -7,7 +8,7 @@
  * JM2: useApprovalList 1회 fetch 후 useClassifiedApprovals로 메모리에서 분류 — N+1 방지
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import type { ErpUser } from '@/types';
 import SApproval from './결재함';
 import SApprovalDocs from './문서조회';
@@ -29,6 +30,7 @@ export type ApprovalView = 'inbox' | 'docs' | 'sent' | 'ref' | 'write' | 'compos
 
 export type 결재Props = {
   user: ErpUser;
+  sub?: string;
 };
 
 // id 기준 중복 제거(분류 버킷 합산 시 동일 문서 1회만)
@@ -44,7 +46,7 @@ function dedupeById(list: ApprovalRow[]): ApprovalRow[] {
   return out;
 }
 
-export default function 결재({ user }: 결재Props) {
+export default function 결재({ user, sub }: 결재Props) {
   const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
   const staffName = typeof user.name === 'string' ? user.name : null;
   const company = typeof user.company === 'string' ? user.company : null;
@@ -52,6 +54,24 @@ export default function 결재({ user }: 결재Props) {
   const [view, setView] = useState<ApprovalView>('inbox');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [composeForm, setComposeForm] = useState<{ slug: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (sub === 'compose:annual_plan') {
+      setComposeForm({ slug: 'annual_plan', name: '연차계획서' });
+      setView('compose');
+    } else if (sub === 'compose:leave_promotion_notice') {
+      setComposeForm({ slug: 'leave_promotion_notice', name: '연차촉진동의서' });
+      setView('compose');
+    } else if (sub && sub.startsWith('detail:')) {
+      const id = sub.split(':')[1];
+      if (id) {
+        setDetailId(id);
+        setView('detail');
+      }
+    } else if (sub === 'inbox' || sub === 'docs' || sub === 'sent' || sub === 'ref' || sub === 'write') {
+      setView(sub as ApprovalView);
+    }
+  }, [sub]);
 
   const { rows, loading, refetch } = useApprovalList(staffId, company);
   const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);

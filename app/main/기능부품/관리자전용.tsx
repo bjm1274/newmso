@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
+import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import {
   ADMIN_ANALYSIS_TABS,
   ADMIN_AUDIT_TABS,
@@ -44,7 +45,7 @@ const StaffPermissionManager = dynamic(() => import('./관리자전용서브/직
 const PopupManager = dynamic(() => import('./관리자전용서브/팝업창관리자'), { ssr: false, loading: AdminSubViewLoading });
 const DataReseter = dynamic(() => import('./관리자전용서브/데이터초기화'), { ssr: false, loading: AdminSubViewLoading });
 const DataBackup = dynamic(() => import('./관리자전용서브/데이터백업'), { ssr: false, loading: AdminSubViewLoading });
-const AuditLogViewer = dynamic(() => import('./관리자전용서브/감사로그뷰어'), { ssr: false, loading: AdminSubViewLoading });
+const AuditLogViewer = dynamic(() => import('./관리자전용서브/감사로그통합뷰어').then((mod) => mod.AuditLogViewer), { ssr: false, loading: AdminSubViewLoading });
 const BusinessDashboard = dynamic(() => import('./관리자전용서브/경영대시보드'), { ssr: false, loading: AdminSubViewLoading });
 const CompanyManager = dynamic(() => import('./관리자전용서브/회사관리'), { ssr: false, loading: AdminSubViewLoading });
 const NotificationAutomation = dynamic(() => import('./관리자전용서브/알림자동화설정'), { ssr: false, loading: AdminSubViewLoading });
@@ -55,7 +56,7 @@ const CustomDashboard = dynamic(() => import('./관리자전용서브/커스텀�
 const BudgetManagement = dynamic(() => import('./관리자전용서브/예산관리'), { ssr: false, loading: AdminSubViewLoading });
 const IntegratedReport = dynamic(() => import('./관리자전용서브/통합보고서'), { ssr: false, loading: AdminSubViewLoading });
 const SalaryAnomalyDetector = dynamic(() => import('./관리자전용서브/급여이상치감지'), { ssr: false, loading: AdminSubViewLoading });
-const AccessAuditLog = dynamic(() => import('./관리자전용서브/접근감사로그'), { ssr: false, loading: AdminSubViewLoading });
+const AccessAuditLog = dynamic(() => import('./관리자전용서브/감사로그통합뷰어').then((mod) => mod.AccessAuditLog), { ssr: false, loading: AdminSubViewLoading });
 const CompanyPnL = dynamic(() => import('./관리자전용서브/법인손익현황'), { ssr: false, loading: AdminSubViewLoading });
 const SystemMasterCenter = dynamic(() => import('./관리자전용서브/시스템마스터센터'), { ssr: false, loading: AdminSubViewLoading });
 
@@ -254,14 +255,25 @@ export default function AdminView(props: Record<string, unknown>) {
         </div>
       );
     }
-    const Workcenter = getAdminWorkcenter(initialTab);
+
+    // 모바일 기기에서의 영문 워크센터 가드 적용 (exec, company, forms 차단)
+    if (isMobile && (initialTab === 'exec' || initialTab === 'company' || initialTab === 'forms')) {
+      const featureNames = {
+        exec: '경영 분석',
+        company: '회사 관리',
+        forms: '결재 양식 관리',
+      };
+      return <DesktopOnlyNotice feature={featureNames[initialTab] || '관리자 워크센터'} />;
+    }
+
+    const workcenterComponent = getAdminWorkcenter(initialTab);
     return (
       <div
         className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
         data-testid="admin-view"
       >
         <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 pb-20 md:p-4">
-          <Workcenter user={user} />
+          {workcenterComponent ? React.createElement(workcenterComponent, { user }) : null}
         </main>
       </div>
     );

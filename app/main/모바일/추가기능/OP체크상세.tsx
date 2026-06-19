@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ErpUser, StaffMember } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
@@ -69,8 +69,8 @@ export default function OP체크상세({
     setLoading(true);
     try {
       const queries = [
-        supabase.from('op_patient_checks').select('*').eq('schedule_post_id', card.scheduleId).maybeSingle(),
-        supabase.from('board_posts').select('*').eq('id', card.scheduleId).maybeSingle(),
+        db.from('op_patient_checks').select('*').eq('schedule_post_id', card.scheduleId).maybeSingle(),
+        db.from('board_posts').select('*').eq('id', card.scheduleId).maybeSingle(),
       ] as const;
       const [{ data: check }, { data: post }] = await Promise.all(queries);
 
@@ -197,7 +197,7 @@ export default function OP체크상세({
       try {
         const company = typeof user.company === 'string' ? user.company : '';
         const dept = typeof user.department === 'string' ? user.department : '';
-        let q = supabase
+        let q = db
           .from('staff_members')
           .select('id, name, company, department, status')
           .limit(200);
@@ -225,7 +225,7 @@ export default function OP체크상세({
             read_at: null,
             created_at: now,
           }));
-          const { error: notiErr } = await supabase.from('notifications').insert(rows);
+          const { error: notiErr } = await d1.from('notifications').insert(rows);
           if (notiErr) {
             // 알림은 보조 — 실패해도 상태 전환은 유지
             console.warn('[mobile-addon] op ready notify', notiErr);

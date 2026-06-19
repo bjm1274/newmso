@@ -3784,10 +3784,10 @@ button, a, [role="button"] {
   /* 인쇄 영역 내부 자손의 강제 높이/플렉스 reset */
   body:has([data-print-root]) [data-print-root] > * {
     flex: none !important;
-    padding: 0 !important;
     margin: 0 !important;
     height: auto !important;
     min-height: 0 !important;
+    max-width: 100% !important;
     max-height: none !important;
   }
 

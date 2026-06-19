@@ -6,7 +6,7 @@ import type { StaffMember } from '@/types';
 
 import { useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import {
   buildFallbackLicenseRows,
   getScopedActiveStaffs,
@@ -303,7 +303,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
         : `${item.expiry_date as string} 만료 예정입니다.`
       : '만료일이 등록되어 있지 않습니다.';
 
-    const { error } = await supabase.from('notifications').insert({
+    const { error } = await d1.from('notifications').insert({
       user_id: item.staff_id,
       type: 'license_expiry',
       title: `자격면허 갱신 안내 - ${item.license_name as string}`,

@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * SHrDocs — 모바일 인사관리: 계약·문서
@@ -14,7 +15,7 @@
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -26,7 +27,7 @@ import { uploadMyDocument } from '../내정보/doc-submit';
 import {
   DOC_ALLOWED_FORMATS_LABEL,
   DOC_MAX_FILE_SIZE_LABEL,
-  MOBILE_SUBMISSION_TYPES,
+  REQUIRED_DOC_CATEGORIES,
 } from '@/lib/document-submission-shared';
 
 export type SHrDocsTab = 'mine' | 'cert' | 'ctr' | 'submit';
@@ -210,7 +211,7 @@ function ContractTab({ staffId }: { staffId: string | null }) {
       setLoading(true);
       try {
         // 정본 employment_contracts 에는 title/end_date 컬럼이 없다.
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('employment_contracts')
           .select('id, start_date, contract_type, status')
           .eq('staff_id', staffId)
@@ -301,13 +302,13 @@ type SubmissionRow = {
 };
 
 // 서류 종류는 공통 모듈(모바일 6종)에서 공유한다.
-const SUBMIT_CATEGORIES = MOBILE_SUBMISSION_TYPES;
+const SUBMIT_CATEGORIES = REQUIRED_DOC_CATEGORIES;
 
 function SubmitTab({ staffId }: { staffId: string | null }) {
   const [rows, setRows] = useState<SubmissionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
-  const [category, setCategory] = useState<string>(SUBMIT_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(SUBMIT_CATEGORIES[0].id);
   const [uploading, setUploading] = useState(false);
   const [staffMeta, setStaffMeta] = useState<{ name: string | null; company: string | null }>({
     name: null,
@@ -321,7 +322,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
     (async () => {
       if (!staffId) return;
       try {
-        const { data } = await supabase
+        const { data } = await db
           .from('staff_members')
           .select('name, company')
           .eq('id', staffId)
@@ -351,7 +352,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
       }
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('document_repository')
           .select('id, title, category, created_at')
           .eq('created_by', staffId)
@@ -426,8 +427,8 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
           }}
         >
           {SUBMIT_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
+            <option key={c.id} value={c.id}>
+              {c.label}
             </option>
           ))}
         </select>

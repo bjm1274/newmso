@@ -177,8 +177,8 @@ export async function sendAdminNotifications(
 
   // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
   if (typeof window !== 'undefined') {
-    const { supabase } = await import('./supabase');
-    const { data: adminUsers, error: adminError } = await supabase
+    const { db, d1 } = await import('./db-client');
+    const { data: adminUsers, error: adminError } = await db
       .from('staff_members')
       .select('id')
       .in('department', ['행정팀', '원무팀', '경영지원팀']);
@@ -205,7 +205,7 @@ export async function sendAdminNotifications(
     );
 
     if (rows.length > 0) {
-      const { error } = await supabase.from('notifications').insert(rows);
+      const { error } = await d1.from('notifications').insert(rows);
       if (error) {
         console.warn('[notifications] sendAdminNotifications insert (client):', error.message);
       }
@@ -461,8 +461,8 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
   // (ENABLE_D1_CLIENT=true면 /api/d1/mutate, 아니면 realSupabase). 알림 실패가
   // 본 기능을 막지 않도록 graceful 처리.
   if (typeof window !== 'undefined') {
-    const { supabase } = await import('./supabase');
-    const { error } = await supabase
+    const { db } = await import('./db-client');
+    const { error } = await db
       .from('notifications')
       .upsert(row, { onConflict: 'id', ignoreDuplicates: true });
     if (error && !/UNIQUE|duplicate/i.test(error.message ?? '')) {

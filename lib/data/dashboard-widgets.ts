@@ -7,7 +7,7 @@
  */
 
 import { fetcher } from '@/lib/fetcher';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 
 const WIDGET_TTL = 60_000; // 1분
@@ -16,7 +16,7 @@ export async function fetchActiveStaffCount(): Promise<number> {
   return fetcher(
     'dashboard:staff_members:count:active',
     async () => {
-      const { count } = await supabase
+      const { count } = await db
         .from('staff_members')
         .select('id', { count: 'exact', head: true })
         .eq('status', '재직');
@@ -30,7 +30,7 @@ export async function fetchPendingApprovalCount(): Promise<number> {
   return fetcher(
     'dashboard:approvals:count:pending',
     async () => {
-      const { count } = await supabase
+      const { count } = await db
         .from('approvals')
         .select('id', { count: 'exact', head: true })
         .eq('status', '대기');
@@ -50,7 +50,7 @@ export async function fetchInventoryItems(): Promise<InventoryItem[]> {
   return fetcher(
     'dashboard:inventory:list',
     async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('inventory')
         .select('id, quantity, min_quantity');
       return (data ?? []) as InventoryItem[];
@@ -64,7 +64,7 @@ export async function fetchTodayCheckedInCount(): Promise<number> {
   return fetcher(
     `dashboard:attendances:count:checked-in:${today}`,
     async () => {
-      const { count } = await supabase
+      const { count } = await db
         .from('attendances')
         .select('id', { count: 'exact', head: true })
         .eq('date', today)
@@ -84,7 +84,7 @@ export async function fetchActiveStaffLeaves(): Promise<StaffLeaveSnapshot[]> {
   return fetcher(
     'dashboard:staff_members:leaves:active',
     async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('staff_members')
         .select('annual_leave_total, annual_leave_used')
         .eq('status', '재직');
@@ -107,7 +107,7 @@ export async function fetchCurrentMonthDepositTotal(): Promise<number> {
   return fetcher(
     `dashboard:deposits:sum:${ym}`,
     async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('virtual_account_deposits')
         .select('amount, deposited_at')
         .eq('deposit_status', 'deposited')
@@ -128,8 +128,7 @@ export async function fetchRecentNotifications(limit = 5): Promise<RecentNotific
   return fetcher(
     `dashboard:notifications:recent:${limit}`,
     async () => {
-      const { data } = await supabase
-        .from('notifications')
+      const { data } = await d1.from('notifications')
         .select('title, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);

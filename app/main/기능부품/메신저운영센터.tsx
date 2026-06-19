@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { StaffMember } from '@/types';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { isActiveChatMember, isMessageReadByCursor, NOTICE_ROOM_ID, NOTICE_ROOM_NAME } from './메신저유틸';
 import {
   CHAT_NOTICE_SCHEDULE_EVENT,
@@ -380,7 +380,7 @@ export default function MessengerOperationsCenter({
           },
         }),
       }));
-      const { error } = await supabase.from('notifications').insert(payload);
+      const { error } = await d1.from('notifications').insert(payload);
       if (error) throw error;
       toast(`${nonReaders.length}명에게 공지 확인 알림을 보냈습니다.`, 'warning');
     } catch (error) {

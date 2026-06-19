@@ -11,12 +11,11 @@
 
 import { useEffect, useRef } from 'react';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { supabase } from '@/lib/supabase';
 
 const ENDPOINT = '/api/d1/rpc/increment-post-views';
 
 /**
- * 조회수 +1 — D1 라우트 우선, 실패 시 supabase rpc → 마지막은 단순 update.
+ * 조회수 +1 — D1 라우트 fetch.
  * 같은 postId 재진입에는 무동작 (ref guard).
  * onIncremented는 ref로 stable하게 캡처해 매 렌더 effect 재실행을 막는다 (JM2).
  */
@@ -40,26 +39,11 @@ export function useIncrementPostView(
 
     void (async () => {
       try {
-        const res = await fetch(ENDPOINT, {
+        await fetch(ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ p_post_id: postId }),
         }).catch(() => null);
-        const ok = !!res?.ok && Boolean(
-          ((await res.clone().json().catch(() => ({ ok: false }))) as { ok?: boolean }).ok,
-        );
-        if (!ok) {
-          const { error } = await supabase.rpc('increment_post_views', { p_post_id: postId });
-          if (error) {
-            const { data: row } = await supabase
-              .from('board_posts')
-              .select('views')
-              .eq('id', postId)
-              .maybeSingle();
-            const nextViews = ((row as { views?: number } | null)?.views ?? 0) + 1;
-            await supabase.from('board_posts').update({ views: nextViews }).eq('id', postId);
-          }
-        }
         callbackRef.current?.();
       } catch {
         // 조회수 실패는 무시 (통계 목적)

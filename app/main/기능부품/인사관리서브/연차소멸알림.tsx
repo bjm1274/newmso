@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 
 interface Props {
   staffs: any[];
@@ -45,7 +45,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
           return;
         }
 
-        const { data: leaveBalances } = await supabase
+        const { data: leaveBalances } = await db
           .from('leave_balances')
           .select('*')
           .in('staff_id', staffIds);
@@ -103,7 +103,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
     setSendingId(String(info.staff.id));
 
     try {
-      await supabase.from('notifications').insert({
+      await d1.from('notifications').insert({
         user_id: info.staff.id,
         title: '연차 소멸 예정 알림',
         body: `보유 연차 ${info.remaining}일이 ${info.expiryDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,

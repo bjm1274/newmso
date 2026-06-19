@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import SignatureCanvas from 'react-signature-canvas';
 import { upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
@@ -93,7 +93,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                 const shiftIds = getWeeklyRotationShiftIds(user, contract?.shift_id ?? user?.shift_id);
                 if (shiftIds.length > 0) {
-                    const { data: shiftRows } = await supabase
+                    const { data: shiftRows } = await db
                         .from('work_shifts')
                         .select('*')
                         .in('id', shiftIds);
@@ -102,7 +102,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         const seedShift = orderedShiftRows[0];
                         const seedCompanyName = String(seedShift.company_name || seedShift.company || '');
                         const seedShiftType = String(seedShift.shift_type || '');
-                        let siblingQuery = supabase
+                        let siblingQuery = db
                             .from('work_shifts')
                             .select('*')
                             .eq('is_active', true);
@@ -116,7 +116,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 }
 
                 if (targetCompany && targetCompany !== '전체') {
-                    const { data: companyRow } = await supabase
+                    const { data: companyRow } = await db
                         .from('companies')
                         .select('*')
                         .eq('name', targetCompany)
@@ -125,7 +125,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 }
 
                 if (!hasTemplateOverride) {
-                    const { data: companyTemplateRow } = await supabase
+                    const { data: companyTemplateRow } = await db
                         .from('contract_templates')
                         .select('template_content, seal_url')
                         .eq('company_name', targetCompany)
@@ -135,7 +135,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     sealUrl = companyTemplateRow?.seal_url || null;
 
                     if (!resolvedTemplateText && targetCompany !== '전체') {
-                        const { data: fallbackTemplateRow } = await supabase
+                        const { data: fallbackTemplateRow } = await db
                             .from('contract_templates')
                             .select('template_content, seal_url')
                             .eq('company_name', '전체')

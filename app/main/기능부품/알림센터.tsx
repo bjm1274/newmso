@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -18,7 +18,6 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import {
   NOTIFICATION_MENU_LABELS,
@@ -107,20 +106,16 @@ export default function NotificationCenter({
 
     try {
       // unread count는 전체 기준으로 정확하게 계산
-      const { count: totalUnread } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', effectiveUserId)
-        .is('read_at', null);
+      const countRes = await fetch('/api/notifications?count=true');
+      if (!countRes.ok) throw new Error('Failed to fetch count');
+      const countJson = await countRes.json();
+      const totalUnread = countJson.count ?? 0;
 
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', effectiveUserId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const listRes = await fetch('/api/notifications?limit=50');
+      if (!listRes.ok) throw new Error('Failed to fetch list');
+      const listJson = await listRes.json();
+      const list = listJson.data || [];
 
-      const list = data || [];
       setNotifications(list);
 
       const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
@@ -210,11 +205,11 @@ export default function NotificationCenter({
     if (!effectiveUserId) return;
 
     const readAt = new Date().toISOString();
-    await supabase
-      .from('notifications')
-      .update({ read_at: readAt })
-      .eq('user_id', effectiveUserId)
-      .is('read_at', null);
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => null);
 
     setNotifications((prev) => prev.map((notification) => ({
       ...notification,
@@ -229,7 +224,11 @@ export default function NotificationCenter({
 
   const markAsRead = useCallback(async (id: string) => {
     const readAt = new Date().toISOString();
-    await supabase.from('notifications').update({ read_at: readAt }).eq('id', id);
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => null);
     setNotifications((prev) =>
       prev.map((notification) =>
         notification.id === id ? { ...notification, read_at: readAt } : notification
@@ -253,7 +252,11 @@ export default function NotificationCenter({
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
     try {
-      await supabase.from('notifications').delete().eq('id', id);
+      await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
     } catch (err) {
       console.warn('[notification-center] delete failed', err);
     }

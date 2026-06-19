@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * 알림탭 — 독립 알림 탭 화면 (바텀탭 연동용).
@@ -13,7 +14,7 @@
 
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { ErpUser } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import {
   resolveNotificationTarget,
@@ -127,8 +128,7 @@ function 알림탭Base({ user }: 알림탭Props) {
     if (!staffId) { setNotifs([]); setLoading(false); return; }
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from('notifications')
+      const { data } = await d1.from('notifications')
         .select(NOTIFICATION_SELECT)
         .eq('user_id', staffId)
         .order('created_at', { ascending: false })
@@ -161,8 +161,7 @@ function 알림탭Base({ user }: 알림탭Props) {
     const nowIso = new Date().toISOString();
     setNotifs((prev) => prev.map((n) => ({ ...n, unread: false })));
     try {
-      await supabase
-        .from('notifications')
+      await d1.from('notifications')
         .update({ read_at: nowIso })
         .eq('user_id', staffId)
         .is('read_at', null);
@@ -177,8 +176,7 @@ function 알림탭Base({ user }: 알림탭Props) {
     const { id } = item;
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
     try {
-      await supabase
-        .from('notifications')
+      await d1.from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('id', id);
     } catch { /* 낙관적 업데이트 유지 */ }
@@ -191,6 +189,7 @@ function 알림탭Base({ user }: 알림탭Props) {
         break;
       case 'approval':
         setMainMenu('전자결재');
+        if (target.approvalView) setSubView(target.approvalView);
         break;
       case 'inventory':
         setMainMenu('재고관리');

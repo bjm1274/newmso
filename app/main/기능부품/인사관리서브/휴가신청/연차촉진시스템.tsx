@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import {
   getStaffPromotionSchedule,
 } from '@/lib/annual-leave-promotion';
@@ -153,8 +153,7 @@ export default function AnnualLeavePromotion({
     setLoading(true);
     try {
       // 알림 발송
-      const { data: notifData, error: notifError } = await supabase
-        .from('notifications')
+      const { data: notifData, error: notifError } = await d1.from('notifications')
         .insert([
           {
             user_id: staff.id,

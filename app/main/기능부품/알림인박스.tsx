@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import {
   resolveNotificationTarget,
   toNotificationMetadataRecord,
@@ -628,7 +627,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
                 <ul className="list-disc list-inside pl-1 space-y-1 text-[11px]">
                   <li>우측 상단 <b className="text-[var(--foreground)]">더보기(⋮ 또는 ⋯) → 설정</b>으로 이동합니다.</li>
                   <li>Edge/Whale: <b className="text-[var(--foreground)]">시스템 및 성능</b> / Chrome: <b className="text-[var(--foreground)]">시스템</b> 탭을 클릭합니다.</li>
-                  <li><b className="text-[var(--accent)] font-semibold">"브라우저가 종료된 후에도 백그라운드 앱을 계속 실행"</b> 항목을 <b className="text-emerald-600">켬(ON)</b>으로 활성화합니다.</li>
+                  <li><b className="text-[var(--accent)] font-semibold">&quot;브라우저가 종료된 후에도 백그라운드 앱을 계속 실행&quot;</b> 항목을 <b className="text-emerald-600">켬(ON)</b>으로 활성화합니다.</li>
                 </ul>
                 <p className="font-semibold text-[var(--foreground)] mt-2">2. PWA 설치 권장</p>
                 <p className="text-[11px]">주소창 우측의 [앱 설치 📥] 버튼을 눌러 데스크톱에 단독 앱으로 설치하여 사용하시면 더욱 안정적으로 작동합니다.</p>
@@ -650,7 +649,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
                 <p className="font-semibold text-[var(--foreground)] mt-2">🤖 Android (삼성 갤럭시 등) 사용자</p>
                 <ul className="list-disc list-inside pl-1 space-y-1 text-[11px]">
                   <li><b className="text-[var(--foreground)]">설정 → 애플리케이션 → Chrome</b> (또는 설치된 MSO PWA 앱)으로 이동합니다.</li>
-                  <li><b className="text-[var(--foreground)]">배터리</b> 메뉴를 클릭하여 <b className="text-[var(--accent)] font-semibold">"제한 없음"</b>을 선택해 줍니다. (배터리 최적화로 인한 백그라운드 서비스 강제 종료 방지)</li>
+                  <li><b className="text-[var(--foreground)]">배터리</b> 메뉴를 클릭하여 <b className="text-[var(--accent)] font-semibold">&quot;제한 없음&quot;</b>을 선택해 줍니다. (배터리 최적화로 인한 백그라운드 서비스 강제 종료 방지)</li>
                 </ul>
               </div>
             </div>
@@ -838,14 +837,12 @@ async function cleanupOldNotifications(userId: string) {
     const lastRaw = window.localStorage.getItem(NOTIFICATIONS_CLEANUP_KEY);
     const last = lastRaw ? Number(lastRaw) : 0;
     if (Number.isFinite(last) && Date.now() - last < NOTIFICATIONS_CLEANUP_THROTTLE_MS) return;
-    const cutoff = new Date(Date.now() - NOTIFICATIONS_RETENTION_MS).toISOString();
-    // 수정 G: read_at IS NOT NULL 조건 추가 — 미읽은 알림은 삭제하지 않음
-    await supabase
-      .from('notifications')
-      .delete()
-      .eq('user_id', userId)
-      .lt('created_at', cutoff)
-      .not('read_at', 'is', null);
+    const res = await fetch('/api/notifications', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cleanup: true }),
+    });
+    if (!res.ok) throw new Error('Cleanup failed');
     window.localStorage.setItem(NOTIFICATIONS_CLEANUP_KEY, String(Date.now()));
   } catch {
     // JM3: cleanup 실패는 silent — 다음 마운트에서 재시도
@@ -873,9 +870,11 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
     try {
       // 7일 이상된 알림을 먼저 자동 정리 (24시간 throttle, silent fail)
       await cleanupOldNotifications(_u.id as string);
-      const { data } = await supabase.from('notifications').select('*').eq('user_id', _u.id as string).order('created_at', { ascending: false }).limit(200);
+      const res = await fetch('/api/notifications?limit=200');
+      if (!res.ok) throw new Error('Fetch failed');
+      const json = await res.json();
       lastFetchedAtRef.current = Date.now();
-      setNotifications(data || []);
+      setNotifications(json.data || []);
     } catch { setNotifications([]); } finally { setLoading(false); }
   }, [_u?.id]);
 
@@ -941,7 +940,11 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   useEffect(() => {
     if (!_u?.id) return;
     const timer = setTimeout(async () => {
-      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', _u.id as string).is('read_at', null);
+      await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      }).catch(() => null);
       setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('erp-notification-read'));
     }, 1500);
@@ -964,21 +967,33 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   }, [onRefresh]);
 
   const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => null);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
     emitNotificationReadSync();
   };
 
   const markAllAsRead = async () => {
     if (!_u?.id) return;
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', _u.id as string).is('read_at', null);
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    }).catch(() => null);
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
     emitNotificationReadSync();
   };
 
   const deleteNotif = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    await supabase.from('notifications').delete().eq('id', id);
+    await fetch('/api/notifications', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }).catch(() => null);
     setNotifications(prev => prev.filter(n => n.id !== id));
     emitNotificationReadSync();
   };
@@ -992,7 +1007,11 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   const markSelectedAsRead = useCallback(async () => {
     if (selectedIds.length === 0) return;
     const readAt = new Date().toISOString();
-    await supabase.from('notifications').update({ read_at: readAt }).in('id', selectedIds);
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: selectedIds }),
+    }).catch(() => null);
     setNotifications((prev) =>
       prev.map((notification) =>
         selectedIds.includes(String(notification.id))
@@ -1007,7 +1026,11 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
 
   const deleteSelected = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    await supabase.from('notifications').delete().in('id', selectedIds);
+    await fetch('/api/notifications', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: selectedIds }),
+    }).catch(() => null);
     setNotifications((prev) =>
       prev.filter((notification) => !selectedIds.includes(String(notification.id)))
     );

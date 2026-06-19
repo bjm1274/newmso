@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
@@ -147,7 +147,7 @@ export default function FormRequest({
         }));
 
       if (notificationRows.length > 0) {
-        const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
+        const { error: notificationError } = await d1.from('notifications').insert(notificationRows);
         if (notificationError) {
           console.error('증명서 발급 참조자 알림 생성 실패:', describeError(notificationError));
         }

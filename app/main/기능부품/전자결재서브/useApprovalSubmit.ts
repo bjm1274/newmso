@@ -26,7 +26,7 @@ import {
   normalizeSupplyRequestItems,
   resolveInventoryDepartment,
 } from '@/app/main/inventory-utils';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import {
   APPROVAL_OPTIONAL_INSERT_COLUMNS,
@@ -204,7 +204,7 @@ export function useApprovalSubmit({
 
     if (notificationRows.length === 0) return;
 
-    const { error } = await supabase.from('notifications').insert(notificationRows);
+    const { error } = await d1.from('notifications').insert(notificationRows);
     if (error && String(error.message || '').toLowerCase().includes('fetch')) {
       if (typeof window !== 'undefined') {
         const host = window.location.hostname;
@@ -722,8 +722,7 @@ export function useApprovalSubmit({
             document_type: formType || null,
           },
         };
-        const { error: approverNotifError } = await supabase
-          .from('notifications')
+        const { error: approverNotifError } = await d1.from('notifications')
           .insert([firstApproverNotification]);
         if (approverNotifError) {
           console.error('첫 결재자 알림 생성 실패:', approverNotifError);

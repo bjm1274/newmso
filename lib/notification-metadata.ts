@@ -366,25 +366,42 @@ export function resolveNotificationTarget(
 ): NotificationTarget {
   const normalizedType = cleanNotificationValue(notificationType);
   const record = toNotificationMetadataRecord(metadata);
-  const roomId = resolveChatNotificationRoomId(record);
+  
+  let resolvedRecord = record;
+  const linkValue = cleanNotificationValue(record.link);
+  if (linkValue) {
+    try {
+      const queryString = linkValue.includes('?') ? linkValue.split('?')[1] : linkValue;
+      const searchParams = new URLSearchParams(queryString);
+      const linkRecord: Record<string, unknown> = { ...record };
+      for (const [key, value] of searchParams.entries()) {
+        linkRecord[key] = value;
+      }
+      resolvedRecord = linkRecord;
+    } catch (e) {
+      console.error('Failed to parse record.link:', e);
+    }
+  }
+
+  const roomId = resolveChatNotificationRoomId(resolvedRecord);
   if (roomId) {
     return {
       kind: 'chat',
-      href: buildChatNotificationHref(record),
+      href: buildChatNotificationHref(resolvedRecord),
       roomId,
-      messageId: resolveChatNotificationMessageId(record) || null,
+      messageId: resolveChatNotificationMessageId(resolvedRecord) || null,
     };
   }
 
-  const explicitInventoryApprovalId = resolveExplicitInventoryApprovalId(record);
+  const explicitInventoryApprovalId = resolveExplicitInventoryApprovalId(resolvedRecord);
   const inventoryApprovalId =
     explicitInventoryApprovalId ||
-    (normalizedType === 'inventory' ? resolveInventoryNotificationApprovalId(record) : '');
-  const inventoryView = resolveInventoryNotificationView(record);
+    (normalizedType === 'inventory' ? resolveInventoryNotificationApprovalId(resolvedRecord) : '');
+  const inventoryView = resolveInventoryNotificationView(resolvedRecord);
   if (normalizedType === 'inventory' || explicitInventoryApprovalId || inventoryView) {
     return {
       kind: 'inventory',
-      href: buildInventoryNotificationHref(record),
+      href: buildInventoryNotificationHref(resolvedRecord),
       approvalId: inventoryApprovalId || null,
       inventoryView:
         inventoryView ||
@@ -392,19 +409,19 @@ export function resolveNotificationTarget(
     };
   }
 
-  const approvalId = resolveApprovalNotificationId(record);
-  const approvalView = resolveApprovalNotificationView(record);
+  const approvalId = resolveApprovalNotificationId(resolvedRecord);
+  const approvalView = resolveApprovalNotificationView(resolvedRecord);
   if (normalizedType === 'approval' || approvalId || approvalView) {
     return {
       kind: 'approval',
-      href: buildApprovalNotificationHref(record),
+      href: buildApprovalNotificationHref(resolvedRecord),
       approvalId: approvalId || null,
       approvalView: approvalView || DEFAULT_APPROVAL_VIEW,
     };
   }
 
-  const postId = resolveBoardNotificationPostId(record);
-  const boardType = resolveBoardNotificationType(record);
+  const postId = resolveBoardNotificationPostId(resolvedRecord);
+  const boardType = resolveBoardNotificationType(resolvedRecord);
   if (
     normalizedType === 'board' ||
     normalizedType === 'notice' ||
@@ -413,19 +430,19 @@ export function resolveNotificationTarget(
   ) {
     return {
       kind: 'board',
-      href: buildBoardNotificationHref(record),
+      href: buildBoardNotificationHref(resolvedRecord),
       boardType: boardType || DEFAULT_BOARD_TYPE,
       postId: postId || null,
     };
   }
 
-  const openMenu = resolveNotificationOpenMenu(record);
+  const openMenu = resolveNotificationOpenMenu(resolvedRecord);
   if (openMenu) {
     return {
       kind: 'menu',
-      href: buildMenuNotificationHref(record, openMenu),
+      href: buildMenuNotificationHref(resolvedRecord, openMenu),
       menu: openMenu,
-      subView: resolveNotificationOpenSubView(record) || null,
+      subView: resolveNotificationOpenSubView(resolvedRecord) || null,
     };
   }
 

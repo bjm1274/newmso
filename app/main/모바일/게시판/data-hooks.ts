@@ -98,7 +98,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
     try {
       const { data } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
-          let q = supabase
+          const q = supabase
             .from('board_posts')
             .select(
               buildSelectColumns(

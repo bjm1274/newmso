@@ -28,12 +28,5 @@ export type SchemaType = typeof schema;
  * 롤백 시에는 DATA_BACKEND를 'dual-write'/'supabase'로 명시 설정한다.
  */
 export function getDataBackend(envOverride?: string): DataBackend {
-  const v = (envOverride
-    ?? (typeof process !== 'undefined' ? process.env.DATA_BACKEND : undefined)
-    ?? (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_DATA_BACKEND : undefined)
-    ?? 'd1') as DataBackend;
-  if (v !== 'supabase' && v !== 'd1' && v !== 'dual-write') {
-    return 'd1';
-  }
-  return v;
+  return 'd1';
 }

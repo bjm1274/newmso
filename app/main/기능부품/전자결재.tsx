@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/supabase-compat';
 import { APPROVAL_OPTIONAL_COLUMNS, buildApprovalSelect } from '@/lib/approval-query-columns';
@@ -433,8 +433,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       const effectiveUserId = String(user?.id || '').trim();
       if (!effectiveUserId) return;
 
-      const { data, error } = await supabase
-        .from('notifications')
+      const { data, error } = await d1.from('notifications')
         .select('id, metadata')
         .eq('user_id', effectiveUserId)
         .in('type', ['approval', 'inventory'])
@@ -453,8 +452,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         .filter(Boolean);
 
       if (matchedIds.length > 0) {
-        const { error: updateError } = await supabase
-          .from('notifications')
+        const { error: updateError } = await d1.from('notifications')
           .update({ read_at: new Date().toISOString() })
           .in('id', matchedIds);
 

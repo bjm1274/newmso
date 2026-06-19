@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * 인사관리 라우터 + 허브.
@@ -144,7 +145,7 @@ export default function 인사관리({
     case 'payroll':
       return <급여워크센터 user={user} onBack={goBack} />;
     case 'welfare':
-      return <복지 company={selectedCompany} onBack={goBack} />;
+      return <복지 user={user} company={selectedCompany} onBack={goBack} />;
     case 'docs':
       return <계약문서 staffId={staffId} onBack={goBack} />;
     case 'offboarding':

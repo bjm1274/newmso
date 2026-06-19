@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
@@ -547,8 +547,7 @@ export function usePayrollSlips(staffId: string | null) {
             .select('*')
             .eq('staff_id', staffId)
             .order('year_month', { ascending: false }),
-          supabase
-            .from('notifications')
+          d1.from('notifications')
             .select('title, body')
             .eq('user_id', staffId)
             .ilike('title', '%급여명세%'),
@@ -804,7 +803,7 @@ export async function requestAttendanceClarification(input: {
   const body = `${whenPart}${kindKo} 사유를 입력해 주세요. (관리자 요청)`;
 
   try {
-    const { error } = await supabase.from('notifications').insert({
+    const { error } = await d1.from('notifications').insert({
       user_id: targetStaffId,
       title: '근태 사유 확인 요청',
       body,
@@ -858,7 +857,7 @@ export async function requestAttendanceClarificationMulti(input: {
   const body = buildAbnormalRequestBody({ whenLabel, counts });
 
   try {
-    const { error } = await supabase.from('notifications').insert({
+    const { error } = await d1.from('notifications').insert({
       user_id: targetStaffId,
       title: '근태 사유 확인 요청',
       body,
@@ -1147,7 +1146,7 @@ export async function requestAttendanceClarificationDaily(input: {
   });
 
   try {
-    const { error } = await supabase.from('notifications').insert({
+    const { error } = await d1.from('notifications').insert({
       user_id: targetStaffId,
       title: '근태 사유 확인 요청',
       body,

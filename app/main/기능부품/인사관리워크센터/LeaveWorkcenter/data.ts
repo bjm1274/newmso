@@ -8,7 +8,7 @@
  * - AbortController로 다중 호출 race 보호 (JM2/JM3).
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
@@ -320,7 +320,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     const firstApproverId: string | null = approvalPayload.meta_data.approver_line?.[0] ?? null;
     if (firstApproverId) {
       try {
-        await supabase.from('notifications').insert({
+        await d1.from('notifications').insert({
           user_id: firstApproverId,
           title: '연차 승인 요청',
           body: `${staffName}님이 연차를 신청했습니다`,
@@ -342,7 +342,7 @@ export async function sendExpiryAlert(staffId: string, remaining: number, expiry
   const expiryLabel = expiryDate
     ? new Date(expiryDate).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })
     : '연말';
-  const { error } = await supabase.from('notifications').insert({
+  const { error } = await d1.from('notifications').insert({
     user_id: staffId,
     title: '연차 소멸 예정 알림',
     body: `보유 연차 ${remaining}일이 ${expiryLabel}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,

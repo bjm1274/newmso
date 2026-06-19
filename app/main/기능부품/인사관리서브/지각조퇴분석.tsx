@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 
@@ -67,7 +67,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
 
         const { data } = await withMissingColumnsFallback(
           (omittedColumns) =>
-            supabase
+            db
               .from('attendances')
               .select(selectCols(omittedColumns))
               .in('staff_id', staffIds)
@@ -207,7 +207,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
     setSending(true);
 
     try {
-      await supabase.from('notifications').insert(
+      await d1.from('notifications').insert(
         targets.map((target) => ({
           user_id: target.staff.id,
           title: '지각 경고 알림',

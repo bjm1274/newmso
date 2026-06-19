@@ -283,8 +283,25 @@ export function fillEmploymentContractTemplate(
   const safeCompany = company ?? {};
   const salarySource = contract || user || {};
   const getSalaryAmount = (fieldName: string) => {
-    const val = toMoneyNumber(salarySource[fieldName]);
-    return val > 0 ? val : toMoneyNumber(safeUser[fieldName]);
+    let val = toMoneyNumber(salarySource[fieldName]);
+    if (val === 0) {
+      if (fieldName === 'agreed_overtime_allowance') {
+        val = toMoneyNumber(salarySource['overtime_allowance']);
+      } else if (fieldName === 'agreed_night_allowance') {
+        val = toMoneyNumber(salarySource['night_work_allowance']) || toMoneyNumber(salarySource['night_duty_allowance']);
+      }
+    }
+    if (val > 0) return val;
+
+    let userVal = toMoneyNumber(safeUser[fieldName]);
+    if (userVal === 0) {
+      if (fieldName === 'agreed_overtime_allowance') {
+        userVal = toMoneyNumber(safeUser['overtime_allowance']);
+      } else if (fieldName === 'agreed_night_allowance') {
+        userVal = toMoneyNumber(safeUser['night_work_allowance']) || toMoneyNumber(safeUser['night_duty_allowance']);
+      }
+    }
+    return userVal;
   };
   const allowanceValues: Record<string, number> = {
     '{{position_allowance}}': getSalaryAmount('position_allowance'),

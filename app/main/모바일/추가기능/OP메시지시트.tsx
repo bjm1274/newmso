@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ErpUser, StaffMember } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
 import MSheet from '../공통/MSheet';
@@ -84,7 +84,7 @@ export default function OP메시지시트({
       try {
         const company = typeof user.company === 'string' ? user.company : '';
         const dept = typeof user.department === 'string' ? user.department : '';
-        let q = supabase
+        let q = db
           .from('staff_members')
           .select('id, name, company, department, status')
           .limit(200);
@@ -139,7 +139,7 @@ export default function OP메시지시트({
         read_at: null,
         created_at: now,
       }));
-      const { error } = await supabase.from('notifications').insert(rows);
+      const { error } = await d1.from('notifications').insert(rows);
       if (error) throw error;
       toast(`${targets.length}명에게 전송했습니다.`, 'success');
       onSent?.();

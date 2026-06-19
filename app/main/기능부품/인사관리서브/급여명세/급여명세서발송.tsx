@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 
 type SendSummary = {
   notifications: number;
@@ -120,7 +120,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
           continue;
         }
 
-        const { error: notificationError } = await supabase.from('notifications').insert({
+        const { error: notificationError } = await d1.from('notifications').insert({
           user_id: record.staff_id,
           type: '급여명세',
           title: `[${yearMonth}] 급여명세서가 도착했습니다`,

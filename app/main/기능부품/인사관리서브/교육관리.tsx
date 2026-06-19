@@ -14,7 +14,7 @@ import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import EducationList from './교육내역/교육내역명단';
 import EducationStatus from './교육내역/교육이수현황';
 import LicenseTracking from './교육내역/자격면허대시보드';
@@ -103,7 +103,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
 
   // 직종 목록 로드
   const loadJobCategories = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('job_categories')
       .select('id, code, name')
       .order('display_order');
@@ -116,7 +116,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
   const loadStaffJobMap = useCallback(async () => {
     const staffIds = activeStaffs.map((s) => String(s.id));
     if (staffIds.length === 0) return;
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_job_categories')
       .select('staff_id, job_category_id')
       .in('staff_id', staffIds);
@@ -148,8 +148,8 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
         { rows: completions, error: completionsError },
         { data: licenses, error: licensesError },
       ] = await Promise.all([
-        selectEducationCompletionRowsWithFallback(supabase),
-        supabase.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
+        selectEducationCompletionRowsWithFallback(db),
+        db.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
       ]);
 
       if (completionsError) throw completionsError;
@@ -459,7 +459,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
                     });
                     if (!confirmed) return;
                     const li = item as unknown as LicenseAlert;
-                    const { error } = await supabase.from('notifications').insert({
+                    const { error } = await d1.from('notifications').insert({
                       user_id: activeTab === '의무교육' ? item.id : li.staffId,
                       type: activeTab === '의무교육' ? 'education' : 'license_expiry',
                       title: activeTab === '의무교육' ? '법정의무교육 이수 독촉' : '자격·면허 갱신 안내',

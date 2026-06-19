@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import SalarySlipContainer from './급여명세서';
 import MyCertificates from './증명서관리';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { LucideIcon } from '../조직도서브/조직도측면창';
@@ -56,8 +56,7 @@ export function PayrollAndCertificatesHub({
             .from('payroll_records')
             .select('record_type, status, year_month')
             .eq('staff_id', user.id),
-          supabase
-            .from('notifications')
+          d1.from('notifications')
             .select('title, body')
             .eq('user_id', user.id)
             .eq('type', '급여명세'),

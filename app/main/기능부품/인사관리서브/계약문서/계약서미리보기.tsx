@@ -248,15 +248,15 @@ export default function ContractPreview({
     };
 
     const items = [
-      { label: '기본급', amount: parseAmount(src.base_salary), note: '월 고정 지급', taxable: true },
+      { label: '기본급', amount: parseAmount(src.base_salary || staff?.base_salary), note: '월 고정 지급', taxable: true },
       { label: '직책수당', amount: parseAmount(src.position_allowance || staff?.position_allowance), note: '직책별 차등', taxable: true },
       { label: '식대', amount: parseAmount(src.meal_allowance || staff?.meal_allowance), note: '비과세 (월 20만 한도)', taxable: false },
       { label: '자가운전보조금', amount: parseAmount(src.vehicle_allowance || staff?.vehicle_allowance), note: '비과세 (월 20만 한도)', taxable: false },
       { label: '보육수당', amount: parseAmount(src.childcare_allowance || staff?.childcare_allowance), note: '비과세', taxable: false },
       { label: '연구활동비', amount: parseAmount(src.research_allowance || staff?.research_allowance), note: '비과세 (월 20만 한도)', taxable: false },
       { label: '기타 비과세', amount: parseAmount(src.other_taxfree || staff?.other_taxfree), note: '비과세', taxable: false },
-      { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance), note: '포괄산정 연장수당', taxable: true },
-      { label: '야간근로수당(약정)', amount: parseAmount(src.agreed_night_allowance || staff?.agreed_night_allowance), note: '포괄산정 야간수당', taxable: true },
+      { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || staff?.overtime_allowance), note: '포괄산정 연장수당', taxable: true },
+      { label: '야간근로수당(약정)', amount: parseAmount(src.agreed_night_allowance || staff?.agreed_night_allowance || staff?.night_work_allowance || staff?.night_duty_allowance), note: '포괄산정 야간수당', taxable: true },
     ].filter(item => item.amount > 0);
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
@@ -517,7 +517,7 @@ export default function ContractPreview({
               <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-0 print:py-0">
+            <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-[40px] print:py-[36px]">
               <table className="w-full border-collapse border-0 print:m-0">
                 <thead className="hidden print:table-header-group">
                   <tr>

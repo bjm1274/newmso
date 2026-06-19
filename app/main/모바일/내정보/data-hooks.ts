@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { getMonthBoundaries } from '@/lib/date-utils';
 import {
@@ -85,8 +85,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
             .select('id', { count: 'exact', head: true })
             .eq('current_approver_id', staffId)
             .eq('status', '대기'),
-          supabase
-            .from('notifications')
+          d1.from('notifications')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', staffId)
             .is('read_at', null),

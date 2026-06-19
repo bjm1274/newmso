@@ -5,7 +5,7 @@ import { useGlobalShortcuts } from './기능부품/마이페이지/useGlobalShor
 import { toast } from '@/lib/toast';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import { getStaffsCached } from '@/lib/use-staff-cache';
@@ -554,7 +554,7 @@ function MainPageContent() {
           if (savedCo && !ignore) {
             setSelectedCo(savedCo);
           }
-          supabase
+          db
             .from('companies')
             .select('id, name, type')
             .eq('is_active', true)
@@ -622,7 +622,7 @@ function MainPageContent() {
   useEffect(() => {
     const checkForcedLogout = async () => {
       try {
-        const { data: config } = await supabase
+        const { data: config } = await db
           .from('system_configs')
           .select('value')
           .eq('key', 'min_auth_time')
@@ -839,7 +839,7 @@ function MainPageContent() {
 
     const updatePresence = async (status: 'online' | 'away') => {
       try {
-        await supabase
+        await db
           .from('staff_members')
           .update({
             last_seen_at: new Date().toISOString(),

@@ -41,11 +41,11 @@ const Loading = () => (
 );
 
 // ─── 기존 풀화면 컴포넌트 (감사 로그 탭에서만 재사용) ─────────
-const AccessAuditLog = dynamic(() => import('../관리자전용서브/접근감사로그'), {
+const AccessAuditLog = dynamic(() => import('../관리자전용서브/감사로그통합뷰어').then((mod) => mod.AccessAuditLog), {
   ssr: false,
   loading: Loading,
 });
-const AuditLogViewer = dynamic(() => import('../관리자전용서브/감사로그뷰어'), {
+const AuditLogViewer = dynamic(() => import('../관리자전용서브/감사로그통합뷰어').then((mod) => mod.AuditLogViewer), {
   ssr: false,
   loading: Loading,
 });

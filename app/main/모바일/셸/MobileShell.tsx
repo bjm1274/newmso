@@ -30,7 +30,7 @@ import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
 import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
 import { useChatRoomsForMobile } from '../채팅/data-hooks';
 import { useNavigation } from '../../contexts/NavigationContext';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { sendAdminNotifications } from '@/lib/notification-utils';
 import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/계약문서/전자서명모달';
@@ -79,7 +79,7 @@ export default function MobileShell({
   const checkPendingContracts = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('employment_contracts')
         .select('*')
         .eq('staff_id', user.id as string)
@@ -120,7 +120,7 @@ export default function MobileShell({
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;
     try {
-      await supabase
+      await db
         .from('employment_contracts')
         .update({
           status: '서명완료',
@@ -129,7 +129,7 @@ export default function MobileShell({
         })
         .eq('id', pendingContract.id);
 
-      const { data: checklistRows } = await supabase
+      const { data: checklistRows } = await db
         .from('onboarding_checklists')
         .select('id, checklist_type, items, target_date')
         .eq('staff_id', currentUserId);
@@ -148,7 +148,7 @@ export default function MobileShell({
           signedAt,
         },
       );
-      await supabase.from('onboarding_checklists').upsert(
+      await db.from('onboarding_checklists').upsert(
         {
           staff_id: currentUserId,
           checklist_type: '입사',
@@ -162,7 +162,7 @@ export default function MobileShell({
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
       const { encryptContract } = await import('@/lib/contract-crypto');
       const encryptedContractText = await encryptContract(contractText);
-      await supabase.from('document_repository').insert({
+      await db.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         category: '근로계약서',
         content: encryptedContractText,
@@ -198,10 +198,11 @@ export default function MobileShell({
   // Synchronize route.tab when global mainMenu changes
   useEffect(() => {
     const targetTab = getTabFromMenu(mainMenu);
-    if (targetTab !== route.tab) {
-      setRoute({ tab: targetTab });
+    const routeSub = 'sub' in route ? (route as any).sub : undefined;
+    if (targetTab !== route.tab || (subView && subView !== routeSub)) {
+      setRoute({ tab: targetTab, sub: subView || undefined } as any);
     }
-  }, [mainMenu]);
+  }, [mainMenu, subView, route.tab, route]);
 
   // URL query parameter synchronization on mount
   useEffect(() => {
@@ -326,7 +327,7 @@ export default function MobileShell({
           )}
           {route.tab === 'approval' && (
             <div data-testid="approval-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              <결재 user={user} />
+              <결재 user={user} sub={(route as any).sub} />
             </div>
           )}
           {route.tab === 'hr' && (

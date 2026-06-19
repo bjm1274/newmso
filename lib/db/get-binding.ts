@@ -27,7 +27,8 @@ function getLocalD1Mock(): D1Database | undefined {
     const path = eval("require('path')");
     const Database = eval("require('better-sqlite3')");
 
-    const dir = path.join(process.cwd(), '.wrangler', 'state', 'v3', 'd1', 'miniflare-D1DatabaseObject');
+    const cwd = typeof process.cwd === 'function' ? process.cwd() : '';
+    const dir = path.join(cwd, '.wrangler', 'state', 'v3', 'd1', 'miniflare-D1DatabaseObject');
     if (!fs.existsSync(dir)) {
       console.warn('[getLocalD1Mock] wrangler local D1 state directory not found at:', dir);
       return undefined;
@@ -159,13 +160,5 @@ export async function getD1Binding(): Promise<D1Database | undefined> {
  * 동기 호출이 가능하면 그쪽을 우선 시도하고, async context만 가능하면 그것 사용.
  */
 export async function resolveDataBackend(): Promise<DataBackend> {
-  try {
-    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-    const { env } = await getCloudflareContext({ async: true });
-    const v = env.DATA_BACKEND;
-    if (v) return getDataBackend(v);
-  } catch {
-    // not in Workers — fall back to process.env
-  }
-  return getDataBackend();
+  return 'd1';
 }

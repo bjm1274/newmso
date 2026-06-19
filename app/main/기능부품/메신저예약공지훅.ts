@@ -3,7 +3,7 @@
 import { useEffect, type MutableRefObject } from 'react';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
 import {
@@ -144,7 +144,7 @@ export function useScheduledNoticeDispatcher({
             }),
           }));
 
-          const { error } = await supabase.from('notifications').insert(payload);
+          const { error } = await d1.from('notifications').insert(payload);
           if (error) {
             console.error('scheduled notice reminder failed', error);
             continue;

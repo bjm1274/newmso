@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 
 import { useEffect, useMemo, useState } from 'react';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
@@ -191,8 +191,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
           .select('*')
           .eq('staff_id', effectiveUserId)
           .order('year_month', { ascending: false }),
-        supabase
-          .from('notifications')
+        d1.from('notifications')
           .select('title, body')
           .eq('user_id', effectiveUserId)
           .eq('type', '급여명세')

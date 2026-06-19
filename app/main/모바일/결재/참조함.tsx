@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
@@ -58,8 +58,7 @@ export default function SApprovalRef({
         // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
         // approval_id 는 metadata JSON 안에 있고, 읽음 여부는 read_at 존재로 판별한다.
         const idSet = new Set(ids);
-        const { data, error } = await supabase
-          .from('notifications')
+        const { data, error } = await d1.from('notifications')
           .select('metadata, read_at')
           .eq('user_id', staffId)
           .eq('type', 'approval');

@@ -938,8 +938,15 @@ export default function NotificationSystem({
   // 배지 카운트 DB 동기화
   const syncBadge = useCallback(async () => {
     if (!effectiveUserId) return;
-    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', effectiveUserId).is('read_at', null);
-    if (typeof count === 'number') { setUnreadCount(count); setAppBadge(count); }
+    try {
+      const res = await fetch('/api/notifications?count=true');
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      const count = json.count;
+      if (typeof count === 'number') { setUnreadCount(count); setAppBadge(count); }
+    } catch {
+      // ignore
+    }
   }, [effectiveUserId]);
 
   const removeToast = useCallback((id: string) => {
@@ -1369,65 +1376,51 @@ export default function NotificationSystem({
         title: n.title,
         body: n.body,
         metadata,
-        read_at: null,
         created_at: new Date().toISOString(),
       };
 
-      const writeQuery = deterministicId
-        ? supabase
-            .from('notifications')
-            .upsert([insertPayload], { onConflict: 'id', ignoreDuplicates: true })
-            .select()
-            .maybeSingle()
-        : supabase
-            .from('notifications')
-            .insert([insertPayload])
-            .select()
-            .single();
-
-      const { data: inserted, error } = await writeQuery;
-
-      if (!error) return inserted;
-
-      const duplicateInsert =
-        Boolean(deterministicId) &&
-        (String((error as { code?: string } | null)?.code || '') === '23505' ||
-          /duplicate key|unique constraint/i.test(String((error as { message?: string } | null)?.message || '')));
-
-      if (duplicateInsert && deterministicId) {
-        const { data: existing } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('id', deterministicId)
-          .maybeSingle();
-        return existing || null;
+      try {
+        const res = await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(insertPayload),
+        });
+        if (!res.ok) throw new Error('Insert failed');
+        const json = await res.json();
+        return {
+          id: deterministicId || json.data?.id,
+          user_id: uid,
+          type: n.type,
+          title: n.title,
+          body: n.body,
+          metadata,
+          read_at: null,
+          created_at: insertPayload.created_at,
+        };
+      } catch (error) {
+        throw error;
       }
-
-      throw error;
     };
 
     // A. notifications 테이블 INSERT 수신 → Toast + 소리 + 진동
     const fetchUnreadNotificationsSince = async (since: string) => {
-      const { data: rows } = await supabase
-        .from('notifications')
-        .select('id,title,body,type,metadata,read_at,created_at')
-        .eq('user_id', uid)
-        .gte('created_at', since)
-        .order('created_at', { ascending: true })
-        .limit(50);
+      try {
+        const res = await fetch('/api/notifications?limit=200');
+        if (!res.ok) throw new Error('Fetch failed');
+        const json = await res.json();
+        const rows = [...(json.data || [])].reverse();
 
-      // 30초 컷오프 제거 — shownIdsRef가 이미 중복 방지를 하고 있으므로
-      // 폴링 지연이나 네트워크 지연 시에도 안전하게 모든 unread 알림을 표시.
-      // (emitIncomingNotification 내부의 shownIdsRef.has(displayKey) 체크가 폭탄 방지)
-      rows?.forEach((row: Record<string, unknown>) => {
-        if (!row?.read_at) {
-          emitIncomingNotification(row);
+        rows.forEach((row: Record<string, unknown>) => {
+          if (!row.read_at && String(row.created_at || '') >= since) {
+            emitIncomingNotification(row);
+          }
+        });
+        void syncBadge();
+        if (rows && rows.length > 0) {
+          void broadcastNotificationList();
         }
-      });
-      void syncBadge();
-      // 새 알림이 들어왔을 가능성이 있으면 list 전체를 broadcast — 구독 컴포넌트 동기 갱신
-      if (rows && rows.length > 0) {
-        void broadcastNotificationList();
+      } catch {
+        // silent fail
       }
     };
 
@@ -1438,12 +1431,10 @@ export default function NotificationSystem({
       if (broadcastInFlight) return;
       broadcastInFlight = true;
       try {
-        const { data: rows } = await supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', uid)
-          .order('created_at', { ascending: false })
-          .limit(200);
+        const res = await fetch('/api/notifications?limit=200');
+        if (!res.ok) throw new Error('Fetch failed');
+        const json = await res.json();
+        const rows = json.data || [];
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent(NOTIFICATION_LIST_UPDATED_EVENT, {
@@ -1663,16 +1654,15 @@ export default function NotificationSystem({
 
     if (!didPrimeNotificationsRef.current) {
       didPrimeNotificationsRef.current = true;
-      supabase
-        .from('notifications')
-        .select('id,type,metadata')
-        .eq('user_id', uid)
-        .lt('created_at', mountedAt)
-        .order('created_at', { ascending: false })
-        .limit(50)
+      fetch('/api/notifications?limit=50')
+        .then(res => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
         .then(
-          ({ data: rows }) => {
-            rows?.forEach((row: Record<string, unknown>) => {
+          (json) => {
+            const rows = json.data || [];
+            rows.forEach((row: Record<string, unknown>) => {
               if (row?.id) shownIdsRef.current.add(getNotificationDisplayKey(row));
             });
           },
@@ -1853,15 +1843,20 @@ export default function NotificationSystem({
       if (!effectiveUserId || Date.now() - lastHiddenRef.current < 2000) return;
       const since = new Date(Date.now() - 90 * 1000).toISOString();
       const resumeNow = Date.now();
-      supabase.from('notifications').select('id,title,body,type,metadata,read_at,created_at').eq('user_id', effectiveUserId).gte('created_at', since).is('read_at', null).order('created_at', { ascending: false }).limit(20)
+      fetch('/api/notifications?limit=20')
+        .then(res => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
         .then(
-          ({ data: rows }) => {
-            // 탭 복귀 시 최근 10초 이내 알림만 토스트 표시 (폭탄 방지)
-            // 나머지는 뱃지 카운트만 갱신
-            rows?.forEach((row: Record<string, unknown>) => {
-              const createdAt = new Date(String(row.created_at || '')).getTime();
-              if (resumeNow - createdAt < 10_000) {
-                emitIncomingNotification(row);
+          (json) => {
+            const rows = json.data || [];
+            rows.forEach((row: Record<string, unknown>) => {
+              if (String(row.created_at || '') >= since && !row.read_at) {
+                const createdAt = new Date(String(row.created_at || '')).getTime();
+                if (resumeNow - createdAt < 10_000) {
+                  emitIncomingNotification(row);
+                }
               }
             });
             void syncBadge();
@@ -1870,7 +1865,7 @@ export default function NotificationSystem({
               window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
             }
           },
-          () => { /* 복귀 재조회 실패는 다음 visibility/polling에서 보강 */ },
+          () => { /* 복귀 재조회 실패는 다음 visibility/polling에서 보강 */ }
         );
     };
     document.addEventListener('visibilitychange', onVis);

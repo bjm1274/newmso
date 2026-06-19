@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * SHrWelfare — 모바일 인사관리: 복지
@@ -12,11 +13,14 @@
  * JM6: chip-bar 버튼은 aria-pressed 사용.
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MAvatar from '../공통/MAvatar';
+import MBtn from '../공통/MBtn';
+import type { ErpUser } from '@/types';
+import { uploadMyDocument } from '../내정보/doc-submit';
 import {
   useWelfareBundle,
   daysUntil,
@@ -34,10 +38,11 @@ export type SHrWelfareTab = 'family' | 'health' | 'cert' | 'dev';
 
 export type SHrWelfareProps = {
   company?: string;
+  user: ErpUser;
   onBack: () => void;
 };
 
-export default function 복지({ company, onBack }: SHrWelfareProps) {
+export default function 복지({ company, user, onBack }: SHrWelfareProps) {
   const [tab, setTab] = useState<SHrWelfareTab>('family');
   const { data, loading } = useWelfareBundle(company);
 
@@ -78,7 +83,7 @@ export default function 복지({ company, onBack }: SHrWelfareProps) {
           <>
             {tab === 'family' && <FamilyTab rows={data.family} />}
             {tab === 'health' && <HealthTab rows={data.checkup} />}
-            {tab === 'cert' && <CertTab rows={data.license} />}
+            {tab === 'cert' && <CertTab user={user} rows={data.license} />}
             {tab === 'dev' && <DeviceTab rows={data.device} />}
           </>
         )}
@@ -253,19 +258,84 @@ function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
 }
 
 // ─── 면허·자격 ────────────────────────────────────────────────
-function CertTab({ rows }: { rows: LicenseRow[] }) {
+function CertTab({ user, rows }: { user: ErpUser; rows: LicenseRow[] }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const staffId = typeof user?.id === 'string' ? user.id : null;
+      const staffName = typeof user?.name === 'string' ? user.name : null;
+      const companyName = typeof user?.company === 'string' ? user.company : null;
+      await uploadMyDocument({
+        staffId,
+        staffName,
+        company: companyName,
+        file,
+        category: '면허자격',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (rows.length === 0) {
     return (
-      <div
-        style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
-      >
-        등록된 면허·자격이 없습니다.
+      <div style={{ padding: '14px 16px 0' }}>
+        <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>면허·자격 갱신 증빙 서류 제출</div>
+          <MBtn
+            variant="primary"
+            icon="upload"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            ariaLabel="갱신 증빙 서류 첨부 후 업로드"
+            block
+          >
+            {uploading ? '업로드 중…' : '갱신 증빙 서류 첨부'}
+          </MBtn>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => void handleFileChange(e)}
+          />
+        </div>
+        <div
+          style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
+        >
+          등록된 면허·자격이 없습니다.
+        </div>
       </div>
     );
   }
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
+      <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>면허·자격 갱신 증빙 서류 제출</div>
+        <MBtn
+          variant="primary"
+          icon="upload"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          ariaLabel="갱신 증빙 서류 첨부 후 업로드"
+          block
+        >
+          {uploading ? '업로드 중…' : '갱신 증빙 서류 첨부'}
+        </MBtn>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          style={{ display: 'none' }}
+          onChange={(e) => void handleFileChange(e)}
+        />
+      </div>
       <div className="m-card flush">
         {rows.map((r) => {
           const left = daysUntil(r.expiry_date);

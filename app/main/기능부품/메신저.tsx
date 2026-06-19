@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 import { toDateKey } from '@/lib/date-utils';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
@@ -928,8 +928,7 @@ export default function ChatView({
     const resolvedReadAt = readAt || new Date().toISOString();
     await Promise.allSettled(
       targetRoomIds.map((targetRoomId) =>
-        supabase
-          .from('notifications')
+        d1.from('notifications')
           .update({ read_at: resolvedReadAt })
           .eq('user_id', effectiveChatUserId)
           .in('type', ['message', 'mention'])
@@ -954,8 +953,7 @@ export default function ChatView({
     if (total === 0 && prevTotalUnreadRef.current !== 0) {
       prevTotalUnreadRef.current = 0;
       // message/mention 알림을 일괄 읽음 처리
-      void supabase
-        .from('notifications')
+      void d1.from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('user_id', effectiveChatUserId)
         .in('type', ['message', 'mention'])
@@ -977,8 +975,7 @@ export default function ChatView({
     }
 
     try {
-      const { data, error } = await supabase
-        .from('notifications')
+      const { data, error } = await d1.from('notifications')
         .select('id, title, body, created_at, read_at, metadata')
         .eq('user_id', effectiveChatUserId)
         .eq('type', 'mention')
@@ -1032,8 +1029,7 @@ export default function ChatView({
     }
 
     try {
-      const { data, error } = await supabase
-        .from('notifications')
+      const { data, error } = await d1.from('notifications')
         .select('id, title, body, created_at, read_at, metadata')
         .eq('user_id', effectiveChatUserId)
         .in('type', ['message', 'mention'])
@@ -2533,8 +2529,7 @@ export default function ChatView({
       ),
     );
 
-    void supabase
-      .from('notifications')
+    void d1.from('notifications')
       .update({ read_at: readAt })
       .eq('id', item.id)
       .eq('user_id', effectiveChatUserId)
@@ -2559,8 +2554,7 @@ export default function ChatView({
       ),
     );
 
-    void supabase
-      .from('notifications')
+    void d1.from('notifications')
       .update({ read_at: readAt })
       .eq('id', item.id)
       .eq('user_id', effectiveChatUserId)
@@ -2802,7 +2796,7 @@ export default function ChatView({
         }),
       }));
 
-      const { error } = await supabase.from('notifications').insert(payload);
+      const { error } = await d1.from('notifications').insert(payload);
       if (error) throw error;
       toast(`${noticeReadStats.unreadMembers.length}명에게 공지 리마인드를 보냈습니다.`, 'success');
     } catch (error) {

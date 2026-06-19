@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember, InventoryItem } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import {
@@ -182,7 +182,7 @@ export function useSupplyWorkflow({
       await updateSupplyApprovalWorkflow(approval, nextItems);
 
       if (approval?.sender_id) {
-        await supabase.from('notifications').insert([{
+        await d1.from('notifications').insert([{
           user_id: approval.sender_id, type: 'inventory',
           title: `[불출 완료] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개가 ${cur.dept || '수령부서'}로 불출 처리되었습니다.`,
@@ -255,7 +255,7 @@ export function useSupplyWorkflow({
       await updateSupplyApprovalWorkflow(approval, nextItems);
 
       if (approval?.sender_id) {
-        await supabase.from('notifications').insert([{
+        await d1.from('notifications').insert([{
           user_id: approval.sender_id, type: 'inventory',
           title: `[발주 진행] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개는 재고가 부족해 발주 절차로 전환되었습니다.`,
@@ -358,7 +358,7 @@ export function useSupplyWorkflow({
       await updateSupplyApprovalWorkflow(approval, nextItems);
 
       if (approval?.sender_id) {
-        await supabase.from('notifications').insert([{
+        await d1.from('notifications').insert([{
           user_id: approval.sender_id, type: 'inventory',
           title: `[불출 취소] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개의 불출이 취소되었습니다. 재고가 원복되었습니다.`,

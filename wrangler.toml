@@ -14,15 +14,8 @@ directory = ".open-next/assets"
 [vars]
 NEXT_PUBLIC_R2_PUBLIC_BASE_URL = "https://r2.pchos.kr"
 
-# 데이터 백엔드 선택 (Phase 2~7 cutover)
-# 'supabase'   : 기존 동작 — write/read 모두 Supabase
-# 'dual-write' : write를 Supabase + D1 양쪽에. 진실은 Supabase, D1 실패는 alert
-# 'd1'         : 최종 컷오버 후 — D1만 사용 (서버 mirror는 D1 binding 직접 사용)
-# Phase 3 컷오버 (2026-05-17): backfill 완료 후 dual-write 활성화.
-# Phase 7 컷오버 (2026-05-17): 'd1' 활성화. 클라이언트는 lib/supabase.ts의
-#   ENABLE_D1_CLIENT=true로 /api/d1/query·/api/d1/mutate 라우팅.
-#   서버 mirror 헬퍼는 dual-write 모드 동작 그대로 (D1 binding 직접 사용).
-# 롤백 시 'dual-write'로 환원 + lib/supabase.ts ENABLE_D1_CLIENT=false 후 재배포.
+# 데이터 백엔드 선택 (Cloudflare D1 컷오버 고정 완료)
+# 프로젝트는 이제 Supabase를 영구 배제하며, 오직 Cloudflare D1(SQLite)만을 사용합니다.
 DATA_BACKEND = "d1"
 
 # Firebase Cloud Messaging (FCM) — 모바일 푸시 알림

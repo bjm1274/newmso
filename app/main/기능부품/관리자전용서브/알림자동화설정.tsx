@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, d1 } from '@/lib/supabase';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
@@ -224,8 +224,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             : `${s.name}님, 미사용 연차 ${remain}일에 대해 근로기준법에 따라 ${stageLabel} 촉진합니다. 만료일(${expiryLabel}) 전까지 사용 계획을 최종 조율해 주시기 바랍니다.`;
 
         // 1) notifications 테이블 알림 INSERT
-        const { data: notifData, error: notifError } = await supabase
-          .from('notifications')
+        const { data: notifData, error: notifError } = await d1.from('notifications')
           .insert([
             {
               user_id: s.id,
