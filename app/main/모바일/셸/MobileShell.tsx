@@ -199,6 +199,13 @@ export default function MobileShell({
   useEffect(() => {
     const targetTab = getTabFromMenu(mainMenu);
     const routeSub = 'sub' in route ? (route as any).sub : undefined;
+    // 내정보(mypage/home) 탭의 sub은 모바일 전용 MHomeSub('attend'|'leave'|...) 네임스페이스로,
+    // PC용 전역 subView(기본값 '전체')와 무관하다. 전역 subView로 덮어쓰면 출퇴근 등
+    // 홈 하위화면 진입 직후 '전체'로 되돌아가 홈으로 튕기므로, mypage 탭은 sub 동기화에서 제외한다.
+    if (targetTab === 'mypage') {
+      if (targetTab !== route.tab) setRoute({ tab: targetTab });
+      return;
+    }
     if (targetTab !== route.tab || (subView && subView !== routeSub)) {
       setRoute({ tab: targetTab, sub: subView || undefined } as any);
     }
