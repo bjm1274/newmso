@@ -594,7 +594,7 @@ function MessengerDrawerImpl({
                     <img
                       src={message.file_url || ''}
                       alt={buildMessengerImageAlt(message.file_name, '공유 이미지')}
-                      crossOrigin="anonymous"
+                      loading="lazy"
                       className="h-full w-full object-cover transition-opacity hover:opacity-90"
                     />
                   ) : (

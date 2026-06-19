@@ -10,6 +10,9 @@ test('attendance correction submit works with the legacy attendance_corrections 
 }) => {
   const d = new Date();
   d.setDate(d.getDate() - 5);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() - 1);
+  }
   const correctionDate = d.toISOString().slice(0, 10);
 
   await mockSupabase(page, {
@@ -63,6 +66,9 @@ test('attendance correction form keeps pending items out of the compose screen a
 }) => {
   const d = new Date();
   d.setDate(d.getDate() - 6);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() - 1);
+  }
   const correctionDate = d.toISOString().slice(0, 10);
   const adminUser = {
     ...fakeUser,

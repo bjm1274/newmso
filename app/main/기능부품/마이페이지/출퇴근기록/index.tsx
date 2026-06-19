@@ -626,6 +626,16 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     showErrors?: boolean;
     preferCached?: boolean;
   } = {}): Promise<boolean> => {
+    // localhost 접속이거나 localStorage의 bypass_gps가 'true'인 경우 우회 허용
+    if (typeof window !== 'undefined') {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const hasBypassFlag = window.localStorage.getItem('bypass_gps') === 'true';
+      if (isLocal || hasBypassFlag) {
+        setDistance(0);
+        return true;
+      }
+    }
+
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       if (showErrors) {
         toast('브라우저가 위치 정보를 지원하지 않습니다.', 'error');

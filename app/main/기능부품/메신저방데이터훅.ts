@@ -1239,7 +1239,7 @@ export function useChatRoomDataSync({
     // (모바일 사이드바 뷰, PC 방 미선택 상태)
     if (!selectedRoomId) {
       try {
-        const roomResult = await fetchAllChatRooms({ force: true });
+        const roomResult = await fetchAllChatRooms();
         if (roomResult.error) {
           console.error('채팅방 목록 조회 실패 (no room selected):', roomResult.error);
           return;
@@ -1266,7 +1266,7 @@ export function useChatRoomDataSync({
       fetchDataRequestSeqRef.current === requestSeq &&
       String(selectedRoomIdRef.current || '') === roomIdForFetch;
 
-    const roomResult = await fetchAllChatRooms({ force: true });
+    const roomResult = await fetchAllChatRooms();
     if (roomResult.error) {
       console.error('채팅방 목록 조회 실패:', roomResult.error);
     }

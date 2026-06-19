@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { getOfflineQueue } from '@/lib/offline-queue';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -86,32 +87,103 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     if (!staffId) { setOpenLog(null); return; }
     try {
       const today = formatLocalDateKey(new Date());
-      // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
-      const { data: todayData } = await supabase
-        .from('attendance')
-        .select('id, staff_id, date, check_in, check_out, status')
-        .eq('staff_id', staffId)
-        .eq('date', today)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      let activeLog: OpenLog | null = null;
 
-      let activeLog = (todayData?.[0] as OpenLog) ?? null;
-
-      // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
-      if (!activeLog?.check_in) {
-        const { data: staleData } = await supabase
+      try {
+        // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
+        const { data: todayData } = await supabase
           .from('attendance')
           .select('id, staff_id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
-          .not('check_in', 'is', null)
-          .is('check_out', null)
-          .neq('status', '결근') // 결근 처리된 건 제외
-          .order('date', { ascending: false })
+          .eq('date', today)
+          .order('created_at', { ascending: false })
           .limit(1);
 
-        if (staleData && staleData.length > 0 && staleData[0].date !== today) {
-          activeLog = staleData[0] as OpenLog;
+        activeLog = (todayData?.[0] as OpenLog) ?? null;
+
+        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
+        if (!activeLog?.check_in) {
+          const { data: staleData } = await supabase
+            .from('attendance')
+            .select('id, staff_id, date, check_in, check_out, status')
+            .eq('staff_id', staffId)
+            .not('check_in', 'is', null)
+            .is('check_out', null)
+            .neq('status', '결근') // 결근 처리된 건 제외
+            .order('date', { ascending: false })
+            .limit(1);
+
+          if (staleData && staleData.length > 0 && staleData[0].date !== today) {
+            activeLog = staleData[0] as OpenLog;
+          }
         }
+      } catch (dbErr) {
+        console.warn('오늘 DB 출퇴근 기록 조회 실패 (오프라인 상태일 수 있음):', dbErr);
+      }
+
+      // 3. 로컬 오프라인 큐가 있다면 병합
+      try {
+        const queue = getOfflineQueue();
+        await queue.ready();
+        const queueItems = queue.list();
+
+        let checkInFromQueue: string | null = null;
+        let checkOutFromQueue: string | null = null;
+        let statusFromQueue: string | null = null;
+        let queueDate: string | null = null;
+
+        for (const item of queueItems) {
+          if (!item.type.startsWith('db:') || !item.type.endsWith(':attendance')) continue;
+          const payload = item.payload as any;
+          if (!payload || payload.table !== 'attendance') continue;
+
+          const data = Array.isArray(payload.data) ? payload.data[0] : payload.data;
+          if (!data) continue;
+
+          const match = payload.match;
+
+          if (payload.kind === 'upsert') {
+            if (data.staff_id === staffId && (data.date === today || (activeLog && data.date === activeLog.date))) {
+              queueDate = data.date;
+              checkInFromQueue = data.check_in ?? checkInFromQueue;
+              statusFromQueue = data.status ?? statusFromQueue;
+            }
+          } else if (payload.kind === 'update') {
+            const targetDate = match?.date || today;
+            if (match?.staff_id === staffId && (targetDate === today || (activeLog && targetDate === activeLog.date))) {
+              queueDate = targetDate;
+              checkOutFromQueue = data.check_out ?? checkOutFromQueue;
+              statusFromQueue = data.status ?? statusFromQueue;
+            }
+          }
+        }
+
+        if (checkInFromQueue) {
+          if (!activeLog) {
+            activeLog = {
+              id: 'pending',
+              date: queueDate || today,
+              check_in: checkInFromQueue,
+              check_out: checkOutFromQueue,
+              status: statusFromQueue,
+            };
+          } else {
+            activeLog = {
+              ...activeLog,
+              check_in: checkInFromQueue,
+              check_out: checkOutFromQueue ?? activeLog.check_out,
+              status: statusFromQueue ?? activeLog.status,
+            };
+          }
+        } else if (checkOutFromQueue && activeLog) {
+          activeLog = {
+            ...activeLog,
+            check_out: checkOutFromQueue,
+            status: statusFromQueue ?? activeLog.status,
+          };
+        }
+      } catch (queueErr) {
+        console.warn('오프라인 큐 조회 실패:', queueErr);
       }
 
       setOpenLog(activeLog);
@@ -148,8 +220,17 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   }, [coords]);
 
   const distanceLabel = distance === null ? null : Math.floor(distance);
-  const withinRange = distance !== null && distance <= ALLOWED_DISTANCE_M;
-  const accuracyTooLow = !!coords && coords.accuracy > ACCURACY_WARN_M;
+
+  // localhost 접속이거나 localStorage의 bypass_gps가 'true'인 경우 우회 허용
+  const isBypassed = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const hasBypassFlag = window.localStorage.getItem('bypass_gps') === 'true';
+    return isLocal || hasBypassFlag;
+  }, []);
+
+  const withinRange = isBypassed || (distance !== null && distance <= ALLOWED_DISTANCE_M);
+  const accuracyTooLow = !isBypassed && !!coords && coords.accuracy > ACCURACY_WARN_M;
 
   const state: 'before' | 'in' | 'done' =
     !openLog?.check_in ? 'before' : !openLog?.check_out ? 'in' : 'done';
@@ -160,7 +241,14 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
       toast('직원 정보를 확인할 수 없습니다.', 'warning');
       return;
     }
-    if (status !== 'success') {
+    if (status !== 'success' && !isBypassed) {
+      if (status === 'denied') {
+        toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+      } else if (status === 'error') {
+        toast(error || '위치 정보를 정확히 가져올 수 없습니다. 다시 시도해 주세요.', 'error');
+      } else {
+        toast('위치 정보를 가져오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+      }
       requestLocation();
       return;
     }

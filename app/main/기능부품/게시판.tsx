@@ -2709,10 +2709,9 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                             <img
                               src={buildStorageInlineUrl(att.url, att.name ?? '') || att.url}
                               alt={att.name}
-                              loading="eager"
+                              loading="lazy"
                               decoding="async"
                               referrerPolicy="no-referrer"
-                              crossOrigin="anonymous"
                               className="max-w-[280px] max-h-[280px] rounded-[var(--radius-lg)] border border-[var(--border)] object-cover shadow-sm bg-[var(--muted)]"
                               onError={(e) => {
                                 const el = e.target as HTMLImageElement;

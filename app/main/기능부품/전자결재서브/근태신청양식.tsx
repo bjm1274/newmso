@@ -103,24 +103,30 @@ export default function AttendanceForms({
 
   useEffect(() => {
     if (formType !== '연차/휴가') return;
-    if (leaveType !== initialLeaveType) setLeaveType(initialLeaveType);
-    if (localStartDate !== initialStartDate) setLocalStartDate(initialStartDate);
-    if (localEndDate !== initialEndDate) setLocalEndDate(initialEndDate);
-    if (selectedDelegateId !== initialDelegateId) setSelectedDelegateId(initialDelegateId);
-    updateExtraData(
-      buildLeaveExtraData(initialLeaveType, initialStartDate, initialEndDate, initialDelegateId),
-    );
+    setLeaveType(initialLeaveType);
+    setLocalStartDate(initialStartDate);
+    setLocalEndDate(initialEndDate);
+    setSelectedDelegateId(initialDelegateId);
+
+    const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === initialDelegateId);
+    updateExtraData({
+      vType: initialLeaveType,
+      leaveType: initialLeaveType,
+      startDate: initialStartDate,
+      endDate: initialEndDate,
+      delegateId: initialDelegateId,
+      delegateName: delegate?.name || '',
+      delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
+      delegatePosition: String(delegate?.position || '').trim(),
+    });
   }, [
-    buildLeaveExtraData,
     formType,
     initialDelegateId,
     initialEndDate,
     initialLeaveType,
     initialStartDate,
-    leaveType,
-    localEndDate,
-    localStartDate,
-    selectedDelegateId,
+    leaveDelegateOptions,
+    updateExtraData,
   ]);
 
   const handleQueryOvertime = async () => {

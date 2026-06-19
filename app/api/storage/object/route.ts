@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const bucket = String(request.nextUrl.searchParams.get('bucket') || '').trim();
     const objectKey = String(request.nextUrl.searchParams.get('key') || '').trim().split('?')[0];
     const download = request.nextUrl.searchParams.get('download') === '1';
+    const proxy = request.nextUrl.searchParams.get('proxy') === '1';
     const fileName = String(request.nextUrl.searchParams.get('name') || '').trim() || 'download';
 
     if (provider !== 'r2') {
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     // (Workers 응답 본문 부담 제거, 브라우저가 redirect 자체를 캐싱).
     // 다운로드 요청은 Content-Disposition을 강제해야 하므로 기존 프록시 경로 유지.
     const publicBaseUrl = getPublicBaseUrl();
-    if (publicBaseUrl && !download) {
+    if (publicBaseUrl && !download && !proxy) {
       const target = `${publicBaseUrl}/${encodeObjectKey(objectKey)}`;
       return NextResponse.redirect(target, {
         status: 302,

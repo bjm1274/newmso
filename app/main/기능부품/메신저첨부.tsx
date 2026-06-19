@@ -12,6 +12,7 @@ import {
   buildStorageDownloadUrl,
   extractStorageUrlExtension,
   triggerManagedBrowserDownload,
+  isInternalStorageObjectUrl,
 } from '@/lib/object-storage-url';
 import type { ChatMessage } from '@/types';
 import { Paperclip, Video } from './lucide-shim';
@@ -71,8 +72,8 @@ export function DeferredAttachmentImage({
           <img
             src={viewSrc}
             alt={alt}
+            loading="lazy"
             className={`${className} ${loaded ? 'opacity-100' : 'absolute inset-0 opacity-0'}`}
-            crossOrigin="anonymous"
             onLoad={() => {
               setLoaded(true);
               onLoad?.();
@@ -281,7 +282,17 @@ export function getDeletedMessagePreviewText() {
 
 export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {
   try {
-    const response = await fetch(imageUrl);
+    let fetchUrl = imageUrl;
+    if (isInternalStorageObjectUrl(imageUrl)) {
+      try {
+        const parsed = new URL(imageUrl, window.location.origin);
+        parsed.searchParams.set('proxy', '1');
+        fetchUrl = parsed.pathname + parsed.search;
+      } catch {
+        // fallback
+      }
+    }
+    const response = await fetch(fetchUrl);
     const blob = await response.blob();
     
     let clipboardBlob = blob;

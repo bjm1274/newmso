@@ -81,12 +81,17 @@ export async function withMissingColumnFallback<T>(
   return result;
 }
 
+const globalOmittedColumnsCache = new Map<string, Set<string>>();
+
 export async function withMissingColumnsFallback<T>(
   execute: (omittedColumns: ReadonlySet<string>) => PromiseLike<SupabaseResult<T>>,
   columnNames: string[],
-  _options?: { cacheKey?: string },
+  options?: { cacheKey?: string },
 ): Promise<SupabaseResult<T>> {
-  const omittedColumns = new Set<string>();
+  const cacheKey = options?.cacheKey;
+  const omittedColumns = new Set<string>(
+    cacheKey ? globalOmittedColumnsCache.get(cacheKey) : undefined
+  );
   let result = await execute(omittedColumns);
 
   while (result.error) {
@@ -100,6 +105,9 @@ export async function withMissingColumnsFallback<T>(
     }
 
     omittedColumns.add(missingColumn);
+    if (cacheKey) {
+      globalOmittedColumnsCache.set(cacheKey, new Set(omittedColumns));
+    }
     result = await execute(omittedColumns);
   }
 
