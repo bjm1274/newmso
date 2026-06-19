@@ -4,9 +4,17 @@ import { stripContractClosingLines } from '@/lib/contract-template-closing';
 
 type Props = {
     templateText: string;
+    privacyConsent?: boolean | null;
+    onPrivacyConsentChange?: (consent: boolean) => void;
+    isInteractive?: boolean;
 };
 
-export default function ContractBodyBlock({ templateText }: Props) {
+export default function ContractBodyBlock({
+    templateText,
+    privacyConsent,
+    onPrivacyConsentChange,
+    isInteractive = false,
+}: Props) {
     const stripped = stripContractClosingLines(templateText || '');
     let raw = stripped.mainText || templateText || '';
 
@@ -94,11 +102,11 @@ export default function ContractBodyBlock({ templateText }: Props) {
 
                 return (
                     <div key={si} className="contract-article mb-4 last:mb-0">
-                        <h4 className="text-[15px] font-black text-[var(--foreground)] mb-3 flex items-center gap-2.5">
+                        <h4 className="text-[15px] font-black text-[var(--foreground)] mb-3 flex items-center gap-2.5 print:mb-1.5">
                             <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0" />
                             제{sec.num}조 [{sec.title}]
                         </h4>
-                        <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
+                        <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2 print:pl-2 print:space-y-1">
                             {processedLines.map((item, li) => {
                                 if (item.type === 'shift_schedule') {
                                     const starts = item.startLine.replace('시업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
@@ -124,9 +132,9 @@ export default function ContractBodyBlock({ templateText }: Props) {
                                     }
 
                                     return (
-                                        <div key={li} className="my-5 flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                                        <div key={li} className="shift-card-container my-5 flex gap-3 overflow-x-auto pb-2 custom-scrollbar print:my-1.5 print:gap-2 print:pb-0">
                                             {cards.map((card, idx) => (
-                                                <div key={idx} className="flex-1 min-w-[150px] max-w-[220px] bg-[#f8faff] border border-[#dbeafe] rounded-xl p-3.5 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 flex flex-col justify-between shrink-0">
+                                                <div key={idx} className="shift-card flex-1 min-w-[150px] max-w-[220px] bg-[#f8faff] border border-[#dbeafe] rounded-xl p-3.5 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 print:p-2.5 flex flex-col justify-between shrink-0">
                                                     <div className="text-center mb-2.5">
                                                         <span className="inline-block px-3 py-1 bg-[#2563eb] text-white font-extrabold text-[12px] tracking-wider rounded-full print:bg-slate-500 print:text-white print:border print:border-slate-600">
                                                             {card.label === '근무시간' ? '기본 근무' : `${card.label} 근무`}
@@ -201,6 +209,32 @@ export default function ContractBodyBlock({ templateText }: Props) {
                                     );
                                 }
                                 if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
+                                    if (isInteractive) {
+                                        return (
+                                            <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 shrink-0">
+                                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                    <input
+                                                        type="radio"
+                                                        name="privacy-consent-active"
+                                                        checked={privacyConsent === true}
+                                                        onChange={() => onPrivacyConsentChange?.(true)}
+                                                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                    />
+                                                    <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의</span>
+                                                </label>
+                                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                    <input
+                                                        type="radio"
+                                                        name="privacy-consent-active"
+                                                        checked={privacyConsent === false}
+                                                        onChange={() => onPrivacyConsentChange?.(false)}
+                                                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                                    />
+                                                    <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
+                                                </label>
+                                            </div>
+                                        );
+                                    }
                                     return (
                                         <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-[var(--muted)]/50 rounded-xl border border-[var(--border-subtle)] shrink-0">
                                             <label className="flex items-center gap-2 select-none opacity-60">

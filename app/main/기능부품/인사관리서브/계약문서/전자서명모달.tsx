@@ -12,6 +12,7 @@ import {
 } from '@/lib/contract-template-closing';
 import { buildContractBodyPrintHTML } from '@/lib/contract-body-print-html';
 import ContractClosingBlock from './계약서마무리블록';
+import ContractBodyBlock from './계약서본문블록';
 import {
     getShiftBandGroupRows,
     getWeeklyRotationShiftIds,
@@ -273,7 +274,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
             const styles = `
                     /* A4 고정: 용지 밖으로 내용이 짤리지 않도록 페이지 크기·여백을 명시 */
-                    @page { size: A4 portrait; margin: 12mm; }
+                    @page { size: A4 portrait; margin: 8mm 10mm; }
                     *, *::before, *::after { box-sizing: border-box; }
                     html, body { margin: 0; padding: 0; }
                     body {
@@ -282,14 +283,52 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         color: #1f2937;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
+                        padding: 0 8mm;
+                    }
+                    body::before {
+                        content: '';
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        border: 2px solid #1e2a4a;
+                        pointer-events: none;
+                        z-index: 100;
+                    }
+                    body::after {
+                        content: '';
+                        position: fixed;
+                        top: 1.2mm;
+                        left: 1.2mm;
+                        right: 1.2mm;
+                        bottom: 1.2mm;
+                        border: 1px solid #c2a14d;
+                        pointer-events: none;
+                        z-index: 100;
                     }
                     img { max-width: 100%; height: auto; }
                     pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
                     /* 모든 콘텐츠를 인쇄 영역 폭 안으로 제한 → 우측 짤림 방지 */
                     .contract-wrapper { padding: 0; }
                     .contract-wrapper, .contract-wrapper * { max-width: 100%; }
+
+                    /* 조항 스타일 컴팩트화 */
+                    .shift-card-container {
+                        margin-top: 6px !important;
+                        margin-bottom: 6px !important;
+                        padding-bottom: 0 !important;
+                    }
+                    .shift-card {
+                        padding: 8px 12px !important;
+                    }
+                    .contract-article {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+
                     @media print {
-                        body { margin: 0; padding: 0; }
+                        body { margin: 0; padding: 0 8mm; }
                         .contract-page, [style*="page-break-before: always"] {
                             page-break-before: always;
                         }
@@ -298,7 +337,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     }
                 `;
 
-            printWindow.document.write(`<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
+            printWindow.document.write(`<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;700;900&display=swap" rel="stylesheet"><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
             printWindow.document.close();
 
             window.setTimeout(() => {
@@ -457,123 +496,17 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         <p className="text-[13px] font-bold text-[var(--foreground)]">계약서 내용을 불러오는 중입니다.</p>
                                         <p className="text-[11px] text-[var(--toss-gray-4)]">잠시만 기다려 주세요.</p>
                                     </div>
-                                ) : (() => {
-                                    const stripped = stripContractClosingLines(localTemplateText);
-                                    let raw = stripped.mainText || localTemplateText;
-                                    if (!raw.trim()) {
-                                        return (
-                                            <div className="min-h-[280px] flex items-center justify-center text-center">
-                                                <p className="text-[13px] font-semibold text-[var(--toss-gray-4)]">
-                                                    표시할 계약서 내용을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.
-                                                </p>
-                                            </div>
-                                        );
-                                    }
-                                    // ASCII 표 장식 제거 (단, 임금 구성항목 등 주요 라벨은 보존)
-                                    raw = raw.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
-
-                                    // 제목 줄 및 기본정보 블록은 이미 상단에 표시되거나 본문에 포함됨
-                                    // 조 단위 파싱
-                                    const sectionRe = /제(\d+)조\s*\[([^\]]+)\]/g;
-                                    const matches: { index: number; full: string; num: string; title: string }[] = [];
-                                    let mm;
-                                    while ((mm = sectionRe.exec(raw)) !== null) {
-                                        matches.push({ index: mm.index, full: mm[0], num: mm[1], title: mm[2] });
-                                    }
-
-                                    if (matches.length === 0) {
-                                        return (
-                                            <>
-                                                <p className="text-[14px] text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{raw}</p>
-                                                <ContractClosingBlock {...closingData} />
-                                            </>
-                                        );
-                                    }
-
-                                    const sectionNodes = matches.map((sec, si) => {
-                                        const start = sec.index + sec.full.length;
-                                        const end = si + 1 < matches.length ? matches[si + 1].index : raw.length;
-                                        const body = raw.slice(start, end).replace(/─+/g, '').trim();
-                                        const lines = body.split('\n').filter(l => l.trim());
-
-                                        return (
-                                            <div key={si} className="mb-4 last:mb-0">
-                                                <h4 className="text-[15px] font-black text-[var(--foreground)] mb-3 flex items-center gap-2.5">
-                                                    <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0" />
-                                                    제{sec.num}조 [{sec.title}]
-                                                </h4>
-                                                <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
-                                                    {lines.map((line, li) => {
-                                                        const t = line.trim();
-                                                        if (t.startsWith('[') && t.endsWith(']')) {
-                                                            return <div key={li} className="mt-4 mb-2"><span className="inline-block text-[12px] font-black text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-md">{t.replace(/[\[\]]/g, '')}</span></div>;
-                                                        }
-                                                        if (/^[①②③④⑤⑥⑦⑧⑨⑩]/.test(t)) {
-                                                            return (
-                                                                <div key={li} className="flex gap-2 mt-1">
-                                                                    <span className="text-blue-600 font-black text-[13px] shrink-0">{t[0]}</span>
-                                                                    <span className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8]">{t.slice(1).trim()}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        if (t.startsWith('-') || t.startsWith('·') || t.startsWith('•')) {
-                                                            return (
-                                                                <div key={li} className="flex gap-2 pl-5 mt-0.5">
-                                                                    <span className="text-[var(--toss-gray-3)] shrink-0">•</span>
-                                                                    <span className="text-[13px] text-[var(--toss-gray-4)] leading-[1.8]">{t.replace(/^[-·•]\s*/, '')}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
-                                                            return (
-                                                                <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 shrink-0">
-                                                                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                                        <input
-                                                                            type="radio"
-                                                                            name="privacy-consent-active"
-                                                                            checked={privacyConsent === true}
-                                                                            onChange={() => setPrivacyConsent(true)}
-                                                                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                                                        />
-                                                                        <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의</span>
-                                                                    </label>
-                                                                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                                        <input
-                                                                            type="radio"
-                                                                            name="privacy-consent-active"
-                                                                            checked={privacyConsent === false}
-                                                                            onChange={() => setPrivacyConsent(false)}
-                                                                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                                                        />
-                                                                        <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
-                                                                    </label>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        // 급여 항목 테이블 스타일 대안 (그리드 레이아웃)
-                                                        if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
-                                                            const parts = t.split(/\s{2,}/);
-                                                            return (
-                                                                <div key={li} className="flex justify-between py-1.5 border-b border-slate-50 px-1 hover:bg-[var(--tab-bg)] transition-colors">
-                                                                    <span className="text-[13px] font-semibold text-[var(--toss-gray-4)]">{parts[0]}</span>
-                                                                    <span className="text-[13px] font-black text-[var(--foreground)]">{parts[1] || ''}</span>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return <p key={li} className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8]">{t}</p>;
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    });
-
-                                    return (
-                                        <>
-                                            {sectionNodes}
-                                            <ContractClosingBlock {...closingData} />
-                                        </>
-                                    );
-                                })()}
+                                ) : (
+                                    <>
+                                        <ContractBodyBlock
+                                            templateText={localTemplateText}
+                                            privacyConsent={privacyConsent}
+                                            onPrivacyConsentChange={setPrivacyConsent}
+                                            isInteractive={true}
+                                        />
+                                        <ContractClosingBlock {...closingData} />
+                                    </>
+                                )}
                             </div>
 
                         </div>

@@ -224,3 +224,90 @@ export function CheckOutSuccessModal({ summary, formatWorkedDuration, onClose }:
     </div>
   );
 }
+
+// ──────────────────────────────────────────────
+// GPS 경고 모달 (위치 설정 안내)
+// ──────────────────────────────────────────────
+
+interface GpsWarningModalProps {
+  onClose: () => void;
+}
+
+export function GpsWarningModal({ onClose }: GpsWarningModalProps) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div
+        className="w-full max-w-md pointer-events-auto"
+        style={{ animation: 'slide-up 0.3s cubic-bezier(.22,1,.36,1) both' }}
+      >
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)]">
+          {/* 헤더 */}
+          <div className="bg-red-600 px-5 py-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="text-[15px] font-bold leading-tight">GPS 위치 설정 안내</p>
+                <p className="text-[12px] font-medium text-white/75">위치 정보가 꺼져 있거나 차단되어 있습니다.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-base text-white/70 transition-colors hover:bg-white/15 active:bg-white/25 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* 본문 */}
+          <div className="space-y-4 px-6 py-5">
+            <p className="text-[13px] text-[var(--toss-gray-5)] leading-relaxed font-semibold">
+              출퇴근 체크를 위해서는 기기의 GPS 활성화 및 브라우저의 위치 권한 허용이 필요합니다. 아래 가이드에 따라 설정을 확인해 주세요.
+            </p>
+
+            <div className="space-y-3 rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 border border-[var(--border-subtle)] text-[12px] text-[var(--foreground)]">
+              <div>
+                <p className="font-black text-red-600 flex items-center gap-1.5 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                  1. 브라우저 주소창 확인
+                </p>
+                <p className="pl-3 text-[var(--toss-gray-4)] leading-relaxed">
+                  주소창 왼쪽의 <b>자물쇠 아이콘(또는 설정 아이콘)</b>을 누른 뒤 <b>&lsquo;위치&rsquo; 권한을 &lsquo;허용&rsquo;</b>으로 변경해 주세요.
+                </p>
+              </div>
+              <div>
+                <p className="font-black text-red-600 flex items-center gap-1.5 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                  2. 윈도우(PC) 위치 서비스 설정
+                </p>
+                <p className="pl-3 text-[var(--toss-gray-4)] leading-relaxed">
+                  시작 &gt; 설정 &gt; <b>개인 정보 및 보안 &gt; 위치</b> 메뉴에서 <b>&lsquo;위치 서비스&rsquo;</b>를 켜고, 사용 중인 브라우저의 위치 액세스 권한을 켬으로 설정해 주세요.
+                </p>
+              </div>
+              <div>
+                <p className="font-black text-red-600 flex items-center gap-1.5 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                  3. 새로고침 후 재시도
+                </p>
+                <p className="pl-3 text-[var(--toss-gray-4)] leading-relaxed">
+                  설정 완료 후 브라우저를 <b>새로고침(F5)</b>한 뒤 다시 시도해 주세요.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full sm:w-28 px-4 py-2 bg-[var(--accent)] hover:opacity-90 active:scale-95 text-white font-bold rounded-[var(--radius-md)] text-xs shadow-sm transition-all"
+              >
+                설정 완료 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

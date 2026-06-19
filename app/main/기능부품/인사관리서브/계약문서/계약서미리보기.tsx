@@ -517,7 +517,7 @@ export default function ContractPreview({
               <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-[40px] print:py-[36px]">
+            <div className="flex flex-col flex-1 px-[40px] py-[36px] border-2 border-[#1e2a4a] rounded-[3px] shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_5px_#c2a14d] print:border-0 print:rounded-none print:shadow-none print:px-[40px] print:py-0">
               <table className="w-full border-collapse border-0 print:m-0">
                 <thead className="hidden print:table-header-group">
                   <tr>

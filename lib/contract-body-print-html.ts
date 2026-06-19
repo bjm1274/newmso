@@ -63,14 +63,171 @@ export function buildContractBodyPrintHTML(templateText: string): string {
     }
 
     // ── 조항별 HTML 생성 ────────────────────────────────────────────
+    const workDaysMatch = raw.match(/근무일은\s*매주\s*(.+?)로\s*하고/);
+    const workDaysText = workDaysMatch ? workDaysMatch[1].trim() : '';
+
+    function parseShiftTimeString(s: string) {
+        if (!s) return { label: '근무시간', time: '' };
+        const match = s.match(/^(.+?)\s+([0-9]{1,2}:[0-9]{2}.*)$/);
+        if (match) {
+            return { label: match[1].trim(), time: match[2].trim() };
+        }
+        return { label: '근무시간', time: s.trim() };
+    }
+
     const sectionsHTML = matches.map((sec, si) => {
         const start = sec.index + sec.full.length;
         const end = si + 1 < matches.length ? matches[si + 1].index : raw.length;
         const body = raw.slice(start, end).replace(/─+/g, '').trim();
         const lines = body.split('\n').filter((l) => l.trim());
 
-        const linesHTML = lines.map((line) => {
-            const t = line.trim();
+        // 시업시각, 종업시각, 휴게시간 라인 전처리
+        type ProcessedLine =
+            | { type: 'text'; text: string }
+            | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string };
+
+        const processedLines: ProcessedLine[] = [];
+        let i = 0;
+        while (i < lines.length) {
+            const t = lines[i].trim();
+            if (t.startsWith('시업시각:')) {
+                let startLine = t;
+                let endLine = '';
+                let breakLine = '';
+                let j = i + 1;
+                while (j < lines.length) {
+                    const nt = lines[j].trim();
+                    if (nt.startsWith('종업시각:')) {
+                        endLine = nt;
+                        j++;
+                    } else if (nt.startsWith('휴게시간:')) {
+                        breakLine = nt;
+                        j++;
+                    } else {
+                        break;
+                    }
+                }
+                processedLines.push({ type: 'shift_schedule', startLine, endLine, breakLine });
+                i = j;
+            } else {
+                processedLines.push({ type: 'text', text: lines[i] });
+                i++;
+            }
+        }
+
+        const linesHTML = processedLines.map((item) => {
+            if (item.type === 'shift_schedule') {
+                const starts = item.startLine.replace('시업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+                const ends = item.endLine.replace('종업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+                const breaks = item.breakLine.replace('휴게시간:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
+
+                const count = Math.max(starts.length, ends.length, breaks.length);
+                const cards = [];
+                for (let k = 0; k < count; k++) {
+                    const sParsed = parseShiftTimeString(starts[k] || '');
+                    const eParsed = parseShiftTimeString(ends[k] || '');
+                    const bParsed = parseShiftTimeString(breaks[k] || '');
+
+                    let label = sParsed.label !== '근무시간' ? sParsed.label : eParsed.label;
+                    if (label === '근무시간' && count > 1) label = `교대 ${k + 1}`;
+
+                    cards.push({
+                        label: label,
+                        start: sParsed.time,
+                        end: eParsed.time,
+                        breakTime: bParsed.time
+                    });
+                }
+
+                const cardsHTML = cards.map((card) => {
+                    const labelText = card.label === '근무시간' ? '기본 근무' : `${card.label} 근무`;
+                    const breakHTML = card.breakTime ? `
+                        <div style="
+                            text-align:center;
+                            font-size:11px;
+                            font-weight:bold;
+                            color:#4b5563;
+                            background:#ffffff;
+                            padding:5px;
+                            border-radius:8px;
+                            border:1px solid #e5e7eb;
+                            margin-bottom:4px;
+                        ">
+                            휴게 <span style="color:#2563eb;margin-left:2px;">${esc(card.breakTime)}</span>
+                        </div>
+                    ` : '';
+                    const workDaysHTML = workDaysText ? `
+                        <div style="
+                            text-align:center;
+                            font-size:10px;
+                            color:#6b7280;
+                            white-space:nowrap;
+                            overflow:hidden;
+                            text-overflow:ellipsis;
+                        ">${esc(workDaysText)}</div>
+                    ` : '';
+
+                    return `
+                        <div class="shift-card" style="
+                            flex:1;
+                            min-width:140px;
+                            max-width:200px;
+                            background:#f8faff;
+                            border:1px solid #dbeafe;
+                            border-radius:12px;
+                            padding:10px;
+                            display:flex;
+                            flex-direction:column;
+                            justify-content:space-between;
+                            box-shadow:0 1px 2px rgba(0,0,0,0.02);
+                        ">
+                            <div style="text-align:center;margin-bottom:8px;">
+                                <span style="
+                                    display:inline-block;
+                                    padding:3px 10px;
+                                    background:#2563eb;
+                                    color:#ffffff;
+                                    font-weight:900;
+                                    font-size:11px;
+                                    border-radius:9999px;
+                                    letter-spacing:0.05em;
+                                ">${esc(labelText)}</span>
+                            </div>
+                            <div style="
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                                gap:4px;
+                                color:#1f2937;
+                                font-weight:900;
+                                font-size:14px;
+                                margin-bottom:8px;
+                                letter-spacing:-0.02em;
+                            ">
+                                <span>${esc(card.start || '-')}</span>
+                                <span style="color:#9ca3af;font-size:12px;">~</span>
+                                <span>${esc(card.end || '-')}</span>
+                            </div>
+                            ${breakHTML}
+                            ${workDaysHTML}
+                        </div>
+                    `;
+                }).join('\n');
+
+                return `
+                    <div class="shift-card-container" style="
+                        margin:10px 0;
+                        display:flex;
+                        gap:8px;
+                        overflow-x:auto;
+                        padding-bottom:4px;
+                    ">
+                        ${cardsHTML}
+                    </div>
+                `;
+            }
+
+            const t = item.text.trim();
 
             // [라벨] 형태 → 파란 배지
             if (t.startsWith('[') && t.endsWith(']')) {
@@ -128,7 +285,7 @@ export function buildContractBodyPrintHTML(templateText: string): string {
         }).join('\n');
 
         const headerTitle = esc(`제${sec.num}조 [${sec.title}]`);
-        return `<div style="margin-bottom:16px;">
+        return `<div style="margin-bottom:16px;" class="contract-article">
   <h4 style="
     font-size:15px;
     font-weight:900;

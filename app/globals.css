@@ -3796,7 +3796,7 @@ button, a, [role="button"] {
   body:has([data-print-root]) [data-print-root] span,
   body:has([data-print-root]) [data-print-root] div,
   body:has([data-print-root]) [data-print-root] td {
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     line-height: 1.45 !important;
   }
 

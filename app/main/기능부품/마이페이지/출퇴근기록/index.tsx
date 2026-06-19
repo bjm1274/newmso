@@ -33,7 +33,7 @@ type MonthlyShiftAssignmentRow,
 type ShiftBoundary,
 type WeatherData,
 } from './commute-types';
-import { CheckInSuccessModal,CheckOutSuccessModal } from './출퇴근모달';
+import { CheckInSuccessModal,CheckOutSuccessModal,GpsWarningModal } from './출퇴근모달';
 import { AttendanceCalendar,StatItem,WorkHoursChart } from './출퇴근차트';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
@@ -174,6 +174,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     workedMinutes: number;
   } | null>(null);
   const [currentWorkStatus, setCurrentWorkStatus] = useState<WorkStatusLabel>('근무중');
+  const [showGpsWarning, setShowGpsWarning] = useState(false);
   // statusChangeNotifiedRef: 컬럼 미존재 toast를 중복 방지용
   const statusChangeNotifiedRef = useRef(false);
   const checkOutSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -628,6 +629,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       if (showErrors) {
         toast('브라우저가 위치 정보를 지원하지 않습니다.', 'error');
+        setShowGpsWarning(true);
       }
       return false;
     }
@@ -654,6 +656,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           if (permissionStatus.state === 'denied') {
             if (showErrors) {
               toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+              setShowGpsWarning(true);
             }
             return false;
           }
@@ -697,10 +700,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       }
       if (geoError?.code === 1) {
         toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+        setShowGpsWarning(true);
       } else if (geoError?.code === 3) {
         toast('위치 확인 시간이 초과되었습니다. 야외에서 다시 시도하거나 GPS를 켜 주세요.', 'error');
+        setShowGpsWarning(true);
       } else {
         toast('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.', 'error');
+        setShowGpsWarning(true);
       }
       return false;
     }
@@ -1093,6 +1099,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
           }}
         />
+      )}
+      {showGpsWarning && (
+        <GpsWarningModal onClose={() => setShowGpsWarning(false)} />
       )}
 
       {/* 담당 근무유형 chip (다중 근무유형 표시) */}

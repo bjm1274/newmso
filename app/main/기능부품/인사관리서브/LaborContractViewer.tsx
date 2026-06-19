@@ -21,6 +21,18 @@ export default function LaborContractViewer({ doc, content, selectedCo }: Props)
   const companyName = String(doc.company_name || selectedCo || '');
   const staffName = String(doc.title || '').split(' ')[0];
 
+  const isHtml = cleanedText.trim().startsWith('<');
+
+  if (isHtml) {
+    return (
+      <div className="bg-[var(--tab-bg)] p-4 md:p-5 rounded-[var(--radius-md)] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
+        <div className="w-full max-w-[700px] bg-white shadow-sm p-8 border border-[var(--border)]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
+          <div dangerouslySetInnerHTML={{ __html: cleanedText }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[var(--tab-bg)] p-4 md:p-5 rounded-[var(--radius-md)] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
       <div className="w-full max-w-[650px] bg-[var(--card)] shadow-sm p-5 md:p-14 font-serif text-[12px] leading-relaxed relative border border-[var(--border)]">

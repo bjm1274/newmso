@@ -229,8 +229,7 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
     <div style="border:1px solid #d1d5db;border-radius:10px;overflow:hidden;">
       <div style="background:#1f2937;color:#fff;padding:8px 12px;font-weight:800;letter-spacing:0.18em;font-size:11px;text-align:center;">사 용 자</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
-        ${row('회사명', companyName)}
-        ${row('사업자번호', companyBusinessNo)}
+        ${row('회사명', companyBusinessNo ? `${companyName ?? ''} (${companyBusinessNo})`.trim() : companyName)}
         ${row('소재지', companyAddress)}
         ${row('연락처', companyPhone)}
         ${row('대표자', companyCeo, sealHTML)}
