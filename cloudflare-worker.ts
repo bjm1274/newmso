@@ -83,18 +83,28 @@ const worker = {
     const routes = CRON_ROUTES_BY_SCHEDULE[controller.cron] || [];
     if (routes.length === 0) return;
 
-    // allSettled: 한 라우트 실패가 같은 cron 의 다른 라우트 실행을 막지 않도록 격리(JM3).
-    const results = await Promise.allSettled(
-      routes.map((route) => callCronRoute(route, controller.cron, env, context)),
+    console.log(
+      `[cron ${controller.cron}] Starting execution of ${routes.length} routes sequentially...`,
     );
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
+
+    for (const route of routes) {
+      const startTime = Date.now();
+      try {
+        console.log(`[cron ${controller.cron}] Starting route: ${route}`);
+        await callCronRoute(route, controller.cron, env, context);
+        const duration = Date.now() - startTime;
+        console.log(
+          `[cron ${controller.cron}] Successfully finished route: ${route} (${duration}ms)`,
+        );
+      } catch (err) {
+        const duration = Date.now() - startTime;
         console.error(
-          `[cron ${controller.cron}] route ${routes[index]} failed:`,
-          result.reason,
+          `[cron ${controller.cron}] Route ${route} failed after ${duration}ms:`,
+          err,
         );
       }
-    });
+    }
+    console.log(`[cron ${controller.cron}] Finished all routes.`);
   },
 };
 
