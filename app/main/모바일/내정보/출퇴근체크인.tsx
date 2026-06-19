@@ -101,20 +101,35 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
 
         activeLog = (todayData?.[0] as OpenLog) ?? null;
 
-        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 오픈된 기록(stale log) 찾기
+        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 기록(stale log) 찾기.
+        //    - 아직 미퇴근(open)인 야간 근무 → 출근 상태로 유지(기존 목적)
+        //    - 자정을 넘겨 '오늘' 퇴근 처리된 기록 → 완료 상태가 즉시 사라지지 않도록 유지
+        //    (어제 안에 출퇴근이 모두 끝난 일반 근무는 제외 — 다음날 화면에 되살아나면 안 됨)
         if (!activeLog?.check_in) {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayKey = formatLocalDateKey(yesterday);
+
           const { data: staleData } = await supabase
             .from('attendance')
             .select('id, staff_id, date, check_in, check_out, status')
             .eq('staff_id', staffId)
             .not('check_in', 'is', null)
-            .is('check_out', null)
             .neq('status', '결근') // 결근 처리된 건 제외
+            .gte('date', yesterdayKey) // 어제 이후만 — 오래된 완료 기록 부활 방지
             .order('date', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(1);
 
-          if (staleData && staleData.length > 0 && staleData[0].date !== today) {
-            activeLog = staleData[0] as OpenLog;
+          const cand = staleData?.[0] as OpenLog | undefined;
+          if (cand && cand.date !== today) {
+            const checkedOutToday = cand.check_out
+              ? formatLocalDateKey(new Date(cand.check_out)) === today
+              : false;
+            // 미퇴근이거나, 오늘 막 퇴근한(자정 넘긴) 기록만 화면에 유지한다.
+            if (!cand.check_out || checkedOutToday) {
+              activeLog = cand;
+            }
           }
         }
       } catch (dbErr) {
