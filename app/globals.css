@@ -3899,8 +3899,11 @@ button, a, [role="button"] {
     border-left: none !important;
     border-right: none !important;
     border-bottom: none !important;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 12px)) !important;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 12px)) !important;
     animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+  .message-ctx-menu kbd {
+    display: none !important;
   }
 }
 

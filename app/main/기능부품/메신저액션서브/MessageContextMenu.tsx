@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏', '👌'] as const;
 
@@ -53,6 +54,11 @@ export default function MessageContextMenu({
 }: MessageContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 화면 가장자리 자동 flip
   const pos = useMemo(() => {
@@ -122,7 +128,9 @@ export default function MessageContextMenu({
     onAddEmoji(rect.left, rect.bottom);
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-[99] bg-black/40 md:hidden animate-fade-in"
@@ -257,6 +265,7 @@ export default function MessageContextMenu({
           <span />
         </button>
       </div>
-    </>
+    </>,
+    document.querySelector('.mso-mobile') || document.body
   );
 }
