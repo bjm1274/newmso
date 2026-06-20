@@ -12,6 +12,7 @@ import {
   canAccessInventorySection,
   canAccessMainMenu,
   canAccessMyPageTab,
+  canAccessFinanceSection,
 } from '@/lib/access-control';
 
 export const FAVORITES_KEY = 'erp_mypage_favorites';
@@ -31,7 +32,7 @@ export type MypageTabId =
   | 'records' | 'records_certificates' | 'records_salary'
   | 'documents' | 'notifications';
 
-export type MainMenuId = '내정보' | '조직도' | '추가기능' | '채팅' | '게시판' | '전자결재' | '인사관리' | '재고관리' | '관리자';
+export type MainMenuId = '내정보' | '조직도' | '추가기능' | '채팅' | '게시판' | '전자결재' | '인사관리' | '재고관리' | '관리자' | '재무회계';
 
 export type FavoriteEntry =
   | { id: string; kind: 'mypage'; tab: MypageTabId; label: string; icon: string }
@@ -62,9 +63,10 @@ export const MAIN_MENU_PRESETS: { mainMenu: MainMenuId; label: string; icon: str
   { mainMenu: '인사관리', label: '인사관리(전체)', icon: 'Users' },
   { mainMenu: '재고관리', label: '재고관리(전체)', icon: 'Package' },
   { mainMenu: '관리자', label: '관리자', icon: 'Settings' },
+  { mainMenu: '재무회계', label: '재무회계(전체)', icon: 'Landmark' },
 ];
 
-export const SUB_MENU_BEARERS: MainMenuId[] = ['게시판', '전자결재', '인사관리', '재고관리', '관리자'];
+export const SUB_MENU_BEARERS: MainMenuId[] = ['게시판', '전자결재', '인사관리', '재고관리', '관리자', '재무회계'];
 
 // 호스트별 inner tab 카탈로그 — 사용자가 특정 sub-view 깊이 안의 탭을 즐겨찾기할 수 있게.
 // pendingKey: 호스트 컴포넌트가 마운트 시 일회성으로 읽고 지우는 localStorage 키
@@ -171,6 +173,7 @@ const MAIN_MENU_ICON_FALLBACK: Record<MainMenuId, string> = {
   인사관리: 'Users',
   재고관리: 'Package',
   관리자: 'Settings',
+  재무회계: 'Landmark',
 };
 
 export function buildSubMenuEntry(mainMenu: MainMenuId, subView: string, innerTab?: string): FavoriteEntry | null {
@@ -312,6 +315,21 @@ const INVENTORY_SUBVIEW_TO_PERM: Record<string, string> = {
   월마감: 'inventory_월마감',
 };
 
+const FINANCE_SUBVIEW_TO_PERM: Record<string, string> = {
+  복식부기: 'finance_복식부기',
+  부가세: 'finance_부가세',
+  결산: 'finance_결산',
+  자금흐름: 'finance_자금흐름',
+  감가상각: 'finance_감가상각',
+  매입원장: 'finance_매입원장',
+  'double-entry': 'finance_복식부기',
+  vat: 'finance_부가세',
+  closing: 'finance_결산',
+  'cash-flow': 'finance_자금흐름',
+  depreciation: 'finance_감가상각',
+  'purchase-ledger': 'finance_매입원장',
+};
+
 export function canAccessFavoriteEntry(user: UserLike, entry: FavoriteEntry): boolean {
   if (entry.kind === 'mypage') {
     if (!user) return true;
@@ -345,6 +363,10 @@ export function canAccessFavoriteEntry(user: UserLike, entry: FavoriteEntry): bo
   }
   if (mainMenu === '관리자') {
     return canAccessAdminSection(user, subView);
+  }
+  if (mainMenu === '재무회계') {
+    const key = FINANCE_SUBVIEW_TO_PERM[subView] || subView;
+    return canAccessFinanceSection(user, key);
   }
   if (mainMenu === '추가기능') {
     return canAccessExtraFeature(user, subView);

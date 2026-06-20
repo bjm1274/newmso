@@ -19,6 +19,7 @@ const loadInventoryView = () => import('../재고관리통합');
 const loadAdminView = () => import('../관리자전용');
 const loadExtraFeaturesView = () => import('../추가기능');
 const loadSharedCalendarView = () => import('../공유캘린더');
+const loadFinanceView = () => import('../재무회계');
 
 /**
  * 사이드바 호버/포커스 시 해당 메뉴 번들을 on-demand prefetch.
@@ -36,6 +37,7 @@ const MENU_LOADER_MAP: Record<string, () => Promise<unknown>> = {
   관리자: loadAdminView,
   추가기능: loadExtraFeaturesView,
   공유캘린더: loadSharedCalendarView,
+  재무회계: loadFinanceView,
 };
 
 export function prefetchMenuModule(menuId: string) {
@@ -89,6 +91,10 @@ const ExtraFeatures = dynamic(loadExtraFeaturesView, {
 const SharedCalendar = dynamic(loadSharedCalendarView, {
   ssr: false,
   loading: () => <MenuViewLoading label="공유캘린더" />,
+});
+const FinanceView = dynamic(loadFinanceView, {
+  ssr: false,
+  loading: () => <MenuViewLoading label="재무·회계·세무" />,
 });
 
 interface MainContentProps {
@@ -406,6 +412,17 @@ export default function MainContent({
             onRefresh={onRefresh}
             initialTab={subView}
             onOpenApproval={onOpenApproval}
+          />
+        </div>
+      )}
+
+      {mainMenu === '재무회계' && (
+        <div className="min-h-0 flex-1 overflow-x-hidden" data-testid="finance-view">
+          <FinanceView
+            user={user}
+            subView={subView || 'double-entry'}
+            setSubView={setSubView}
+            selectedCompanyId={selectedCompanyId}
           />
         </div>
       )}

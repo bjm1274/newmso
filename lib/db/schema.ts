@@ -2768,4 +2768,52 @@ export const budget_executions = sqliteTable("budget_executions", {
 	index("idx_budget_executions_dept").on(table.dept),
 ]);
 
+// ── 2026-06-20 재무회계 서버화 (G2)
+//    복식부기 분개장, 고정자산 대장, 금융 연동 현황 데이터를 D1 실테이블로 이관.
+
+export const journal_entries = sqliteTable("journal_entries", {
+	id: text().primaryKey().notNull(),
+	company_id: text(),
+	date: text().notNull(),
+	desc: text().notNull(),
+	debit_acc: text().notNull(),
+	credit_acc: text().notNull(),
+	amount: integer().notNull(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_journal_entries_date").on(table.date),
+	index("idx_journal_entries_company_id").on(table.company_id),
+]);
+
+export const fixed_assets = sqliteTable("fixed_assets", {
+	id: text().primaryKey().notNull(),
+	company_id: text(),
+	name: text().notNull(),
+	category: text().notNull(),
+	date: text().notNull(),
+	cost: integer().notNull(),
+	salvage: integer().notNull(),
+	useful_life: integer().notNull(),
+	method: text().notNull(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_fixed_assets_company_id").on(table.company_id),
+]);
+
+export const bank_accounts_sync = sqliteTable("bank_accounts_sync", {
+	id: text().primaryKey().notNull(),
+	company_id: text(),
+	type: text().notNull(),
+	name: text().notNull(),
+	num: text().notNull(),
+	state: text().notNull(),
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
+},
+(table) => [
+	index("idx_bank_accounts_sync_company_id").on(table.company_id),
+]);
+
+
 

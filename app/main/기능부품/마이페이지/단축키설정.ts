@@ -17,6 +17,7 @@ import {
   HR_TAB_KEY,
   INV_VIEW_KEY,
   MYPAGE_TAB_KEY,
+  FINANCE_VIEW_KEY,
 } from '../../navigation-state';
 
 export const SHORTCUTS_KEY = 'erp_mypage_shortcuts';
@@ -133,6 +134,7 @@ export function applyFavoriteEntry(
     else if (entry.mainMenu === '재고관리') safeWrite(INV_VIEW_KEY, entry.subView);
     else if (entry.mainMenu === '전자결재') safeWrite(APPROVAL_VIEW_KEY, entry.subView);
     else if (entry.mainMenu === '관리자') safeWrite(ADMIN_SUBVIEW_KEY, entry.subView);
+    else if (entry.mainMenu === '재무회계') safeWrite(FINANCE_VIEW_KEY, entry.subView);
   }
   if (entry.innerTab && entry.subView) {
     const pendingKey = getInnerTabPendingKey(entry.mainMenu, entry.subView);

@@ -18,7 +18,8 @@ export type MainMenuId =
   | '전자결재'
   | '인사관리'
   | '재고관리'
-  | '관리자';
+  | '관리자'
+  | '재무회계';
 
 export type MyPageTabId =
   | 'profile'
@@ -128,6 +129,21 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   analyze: 'inventory_월마감',
 };
 
+const FINANCE_PERMISSION_KEYS: Record<string, string> = {
+  복식부기: 'finance_복식부기',
+  부가세: 'finance_부가세',
+  결산: 'finance_결산',
+  자금흐름: 'finance_자금흐름',
+  감가상각: 'finance_감가상각',
+  매입원장: 'finance_매입원장',
+  'double-entry': 'finance_복식부기',
+  vat: 'finance_부가세',
+  closing: 'finance_결산',
+  'cash-flow': 'finance_자금흐름',
+  depreciation: 'finance_감가상각',
+  'purchase-ledger': 'finance_매입원장',
+};
+
 const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   경영분석: 'admin_경영분석',
   감사센터: 'admin_감사센터',
@@ -159,6 +175,13 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   menu_인사관리: ['hr', ...Object.values(HR_PERMISSION_KEYS)],
   menu_재고관리: ['inventory', ...Object.values(INVENTORY_PERMISSION_KEYS)],
   menu_관리자: ['admin', ...Object.values(ADMIN_PERMISSION_KEYS)],
+  menu_재무회계: ['finance', ...Object.values(FINANCE_PERMISSION_KEYS)],
+  finance_복식부기: ['finance'],
+  finance_부가세: ['finance'],
+  finance_결산: ['finance'],
+  finance_자금흐름: ['finance'],
+  finance_감가상각: ['finance'],
+  finance_매입원장: ['finance'],
   extra_조직도: ['menu_조직도'],
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval', 'admin_공문서대장'],
@@ -379,7 +402,9 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
                   ? resolveExplicitMenuAccess('menu_채팅')
                   : menuId === '내정보'
                     ? resolveExplicitMenuAccess('menu_내정보')
-                    : null;
+                    : menuId === '재무회계'
+                      ? resolveExplicitMenuAccess('menu_재무회계')
+                      : null;
   if (explicitMenuAccess !== null) {
     return explicitMenuAccess;
   }
@@ -403,6 +428,8 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
       return isPrivilegedUser(user) || hasPermission(user, 'menu_재고관리');
     case '관리자':
       return isPrivilegedUser(user) || hasPermission(user, 'menu_관리자');
+    case '재무회계':
+      return isPrivilegedUser(user) || hasPermission(user, 'menu_재무회계');
     default:
       return false;
   }
@@ -507,6 +534,13 @@ export function canAccessInventorySection(
     return group.some((key) => canAccessDetailedSection(user, '재고관리', key, INVENTORY_PERMISSION_KEYS));
   }
   return canAccessDetailedSection(user, '재고관리', sectionIdOrPermissionKey, INVENTORY_PERMISSION_KEYS);
+}
+
+export function canAccessFinanceSection(
+  user: UserLike | null | undefined,
+  sectionIdOrPermissionKey: string
+): boolean {
+  return canAccessDetailedSection(user, '재무회계', sectionIdOrPermissionKey, FINANCE_PERMISSION_KEYS);
 }
 
 export function canAccessAdminSection(

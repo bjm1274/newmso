@@ -11,6 +11,7 @@ import {
   Package,
   Shield,
   Calendar,
+  Landmark,
   type LucideProps,
 } from 'lucide-react';
 import { canAccessMainMenu } from '@/lib/access-control';
@@ -72,6 +73,14 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: 'docs', label: '계약·문서', group: '문서', icon: 'folder' },
   ],
   관리자: ADMIN_SIDEBAR_ITEMS,
+  재무회계: [
+    { id: 'double-entry', label: '복식부기', icon: 'calculator' },
+    { id: 'vat', label: '부가세', icon: 'document' },
+    { id: 'closing', label: '결산', icon: 'calendar-clock' },
+    { id: 'cash-flow', label: '자금흐름', icon: 'banknote' },
+    { id: 'depreciation', label: '감가상각', icon: 'analytics' },
+    { id: 'purchase-ledger', label: '매입원장', icon: 'clipboard' },
+  ],
 };
 
 type MainMenuLucideIcon = React.ComponentType<LucideProps>;
@@ -91,6 +100,7 @@ const MAIN_MENUS: {
   { id: '인사관리', LucideIcon: Briefcase, label: '인사관리', testId: 'sidebar-menu-hr' },
   { id: '재고관리', LucideIcon: Package, label: '재고관리', testId: 'sidebar-menu-inventory' },
   { id: '관리자', LucideIcon: Shield, label: '관리자', testId: 'sidebar-menu-admin' },
+  { id: '재무회계', LucideIcon: Landmark, label: '재무회계', testId: 'sidebar-menu-finance' },
 ];
 
 const ICON_PATHS: Record<string, React.ReactNode> = {

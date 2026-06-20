@@ -635,11 +635,11 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'education_completions',       // 교육 이수
   'email_queue',                 // 이메일 발송 큐
 
-  // ── 2026-06-10 예산관리 서버화 (G1) — migration 0015로 D1에 신설된 예산 테이블 2종.
-  //    소비처(관리자전용서브/예산관리.tsx)가 localStorage→D1로 이관. MSO 설계상 회사
-  //    격리 불필요(company NULL 허용, 필터 없음) — 형제 테이블과 동일하게 PUBLIC_ALL.
   'budget_settings',             // 예산 설정
   'budget_executions',           // 예산 집행
+  'journal_entries',             // 복식부기 분개장
+  'fixed_assets',                // 고정자산 대장
+  'bank_accounts_sync',          // 금융 연동 현황
 
   // ── 2026-05-20 확인 — 아래는 클라이언트 코드가 supabase.from()으로
   //    호출하지만 Supabase에 테이블이 실제로 존재하지 않음(probe 결과 PGRST205

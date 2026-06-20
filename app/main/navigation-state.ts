@@ -12,8 +12,9 @@ export const HR_WORKSPACE_KEY = 'erp_hr_workspace';
 export const INV_VIEW_KEY = 'erp_inventory_view';
 export const APPROVAL_VIEW_KEY = 'erp_approval_view';
 export const ADMIN_SUBVIEW_KEY = 'erp_admin_subview';
+export const FINANCE_VIEW_KEY = 'erp_finance_view';
 
-type SupportedMenuId = '내정보' | '채팅' | '전자결재' | '관리자' | '인사관리' | '재고관리';
+type SupportedMenuId = '내정보' | '채팅' | '전자결재' | '관리자' | '인사관리' | '재고관리' | '재무회계';
 
 export type StoredMainNavigationState = {
   savedMenu: string | null;
@@ -27,6 +28,7 @@ const SUBVIEW_STORAGE_KEY_BY_MENU: Partial<Record<SupportedMenuId, string>> = {
   재고관리: INV_VIEW_KEY,
   전자결재: APPROVAL_VIEW_KEY,
   관리자: ADMIN_SUBVIEW_KEY,
+  재무회계: FINANCE_VIEW_KEY,
 };
 
 function readLocalStorage(key: string) {
@@ -139,6 +141,9 @@ export function resetPersistedMenuState(menu: string) {
       break;
     case '재고관리':
       removeLocalStorage(INV_VIEW_KEY);
+      break;
+    case '재무회계':
+      removeLocalStorage(FINANCE_VIEW_KEY);
       break;
     default:
       break;

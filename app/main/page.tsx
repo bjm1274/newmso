@@ -24,6 +24,7 @@ import {
   canAccessMainMenu,
   hasUserPayloadChanged,
   normalizeMainMenuForUser,
+  canAccessFinanceSection,
 } from '@/lib/access-control';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 import { getDisplayedAdminSubView } from './admin-menu-config';
@@ -92,6 +93,7 @@ const SIDEBAR_NAV_LABELS = [
   { testId: 'sidebar-menu-hr', label: '인사관리' },
   { testId: 'sidebar-menu-inventory', label: '재고관리' },
   { testId: 'sidebar-menu-admin', label: '관리자' },
+  { testId: 'sidebar-menu-finance', label: '재무회계' },
 ];
 
 function MainPageFallback() {
@@ -964,6 +966,10 @@ function MainPageContent() {
 
           if (mainMenu === '재고관리') {
             return canAccessInventorySection(user, subMenu.id);
+          }
+
+          if (mainMenu === '재무회계') {
+            return canAccessFinanceSection(user, subMenu.id);
           }
 
           if (mainMenu === '관리자') {
