@@ -82,9 +82,14 @@ export function buildContractBodyPrintHTML(templateText: string): string {
         const lines = body.split('\n').filter((l) => l.trim());
 
         // 시업시각, 종업시각, 휴게시간 라인 전처리
+        type SalaryItem = { label: string; amount: string; isTotal: boolean; isHourly: boolean };
         type ProcessedLine =
             | { type: 'text'; text: string }
-            | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string };
+            | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string }
+            | { type: 'salary_table'; items: SalaryItem[] };
+
+        // 급여 항목 줄: "라벨: 금 1,234,567원" 형태 (제6조 임금 구성항목)
+        const SALARY_LINE_RE = /^(.+?)\s*[:：]\s*금\s*([0-9,]+)\s*원\s*$/;
 
         const processedLines: ProcessedLine[] = [];
         let i = 0;
@@ -109,6 +114,18 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                 }
                 processedLines.push({ type: 'shift_schedule', startLine, endLine, breakLine });
                 i = j;
+            } else if (SALARY_LINE_RE.test(t)) {
+                const items: SalaryItem[] = [];
+                let j = i;
+                while (j < lines.length) {
+                    const sm = lines[j].trim().match(SALARY_LINE_RE);
+                    if (!sm) break;
+                    const label = sm[1].trim();
+                    items.push({ label, amount: sm[2], isTotal: /합계/.test(label), isHourly: /통상시급/.test(label) });
+                    j++;
+                }
+                processedLines.push({ type: 'salary_table', items });
+                i = j;
             } else {
                 processedLines.push({ type: 'text', text: lines[i] });
                 i++;
@@ -116,6 +133,26 @@ export function buildContractBodyPrintHTML(templateText: string): string {
         }
 
         const linesHTML = processedLines.map((item) => {
+            if (item.type === 'salary_table') {
+                const detail = item.items.filter((it) => !it.isTotal && !it.isHourly);
+                const totalItem = item.items.find((it) => it.isTotal);
+                const hourlyItem = item.items.find((it) => it.isHourly);
+                const cardsHTML = detail.map((it) => `
+                    <div style="flex:1;min-width:100px;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;padding:6px 8px;text-align:center;">
+                      <div style="font-size:10px;font-weight:700;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(it.label)}</div>
+                      <div style="font-size:12px;font-weight:900;color:#111827;margin-top:2px;">${esc(it.amount)}원</div>
+                    </div>`).join('');
+                const summaryParts: string[] = [];
+                if (totalItem) summaryParts.push(`<div><span style="font-size:11px;font-weight:700;color:#6b7280;margin-right:6px;">${esc(totalItem.label)}</span><span style="font-size:13px;font-weight:900;color:#1d4ed8;">금 ${esc(totalItem.amount)}원</span></div>`);
+                if (hourlyItem) summaryParts.push(`<div><span style="font-size:11px;font-weight:700;color:#6b7280;margin-right:6px;">${esc(hourlyItem.label)}</span><span style="font-size:12px;font-weight:900;color:#047857;">금 ${esc(hourlyItem.amount)}원</span></div>`);
+                const summaryHTML = summaryParts.length
+                    ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #d1d5db;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 24px;">${summaryParts.join('')}</div>`
+                    : '';
+                return `<div class="salary-box" style="margin:8px 0;border:1px solid #d1d5db;border-radius:12px;background:#f9fafb;padding:12px;break-inside:avoid;page-break-inside:avoid;">
+  <div style="display:flex;flex-wrap:wrap;gap:6px;">${cardsHTML}</div>
+  ${summaryHTML}
+</div>`;
+            }
             if (item.type === 'shift_schedule') {
                 const starts = item.startLine.replace('시업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
                 const ends = item.endLine.replace('종업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);

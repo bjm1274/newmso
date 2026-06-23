@@ -75,7 +75,8 @@ export const CONTRACT_SALARY_COMPOSITION_BLOCK = `기본급: 금 {{base_salary}}
 연장근로수당(약정): 금 {{agreed_overtime_allowance}}원
 야간근로수당(약정): 금 {{agreed_night_allowance}}원
 야간당직수당: 금 {{night_duty_allowance}}원
-합계(비과세 포함): 금 {{total_salary}}원`;
+합계(비과세 포함): 금 {{total_salary}}원
+통상시급: 금 {{hourly_wage}}원`;
 
 const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 본 계약은 사용자와 근로자 간의 근로조건을 명확히 정함으로써 상호 신뢰와 협력을 바탕으로 성실히 근로관계를 유지하는 것을 목적으로 한다.
@@ -198,7 +199,7 @@ const replaceFromArticle10 = (content: string) => {
 // "기본급: 금 {{base_salary}}원" 줄부터 "합계 ... {{total_salary}}원"(또는 total_monthly) 줄까지를
 // 한 덩어리로 매칭한다. 라벨/항목 구성이 다른 구형·커스텀 템플릿도 포착된다.
 const CONTRACT_SALARY_BLOCK_PATTERN =
-  /기본급\s*[:：]\s*금\s*\{\{\s*base_salary\s*\}\}\s*원[\s\S]*?합계[^\n]*\{\{\s*total_(?:salary|monthly)\s*\}\}\s*원/;
+  /기본급\s*[:：]\s*금\s*\{\{\s*base_salary\s*\}\}\s*원[\s\S]*?합계[^\n]*\{\{\s*total_(?:salary|monthly)\s*\}\}\s*원(?:\s*\n\s*통상시급[^\n]*\{\{\s*hourly_wage\s*\}\}\s*원)?/;
 
 // 구형/커스텀 템플릿의 제6조 급여 블록을 표준 구성(모든 수당 항목 포함)으로 보정한다.
 // 일부 수당 항목 줄이 누락된 템플릿에서도 약정수당·비과세 항목이 빠짐없이 노출되도록 한다.

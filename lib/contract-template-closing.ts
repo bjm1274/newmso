@@ -216,7 +216,7 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
 
   const signatureHTML = signatureDataUrl
     ? `<img src="${escapeHTML(signatureDataUrl)}" alt="서명" style="height:34px;object-fit:contain;vertical-align:middle;" />`
-    : `<span style="display:inline-block;min-width:140px;border-bottom:1px solid #333;height:18px;vertical-align:middle;"></span>`;
+    : `<span style="display:inline-block;min-width:140px;border-bottom:1px solid #333;height:32px;vertical-align:bottom;"></span>`;
 
   const row = (label: string, value?: string, suffix = '') => {
     if (!value && !suffix) return '';
@@ -242,13 +242,12 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
         ${row('주소', employeeAddress)}
         ${row('연락처', employeePhone)}
         <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;">서명</td><td style="padding:5px 10px;">${signatureHTML}</td></tr>
+        <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;vertical-align:middle;">교부확인</td><td style="padding:8px 10px;text-align:center;"><div style="font-size:17px;font-weight:700;letter-spacing:0.3em;color:#cbd5e1;">교부 받음</div><div style="font-size:9px;color:#9ca3af;margin-top:2px;">위 글자를 따라 자필로 적어 주세요</div></td></tr>
       </table>
     </div>
   </div>
-  <div style="margin-top:14px;padding:12px 16px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;font-size:12px;color:#374151;">
-    <p style="margin:0 0 4px 0;font-weight:700;color:#111827;">근로계약서 교부 확인</p>
-    <p style="margin:0;">본인은 본 근로계약서 1부를 교부받았음을 확인합니다.</p>
-    <p style="margin:6px 0 0 0;color:#6b7280;">계약 체결일: <span style="font-weight:700;color:#111827;">${escapeHTML(contractDate)}</span></p>
+  <div style="margin-top:14px;text-align:center;">
+    <p style="margin:0;font-size:12.5px;color:#6b7280;">계약 체결일: <span style="font-weight:700;color:#111827;">${escapeHTML(contractDate)}</span></p>
   </div>
 </div>
 `;

@@ -91,9 +91,9 @@ export default function ContractClosingBlock(props: Props) {
                         {renderRow('성명', employeeName, 'employee')}
                         {renderRow('주소', employeeAddress, 'employee')}
                         {renderRow('연락처', employeePhone, 'employee')}
-                        <div className="flex items-stretch text-[11.5px] min-h-[36px] print:min-h-[26px]">
+                        <div className="flex items-stretch text-[11.5px] min-h-[48px] print:min-h-[36px]">
                             <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-blue-500/10 text-blue-700 font-bold print:px-1.5">서명</span>
-                            <span className="flex-1 min-w-0 px-2.5 leading-snug flex items-center gap-2 print:px-1.5">
+                            <span className="flex-1 min-w-0 px-2.5 pb-1.5 leading-snug flex items-end gap-2 print:px-1.5 print:pb-1">
                                 {signatureDataUrl ? (
                                     <img
                                         src={signatureDataUrl}
@@ -109,16 +109,19 @@ export default function ContractClosingBlock(props: Props) {
                                 )}
                             </span>
                         </div>
+                        <div className="flex items-stretch text-[11.5px] min-h-[46px] print:min-h-[34px]">
+                            <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-blue-500/10 text-blue-700 font-bold print:px-1.5">교부확인</span>
+                            <span className="flex-1 min-w-0 px-2.5 py-1.5 flex flex-col items-center justify-center text-center leading-tight print:px-1.5">
+                                <span className="contract-receipt-trace text-[17px] font-bold tracking-[0.35em] text-slate-300 select-none">교부 받음</span>
+                                <span className="text-[8px] text-[var(--toss-gray-3)] mt-0.5">위 글자를 따라 자필로 적어 주세요</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--tab-bg)] px-4 py-3 text-[12px] text-[var(--foreground)] break-inside-avoid break-before-avoid print:px-2.5 print:py-1.5">
-                <p className="font-bold mb-1">근로계약서 교부 확인</p>
-                <p className="text-[var(--toss-gray-5)]">
-                    본인은 본 근로계약서 1부를 교부받았음을 확인합니다.
-                </p>
-                <p className="mt-1.5 text-[var(--toss-gray-4)]">
+            <div className="text-center break-inside-avoid break-before-avoid">
+                <p className="text-[12.5px] text-[var(--toss-gray-4)] print:text-[11px]">
                     계약 체결일:{' '}
                     <span className="font-bold text-[var(--foreground)]">{contractDate}</span>
                 </p>

@@ -3887,6 +3887,13 @@ button, a, [role="button"] {
     break-before: auto;
     page-break-before: auto;
   }
+
+  /* 교부 받음 자필 따라쓰기 가이드: 인쇄 시 일반 텍스트 축소(10.5px) 규칙을 덮어 충분히 크게 유지 */
+  body:has([data-print-root]) [data-print-root] .contract-receipt-trace {
+    font-size: 15px !important;
+    letter-spacing: 0.3em !important;
+    line-height: 1.3 !important;
+  }
 }
 
 /* Mobile Context Menu as Bottom Sheet & Backdrop (Added for Swipe Actions) */

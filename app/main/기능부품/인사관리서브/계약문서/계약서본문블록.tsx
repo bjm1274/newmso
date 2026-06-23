@@ -58,9 +58,14 @@ export default function ContractBodyBlock({
                 const workDaysText = workDaysMatch ? workDaysMatch[1].trim() : '';
 
                 // 시업시각, 종업시각, 휴게시간 라인들을 파싱해서 하나의 시각적 블록으로 통합하기 위한 전처리
+                type SalaryItem = { label: string; amount: string; isTotal: boolean; isHourly: boolean };
                 type ProcessedLine =
                     | { type: 'text'; text: string }
-                    | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string };
+                    | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string }
+                    | { type: 'salary_table'; items: SalaryItem[] };
+
+                // 급여 항목 줄: "라벨: 금 1,234,567원" 형태 (제6조 임금 구성항목)
+                const SALARY_LINE_RE = /^(.+?)\s*[:：]\s*금\s*([0-9,]+)\s*원\s*$/;
 
                 const processedLines: ProcessedLine[] = [];
                 let i = 0;
@@ -85,6 +90,18 @@ export default function ContractBodyBlock({
                         }
                         processedLines.push({ type: 'shift_schedule', startLine, endLine, breakLine });
                         i = j;
+                    } else if (SALARY_LINE_RE.test(t)) {
+                        const items: SalaryItem[] = [];
+                        let j = i;
+                        while (j < lines.length) {
+                            const sm = lines[j].trim().match(SALARY_LINE_RE);
+                            if (!sm) break;
+                            const label = sm[1].trim();
+                            items.push({ label, amount: sm[2], isTotal: /합계/.test(label), isHourly: /통상시급/.test(label) });
+                            j++;
+                        }
+                        processedLines.push({ type: 'salary_table', items });
+                        i = j;
                     } else {
                         processedLines.push({ type: 'text', text: lines[i] });
                         i++;
@@ -108,6 +125,39 @@ export default function ContractBodyBlock({
                         </h4>
                         <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2 print:pl-2 print:space-y-1">
                             {processedLines.map((item, li) => {
+                                if (item.type === 'salary_table') {
+                                    const detailItems = item.items.filter((it) => !it.isTotal && !it.isHourly);
+                                    const totalItem = item.items.find((it) => it.isTotal);
+                                    const hourlyItem = item.items.find((it) => it.isHourly);
+                                    return (
+                                        <div key={li} className="salary-box my-2 rounded-xl border border-[var(--border)] bg-[var(--tab-bg)]/40 p-3 break-inside-avoid print:my-1.5 print:p-2 print:bg-slate-50 print:border-slate-300">
+                                            <div className="flex flex-wrap gap-1.5 print:gap-1">
+                                                {detailItems.map((it, idx) => (
+                                                    <div key={idx} className="flex-1 min-w-[100px] bg-white rounded-lg border border-[var(--border-subtle)] px-2 py-1.5 text-center print:border-slate-300 print:py-1">
+                                                        <div className="text-[10px] font-bold text-[var(--toss-gray-4)] truncate print:text-[9px]">{it.label}</div>
+                                                        <div className="text-[12.5px] font-black text-[var(--foreground)] mt-0.5 print:text-[11px]">{it.amount}원</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {(totalItem || hourlyItem) && (
+                                                <div className="mt-2.5 pt-2 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-x-6 gap-y-1 print:mt-1.5 print:pt-1.5">
+                                                    {totalItem && (
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] print:text-[10px]">{totalItem.label}</span>
+                                                            <span className="text-[14px] font-black text-blue-700 print:text-[12px]">금 {totalItem.amount}원</span>
+                                                        </div>
+                                                    )}
+                                                    {hourlyItem && (
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] print:text-[10px]">{hourlyItem.label}</span>
+                                                            <span className="text-[13px] font-black text-emerald-700 print:text-[12px]">금 {hourlyItem.amount}원</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
                                 if (item.type === 'shift_schedule') {
                                     const starts = item.startLine.replace('시업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
                                     const ends = item.endLine.replace('종업시각:', '').trim().split('/').map(x => x.trim()).filter(Boolean);
