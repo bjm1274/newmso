@@ -254,10 +254,19 @@ function buildWeeklyHolidayText(
 
 function removeAllowanceLinesWithoutAmounts(
   content: string,
-  _allowanceValues: Record<string, number>,
+  allowanceValues: Record<string, number>,
 ) {
-  // Keep all lines regardless of allowance values - show 0원 items too
-  return content.replace(/\r\n/g, '\n').trim();
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const resultLines = lines.filter(line => {
+    // Check if the line contains any allowance token
+    const matchingTokens = Object.keys(allowanceValues).filter(token => line.includes(token));
+    if (matchingTokens.length === 0) return true; // No allowance token, keep line
+    
+    // If it contains allowance tokens, check if AT LEAST ONE has a non-zero value
+    const hasValue = matchingTokens.some(token => allowanceValues[token] > 0);
+    return hasValue;
+  });
+  return resultLines.join('\n').trim();
 }
 
 export function fillEmploymentContractTemplate(

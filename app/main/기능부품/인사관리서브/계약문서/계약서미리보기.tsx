@@ -257,7 +257,7 @@ export default function ContractPreview({
       { label: '기타 비과세', amount: parseAmount(src.other_taxfree || staff?.other_taxfree), note: '비과세', taxable: false },
       { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || staff?.overtime_allowance), note: '포괄산정 연장수당', taxable: true },
       { label: '야간근로수당(약정)', amount: parseAmount(src.agreed_night_allowance || staff?.agreed_night_allowance || staff?.night_work_allowance || staff?.night_duty_allowance), note: '포괄산정 야간수당', taxable: true },
-    ];
+    ].filter(item => item.amount > 0);
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
     const taxableTotal = items.filter(i => i.taxable).reduce((sum, i) => sum + i.amount, 0);
