@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source ".";
+@source "../lib";
 
 /* ======================================================================
  * MSO ERP Design System — 2025 Edition
