@@ -351,7 +351,7 @@ export async function processFinalApprovalEffects(
     }
   }
 
-  if (item.type === '연차/휴가') {
+  if (item.type === '연차/휴가' || item.type === '휴가신청') {
     const senderId = String(item.sender_id || '');
     const leaveSummary = extractLeaveRequestMeta(itemMetaData);
     const startStr = leaveSummary?.startDate || '';

@@ -234,6 +234,7 @@ function isStandaloneWebApp() {
 function isMobileClientDevice() {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
+  if (ua.includes('Electron')) return false; // Electron is a PC/desktop app, never mobile
   if (/android|iphone|ipad|ipod/i.test(ua)) return true;
   try {
     return Boolean(window.matchMedia?.('(max-width: 768px)')?.matches);
@@ -732,7 +733,9 @@ export function sendNotification(title: string, options?: NotificationOptions) {
     return;
   }
 
-  if ('serviceWorker' in navigator) {
+  const isElectronApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+
+  if ('serviceWorker' in navigator && !isElectronApp) {
     navigator.serviceWorker.ready
       .then((reg) =>
         reg.showNotification(title, {
@@ -1230,8 +1233,10 @@ export default function NotificationSystem({
       const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
       const isBackgroundClient =
         typeof document !== 'undefined' && document.visibilityState !== 'visible';
+      const isElectronApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
       const shouldShowSystemNotification =
-        (
+        isElectronApp ||
+        ((
           !isMobileClientDevice() ||
           isBackgroundClient ||
           shouldPreferMobileNativePopup
@@ -1240,7 +1245,7 @@ export default function NotificationSystem({
           !isChatType ||
           !hasPushSubscriptionActive(effectiveUserId) ||
           shouldPreferMobileNativePopup
-        );
+        ));
       if (
         canShowNativeNotification &&
         shouldShowSystemNotification &&

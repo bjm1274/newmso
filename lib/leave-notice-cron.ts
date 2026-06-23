@@ -171,6 +171,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
   const db = getD1Drizzle(d1);
 
   const targetDate = getTimeZoneDateKeyOffset(0, LEAVE_NOTICE_TIMEZONE, now);
+  const minAnnounceDate = getTimeZoneDateKeyOffset(-3, LEAVE_NOTICE_TIMEZONE, now); // Allow announcing leaves from the last 3 days in case of weekend/holiday/server delay
   const approvals = await fetchApprovedLeaveApprovals(db);
   const dueApprovals = approvals.filter((approval) => {
     const leaveMeta = extractLeaveRequestMeta(
@@ -180,16 +181,15 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
     );
 
     if (!leaveMeta) return false;
-    if (leaveMeta.startDate !== targetDate) return false;
+    // Don't announce future leaves, and don't announce extremely old leaves
+    if (leaveMeta.startDate > targetDate || leaveMeta.startDate < minAnnounceDate) return false;
 
-    const existingTargetDate = String(
-      (approval.meta_data as Record<string, unknown> | null | undefined)?.leave_notice_target_date || ''
-    ).trim();
     const existingAnnouncedAt = String(
       (approval.meta_data as Record<string, unknown> | null | undefined)?.leave_notice_announced_at || ''
     ).trim();
 
-    return !(existingAnnouncedAt && existingTargetDate === targetDate);
+    // Only announce if it has not been announced yet
+    return !existingAnnouncedAt;
   });
 
   const senderIds = Array.from(
@@ -329,9 +329,8 @@ export async function announceLeaveApprovalIfNeeded(
   // Only announce if the leave starts today or in the past
   if (leaveMeta.startDate > targetDate) return false;
 
-  const existingTargetDate = String(metaData.leave_notice_target_date || '').trim();
   const existingAnnouncedAt = String(metaData.leave_notice_announced_at || '').trim();
-  if (existingAnnouncedAt && existingTargetDate === leaveMeta.startDate) {
+  if (existingAnnouncedAt) {
     return false; // Already announced
   }
 
