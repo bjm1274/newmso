@@ -1,5 +1,8 @@
 const PROFILE_PHOTO_BUCKET = 'profiles';
-const STAFF_ALLOWANCE_KEYS = [
+const STAFF_SALARY_KEYS = [
+  // 기본급도 일부 직원은 top-level 컬럼이 0/누락이고 permissions.payroll_allowances에만 값이 있어,
+  // 계약서·급여 화면에서 누락되지 않도록 수당과 함께 끌어올린다.
+  'base_salary',
   'meal_allowance',
   'night_duty_allowance',
   'vehicle_allowance',
@@ -193,10 +196,15 @@ export function normalizeProfileUser<T>(source: T): T {
     employment_type: employType,
   } as Record<string, any>;
 
-  for (const key of STAFF_ALLOWANCE_KEYS) {
+  for (const key of STAFF_SALARY_KEYS) {
     const topLevelValue = cleanFiniteNumber(base[key]);
     const fallbackValue = cleanFiniteNumber(payrollAllowances[key] ?? permissions[key]);
-    if (topLevelValue !== null) {
+    // 급여·계약 등 다른 화면과 동일하게, top-level 값이 0/누락이면 permissions 저장본(payroll_allowances)으로 폴백한다.
+    if (topLevelValue) {
+      normalizedBase[key] = topLevelValue;
+    } else if (fallbackValue) {
+      normalizedBase[key] = fallbackValue;
+    } else if (topLevelValue !== null) {
       normalizedBase[key] = topLevelValue;
     } else if (fallbackValue !== null) {
       normalizedBase[key] = fallbackValue;

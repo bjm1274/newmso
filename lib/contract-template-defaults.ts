@@ -61,6 +61,22 @@ export const CONTRACT_TEMPLATE_VARIABLES: ContractTemplateVariable[] = [
   { key: '{{payday}}', desc: '급여 지급일', category: '근무' },
 ];
 
+// 제6조 [임금 및 구성항목]의 표준 급여 구성 블록.
+// 기본 템플릿과 구형 템플릿 보정(upgradeSalaryCompositionBlock)이 같은 정의를 공유하여
+// 항목이 추가/변경되어도 한 곳만 고치면 되도록 한다.
+// 값이 0인 수당 줄은 fillEmploymentContractTemplate 단계에서 자동 제거된다.
+export const CONTRACT_SALARY_COMPOSITION_BLOCK = `기본급: 금 {{base_salary}}원
+식대: 금 {{meal_allowance}}원
+직책수당: 금 {{position_allowance}}원
+자가운전보조금: 금 {{vehicle_allowance}}원
+보육수당: 금 {{childcare_allowance}}원
+연구활동비: 금 {{research_allowance}}원
+기타수당: 금 {{other_taxfree}}원
+연장근로수당(약정): 금 {{agreed_overtime_allowance}}원
+야간근로수당(약정): 금 {{agreed_night_allowance}}원
+야간당직수당: 금 {{night_duty_allowance}}원
+합계(비과세 포함): 금 {{total_salary}}원`;
+
 const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 본 계약은 사용자와 근로자 간의 근로조건을 명확히 정함으로써 상호 신뢰와 협력을 바탕으로 성실히 근로관계를 유지하는 것을 목적으로 한다.
 
@@ -95,17 +111,7 @@ const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 제6조 [임금 및 구성항목]
 ① 근로자의 임금은 월급제로 하며, 월 임금의 구성항목은 다음과 같다.
 
-기본급: 금 {{base_salary}}원
-식대: 금 {{meal_allowance}}원
-직책수당: 금 {{position_allowance}}원
-자가운전보조금: 금 {{vehicle_allowance}}원
-보육수당: 금 {{childcare_allowance}}원
-연구활동비: 금 {{research_allowance}}원
-기타수당: 금 {{other_taxfree}}원
-연장근로수당(약정): 금 {{agreed_overtime_allowance}}원
-야간근로수당(약정): 금 {{agreed_night_allowance}}원
-야간당직수당: 금 {{night_duty_allowance}}원
-합계(비과세 포함): 금 {{total_salary}}원
+${CONTRACT_SALARY_COMPOSITION_BLOCK}
 ② 임금은 매월 1일부터 말일까지 산정하여 익월 {{payday}}일 근로자 명의의 계좌로 지급한다. 지급일이 휴일인 경우에는 전일 또는 익영업일에 지급할 수 있다.
 ③ 중도 입사 또는 중도 퇴사 시 해당 월의 실제 근무일수 또는 회사가 정한 합리적인 기준에 따라 일할 계산하여 지급한다.
 ④ 법령에 따른 세금, 4대보험료, 기타 법정 공제금은 임금에서 공제할 수 있다.
@@ -188,30 +194,36 @@ const replaceFromArticle10 = (content: string) => {
   return `${content.slice(0, article10Index).trim()}\n\n${CONTRACT_TEMPLATE_APPENDIX_FROM_ARTICLE_10}`;
 };
 
+// 제6조 급여 구성 블록을 찾아내는 패턴.
+// "기본급: 금 {{base_salary}}원" 줄부터 "합계 ... {{total_salary}}원"(또는 total_monthly) 줄까지를
+// 한 덩어리로 매칭한다. 라벨/항목 구성이 다른 구형·커스텀 템플릿도 포착된다.
+const CONTRACT_SALARY_BLOCK_PATTERN =
+  /기본급\s*[:：]\s*금\s*\{\{\s*base_salary\s*\}\}\s*원[\s\S]*?합계[^\n]*\{\{\s*total_(?:salary|monthly)\s*\}\}\s*원/;
+
+// 구형/커스텀 템플릿의 제6조 급여 블록을 표준 구성(모든 수당 항목 포함)으로 보정한다.
+// 일부 수당 항목 줄이 누락된 템플릿에서도 약정수당·비과세 항목이 빠짐없이 노출되도록 한다.
+// 함수형 치환을 사용해 치환 문자열의 특수문자($&, $1 등) 해석을 방지한다. 매칭이 없으면 원본을 그대로 반환한다.
+const upgradeSalaryCompositionBlock = (content: string) =>
+  content.replace(CONTRACT_SALARY_BLOCK_PATTERN, () => CONTRACT_SALARY_COMPOSITION_BLOCK);
+
 export const upgradeLegacyContractTemplate = (content?: string | null) => {
   const normalized = normalizeTemplate(content);
   if (!normalized) return DEFAULT_CONTRACT_TEMPLATE;
 
-  if (!normalized.includes('지식재산권 및 정보의 귀속')) {
-    return replaceFromArticle10(normalized);
-  }
-
-  if (!/제10조\s*\[/.test(normalized)) {
-    return replaceFromArticle10(normalized);
-  }
-
-  // 퇴직 및 인수인계 조항이 없거나 구형 14조 교부 형태인 경우 강제 업그레이드
-  if (
+  // 제10조 이후 부록(지식재산권/퇴직·인수인계/교부 확인 등)이 구형이면 강제 업그레이드
+  const needsAppendixUpgrade =
+    !normalized.includes('지식재산권 및 정보의 귀속') ||
+    !/제10조\s*\[/.test(normalized) ||
     normalized.includes('제10조 [재산보호 및 보험]') ||
     normalized.includes('제10조 [개인정보 동의]') ||
     !normalized.includes('퇴직 및 인수인계') ||
     (normalized.includes('제10조 [개인정보의 수집·이용에 대한 동의]') &&
-      !normalized.includes('제15조 [근로계약서 교부]'))
-  ) {
-    return replaceFromArticle10(normalized);
-  }
+      !normalized.includes('제15조 [근로계약서 교부]'));
 
-  return normalized;
+  const upgraded = needsAppendixUpgrade ? replaceFromArticle10(normalized) : normalized;
+
+  // 제6조 임금 구성항목: 구형 템플릿에 누락된 수당 항목 줄을 표준 구성으로 보정
+  return upgradeSalaryCompositionBlock(upgraded);
 };
 
 export const hasInlineContractReceiptSection = (content?: string | null) =>

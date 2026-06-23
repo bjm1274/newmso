@@ -11,6 +11,7 @@ import {
     type ContractClosingData,
 } from '@/lib/contract-template-closing';
 import { buildContractBodyPrintHTML } from '@/lib/contract-body-print-html';
+import { buildConfidentialityPledgePrintHTML } from '@/lib/contract-confidentiality-pledge';
 import ContractClosingBlock from './계약서마무리블록';
 import ContractBodyBlock from './계약서본문블록';
 import {
@@ -327,6 +328,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         page-break-inside: avoid;
                     }
 
+                    /* 페이지마다 상·하 여백 확보 (관리자 미리보기와 동일한 표 header/footer 스페이서 방식) */
+                    .contract-print-table { width: 100%; border-collapse: collapse; }
+                    .contract-print-table > thead { display: table-header-group; }
+                    .contract-print-table > tfoot { display: table-footer-group; }
+                    .contract-print-spacer { height: 12mm; padding: 0; border: 0; }
+
                     @media print {
                         body { margin: 0; padding: 0 8mm; }
                         .contract-page, [style*="page-break-before: always"] {
@@ -397,29 +404,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 </div>
             `;
 
-            const confidentialitySection = `
-                <div style="page-break-before: always; padding: 40px; font-family: serif;">
-                    <h2 style="text-align: center; text-decoration: underline; letter-spacing: 5px;">비 밀 유 지 서 약 서</h2>
-                    <p style="margin-top: 30px; line-height: 1.8;">본인(이하 '서약자')은 ${company?.name || user?.company}(이하 '회사')에 근무함에 있어 다음과 같이 서약합니다...</p>
-                    <div style="margin-top: 20px; font-size: 13px; line-height: 1.6;">
-                        <p><b>제1조 [비밀유지의 범위]</b> 환자 정보, 경영 전략, 의료 프로세스, 인사 정보 등</p>
-                        <p><b>제2조 [비밀유지의 의무]</b> 사전 승인 없이 제3자 유출 금지</p>
-                        <p><b>제3조 [비밀유지 기간]</b> 퇴직 후 3년 동안 효력 유지</p>
-                    </div>
-                    <div style="margin-top: 60px; border-top: 1px dotted #ccc; pt: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px;">
-                            <div style="text-align: left;">
-                                <p style="font-size: 10px; color: #999; margin: 0;">[서약자]</p>
-                                <p style="font-weight: bold; font-size: 16px; margin: 5px 0;">${user?.name} (인)</p>
-                                <img src="${signatureData}" style="width: 120px; height: auto;" />
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="font-weight: bold;">${today}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            // 비밀유지서약서 본문은 관리자 미리보기(React 컴포넌트)와 동일한 공유 소스 사용
+            const confidentialitySection = buildConfidentialityPledgePrintHTML({
+                companyName: company?.name || user?.company || '',
+                employeeName: user?.name || '',
+                contractDate: today,
+                signatureDataUrl: signatureData,
+            });
 
             const { mainText: strippedTemplate } = stripContractClosingLines(localTemplateText);
             const bodyText = strippedTemplate || localTemplateText;
@@ -440,14 +431,20 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
 
             const fullContractHTML = `
-                <div class="contract-wrapper">
-                    <div class="contract-page">
-                        ${bodyHTML}
-                        ${closingHTML}
-                    </div>
-                    ${agreementsSection}
-                    ${confidentialitySection}
-                </div>
+                <table class="contract-print-table">
+                    <thead><tr><td class="contract-print-spacer"></td></tr></thead>
+                    <tbody><tr><td>
+                        <div class="contract-wrapper">
+                            <div class="contract-page">
+                                ${bodyHTML}
+                                ${closingHTML}
+                                ${confidentialitySection}
+                            </div>
+                            ${agreementsSection}
+                        </div>
+                    </td></tr></tbody>
+                    <tfoot><tr><td class="contract-print-spacer"></td></tr></tfoot>
+                </table>
             `;
 
             await Promise.resolve(onSuccess(signatureData, fullContractHTML));

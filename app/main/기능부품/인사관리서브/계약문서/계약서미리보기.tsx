@@ -538,7 +538,7 @@ export default function ContractPreview({
               <table className="w-full border-collapse border-0 print:m-0">
                 <thead className="hidden print:table-header-group">
                   <tr>
-                    <td className="h-0 print:h-[6mm]"></td>
+                    <td className="h-0 print:h-[12mm]"></td>
                   </tr>
                 </thead>
                 <tbody>
@@ -572,7 +572,7 @@ export default function ContractPreview({
                 </tbody>
                 <tfoot className="hidden print:table-footer-group">
                   <tr>
-                    <td className="h-0 print:h-[6mm]"></td>
+                    <td className="h-0 print:h-[12mm]"></td>
                   </tr>
                 </tfoot>
               </table>
