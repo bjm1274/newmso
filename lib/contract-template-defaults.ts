@@ -43,6 +43,7 @@ export const CONTRACT_TEMPLATE_VARIABLES: ContractTemplateVariable[] = [
   { key: '{{other_taxfree}}', desc: '기타 비과세', category: '임금' },
   { key: '{{agreed_overtime_allowance}}', desc: '연장근로수당(약정)', category: '임금' },
   { key: '{{agreed_night_allowance}}', desc: '야간근로수당(약정)', category: '임금' },
+  { key: '{{night_duty_allowance}}', desc: '야간당직수당(비과세)', category: '임금' },
   { key: '{{total_monthly}}', desc: '월 급여 합계', category: '임금' },
   { key: '{{total_salary}}', desc: '월 급여 합계', category: '임금' },
   { key: '{{annual_salary}}', desc: '연봉', category: '임금' },
@@ -103,6 +104,7 @@ const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 기타수당: 금 {{other_taxfree}}원
 연장근로수당(약정): 금 {{agreed_overtime_allowance}}원
 야간근로수당(약정): 금 {{agreed_night_allowance}}원
+야간당직수당: 금 {{night_duty_allowance}}원
 합계(비과세 포함): 금 {{total_salary}}원
 ② 임금은 매월 1일부터 말일까지 산정하여 익월 {{payday}}일 근로자 명의의 계좌로 지급한다. 지급일이 휴일인 경우에는 전일 또는 익영업일에 지급할 수 있다.
 ③ 중도 입사 또는 중도 퇴사 시 해당 월의 실제 근무일수 또는 회사가 정한 합리적인 기준에 따라 일할 계산하여 지급한다.

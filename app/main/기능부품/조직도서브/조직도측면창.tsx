@@ -80,6 +80,10 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: 'cash-flow', label: '자금흐름', icon: 'banknote' },
     { id: 'depreciation', label: '감가상각', icon: 'analytics' },
     { id: 'purchase-ledger', label: '매입원장', icon: 'clipboard' },
+    { id: 'expense', label: '경비청구', icon: 'purchase' },
+    { id: 'disbursement', label: '지출결의', icon: 'banknote' },
+    { id: 'payroll-link', label: '급여연동', icon: 'transfer' },
+    { id: 'tax-reporting', label: '세무신고', icon: 'landmark' },
   ],
 };
 

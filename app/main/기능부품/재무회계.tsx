@@ -18,7 +18,11 @@ import {
   DollarSign,
   Download,
   Building,
-  CreditCard
+  CreditCard,
+  Landmark,
+  Receipt,
+  Send,
+  ArrowLeftRight
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
@@ -37,6 +41,36 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
   const [cashFlowTab, setCashFlowTab] = useState<'status' | 'forecast' | 'sync'>('status');
   const [depreciationTab, setDepreciationTab] = useState<'status' | 'assets'>('status');
   const [purchaseTab, setPurchaseTab] = useState<'ledger' | 'ap' | 'reconcile'>('ledger');
+  const [expenseTab, setExpenseTab] = useState<'inbox' | 'claims' | 'register'>('inbox');
+  const [disbursementTab, setDisbursementTab] = useState<'list' | 'draft'>('list');
+  const [payrollLinkTab, setPayrollLinkTab] = useState<'sync'>('sync');
+  const [taxReportingTab, setTaxReportingTab] = useState<'dashboard'>('dashboard');
+
+  // --- Dynamic New States ---
+  const [expenses, setExpenses] = useState([
+    { id: 'exp-1', date: '2026-06-20', name: '김철수 (외래간호)', desc: '의료 학회 참석 여비', category: '여비교통비', amount: 120000, state: '대기중' },
+    { id: 'exp-2', date: '2026-06-21', name: '이영희 (행정지원)', desc: '원내 데스크용 필기구 구매', category: '소모품비', amount: 45000, state: '승인완료' },
+    { id: 'exp-3', date: '2026-06-22', name: '박민수 (물리치료)', desc: '치료실 소형 비품 교체', category: '소모품비', amount: 89000, state: '반려' },
+  ]);
+  const [newExpense, setNewExpense] = useState({ desc: '', category: '소모품비', amount: '' });
+
+  const [disbursements, setDisbursements] = useState([
+    { id: 'disb-1', date: '2026-06-25', vendor: '(주)나라메디칼', desc: '의료기기 리스료 납부 건', amount: 3500000, state: '결재완료' },
+    { id: 'disb-2', date: '2026-06-27', vendor: '(주)아산메디텍', desc: '의료 소모품 매입 대금 결제', amount: 1500000, state: '승인대기' },
+    { id: 'disb-3', date: '2026-06-30', vendor: '대성타워 임대인', desc: '7월 원내 임차료 지급 건', amount: 2000000, state: '기안중' },
+  ]);
+  const [newDisb, setNewDisb] = useState({ vendor: '', desc: '', amount: '' });
+
+  const [payrollSyncs, setPayrollSyncs] = useState([
+    { period: '2026년 05월 급여', totalAmount: 48500000, empCount: 15, state: '전송완료', synced_at: '2026-05-25 10:12' },
+    { period: '2026년 06월 급여', totalAmount: 51200000, empCount: 16, state: '대기중', synced_at: '-' },
+  ]);
+
+  const [taxReports, setTaxReports] = useState([
+    { type: '원천세', period: '2026년 06월분', deadline: '2026-07-10', status: '작성중', fileUrl: '#' },
+    { type: '부가세', period: '2026년 1기 확정', deadline: '2026-07-25', status: '대기', fileUrl: '#' },
+    { type: '법인세', period: '2026년 중간예납', deadline: '2026-08-31', status: '대기', fileUrl: '#' },
+  ]);
 
   const [loading, setLoading] = useState(true);
 
@@ -366,6 +400,10 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             {subView === 'cash-flow' && '자금흐름 — 일일 자금 현황 및 자금수지 예측, 은행 연동'}
             {subView === 'depreciation' && '감가상각 — 고정자산 취득 대장 및 월 감가상각 자동 산출'}
             {subView === 'purchase-ledger' && '매입원장 — 거래처별 매입채무 대장 및 세금계산서 대사 검증'}
+            {subView === 'expense' && '경비청구 — 법인카드 및 지출 영수증 청구 및 승인 관리'}
+            {subView === 'disbursement' && '지출결의 — 대금 지급 계획 및 지출결의서 통합 관리'}
+            {subView === 'payroll-link' && '급여연동 — 인사관리 급여대장 승인 데이터 연동 및 전표 자동 발행'}
+            {subView === 'tax-reporting' && '세무신고 — 원천세/부가세 신고 대시보드 및 국세청 변환용 파일 생성'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1128,6 +1166,321 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             )}
           </div>
         )}
+
+        {/* 7. 경비청구 (expense) */}
+        {subView === 'expense' && (
+              <div className="space-y-5">
+                <div className="flex gap-1.5 p-1 border border-[var(--border)] bg-[var(--card)] rounded-xl w-fit">
+                  <button onClick={() => setExpenseTab('inbox')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${expenseTab === 'inbox' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>청구 검토 보관함</button>
+                  <button onClick={() => setExpenseTab('claims')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${expenseTab === 'claims' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>나의 청구 내역</button>
+                  <button onClick={() => setExpenseTab('register')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${expenseTab === 'register' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>영수증 등록</button>
+                </div>
+
+                {expenseTab === 'inbox' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                    <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-[var(--foreground)]">지출결의/경비청구 승인 대기 목록</h3>
+                      <span className="text-xs text-[var(--toss-gray-3)] font-bold">총 {expenses.filter(e => e.state === '대기중').length}건 검토 필요</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                            <th className="p-3">일자</th>
+                            <th className="p-3">청구자</th>
+                            <th className="p-3">내역</th>
+                            <th className="p-3">계정과목</th>
+                            <th className="p-3 text-right">금액</th>
+                            <th className="p-3 text-center">승인처리</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
+                          {expenses.map(exp => (
+                            <tr key={exp.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                              <td className="p-3 text-[var(--toss-gray-4)]">{exp.date}</td>
+                              <td className="p-3 text-[var(--foreground)]">{exp.name}</td>
+                              <td className="p-3 text-[var(--foreground)]">{exp.desc}</td>
+                              <td className="p-3 text-[var(--toss-gray-4)]">{exp.category}</td>
+                              <td className="p-3 text-right font-black tabular-nums">{exp.amount.toLocaleString()}원</td>
+                              <td className="p-3 text-center">
+                                {exp.state === '대기중' ? (
+                                  <div className="flex justify-center gap-1.5">
+                                    <button onClick={() => {
+                                      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '승인완료' } : e));
+                                      toast('경비 청구가 승인되었습니다.', 'success');
+                                    }} className="px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100 transition-all">승인</button>
+                                    <button onClick={() => {
+                                      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '반려' } : e));
+                                      toast('경비 청구가 반려되었습니다.', 'error');
+                                    }} className="px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold hover:bg-red-100 transition-all">반려</button>
+                                  </div>
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${exp.state === '승인완료' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-red-50 text-red-600 dark:bg-red-950/40'}`}>{exp.state}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {expenseTab === 'claims' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">내 법인카드 / 지출 청구 내역</h3>
+                    <div className="space-y-3">
+                      {expenses.slice(1).map(exp => (
+                        <div key={exp.id} className="flex justify-between items-center p-3 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)]">{exp.category}</span>
+                            <h4 className="text-xs font-black text-[var(--foreground)]">{exp.desc}</h4>
+                            <p className="text-[10px] text-[var(--toss-gray-3)] font-mono">{exp.date} | 법인 신한 1234</p>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <span className="inline-block text-xs font-black text-[var(--foreground)]">{exp.amount.toLocaleString()}원</span>
+                            <p className={`text-[10px] font-bold ${exp.state === '승인완료' ? 'text-emerald-500' : 'text-red-400'}`}>{exp.state}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {expenseTab === 'register' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm max-w-md mx-auto space-y-4">
+                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                      <Receipt size={16} className="text-[var(--accent)]" />
+                      <span>신규 경비 청구 등록 (영수증 제출)</span>
+                    </h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newExpense.desc || !newExpense.amount) return;
+                      const val = parseInt(newExpense.amount);
+                      setExpenses(prev => [
+                        ...prev,
+                        { id: 'exp-' + (prev.length + 1), date: new Date().toISOString().split('T')[0], name: user?.name || '기안자', desc: newExpense.desc, category: newExpense.category, amount: val, state: '대기중' }
+                      ]);
+                      setNewExpense({ desc: '', category: '소모품비', amount: '' });
+                      toast('영수증 및 지출 정보가 등록되었습니다.', 'success');
+                    }} className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">내용 / 적요</label>
+                        <input type="text" value={newExpense.desc} onChange={e => setNewExpense({ ...newExpense, desc: e.target.value })} placeholder="예: 회의용 음료수 구매" className="w-full px-3 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:border-[var(--accent)] text-[var(--foreground)]" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">계정과목</label>
+                          <select value={newExpense.category} onChange={e => setNewExpense({ ...newExpense, category: e.target.value })} className="w-full px-2 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none text-[var(--foreground)]">
+                            <option value="소모품비">소모품비</option>
+                            <option value="복리후생비">복리후생비</option>
+                            <option value="여비교통비">여비교통비</option>
+                            <option value="도서인쇄비">도서인쇄비</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">금액 (원)</label>
+                          <input type="number" value={newExpense.amount} onChange={e => setNewExpense({ ...newExpense, amount: e.target.value })} placeholder="원 단위 숫자로만" className="w-full px-3 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:border-[var(--accent)] text-[var(--foreground)]" />
+                        </div>
+                      </div>
+                      <div className="border-2 border-dashed border-[var(--border)] rounded-xl p-6 text-center cursor-pointer hover:bg-[var(--muted)]/30 transition-colors">
+                        <span className="text-xs text-[var(--toss-gray-3)] font-bold">📸 사진 또는 영수증 PDF 파일 업로드 (여기를 클릭)</span>
+                      </div>
+                      <button type="submit" className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white font-bold text-xs hover:bg-[var(--accent-hover)] transition-all active:scale-[0.98]">
+                        결의 요청 제출
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 8. 지출결의 (disbursement) */}
+            {subView === 'disbursement' && (
+              <div className="space-y-5">
+                <div className="flex gap-1.5 p-1 border border-[var(--border)] bg-[var(--card)] rounded-xl w-fit">
+                  <button onClick={() => setDisbursementTab('list')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${disbursementTab === 'list' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>지출결의서 대장</button>
+                  <button onClick={() => setDisbursementTab('draft')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${disbursementTab === 'draft' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>결의서 기안 작성</button>
+                </div>
+
+                {disbursementTab === 'list' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                    <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-[var(--foreground)]">지출 결의 내역 현황</h3>
+                      <button onClick={() => toast('이체 파일 생성 대기중...', 'info')} className="px-2.5 py-1.5 rounded bg-[var(--accent)] text-white text-[10px] font-bold hover:bg-[var(--accent-hover)] transition-all">은행 이체 텍스트 파일(CMS) 생성</button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                            <th className="p-3">지출예정일</th>
+                            <th className="p-3">지급처 (거래처)</th>
+                            <th className="p-3">지급 내용</th>
+                            <th className="p-3 text-right">금액</th>
+                            <th className="p-3 text-center">진행상태</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
+                          {disbursements.map(disb => (
+                            <tr key={disb.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                              <td className="p-3 text-[var(--toss-gray-4)]">{disb.date}</td>
+                              <td className="p-3 text-[var(--foreground)] font-bold">{disb.vendor}</td>
+                              <td className="p-3 text-[var(--foreground)]">{disb.desc}</td>
+                              <td className="p-3 text-right font-black tabular-nums text-red-500">{disb.amount.toLocaleString()}원</td>
+                              <td className="p-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${disb.state === '결재완료' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : disb.state === '승인대기' ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40' : 'bg-gray-100 text-gray-700 dark:bg-gray-800'}`}>{disb.state}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {disbursementTab === 'draft' && (
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm max-w-md mx-auto space-y-4">
+                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                      <Send size={16} className="text-[var(--accent)]" />
+                      <span>신규 지출결의서 작성</span>
+                    </h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newDisb.vendor || !newDisb.desc || !newDisb.amount) return;
+                      const val = parseInt(newDisb.amount);
+                      setDisbursements(prev => [
+                        ...prev,
+                        { id: 'disb-' + (prev.length + 1), date: new Date().toISOString().split('T')[0], vendor: newDisb.vendor, desc: newDisb.desc, amount: val, state: '기안중' }
+                      ]);
+                      setNewDisb({ vendor: '', desc: '', amount: '' });
+                      toast('지출결의서 기안이 임시저장되었습니다.', 'success');
+                    }} className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">지급처 (거래처명)</label>
+                        <input type="text" value={newDisb.vendor} onChange={e => setNewDisb({ ...newDisb, vendor: e.target.value })} placeholder="예: (주)나라메디칼" className="w-full px-3 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:border-[var(--accent)] text-[var(--foreground)]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">지출 내용 요약</label>
+                        <input type="text" value={newDisb.desc} onChange={e => setNewDisb({ ...newDisb, desc: e.target.value })} placeholder="예: 6월 의료 소모품 결제" className="w-full px-3 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:border-[var(--accent)] text-[var(--foreground)]" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">지급 금액 (원)</label>
+                        <input type="number" value={newDisb.amount} onChange={e => setNewDisb({ ...newDisb, amount: e.target.value })} placeholder="지급액" className="w-full px-3 py-2 text-xs border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:border-[var(--accent)] text-[var(--foreground)]" />
+                      </div>
+                      <button type="submit" className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white font-bold text-xs hover:bg-[var(--accent-hover)] transition-all active:scale-[0.98]">
+                        결의서 기안 올리기
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 9. 급여연동 (payroll-link) */}
+            {subView === 'payroll-link' && (
+              <div className="space-y-5">
+                <div className="flex gap-1.5 p-1 border border-[var(--border)] bg-[var(--card)] rounded-xl w-fit">
+                  <button onClick={() => setPayrollLinkTab('sync')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${payrollLinkTab === 'sync' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>급여 회계 전송</button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">인사 급여대장 연동 목록</h3>
+                    <div className="space-y-3">
+                      {payrollSyncs.map((sync, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-3.5 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-black text-[var(--foreground)]">{sync.period}</h4>
+                            <p className="text-[10px] text-[var(--toss-gray-4)] font-semibold">대상 직원 {sync.empCount}명 | 총 급여 {sync.totalAmount.toLocaleString()}원</p>
+                            {sync.state === '전송완료' && <p className="text-[9px] text-[var(--toss-gray-3)] font-mono">전송 시각: {sync.synced_at}</p>}
+                          </div>
+                          <div>
+                            {sync.state === '대기중' ? (
+                              <button onClick={() => {
+                                setPayrollSyncs(prev => prev.map(p => p.period === sync.period ? { ...p, state: '전송완료', synced_at: new Date().toISOString().replace('T', ' ').substring(0, 16) } : p));
+                                // Auto insert into journal entries
+                                const salaryRow = { id: 'sal-' + Date.now(), date: new Date().toISOString().split('T')[0], desc: `${sync.period} 회계 처리`, debitAcc: '급여', creditAcc: '보통예금', amount: sync.totalAmount };
+                                setJournalEntries(prev => [salaryRow, ...prev]);
+                                toast('급여 전표 분개가 성공적으로 자동 발행되었습니다.', 'success');
+                              }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-hover)] transition-all">
+                                <ArrowLeftRight size={12} />
+                                <span>회계 전표 전송</span>
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black">전송완료</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                      <Info size={15} className="text-blue-500" />
+                      <span>급여 전표 자동분개 템플릿</span>
+                    </h3>
+                    <p className="text-xs text-[var(--toss-gray-4)] leading-relaxed">
+                      인사 승인 완료 시 아래 규칙에 따라 회계 분개장이 자동 작성됩니다.
+                    </p>
+                    <div className="p-3 border border-[var(--border)] rounded-xl bg-[var(--muted)]/20 font-mono text-[10px] text-[var(--foreground)] space-y-1.5">
+                      <div className="text-emerald-600 font-bold">차변: (비용) 급여 / 제수당</div>
+                      <div className="text-blue-600 font-bold">대변: (자산) 보통예금 (지급액)</div>
+                      <div className="text-blue-600 font-bold">대변: (부채) 예수금 (4대보험/원천세)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 10. 세무신고 (tax-reporting) */}
+            {subView === 'tax-reporting' && (
+              <div className="space-y-5">
+                <div className="flex gap-1.5 p-1 border border-[var(--border)] bg-[var(--card)] rounded-xl w-fit">
+                  <button onClick={() => setTaxReportingTab('dashboard')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${taxReportingTab === 'dashboard' ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'}`}>세무 통합 대시보드</button>
+                </div>
+
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+                  <div className="p-4 border-b border-[var(--border)]">
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">국세청 전자세무 신고 현황</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] bg-[var(--muted)]/50 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                          <th className="p-3">세목</th>
+                          <th className="p-3">신고 대상 기간</th>
+                          <th className="p-3">납부/신고 기한</th>
+                          <th className="p-3">진행 상태</th>
+                          <th className="p-3 text-center">홈택스 변환용 전자 파일</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
+                        {taxReports.map((report, idx) => (
+                          <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
+                            <td className="p-3 text-[var(--foreground)] font-bold">{report.type}</td>
+                            <td className="p-3 text-[var(--foreground)]">{report.period}</td>
+                            <td className="p-3 text-red-500 font-bold">{report.deadline}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${report.status === '완료' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{report.status}</span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <button onClick={() => {
+                                setTaxReports(prev => prev.map((r, i) => i === idx ? { ...r, status: '완료' } : r));
+                                toast(`${report.type} 홈택스 파일(.txt)이 다운로드 되었습니다.`, 'success');
+                              }} className="flex mx-auto items-center gap-1 px-2.5 py-1 rounded bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] hover:bg-[var(--border)] text-[10px] font-bold transition-all">
+                                <Download size={11} />
+                                <span>파일 생성 (.txt)</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
       </div>
     </div>

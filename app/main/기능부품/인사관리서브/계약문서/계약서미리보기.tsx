@@ -246,17 +246,34 @@ export default function ContractPreview({
       const num = Number(raw);
       return Number.isFinite(num) ? num : 0;
     };
+    // Resolve salary field: use contract value if positive, else staff value
+    const resolve = (field: string, ...altFields: string[]) => {
+      let val = parseAmount(src[field]);
+      if (val > 0) return val;
+      for (const alt of altFields) {
+        val = parseAmount(src[alt]);
+        if (val > 0) return val;
+      }
+      val = parseAmount(staff?.[field]);
+      if (val > 0) return val;
+      for (const alt of altFields) {
+        val = parseAmount(staff?.[alt]);
+        if (val > 0) return val;
+      }
+      return 0;
+    };
 
     const items = [
-      { label: '기본급', amount: parseAmount(src.base_salary || staff?.base_salary), note: '월 고정 지급', taxable: true },
-      { label: '직책수당', amount: parseAmount(src.position_allowance || staff?.position_allowance), note: '직책별 차등', taxable: true },
-      { label: '식대', amount: parseAmount(src.meal_allowance || staff?.meal_allowance), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '자가운전보조금', amount: parseAmount(src.vehicle_allowance || staff?.vehicle_allowance), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '보육수당', amount: parseAmount(src.childcare_allowance || staff?.childcare_allowance), note: '비과세', taxable: false },
-      { label: '연구활동비', amount: parseAmount(src.research_allowance || staff?.research_allowance), note: '비과세 (월 20만 한도)', taxable: false },
-      { label: '기타 비과세', amount: parseAmount(src.other_taxfree || staff?.other_taxfree), note: '비과세', taxable: false },
-      { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || staff?.overtime_allowance), note: '포괄산정 연장수당', taxable: true },
-      { label: '야간근로수당(약정)', amount: parseAmount(src.agreed_night_allowance || staff?.agreed_night_allowance || staff?.night_work_allowance || staff?.night_duty_allowance), note: '포괄산정 야간수당', taxable: true },
+      { label: '기본급', amount: resolve('base_salary'), note: '월 고정 지급', taxable: true },
+      { label: '직책수당', amount: resolve('position_allowance'), note: '직책별 차등', taxable: true },
+      { label: '식대', amount: resolve('meal_allowance'), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '자가운전보조금', amount: resolve('vehicle_allowance'), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '보육수당', amount: resolve('childcare_allowance'), note: '비과세', taxable: false },
+      { label: '연구활동비', amount: resolve('research_allowance'), note: '비과세 (월 20만 한도)', taxable: false },
+      { label: '기타 비과세', amount: resolve('other_taxfree'), note: '비과세', taxable: false },
+      { label: '연장근로수당(약정)', amount: resolve('agreed_overtime_allowance', 'overtime_allowance'), note: '포괄산정 연장수당', taxable: true },
+      { label: '야간근로수당(약정)', amount: resolve('agreed_night_allowance'), note: '포괄산정 야간수당', taxable: true },
+      { label: '야간당직수당', amount: resolve('night_duty_allowance'), note: '비과세', taxable: false },
     ].filter(item => item.amount > 0);
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
@@ -327,7 +344,7 @@ export default function ContractPreview({
 
       // 급여 raw 데이터 행 스킵
       if (skipSalaryLines) {
-        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|기타\s*비과세|자가운전|보육|연구|연장근로수당|야간근로수당|합계|────)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
+        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|기타\s*비과세|자가운전|보육|연구|연장근로수당|야간근로수당|야간당직수당|합계|────)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
           continue;
         }
         if (/^[1-9]\./.test(trimmed) || /^[①-⑩가-하]/.test(trimmed) || trimmed.startsWith('제')) {

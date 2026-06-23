@@ -145,6 +145,19 @@ export const STAFF_META_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'staff_meta_extension', label: '내선번호 사용' },
 ];
 
+export const FINANCE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
+  { key: 'finance_복식부기', label: '복식부기', hint: '전표 분개장, 계정과목, 시산표 정밀 관리' },
+  { key: 'finance_부가세', label: '부가세', hint: '세금계산서 조회, 부가세 모의 계산, 세무 일정' },
+  { key: 'finance_결산', label: '결산', hint: '월차/연차 결산 작업 및 재무 보고서' },
+  { key: 'finance_자금흐름', label: '자금흐름', hint: '일일 자금 현황, 자금 수지 예측, 금융 연동' },
+  { key: 'finance_감가상각', label: '감가상각', hint: '고정자산 취득 대장 및 월 감가상각 자동 산출' },
+  { key: 'finance_매입원장', label: '매입원장', hint: '거래처별 매입채무 대장 및 세금계산서 대사 검증' },
+  { key: 'finance_경비청구', label: '경비청구', hint: '영수증 제출/조회 및 법인카드 지출 승인' },
+  { key: 'finance_지출결의', label: '지출결의', hint: '자금 집행 지출결의서 등록 및 기안 관리' },
+  { key: 'finance_급여연동', label: '급여연동', hint: 'HR 급여대장 연동 회계전표 자동 발행' },
+  { key: 'finance_세무신고', label: '세무신고', hint: '원천세/부가세 신고자료 추출 및 홈택스 파일 생성' },
+];
+
 export const FEATURE_PERMISSION_GROUPS: FeaturePermissionGroup[] = [
   {
     id: 'main-menu',
@@ -193,6 +206,12 @@ export const FEATURE_PERMISSION_GROUPS: FeaturePermissionGroup[] = [
     label: '재고관리 세부 권한',
     description: '재고관리 안에서 접근할 수 있는 업무 메뉴입니다.',
     items: INVENTORY_PERMISSION_ITEMS,
+  },
+  {
+    id: 'finance',
+    label: '재무회계 세부 권한',
+    description: '재무회계 메뉴 안에서 접근할 수 있는 세부 업무 메뉴입니다.',
+    items: FINANCE_PERMISSION_ITEMS,
   },
   {
     id: 'admin',

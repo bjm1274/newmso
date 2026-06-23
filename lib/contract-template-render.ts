@@ -282,26 +282,30 @@ export function fillEmploymentContractTemplate(
   const safeContract = contract ?? {};
   const safeCompany = company ?? {};
   const salarySource = contract || user || {};
-  const getSalaryAmount = (fieldName: string) => {
-    let val = toMoneyNumber(salarySource[fieldName]);
-    if (val === 0) {
-      if (fieldName === 'agreed_overtime_allowance') {
-        val = toMoneyNumber(salarySource['overtime_allowance']);
-      } else if (fieldName === 'agreed_night_allowance') {
-        val = toMoneyNumber(salarySource['night_work_allowance']) || toMoneyNumber(salarySource['night_duty_allowance']);
-      }
-    }
-    if (val > 0) return val;
 
-    let userVal = toMoneyNumber(safeUser[fieldName]);
-    if (userVal === 0) {
-      if (fieldName === 'agreed_overtime_allowance') {
-        userVal = toMoneyNumber(safeUser['overtime_allowance']);
-      } else if (fieldName === 'agreed_night_allowance') {
-        userVal = toMoneyNumber(safeUser['night_work_allowance']) || toMoneyNumber(safeUser['night_duty_allowance']);
+  // Resolve a salary field by checking both contract and user, preferring
+  // whichever has a positive value. Contract overrides user when both > 0.
+  const getSalaryAmount = (fieldName: string) => {
+    const alternates: Record<string, string[]> = {
+      agreed_overtime_allowance: ['overtime_allowance'],
+      agreed_night_allowance: ['night_work_allowance', 'night_duty_allowance'],
+    };
+    const tryResolve = (source: Record<string, unknown>) => {
+      let val = toMoneyNumber(source[fieldName]);
+      if (val === 0 && alternates[fieldName]) {
+        for (const alt of alternates[fieldName]) {
+          val = toMoneyNumber(source[alt]);
+          if (val > 0) break;
+        }
       }
-    }
-    return userVal;
+      return val;
+    };
+
+    const contractVal = tryResolve(safeContract);
+    const userVal = tryResolve(safeUser);
+
+    // Use contract value if positive, otherwise fall back to user value
+    return contractVal > 0 ? contractVal : userVal;
   };
   const allowanceValues: Record<string, number> = {
     '{{position_allowance}}': getSalaryAmount('position_allowance'),
@@ -312,14 +316,15 @@ export function fillEmploymentContractTemplate(
     '{{other_taxfree}}': getSalaryAmount('other_taxfree'),
     '{{agreed_overtime_allowance}}': getSalaryAmount('agreed_overtime_allowance'),
     '{{agreed_night_allowance}}': getSalaryAmount('agreed_night_allowance'),
+    '{{night_duty_allowance}}': getSalaryAmount('night_duty_allowance'),
   };
 
   const weeklyWorkHours = resolveWeeklyWorkingHours(
-    salarySource,
+    safeContract,
     resolveWeeklyWorkingHours(safeUser, 40),
   );
   const workingDaysPerWeek = resolveWorkingDaysPerWeek(
-    salarySource,
+    safeContract,
     resolveWorkingDaysPerWeek(safeUser, 5),
   );
   const shiftVars = buildShiftContractVariables(shift, safeContract, safeUser);
@@ -334,6 +339,7 @@ export function fillEmploymentContractTemplate(
     getSalaryAmount('other_taxfree'),
     getSalaryAmount('agreed_overtime_allowance'),
     getSalaryAmount('agreed_night_allowance'),
+    getSalaryAmount('night_duty_allowance'),
   ];
   const totalMonthlyWage = salaryItems.reduce((sum, amount) => sum + amount, 0);
   const monthlyWorkHours = getMonthlyWorkingHours(weeklyWorkHours);
@@ -410,6 +416,7 @@ export function fillEmploymentContractTemplate(
     other_taxfree: formatWon(getSalaryAmount('other_taxfree')),
     agreed_overtime_allowance: formatWon(getSalaryAmount('agreed_overtime_allowance')),
     agreed_night_allowance: formatWon(getSalaryAmount('agreed_night_allowance')),
+    night_duty_allowance: formatWon(getSalaryAmount('night_duty_allowance')),
     total_monthly: formatWon(totalMonthlyWage),
     total_salary: formatWon(totalMonthlyWage),
     annual_salary: formatWon(totalMonthlyWage * 12),
