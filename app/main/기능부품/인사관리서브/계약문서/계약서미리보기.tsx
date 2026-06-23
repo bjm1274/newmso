@@ -257,7 +257,7 @@ export default function ContractPreview({
       { label: '기타 비과세', amount: parseAmount(src.other_taxfree || staff?.other_taxfree), note: '비과세', taxable: false },
       { label: '연장근로수당(약정)', amount: parseAmount(src.agreed_overtime_allowance || staff?.agreed_overtime_allowance || staff?.overtime_allowance), note: '포괄산정 연장수당', taxable: true },
       { label: '야간근로수당(약정)', amount: parseAmount(src.agreed_night_allowance || staff?.agreed_night_allowance || staff?.night_work_allowance || staff?.night_duty_allowance), note: '포괄산정 야간수당', taxable: true },
-    ].filter(item => item.amount > 0);
+    ];
 
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
     const taxableTotal = items.filter(i => i.taxable).reduce((sum, i) => sum + i.amount, 0);
@@ -327,7 +327,7 @@ export default function ContractPreview({
 
       // 급여 raw 데이터 행 스킵
       if (skipSalaryLines) {
-        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|────|자가운전|보육|연구)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
+        if (/^(구\s*성\s*항\s*목|기본급|식대|직책수당|기타수당|기타\s*비과세|자가운전|보육|연구|연장근로수당|야간근로수당|합계|────)/.test(trimmed) || /금\s*액.*산\s*정/.test(trimmed)) {
           continue;
         }
         if (/^[1-9]\./.test(trimmed) || /^[①-⑩가-하]/.test(trimmed) || trimmed.startsWith('제')) {

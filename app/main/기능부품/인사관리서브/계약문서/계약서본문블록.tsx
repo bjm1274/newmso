@@ -192,7 +192,7 @@ export default function ContractBodyBlock({
                                         </div>
                                     );
                                 }
-                                if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
+                                if (/^(기본급|식대|직책수당|자가운전보조금|보육수당|연구활동비|기타수당|기타\s*비과세|연장근로수당|야간근로수당|합계)/.test(t)) {
                                     const parts = t.split(/\s{2,}/);
                                     return (
                                         <div
