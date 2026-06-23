@@ -405,13 +405,23 @@ export default function SalaryDetail({
     },
     {
       label: '연장수당',
-      value: taxableAllowanceBreakdown.overtime_allowance,
+      value: taxableAllowanceBreakdown.overtime_allowance - resolvedAgreedOvertime,
       note: '고정 또는 포괄 연장수당',
     },
     {
+      label: '약정연장수당',
+      value: resolvedAgreedOvertime,
+      note: '약정 연장수당',
+    },
+    {
       label: '야간근로수당',
-      value: taxableAllowanceBreakdown.night_work_allowance,
+      value: taxableAllowanceBreakdown.night_work_allowance - resolvedAgreedNight,
       note: '고정 야간근로 과세수당',
+    },
+    {
+      label: '약정야간수당',
+      value: resolvedAgreedNight,
+      note: '약정 야간수당',
     },
     {
       label: '휴일근로수당',
@@ -471,7 +481,7 @@ export default function SalaryDetail({
       value: toNumber(data.other_taxfree),
       note: '기타 비과세 수당',
     },
-  ].filter((row) => row.value > 0);
+  ];
 
   const deductionRows = [
     { label: '국민연금', value: calc.pension },

@@ -28,6 +28,13 @@ type StaffInfo = {
   working_hours_per_week?: number;
   shift_type?: string;
   isAlternateDayShift?: boolean;
+  agreed_overtime_allowance?: number;
+  agreed_night_allowance?: number;
+  overtime_allowance?: number;
+  night_work_allowance?: number;
+  position_allowance?: number;
+  holiday_work_allowance?: number;
+  annual_leave_pay?: number;
 };
 
 type SalaryRecord = {
@@ -53,6 +60,7 @@ type SalaryRecord = {
   local_tax?: number;
   net_pay?: number;
   advance_pay?: number;
+  deduction_detail?: Record<string, unknown> | string;
 };
 
 type MobileSalarySlipProps = {
@@ -73,22 +81,7 @@ function formatYearMonthLabel(yearMonth: string): string {
   return `${year}년 ${Number(month)}월`;
 }
 
-type AmountRow = { label: string; value: number };
-
-function buildPaymentRows(record: SalaryRecord): AmountRow[] {
-  return [
-    { label: '기본급', value: Number(record.base_salary || 0) },
-    { label: '연장근로수당', value: Number(record.overtime_pay || 0) },
-    { label: '식대', value: Number(record.meal_allowance || 0) },
-    { label: '야간당직수당', value: Number(record.night_duty_allowance || 0) },
-    { label: '차량유지비', value: Number(record.vehicle_allowance || 0) },
-    { label: '보육수당', value: Number(record.childcare_allowance || 0) },
-    { label: '연구수당', value: Number(record.research_allowance || 0) },
-    { label: '기타 비과세', value: Number(record.other_taxfree || 0) },
-    { label: '기타수당', value: Number(record.extra_allowance || 0) },
-    { label: '상여금', value: Number(record.bonus || 0) },
-  ].filter((row) => row.value > 0);
-}
+type AmountRow = { label: string; value: number; isTaxFree?: boolean };
 
 function buildDeductionRows(record: SalaryRecord): AmountRow[] {
   return [
@@ -109,12 +102,100 @@ export default function MobileSalarySlip({
   selectedYearMonth,
   onSelectMonth,
 }: MobileSalarySlipProps) {
-  const paymentRows = useMemo(() => (record ? buildPaymentRows(record) : []), [record]);
+  const deductionDetail = useMemo(() => {
+    if (!record?.deduction_detail) return {};
+    if (typeof record.deduction_detail === 'object') return record.deduction_detail;
+    try {
+      return JSON.parse(record.deduction_detail);
+    } catch {
+      return {};
+    }
+  }, [record?.deduction_detail]);
+
+  const taxableAllowanceBreakdown = useMemo(() => {
+    const savedBreakdown =
+      deductionDetail.taxable_allowance_breakdown &&
+      typeof deductionDetail.taxable_allowance_breakdown === 'object'
+        ? (deductionDetail.taxable_allowance_breakdown as Record<string, unknown>)
+        : null;
+
+    const source = savedBreakdown || {
+      position_allowance: staff?.position_allowance || 0,
+      overtime_allowance: staff?.overtime_allowance || 0,
+      night_work_allowance: staff?.night_work_allowance || 0,
+      holiday_work_allowance: staff?.holiday_work_allowance || 0,
+      annual_leave_pay: staff?.annual_leave_pay || 0,
+      manual_extra_allowance: 0,
+    };
+    return {
+      position_allowance: Number(source.position_allowance || 0),
+      overtime_allowance: Number(source.overtime_allowance || 0),
+      night_work_allowance: Number(source.night_work_allowance || 0),
+      holiday_work_allowance: Number(source.holiday_work_allowance || 0),
+      annual_leave_pay: Number(source.annual_leave_pay || 0),
+      manual_extra_allowance: Number(source.manual_extra_allowance || 0),
+    };
+  }, [deductionDetail, staff]);
+
+  const resolvedAgreedOvertime = useMemo(() => {
+    const masterAgreedOvertime = Number(staff?.agreed_overtime_allowance || 0);
+    const masterTotalOvertime = Number(staff?.overtime_allowance || 0) + masterAgreedOvertime;
+    const resolvedOvertime = Number(taxableAllowanceBreakdown.overtime_allowance || 0);
+    return masterTotalOvertime > 0
+      ? Math.round((resolvedOvertime * masterAgreedOvertime) / masterTotalOvertime)
+      : masterAgreedOvertime;
+  }, [staff, taxableAllowanceBreakdown]);
+
+  const resolvedAgreedNight = useMemo(() => {
+    const masterAgreedNight = Number(staff?.agreed_night_allowance || 0);
+    const masterTotalNight = Number(staff?.night_work_allowance || 0) + masterAgreedNight;
+    const resolvedNight = Number(taxableAllowanceBreakdown.night_work_allowance || 0);
+    return masterTotalNight > 0
+      ? Math.round((resolvedNight * masterAgreedNight) / masterTotalNight)
+      : masterAgreedNight;
+  }, [staff, taxableAllowanceBreakdown]);
+
+  const paymentRows = useMemo(() => {
+    if (!record) return [];
+    const fixedTaxableAllowanceTotal =
+      Number(taxableAllowanceBreakdown.position_allowance || 0) +
+      Number(taxableAllowanceBreakdown.overtime_allowance || 0) +
+      Number(taxableAllowanceBreakdown.night_work_allowance || 0) +
+      Number(taxableAllowanceBreakdown.holiday_work_allowance || 0) +
+      Number(taxableAllowanceBreakdown.annual_leave_pay || 0);
+    
+    const remainingExtraAllowance = Math.max(0, Number(record.extra_allowance || 0) - fixedTaxableAllowanceTotal);
+    const manualExtra = Number(taxableAllowanceBreakdown.manual_extra_allowance || 0) + remainingExtraAllowance;
+
+    const rows = [
+      { label: '기본급', value: Number(record.base_salary || 0) },
+      { label: '직책수당', value: Number(taxableAllowanceBreakdown.position_allowance || 0) },
+      { label: '연장수당', value: Number(taxableAllowanceBreakdown.overtime_allowance || 0) - resolvedAgreedOvertime },
+      { label: '약정연장수당', value: resolvedAgreedOvertime },
+      { label: '야간근로수당', value: Number(taxableAllowanceBreakdown.night_work_allowance || 0) - resolvedAgreedNight },
+      { label: '약정야간수당', value: resolvedAgreedNight },
+      { label: '휴일근로수당', value: Number(taxableAllowanceBreakdown.holiday_work_allowance || 0) },
+      { label: '연차휴가수당', value: Number(taxableAllowanceBreakdown.annual_leave_pay || 0) },
+      { label: '추가 연장근로수당', value: Number(record.overtime_pay || 0) },
+      { label: '식대', value: Number(record.meal_allowance || 0), isTaxFree: true },
+      { label: '야간당직수당', value: Number(record.night_duty_allowance || 0), isTaxFree: true },
+      { label: '차량유지비', value: Number(record.vehicle_allowance || 0), isTaxFree: true },
+      { label: '보육수당', value: Number(record.childcare_allowance || 0), isTaxFree: true },
+      { label: '연구수당', value: Number(record.research_allowance || 0), isTaxFree: true },
+      { label: '기타 비과세', value: Number(record.other_taxfree || 0), isTaxFree: true },
+      { label: '기타 과세수당', value: manualExtra },
+      { label: '상여금', value: Number(record.bonus || 0) },
+    ];
+
+    // Filter payments by value > 0, EXCEPT non-taxable items which are always shown (value >= 0)!
+    return rows.filter((row) => row.isTaxFree || row.value > 0);
+  }, [record, taxableAllowanceBreakdown, resolvedAgreedOvertime, resolvedAgreedNight]);
+
   const deductionRows = useMemo(() => (record ? buildDeductionRows(record) : []), [record]);
-  const totalPayment = useMemo(
-    () => paymentRows.reduce((acc, row) => acc + row.value, 0),
-    [paymentRows],
-  );
+  const totalPayment = useMemo(() => {
+    // Sum only taxable and non-taxable values that are > 0
+    return paymentRows.reduce((acc, row) => acc + row.value, 0);
+  }, [paymentRows]);
   const totalDeduction = useMemo(
     () => deductionRows.reduce((acc, row) => acc + row.value, 0),
     [deductionRows],

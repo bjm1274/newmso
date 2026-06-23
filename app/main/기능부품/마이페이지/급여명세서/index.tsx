@@ -318,6 +318,13 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
             working_hours_per_week: typeof mobileStaff.working_hours_per_week === 'number' ? mobileStaff.working_hours_per_week : undefined,
             shift_type: typeof mobileStaff.shift_type === 'string' ? mobileStaff.shift_type : undefined,
             isAlternateDayShift: typeof mobileStaff.isAlternateDayShift === 'boolean' ? mobileStaff.isAlternateDayShift : undefined,
+            agreed_overtime_allowance: typeof mobileStaff.agreed_overtime_allowance === 'number' ? mobileStaff.agreed_overtime_allowance : undefined,
+            agreed_night_allowance: typeof mobileStaff.agreed_night_allowance === 'number' ? mobileStaff.agreed_night_allowance : undefined,
+            overtime_allowance: typeof mobileStaff.overtime_allowance === 'number' ? mobileStaff.overtime_allowance : undefined,
+            night_work_allowance: typeof mobileStaff.night_work_allowance === 'number' ? mobileStaff.night_work_allowance : undefined,
+            position_allowance: typeof mobileStaff.position_allowance === 'number' ? mobileStaff.position_allowance : undefined,
+            holiday_work_allowance: typeof mobileStaff.holiday_work_allowance === 'number' ? mobileStaff.holiday_work_allowance : undefined,
+            annual_leave_pay: typeof mobileStaff.annual_leave_pay === 'number' ? mobileStaff.annual_leave_pay : undefined,
           }}
           record={salaryData}
           availableMonths={availableMonths}
