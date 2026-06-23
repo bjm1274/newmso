@@ -11,6 +11,8 @@ const STAFF_ALLOWANCE_KEYS = [
   'night_work_allowance',
   'holiday_work_allowance',
   'annual_leave_pay',
+  'agreed_overtime_allowance',
+  'agreed_night_allowance',
 ] as const;
 
 function getR2PublicBase(): string | null {

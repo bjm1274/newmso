@@ -132,24 +132,26 @@ export default function ContractBodyBlock({
                                     }
 
                                     return (
-                                        <div key={li} className="shift-card-container my-1.5 flex flex-wrap gap-1 pb-0.5 custom-scrollbar print:my-0.5 print:gap-0.5 print:pb-0">
+                                        <div key={li} className="shift-card-container my-2 flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar print:my-1 print:gap-1 print:pb-0">
                                             {cards.map((card, idx) => (
-                                                <div key={idx} className="shift-card w-[60px] bg-[#f8faff] border border-[#dbeafe] rounded-md p-1 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 flex flex-col justify-between shrink-0 text-center">
-                                                    <div className="mb-0.5">
-                                                        <span className="inline-block px-1 py-px bg-[#2563eb] text-white font-extrabold text-[7px] tracking-tight rounded-sm print:bg-slate-500 print:text-white print:border print:border-slate-600 leading-none">
-                                                            {card.label === '근무시간' ? '기본' : card.label}
+                                                <div key={idx} className="shift-card flex-1 min-w-[90px] max-w-[130px] bg-[#f8faff] border border-[#dbeafe] rounded-lg p-1.5 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 print:p-1 flex flex-col justify-between shrink-0">
+                                                    <div className="text-center mb-1">
+                                                        <span className="inline-block px-1.5 py-0.5 bg-[#2563eb] text-white font-extrabold text-[8px] tracking-wider rounded-full print:bg-slate-500 print:text-white print:border print:border-slate-600">
+                                                            {card.label === '근무시간' ? '기본 근무' : `${card.label} 근무`}
                                                         </span>
                                                     </div>
-                                                    <div className="text-slate-800 font-black text-[8px] tracking-tighter print:text-black leading-none my-0.5 whitespace-nowrap">
-                                                        {card.start || '-'}~{card.end || '-'}
+                                                    <div className="flex items-center justify-center gap-1 text-slate-800 font-black text-[10px] mb-1 tracking-tight print:text-black">
+                                                        <span>{card.start || '-'}</span>
+                                                        <span className="text-slate-400 text-[9px] print:text-slate-500">~</span>
+                                                        <span>{card.end || '-'}</span>
                                                     </div>
                                                     {card.breakTime && (
-                                                        <div className="text-[6.5px] font-bold text-slate-600 bg-white py-0.5 rounded border border-blue-50 print:border-slate-200 print:bg-white print:text-slate-700 leading-none mb-0.5 truncate">
-                                                            휴 {card.breakTime}
+                                                        <div className="text-center text-[8px] font-bold text-slate-600 bg-white py-0.5 rounded border border-blue-100 print:border-slate-300 print:bg-white print:text-slate-700 mb-0.5">
+                                                            휴게 <span className="text-blue-600 print:text-slate-600 ml-0.5">{card.breakTime}</span>
                                                         </div>
                                                     )}
                                                     {workDaysText && (
-                                                        <div className="text-[6px] font-medium text-slate-400 truncate print:text-slate-500 leading-none">
+                                                        <div className="text-center text-[7px] font-medium text-slate-500 truncate print:text-slate-500">
                                                             {workDaysText}
                                                         </div>
                                                     )}

@@ -140,75 +140,73 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                 }
 
                 const cardsHTML = cards.map((card) => {
-                    const labelText = card.label === '근무시간' ? '기본' : card.label;
+                    const labelText = card.label === '근무시간' ? '기본 근무' : `${card.label} 근무`;
                     const breakHTML = card.breakTime ? `
                         <div style="
                             text-align:center;
-                            font-size:6.5px;
+                            font-size:11px;
                             font-weight:bold;
                             color:#4b5563;
                             background:#ffffff;
-                            padding:2px;
-                            border-radius:4px;
+                            padding:5px;
+                            border-radius:8px;
                             border:1px solid #e5e7eb;
-                            margin-bottom:2px;
-                            white-space:nowrap;
-                            overflow:hidden;
-                            text-overflow:ellipsis;
-                            line-height:1;
+                            margin-bottom:4px;
                         ">
-                            휴 ${esc(card.breakTime)}
+                            휴게 <span style="color:#2563eb;margin-left:2px;">${esc(card.breakTime)}</span>
                         </div>
                     ` : '';
                     const workDaysHTML = workDaysText ? `
                         <div style="
                             text-align:center;
-                            font-size:6px;
+                            font-size:10px;
                             color:#6b7280;
                             white-space:nowrap;
                             overflow:hidden;
                             text-overflow:ellipsis;
-                            line-height:1;
                         ">${esc(workDaysText)}</div>
                     ` : '';
 
                     return `
                         <div class="shift-card" style="
-                            width:60px;
+                            flex:1;
+                            min-width:140px;
+                            max-width:200px;
                             background:#f8faff;
                             border:1px solid #dbeafe;
-                            border-radius:6px;
-                            padding:4px;
+                            border-radius:12px;
+                            padding:10px;
                             display:flex;
                             flex-direction:column;
                             justify-content:space-between;
                             box-shadow:0 1px 2px rgba(0,0,0,0.02);
-                            text-align:center;
-                            box-sizing:border-box;
                         ">
-                            <div style="text-align:center;margin-bottom:2px;">
+                            <div style="text-align:center;margin-bottom:8px;">
                                 <span style="
                                     display:inline-block;
-                                    padding:1px 3px;
+                                    padding:3px 10px;
                                     background:#2563eb;
                                     color:#ffffff;
                                     font-weight:900;
-                                    font-size:7px;
-                                    border-radius:2px;
-                                    line-height:1;
+                                    font-size:11px;
+                                    border-radius:9999px;
+                                    letter-spacing:0.05em;
                                 ">${esc(labelText)}</span>
                             </div>
                             <div style="
-                                display:block;
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                                gap:4px;
                                 color:#1f2937;
                                 font-weight:900;
-                                font-size:8px;
-                                margin-bottom:4px;
-                                letter-spacing:-0.04em;
-                                white-space:nowrap;
-                                line-height:1;
+                                font-size:14px;
+                                margin-bottom:8px;
+                                letter-spacing:-0.02em;
                             ">
-                                ${esc(card.start || '-')}~${esc(card.end || '-')}
+                                <span>${esc(card.start || '-')}</span>
+                                <span style="color:#9ca3af;font-size:12px;">~</span>
+                                <span>${esc(card.end || '-')}</span>
                             </div>
                             ${breakHTML}
                             ${workDaysHTML}
@@ -218,11 +216,11 @@ export function buildContractBodyPrintHTML(templateText: string): string {
 
                 return `
                     <div class="shift-card-container" style="
-                        margin:6px 0;
+                        margin:10px 0;
                         display:flex;
-                        flex-wrap:wrap;
-                        gap:4px;
-                        padding-bottom:2px;
+                        gap:8px;
+                        overflow-x:auto;
+                        padding-bottom:4px;
                     ">
                         ${cardsHTML}
                     </div>
