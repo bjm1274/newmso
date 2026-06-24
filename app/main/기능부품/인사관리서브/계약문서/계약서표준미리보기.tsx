@@ -8,12 +8,14 @@ type Props = {
     templateText: string;
     closingData: ContractClosingData;
     showTitle?: boolean;
+    privacyConsent?: boolean | null;
 };
 
 export default function ContractStandardPreview({
     templateText,
     closingData,
     showTitle = true,
+    privacyConsent,
 }: Props) {
     return (
         <div className="text-[var(--foreground)]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
@@ -32,7 +34,7 @@ export default function ContractStandardPreview({
                     </div>
                 </div>
             )}
-            <ContractBodyBlock templateText={templateText} />
+            <ContractBodyBlock templateText={templateText} privacyConsent={privacyConsent} />
             <ContractClosingBlock {...closingData} />
         </div>
     );

@@ -331,7 +331,7 @@ export default function ContractBodyBlock({
                                                 <input
                                                     type="radio"
                                                     disabled
-                                                    checked={false}
+                                                    checked={privacyConsent === true}
                                                     className="w-4 h-4 text-blue-600 border-gray-300"
                                                 />
                                                 <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의 (서명 시 선택 가능)</span>
@@ -340,7 +340,7 @@ export default function ContractBodyBlock({
                                                 <input
                                                     type="radio"
                                                     disabled
-                                                    checked={false}
+                                                    checked={privacyConsent === false}
                                                     className="w-4 h-4 text-blue-600 border-gray-300"
                                                 />
                                                 <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>

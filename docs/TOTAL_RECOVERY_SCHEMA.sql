@@ -391,6 +391,8 @@ CREATE TABLE employment_contracts (
     break_start_time TIME DEFAULT '12:00',
     break_end_time TIME DEFAULT '13:00',
     signature_data TEXT, -- 서명 이미지 DataURL
+    receipt_signature_data TEXT,
+    privacy_consent INT,
     requested_at TIMESTAMPTZ DEFAULT NOW(),
     signed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),

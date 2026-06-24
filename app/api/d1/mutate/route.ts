@@ -292,6 +292,16 @@ export async function POST(request: Request) {
         );
         CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
       `);
+        try {
+          await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `receipt_signature_data` text;");
+        } catch (e) {
+          // Ignore if column already exists
+        }
+        try {
+          await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `privacy_consent` integer;");
+        } catch (e) {
+          // Ignore if column already exists
+        }
         provisioned = true;
       } catch (err) {
         console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);

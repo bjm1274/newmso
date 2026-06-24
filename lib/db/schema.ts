@@ -721,6 +721,8 @@ export const employment_contracts = sqliteTable("employment_contracts", {
 	break_start_time: text().default("12:00:00"),
 	break_end_time: text().default("13:00:00"),
 	signature_data: text(),
+	receipt_signature_data: text(),
+	privacy_consent: integer(),
 	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	signed_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),

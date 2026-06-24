@@ -27,7 +27,12 @@ type Props = {
     user: any;
     templateText?: string;
     onClose: () => void;
-    onSuccess: (signatureData: string, contractText: string) => Promise<void> | void;
+    onSuccess: (
+        signatureData: string,
+        contractText: string,
+        receiptSignatureData?: string,
+        privacyConsent?: boolean | null
+    ) => Promise<void> | void;
 };
 
 const REQUIRED_AGREEMENTS = [
@@ -471,7 +476,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 </table>
             `;
 
-            await Promise.resolve(onSuccess(signatureData, fullContractHTML));
+            await Promise.resolve(onSuccess(signatureData, fullContractHTML, receiptTraceData, privacyConsent));
             openContractPrintPreview(fullContractHTML);
         } catch (error) {
             console.error(error);

@@ -474,6 +474,8 @@ export default function ContractPreview({
   }
 
   const sig = contract?.status === '서명완료' ? (contract?.signature_data as string | undefined) : undefined;
+  const receiptSig = contract?.status === '서명완료' ? (contract?.receipt_signature_data as string | undefined) : undefined;
+  const privacyConsent = contract?.privacy_consent === 1 ? true : (contract?.privacy_consent === 0 ? false : null);
   const sections = parseContractSections(text);
   const hasInlineClosingSection = hasInlineContractReceiptSection(text);
 
@@ -546,6 +548,7 @@ export default function ContractPreview({
                     <td className="align-top p-0">
                       <ContractStandardPreview
                         templateText={text}
+                        privacyConsent={privacyConsent}
                         closingData={{
                           companyName,
                           companyBusinessNo: (company?.business_no as string) || undefined,
@@ -558,6 +561,7 @@ export default function ContractPreview({
                           employeePhone: staff.phone || undefined,
                           contractDate: contractDateText,
                           signatureDataUrl: sig,
+                          receiptTraceDataUrl: receiptSig,
                         }}
                       />
 
