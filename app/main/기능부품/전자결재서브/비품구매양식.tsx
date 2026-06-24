@@ -31,11 +31,13 @@ export type { InventoryCatalogItem, SupplyRow } from './supplies-helpers';
 type SuppliesFormProps = {
   setExtraData: (value: Record<string, unknown>) => void;
   initialItems?: unknown[];
+  initialNote?: string;
+  initialAttachments?: unknown[];
   user?: Record<string, unknown> | null;
 };
 
-export default function SuppliesForm({ setExtraData, initialItems, user }: SuppliesFormProps) {
-  const form = useSuppliesForm({ setExtraData, initialItems, user });
+export default function SuppliesForm({ setExtraData, initialItems, initialNote, initialAttachments, user }: SuppliesFormProps) {
+  const form = useSuppliesForm({ setExtraData, initialItems, initialNote, initialAttachments, user });
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm animate-in fade-in duration-300">

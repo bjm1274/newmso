@@ -313,11 +313,30 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         )
       );
 
-      return mergeApprovalCcUsers(
+      const dbCcUsers = mergeApprovalCcUsers(
         ...candidateKeys.map((key) => approvalReferenceDefaults[key] || [])
       );
+
+      if (normalizedFormType === 'resignation' || normalizedFormType === '사직서') {
+        const supportCcUsers = (approvalDirectoryStaffs || [])
+          .filter((staff) => {
+            return (
+              isActiveStaff(staff) &&
+              matchesInventorySupportCompanyName(staff?.company) &&
+              String(staff?.department || '').trim() === '경영지원팀'
+            );
+          })
+          .map((staff) => ({
+            id: staff.id,
+            name: staff.name,
+          }));
+
+        return mergeApprovalCcUsers(dbCcUsers, supportCcUsers);
+      }
+
+      return dbCcUsers;
     },
-    [approvalReferenceDefaults, customFormTypes]
+    [approvalReferenceDefaults, customFormTypes, approvalDirectoryStaffs]
   );
   const applyDefaultReferenceUsers = useCallback(
     (targetFormType: string) => {

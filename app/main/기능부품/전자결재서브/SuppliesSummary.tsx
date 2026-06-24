@@ -13,6 +13,7 @@
  */
 
 import { memo, useId, useState, useCallback } from 'react';
+import { toast } from '@/lib/toast';
 
 type SuppliesSummaryProps = {
   itemCount: number;
@@ -22,8 +23,18 @@ type SuppliesSummaryProps = {
   estimatedHours?: number;
   note: string;
   onNoteChange: (next: string) => void;
-  attachments: File[];
-  onAttachmentsChange: (next: File[]) => void;
+  attachments: any[];
+  onAttachmentsChange: (next: any[]) => void;
+};
+
+type UploadResponse = {
+  url?: string;
+  fileName?: string;
+  mimeType?: string;
+  provider?: string | null;
+  bucket?: string | null;
+  path?: string | null;
+  error?: string;
 };
 
 const MAX_NOTE_LENGTH = 500;
@@ -61,13 +72,62 @@ function SuppliesSummaryImpl({
   const noteId = useId();
   const noteHelpId = `${noteId}-help`;
   const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingNames, setUploadingNames] = useState<string[]>([]);
 
   const handleFiles = useCallback(
-    (files: FileList | null) => {
+    async (files: FileList | null) => {
       const { ok, error } = pickValidFiles(files);
       setFileError(error);
-      if (ok.length > 0) {
-        onAttachmentsChange([...attachments, ...ok]);
+      if (ok.length === 0) return;
+
+      setUploading(true);
+      setUploadingNames(ok.map((file) => file.name));
+
+      const uploadedAttachments: any[] = [];
+      const failedFiles: string[] = [];
+
+      for (const file of ok) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await fetch('/api/approvals/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const payload = (await response.json().catch(() => ({}))) as UploadResponse;
+          if (!response.ok || !payload.url || !payload.fileName) {
+            throw new Error(payload.error || '파일 업로드에 실패했습니다.');
+          }
+
+          uploadedAttachments.push({
+            name: payload.fileName,
+            url: payload.url,
+            mimeType: payload.mimeType || file.type || 'application/octet-stream',
+            size: file.size,
+            provider: payload.provider || null,
+            bucket: payload.bucket || null,
+            path: payload.path || null,
+            uploadedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error('[Approval Supplies] Attachment upload failed:', err);
+          failedFiles.push(file.name);
+        }
+      }
+
+      setUploading(false);
+      setUploadingNames([]);
+
+      if (uploadedAttachments.length > 0) {
+        onAttachmentsChange([...attachments, ...uploadedAttachments]);
+        toast(`${uploadedAttachments.length}개 파일을 첨부했습니다.`, 'success');
+      }
+
+      if (failedFiles.length > 0) {
+        toast(`업로드 실패: ${failedFiles.join(', ')}`, 'warning');
       }
     },
     [attachments, onAttachmentsChange],
@@ -134,16 +194,21 @@ function SuppliesSummaryImpl({
           <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
             첨부 사진 · 파일
           </span>
-          <label className="flex w-full cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-[11px] font-semibold text-[var(--toss-gray-4)] transition-colors hover:border-[var(--accent)]/60 hover:bg-[var(--accent-light)]/40 focus-within:border-[var(--accent)]">
+          <label className={`flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-[11px] font-semibold text-[var(--toss-gray-4)] transition-colors ${
+            uploading 
+              ? 'opacity-60 cursor-not-allowed' 
+              : 'cursor-pointer hover:border-[var(--accent)]/60 hover:bg-[var(--accent-light)]/40 focus-within:border-[var(--accent)]'
+          }`}>
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current text-[12px] leading-none">
-              +
+              {uploading ? '↻' : '+'}
             </span>
-            <span>사진을 드래그하거나 클릭하여 첨부</span>
+            <span>{uploading ? '사진 업로드 중...' : '사진을 드래그하거나 클릭하여 첨부'}</span>
             <span className="ml-auto text-[10px] text-[var(--toss-gray-3)]">JPG · PNG 5MB</span>
             <input
               type="file"
               accept={ACCEPTED_MIME.join(',')}
               multiple
+              disabled={uploading}
               onChange={(event) => {
                 handleFiles(event.target.files);
                 // 같은 파일 재선택 허용
@@ -153,6 +218,12 @@ function SuppliesSummaryImpl({
               className="sr-only"
             />
           </label>
+
+          {uploadingNames.length > 0 && (
+            <p className="text-[10px] text-[var(--toss-gray-3)] animate-pulse">
+              업로드 중: {uploadingNames.join(', ')}
+            </p>
+          )}
 
           {fileError ? (
             <p

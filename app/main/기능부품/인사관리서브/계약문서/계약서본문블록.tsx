@@ -62,10 +62,13 @@ export default function ContractBodyBlock({
                 type ProcessedLine =
                     | { type: 'text'; text: string }
                     | { type: 'shift_schedule'; startLine: string; endLine: string; breakLine: string }
-                    | { type: 'salary_table'; items: SalaryItem[] };
+                    | { type: 'salary_table'; items: SalaryItem[] }
+                    | { type: 'privacy_item'; title: string; bullets: string[] };
 
                 // 급여 항목 줄: "라벨: 금 1,234,567원" 형태 (제6조 임금 구성항목)
                 const SALARY_LINE_RE = /^(.+?)\s*[:：]\s*금\s*([0-9,]+)\s*원\s*$/;
+                // 제11조 개인정보 수집·이용 동의: 번호 항목 + 하위 불릿을 가로 칩으로 압축
+                const isPrivacyConsentSection = sec.title.includes('개인정보의 수집');
 
                 const processedLines: ProcessedLine[] = [];
                 let i = 0;
@@ -101,6 +104,15 @@ export default function ContractBodyBlock({
                             j++;
                         }
                         processedLines.push({ type: 'salary_table', items });
+                        i = j;
+                    } else if (isPrivacyConsentSection && /^[0-9]+\.\s/.test(t)) {
+                        const bullets: string[] = [];
+                        let j = i + 1;
+                        while (j < lines.length && /^[-·•]/.test(lines[j].trim())) {
+                            bullets.push(lines[j].trim().replace(/^[-·•]\s*/, ''));
+                            j++;
+                        }
+                        processedLines.push({ type: 'privacy_item', title: t, bullets });
                         i = j;
                     } else {
                         processedLines.push({ type: 'text', text: lines[i] });
@@ -155,6 +167,25 @@ export default function ContractBodyBlock({
                                                     )}
                                                 </div>
                                             )}
+                                        </div>
+                                    );
+                                }
+                                if (item.type === 'privacy_item') {
+                                    if (item.bullets.length === 0) {
+                                        return (
+                                            <p key={li} className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8] mt-1">
+                                                {item.title}
+                                            </p>
+                                        );
+                                    }
+                                    return (
+                                        <div key={li} className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                            <span className="text-[13px] font-bold text-[var(--toss-gray-5)] shrink-0">{item.title}</span>
+                                            {item.bullets.map((b, bi) => (
+                                                <span key={bi} className="inline-block text-[12px] text-[var(--toss-gray-4)] bg-[var(--muted)]/60 border border-[var(--border-subtle)] rounded-md px-2 py-0.5 print:text-[11px] print:px-1.5">
+                                                    {b}
+                                                </span>
+                                            ))}
                                         </div>
                                     );
                                 }

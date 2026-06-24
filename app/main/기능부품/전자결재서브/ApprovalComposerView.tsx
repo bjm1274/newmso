@@ -349,6 +349,8 @@ export default function ApprovalComposerView({
                 key={suppliesLoadKey}
                 setExtraData={setExtraData}
                 initialItems={Array.isArray(extraData.items) ? (extraData.items as unknown[]) : undefined}
+                initialNote={typeof extraData.note === 'string' ? extraData.note : undefined}
+                initialAttachments={Array.isArray(extraData.attachments) ? extraData.attachments : undefined}
                 user={user}
               />
             ) : formType === '수리요청서' ? (

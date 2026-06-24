@@ -23,6 +23,7 @@ import {
   normalizeSupplyRequestItems,
   type SupplyRequestMonthlySuggestion,
 } from '@/app/main/inventory-utils';
+import { normalizeApprovalAttachments } from '@/lib/approval-report-utils';
 import {
   buildInventoryLabel,
   buildRowFromUnknown,
@@ -48,12 +49,14 @@ import {
 type UseSuppliesFormArgs = {
   setExtraData: (value: Record<string, unknown>) => void;
   initialItems?: unknown[];
+  initialNote?: string;
+  initialAttachments?: unknown[];
   user?: Record<string, unknown> | null;
 };
 
 export type UseSuppliesFormReturn = ReturnType<typeof useSuppliesForm>;
 
-export function useSuppliesForm({ setExtraData, initialItems, user }: UseSuppliesFormArgs) {
+export function useSuppliesForm({ setExtraData, initialItems, initialNote, initialAttachments, user }: UseSuppliesFormArgs) {
   const [items, setItems] = useState<SupplyRow[]>(() => {
     if (Array.isArray(initialItems) && initialItems.length > 0) {
       return initialItems.map(buildRowFromUnknown);
@@ -66,8 +69,13 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [sortKey, setSortKey] = useState<'category' | 'name' | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
-  const [note, setNote] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [note, setNote] = useState(initialNote || '');
+  const [attachments, setAttachments] = useState<any[]>(() => {
+    if (Array.isArray(initialAttachments)) {
+      return normalizeApprovalAttachments(initialAttachments);
+    }
+    return [];
+  });
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
 
   const initialDepartment = useMemo(() => {
@@ -225,9 +233,10 @@ export function useSuppliesForm({ setExtraData, initialItems, user }: UseSupplie
       inventory_source_department: requesterDepartment || null,
       note: note.trim() || null,
       attachment_count: attachments.length,
+      attachments: attachments,
     });
     setDraftSavedAt(formatDraftTime(new Date()));
-  }, [items, note, attachments.length, requesterCompany, requesterDepartment, setExtraData]);
+  }, [items, note, attachments, requesterCompany, requesterDepartment, setExtraData]);
 
   const visibleMonthlySuggestions = useMemo(
     () => monthlySuggestions.slice(0, MONTHLY_STATS_VISIBLE_LIMIT),
