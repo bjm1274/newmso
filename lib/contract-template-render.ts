@@ -7,6 +7,7 @@ import {
 import { buildShiftContractVariables } from '@/lib/contract-shift-rotation';
 import {
   cleanOptionalText,
+  getStaffContractEndDate,
   getStaffEmploymentType,
   getStaffLicenseDate,
   getStaffLicenseNo,
@@ -364,7 +365,11 @@ export function fillEmploymentContractTemplate(
   const employeeAddress = firstText(safeUser.address, safeUser.employee_address);
   const workingDaysText = buildWorkDayText(workingDaysPerWeek, shift, safeContract, safeUser);
   const weeklyHolidayText = buildWeeklyHolidayText(workingDaysPerWeek, shift, safeContract, safeUser);
-  const contractEndDate = formatDate(safeContract.contract_end_date || safeUser.contract_end_date);
+  // 계약종료일은 staff 레코드의 permissions.contract_end_date 에 저장되므로
+  // top-level 뿐 아니라 permissions 내부까지 탐색하는 헬퍼로 해석한다.
+  const resolvedContractEndDate =
+    getStaffContractEndDate(safeContract) || getStaffContractEndDate(safeUser);
+  const contractEndDate = formatDate(resolvedContractEndDate);
   const contractType = firstText(
     salarySource.contract_type,
     getStaffEmploymentType(safeUser),
@@ -373,8 +378,7 @@ export function fillEmploymentContractTemplate(
   );
   const isFixedTerm =
     String(contractType).includes('계약직') ||
-    !!safeContract.contract_end_date ||
-    !!safeUser.contract_end_date;
+    !!resolvedContractEndDate;
 
   const vars: Record<string, string> = {
     staff_name: String(safeUser.name || ''),
