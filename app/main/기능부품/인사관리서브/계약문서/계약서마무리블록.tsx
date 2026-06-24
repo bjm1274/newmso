@@ -2,7 +2,12 @@
 
 import type { ContractClosingData } from '@/lib/contract-template-closing';
 
-type Props = ContractClosingData;
+type Props = ContractClosingData & {
+    /** 교부확인을 자필로 직접 작성하도록 인터랙티브 모드로 렌더링한다(직원 전자서명 모달). */
+    isInteractive?: boolean;
+    /** 교부확인 자필 작성 패드를 여는 콜백. (receiptTraceDataUrl 은 ContractClosingData 에서 상속) */
+    onReceiptRequest?: () => void;
+};
 
 export default function ContractClosingBlock(props: Props) {
     const {
@@ -17,6 +22,9 @@ export default function ContractClosingBlock(props: Props) {
         employeePhone,
         contractDate,
         signatureDataUrl,
+        isInteractive = false,
+        receiptTraceDataUrl,
+        onReceiptRequest,
     } = props;
 
     const renderRow = (
@@ -112,8 +120,39 @@ export default function ContractClosingBlock(props: Props) {
                         <div className="flex items-stretch text-[11.5px] min-h-[46px] print:min-h-[34px]">
                             <span className="w-[78px] shrink-0 flex items-center px-2.5 bg-blue-500/10 text-blue-700 font-bold print:px-1.5">교부확인</span>
                             <span className="flex-1 min-w-0 px-2.5 py-1.5 flex flex-col items-center justify-center text-center leading-tight print:px-1.5">
-                                <span className="contract-receipt-trace text-[17px] font-bold tracking-[0.35em] text-slate-300 select-none">교부 받음</span>
-                                <span className="text-[8px] text-[var(--toss-gray-3)] mt-0.5">위 글자를 따라 자필로 적어 주세요</span>
+                                {receiptTraceDataUrl ? (
+                                    <>
+                                        <img
+                                            src={receiptTraceDataUrl}
+                                            alt="교부확인 자필"
+                                            className="h-9 object-contain"
+                                            style={{ mixBlendMode: 'multiply' }}
+                                        />
+                                        {isInteractive && onReceiptRequest && (
+                                            <button
+                                                type="button"
+                                                onClick={onReceiptRequest}
+                                                className="text-[9px] text-[var(--toss-gray-3)] mt-0.5 underline print:hidden"
+                                            >
+                                                다시 쓰기
+                                            </button>
+                                        )}
+                                    </>
+                                ) : isInteractive && onReceiptRequest ? (
+                                    <button
+                                        type="button"
+                                        onClick={onReceiptRequest}
+                                        className="flex flex-col items-center gap-0.5 group print:hidden"
+                                    >
+                                        <span className="text-[12.5px] font-bold text-blue-600 group-hover:text-blue-700">✍️ ‘교부 받음’ 자필 작성</span>
+                                        <span className="text-[8px] text-[var(--toss-gray-3)]">눌러서 직접 적어 주세요</span>
+                                    </button>
+                                ) : (
+                                    <>
+                                        <span className="contract-receipt-trace text-[17px] font-bold tracking-[0.35em] text-slate-300 select-none">교부 받음</span>
+                                        <span className="text-[8px] text-[var(--toss-gray-3)] mt-0.5">위 글자를 따라 자필로 적어 주세요</span>
+                                    </>
+                                )}
                             </span>
                         </div>
                     </div>

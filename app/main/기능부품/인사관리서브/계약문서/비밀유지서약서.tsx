@@ -8,8 +8,8 @@ import {
 } from '@/lib/contract-confidentiality-pledge';
 
 /**
- * 근로계약서 하단에 첨부되는 비밀유지 서약서.
- * 인쇄 시 별도 페이지로 분리하지 않고 계약서 본문(서명·직인) 아래에 이어서 출력되도록 contract-pledge 클래스를 부여한다.
+ * 근로계약서에 첨부되는 비밀유지 서약서.
+ * 인쇄 시에는 계약서 본문(서명·직인) 아래에 붙이지 않고 별도 페이지(뒷장)로 분리되도록 print:break-before-page 를 부여한다.
  * 서약서 본문(조항·문구)은 직원 서명 PDF(전자서명모달)와 동일하게 lib/contract-confidentiality-pledge 에서 공유한다.
  */
 type Props = {
@@ -27,7 +27,7 @@ export default function ConfidentialityPledge({
 }: Props) {
     return (
         <section
-            className="contract-pledge mt-10 print:mt-8 print:pt-6 print:border-t print:border-[var(--border-subtle)]"
+            className="contract-pledge mt-10 print:mt-0 print:pt-0 print:break-before-page"
             style={{ fontFamily: 'Noto Sans KR, sans-serif' }}
         >
             <div className="text-center mb-6">

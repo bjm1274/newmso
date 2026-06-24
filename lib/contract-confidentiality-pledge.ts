@@ -48,7 +48,8 @@ function escapeHTML(value: unknown) {
 /**
  * 직원 서명 PDF(전자서명모달)에서 사용하는 비밀유지 서약서 인쇄 HTML.
  * 관리자 미리보기(React 컴포넌트)와 동일한 조항/문구를 출력한다.
- * 계약서 본문(서명·직인) 바로 아래에 이어서 출력되도록 상단 구분선 + 페이지 내 분리 방지를 둔다.
+ * 계약서 본문(서명·직인) 아래에 붙이지 않고 별도 페이지(뒷장)로 출력되므로
+ * 상단 구분선/여백 없이 페이지 상단부터 시작한다. 페이지 분리는 호출부의 .contract-page 래퍼가 담당한다.
  */
 export function buildConfidentialityPledgePrintHTML(opts: ConfidentialityPledgePrintData): string {
   const { companyName, employeeName, contractDate, signatureDataUrl } = opts;
@@ -66,7 +67,7 @@ export function buildConfidentialityPledgePrintHTML(opts: ConfidentialityPledgeP
   ).join('');
 
   return `
-      <div style="margin-top:28px;padding:28px 40px 40px;font-family:'Noto Sans KR', sans-serif;border-top:1px solid #d1d5db;break-inside:avoid;page-break-inside:avoid;">
+      <div style="padding:28px 40px 40px;font-family:'Noto Sans KR', sans-serif;">
         <div style="text-align:center;margin-bottom:22px;">
           <h2 style="font-family:'Noto Serif KR', Georgia, serif;font-size:20px;font-weight:900;letter-spacing:0.35em;color:#111827;margin:0;">비 밀 유 지 서 약 서</h2>
         </div>

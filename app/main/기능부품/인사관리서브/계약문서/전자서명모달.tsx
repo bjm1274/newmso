@@ -47,6 +47,11 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const sigCanvas = useRef<SignatureCanvas>(null);
     const submitLockRef = useRef(false);
     const [isSigEmpty, setIsSigEmpty] = useState(true);
+    // 교부확인: '교부 받음'을 자필로 작성하는 캔버스 팝업 상태
+    const [receiptTrace, setReceiptTrace] = useState<string | null>(null);
+    const [showReceiptPad, setShowReceiptPad] = useState(false);
+    const [isReceiptEmpty, setIsReceiptEmpty] = useState(true);
+    const receiptCanvas = useRef<SignatureCanvas>(null);
     const [company, setCompany] = useState<Record<string, unknown> | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -246,6 +251,9 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (privacyConsent === null) {
                 return toast('제11조 개인정보의 수집·이용 동의 여부를 선택해 주세요.');
             }
+            if (!receiptTrace) {
+                return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.");
+            }
             setStep(2);
         }
         else if (step === 2) {
@@ -260,6 +268,23 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const handleClearSignature = () => {
         sigCanvas.current?.clear();
         setIsSigEmpty(true);
+    };
+
+    const openReceiptPad = () => {
+        setIsReceiptEmpty(true);
+        setShowReceiptPad(true);
+    };
+
+    const handleSaveReceiptTrace = () => {
+        if (isReceiptEmpty || receiptCanvas.current?.isEmpty()) {
+            return toast("'교부 받음'을 자필로 작성해 주세요.");
+        }
+        const data = receiptCanvas.current?.toDataURL('image/png');
+        if (!data) {
+            return toast('다시 시도해 주세요.', 'error');
+        }
+        setReceiptTrace(data);
+        setShowReceiptPad(false);
     };
 
     const openContractPrintPreview = (fullContractHTML: string) => {
@@ -417,6 +442,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             const closingHTML = buildClosingPrintHTML({
                 ...closingData,
                 signatureDataUrl: signatureData,
+                receiptTraceDataUrl: receiptTrace ?? undefined,
             });
 
             let resolvedBodyText = bodyText;
@@ -430,6 +456,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
             const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
 
+            // 비밀유지서약서는 본문(서명·직인) 아래에 붙이지 않고 별도 페이지(뒷장)로 분리한다.
             const fullContractHTML = `
                 <table class="contract-print-table">
                     <thead><tr><td class="contract-print-spacer"></td></tr></thead>
@@ -438,6 +465,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             <div class="contract-page">
                                 ${bodyHTML}
                                 ${closingHTML}
+                            </div>
+                            <div class="contract-page" style="page-break-before: always;">
                                 ${confidentialitySection}
                             </div>
                             ${agreementsSection}
@@ -501,7 +530,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                             onPrivacyConsentChange={setPrivacyConsent}
                                             isInteractive={true}
                                         />
-                                        <ContractClosingBlock {...closingData} />
+                                        <ContractClosingBlock
+                                            {...closingData}
+                                            isInteractive
+                                            receiptTraceDataUrl={receiptTrace ?? undefined}
+                                            onReceiptRequest={openReceiptPad}
+                                        />
                                     </>
                                 )}
                             </div>
@@ -632,6 +666,56 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
                 </div>
             </div>
+
+            {showReceiptPad && (
+                <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[var(--card)] w-full max-w-md rounded-2xl border-2 border-[var(--border)] shadow-xl overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)]">
+                            <div>
+                                <h3 className="text-base font-bold text-[var(--foreground)]">교부확인 자필 작성</h3>
+                                <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">아래 칸에 ‘교부 받음’을 자필로 적어 주세요.</p>
+                            </div>
+                            <button onClick={() => setShowReceiptPad(false)} className="p-2 -mr-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors" aria-label="닫기">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <div className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-xl p-2 relative shadow-inner overflow-hidden">
+                                <SignatureCanvas
+                                    ref={receiptCanvas}
+                                    penColor="#1e293b"
+                                    canvasProps={{ className: 'w-full h-[160px] cursor-crosshair touch-none' }}
+                                    onEnd={() => setIsReceiptEmpty(false)}
+                                />
+                                {isReceiptEmpty && (
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20 text-[var(--toss-gray-3)]">
+                                        <span className="text-[15px] font-black tracking-[0.3em]">교부 받음</span>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { receiptCanvas.current?.clear(); setIsReceiptEmpty(true); }}
+                                className="mt-2 text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
+                            >
+                                다시 쓰기
+                            </button>
+                        </div>
+                        <div className="p-4 border-t border-[var(--border)] flex gap-3">
+                            <button onClick={() => setShowReceiptPad(false)} className="px-5 py-3 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSaveReceiptTrace}
+                                disabled={isReceiptEmpty}
+                                className={`flex-1 px-5 py-3 rounded-xl text-white font-black text-[13px] shadow-sm transition-all ${isReceiptEmpty ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-[var(--accent)] hover:bg-blue-600 active:scale-[0.98]'}`}
+                            >
+                                저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

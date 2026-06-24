@@ -184,6 +184,8 @@ export type ContractClosingData = {
   employeePhone?: string;
   contractDate: string;
   signatureDataUrl?: string;
+  /** 교부확인란에 자필로 작성된 '교부 받음' 이미지(dataURL). */
+  receiptTraceDataUrl?: string;
 };
 
 function escapeHTML(value: unknown) {
@@ -207,6 +209,7 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
     employeePhone,
     contractDate,
     signatureDataUrl,
+    receiptTraceDataUrl,
   } = opts;
 
   // 직인은 실 이미지만 표시(원형 테두리 제거). 회사명 끝 글자에 살짝 겹쳐 위조 방지.
@@ -217,6 +220,11 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
   const signatureHTML = signatureDataUrl
     ? `<img src="${escapeHTML(signatureDataUrl)}" alt="서명" style="height:34px;object-fit:contain;vertical-align:middle;" />`
     : `<span style="display:inline-block;min-width:140px;border-bottom:1px solid #333;height:32px;vertical-align:bottom;"></span>`;
+
+  // 교부확인: 자필로 작성된 이미지가 있으면 표시, 없으면 따라쓰기 안내 문구.
+  const receiptHTML = receiptTraceDataUrl
+    ? `<img src="${escapeHTML(receiptTraceDataUrl)}" alt="교부확인 자필" style="height:34px;object-fit:contain;vertical-align:middle;mix-blend-mode:multiply;" />`
+    : `<div style="font-size:17px;font-weight:700;letter-spacing:0.3em;color:#cbd5e1;">교부 받음</div><div style="font-size:9px;color:#9ca3af;margin-top:2px;">위 글자를 따라 자필로 적어 주세요</div>`;
 
   const row = (label: string, value?: string, suffix = '') => {
     if (!value && !suffix) return '';
@@ -242,7 +250,7 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
         ${row('주소', employeeAddress)}
         ${row('연락처', employeePhone)}
         <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;">서명</td><td style="padding:5px 10px;">${signatureHTML}</td></tr>
-        <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;vertical-align:middle;">교부확인</td><td style="padding:8px 10px;text-align:center;"><div style="font-size:17px;font-weight:700;letter-spacing:0.3em;color:#cbd5e1;">교부 받음</div><div style="font-size:9px;color:#9ca3af;margin-top:2px;">위 글자를 따라 자필로 적어 주세요</div></td></tr>
+        <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;vertical-align:middle;">교부확인</td><td style="padding:8px 10px;text-align:center;">${receiptHTML}</td></tr>
       </table>
     </div>
   </div>
