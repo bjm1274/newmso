@@ -47,9 +47,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const sigCanvas = useRef<SignatureCanvas>(null);
     const submitLockRef = useRef(false);
     const [isSigEmpty, setIsSigEmpty] = useState(true);
-    // 교부확인: '교부 받음'을 자필로 작성하는 캔버스 팝업 상태
-    const [receiptTrace, setReceiptTrace] = useState<string | null>(null);
-    const [showReceiptPad, setShowReceiptPad] = useState(false);
+    // 교부확인: 최종 서명 단계에서 '교부 받음'을 자필로 작성하는 캔버스
     const [isReceiptEmpty, setIsReceiptEmpty] = useState(true);
     const receiptCanvas = useRef<SignatureCanvas>(null);
     const [company, setCompany] = useState<Record<string, unknown> | null>(null);
@@ -251,9 +249,6 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (privacyConsent === null) {
                 return toast('제11조 개인정보의 수집·이용 동의 여부를 선택해 주세요.');
             }
-            if (!receiptTrace) {
-                return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.");
-            }
             setStep(2);
         }
         else if (step === 2) {
@@ -270,21 +265,9 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         setIsSigEmpty(true);
     };
 
-    const openReceiptPad = () => {
+    const handleClearReceipt = () => {
+        receiptCanvas.current?.clear();
         setIsReceiptEmpty(true);
-        setShowReceiptPad(true);
-    };
-
-    const handleSaveReceiptTrace = () => {
-        if (isReceiptEmpty || receiptCanvas.current?.isEmpty()) {
-            return toast("'교부 받음'을 자필로 작성해 주세요.");
-        }
-        const data = receiptCanvas.current?.toDataURL('image/png');
-        if (!data) {
-            return toast('다시 시도해 주세요.', 'error');
-        }
-        setReceiptTrace(data);
-        setShowReceiptPad(false);
     };
 
     const openContractPrintPreview = (fullContractHTML: string) => {
@@ -390,6 +373,9 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         if (isSigEmpty || sigCanvas.current?.isEmpty()) {
             return toast('서명을 완료해 주세요.', 'success');
         }
+        if (isReceiptEmpty || receiptCanvas.current?.isEmpty()) {
+            return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.");
+        }
 
         submitLockRef.current = true;
         setIsGenerating(true);
@@ -398,6 +384,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             const signatureData = sigCanvas.current?.toDataURL('image/png');
             if (!signatureData) {
                 toast('서명을 다시 시도해 주세요.', 'error');
+                return;
+            }
+            // 교부확인('교부 받음') 자필 — 최종 서명 단계에서 함께 작성되어 계약서에 삽입된다.
+            const receiptTraceData = receiptCanvas.current?.toDataURL('image/png');
+            if (!receiptTraceData) {
+                toast("'교부 받음' 자필을 다시 시도해 주세요.", 'error');
                 return;
             }
 
@@ -442,16 +434,19 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             const closingHTML = buildClosingPrintHTML({
                 ...closingData,
                 signatureDataUrl: signatureData,
-                receiptTraceDataUrl: receiptTrace ?? undefined,
+                receiptTraceDataUrl: receiptTraceData,
             });
 
             let resolvedBodyText = bodyText;
-            if (privacyConsent === true) {
-                resolvedBodyText = resolvedBodyText.replace('□ 동의    □ 동의하지 않음', '☑ 동의    □ 동의하지 않음');
-                resolvedBodyText = resolvedBodyText.replace('□ 동의 □ 동의하지 않음', '☑ 동의 □ 동의하지 않음');
-            } else if (privacyConsent === false) {
-                resolvedBodyText = resolvedBodyText.replace('□ 동의    □ 동의하지 않음', '□ 동의    ☑ 동의하지 않음');
-                resolvedBodyText = resolvedBodyText.replace('□ 동의 □ 동의하지 않음', '□ 동의 ☑ 동의하지 않음');
+            if (privacyConsent !== null) {
+                // 개인정보 동의 선택 결과를 본문에 체크표시(☑/□)로 반영한다.
+                // 템플릿마다 '□ 동의' 와 '□ 동의하지 않음' 사이 공백 수가 달라도 매칭되도록 정규식 사용.
+                const agreeMark = privacyConsent ? '☑' : '□';
+                const declineMark = privacyConsent ? '□' : '☑';
+                resolvedBodyText = resolvedBodyText.replace(
+                    /□\s*동의\s+□\s*동의하지\s*않음/,
+                    `${agreeMark} 동의    ${declineMark} 동의하지 않음`,
+                );
             }
 
             const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
@@ -530,12 +525,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                             onPrivacyConsentChange={setPrivacyConsent}
                                             isInteractive={true}
                                         />
-                                        <ContractClosingBlock
-                                            {...closingData}
-                                            isInteractive
-                                            receiptTraceDataUrl={receiptTrace ?? undefined}
-                                            onReceiptRequest={openReceiptPad}
-                                        />
+                                        <ContractClosingBlock {...closingData} />
                                     </>
                                 )}
                             </div>
@@ -606,30 +596,56 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                     {step === 4 && (
                         <div className="space-y-4 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-4">
+                            <div className="text-center mb-2">
                                 <span className="text-3xl block mb-2">✍️</span>
                                 <h3 className="text-lg font-bold text-[var(--foreground)]">최종 전자서명</h3>
-                                <p className="text-[10px] text-[var(--toss-gray-4)] font-bold mt-1">본인의 성함을 정자로 기재해 주세요.</p>
+                                <p className="text-[10px] text-[var(--toss-gray-4)] font-bold mt-1">서명과 교부확인을 모두 자필로 작성해 주세요.</p>
                             </div>
 
-                            <div data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
-                                <SignatureCanvas
-                                    ref={sigCanvas}
-                                    penColor="#1e293b"
-                                    canvasProps={{ className: "w-full h-[200px] cursor-crosshair touch-none" }}
-                                    onEnd={() => setIsSigEmpty(false)}
-                                />
-                                {isSigEmpty && (
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col opacity-20 text-[var(--toss-gray-3)] gap-1">
-                                        <span className="text-[10px] font-black tracking-[.2em] uppercase">Sign Here</span>
-                                    </div>
-                                )}
+                            {/* 전자서명 */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[11px] font-black text-[var(--foreground)]">전자서명 <span className="text-[var(--toss-gray-4)] font-bold">(성함을 정자로)</span></span>
+                                    <button type="button" onClick={handleClearSignature} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
+                                        다시 쓰기
+                                    </button>
+                                </div>
+                                <div data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                                    <SignatureCanvas
+                                        ref={sigCanvas}
+                                        penColor="#1e293b"
+                                        canvasProps={{ className: "w-full h-[180px] cursor-crosshair touch-none" }}
+                                        onEnd={() => setIsSigEmpty(false)}
+                                    />
+                                    {isSigEmpty && (
+                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col opacity-20 text-[var(--toss-gray-3)] gap-1">
+                                            <span className="text-[10px] font-black tracking-[.2em] uppercase">Sign Here</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex justify-start">
-                                <button type="button" onClick={handleClearSignature} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
-                                    다시 쓰기
-                                </button>
+                            {/* 교부확인 자필 — 계약서 교부확인란에 삽입됨 */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[11px] font-black text-[var(--foreground)]">교부확인 <span className="text-[var(--toss-gray-4)] font-bold">(‘교부 받음’ 자필 기재)</span></span>
+                                    <button type="button" onClick={handleClearReceipt} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
+                                        다시 쓰기
+                                    </button>
+                                </div>
+                                <div data-testid="contract-receipt-canvas" className="bg-[var(--card)] border-2 border-emerald-400 rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                                    <SignatureCanvas
+                                        ref={receiptCanvas}
+                                        penColor="#1e293b"
+                                        canvasProps={{ className: "w-full h-[120px] cursor-crosshair touch-none" }}
+                                        onEnd={() => setIsReceiptEmpty(false)}
+                                    />
+                                    {isReceiptEmpty && (
+                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20 text-[var(--toss-gray-3)]">
+                                            <span className="text-[15px] font-black tracking-[0.3em]">교부 받음</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="bg-blue-500/10 p-4 rounded-xl text-[10px] font-bold text-blue-600 text-center">
@@ -660,62 +676,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
                     ) : (
-                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
+                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isReceiptEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isReceiptEmpty || isGenerating ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
                             {isGenerating ? '서류 생성 중...' : '최종 서명 및 저장'}
                         </button>
                     )}
                 </div>
             </div>
-
-            {showReceiptPad && (
-                <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-[var(--card)] w-full max-w-md rounded-2xl border-2 border-[var(--border)] shadow-xl overflow-hidden flex flex-col">
-                        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)]">
-                            <div>
-                                <h3 className="text-base font-bold text-[var(--foreground)]">교부확인 자필 작성</h3>
-                                <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">아래 칸에 ‘교부 받음’을 자필로 적어 주세요.</p>
-                            </div>
-                            <button onClick={() => setShowReceiptPad(false)} className="p-2 -mr-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors" aria-label="닫기">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            </button>
-                        </div>
-                        <div className="p-4">
-                            <div className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-xl p-2 relative shadow-inner overflow-hidden">
-                                <SignatureCanvas
-                                    ref={receiptCanvas}
-                                    penColor="#1e293b"
-                                    canvasProps={{ className: 'w-full h-[160px] cursor-crosshair touch-none' }}
-                                    onEnd={() => setIsReceiptEmpty(false)}
-                                />
-                                {isReceiptEmpty && (
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20 text-[var(--toss-gray-3)]">
-                                        <span className="text-[15px] font-black tracking-[0.3em]">교부 받음</span>
-                                    </div>
-                                )}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => { receiptCanvas.current?.clear(); setIsReceiptEmpty(true); }}
-                                className="mt-2 text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
-                            >
-                                다시 쓰기
-                            </button>
-                        </div>
-                        <div className="p-4 border-t border-[var(--border)] flex gap-3">
-                            <button onClick={() => setShowReceiptPad(false)} className="px-5 py-3 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
-                                취소
-                            </button>
-                            <button
-                                onClick={handleSaveReceiptTrace}
-                                disabled={isReceiptEmpty}
-                                className={`flex-1 px-5 py-3 rounded-xl text-white font-black text-[13px] shadow-sm transition-all ${isReceiptEmpty ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-[var(--accent)] hover:bg-blue-600 active:scale-[0.98]'}`}
-                            >
-                                저장
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div >
     );
 }

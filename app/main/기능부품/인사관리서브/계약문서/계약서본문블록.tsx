@@ -291,28 +291,37 @@ export default function ContractBodyBlock({
                                 }
                                 if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
                                     if (isInteractive) {
+                                        const consentOptions: { value: boolean; label: string }[] = [
+                                            { value: true, label: '동의' },
+                                            { value: false, label: '동의하지 않음' },
+                                        ];
                                         return (
-                                            <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 shrink-0">
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="radio"
-                                                        name="privacy-consent-active"
-                                                        checked={privacyConsent === true}
-                                                        onChange={() => onPrivacyConsentChange?.(true)}
-                                                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                                    />
-                                                    <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의</span>
-                                                </label>
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="radio"
-                                                        name="privacy-consent-active"
-                                                        checked={privacyConsent === false}
-                                                        onChange={() => onPrivacyConsentChange?.(false)}
-                                                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                                    />
-                                                    <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
-                                                </label>
+                                            <div key={li} className="flex items-center gap-3 mt-3 mb-3 p-3 bg-blue-500/5 rounded-xl border border-blue-500/10 shrink-0">
+                                                {consentOptions.map((opt) => {
+                                                    const selected = privacyConsent === opt.value;
+                                                    return (
+                                                        <label
+                                                            key={opt.label}
+                                                            className={`flex items-center gap-2 cursor-pointer select-none px-3 py-1.5 rounded-lg border-2 transition-all ${selected ? 'border-blue-500 bg-blue-500/10' : 'border-transparent hover:bg-[var(--muted)]/60'}`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="privacy-consent-active"
+                                                                checked={selected}
+                                                                onChange={() => onPrivacyConsentChange?.(opt.value)}
+                                                                className="sr-only"
+                                                            />
+                                                            <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-blue-600 border-blue-600' : 'border-slate-400 bg-white'}`}>
+                                                                {selected && (
+                                                                    <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                )}
+                                                            </span>
+                                                            <span className={`text-[13.5px] font-bold ${selected ? 'text-blue-700' : 'text-[var(--foreground)]'}`}>{opt.label}</span>
+                                                        </label>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     }
