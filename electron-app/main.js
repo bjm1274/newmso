@@ -33,8 +33,12 @@ function createWindow() {
 
   // 새 창 열기 (외부 링크, 파일 다운로드 등)는 기본 브라우저 사용
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    // about:blank, blob:, data: 등은 Electron 내부에서 처리하도록 허용 (인쇄 및 다운로드 등 지원)
+    return { action: 'allow' };
   });
 }
 
