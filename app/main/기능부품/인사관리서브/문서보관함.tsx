@@ -217,26 +217,13 @@ export default function DocumentRepository({
   const handleOpenPdf = async () => {
     if (!selected) return;
     if (selected.content) {
-      const win = window.open('', '_blank');
-      if (!win) {
-        toast('팝업 차단을 해제한 뒤 다시 열어 주세요.', 'warning');
-        return;
-      }
-      try {
-        win.document.write('<html><head><title>문서 로드 중...</title></head><body><div style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #666;">문서를 가져오는 중입니다. 잠시만 기다려 주세요...</div></body></html>');
-        win.document.close();
-      } catch (e) {
-        console.error('팝업 문서 쓰기 실패:', e);
-      }
-
       try {
         // 인쇄 직전 복호화(평문 레코드는 그대로 통과)
         const { decryptContract } = await import('@/lib/contract-crypto');
         const decryptedContent = await decryptContract(String(selected.content || ''));
-        openDocumentPrintView({ ...selected, content: decryptedContent }, selectedCo, win);
+        openDocumentPrintView({ ...selected, content: decryptedContent }, selectedCo);
       } catch (error) {
         console.error('문서 열기 실패:', error);
-        try { win.close(); } catch (_) {}
         toast('문서를 여는 중 오류가 발생했습니다.', 'error');
       }
       return;

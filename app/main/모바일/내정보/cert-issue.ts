@@ -113,25 +113,6 @@ export async function issueAndPrintMyCert(
     return false;
   }
 
-  const isMobilePrintFlow =
-    typeof navigator !== 'undefined' &&
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-
-  let win: Window | null = null;
-  if (!isMobilePrintFlow) {
-    win = window.open('', '_blank');
-    if (!win) {
-      toast('인쇄 창을 열 수 없습니다. 팝업 차단을 확인해 주세요.', 'error');
-      return false;
-    }
-    try {
-      win.document.write('<html><head><title>인쇄 준비 중...</title></head><body><div style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #666;">인쇄를 준비하는 중입니다. 잠시만 기다려 주세요...</div></body></html>');
-      win.document.close();
-    } catch (e) {
-      console.error('팝업 문서 쓰기 실패:', e);
-    }
-  }
-
   try {
     // 본인 1건만 조회 (JM5: staffId 고정).
     const { data: staffData, error: staffError } = await supabase
@@ -145,9 +126,6 @@ export async function issueAndPrintMyCert(
     const staff = (staffData ?? null) as StaffRow | null;
     if (!staff) {
       toast('본인 인사 정보를 찾을 수 없습니다.', 'error');
-      if (win) {
-        try { win.close(); } catch (_) {}
-      }
       return false;
     }
 
@@ -241,14 +219,11 @@ export async function issueAndPrintMyCert(
       isResigned,
     };
 
-    openIssuedCertificatePrintView(cert, context, win);
+    openIssuedCertificatePrintView(cert, context);
     return true;
   } catch (error) {
     console.error('[mobile-cert] issue failed', error);
     toast('증명서 발급 중 오류가 발생했습니다.', 'error');
-    if (win) {
-      try { win.close(); } catch (_) {}
-    }
     return false;
   }
 }

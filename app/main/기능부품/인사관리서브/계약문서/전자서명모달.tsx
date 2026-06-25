@@ -428,7 +428,6 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
         submitLockRef.current = true;
         setIsGenerating(true);
-        let printWindow: Window | null = null;
         try {
             // react-signature-canvas v1.1.0-alpha부터 getTrimmedCanvas 제거 → toDataURL 직접 호출
             const signatureData = sigCanvas.current?.toDataURL('image/png');
@@ -441,15 +440,6 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (!receiptTraceData) {
                 toast("'교부 받음' 자필을 다시 시도해 주세요.", 'error');
                 return;
-            }
-
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-            if (!isMobile) {
-                printWindow = window.open('', '_blank');
-                if (printWindow) {
-                    printWindow.document.write('<html><head><title>계약서 생성 중...</title></head><body><div style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #666;">계약서 및 전자서명을 저장하고 인쇄를 준비하고 있습니다. 잠시만 기다려 주세요...</div></body></html>');
-                    printWindow.document.close();
-                }
             }
 
             // 1. 전체 통합 HTML 구성 (인쇄 및 저장용)
@@ -548,18 +538,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
             await Promise.resolve(onSuccess(signatureData, fullContractHTML, receiptTraceData, privacyConsent));
             try {
-                openContractPrintPreview(fullContractHTML, printWindow);
+                openContractPrintPreview(fullContractHTML);
             } catch (printError) {
                 console.warn('Failed to open contract print preview:', printError);
-                if (printWindow) {
-                    try { printWindow.close(); } catch (_) {}
-                }
             }
         } catch (error) {
             console.error(error);
-            if (printWindow) {
-                try { printWindow.close(); } catch (_) {}
-            }
             toast(error instanceof Error ? error.message : "서류 생성 중 오류가 발생했습니다.", 'error');
         } finally {
             submitLockRef.current = false;

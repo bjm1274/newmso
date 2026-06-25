@@ -366,87 +366,42 @@ export function openIssuedCertificatePrintView(
   context: IssuedCertificateContext = {},
   targetWindow?: Window | null,
 ) {
-  const isMobilePrintFlow =
-    typeof navigator !== 'undefined' &&
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  if (targetWindow) {
+    try {
+      targetWindow.close();
+    } catch (err) {}
+  }
 
-  if (isMobilePrintFlow) {
-    if (targetWindow) {
-      try {
-        targetWindow.close();
-      } catch (err) {}
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+
+  const cleanup = () => {
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 1200);
+  };
+
+  iframe.onload = () => {
+    const frameWindow = iframe.contentWindow;
+    if (!frameWindow) {
+      cleanup();
+      toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+      return;
     }
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
+    frameWindow.focus();
+    frameWindow.print();
+    cleanup();
+  };
 
-    const cleanup = () => {
-      window.setTimeout(() => {
-        iframe.remove();
-      }, 1200);
-    };
-
-    iframe.onload = () => {
-      const frameWindow = iframe.contentWindow;
-      if (!frameWindow) {
-        cleanup();
-        toast('모바일 인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-        return;
-      }
-      frameWindow.focus();
-      frameWindow.print();
-      cleanup();
-    };
-
-    iframe.srcdoc = buildIssuedCertificatePrintHtml(cert, context, { autoPrint: true });
-    document.body.appendChild(iframe);
-    return;
-  }
-
-  const win = targetWindow || window.open('', '_blank');
-  if (!win) {
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-
-    const cleanup = () => {
-      window.setTimeout(() => {
-        iframe.remove();
-      }, 1200);
-    };
-
-    iframe.onload = () => {
-      const frameWindow = iframe.contentWindow;
-      if (!frameWindow) {
-        cleanup();
-        toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-        return;
-      }
-      frameWindow.focus();
-      frameWindow.print();
-      cleanup();
-    };
-
-    iframe.srcdoc = buildIssuedCertificatePrintHtml(cert, context, { autoPrint: true });
-    document.body.appendChild(iframe);
-    return;
-  }
-  const html = buildIssuedCertificatePrintHtml(cert, context, { autoPrint: true });
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  iframe.srcdoc = buildIssuedCertificatePrintHtml(cert, context, { autoPrint: true });
+  document.body.appendChild(iframe);
 }
 
 // ─────────────────────────────────────────────

@@ -148,42 +148,40 @@ export function openDocumentPrintView(
 </html>`;
   }
 
-  const popup = targetWindow || window.open('', '_blank');
-  if (!popup) {
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-
-    const cleanup = () => {
-      window.setTimeout(() => {
-        iframe.remove();
-      }, 1200);
-    };
-
-    iframe.onload = () => {
-      const frameWindow = iframe.contentWindow;
-      if (!frameWindow) {
-        cleanup();
-        toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-        return;
-      }
-      frameWindow.focus();
-      frameWindow.print();
-      cleanup();
-    };
-
-    iframe.srcdoc = htmlContent;
-    document.body.appendChild(iframe);
-    return;
+  if (targetWindow) {
+    try {
+      targetWindow.close();
+    } catch (err) {}
   }
 
-  popup.document.open();
-  popup.document.write(htmlContent);
-  popup.document.close();
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.opacity = '0';
+
+  const cleanup = () => {
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 1200);
+  };
+
+  iframe.onload = () => {
+    const frameWindow = iframe.contentWindow;
+    if (!frameWindow) {
+      cleanup();
+      toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+      return;
+    }
+    frameWindow.focus();
+    frameWindow.print();
+    cleanup();
+  };
+
+  iframe.srcdoc = htmlContent;
+  document.body.appendChild(iframe);
 }
