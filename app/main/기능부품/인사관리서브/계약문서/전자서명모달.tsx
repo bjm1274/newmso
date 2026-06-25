@@ -499,7 +499,11 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             `;
 
             await Promise.resolve(onSuccess(signatureData, fullContractHTML, receiptTraceData, privacyConsent));
-            openContractPrintPreview(fullContractHTML);
+            try {
+                openContractPrintPreview(fullContractHTML);
+            } catch (printError) {
+                console.warn('Failed to open contract print preview:', printError);
+            }
         } catch (error) {
             console.error(error);
             toast(error instanceof Error ? error.message : "서류 생성 중 오류가 발생했습니다.", 'error');
