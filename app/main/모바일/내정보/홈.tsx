@@ -20,7 +20,7 @@ import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import MIcon from '../공통/MIcon';
-import { useTodayCounts } from './data-hooks';
+import { useMonthlyAttendance, useTodayCounts } from './data-hooks';
 import type { MHomeSub, MTab } from '../셸/m-routes';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
@@ -145,6 +145,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const staffId = typeof user.id === 'string' ? user.id : null;
   const active = isActiveStaff(user);
   const counts = useTodayCounts(staffId);
+  const { data: monthlyAttendance } = useMonthlyAttendance(staffId);
 
   const { dialog, openPrompt } = useActionDialog();
 
@@ -316,7 +317,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const hireYears = getYearsSince(user.hire_date as string | undefined);
 
   /* 비밀번호 게이트 */
-  const [pwGate, setPwGate] = useState<'payslip' | 'cert' | null>(null);
+  const [pwGate, setPwGate] = useState<'cert' | null>(null);
   const [pw, setPw] = useState('');
   const [pwErr, setPwErr] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
@@ -368,7 +369,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const QUICK_ITEMS: QuickItem[] = [
     { id: 'attend',   icon: 'clock',       label: '출퇴근',   tone: 'accent',  sub: 'attend', tab: null },
     { id: 'leave',    icon: 'calendar',    label: '연차',     tone: 'success', sub: 'leave',  tab: null },
-    { id: 'payslip',  icon: 'won',         label: '급여명세', tone: 'warn',    sub: 'payslip', tab: null, pwGate: true },
+    { id: 'payslip',  icon: 'won',         label: '급여명세', tone: 'warn',    sub: 'payslip', tab: null },
     { id: 'cert',     icon: 'fileText',    label: '증명서',   tone: 'muted',   sub: 'cert', tab: null, pwGate: true },
     { id: 'approval', icon: 'checkCircle', label: '전자결재', tone: 'accent',  sub: null, tab: 'approval', badge: counts.pendingApproval > 0 ? counts.pendingApproval : undefined },
     { id: 'stock',    icon: 'box',         label: '재고',     tone: 'success', sub: null, tab: 'stock' },
@@ -378,7 +379,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
 
   const handleQuick = useCallback((item: QuickItem) => {
     if (item.pwGate) {
-      setPwGate(item.sub as 'payslip' | 'cert');
+      setPwGate('cert');
       return;
     }
     if (item.sub) {
@@ -394,6 +395,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const leaveTotal = Number(user.annual_leave_total) || 15;
   const leaveUsed = Number(user.annual_leave_used) || 0;
   const leaveRemaining = Math.max(0, leaveTotal - leaveUsed);
+  const lateCountLabel = monthlyAttendance ? `${monthlyAttendance.late}회` : '집계 중';
 
   return (
     <div className="m-screen">
@@ -516,7 +518,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             }}
           >
             {[
-              { label: '이번달 지각', value: '0회' },
+              { label: '이번달 지각', value: lateCountLabel },
               { label: '잔여 연차', value: `${leaveRemaining}일` },
               { label: '미결재', value: `${counts.pendingApproval}건` },
             ].map((st) => (
@@ -716,7 +718,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             {/* 알림 설정 — 탭 시 브라우저/기기 알림 권한 허용 여부 확인 + 요청 */}
             <button
               type="button"
-              onClick={() => void checkAndRequestNotif()}
+              onClick={() => onSub('notifSettings')}
               aria-label="알림 권한 확인 및 설정"
               style={{
                 width: '100%',
@@ -987,7 +989,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               보안 확인
             </div>
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 600, marginTop: 6, lineHeight: 1.5 }}>
-              {pwGate === 'payslip' ? '급여명세서 열람을 위해' : '증명서 발급을 위해'}
+              증명서 발급을 위해
               <br />비밀번호를 입력해 주세요.
             </div>
 

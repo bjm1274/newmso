@@ -14,20 +14,21 @@
 
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { ErpUser } from '@/types';
-import { db, d1 } from '@/lib/db-client';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import {
   resolveNotificationTarget,
   toNotificationMetadataRecord,
 } from '@/lib/notification-metadata';
 import { useNavigation } from '@/app/main/contexts/NavigationContext';
+import {
+  emitNotificationReadEvent,
+  fetchNotificationList,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  NOTIFICATION_LIST_UPDATED_EVENT,
+  type NotificationRecord,
+} from '@/app/main/기능부품/알림시스템/notification-api';
 import MIcon from '../공통/MIcon';
-
-// 알림시스템.tsx 의 NOTIFICATION_LIST_UPDATED_EVENT(= 'erp-notification-list-updated')와
-// 반드시 동일해야 한다. 과거 값이 변수명 문자열로 잘못 설정돼 모바일 알림탭이 실시간
-// 갱신 이벤트를 전혀 수신하지 못했음. 대형 'use client' 모듈(알림시스템.tsx)을 모바일
-// 번들에 끌어오지 않기 위해 import 대신 동일 문자열로 맞춘다.
-const NOTIFICATION_LIST_UPDATED_EVENT = 'erp-notification-list-updated';
 
 type Tone = 'accent' | 'success' | 'warn' | 'danger' | 'muted';
 
@@ -53,8 +54,6 @@ const TONE_MAP: Record<Tone, { bg: string; fg: string }> = {
   danger:  { bg: 'var(--m-danger-soft)', fg: 'var(--m-danger)' },
   muted:   { bg: 'var(--z-100)', fg: 'var(--z-600)' },
 };
-
-const NOTIFICATION_SELECT = 'id, user_id, type, title, body, metadata, read_at, created_at';
 
 /** notifications.type → 모바일 아이콘/톤 매핑 */
 function mapTypeToVisual(type: string): { icon: string; tone: Tone } {
@@ -86,17 +85,7 @@ function mapTypeToVisual(type: string): { icon: string; tone: Tone } {
   }
 }
 
-type NotificationDbRow = {
-  id?: unknown;
-  type?: unknown;
-  title?: unknown;
-  body?: unknown;
-  metadata?: unknown;
-  read_at?: unknown;
-  created_at?: unknown;
-};
-
-function normalizeRow(row: NotificationDbRow): NotifItem {
+function normalizeRow(row: NotificationRecord): NotifItem {
   const type = toNotificationText(row.type, 'notification', true);
   const visual = mapTypeToVisual(type);
   const created = toNotificationText(row.created_at, '');
@@ -128,14 +117,9 @@ function 알림탭Base({ user }: 알림탭Props) {
     if (!staffId) { setNotifs([]); setLoading(false); return; }
     setLoading(true);
     try {
-      const { data } = await d1.from('notifications')
-        .select(NOTIFICATION_SELECT)
-        .eq('user_id', staffId)
-        .order('created_at', { ascending: false })
-        .limit(200);
+      const data = await fetchNotificationList(200);
       if (cancelledRef.current) return;
-      const rows = Array.isArray(data) ? (data as NotificationDbRow[]) : [];
-      setNotifs(rows.map(normalizeRow).filter((n) => n.id));
+      setNotifs(data.map(normalizeRow).filter((n) => n.id));
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
@@ -158,14 +142,9 @@ function 알림탭Base({ user }: 알림탭Props) {
 
   const handleMarkAllRead = useCallback(async () => {
     if (!staffId) return;
-    const nowIso = new Date().toISOString();
     setNotifs((prev) => prev.map((n) => ({ ...n, unread: false })));
-    try {
-      await d1.from('notifications')
-        .update({ read_at: nowIso })
-        .eq('user_id', staffId)
-        .is('read_at', null);
-    } catch { /* 낙관적 업데이트 유지 */ }
+    await markAllNotificationsAsRead().catch(() => null);
+    emitNotificationReadEvent();
   }, [staffId]);
 
   // 탭 시: (1) 읽음 처리 → (2) 알림 종류에 맞는 모바일 탭/서브뷰로 이동.
@@ -175,11 +154,8 @@ function 알림탭Base({ user }: 알림탭Props) {
   const handleTapItem = useCallback(async (item: NotifItem) => {
     const { id } = item;
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
-    try {
-      await d1.from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('id', id);
-    } catch { /* 낙관적 업데이트 유지 */ }
+    await markNotificationAsRead(id).catch(() => null);
+    emitNotificationReadEvent();
 
     // 목적지 결정 — PC와 동일한 매핑 엔진 재사용.
     const target = resolveNotificationTarget(item.type, item.metadata);

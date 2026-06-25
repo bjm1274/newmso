@@ -564,7 +564,10 @@ export default function ContractPreview({
                           receiptTraceDataUrl: receiptSig,
                         }}
                       />
-
+                    </td>
+                  </tr>
+                  <tr className="print:break-before-page" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
+                    <td className="align-top p-0">
                       <ConfidentialityPledge
                         companyName={companyName}
                         employeeName={staff.name}

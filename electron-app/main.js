@@ -59,6 +59,52 @@ if (!gotTheLock) {
       app.setAppUserModelId('com.pchos.allerp');
     }
 
+    // 권한 요청 핸들러 설정 (마이크, 알림, 클립보드 등)
+    const { session } = require('electron');
+    
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      try {
+        const url = webContents.getURL();
+        if (!url) {
+          return callback(false);
+        }
+        const origin = new URL(url).origin;
+        if (origin === 'https://erp.pchos.kr' || origin.startsWith('http://localhost:')) {
+          if (
+            permission === 'media' ||
+            permission === 'notifications' ||
+            permission === 'clipboard-read' ||
+            permission === 'clipboard-sanitized-write'
+          ) {
+            return callback(true);
+          }
+        }
+      } catch (err) {
+        console.error('Permission request error:', err);
+      }
+      callback(false);
+    });
+
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      try {
+        if (!requestingOrigin) return false;
+        const origin = new URL(requestingOrigin).origin;
+        if (origin === 'https://erp.pchos.kr' || origin.startsWith('http://localhost:')) {
+          if (
+            permission === 'media' ||
+            permission === 'notifications' ||
+            permission === 'clipboard-read' ||
+            permission === 'clipboard-sanitized-write'
+          ) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.error('Permission check error:', err);
+      }
+      return false;
+    });
+
     createWindow();
 
     // 트레이 아이콘 설정

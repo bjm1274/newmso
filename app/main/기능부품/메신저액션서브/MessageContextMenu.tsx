@@ -36,6 +36,9 @@ export interface MessageContextMenuProps {
   onTask: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
+  onReadDetail?: () => void;
+  onOpenThread?: () => void;
+  threadReplyCount?: number;
 }
 
 export default function MessageContextMenu({
@@ -51,6 +54,9 @@ export default function MessageContextMenu({
   onTask,
   onDelete,
   canDelete = false,
+  onReadDetail,
+  onOpenThread,
+  threadReplyCount,
 }: MessageContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
@@ -242,6 +248,43 @@ export default function MessageContextMenu({
           <span>할 일로 변환</span>
           <span />
         </button>
+
+        {(onOpenThread || onReadDetail) && (
+          <>
+            <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
+            {onOpenThread && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onOpenThread();
+                  onClose();
+                }}
+                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+              >
+                <span aria-hidden="true" className="text-[var(--toss-gray-4)]">💬</span>
+                <span>스레드 답글 {threadReplyCount && threadReplyCount > 0 ? `(${threadReplyCount})` : ''}</span>
+                <span />
+              </button>
+            )}
+            {onReadDetail && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onReadDetail();
+                  onClose();
+                }}
+                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+              >
+                <span aria-hidden="true" className="text-[var(--toss-gray-4)]">👀</span>
+                <span>읽음 확인</span>
+                <span />
+              </button>
+            )}
+          </>
+        )}
+
         <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
         <button
           type="button"

@@ -44,6 +44,9 @@ interface MessageActionsHostProps {
   onBookmark: () => void;
   onTask: () => void;
   onDelete?: () => void;
+  onReadDetail?: () => void;
+  onOpenThread?: () => void;
+  threadReplyCount?: number;
 }
 
 export default function MessageActionsHost({
@@ -62,6 +65,9 @@ export default function MessageActionsHost({
   onBookmark,
   onTask,
   onDelete,
+  onReadDetail,
+  onOpenThread,
+  threadReplyCount,
 }: MessageActionsHostProps) {
   const [ctxMenu, setCtxMenu] = useState<Anchor | null>(null);
   const [picker, setPicker] = useState<Anchor | null>(null);
@@ -239,6 +245,9 @@ export default function MessageActionsHost({
           onTask={onTask}
           onDelete={onDelete}
           canDelete={canDelete ?? mine}
+          onReadDetail={onReadDetail}
+          onOpenThread={onOpenThread}
+          threadReplyCount={threadReplyCount}
         />
       )}
       {picker && (

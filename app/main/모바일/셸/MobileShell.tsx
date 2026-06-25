@@ -34,6 +34,12 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { sendAdminNotifications } from '@/lib/notification-utils';
 import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/계약문서/전자서명모달';
+import {
+  countUnreadNotifications,
+  fetchUnreadNotificationCount,
+  NOTIFICATION_LIST_UPDATED_EVENT,
+  NOTIFICATION_READ_EVENT,
+} from '@/app/main/기능부품/알림시스템/notification-api';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -201,6 +207,54 @@ export default function MobileShell({
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
   const totalUnread = rooms.reduce((sum, r) => sum + (r.unread_count || 0), 0);
+  const [notificationUnread, setNotificationUnread] = useState(0);
+
+  const refreshNotificationUnread = useCallback(async () => {
+    if (!userId) {
+      setNotificationUnread(0);
+      return;
+    }
+    try {
+      setNotificationUnread(await fetchUnreadNotificationCount());
+    } catch {
+      // 알림시스템의 다음 broadcast 또는 visibility 복귀에서 다시 보정한다.
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshNotificationUnread();
+    if (typeof window === 'undefined') return;
+
+    const handleListUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ notifications?: unknown }>).detail;
+      if (Array.isArray(detail?.notifications)) {
+        setNotificationUnread(countUnreadNotifications(detail.notifications as Array<{ read_at?: unknown }>));
+        return;
+      }
+      void refreshNotificationUnread();
+    };
+    const handleRefresh = () => {
+      void refreshNotificationUnread();
+    };
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      void refreshNotificationUnread();
+    };
+
+    window.addEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
+    window.addEventListener(NOTIFICATION_READ_EVENT, handleRefresh);
+    window.addEventListener('erp-new-notification', handleRefresh);
+    window.addEventListener('focus', handleRefresh);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener(NOTIFICATION_LIST_UPDATED_EVENT, handleListUpdated as EventListener);
+      window.removeEventListener(NOTIFICATION_READ_EVENT, handleRefresh);
+      window.removeEventListener('erp-new-notification', handleRefresh);
+      window.removeEventListener('focus', handleRefresh);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [refreshNotificationUnread]);
 
   // Synchronize route.tab when global mainMenu changes
   useEffect(() => {
@@ -360,7 +414,7 @@ export default function MobileShell({
             </div>
           )}
         </div>
-        <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread }} />
+        <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread, notif: notificationUnread }} />
       </div>
     </div>
   );

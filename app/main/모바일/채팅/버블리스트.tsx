@@ -32,7 +32,6 @@ export type BubbleListProps = {
   onTask: (message: ChatMessage) => void;
   onDelete: (message: ChatMessage) => void;
   onForward: (message: ChatMessage) => void;
-  onEdit?: (message: ChatMessage) => void;
   onReactionDetail?: (message: ChatMessage) => void;
   onReadDetail?: (message: ChatMessage) => void;
   onOpenThread?: (message: ChatMessage) => void;
@@ -57,7 +56,6 @@ export default function BubbleList({
   onTask,
   onDelete,
   onForward,
-  onEdit,
   onReactionDetail,
   onReadDetail,
   onOpenThread,
@@ -160,7 +158,6 @@ export default function BubbleList({
             onTask={onTask}
             onDelete={onDelete}
             onForward={onForward}
-            onEdit={onEdit}
             onReactionDetail={onReactionDetail}
             onReadDetail={onReadDetail}
             onOpenThread={onOpenThread}

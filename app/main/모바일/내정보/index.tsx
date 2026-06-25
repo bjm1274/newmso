@@ -15,6 +15,7 @@ import 급여명세 from './급여명세';
 import 증명서 from './증명서';
 import 정보수정 from './정보수정';
 import 나의할일 from './나의할일';
+import 알림설정 from './알림설정';
 
 export type 내정보Props = {
   user: ErpUser;
@@ -53,6 +54,8 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
     contentElement = <정보수정 user={user} onBack={onBack} />;
   } else if (sub === 'todo') {
     contentElement = <나의할일 user={user} onBack={onBack} onSwitchTab={onSwitchTab} />;
+  } else if (sub === 'notifSettings') {
+    contentElement = <알림설정 user={user} onBack={onBack} />;
   } else {
     contentElement = <SHome user={user} onSub={onSub} onLogout={onLogout} onSwitchTab={onSwitchTab} />;
   }

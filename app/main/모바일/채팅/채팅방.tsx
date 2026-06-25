@@ -59,7 +59,6 @@ import {
 } from './업로드';
 import { toggleMobileReaction } from './반응';
 import {
-  editMobileMessage,
   renameMobileRoom,
   addMobileRoomMembers,
   removeMobileRoomMember,
@@ -68,7 +67,6 @@ import {
   fetchRoomPolls,
   type RoomPollsResult,
 } from './메시지액션';
-import { MessageEditSheet } from './수정시트';
 import { ReactionDetailSheet, ReadStatusSheet } from './상세시트';
 import { ThreadSheet } from './스레드시트';
 import { AddMemberSheet } from './멤버관리시트';
@@ -149,8 +147,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
 
   // 메시지 수정 시트
-  const [editTarget, setEditTarget] = useState<ChatMessage | null>(null);
-  const [editSaving, setEditSaving] = useState(false);
+
   // 반응/읽음 상세 시트
   const [reactionDetailTarget, setReactionDetailTarget] = useState<ChatMessage | null>(null);
   const [readDetailTarget, setReadDetailTarget] = useState<ChatMessage | null>(null);
@@ -476,29 +473,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     [room.id, userId, refreshPolls],
   );
 
-  // ── 메시지 수정 ──
-  const handleSaveEdit = useCallback(
-    async (message: ChatMessage, content: string) => {
-      setEditSaving(true);
-      try {
-        const result = await editMobileMessage({
-          messageId: String(message.id),
-          content,
-          roomId: String(room.id),
-        });
-        if (!result.ok) {
-          toast(result.error, 'error');
-          return;
-        }
-        toast('메시지가 수정되었습니다.', 'success');
-        setEditTarget(null);
-        void refresh();
-      } finally {
-        setEditSaving(false);
-      }
-    },
-    [room.id, refresh],
-  );
+
 
   // ── 스레드 답글 전송 — 기존 sendMobileTextMessage(replyToId) 재사용 ──
   const handleSendThreadReply = useCallback(
@@ -877,7 +852,6 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             setForwardMessage(msg);
             setIsForwardOpen(true);
           }}
-          onEdit={(msg) => setEditTarget(msg)}
           onReactionDetail={(msg) => setReactionDetailTarget(msg)}
           onReadDetail={(msg) => setReadDetailTarget(msg)}
           onOpenThread={(msg) => setThreadRoot(msg)}
@@ -1461,13 +1435,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         </div>
       </MSheet>
 
-      {/* 메시지 수정 시트 */}
-      <MessageEditSheet
-        message={editTarget}
-        saving={editSaving}
-        onClose={() => setEditTarget(null)}
-        onSave={(message, content) => { void handleSaveEdit(message, content); }}
-      />
+
 
       {/* 반응 상세 시트 */}
       <ReactionDetailSheet

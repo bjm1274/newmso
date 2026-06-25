@@ -55,11 +55,7 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분
 let sseSource: EventSource | null = null;
 let sseErrorCount = 0;
 const MAX_SSE_ERRORS = 3;
-let useSSE = typeof window !== 'undefined' &&
-             typeof window.EventSource !== 'undefined' &&
-             !navigator.webdriver &&
-             !window.navigator.userAgent.includes('HeadlessChrome') &&
-             !window.navigator.userAgent.includes('Playwright');
+let useSSE = false;
 let sseSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Cross-Tab Leader Election & Self-Healing SSE
@@ -257,6 +253,11 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
     if (!data.ok || !data.tail) return;
 
     processTailData(entry, data.tail);
+
+    // 타 탭으로 변경내용 브로드캐스트 (SSE 미사용 폴링 환경 대응)
+    if (bc) {
+      bc.postMessage({ type: 'change', tail: data.tail });
+    }
   } catch (err) {
     console.warn('[polling-bus] poll failed', err);
   } finally {

@@ -264,7 +264,12 @@ function MyPageMain({
     };
   }, [fetchMonthlyAttendanceSummary, user?.id]);
 
-  const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
+  const handleSignComplete = async (
+    signatureDataUrl: string,
+    contractText: string,
+    receiptSignatureData?: string,
+    privacyConsent?: boolean | null
+  ) => {
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;
     try {
@@ -273,7 +278,9 @@ function MyPageMain({
         .update({
           status: '서명완료',
           signed_at: new Date().toISOString(),
-          signature_data: signatureDataUrl
+          signature_data: signatureDataUrl,
+          receipt_signature_data: receiptSignatureData || null,
+          privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
         .eq('id', pendingContract.id);
 

@@ -13,6 +13,7 @@ import {
   extractStorageUrlExtension,
   triggerManagedBrowserDownload,
   isInternalStorageObjectUrl,
+  rewritePublicR2UrlToInternal,
 } from '@/lib/object-storage-url';
 import type { ChatMessage } from '@/types';
 import { Paperclip, Video } from './lucide-shim';
@@ -283,6 +284,12 @@ export function getDeletedMessagePreviewText() {
 export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {
   try {
     let fetchUrl = imageUrl;
+    const internalUrl = rewritePublicR2UrlToInternal(imageUrl);
+    if (internalUrl) {
+      imageUrl = internalUrl;
+      fetchUrl = internalUrl;
+    }
+
     if (isInternalStorageObjectUrl(imageUrl)) {
       try {
         const parsed = new URL(imageUrl, window.location.origin);

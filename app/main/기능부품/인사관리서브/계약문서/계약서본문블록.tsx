@@ -213,7 +213,7 @@ export default function ContractBodyBlock({
                                     }
 
                                     return (
-                                        <div key={li} className="shift-card-container my-2 flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar print:my-1 print:gap-1 print:pb-0">
+                                        <div key={li} className="shift-card-container my-2 flex flex-wrap gap-1.5 overflow-x-auto pb-1 custom-scrollbar print:my-1 print:gap-1 print:pb-0">
                                             {cards.map((card, idx) => (
                                                 <div key={idx} className="shift-card flex-1 min-w-[90px] max-w-[130px] bg-[#f8faff] border border-[#dbeafe] rounded-lg p-1.5 shadow-sm print:shadow-none print:border-slate-300 print:bg-slate-50 print:p-1 flex flex-col justify-between shrink-0">
                                                     <div className="text-center mb-1">
@@ -326,25 +326,27 @@ export default function ContractBodyBlock({
                                         );
                                     }
                                     return (
-                                        <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-[var(--muted)]/50 rounded-xl border border-[var(--border-subtle)] shrink-0">
-                                            <label className="flex items-center gap-2 select-none opacity-60">
-                                                <input
-                                                    type="radio"
-                                                    disabled
-                                                    checked={privacyConsent === true}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300"
-                                                />
-                                                <span className="text-[13.5px] font-bold text-[var(--foreground)]">동의 (서명 시 선택 가능)</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 select-none opacity-60">
-                                                <input
-                                                    type="radio"
-                                                    disabled
-                                                    checked={privacyConsent === false}
-                                                    className="w-4 h-4 text-blue-600 border-gray-300"
-                                                />
-                                                <span className="text-[13.5px] font-bold text-[var(--toss-gray-4)]">동의하지 않음</span>
-                                            </label>
+                                        <div key={li} className="flex items-center gap-6 mt-3 mb-3 p-3 bg-slate-50 border border-slate-200 rounded-xl shrink-0 print:bg-white print:border-slate-300 print:my-1.5 print:p-2">
+                                            <div className="flex items-center gap-2 select-none">
+                                                <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${privacyConsent === true ? 'bg-blue-600 border-blue-600' : 'border-slate-400 bg-white'}`}>
+                                                    {privacyConsent === true && (
+                                                        <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </span>
+                                                <span className={`text-[13.5px] font-bold ${privacyConsent === true ? 'text-blue-700' : 'text-slate-500'}`}>동의</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 select-none">
+                                                <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${privacyConsent === false ? 'bg-blue-600 border-blue-600' : 'border-slate-400 bg-white'}`}>
+                                                    {privacyConsent === false && (
+                                                        <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </span>
+                                                <span className={`text-[13.5px] font-bold ${privacyConsent === false ? 'text-blue-700' : 'text-slate-500'}`}>동의하지 않음</span>
+                                            </div>
                                         </div>
                                     );
                                 }

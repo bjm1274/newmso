@@ -12,7 +12,6 @@ import {
   initNotificationService,
   loadNotifSettings,
   NOTIFICATION_DELIVERY_EVENT,
-  NOTIFICATION_LIST_UPDATED_EVENT,
   NotifSettings,
   PUSH_DEBUG_EVENT,
   PUSH_STATUS_CHANGED_EVENT,
@@ -23,6 +22,18 @@ import {
   type NotificationDeliveryLogEntry,
   type PushConnectionStatus,
 } from './알림시스템';
+import {
+  cleanupReadNotifications,
+  deleteNotificationById,
+  deleteNotificationsByIds,
+  emitNotificationReadEvent,
+  fetchNotificationList,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  markNotificationsAsRead,
+  NOTIFICATION_LIST_UPDATED_EVENT,
+} from './알림시스템/notification-api';
+import { normalizeKeywordList } from './알림시스템/filter-helpers';
 import { timeAgo } from '@/lib/notification-utils';
 
 // ─── 타입 설정 ───
@@ -44,18 +55,6 @@ const INBOX_DATE_FILTERS: Array<{ id: InboxDateRange; label: string }> = [
   { id: '7d', label: '최근 7일' },
   { id: '30d', label: '최근 30일' },
 ];
-
-function normalizeKeywordInput(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(/[\n,]/)
-        .map((token) => token.trim())
-        .filter(Boolean)
-        .slice(0, 30),
-    ),
-  );
-}
 
 function isWithinInboxDateRange(dateValue: string, range: InboxDateRange) {
   if (range === 'all') return true;
@@ -219,7 +218,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
   };
 
   const commitKeywords = () => {
-    const nextKeywords = normalizeKeywordInput(keywordInput);
+    const nextKeywords = normalizeKeywordList(keywordInput);
     update({ keywords: nextKeywords });
     setKeywordInput(nextKeywords.join(', '));
   };
@@ -828,7 +827,6 @@ function SettingsTab({ userId }: { userId?: string | null }) {
 // 7일 이상된 알림 자동 삭제 — 사용자별, 24시간 throttle.
 // 실제 DELETE는 서버 cron이 아닌 클라이언트 마운트 시점 1회로 충분 (개인 인박스).
 const NOTIFICATIONS_CLEANUP_KEY = 'erp_notif_cleanup_last';
-const NOTIFICATIONS_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const NOTIFICATIONS_CLEANUP_THROTTLE_MS = 24 * 60 * 60 * 1000;
 
 async function cleanupOldNotifications(userId: string) {
@@ -837,12 +835,7 @@ async function cleanupOldNotifications(userId: string) {
     const lastRaw = window.localStorage.getItem(NOTIFICATIONS_CLEANUP_KEY);
     const last = lastRaw ? Number(lastRaw) : 0;
     if (Number.isFinite(last) && Date.now() - last < NOTIFICATIONS_CLEANUP_THROTTLE_MS) return;
-    const res = await fetch('/api/notifications', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cleanup: true }),
-    });
-    if (!res.ok) throw new Error('Cleanup failed');
+    await cleanupReadNotifications();
     window.localStorage.setItem(NOTIFICATIONS_CLEANUP_KEY, String(Date.now()));
   } catch {
     // JM3: cleanup 실패는 silent — 다음 마운트에서 재시도
@@ -870,11 +863,9 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
     try {
       // 7일 이상된 알림을 먼저 자동 정리 (24시간 throttle, silent fail)
       await cleanupOldNotifications(_u.id as string);
-      const res = await fetch('/api/notifications?limit=200');
-      if (!res.ok) throw new Error('Fetch failed');
-      const json = await res.json();
+      const rows = await fetchNotificationList(200);
       lastFetchedAtRef.current = Date.now();
-      setNotifications(json.data || []);
+      setNotifications(rows);
     } catch { setNotifications([]); } finally { setLoading(false); }
   }, [_u?.id]);
 
@@ -940,13 +931,9 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   useEffect(() => {
     if (!_u?.id) return;
     const timer = setTimeout(async () => {
-      await fetch('/api/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true }),
-      }).catch(() => null);
+      await markAllNotificationsAsRead().catch(() => null);
       setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
-      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('erp-notification-read'));
+      emitNotificationReadEvent();
     }, 1500);
     return () => clearTimeout(timer);
   }, [_u?.id]);
@@ -959,7 +946,7 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
 
   const emitNotificationReadSync = useCallback(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('erp-notification-read'));
+      emitNotificationReadEvent();
     }
     if (typeof onRefresh === 'function') {
       onRefresh();
@@ -967,33 +954,21 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   }, [onRefresh]);
 
   const markAsRead = async (id: string) => {
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    }).catch(() => null);
+    await markNotificationAsRead(id).catch(() => null);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
     emitNotificationReadSync();
   };
 
   const markAllAsRead = async () => {
     if (!_u?.id) return;
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ all: true }),
-    }).catch(() => null);
+    await markAllNotificationsAsRead().catch(() => null);
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
     emitNotificationReadSync();
   };
 
   const deleteNotif = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    await fetch('/api/notifications', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    }).catch(() => null);
+    await deleteNotificationById(id).catch(() => null);
     setNotifications(prev => prev.filter(n => n.id !== id));
     emitNotificationReadSync();
   };
@@ -1007,11 +982,7 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
   const markSelectedAsRead = useCallback(async () => {
     if (selectedIds.length === 0) return;
     const readAt = new Date().toISOString();
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: selectedIds }),
-    }).catch(() => null);
+    await markNotificationsAsRead(selectedIds).catch(() => null);
     setNotifications((prev) =>
       prev.map((notification) =>
         selectedIds.includes(String(notification.id))
@@ -1026,11 +997,7 @@ function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown
 
   const deleteSelected = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    await fetch('/api/notifications', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: selectedIds }),
-    }).catch(() => null);
+    await deleteNotificationsByIds(selectedIds).catch(() => null);
     setNotifications((prev) =>
       prev.filter((notification) => !selectedIds.includes(String(notification.id)))
     );

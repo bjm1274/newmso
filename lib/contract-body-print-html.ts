@@ -203,14 +203,14 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                     const breakHTML = card.breakTime ? `
                         <div style="
                             text-align:center;
-                            font-size:11px;
+                            font-size:8px;
                             font-weight:bold;
                             color:#4b5563;
                             background:#ffffff;
-                            padding:5px;
-                            border-radius:8px;
+                            padding:2px 3px;
+                            border-radius:6px;
                             border:1px solid #e5e7eb;
-                            margin-bottom:4px;
+                            margin-bottom:2px;
                         ">
                             휴게 <span style="color:#2563eb;margin-left:2px;">${esc(card.breakTime)}</span>
                         </div>
@@ -218,7 +218,7 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                     const workDaysHTML = workDaysText ? `
                         <div style="
                             text-align:center;
-                            font-size:10px;
+                            font-size:7px;
                             color:#6b7280;
                             white-space:nowrap;
                             overflow:hidden;
@@ -229,25 +229,25 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                     return `
                         <div class="shift-card" style="
                             flex:1;
-                            min-width:140px;
-                            max-width:200px;
+                            min-width:90px;
+                            max-width:130px;
                             background:#f8faff;
                             border:1px solid #dbeafe;
-                            border-radius:12px;
-                            padding:10px;
+                            border-radius:8px;
+                            padding:6px;
                             display:flex;
                             flex-direction:column;
                             justify-content:space-between;
                             box-shadow:0 1px 2px rgba(0,0,0,0.02);
                         ">
-                            <div style="text-align:center;margin-bottom:8px;">
+                            <div style="text-align:center;margin-bottom:4px;">
                                 <span style="
                                     display:inline-block;
-                                    padding:3px 10px;
+                                    padding:2px 6px;
                                     background:#2563eb;
                                     color:#ffffff;
                                     font-weight:900;
-                                    font-size:11px;
+                                    font-size:8px;
                                     border-radius:9999px;
                                     letter-spacing:0.05em;
                                 ">${esc(labelText)}</span>
@@ -256,15 +256,15 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                                 display:flex;
                                 align-items:center;
                                 justify-content:center;
-                                gap:4px;
+                                gap:3px;
                                 color:#1f2937;
                                 font-weight:900;
-                                font-size:14px;
-                                margin-bottom:8px;
+                                font-size:10px;
+                                margin-bottom:4px;
                                 letter-spacing:-0.02em;
                             ">
                                 <span>${esc(card.start || '-')}</span>
-                                <span style="color:#9ca3af;font-size:12px;">~</span>
+                                <span style="color:#9ca3af;font-size:9px;">~</span>
                                 <span>${esc(card.end || '-')}</span>
                             </div>
                             ${breakHTML}
@@ -277,8 +277,8 @@ export function buildContractBodyPrintHTML(templateText: string): string {
                     <div class="shift-card-container" style="
                         margin:10px 0;
                         display:flex;
-                        gap:8px;
-                        overflow-x:auto;
+                        flex-wrap:wrap;
+                        gap:6px;
                         padding-bottom:4px;
                     ">
                         ${cardsHTML}
@@ -337,6 +337,25 @@ export function buildContractBodyPrintHTML(templateText: string): string {
   <span style="font-size:13px;font-weight:600;color:#4b5563;">${label}</span>
   <span style="font-size:13px;font-weight:900;color:#111827;">${amount}</span>
 </div>`;
+            }
+
+            // 개인정보 수집/이용 동의 (체크박스 행) -> 체크박스 아이콘화하여 렌더링
+            if ((t.includes('☑ 동의') || t.includes('□ 동의')) && (t.includes('☑ 동의하지') || t.includes('□ 동의하지') || t.includes('동의하지 않음'))) {
+                const hasAgree = t.includes('☑ 동의');
+                const hasDecline = t.includes('☑ 동의하지') || (!hasAgree && !t.includes('□ 동의하지'));
+
+                const agreeCheck = hasAgree
+                    ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:2px solid #2563eb;background:#2563eb;border-radius:4px;margin-right:6px;vertical-align:middle;"><svg style="width:12px;height:12px;color:white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg></span>`
+                    : `<span style="display:inline-block;width:18px;height:18px;border:2px solid #9ca3af;background:white;border-radius:4px;margin-right:6px;vertical-align:middle;"></span>`;
+
+                const declineCheck = hasDecline
+                    ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:2px solid #2563eb;background:#2563eb;border-radius:4px;margin-right:6px;vertical-align:middle;"><svg style="width:12px;height:12px;color:white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg></span>`
+                    : `<span style="display:inline-block;width:18px;height:18px;border:2px solid #9ca3af;background:white;border-radius:4px;margin-right:6px;vertical-align:middle;"></span>`;
+
+                return `<div style="margin:12px 0;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;display:flex;gap:24px;align-items:center;break-inside:avoid;page-break-inside:avoid;">
+                    <span style="font-size:13px;color:${hasAgree ? '#1d4ed8' : '#4b5563'};font-weight:700;">${agreeCheck}동의</span>
+                    <span style="font-size:13px;color:${hasDecline ? '#1d4ed8' : '#4b5563'};font-weight:700;">${declineCheck}동의하지 않음</span>
+                </div>`;
             }
 
             // 일반 문단

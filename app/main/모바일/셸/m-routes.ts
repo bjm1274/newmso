@@ -6,7 +6,7 @@
 
 export type MTab = 'notif' | 'mypage' | 'addon' | 'chat' | 'board' | 'approval' | 'hr' | 'stock' | 'admin';
 
-export type MHomeSub = 'attend' | 'leave' | 'payslip' | 'cert' | 'edit' | 'todo';
+export type MHomeSub = 'attend' | 'leave' | 'payslip' | 'cert' | 'edit' | 'todo' | 'notifSettings';
 
 export type MRoute =
   | { tab: 'notif' }

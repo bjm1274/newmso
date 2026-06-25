@@ -26,7 +26,16 @@ import {
 } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { toNotificationText, timeAgo } from '@/lib/notification-utils';
-import { NOTIFICATION_LIST_UPDATED_EVENT } from '@/app/main/기능부품/알림시스템';
+import {
+  countUnreadNotifications,
+  deleteNotificationById,
+  emitNotificationReadEvent,
+  fetchNotificationList,
+  fetchUnreadNotificationCount,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  NOTIFICATION_LIST_UPDATED_EVENT,
+} from './알림시스템/notification-api';
 import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
 import { useIsMobile } from '@/app/components/useIsMobile';
 
@@ -105,20 +114,14 @@ export default function NotificationCenter({
     if (!effectiveUserId) return;
 
     try {
-      // unread count는 전체 기준으로 정확하게 계산
-      const countRes = await fetch('/api/notifications?count=true');
-      if (!countRes.ok) throw new Error('Failed to fetch count');
-      const countJson = await countRes.json();
-      const totalUnread = countJson.count ?? 0;
-
-      const listRes = await fetch('/api/notifications?limit=50');
-      if (!listRes.ok) throw new Error('Failed to fetch list');
-      const listJson = await listRes.json();
-      const list = listJson.data || [];
+      const [totalUnread, list] = await Promise.all([
+        fetchUnreadNotificationCount(),
+        fetchNotificationList(50),
+      ]);
 
       setNotifications(list);
 
-      const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
+      const unread = totalUnread ?? countUnreadNotifications(list);
       setUnreadCount(unread);
       return unread;
     } catch (err) {
@@ -153,7 +156,7 @@ export default function NotificationCenter({
       const next = Array.isArray(detail?.notifications) ? (detail!.notifications as any[]) : null;
       if (!next) return;
       setNotifications(next);
-      const unread = next.filter((notification: any) => !notification.read_at).length;
+      const unread = countUnreadNotifications(next);
       if (unread > prevCountRef.current) triggerShake();
       setUnreadCount(unread);
       prevCountRef.current = unread;
@@ -205,39 +208,27 @@ export default function NotificationCenter({
     if (!effectiveUserId) return;
 
     const readAt = new Date().toISOString();
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ all: true }),
-    }).catch(() => null);
+    await markAllNotificationsAsRead().catch(() => null);
 
     setNotifications((prev) => prev.map((notification) => ({
       ...notification,
       read_at: notification.read_at || readAt,
     })));
     setUnreadCount(0);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('erp-notification-read'));
-    }
+    emitNotificationReadEvent();
     sound.playSystem();
   }, [effectiveUserId]);
 
   const markAsRead = useCallback(async (id: string) => {
     const readAt = new Date().toISOString();
-    await fetch('/api/notifications', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    }).catch(() => null);
+    await markNotificationAsRead(id).catch(() => null);
     setNotifications((prev) =>
       prev.map((notification) =>
         notification.id === id ? { ...notification, read_at: readAt } : notification
       )
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('erp-notification-read'));
-    }
+    emitNotificationReadEvent();
   }, []);
 
   const deleteNotification = useCallback(async (id: string) => {
@@ -252,17 +243,11 @@ export default function NotificationCenter({
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
     try {
-      await fetch('/api/notifications', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
+      await deleteNotificationById(id);
     } catch (err) {
       console.warn('[notification-center] delete failed', err);
     }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('erp-notification-read'));
-    }
+    emitNotificationReadEvent();
   }, []);
 
   const openNotificationTarget = useCallback((notification: any) => {

@@ -18,15 +18,8 @@ import {
   sendNotification,
   type PushConnectionStatus,
 } from '../../기능부품/알림시스템';
+import { normalizeKeywordList } from '../../기능부품/알림시스템/filter-helpers';
 import { timeAgo } from '@/lib/notification-utils';
-
-// 키워드 정규화
-function normalizeKeywordInput(str: string): string[] {
-  return str
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
 
 export type 알림설정Props = {
   user: ErpUser;
@@ -74,7 +67,7 @@ export default function 알림설정({ user, onBack }: 알림설정Props) {
   };
 
   const commitKeywords = () => {
-    const nextKeywords = normalizeKeywordInput(keywordInput);
+    const nextKeywords = normalizeKeywordList(keywordInput);
     update({ keywords: nextKeywords });
     setKeywordInput(nextKeywords.join(', '));
   };

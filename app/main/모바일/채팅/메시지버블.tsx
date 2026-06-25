@@ -38,8 +38,6 @@ export type MessageBubbleProps = {
   onTask: (message: ChatMessage) => void;
   onDelete: (message: ChatMessage) => void;
   onForward: (message: ChatMessage) => void;
-  /** 본인 텍스트 메시지 수정 */
-  onEdit?: (message: ChatMessage) => void;
   /** 이모지별 반응자 상세 */
   onReactionDetail?: (message: ChatMessage) => void;
   /** 읽음 상세(누가 읽었나) */
@@ -90,7 +88,6 @@ export default function MessageBubble({
   onTask,
   onDelete,
   onForward,
-  onEdit,
   onReactionDetail,
   onReadDetail,
   onOpenThread,
@@ -154,9 +151,6 @@ export default function MessageBubble({
   }, [text]);
 
   const wasEdited = Boolean(message.edited_at);
-  // 본인이 보낸 일반 텍스트 메시지만 수정 가능(첨부/이모티콘/시스템 메시지 제외)
-  const canEdit =
-    mine && !!onEdit && !hasFile && !isEmoticonOrSticker && !isSystemMessage && !!text;
 
   const handleCopy = useCallback(() => {
     if (text) {
@@ -178,6 +172,9 @@ export default function MessageBubble({
       onBookmark={() => onBookmark(message)}
       onTask={() => onTask(message)}
       onDelete={() => onDelete(message)}
+      onReadDetail={onReadDetail && mine ? () => onReadDetail(message) : undefined}
+      onOpenThread={onOpenThread ? () => onOpenThread(message) : undefined}
+      threadReplyCount={threadReplyCount}
     >
       <div
         ref={containerRef}
@@ -224,6 +221,7 @@ export default function MessageBubble({
               gap: 6,
               position: 'relative',
               minWidth: 0,
+              maxWidth: '100%',
             }}
           >
             {mine && (
@@ -277,6 +275,7 @@ export default function MessageBubble({
                 whiteSpace: 'pre-wrap',
                 overflow: 'hidden',
                 minWidth: 0,
+                flexShrink: 1,
               }}
             >
               {replyTarget && (
@@ -444,7 +443,7 @@ export default function MessageBubble({
             </div>
           )}
 
-          {(canEdit || wasEdited || onOpenThread || (onReactionDetail && reactionEntries.length > 0) || (onReadDetail && mine)) && (
+          {wasEdited && (
             <div
               style={{
                 display: 'flex',
@@ -456,57 +455,7 @@ export default function MessageBubble({
                 justifyContent: mine ? 'flex-end' : 'flex-start',
               }}
             >
-              {wasEdited && (
-                <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>수정됨</span>
-              )}
-              {canEdit && (
-                <button
-                  type="button"
-                  aria-label="메시지 수정"
-                  onClick={() => onEdit?.(message)}
-                  style={metaBtnStyle}
-                >
-                  수정
-                </button>
-              )}
-              {onReactionDetail && reactionEntries.length > 0 && (
-                <button
-                  type="button"
-                  aria-label="반응 상세 보기"
-                  onClick={() => onReactionDetail(message)}
-                  style={metaBtnStyle}
-                >
-                  반응 상세
-                </button>
-              )}
-              {onReadDetail && mine && (
-                <button
-                  type="button"
-                  aria-label="읽음 확인 상세 보기"
-                  onClick={() => onReadDetail(message)}
-                  style={metaBtnStyle}
-                >
-                  읽음 확인
-                </button>
-              )}
-              {onOpenThread && (
-                <button
-                  type="button"
-                  aria-label={threadReplyCount > 0 ? `스레드 답글 ${threadReplyCount}개 보기` : '스레드 열기'}
-                  onClick={() => onOpenThread(message)}
-                  style={{
-                    ...metaBtnStyle,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 3,
-                    color: threadReplyCount > 0 ? 'var(--m-accent)' : 'var(--z-500)',
-                    fontWeight: threadReplyCount > 0 ? 800 : 600,
-                  }}
-                >
-                  <MIcon name="chat" size={12} />
-                  {threadReplyCount > 0 ? `답글 ${threadReplyCount}` : '스레드'}
-                </button>
-              )}
+              <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>수정됨</span>
             </div>
           )}
         </div>

@@ -52,6 +52,23 @@ export function isInternalStorageObjectUrl(url: string): boolean {
   }
 }
 
+export function rewritePublicR2UrlToInternal(url: string): string | null {
+  const normalizedUrl = String(url || '').trim();
+  if (!normalizedUrl) return null;
+  if (!R2_PUBLIC_BASE || !R2_PUBLIC_HOST) return null;
+
+  try {
+    const parsed = new URL(normalizedUrl, typeof window !== 'undefined' ? window.location.origin : 'https://local-storage-proxy.test');
+    if (parsed.hostname !== R2_PUBLIC_HOST) return null;
+    const objectKey = decodeURIComponent(parsed.pathname.substring(1));
+    if (!objectKey) return null;
+    return `${INTERNAL_OBJECT_PROXY_PATH}?provider=r2&bucket=pchos-files&key=${encodeURIComponent(objectKey)}`;
+  } catch {
+    return null;
+  }
+}
+
+
 export function buildInternalStorageDownloadUrl(url: string, fileName: string): string {
   const parsed = new URL(url, 'https://local-storage-proxy.test');
   parsed.searchParams.set('download', '1');

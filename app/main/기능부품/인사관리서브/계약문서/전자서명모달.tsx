@@ -11,7 +11,13 @@ import {
     type ContractClosingData,
 } from '@/lib/contract-template-closing';
 import { buildContractBodyPrintHTML } from '@/lib/contract-body-print-html';
-import { buildConfidentialityPledgePrintHTML } from '@/lib/contract-confidentiality-pledge';
+import {
+    buildConfidentialityPledgePrintHTML,
+    CONFIDENTIALITY_PLEDGE_CLAUSES,
+    CONFIDENTIALITY_PLEDGE_INTRO_PREFIX,
+    CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX,
+    CONFIDENTIALITY_PLEDGE_AFFIRMATION,
+} from '@/lib/contract-confidentiality-pledge';
 import ContractClosingBlock from './계약서마무리블록';
 import ContractBodyBlock from './계약서본문블록';
 import {
@@ -456,22 +462,38 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
             const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
 
-            // 비밀유지서약서는 본문(서명·직인) 아래에 붙이지 않고 별도 페이지(뒷장)로 분리한다.
+            // 비밀유지서약서와 주요 조항 동의서는 각각 별도의 tr 행으로 분리하여 인쇄 시 뒷장으로 깔끔하게 넘어가도록 처리한다.
             const fullContractHTML = `
-                <table class="contract-print-table">
+                <table class="contract-print-table" style="width:100%; border-collapse:collapse;">
                     <thead><tr><td class="contract-print-spacer"></td></tr></thead>
-                    <tbody><tr><td>
-                        <div class="contract-wrapper">
+                    <tbody>
+                      <tr>
+                        <td style="padding:0; margin:0; border:0;">
+                          <div class="contract-wrapper">
                             <div class="contract-page">
                                 ${bodyHTML}
                                 ${closingHTML}
                             </div>
-                            <div class="contract-page" style="page-break-before: always;">
+                          </div>
+                        </td>
+                      </tr>
+                      <tr style="page-break-before:always; break-before:page;">
+                        <td style="padding:0; margin:0; border:0;">
+                          <div class="contract-wrapper">
+                            <div class="contract-page">
                                 ${confidentialitySection}
                             </div>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr style="page-break-before:always; break-before:page;">
+                        <td style="padding:0; margin:0; border:0;">
+                          <div class="contract-wrapper">
                             ${agreementsSection}
-                        </div>
-                    </td></tr></tbody>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
                     <tfoot><tr><td class="contract-print-spacer"></td></tr></tfoot>
                 </table>
             `;
@@ -585,16 +607,24 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             </div>
 
                             <div className="bg-[var(--tab-bg)] border border-[var(--border)] p-4 rounded-xl font-serif text-[11px] leading-[1.8] text-[var(--foreground)] overflow-y-auto max-h-[300px] custom-scrollbar">
-                                <p className="mb-4 font-bold">본인은 회사의 영업비밀을 보호하고 정당한 권익을 지킬 것을 서약합니다.</p>
+                                <p className="mb-4 font-bold">
+                                    {CONFIDENTIALITY_PLEDGE_INTRO_PREFIX}
+                                    <span className="font-bold text-[var(--foreground)]">{String(company?.name || user?.company || '회사')}</span>
+                                    {CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX}
+                                </p>
                                 <div className="space-y-4">
-                                    <p><b>1. 비밀유지 범위:</b> 환자정보, 경영 전략, 기술 노하우 등</p>
-                                    <p><b>2. 위반 시 조치:</b> 민형사상 책임 및 손해 배상 의무 부담</p>
+                                    {CONFIDENTIALITY_PLEDGE_CLAUSES.map((clause, idx) => (
+                                        <div key={idx} className="space-y-1">
+                                            <p className="font-bold text-[12px] text-[var(--foreground)]">{clause.title}</p>
+                                            <p className="text-[var(--toss-gray-5)] pl-2.5 border-l-2 border-[var(--border-subtle)] leading-relaxed">{clause.body}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
                             <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl cursor-pointer hover:bg-emerald-100 transition-colors">
                                 <input data-testid="contract-confidentiality-checkbox" type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
-                                <span className="text-[12px] font-black text-emerald-800">비밀유지 내용을 이해하였으며 이에 서약합니다.</span>
+                                <span className="text-[12px] font-black text-emerald-800">{CONFIDENTIALITY_PLEDGE_AFFIRMATION}</span>
                             </label>
                         </div>
                     )}

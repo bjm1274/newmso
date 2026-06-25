@@ -84,8 +84,8 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-const TABS: { id: MTab; label: string; hasDot?: boolean }[] = [
-  { id: 'notif',    label: '알림',     hasDot: true },
+const TABS: { id: MTab; label: string }[] = [
+  { id: 'notif',    label: '알림' },
   { id: 'mypage',   label: '내정보' },
   { id: 'addon',    label: '추가기능' },
   { id: 'chat',     label: '채팅' },
@@ -114,7 +114,7 @@ function MobileBottomTabBase({
       {TABS.map((t) => {
         const on = t.id === active;
         const badgeCount = badges?.[t.id];
-        const showDot = dots?.[t.id] ?? (t.hasDot && t.id === 'notif');
+        const showDot = dots?.[t.id] ?? false;
         
         // E2E test-id mapping for mobile menu items
         let testId = `sidebar-menu-${t.id}-mobile`;
