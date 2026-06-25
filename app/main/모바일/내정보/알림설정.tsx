@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable react-hooks/rules-of-hooks */
 
 import { useState, useEffect, useCallback } from 'react';
 import type { ErpUser } from '@/types';
@@ -41,7 +40,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   );
 }
 
-export default function 알림설정({ user, onBack }: 알림설정Props) {
+function MobileNotificationSettings({ user, onBack }: 알림설정Props) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const [settings, setSettings] = useState<NotifSettings>(loadNotifSettings);
   const [keywordInput, setKeywordInput] = useState('');
@@ -416,3 +415,5 @@ export default function 알림설정({ user, onBack }: 알림설정Props) {
     </div>
   );
 }
+
+export default MobileNotificationSettings;

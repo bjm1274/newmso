@@ -45,18 +45,13 @@ export default function AttendanceForms({
     }
     return [];
   });
-  const [localStartDate, setLocalStartDate] = useState('');
-  const [localEndDate, setLocalEndDate] = useState('');
-  const [leaveType, setLeaveType] = useState(DEFAULT_LEAVE_TYPE);
-  const [selectedDelegateId, setSelectedDelegateId] = useState('');
   const [hasQueried, setHasQueried] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const initialLeaveType =
-    String(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE).trim() || DEFAULT_LEAVE_TYPE;
-  const initialStartDate = String(seedExtraData.startDate || seedExtraData.start || '').trim();
-  const initialEndDate = String(seedExtraData.endDate || seedExtraData.end || '').trim();
-  const initialDelegateId = String(seedExtraData.delegateId || seedExtraData.delegate_id || '').trim();
+  const leaveType = String(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE).trim() || DEFAULT_LEAVE_TYPE;
+  const localStartDate = String(seedExtraData.startDate || seedExtraData.start || '').trim();
+  const localEndDate = String(seedExtraData.endDate || seedExtraData.end || '').trim();
+  const selectedDelegateId = String(seedExtraData.delegateId || seedExtraData.delegate_id || '').trim();
 
   const leaveDelegateOptions = useMemo(() => {
     const currentUserId = String(currentUser.id || '').trim();
@@ -82,10 +77,10 @@ export default function AttendanceForms({
   }, [currentUser.id, staffRows]);
 
   const buildLeaveExtraData = useCallback((
-    nextLeaveType = leaveType,
-    nextStartDate = localStartDate,
-    nextEndDate = localEndDate,
-    nextDelegateId = selectedDelegateId,
+    nextLeaveType: string,
+    nextStartDate: string,
+    nextEndDate: string,
+    nextDelegateId: string,
   ) => {
     const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === nextDelegateId);
 
@@ -99,35 +94,36 @@ export default function AttendanceForms({
       delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
       delegatePosition: String(delegate?.position || '').trim(),
     };
-  }, [leaveDelegateOptions, leaveType, localEndDate, localStartDate, selectedDelegateId]);
+  }, [leaveDelegateOptions]);
 
   useEffect(() => {
     if (formType !== '연차/휴가') return;
-    setLeaveType(initialLeaveType);
-    setLocalStartDate(initialStartDate);
-    setLocalEndDate(initialEndDate);
-    setSelectedDelegateId(initialDelegateId);
 
-    const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === initialDelegateId);
+    const hasExistingData =
+      seedExtraData.leaveType ||
+      seedExtraData.vType ||
+      seedExtraData.startDate ||
+      seedExtraData.start ||
+      seedExtraData.endDate ||
+      seedExtraData.end ||
+      seedExtraData.delegateId ||
+      seedExtraData.delegate_id;
+
+    if (hasExistingData) return;
+
+    const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === selectedDelegateId);
     updateExtraData({
-      vType: initialLeaveType,
-      leaveType: initialLeaveType,
-      startDate: initialStartDate,
-      endDate: initialEndDate,
-      delegateId: initialDelegateId,
+      vType: leaveType,
+      leaveType: leaveType,
+      startDate: localStartDate,
+      endDate: localEndDate,
+      delegateId: selectedDelegateId,
       delegateName: delegate?.name || '',
       delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
       delegatePosition: String(delegate?.position || '').trim(),
     });
-  }, [
-    formType,
-    initialDelegateId,
-    initialEndDate,
-    initialLeaveType,
-    initialStartDate,
-    leaveDelegateOptions,
-    updateExtraData,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formType]);
 
   const handleQueryOvertime = async () => {
     setIsLoading(true);
@@ -282,7 +278,6 @@ export default function AttendanceForms({
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                 onChange={(event) => {
                   const nextLeaveType = event.target.value;
-                  setLeaveType(nextLeaveType);
                   updateExtraData(
                     buildLeaveExtraData(nextLeaveType, localStartDate, localEndDate, selectedDelegateId),
                   );
@@ -304,7 +299,6 @@ export default function AttendanceForms({
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                 onChange={(event) => {
                   const nextDelegateId = event.target.value;
-                  setSelectedDelegateId(nextDelegateId);
                   updateExtraData(
                     buildLeaveExtraData(leaveType, localStartDate, localEndDate, nextDelegateId),
                   );
@@ -332,7 +326,6 @@ export default function AttendanceForms({
                 data-testid="approval-leave-start-date"
                 value={localStartDate}
                 onChange={(value) => {
-                  setLocalStartDate(value);
                   updateExtraData(
                     buildLeaveExtraData(leaveType, value, localEndDate, selectedDelegateId),
                   );
@@ -350,7 +343,6 @@ export default function AttendanceForms({
                 data-testid="approval-leave-end-date"
                 value={localEndDate}
                 onChange={(value) => {
-                  setLocalEndDate(value);
                   updateExtraData(
                     buildLeaveExtraData(leaveType, localStartDate, value, selectedDelegateId),
                   );

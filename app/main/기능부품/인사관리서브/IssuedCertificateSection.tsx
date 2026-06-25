@@ -94,6 +94,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
   const [issuedCerts, setIssuedCerts] = useState<IssuedRow[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, StaffRow>>({});
   const [sealMap, setSealMap] = useState<Record<string, string>>({});
+  const [logoMap, setLogoMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [selectedCert, setSelectedCert] = useState<IssuedRow | null>(null);
 
@@ -129,7 +130,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
           certQuery = certQuery.eq('staff_id', ownStaffId);
         }
 
-        const [certRes, staffRes, sealRes] = await Promise.all([
+        const [certRes, staffRes, sealRes, companyRes] = await Promise.all([
           certQuery,
           supabase
             .from('staff_members')
@@ -137,6 +138,9 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
           supabase
             .from('contract_templates')
             .select('company_name, seal_url'),
+          supabase
+            .from('companies')
+            .select('name, logo_url'),
         ]);
 
         if (cancelled) return;
@@ -173,9 +177,17 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
           }
         }
 
+        const newLogoMap: Record<string, string> = {};
+        for (const row of companyRes.data || []) {
+          if (row.name && row.logo_url) {
+            newLogoMap[row.name] = row.logo_url;
+          }
+        }
+
         setIssuedCerts(certs);
         setStaffMap(newStaffMap);
         setSealMap(newSealMap);
+        setLogoMap(newLogoMap);
       } catch (err) {
         console.error('발급 증명서 섹션 로드 실패:', err);
         toast('발급 증명서 목록을 불러오지 못했습니다.', 'error');
@@ -214,7 +226,10 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
     const staff = staffMap[staffId] || null;
     const companyName = String(staff?.company || cert.staff_members?.company || selectedCo || '').trim();
     const sealUrl = sealMap[companyName] || '';
-    return buildContext(staff, sealUrl);
+    const companyLogoUrl = logoMap[companyName] || '';
+    const ctx = buildContext(staff, sealUrl);
+    ctx.companyLogoUrl = companyLogoUrl || null;
+    return ctx;
   };
 
   const handlePrint = (cert: IssuedRow) => {

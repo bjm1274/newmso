@@ -88,6 +88,7 @@ function resolveStoredTemplateDesign(
 }
 
 export default function ApprovalView({ user, staffs, selectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
+  const activeStaffs = useMemo(() => staffs.filter(isActiveStaff), [staffs]);
   const defaultApprovalView =
     APPROVAL_VIEWS.find((view) => canAccessApprovalSection(user, view)) || '기안함';
   const [viewMode, setViewMode] = useState(
@@ -1244,7 +1245,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         {viewMode === '작성하기' ? (
           <ApprovalComposerView
             user={user}
-            staffs={staffs.filter(isActiveStaff)}
+            staffs={activeStaffs}
             draftBanner={draftBanner}
             setDraftBanner={setDraftBanner}
             loadDraftFromStorage={loadDraftFromStorage}

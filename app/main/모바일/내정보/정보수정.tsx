@@ -65,7 +65,7 @@ export type 정보수정Props = {
   onBack: () => void;
 };
 
-function 정보수정Base({ user, onBack }: 정보수정Props) {
+function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const name = (user.name || '직원') as string;
   const position = (user.position || '') as string;
@@ -366,5 +366,5 @@ function 정보수정Base({ user, onBack }: 정보수정Props) {
   );
 }
 
-const 정보수정 = memo(정보수정Base);
+const 정보수정 = memo(MobileProfileEditBase);
 export default 정보수정;

@@ -69,13 +69,15 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [seals, setSeals] = useState<Record<string, string>>({});
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [design, setDesign] = useState(() => resolveDocumentDesign(null, 'certificate'));
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadResources = async () => {
-      const [sealResult, designStore] = await Promise.all([
+      const [sealResult, companyResult, designStore] = await Promise.all([
         d1.from('contract_templates').select('company_name, seal_url'),
+        d1.from('companies').select('name, logo_url'),
         fetchDocumentDesignStore(),
       ]);
 
@@ -86,6 +88,15 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         }
       });
       setSeals(sealMap);
+
+      const logoMap: Record<string, string> = {};
+      (companyResult.data || []).forEach((row: any) => {
+        if (row.name && row.logo_url) {
+          logoMap[row.name] = row.logo_url;
+        }
+      });
+      setLogos(logoMap);
+
       setDesign(resolveDocumentDesign(designStore, 'certificate', (selectedStaff?.company as string) || selectedCo));
     };
 
@@ -150,7 +161,8 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
   const primaryColor = design.primaryColor;
   const borderColor = design.borderColor;
   const surface = alphaColor(primaryColor, 0.08);
-  const watermarkSrc = seals[companyName] || '/sy-logo.png';
+  const companyLogoUrl = logos[companyName] || '/sy-logo.png';
+  const watermarkSrc = companyLogoUrl;
   const profilePhotoUrl = getProfilePhotoUrl(selectedStaff) || undefined;
   const joinedAt = selectedStaff?.joined_at || selectedStaff?.join_date;
   const totalPay = Number(selectedStaff?.base_salary || selectedStaff?.base || 0) + Number(selectedStaff?.meal_allowance || selectedStaff?.meal || 0);
@@ -276,6 +288,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       department: (selectedStaff.department as string) || null,
       joinedAt: (joinedAt as string | undefined) || null,
       sealImageUrl: seals[companyName] || null,
+      companyLogoUrl,
       primaryColor,
       borderColor,
       employeeNo: (selectedStaff.employee_no as string) || String(selectedStaff.id ?? '') || null,
@@ -323,16 +336,14 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         </div>
 
         <div className="relative z-10 flex h-full flex-col">
-          <div className="flex items-start gap-4">
+          <div className="relative flex items-center justify-center min-h-[72px] w-full">
             <div
-              className="flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
+              className="absolute left-0 flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
               style={{ border: `1px solid ${borderColor}` }}
             >
-              <img src="/sy-logo.png" alt="" className="h-11 w-11 object-contain" />
+              <img src={companyLogoUrl} alt="" className="h-11 w-11 object-contain" />
             </div>
-            <div className="min-w-0 flex-1 pt-1">
-              <h3 className="mt-1 text-[34px] font-black tracking-[-0.04em] text-[var(--foreground)]">{certificateTitle}</h3>
-            </div>
+            <h3 className="text-[34px] font-black tracking-[-0.04em] text-[var(--foreground)] text-center w-full px-[88px]">{certificateTitle}</h3>
           </div>
 
           <div className="mt-4 h-[3px] w-full" style={{ backgroundColor: primaryColor }} />

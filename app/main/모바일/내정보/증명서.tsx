@@ -40,7 +40,7 @@ export type 증명서Props = {
   onBack: () => void;
 };
 
-function 증명서Base({ user, onBack }: 증명서Props) {
+function MobileCertificateBase({ user, onBack }: 증명서Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const [reloadToken, setReloadToken] = useState(0);
   const [issuingId, setIssuingId] = useState<string | null>(null);
@@ -194,5 +194,5 @@ function 증명서Base({ user, onBack }: 증명서Props) {
   );
 }
 
-const 증명서 = memo(증명서Base);
+const 증명서 = memo(MobileCertificateBase);
 export default 증명서;

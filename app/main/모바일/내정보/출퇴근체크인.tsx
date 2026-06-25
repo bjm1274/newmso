@@ -140,9 +140,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         await queue.ready();
         const queueItems = queue.list();
 
-        let checkInFromQueue: Record<string, string | null> = {};
-        let checkOutFromQueue: Record<string, string | null> = {};
-        let statusFromQueue: Record<string, string | null> = {};
+        const checkInFromQueue: Record<string, string | null> = {};
+        const checkOutFromQueue: Record<string, string | null> = {};
+        const statusFromQueue: Record<string, string | null> = {};
 
         for (const item of queueItems) {
           if (!item.type.startsWith('db:') || !item.type.endsWith(':attendance')) continue;

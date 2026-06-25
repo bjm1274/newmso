@@ -129,22 +129,34 @@ export async function issueAndPrintMyCert(
       return false;
     }
 
-    // 회사 직인 (회사명 기준 contract_templates).
+    // 회사 직인 및 로고 조회
     const companyName = String(staff.company ?? '').trim();
     let sealUrl: string | null = null;
+    let companyLogoUrl: string | null = null;
     if (companyName) {
       try {
-        const sealRes = await supabase
-          .from('contract_templates')
-          .select('seal_url')
-          .eq('company_name', companyName)
-          .limit(1);
+        const [sealRes, companyRes] = await Promise.all([
+          supabase
+            .from('contract_templates')
+            .select('seal_url')
+            .eq('company_name', companyName)
+            .limit(1),
+          supabase
+            .from('companies')
+            .select('logo_url')
+            .eq('name', companyName)
+            .limit(1)
+        ]);
         const sealRow = (sealRes.data?.[0] ?? null) as { seal_url?: string | null } | null;
         if (!sealRes.error && sealRow?.seal_url) {
           sealUrl = String(sealRow.seal_url);
         }
+        const companyRow = (companyRes.data?.[0] ?? null) as { logo_url?: string | null } | null;
+        if (!companyRes.error && companyRow?.logo_url) {
+          companyLogoUrl = String(companyRow.logo_url);
+        }
       } catch (sealError) {
-        console.error('[mobile-cert] seal lookup failed', sealError);
+        console.error('[mobile-cert] seal/logo lookup failed', sealError);
       }
     }
 
@@ -209,6 +221,7 @@ export async function issueAndPrintMyCert(
       department: str(staff.department),
       joinedAt,
       sealImageUrl: sealUrl,
+      companyLogoUrl,
       employeeNo,
       duty: dutyLabel,
       rank: rankLabel,

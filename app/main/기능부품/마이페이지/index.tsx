@@ -126,7 +126,6 @@ function MyPageMain({
 }: MyPageMainProps) {
   // 2026-05-27: chunk가 isMobile 변수 참조하는 stale 잔재 — 안전 정의
   // (현재 본문에서 사용 안 해도 컴파일된 코드의 미정의 참조 회귀 방지)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isMobile = useIsMobile();
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const isRetired = !isActiveStaff(user ?? {});
@@ -364,26 +363,52 @@ function MyPageMain({
     }
   };
 
-  // 초기 탭: 알림 탭 우선, 그 외에는 이전에 보던 탭을 로컬스토리지에서 복구
+  // 초기 탭: 외부 진입값 우선, 그 외에는 이전에 보던 탭을 로컬스토리지에서 복구
   useEffect(() => {
-    if (initialMyPageTab === 'notifications') {
-      setActiveTab('notifications');
+    const persistRecordsView = (view: 'salary' | 'certificates') => {
+      if (typeof window === 'undefined') return;
+      try {
+        window.localStorage.setItem(MYPAGE_RECORDS_VIEW_KEY, view);
+      } catch {
+        // ignore
+      }
+    };
+
+    const applyInitialTab = (value: string | null | undefined) => {
+      const tab = String(value ?? '').trim();
+      if (!tab) return false;
+
+      if (tab === 'salary' || tab === 'records_salary') {
+        setActiveTab('records');
+        setRecordsView('salary');
+        persistRecordsView('salary');
+        return true;
+      }
+
+      if (tab === 'certificates' || tab === 'records_certificates') {
+        setActiveTab('records');
+        setRecordsView('certificates');
+        persistRecordsView('certificates');
+        return true;
+      }
+
+      const allowedTabs = ['profile', 'records', 'todo', 'commute', 'leave', 'documents', 'notifications'] as const;
+      if ((allowedTabs as readonly string[]).includes(tab)) {
+        setActiveTab(tab as typeof allowedTabs[number]);
+        return true;
+      }
+
+      return false;
+    };
+
+    if (applyInitialTab(initialMyPageTab)) {
       onConsumeMyPageInitialTab?.();
       return;
     }
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(MYPAGE_TAB_KEY);
-      const allowed = ['profile', 'records', 'salary', 'todo', 'commute', 'leave', 'certificates', 'documents', 'notifications'] as const;
-      if (saved && (allowed as readonly string[]).includes(saved)) {
-        if (saved === 'salary' || saved === 'certificates') {
-          setActiveTab('records');
-          setRecordsView(saved);
-          window.localStorage.setItem(MYPAGE_RECORDS_VIEW_KEY, saved);
-        } else {
-          setActiveTab(saved as Exclude<typeof allowed[number], 'salary' | 'certificates'>);
-        }
-      }
+      applyInitialTab(saved);
     } catch {
       // ignore
     }

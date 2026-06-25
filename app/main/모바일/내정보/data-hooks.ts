@@ -8,9 +8,10 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { getMonthBoundaries } from '@/lib/date-utils';
+import { fetchUnreadNotificationCount } from '@/app/main/기능부품/알림시스템/notification-api';
 import {
   calculateMonthlyAttendance,
   type MonthlyAttendance,
@@ -79,23 +80,20 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
     let cancelled = false;
     const fetchCounts = async () => {
       try {
-        const [approvalRes, alertRes] = await Promise.all([
+        const [approvalRes, unreadAlert] = await Promise.all([
           supabase
             .from('approvals')
             .select('id', { count: 'exact', head: true })
             .eq('current_approver_id', staffId)
             .eq('status', '대기'),
-          d1.from('notifications')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', staffId)
-            .is('read_at', null),
+          fetchUnreadNotificationCount(),
         ]);
         if (cancelled) return;
         setCounts({
           pendingApproval: approvalRes.count ?? 0,
           unreadChat: 0,
           newBoard: 0,
-          unreadAlert: alertRes.count ?? 0,
+          unreadAlert,
         });
       } catch {
         // silent
@@ -206,156 +204,6 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
     })();
     return () => { cancelled = true; };
   }, [staffId]);
-
-  return state;
-}
-
-// ─── 급여명세: 최신 payroll_records 1건 ───
-export type PaySlipLine = { label: string; amount: number };
-export type MyPayslip = {
-  yearMonth: string;
-  netPay: number;
-  payItems: PaySlipLine[];
-  deductItems: PaySlipLine[];
-  payTotal: number;
-  deductTotal: number;
-  loading: boolean;
-  found: boolean;
-};
-
-type PayrollRow = Record<string, unknown>;
-
-function num(row: PayrollRow, key: string): number {
-  const v = row[key];
-  return typeof v === 'number' ? v : Number(v ?? 0) || 0;
-}
-
-export function useMyLatestPayroll(staffId: string | null | undefined): MyPayslip {
-  const [state, setState] = useState<MyPayslip>({
-    yearMonth: '', netPay: 0, payItems: [], deductItems: [], payTotal: 0, deductTotal: 0, loading: true, found: false,
-  });
-
-  useEffect(() => {
-    if (!staffId) { setState((p) => ({ ...p, loading: false })); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('payroll_records')
-          .select('*')
-          .eq('staff_id', staffId)
-          .order('year_month', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (cancelled) return;
-        if (!data) { setState((p) => ({ ...p, loading: false, found: false })); return; }
-        const r = data as PayrollRow;
-
-        const payItems: PaySlipLine[] = [
-          { label: '기본급', amount: num(r, 'base_salary') },
-          { label: '식대', amount: num(r, 'meal_allowance') },
-          { label: '차량유지', amount: num(r, 'vehicle_allowance') },
-          { label: '보육수당', amount: num(r, 'childcare_allowance') },
-          { label: '연구수당', amount: num(r, 'research_allowance') },
-          { label: '야간수당', amount: num(r, 'night_duty_allowance') },
-          { label: '연장근로', amount: num(r, 'overtime_pay') },
-          { label: '기타수당', amount: num(r, 'extra_allowance') },
-          { label: '상여금', amount: num(r, 'bonus') },
-        ].filter((it) => it.amount > 0);
-
-        const deductItems: PaySlipLine[] = [
-          { label: '국민연금', amount: num(r, 'national_pension') },
-          { label: '건강보험', amount: num(r, 'health_insurance') },
-          { label: '장기요양', amount: num(r, 'long_term_care') },
-          { label: '고용보험', amount: num(r, 'employment_insurance') },
-          { label: '소득세', amount: num(r, 'income_tax') },
-          { label: '지방소득세', amount: num(r, 'local_tax') },
-          { label: '근태공제', amount: num(r, 'attendance_deduction') },
-        ].filter((it) => it.amount > 0);
-
-        const payTotal = payItems.reduce((s, it) => s + it.amount, 0);
-        const deductTotal = deductItems.reduce((s, it) => s + it.amount, 0);
-
-        setState({
-          yearMonth: String(r['year_month'] ?? ''),
-          netPay: num(r, 'net_pay'),
-          payItems,
-          deductItems,
-          payTotal,
-          deductTotal,
-          loading: false,
-          found: true,
-        });
-      } catch {
-        if (!cancelled) setState((p) => ({ ...p, loading: false }));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [staffId]);
-
-  return state;
-}
-
-// ─── 급여명세: 최근 N개월 실지급 추이 (payroll_records, limit 없이 다건) ───
-export type PayrollTrendPoint = {
-  /** YYYY-MM 원본 */
-  yearMonth: string;
-  /** 'M월' 축 라벨 */
-  label: string;
-  /** 실지급(net_pay) */
-  netPay: number;
-};
-
-export type MyPayrollTrend = {
-  points: PayrollTrendPoint[];
-  loading: boolean;
-};
-
-function trendAxisLabel(ym: string): string {
-  const m = /^(\d{4})-?(\d{2})/.exec(ym);
-  if (m) return `${Number(m[2])}월`;
-  return ym;
-}
-
-/**
- * useMyPayrollTrend — useMyLatestPayroll과 동일한 payroll_records 테이블/컬럼(year_month, net_pay)을
- * 사용하되 limit(1) 대신 최근 months개를 가져와 월별 실지급 추이를 만든다.
- * 차트는 과거→최근 순서(오름차순)로 표시하므로 역순 정렬한다.
- */
-export function useMyPayrollTrend(
-  staffId: string | null | undefined,
-  months = 6,
-): MyPayrollTrend {
-  const [state, setState] = useState<MyPayrollTrend>({ points: [], loading: true });
-
-  useEffect(() => {
-    if (!staffId) { setState({ points: [], loading: false }); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('payroll_records')
-          .select('year_month, net_pay')
-          .eq('staff_id', staffId)
-          .order('year_month', { ascending: false })
-          .limit(months);
-        if (cancelled) return;
-        const rows = Array.isArray(data) ? (data as PayrollRow[]) : [];
-        // 최신순으로 받아 과거→최근(차트 X축) 순서로 뒤집는다.
-        const points: PayrollTrendPoint[] = rows
-          .map((r) => {
-            const ym = String(r['year_month'] ?? '');
-            return { yearMonth: ym, label: trendAxisLabel(ym), netPay: num(r, 'net_pay') };
-          })
-          .filter((p) => p.yearMonth)
-          .reverse();
-        setState({ points, loading: false });
-      } catch {
-        if (!cancelled) setState({ points: [], loading: false });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [staffId, months]);
 
   return state;
 }

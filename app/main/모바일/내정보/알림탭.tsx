@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable react-hooks/rules-of-hooks */
 
 /**
  * 알림탭 — 독립 알림 탭 화면 (바텀탭 연동용).
@@ -106,7 +105,7 @@ export type 알림탭Props = {
   user: ErpUser;
 };
 
-function 알림탭Base({ user }: 알림탭Props) {
+function MobileNotificationTabBase({ user }: 알림탭Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const { setMainMenu, setSubView } = useNavigation();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
@@ -361,5 +360,5 @@ function 알림탭Base({ user }: 알림탭Props) {
   );
 }
 
-const 알림탭 = memo(알림탭Base);
+const 알림탭 = memo(MobileNotificationTabBase);
 export default 알림탭;

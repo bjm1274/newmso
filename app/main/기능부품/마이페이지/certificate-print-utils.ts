@@ -119,6 +119,7 @@ export type IssuedCertificateContext = {
   duty?: string | null;
   rank?: string | null;
   profilePhotoUrl?: string | null;
+  companyLogoUrl?: string | null;
   // 본문 표에 추가로 노출할 행 (예: 급여 증명서의 기준 급여)
   extraInfoRows?: Array<{ label: string; value: string }> | null;
   resignedAt?: string | null;
@@ -177,6 +178,7 @@ export function buildIssuedCertificatePrintHtml(
   const photoInitial = escapeHtml(String(context.staffName || cert.staff_members?.name || '?').slice(0, 1));
   const primaryColor = escapeHtml(context.primaryColor || '#197c86');
   const borderColor = escapeHtml(context.borderColor || '#d7dee5');
+  const logoUrl = escapeHtml(context.companyLogoUrl || '/sy-logo.png');
   const closingText = escapeHtml(getClosingText(certType));
 
   // Dynamic rows based on certType
@@ -264,10 +266,10 @@ window.onload = () => window.print();
     .watermark{position:absolute;left:50%;top:52%;width:128px;height:128px;transform:translate(-50%,-50%);object-fit:contain;opacity:0.06;mix-blend-mode:multiply;pointer-events:none}
     .stack{position:relative;z-index:1;display:flex;flex-direction:column;height:100%}
     /* 헤더: 로고 박스 + 제목 */
-    .header{display:flex;align-items:flex-start;gap:16px}
-    .logo-box{width:72px;height:72px;border:1px solid ${borderColor};border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header{position:relative;display:flex;align-items:center;justify-content:center;min-height:72px;width:100%}
+    .logo-box{position:absolute;left:0;width:72px;height:72px;border:1px solid ${borderColor};border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .logo-box img{width:44px;height:44px;object-fit:contain}
-    .doc-title{font-size:34px;font-weight:900;letter-spacing:-0.04em;color:#111827;margin:4px 0 0;line-height:1.1}
+    .doc-title{font-size:34px;font-weight:900;letter-spacing:-0.04em;color:#111827;margin:0;line-height:1.1;text-align:center;width:100%;padding:0 88px}
     .accent-bar{height:3px;width:100%;background:${primaryColor};margin:16px 0 0}
     /* 사진 + 인적사항 */
     .identity-row{display:grid;grid-template-columns:96px 1fr;gap:12px;margin-top:20px}
@@ -307,10 +309,10 @@ window.onload = () => window.print();
 </head>
 <body>
   <main class="sheet" aria-label="${title}">
-    <img class="watermark" src="/sy-logo.png" alt="" aria-hidden="true" />
+    <img class="watermark" src="${logoUrl}" alt="" aria-hidden="true" />
     <div class="stack">
       <header class="header">
-        <div class="logo-box"><img src="/sy-logo.png" alt="" /></div>
+        <div class="logo-box"><img src="${logoUrl}" alt="" /></div>
         <h1 class="doc-title">${title}</h1>
       </header>
       <div class="accent-bar" aria-hidden="true"></div>

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 내정보 라우터 — home/attend/leave/payslip/cert/edit 6 sub-route 전환.
+ * 내정보 라우터 — home/attend/leave/payslip/cert/edit/todo/notifSettings sub-route 전환.
  * MobileShell이 tab === 'home' 일 때 마운트.
  * JM: 단일 책임 (분기만), ~60줄
  */

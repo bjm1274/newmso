@@ -27,7 +27,7 @@ export type 연차Props = {
   onBack: () => void;
 };
 
-function 연차Base({ user, onBack }: 연차Props) {
+function MobileLeaveBase({ user, onBack }: 연차Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const { remaining, total, used, usageRate, history, loading } = useMyLeave(staffId);
   const currentYear = new Date().getFullYear();
@@ -162,5 +162,5 @@ function 연차Base({ user, onBack }: 연차Props) {
   );
 }
 
-const 연차 = memo(연차Base);
+const 연차 = memo(MobileLeaveBase);
 export default 연차;

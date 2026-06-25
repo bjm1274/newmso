@@ -71,6 +71,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
   const [issuedCerts, setIssuedCerts] = useState<IssuedCertificateRow[]>([]);
   const [staffDetail, setStaffDetail] = useState<CertificateContextStaff | null>(null);
   const [sealUrl, setSealUrl] = useState<string>('');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const effectiveUserId = getStaffLikeId(resolvedUser);
 
@@ -150,21 +151,32 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
         setIssuedCerts(issuedRows);
         setStaffDetail(staff);
 
-        // 직인 URL은 회사명을 기준으로 contract_templates 에서 한 번만 조회
+        // 직인 URL은 회사명을 기준으로 contract_templates 에서 한 번만 조회, 회사 로고 URL도 조회
         const companyName = String(staff?.company || '').trim();
         if (companyName) {
           try {
-            const sealRes = await supabase
-              .from('contract_templates')
-              .select('seal_url')
-              .eq('company_name', companyName)
-              .limit(1);
+            const [sealRes, companyRes] = await Promise.all([
+              supabase
+                .from('contract_templates')
+                .select('seal_url')
+                .eq('company_name', companyName)
+                .limit(1),
+              supabase
+                .from('companies')
+                .select('logo_url')
+                .eq('name', companyName)
+                .limit(1)
+            ]);
             const sealRow = sealRes.data?.[0];
             if (!cancelled && !sealRes.error && sealRow?.seal_url) {
               setSealUrl(String(sealRow.seal_url));
             }
+            const logoRow = companyRes.data?.[0];
+            if (!cancelled && !companyRes.error && logoRow?.logo_url) {
+              setCompanyLogoUrl(String(logoRow.logo_url));
+            }
           } catch (sealError) {
-            console.error('증명서 직인 조회 실패:', sealError);
+            console.error('증명서 직인/로고 조회 실패:', sealError);
           }
         }
       } catch (error) {
@@ -210,12 +222,13 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       department: staffDetail?.department || (resolvedUser?.department as string) || null,
       joinedAt: staffDetail?.joined_at || staffDetail?.join_date || null,
       sealImageUrl: sealUrl || null,
+      companyLogoUrl: companyLogoUrl || null,
       employeeNo,
       duty: dutyLabel,
       rank: rankLabel,
       profilePhotoUrl: getProfilePhotoUrl(staffDetail) || null,
     };
-  }, [resolvedUser, sealUrl, staffDetail]);
+  }, [resolvedUser, sealUrl, companyLogoUrl, staffDetail]);
 
   // ── 인쇄/다운로드 핸들러 ──
   const handlePrintApproval = (doc: ApprovalDoc) => {
