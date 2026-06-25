@@ -281,17 +281,18 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         setIsReceiptEmpty(true);
     };
 
-    const openContractPrintPreview = (fullContractHTML: string) => {
+    const openContractPrintPreview = (fullContractHTML: string, targetWindow?: Window | null) => {
         // 모바일 기기(PWA/웹뷰)에서는 window.print() 호출 시 앱이 튕기거나(크래시) 오작동할 수 있으므로 인쇄 미리보기를 생략합니다.
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
         if (isMobile) {
+            if (targetWindow) {
+                try { targetWindow.close(); } catch (_) {}
+            }
             return;
         }
 
         try {
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) return;
-
+            const printWindow = targetWindow || window.open('', '_blank');
             const styles = `
                     /* A4 고정: 용지 밖으로 내용이 짤리지 않도록 페이지 크기·여백을 명시 */
                     @page { size: A4 portrait; margin: 8mm 10mm; }
@@ -363,7 +364,44 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     }
                 `;
 
-            printWindow.document.write(`<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;700;900&display=swap" rel="stylesheet"><style>${styles}</style></head><body>${fullContractHTML}</body></html>`);
+            const fullHtml = `<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;700;900&display=swap" rel="stylesheet"><style>${styles}</style></head><body>${fullContractHTML}</body></html>`;
+
+            if (!printWindow) {
+                const iframe = document.createElement('iframe');
+                iframe.setAttribute('aria-hidden', 'true');
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                iframe.style.opacity = '0';
+
+                const cleanup = () => {
+                    window.setTimeout(() => {
+                        iframe.remove();
+                    }, 1200);
+                };
+
+                iframe.onload = () => {
+                    const frameWindow = iframe.contentWindow;
+                    if (!frameWindow) {
+                        cleanup();
+                        toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+                        return;
+                    }
+                    frameWindow.focus();
+                    frameWindow.print();
+                    cleanup();
+                };
+
+                iframe.srcdoc = fullHtml;
+                document.body.appendChild(iframe);
+                return;
+            }
+
+            printWindow.document.open();
+            printWindow.document.write(fullHtml);
             printWindow.document.close();
 
             window.setTimeout(() => {
@@ -390,6 +428,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
         submitLockRef.current = true;
         setIsGenerating(true);
+        let printWindow: Window | null = null;
         try {
             // react-signature-canvas v1.1.0-alpha부터 getTrimmedCanvas 제거 → toDataURL 직접 호출
             const signatureData = sigCanvas.current?.toDataURL('image/png');
@@ -402,6 +441,15 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (!receiptTraceData) {
                 toast("'교부 받음' 자필을 다시 시도해 주세요.", 'error');
                 return;
+            }
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            if (!isMobile) {
+                printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.write('<html><head><title>계약서 생성 중...</title></head><body><div style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; color: #666;">계약서 및 전자서명을 저장하고 인쇄를 준비하고 있습니다. 잠시만 기다려 주세요...</div></body></html>');
+                    printWindow.document.close();
+                }
             }
 
             // 1. 전체 통합 HTML 구성 (인쇄 및 저장용)
@@ -500,12 +548,18 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
             await Promise.resolve(onSuccess(signatureData, fullContractHTML, receiptTraceData, privacyConsent));
             try {
-                openContractPrintPreview(fullContractHTML);
+                openContractPrintPreview(fullContractHTML, printWindow);
             } catch (printError) {
                 console.warn('Failed to open contract print preview:', printError);
+                if (printWindow) {
+                    try { printWindow.close(); } catch (_) {}
+                }
             }
         } catch (error) {
             console.error(error);
+            if (printWindow) {
+                try { printWindow.close(); } catch (_) {}
+            }
             toast(error instanceof Error ? error.message : "서류 생성 중 오류가 발생했습니다.", 'error');
         } finally {
             submitLockRef.current = false;

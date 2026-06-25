@@ -74,7 +74,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   const { status, coords, error, requestLocation } = useGeolocationCheckin();
   const [now, setNow] = useState<Date>(() => new Date());
   const [submitting, setSubmitting] = useState(false);
-  const [openLog, setOpenLog] = useState<OpenLog | null>(null);
+  const [todayLog, setTodayLog] = useState<OpenLog | null>(null);
+  const [staleLog, setStaleLog] = useState<OpenLog | null>(null);
+  const openLog = todayLog || staleLog;
   const { data: monthly, refetch } = useMonthlyAttendance(staffId);
 
   useEffect(() => {
@@ -84,10 +86,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
 
   // 오늘 출퇴근 기록 조회 — useCallback으로 분리해 앱 복귀(포커스/visibility) 시 재호출
   const fetchTodayLog = useCallback(async () => {
-    if (!staffId) { setOpenLog(null); return; }
+    if (!staffId) { setTodayLog(null); setStaleLog(null); return; }
     try {
       const today = formatLocalDateKey(new Date());
       let activeLog: OpenLog | null = null;
+      let staleLogCandidate: OpenLog | null = null;
 
       try {
         // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
@@ -101,39 +104,34 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
 
         activeLog = (todayData?.[0] as OpenLog) ?? null;
 
-        // 2. 야간 근무자 구제 로직: 오늘 출근 기록이 없다면, 어제 기록(stale log) 찾기.
-        //    - 아직 미퇴근(open)인 야간 근무 → 출근 상태로 유지(기존 목적)
-        //    - 자정을 넘겨 '오늘' 퇴근 처리된 기록 → 완료 상태가 즉시 사라지지 않도록 유지
-        //    (어제 안에 출퇴근이 모두 끝난 일반 근무는 제외 — 다음날 화면에 되살아나면 안 됨)
-        if (!activeLog?.check_in) {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayKey = formatLocalDateKey(yesterday);
+        // 2. 야간 근무자 구제 로직을 위해 어제 기록(stale log) 찾기
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayKey = formatLocalDateKey(yesterday);
 
-          const { data: staleData } = await supabase
-            .from('attendance')
-            .select('id, staff_id, date, check_in, check_out, status')
-            .eq('staff_id', staffId)
-            .not('check_in', 'is', null)
-            .neq('status', '결근') // 결근 처리된 건 제외
-            .gte('date', yesterdayKey) // 어제 이후만 — 오래된 완료 기록 부활 방지
-            .order('date', { ascending: false })
-            .order('created_at', { ascending: false })
-            .limit(1);
+        const { data: staleData } = await supabase
+          .from('attendance')
+          .select('id, staff_id, date, check_in, check_out, status')
+          .eq('staff_id', staffId)
+          .not('check_in', 'is', null)
+          .neq('status', '결근') // 결근 처리된 건 제외
+          .gte('date', yesterdayKey) // 어제 이후만
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-          const cand = staleData?.[0] as OpenLog | undefined;
-          if (cand && cand.date !== today) {
-            const checkedOutToday = cand.check_out
-              ? formatLocalDateKey(new Date(cand.check_out)) === today
-              : false;
-            // 미퇴근이거나, 오늘 막 퇴근한(자정 넘긴) 기록만 화면에 유지한다.
-            if (!cand.check_out || checkedOutToday) {
-              activeLog = cand;
-            }
+        const cand = staleData?.[0] as OpenLog | undefined;
+        if (cand && cand.date !== today) {
+          const checkedOutToday = cand.check_out
+            ? formatLocalDateKey(new Date(cand.check_out)) === today
+            : false;
+          // 미퇴근이거나, 오늘 막 퇴근한(자정 넘긴) 기록만 stale log로 유지한다.
+          if (!cand.check_out || checkedOutToday) {
+            staleLogCandidate = cand;
           }
         }
       } catch (dbErr) {
-        console.warn('오늘 DB 출퇴근 기록 조회 실패 (오프라인 상태일 수 있음):', dbErr);
+        console.warn('DB 출퇴근 기록 조회 실패 (오프라인 상태일 수 있음):', dbErr);
       }
 
       // 3. 로컬 오프라인 큐가 있다면 병합
@@ -142,10 +140,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         await queue.ready();
         const queueItems = queue.list();
 
-        let checkInFromQueue: string | null = null;
-        let checkOutFromQueue: string | null = null;
-        let statusFromQueue: string | null = null;
-        let queueDate: string | null = null;
+        let checkInFromQueue: Record<string, string | null> = {};
+        let checkOutFromQueue: Record<string, string | null> = {};
+        let statusFromQueue: Record<string, string | null> = {};
 
         for (const item of queueItems) {
           if (!item.type.startsWith('db:') || !item.type.endsWith(':attendance')) continue;
@@ -158,51 +155,71 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           const match = payload.match;
 
           if (payload.kind === 'upsert') {
-            if (data.staff_id === staffId && (data.date === today || (activeLog && data.date === activeLog.date))) {
-              queueDate = data.date;
-              checkInFromQueue = data.check_in ?? checkInFromQueue;
-              statusFromQueue = data.status ?? statusFromQueue;
+            if (data.staff_id === staffId && (data.date === today || (staleLogCandidate && data.date === staleLogCandidate.date))) {
+              const targetDate = data.date;
+              checkInFromQueue[targetDate] = data.check_in ?? checkInFromQueue[targetDate] ?? null;
+              statusFromQueue[targetDate] = data.status ?? statusFromQueue[targetDate] ?? null;
             }
           } else if (payload.kind === 'update') {
             const targetDate = match?.date || today;
-            if (match?.staff_id === staffId && (targetDate === today || (activeLog && targetDate === activeLog.date))) {
-              queueDate = targetDate;
-              checkOutFromQueue = data.check_out ?? checkOutFromQueue;
-              statusFromQueue = data.status ?? statusFromQueue;
+            if (match?.staff_id === staffId && (targetDate === today || (staleLogCandidate && targetDate === staleLogCandidate.date))) {
+              checkOutFromQueue[targetDate] = data.check_out ?? checkOutFromQueue[targetDate] ?? null;
+              statusFromQueue[targetDate] = data.status ?? statusFromQueue[targetDate] ?? null;
             }
           }
         }
 
-        if (checkInFromQueue) {
+        // 오늘 기록 큐 병합
+        if (checkInFromQueue[today] !== undefined) {
           if (!activeLog) {
             activeLog = {
               id: 'pending',
-              date: queueDate || today,
-              check_in: checkInFromQueue,
-              check_out: checkOutFromQueue,
-              status: statusFromQueue,
+              date: today,
+              check_in: checkInFromQueue[today],
+              check_out: checkOutFromQueue[today] ?? null,
+              status: statusFromQueue[today],
             };
           } else {
             activeLog = {
               ...activeLog,
-              check_in: checkInFromQueue,
-              check_out: checkOutFromQueue ?? activeLog.check_out,
-              status: statusFromQueue ?? activeLog.status,
+              check_in: checkInFromQueue[today] ?? activeLog.check_in,
+              check_out: checkOutFromQueue[today] ?? activeLog.check_out,
+              status: statusFromQueue[today] ?? activeLog.status,
             };
           }
-        } else if (checkOutFromQueue && activeLog) {
+        } else if (checkOutFromQueue[today] !== undefined && activeLog) {
           activeLog = {
             ...activeLog,
-            check_out: checkOutFromQueue,
-            status: statusFromQueue ?? activeLog.status,
+            check_out: checkOutFromQueue[today],
+            status: statusFromQueue[today] ?? activeLog.status,
           };
+        }
+
+        // 어제 미퇴근 기록 큐 병합
+        if (staleLogCandidate) {
+          const staleDate = staleLogCandidate.date;
+          if (checkInFromQueue[staleDate] !== undefined) {
+            staleLogCandidate = {
+              ...staleLogCandidate,
+              check_in: checkInFromQueue[staleDate] ?? staleLogCandidate.check_in,
+              check_out: checkOutFromQueue[staleDate] ?? staleLogCandidate.check_out,
+              status: statusFromQueue[staleDate] ?? staleLogCandidate.status,
+            };
+          } else if (checkOutFromQueue[staleDate] !== undefined) {
+            staleLogCandidate = {
+              ...staleLogCandidate,
+              check_out: checkOutFromQueue[staleDate],
+              status: statusFromQueue[staleDate] ?? staleLogCandidate.status,
+            };
+          }
         }
       } catch (queueErr) {
         console.warn('오프라인 큐 조회 실패:', queueErr);
       }
 
-      setOpenLog(activeLog);
-    } catch {/* 에러 시 기존 openLog 유지 — 앱 복귀 시 기록이 사라지는 것을 방지 */}
+      setTodayLog(activeLog);
+      setStaleLog(staleLogCandidate);
+    } catch {/* 에러 시 기존 상태 유지 */}
   }, [staffId]);
 
   useEffect(() => {
@@ -226,6 +243,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     };
   }, [fetchTodayLog]);
 
+  // 마운트 시 기기 위치 측정 자동 시작
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
   const distance = useMemo(() => {
     if (!coords) return null;
     return calculateDistance(
@@ -248,7 +270,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   const accuracyTooLow = !isBypassed && !!coords && coords.accuracy > ACCURACY_WARN_M;
 
   const state: 'before' | 'in' | 'done' =
-    !openLog?.check_in ? 'before' : !openLog?.check_out ? 'in' : 'done';
+    !todayLog?.check_in ? 'before' : !todayLog?.check_out ? 'in' : 'done';
   const canAct = !!staffId && !submitting;
 
   const handleAction = async () => {
@@ -300,7 +322,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
             const existingRow = existingRows?.[0] as OpenLog | undefined;
             if (existingRow?.check_in) {
               // 이미 출근 기록 존재 — 중복 출근 방지, 실제 DB 시각으로 표시
-              setOpenLog(existingRow);
+              setTodayLog(existingRow);
               toast('이미 출근 처리된 기록이 있습니다.', 'info');
               return;
             }
@@ -316,11 +338,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         if (error) throw new Error(error);
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
-          setOpenLog({ id: 'pending', date: today, check_in: nowIso, check_out: null });
+          setTodayLog({ id: 'pending', date: today, check_in: nowIso, check_out: null });
           toast('오프라인 — 출근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
-          setOpenLog(row || { id: 'upserted', date: today, check_in: nowIso, check_out: null, status: checkInStatus });
+          setTodayLog(row || { id: 'upserted', date: today, check_in: nowIso, check_out: null, status: checkInStatus });
           try {
             await syncToAttendances(staffId, today, nowIso, null, checkInStatus);
           } catch (syncErr) {
@@ -332,11 +354,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           );
         }
       } else if (state === 'in') {
-        const dateKey = openLog?.date ?? today;
-        const checkInIso = openLog?.check_in ?? null;
+        const dateKey = todayLog?.date ?? today;
+        const checkInIso = todayLog?.check_in ?? null;
 
         // 지각 기준시간 구하고 조퇴 여부 판정
-        let finalStatus = openLog?.status || '정상';
+        let finalStatus = todayLog?.status || '정상';
         let earlyLeaveMinutes = 0;
         try {
           const lateThreshold = await resolveLateThreshold(staffId, dateKey, { company });
@@ -355,12 +377,12 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         if (error) throw new Error(error);
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
-          if (openLog) setOpenLog({ ...openLog, check_out: nowIso, status: finalStatus });
+          if (todayLog) setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
           toast('오프라인 — 퇴근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
-          if (row) setOpenLog(row);
-          else if (openLog) setOpenLog({ ...openLog, check_out: nowIso, status: finalStatus });
+          if (row) setTodayLog(row);
+          else if (todayLog) setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
           else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
           
           try {
@@ -377,6 +399,77 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           );
         }
       }
+      void refetch();
+      window.dispatchEvent(new CustomEvent('erp-attendance-updated', { detail: { staffId } }));
+    } catch (err) {
+      toast(`처리 실패: ${(err as Error)?.message ?? '알 수 없는 오류'}`, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStaleCheckOut = async () => {
+    if (!staffId || !staleLog) return;
+    if (status !== 'success' && !isBypassed) {
+      if (status === 'denied') {
+        toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+      } else if (status === 'error') {
+        toast(error || '위치 정보를 정확히 가져올 수 없습니다. 다시 시도해 주세요.', 'error');
+      } else {
+        toast('위치 정보를 가져오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+      }
+      requestLocation();
+      return;
+    }
+    if (!withinRange) {
+      toast(
+        `현재 사무실과 거리 약 ${distanceLabel}m — 반경 ${ALLOWED_DISTANCE_M}m 안에서만 처리됩니다.`,
+        'warning',
+      );
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const dateKey = staleLog.date;
+      const checkInIso = staleLog.check_in;
+      const nowIso = new Date().toISOString();
+
+      let finalStatus = staleLog.status || '정상';
+      let earlyLeaveMinutes = 0;
+      try {
+        const lateThreshold = await resolveLateThreshold(staffId, dateKey, { company });
+        earlyLeaveMinutes = calculateEarlyLeaveMinutes(dateKey, nowIso, lateThreshold);
+        if (earlyLeaveMinutes > 0) {
+          finalStatus = '조퇴';
+        }
+      } catch {}
+
+      const { data, queued, error: dbErr } = await enqueueSupabaseMutation<OpenLog>({
+        kind: 'update',
+        table: 'attendance',
+        payload: { check_out: nowIso, status: finalStatus },
+        match: { staff_id: staffId, date: dateKey },
+      });
+      if (dbErr) throw new Error(dbErr);
+      if (queued) {
+        setStaleLog({ ...staleLog, check_out: nowIso, status: finalStatus });
+        toast('오프라인 — 어제 퇴근 기록이 동기화 대기 중입니다.', 'warning');
+      } else {
+        const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
+        setStaleLog(row || { ...staleLog, check_out: nowIso, status: finalStatus });
+        try {
+          await syncToAttendances(staffId, dateKey, checkInIso, nowIso, finalStatus, { earlyLeaveMinutes });
+        } catch (syncErr) {
+          console.error('syncToAttendances fail', syncErr);
+        }
+        toast(
+          finalStatus === '조퇴'
+            ? `조퇴로 처리되었습니다. 정해진 퇴근 시간보다 ${earlyLeaveMinutes}분 일찍 퇴근하셨습니다.`
+            : '어제 퇴근 체크아웃이 완료되었습니다.',
+          finalStatus === '조퇴' ? 'warning' : 'success',
+        );
+      }
+      void fetchTodayLog();
       void refetch();
       window.dispatchEvent(new CustomEvent('erp-attendance-updated', { detail: { staffId } }));
     } catch (err) {
@@ -452,6 +545,41 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           )}
         </div>
 
+        {/* 어제 미퇴근 경보 및 퇴근 버튼 */}
+        {staleLog && !staleLog.check_out && (
+          <div style={{ margin: '12px 20px 4px', padding: '12px 16px', borderRadius: 16, backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--z-900)' }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#D97706', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <MIcon name="clock" size={16} />
+              전날 미퇴근 기록이 있습니다
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--z-500)', lineHeight: '1.4', marginBottom: 10 }}>
+              어제 {formatHHmm(staleLog.check_in)}에 출근한 기록이 아직 열려 있습니다. 퇴근 처리하거나 오늘 출근을 새로 진행하세요.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleStaleCheckOut}
+                disabled={submitting}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  backgroundColor: '#D97706',
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  border: 0,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+              >
+                {submitting ? '처리 중…' : '어제 퇴근 처리'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 큰 체크인 버튼 */}
         <div style={{ padding: '18px 20px 6px' }}>
           <button
@@ -478,6 +606,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
             <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{btnSub}</div>
           </button>
         </div>
+        <div style={{ padding: '0 24px', marginTop: 4, marginBottom: 8, fontSize: 11, color: 'var(--z-500)', lineHeight: '1.4', textAlign: 'center' }}>
+          ※ 출퇴근 기록 및 근무지 인증을 위해 기기의 GPS 위치 정보를 활용합니다.
+        </div>
 
         {/* 오늘 기록 */}
         <div className="m-section">
@@ -495,7 +626,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               </div>
               <div>
                 <div className="lbl">출근</div>
-                <div className="sub">{openLog?.check_in ? 'GPS 인증' : '예정'}</div>
+                <div className="sub">{openLog?.check_in ? (openLog.date !== formatLocalDateKey(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
               </div>
               {openLog?.check_in ? <MChip tone="success">완료</MChip> : <MChip>예정</MChip>}
             </div>
@@ -511,7 +642,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               </div>
               <div>
                 <div className="lbl">퇴근</div>
-                <div className="sub">{openLog?.check_out ? 'GPS 인증' : '예정'}</div>
+                <div className="sub">{openLog?.check_out ? (openLog.date !== formatLocalDateKey(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
               </div>
               {openLog?.check_out ? <MChip tone="success">완료</MChip> : <MChip>예정</MChip>}
             </div>

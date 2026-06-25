@@ -65,25 +65,53 @@ if (!gotTheLock) {
 
     // 권한 요청 핸들러 설정 (마이크, 알림, 클립보드 등)
     const { session } = require('electron');
+    const fs = require('fs');
+    const logPath = 'd:\\newmso\\electron-app\\permission-log.txt';
+
+    function writeLog(msg) {
+      try {
+        const timestamp = new Date().toISOString();
+        fs.appendFileSync(logPath, `[${timestamp}] ${msg}\n`);
+      } catch (err) {
+        // ignore log write errors
+      }
+    }
+
+    writeLog('Electron whenReady triggered');
     
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       try {
         const url = webContents.getURL();
+        writeLog(`Requesting permission: "${permission}" for URL: "${url}"`);
         if (!url) {
+          writeLog('Denied: empty URL');
           return callback(false);
         }
         const origin = new URL(url).origin;
-        if (origin === 'https://erp.pchos.kr' || origin.startsWith('http://localhost:')) {
-          if (
-            permission === 'media' ||
-            permission === 'notifications' ||
-            permission === 'clipboard-read' ||
-            permission === 'clipboard-sanitized-write'
-          ) {
+        writeLog(`Origin: "${origin}"`);
+        if (origin.includes('pchos.kr') || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          const matched = [
+            'media',
+            'audioCapture',
+            'videoCapture',
+            'microphone',
+            'camera',
+            'notifications',
+            'clipboard-read',
+            'clipboard-sanitized-write'
+          ].includes(permission);
+          
+          if (matched) {
+            writeLog(`Granted permission: "${permission}"`);
             return callback(true);
+          } else {
+            writeLog(`Skipped match for permission: "${permission}"`);
           }
+        } else {
+          writeLog(`Denied: Origin "${origin}" not allowed`);
         }
       } catch (err) {
+        writeLog(`Permission request error: ${err.message}`);
         console.error('Permission request error:', err);
       }
       callback(false);
@@ -91,19 +119,31 @@ if (!gotTheLock) {
 
     session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
       try {
-        if (!requestingOrigin) return false;
+        writeLog(`Checking permission: "${permission}" for Origin: "${requestingOrigin}", details: ${JSON.stringify(details || {})}`);
+        if (!requestingOrigin) {
+          writeLog('Denied check: empty requestingOrigin');
+          return false;
+        }
         const origin = new URL(requestingOrigin).origin;
-        if (origin === 'https://erp.pchos.kr' || origin.startsWith('http://localhost:')) {
-          if (
-            permission === 'media' ||
-            permission === 'notifications' ||
-            permission === 'clipboard-read' ||
-            permission === 'clipboard-sanitized-write'
-          ) {
+        if (origin.includes('pchos.kr') || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          const matched = [
+            'media',
+            'audioCapture',
+            'videoCapture',
+            'microphone',
+            'camera',
+            'notifications',
+            'clipboard-read',
+            'clipboard-sanitized-write'
+          ].includes(permission);
+
+          if (matched) {
+            writeLog(`Granted check: "${permission}"`);
             return true;
           }
         }
       } catch (err) {
+        writeLog(`Permission check error: ${err.message}`);
         console.error('Permission check error:', err);
       }
       return false;

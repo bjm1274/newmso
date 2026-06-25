@@ -5,6 +5,10 @@ import com.google.androidbrowserhelper.trusted.LauncherActivity
 
 class MainTwaActivity : LauncherActivity() {
     override fun getLaunchingUrl(): Uri {
-        return Uri.parse("https://erp.pchos.kr/main")
+        val intentUri = intent?.data
+        if (intentUri != null) {
+            return intentUri
+        }
+        return super.getLaunchingUrl()
     }
 }

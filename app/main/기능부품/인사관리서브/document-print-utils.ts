@@ -13,20 +13,20 @@ export function formatDocumentDate(value: unknown): string {
   return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: string): void {
+export function openDocumentPrintView(
+  doc: Record<string, unknown>,
+  selectedCo: string,
+  targetWindow?: Window | null,
+): void {
   const title = String(doc.title || '문서');
   const category = String(doc.category || '문서');
   const companyName = String(doc.company_name || selectedCo || '전체');
   const content = String(doc.content || '');
   const updatedAt = formatDocumentDate(doc.updated_at || doc.created_at);
-  const popup = window.open('', '_blank');
-  if (!popup) {
-    toast('팝업 차단을 해제한 뒤 다시 열어 주세요.', 'warning');
-    return;
-  }
 
+  let htmlContent = '';
   if (category === '근로계약서' && content.trim().startsWith('<')) {
-    popup.document.write(`<!doctype html>
+    htmlContent = `<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
@@ -107,12 +107,9 @@ export function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: 
   <div class="toolbar"><button onclick="window.print()">인쇄 / PDF 저장</button></div>
   ${content}
 </body>
-</html>`);
-    popup.document.close();
-    return;
-  }
-
-  popup.document.write(`<!doctype html>
+</html>`;
+  } else {
+    htmlContent = `<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
@@ -148,6 +145,45 @@ export function openDocumentPrintView(doc: Record<string, unknown>, selectedCo: 
     <div class="footer">${escapeHtml(companyName)}</div>
   </main>
 </body>
-</html>`);
+</html>`;
+  }
+
+  const popup = targetWindow || window.open('', '_blank');
+  if (!popup) {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.opacity = '0';
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        iframe.remove();
+      }, 1200);
+    };
+
+    iframe.onload = () => {
+      const frameWindow = iframe.contentWindow;
+      if (!frameWindow) {
+        cleanup();
+        toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+        return;
+      }
+      frameWindow.focus();
+      frameWindow.print();
+      cleanup();
+    };
+
+    iframe.srcdoc = htmlContent;
+    document.body.appendChild(iframe);
+    return;
+  }
+
+  popup.document.open();
+  popup.document.write(htmlContent);
   popup.document.close();
 }
