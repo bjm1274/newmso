@@ -273,7 +273,7 @@ function MyPageMain({
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;
     try {
-      await supabase
+      const { error: updateError } = await supabase
         .from('employment_contracts')
         .update({
           status: '서명완료',
@@ -283,6 +283,10 @@ function MyPageMain({
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
         .eq('id', pendingContract.id);
+
+      if (updateError) {
+        throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);
+      }
 
       const { data: checklistRows } = await supabase
         .from('onboarding_checklists')
@@ -303,7 +307,7 @@ function MyPageMain({
           signedAt,
         },
       );
-      await supabase.from('onboarding_checklists').upsert(
+      const { error: checklistError } = await supabase.from('onboarding_checklists').upsert(
         {
           staff_id: currentUserId,
           checklist_type: '입사',
@@ -314,11 +318,15 @@ function MyPageMain({
         { onConflict: 'staff_id,checklist_type' },
       );
 
+      if (checklistError) {
+        throw new Error(`온보딩 체크리스트 업데이트 실패: ${checklistError.message}`);
+      }
+
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
       // 서명 이미지·주소·연락처 PII 가 포함되므로 저장 직전 암호화(키 미설정 시 평문 폴백)
       const { encryptContract } = await import('@/lib/contract-crypto');
       const encryptedContractText = await encryptContract(contractText);
-      await supabase.from('document_repository').insert({
+      const { error: insertDocError } = await supabase.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         category: '근로계약서',
         content: encryptedContractText,
@@ -326,6 +334,10 @@ function MyPageMain({
         created_by: currentUserId,
         version: 1
       });
+
+      if (insertDocError) {
+        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+      }
 
       // HR에게 알림 전송 — [4차 전수조사 admin-05] 존재하지 않는 user_id='system_admin'
       // (FK 위반) 대신 HR 담당 부서 staff에게 fan-out + dedupe하는 공통 헬퍼 사용.
@@ -348,7 +360,7 @@ function MyPageMain({
       setShowSignaturePad(false);
     } catch (e) {
       console.error('[마이페이지] 근로계약서 서명 저장 실패:', e);
-      toast('서명 저장 중 오류가 발생했습니다.', 'error');
+      toast(e instanceof Error ? e.message : '서명 저장 중 오류가 발생했습니다.', 'error');
     }
   };
 

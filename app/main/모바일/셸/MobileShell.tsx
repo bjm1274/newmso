@@ -131,7 +131,7 @@ export default function MobileShell({
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;
     try {
-      await db
+      const { error: updateError } = await db
         .from('employment_contracts')
         .update({
           status: '서명완료',
@@ -141,6 +141,10 @@ export default function MobileShell({
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
         .eq('id', pendingContract.id);
+
+      if (updateError) {
+        throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);
+      }
 
       const { data: checklistRows } = await db
         .from('onboarding_checklists')
@@ -161,7 +165,7 @@ export default function MobileShell({
           signedAt,
         },
       );
-      await db.from('onboarding_checklists').upsert(
+      const { error: checklistError } = await db.from('onboarding_checklists').upsert(
         {
           staff_id: currentUserId,
           checklist_type: '입사',
@@ -172,10 +176,14 @@ export default function MobileShell({
         { onConflict: 'staff_id,checklist_type' },
       );
 
+      if (checklistError) {
+        throw new Error(`온보딩 체크리스트 업데이트 실패: ${checklistError.message}`);
+      }
+
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
       const { encryptContract } = await import('@/lib/contract-crypto');
       const encryptedContractText = await encryptContract(contractText);
-      await db.from('document_repository').insert({
+      const { error: insertDocError } = await db.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         category: '근로계약서',
         content: encryptedContractText,
@@ -183,6 +191,10 @@ export default function MobileShell({
         created_by: currentUserId,
         version: 1
       });
+
+      if (insertDocError) {
+        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+      }
 
       // HR에게 알림 전송 — [4차 전수조사 admin-05] FK 위반하는 user_id='system_admin'
       // 대신 HR 담당 부서 staff fan-out + dedupe 공통 헬퍼 사용.
@@ -199,7 +211,7 @@ export default function MobileShell({
       setShowSignaturePad(false);
     } catch (e) {
       console.error('[모바일셸] 근로계약서 서명 저장 실패:', e);
-      toast('서명 저장 중 오류가 발생했습니다.', 'error');
+      toast(e instanceof Error ? e.message : '서명 저장 중 오류가 발생했습니다.', 'error');
     }
   };
 

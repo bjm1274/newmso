@@ -290,22 +290,32 @@ export async function POST(request: Request) {
           \`committee_members\` text,
           \`created_at\` text DEFAULT (CURRENT_TIMESTAMP)
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
       `);
-        try {
-          await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `receipt_signature_data` text;");
-        } catch (e) {
-          // Ignore if column already exists
-        }
-        try {
-          await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `privacy_consent` integer;");
-        } catch (e) {
-          // Ignore if column already exists
-        }
-        provisioned = true;
       } catch (err) {
-        console.error('Failed to auto-provision disciplinary_committees table & unique index:', err);
+        console.error('Failed to auto-provision disciplinary_committees table:', err);
       }
+
+      try {
+        await d1.exec(`
+          CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
+        `);
+      } catch (err) {
+        console.warn('Failed to create unique index on employment_contracts (duplicates might exist):', err);
+      }
+
+      try {
+        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `receipt_signature_data` text;");
+      } catch (e) {
+        // Ignore if column already exists
+      }
+
+      try {
+        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `privacy_consent` integer;");
+      } catch (e) {
+        // Ignore if column already exists
+      }
+
+      provisioned = true;
     }
 
     const db = getD1Drizzle(d1);
