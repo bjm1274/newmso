@@ -131,13 +131,14 @@ export async function POST(req: Request) {
             },
             body: JSON.stringify({
                 file: {
-                    displayName: `consultation_${Date.now()}`
+                    display_name: `consultation_${Date.now()}`
                 }
             })
         });
 
         if (!startRes.ok) {
-            return NextResponse.json({ error: `Gemini File API 업로드 세션 생성 실패: ${startRes.statusText}` }, { status: 502 });
+            const errText = await startRes.text().catch(() => '');
+            return NextResponse.json({ error: `Gemini File API 업로드 세션 생성 실패: ${startRes.statusText} (${errText})` }, { status: 502 });
         }
 
         const uploadUrl = startRes.headers.get('X-Goog-Upload-URL');
@@ -156,7 +157,8 @@ export async function POST(req: Request) {
         });
 
         if (!uploadRes.ok) {
-            return NextResponse.json({ error: `Gemini File API 파일 스트리밍 업로드 실패: ${uploadRes.statusText}` }, { status: 502 });
+            const errText = await uploadRes.text().catch(() => '');
+            return NextResponse.json({ error: `Gemini File API 파일 스트리밍 업로드 실패: ${uploadRes.statusText} (${errText})` }, { status: 502 });
         }
 
         const uploadData = await uploadRes.json() as { file: { name: string; uri: string } };
