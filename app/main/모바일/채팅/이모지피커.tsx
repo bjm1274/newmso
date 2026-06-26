@@ -17,6 +17,7 @@ import {
   FREQUENT,
   STATIC_WORKER_LABELS,
   STATIC_HOSPITAL_LABELS,
+  STATIC_CAT_LABELS,
   type EmojiEntry,
   type CategoryId,
 } from '@/app/main/기능부품/메신저액션서브/emoji-data';
@@ -40,8 +41,8 @@ export default function EmojiPicker({
 }: EmojiPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryId>('emoticons');
-  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital'>('all');
+  const [category, setCategory] = useState<CategoryId>('stickers');
+  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital' | 'cat'>('all');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // ESC 키 닫기
@@ -96,27 +97,6 @@ export default function EmojiPicker({
     const cat = CATEGORIES.find((c) => c.id === category);
     if (!cat) return FREQUENT;
 
-    if (category === 'emoticons' && subGroup !== 'all') {
-      return cat.list.filter((entry) => {
-        const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-        const def = id ? getEmoticonDef(id) : null;
-        if (!def) return false;
-        if (subGroup === 'worker') {
-          return def.group === 'office' || def.group === 'developer';
-        }
-        return def.group === 'hospital';
-      });
-    }
-    if (category === 'stickers' && subGroup !== 'all') {
-      return cat.list.filter((entry) => {
-        const id = entry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
-        if (!id) return false;
-        if (subGroup === 'worker') {
-          return id.startsWith('worker-');
-        }
-        return id.startsWith('hospital-');
-      });
-    }
     return cat.list;
   }, [query, category, subGroup]);
 
@@ -145,7 +125,7 @@ export default function EmojiPicker({
 
   if (!open) return null;
 
-  const isEmoticonCat = !query && (category === 'emoticons' || category === 'stickers');
+  const isEmoticonCat = !query && category === 'stickers';
 
   return (
     <div
@@ -233,7 +213,7 @@ export default function EmojiPicker({
                 aria-label={cat.label}
                 onClick={() => {
                   setCategory(cat.id);
-                  if (cat.id !== 'emoticons' && cat.id !== 'stickers') {
+                  if (cat.id !== 'stickers') {
                     setSubGroup('all');
                   }
                 }}
@@ -259,51 +239,7 @@ export default function EmojiPicker({
         </div>
       )}
 
-      {/* 🏷 스티커/이모티콘용 서브그룹 탭 */}
-      {!query && (category === 'emoticons' || category === 'stickers') && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 4,
-            padding: 3,
-            background: 'var(--m-bg)',
-            borderRadius: 8,
-            marginBottom: 8,
-            border: '1px solid var(--m-border)',
-            boxSizing: 'border-box',
-          }}
-        >
-          {[
-            { id: 'all', label: '전체' },
-            { id: 'worker', label: '직장인' },
-            { id: 'hospital', label: '병원' },
-          ].map((sub) => {
-            const active = subGroup === sub.id;
-            return (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => setSubGroup(sub.id as any)}
-                style={{
-                  flex: 1,
-                  padding: '5px 0',
-                  borderRadius: 6,
-                  textAlign: 'center',
-                  fontSize: 11.5,
-                  fontWeight: active ? 'bold' : 'normal',
-                  background: active ? 'var(--m-card)' : 'transparent',
-                  color: active ? 'var(--m-accent)' : 'var(--z-600)',
-                  border: 0,
-                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {sub.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      
 
       {/* 📦 그리드 리스트 영역 */}
       <div
@@ -488,7 +424,11 @@ export default function EmojiPicker({
                     const id = activeEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
                     if (id) {
                       const isHospital = id.startsWith('hospital-');
+                      const isCat = id.startsWith('cat-');
                       const num = parseInt(id.split('-')[1], 10);
+                      if (isCat) {
+                        return "";
+                      }
                       return isHospital
                         ? STATIC_HOSPITAL_LABELS[num - 1] || id
                         : STATIC_WORKER_LABELS[num - 1] || id;

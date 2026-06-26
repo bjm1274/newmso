@@ -237,6 +237,15 @@ function MessengerComposerImpl({
 
   const handleInsertEmoji = (emoji: string) => {
     setShowEmojiPicker(false);
+    
+    if (emoji.startsWith('[stat:')) {
+      propagateChange(emoji, emoji.length);
+      setTimeout(() => {
+        void onSendMessage();
+      }, 0);
+      return;
+    }
+
     const ta = composerRef.current;
     if (!ta) {
       propagateChange(inputMsg + emoji, (inputMsg + emoji).length);

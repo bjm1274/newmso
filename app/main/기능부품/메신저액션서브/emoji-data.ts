@@ -71,26 +71,24 @@ export const STATIC_HOSPITAL_LABELS = [
   "오늘도 무사히"
 ];
 
+export const STATIC_CAT_LABELS = [
+  "미소 고양이", "하트 뿅뿅", "하트 날리기", "어리둥절", "시무룩", "곁눈질", "고민 중",
+  "방긋", "웃픈 고양이", "엉엉", "식은땀", "오싹", "겁먹음", "최고!",
+  "깜놀", "분노 폭발", "충격", "쿨쿨", "선글라스", "윙크 따봉", "흐뭇",
+  "메롱", "헤헤 메롱", "깜짝이야", "쉿", "만세 축하", "슬픈 눈물", "따봉 고양이"
+];
+
 /* ------------------------------------------------------------------ */
 /*  Derived entries (emoticons & stickers)                             */
 /* ------------------------------------------------------------------ */
 
-export const EMOTICONS_ENTRIES: EmojiEntry[] = ALL_EMOTICONS.map(e => ({
-  e: `[emo:${e.id}]`,
-  name: `:${e.id}:`,
-  keywords: [e.label, e.group, '이모티콘', '움직이는 이모티콘', 'emoticon', 'custom']
-}));
+export const EMOTICONS_ENTRIES: EmojiEntry[] = [];
 
 export const STICKERS_ENTRIES: EmojiEntry[] = [
-  ...STATIC_WORKER_LABELS.map((label, i) => ({
-    e: `[stat:worker-${i + 1}]`,
-    name: `:worker-${i + 1}:`,
-    keywords: [label, '직장인', '회사원', '정적', 'static', 'sticker', 'worker']
-  })),
-  ...STATIC_HOSPITAL_LABELS.map((label, i) => ({
-    e: `[stat:hospital-${i + 1}]`,
-    name: `:hospital-${i + 1}:`,
-    keywords: [label, '병원', '의사', '간호사', '의료진', '정적', 'static', 'sticker', 'hospital']
+  ...STATIC_CAT_LABELS.map((label, i) => ({
+    e: `[stat:cat-${i + 1}]`,
+    name: `:cat-${i + 1}:`,
+    keywords: [label, '고양이', '간호사', '이모지', '정적', 'static', 'sticker', 'cat', 'nurse']
   }))
 ];
 
@@ -237,7 +235,6 @@ export const CELEBRATE: EmojiEntry[] = [
 /* ------------------------------------------------------------------ */
 
 export const CATEGORIES = [
-  { id: 'emoticons', label: '움직이는 이모티콘', icon: '⚡', list: EMOTICONS_ENTRIES },
   { id: 'stickers', label: '스티커 이모티콘', icon: '🎨', list: STICKERS_ENTRIES },
   { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
   { id: 'faces', label: '표정', icon: '😀', list: FACES },

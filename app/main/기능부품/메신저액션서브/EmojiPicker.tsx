@@ -21,12 +21,13 @@ import {
   FREQUENT,
   STATIC_WORKER_LABELS,
   STATIC_HOSPITAL_LABELS,
+  STATIC_CAT_LABELS,
   type EmojiEntry,
   type CategoryId,
 } from './emoji-data';
 
 // Re-export for backward compatibility — other modules import these from EmojiPicker
-export { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS } from './emoji-data';
+export { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS, STATIC_CAT_LABELS } from './emoji-data';
 
 const PICKER_WIDTH = 320;
 const PICKER_HEIGHT_APPROX = 360;
@@ -43,8 +44,8 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryId>('emoticons');
-  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital'>('all');
+  const [category, setCategory] = useState<CategoryId>('stickers');
+  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital' | 'cat'>('all');
   const [focusIdx, setFocusIdx] = useState(0);
 
   const pos = useMemo(() => {
@@ -85,27 +86,6 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
     const cat = CATEGORIES.find((c) => c.id === category);
     if (!cat) return FREQUENT;
 
-    if (category === 'emoticons' && subGroup !== 'all') {
-      return cat.list.filter((entry) => {
-        const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-        const def = id ? getEmoticonDef(id) : null;
-        if (!def) return false;
-        if (subGroup === 'worker') {
-          return def.group === 'office' || def.group === 'developer';
-        }
-        return def.group === 'hospital';
-      });
-    }
-    if (category === 'stickers' && subGroup !== 'all') {
-      return cat.list.filter((entry) => {
-        const id = entry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
-        if (!id) return false;
-        if (subGroup === 'worker') {
-          return id.startsWith('worker-');
-        }
-        return id.startsWith('hospital-');
-      });
-    }
     return cat.list;
   }, [query, category, subGroup]);
 
@@ -212,7 +192,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 aria-label={cat.label}
                 onClick={() => {
                   setCategory(cat.id);
-                  if (cat.id !== 'emoticons' && cat.id !== 'stickers') setSubGroup('all'); // Reset subGroup on other tabs
+                  if (cat.id !== 'stickers') setSubGroup('all'); // Reset subGroup on other tabs
                 }}
                 className={`flex-1 h-7 rounded-md text-sm transition-colors ${
                   active ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
@@ -225,31 +205,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           })}
         </div>
       )}
-      {!query && (category === 'emoticons' || category === 'stickers') && (
-        <div className="flex gap-1 px-1 py-0.5 bg-[var(--muted)]/60 rounded-lg border border-[var(--border)] text-[10.5px] font-semibold text-[var(--toss-gray-3)] shrink-0 shadow-inner">
-          {[
-            { id: 'all', label: '전체' },
-            { id: 'worker', label: '직장인' },
-            { id: 'hospital', label: '병원' }
-          ].map((sub) => {
-            const active = subGroup === sub.id;
-            return (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => setSubGroup(sub.id as any)}
-                className={`flex-1 py-1 rounded-md text-center transition-all ${
-                  active 
-                    ? 'bg-[var(--card)] text-[var(--accent)] font-extrabold shadow-sm' 
-                    : 'hover:text-[var(--foreground)]'
-                }`}
-              >
-                {sub.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      
       <div className="flex flex-col">
         <span className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-[var(--toss-gray-4)]">
           {query ? `검색 결과 ${items.length}` : CATEGORIES.find((c) => c.id === category)?.label}
@@ -258,10 +214,10 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           <div className="grid h-32 place-items-center text-[12px] text-[var(--toss-gray-4)]">결과 없음</div>
         ) : (
           <div className="max-h-[240px] overflow-y-auto pr-1">
-            <div className={!query && (category === 'emoticons' || category === 'stickers') ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
+            <div className={!query && category === 'stickers' ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
               {items.map((entry, idx) => {
                 const focused = idx === focusIdx;
-                const isEmoticonCat = !query && (category === 'emoticons' || category === 'stickers');
+                const isEmoticonCat = !query && category === 'stickers';
                 const isCustomEmo = entry.e.startsWith('[emo:');
                 const isSticker = entry.e.startsWith('[stat:');
                 
@@ -346,18 +302,21 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 const id = focusedEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
                 if (id) {
                   const isHospital = id.startsWith('hospital-');
+                  const isCat = id.startsWith('cat-');
                   const num = parseInt(id.split('-')[1], 10);
-                  const label = isHospital 
-                    ? STATIC_HOSPITAL_LABELS[num - 1] || id 
-                    : STATIC_WORKER_LABELS[num - 1] || id;
+                  const label = isCat
+                    ? ''
+                    : isHospital
+                      ? STATIC_HOSPITAL_LABELS[num - 1] || id
+                      : STATIC_WORKER_LABELS[num - 1] || id;
                   return (
                     <>
                       <img 
                         src={`/emoticon/static/${id}.png`}
-                        alt={label}
+                        alt={label || '고양이'}
                         className="w-6 h-6 object-contain shrink-0" 
                       />
-                      <span className="font-bold text-[var(--foreground)]">{label}</span>
+                      {label && <span className="font-bold text-[var(--foreground)]">{label}</span>}
                       <span className="font-mono text-[9px] opacity-60">({id})</span>
                     </>
                   );

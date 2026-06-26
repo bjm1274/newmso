@@ -369,6 +369,16 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     if (!input) {
       return;
     }
+
+    if (emoji.startsWith('[stat:')) {
+      input.value = emoji;
+      setHasText(true);
+      setTimeout(() => {
+        void handleSendText();
+      }, 0);
+      return;
+    }
+
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     const next = input.value.slice(0, start) + emoji + input.value.slice(end);
@@ -380,7 +390,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       const caret = start + emoji.length;
       input.setSelectionRange(caret, caret);
     });
-  }, []);
+  }, [handleSendText]);
 
   const handleToggleReaction = useCallback(
     async (messageId: string, emoji: string) => {

@@ -4,7 +4,7 @@ import { type ReactNode } from 'react';
 import { stripHiddenMessageMetaBlocks } from './메신저첨부';
 import { parseMarkdownSegments } from './메신저포매팅';
 import { getEmoticonDef, buildEmoticonSVG, type EmoticonDef } from './메신저액션서브/emoticon-engine';
-import { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS } from './메신저액션서브/EmojiPicker';
+import { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS, STATIC_CAT_LABELS } from './메신저액션서브/EmojiPicker';
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -96,7 +96,11 @@ function renderFormattedSegments(content: string, isMine: boolean, highlightQuer
 
 function resolveStickerLabel(statId: string): string {
   const isHospital = statId.startsWith('hospital-');
+  const isCat = statId.startsWith('cat-');
   const num = parseInt(statId.split('-')[1], 10);
+  if (isCat) {
+    return STATIC_CAT_LABELS[num - 1] || statId;
+  }
   return isHospital
     ? STATIC_HOSPITAL_LABELS[num - 1] || statId
     : STATIC_WORKER_LABELS[num - 1] || statId;
@@ -124,20 +128,23 @@ function renderEmoticonCard(def: EmoticonDef): ReactNode {
 /** 단독 전송 시: 큰 정적 스티커 카드 (PNG) */
 function renderStickerCard(statId: string): ReactNode {
   const label = resolveStickerLabel(statId);
+  const isCat = statId.startsWith('cat-');
   return (
     <div
-      className="flex flex-col items-center p-2 rounded-2xl bg-white border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:bg-[var(--card)]"
+      className="flex flex-col items-center justify-center p-2 rounded-2xl bg-white border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:bg-[var(--card)]"
       style={{ width: '132px', height: '132px' }}
     >
       <img
         src={`/emoticon/static/${statId}.png`}
-        alt={label}
-        className="w-[100px] h-[100px] object-contain hover:scale-105 transition-transform"
+        alt={label || '고양이'}
+        className={isCat ? "w-[110px] h-[110px] object-contain hover:scale-105 transition-transform" : "w-[100px] h-[100px] object-contain hover:scale-105 transition-transform"}
         loading="lazy"
       />
-      <span className="text-[12.5px] font-bold text-[var(--foreground)] mt-1.5 opacity-90" style={{ fontFamily: 'Gaegu, sans-serif' }}>
-        {label}
-      </span>
+      {!isCat && label && (
+        <span className="text-[12.5px] font-bold text-[var(--foreground)] mt-1.5 opacity-90" style={{ fontFamily: 'Gaegu, sans-serif' }}>
+          {label}
+        </span>
+      )}
     </div>
   );
 }
