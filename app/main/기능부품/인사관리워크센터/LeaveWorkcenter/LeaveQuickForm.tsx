@@ -55,6 +55,14 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
   const [leaveType, setLeaveType] = useState<LeaveTypeOption>('연차');
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [manualDays, setManualDays] = useState<string>('1');
+
+  // 부여/소멸 유형일 때는 날짜 범위를 단일 항목으로 제한
+  useEffect(() => {
+    if (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') {
+      setDateRanges((prev) => prev.slice(0, 1));
+    }
+  }, [leaveType]);
 
   // 표에서 행을 선택하면 폼 prefill
   useEffect(() => {
@@ -84,13 +92,21 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
     return dateRanges.reduce((sum, range) => sum + computeDays(range.startDate, range.endDate, leaveType), 0);
   }, [dateRanges, leaveType]);
 
+  const activeDays = useMemo(() => {
+    if (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') {
+      const parsed = parseFloat(manualDays);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return totalDays;
+  }, [leaveType, manualDays, totalDays]);
+
   const remaining = picked?.remaining ?? 0;
   const remainingAfter = useMemo(() => {
     if (leaveType === '연차(부여)') {
-      return remaining + totalDays;
+      return remaining + activeDays;
     }
-    return Math.max(0, remaining - totalDays);
-  }, [remaining, totalDays, leaveType]);
+    return Math.max(0, remaining - activeDays);
+  }, [remaining, activeDays, leaveType]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,7 +129,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
             leaveType,
             startDate: range.startDate,
             endDate: range.endDate || range.startDate,
-            days: computeDays(range.startDate, range.endDate, leaveType),
+            days: (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') ? activeDays : computeDays(range.startDate, range.endDate, leaveType),
             reason,
           })
         )
@@ -121,6 +137,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
       toast(`${dateRanges.length}건의 연차/휴가 신청을 상신했습니다.`, 'success');
       setReason('');
       setDateRanges([{ id: Date.now(), startDate: todayIso(), endDate: todayIso() }]);
+      setManualDays('1');
       onSubmitted();
     } catch (error) {
       console.error('휴가 신청 실패:', error);
@@ -184,7 +201,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
                   required
                 />
               </label>
-              {dateRanges.length > 1 && (
+              {dateRanges.length > 1 && leaveType !== '연차(부여)' && leaveType !== '연차(과거사용)' && (
                 <button
                   type="button"
                   onClick={() => removeDateRange(range.id)}
@@ -196,13 +213,15 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
               )}
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addDateRange}
-            className="w-full bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-[var(--accent)] border border-dashed border-[var(--accent)]/30 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all mt-1 cursor-pointer"
-          >
-            + 날짜 범위 추가
-          </button>
+          {leaveType !== '연차(부여)' && leaveType !== '연차(과거사용)' && (
+            <button
+              type="button"
+              onClick={addDateRange}
+              className="w-full bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-[var(--accent)] border border-dashed border-[var(--accent)]/30 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all mt-1 cursor-pointer"
+            >
+              + 날짜 범위 추가
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -228,12 +247,24 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
           </label>
           <label className="flex flex-col gap-1 text-left">
             <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">총 일수</span>
-            <input
-              value={totalDays}
-              readOnly
-              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-2 py-1.5 text-right text-[12px] tnum font-bold"
-              aria-label="자동 계산된 총 일수"
-            />
+            {(leaveType === '연차(부여)' || leaveType === '연차(과거사용)') ? (
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                value={manualDays}
+                onChange={(e) => setManualDays(e.target.value)}
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-right text-[12px] tnum font-bold"
+                aria-label="수동 입력된 총 일수"
+              />
+            ) : (
+              <input
+                value={totalDays}
+                readOnly
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-2 py-1.5 text-right text-[12px] tnum font-bold"
+                aria-label="자동 계산된 총 일수"
+              />
+            )}
           </label>
         </div>
 

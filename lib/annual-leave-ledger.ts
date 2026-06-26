@@ -147,6 +147,7 @@ type EnsureApprovedAnnualLeaveRequestParams = {
   delegateName?: string | null;
   delegateDepartment?: string | null;
   delegatePosition?: string | null;
+  days?: number | null;
 };
 
 function buildLeaveRequestPayload(params: EnsureApprovedAnnualLeaveRequestParams) {
@@ -158,6 +159,7 @@ function buildLeaveRequestPayload(params: EnsureApprovedAnnualLeaveRequestParams
     reason: params.reason,
     status: '승인',
     approved_at: new Date().toISOString(),
+    days: params.days ?? null,
   };
 }
 
@@ -173,22 +175,10 @@ type D1LeaveRequestInsert = {
   approved_at: string;
   company_id: string | null;
   created_at: string;
+  days: number | null;
 };
 
-export async function ensureApprovedAnnualLeaveRequest(params: {
-  staffId: string;
-  leaveType: string;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  approvalId?: string | null;
-  companyId?: string | null;
-  companyName?: string | null;
-  delegateId?: string | null;
-  delegateName?: string | null;
-  delegateDepartment?: string | null;
-  delegatePosition?: string | null;
-}) {
+export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnnualLeaveRequestParams) {
   const { staffId, leaveType, startDate, endDate } = params;
   const payload = buildLeaveRequestPayload(params);
 
@@ -227,6 +217,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
           approved_at: payload.approved_at,
           // D1 스키마에 company_id 있음
           ...(params.companyId ? { company_id: params.companyId } : {}),
+          days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)),
         })
         .where(eq(leaveRequestsTable.id, matchedRow.id));
     }
@@ -246,6 +237,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: {
     approved_at: payload.approved_at,
     company_id: params.companyId ?? null,
     created_at: new Date().toISOString(),
+    days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)),
   };
   await db.insert(leaveRequestsTable).values(insertValues);
   return newId;
@@ -262,12 +254,18 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string) {
       start_date: leaveRequestsTable.start_date,
       end_date: leaveRequestsTable.end_date,
       status: leaveRequestsTable.status,
+      days: leaveRequestsTable.days,
     })
     .from(leaveRequestsTable)
     .where(eq(leaveRequestsTable.staff_id, staffId));
 
   const approvedAnnualLeaveDays = rows.reduce((sum, row) => {
     if (!isApprovedLeaveStatus(row?.status)) return sum;
+    // 1순위: DB에 이미 저장된 days 값이 유효한 수치라면 우선 사용
+    const dbDays = row.days != null ? Number(row.days) : null;
+    if (dbDays !== null && !Number.isNaN(dbDays)) {
+      return sum + dbDays;
+    }
     const unit = getLeaveUnit(row?.leave_type);
     if (unit === 0.5) return sum + 0.5;
     if (!isAnnualLeaveType(row?.leave_type)) return sum;

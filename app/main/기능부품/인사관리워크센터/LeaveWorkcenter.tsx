@@ -101,8 +101,10 @@ export default function LeaveWorkcenter({
 
       // 만약 '연차(부여)' 유형이고 상태가 '승인'으로 되었거나 철회되는 경우
       if (targetLeave.leave_type === '연차(부여)') {
-        // 정본 calculateLeaveDays 로 통일 (Math.ceil + 음수 보정)
-        const days = calculateLeaveDays(targetLeave.start_date, targetLeave.end_date || targetLeave.start_date);
+        // DB에 저장된 days가 있다면 우선 적용하고, 없으면 정본 calculateLeaveDays 로 통일
+        const days = typeof targetLeave.days === 'number' && targetLeave.days > 0
+          ? targetLeave.days
+          : calculateLeaveDays(targetLeave.start_date, targetLeave.end_date || targetLeave.start_date);
 
         const staff = staffs.find((s) => String(s.id) === String(targetLeave.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
@@ -170,7 +172,9 @@ export default function LeaveWorkcenter({
       if (error) throw error;
 
       if (target.status === '승인' && target.leave_type === '연차(부여)') {
-        const days = calculateLeaveDays(target.start_date, target.end_date || target.start_date);
+        const days = typeof target.days === 'number' && target.days > 0
+          ? target.days
+          : calculateLeaveDays(target.start_date, target.end_date || target.start_date);
         const staff = staffs.find((s) => String(s.id) === String(target.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
         const newTotal = Math.max(0, currentTotal - days);
@@ -300,6 +304,17 @@ export default function LeaveWorkcenter({
     setSuggest({ open: false, item: null });
   }, []);
 
+  const pickedRequests = useMemo(() => {
+    if (!picked) return [];
+    return data.requests
+      .filter((r) => String(r.staff_id) === String(picked.staff.id))
+      .sort((a, b) => {
+        const dateA = a.created_at || a.start_date || '';
+        const dateB = b.created_at || b.start_date || '';
+        return dateB.localeCompare(dateA);
+      });
+  }, [picked, data.requests]);
+
   // 캘린더용 entries — leave_requests의 start_date~end_date를 일자 단위로 펼침
   const calendarEntries = useMemo<LeaveCalendarEntry[]>(() => {
     const staffMap = new Map<string, string>();
@@ -361,43 +376,137 @@ export default function LeaveWorkcenter({
       )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <WorkcenterSection
-          title="직원별 연차 현황"
-          padded={false}
-          rightSlot={
-            data.totals.pending > 0 ? (
-              <button
-                type="button"
-                data-testid="leave-approval-pending-btn"
-                onClick={() => {
-                  setApprovalTab('pending');
-                  setShowApprovalModal(true);
-                }}
-                className="bg-orange-500 text-white px-2.5 py-1 text-[11px] font-bold rounded-[var(--radius-md)] animate-pulse hover:opacity-90 transition-all shadow-sm"
-              >
-                🔔 승인 대기 결재 ({data.totals.pending}건)
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setApprovalTab('history');
-                  setShowApprovalModal(true);
-                }}
-                className="bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-[var(--card)] transition-colors"
-              >
-                결재 내역 보기
-              </button>
-            )
-          }
-        >
-          <LeaveBalanceTable
-            rows={data.rows}
-            selectedStaffId={picked ? String(picked.staff.id) : null}
-            loading={loading}
-            onPick={handlePick}
-          />
-        </WorkcenterSection>
+        <div className="flex flex-col gap-3">
+          <WorkcenterSection
+            title="직원별 연차 현황"
+            padded={false}
+            rightSlot={
+              data.totals.pending > 0 ? (
+                <button
+                  type="button"
+                  data-testid="leave-approval-pending-btn"
+                  onClick={() => {
+                    setApprovalTab('pending');
+                    setShowApprovalModal(true);
+                  }}
+                  className="bg-orange-500 text-white px-2.5 py-1 text-[11px] font-bold rounded-[var(--radius-md)] animate-pulse hover:opacity-90 transition-all shadow-sm"
+                >
+                  🔔 승인 대기 결재 ({data.totals.pending}건)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApprovalTab('history');
+                    setShowApprovalModal(true);
+                  }}
+                  className="bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-[var(--card)] transition-colors"
+                >
+                  결재 내역 보기
+                </button>
+              )
+            }
+          >
+            <LeaveBalanceTable
+              rows={data.rows}
+              selectedStaffId={picked ? String(picked.staff.id) : null}
+              loading={loading}
+              onPick={handlePick}
+            />
+          </WorkcenterSection>
+
+          {picked && (
+            <WorkcenterSection
+              title={`연차 사용 및 부여 내역 - ${picked.staff.name}`}
+              padded={false}
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-[12px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30 text-[var(--toss-gray-4)] font-bold">
+                      <th className="px-4 py-2">날짜 범위</th>
+                      <th className="px-4 py-2">유형</th>
+                      <th className="px-4 py-2">일수</th>
+                      <th className="px-4 py-2">사유</th>
+                      <th className="px-4 py-2">상태</th>
+                      <th className="px-4 py-2 text-right">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pickedRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-[var(--toss-gray-3)] font-medium">
+                          이 직원의 연차 사용/부여 내역이 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      pickedRequests.map((req) => {
+                        let typeBadgeColor = 'bg-blue-500/10 text-blue-600 border-blue-200';
+                        let typeLabel = req.leave_type;
+                        if (req.leave_type === '연차(부여)') {
+                          typeBadgeColor = 'bg-emerald-500/10 text-emerald-600 border-emerald-200';
+                          typeLabel = '연차 신규 부여';
+                        } else if (req.leave_type === '연차(과거사용)') {
+                          typeBadgeColor = 'bg-orange-500/10 text-orange-600 border-orange-200';
+                          typeLabel = '과거 사용 소급';
+                        } else if (req.leave_type === '오전반차' || req.leave_type === '오후반차') {
+                          typeBadgeColor = 'bg-sky-500/10 text-sky-600 border-sky-200';
+                        } else if (req.leave_type === '병가') {
+                          typeBadgeColor = 'bg-red-500/10 text-red-600 border-red-200';
+                        } else if (req.leave_type === '경조') {
+                          typeBadgeColor = 'bg-purple-500/10 text-purple-600 border-purple-200';
+                        }
+
+                        const reqDays = typeof req.days === 'number' && req.days > 0
+                          ? req.days
+                          : Math.max(1, calculateLeaveDays(req.start_date, req.end_date || req.start_date));
+
+                        return (
+                          <tr key={req.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/10 transition-colors">
+                            <td className="px-4 py-2.5 font-medium text-[var(--foreground)]">
+                              {req.start_date} {req.end_date !== req.start_date ? `~ ${req.end_date}` : ''}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeBadgeColor}`}>
+                                {typeLabel}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 font-bold text-[var(--foreground)]">
+                              {reqDays}일
+                            </td>
+                            <td className="px-4 py-2.5 text-[var(--toss-gray-4)] max-w-[200px] truncate" title={req.reason}>
+                              {req.reason || '-'}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                req.status === '승인'
+                                  ? 'bg-green-500/10 text-green-700'
+                                  : req.status === '반려'
+                                    ? 'bg-red-500/10 text-red-700'
+                                    : 'bg-orange-500/10 text-orange-700'
+                              }`}>
+                                {req.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLeave(req.id)}
+                                className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-600 rounded-md text-[10px] font-bold transition shadow-sm border border-red-500/20"
+                              >
+                                삭제
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </WorkcenterSection>
+          )}
+        </div>
 
         <LeaveQuickForm
           picked={picked}

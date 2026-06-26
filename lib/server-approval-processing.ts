@@ -361,7 +361,7 @@ export async function processFinalApprovalEffects(
       try {
         const start = new Date(startStr);
         const end = new Date(endStr || startStr);
-        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const days = leaveSummary?.days ?? Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
         const leaveType = leaveSummary?.leaveType || '연차';
         const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
@@ -370,6 +370,7 @@ export async function processFinalApprovalEffects(
           leaveType,
           startDate: startStr,
           endDate: endStr,
+          days: leaveSummary?.days,
           reason: leaveSummary?.reason || String(item.title || ''),
           approvalId: String(item.id || '').trim() || null,
           companyId: String(item.company_id || '').trim() || null,
@@ -382,50 +383,78 @@ export async function processFinalApprovalEffects(
 
         // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
         const leaveDb = await requireD1ForApprovalProcessing('leave_attendance.upsert');
-        for (let index = 0; index < days; index += 1) {
-          const date = new Date(start);
-          date.setDate(date.getDate() + index);
-          const dateStr = formatKoreanDateKey(date);
 
+        // 연차 신규 부여(+)인 경우, 승인 시 직원의 연차 총량(annual_leave_total) 가산 처리
+        if (leaveType === '연차(부여)') {
+          const staffRows = await leaveDb
+            .select({ annual_leave_total: staffMembersTable.annual_leave_total })
+            .from(staffMembersTable)
+            .where(eq(staffMembersTable.id, senderId))
+            .limit(1);
+          const currentTotal = Number(staffRows[0]?.annual_leave_total ?? 0);
+          const newTotal = currentTotal + days;
+          
           await leaveDb
-            .insert(attendanceTable)
-            .values({
-              id: crypto.randomUUID(),
-              staff_id: senderId,
-              date: dateStr,
-              status: leaveStatus.legacy,
-              created_at: new Date().toISOString(),
-            })
-            .onConflictDoUpdate({
-              target: [attendanceTable.staff_id, attendanceTable.date],
-              set: { status: sql`excluded.status` },
-            });
+            .update(staffMembersTable)
+            .set({ annual_leave_total: newTotal })
+            .where(eq(staffMembersTable.id, senderId));
+        }
 
-          await leaveDb
-            .insert(attendancesTable)
-            .values({
-              id: crypto.randomUUID(),
-              staff_id: senderId,
-              work_date: dateStr,
-              status: leaveStatus.modern,
-              check_in_time: null,
-              check_out_time: null,
-              work_hours_minutes: 0,
-              created_at: new Date().toISOString(),
-            })
-            .onConflictDoUpdate({
-              target: [attendancesTable.staff_id, attendancesTable.work_date],
-              set: {
-                status: sql`excluded.status`,
-                check_in_time: sql`excluded.check_in_time`,
-                check_out_time: sql`excluded.check_out_time`,
-                work_hours_minutes: sql`excluded.work_hours_minutes`,
-              },
-            });
+        // 연차(부여) 및 연차(과거사용)는 실제 휴가 사용이 아니므로 출결부 마킹 생략
+        if (leaveType !== '연차(부여)' && leaveType !== '연차(과거사용)') {
+          for (let index = 0; index < days; index += 1) {
+            const date = new Date(start);
+            date.setDate(date.getDate() + index);
+            const dateStr = formatKoreanDateKey(date);
+
+            await leaveDb
+              .insert(attendanceTable)
+              .values({
+                id: crypto.randomUUID(),
+                staff_id: senderId,
+                date: dateStr,
+                status: leaveStatus.legacy,
+                created_at: new Date().toISOString(),
+              })
+              .onConflictDoUpdate({
+                target: [attendanceTable.staff_id, attendanceTable.date],
+                set: { status: sql`excluded.status` },
+              });
+
+            await leaveDb
+              .insert(attendancesTable)
+              .values({
+                id: crypto.randomUUID(),
+                staff_id: senderId,
+                work_date: dateStr,
+                status: leaveStatus.modern,
+                check_in_time: null,
+                check_out_time: null,
+                work_hours_minutes: 0,
+                created_at: new Date().toISOString(),
+              })
+              .onConflictDoUpdate({
+                target: [attendancesTable.staff_id, attendancesTable.work_date],
+                set: {
+                  status: sql`excluded.status`,
+                  check_in_time: sql`excluded.check_in_time`,
+                  check_out_time: sql`excluded.check_out_time`,
+                  work_hours_minutes: sql`excluded.work_hours_minutes`,
+                },
+              });
+          }
         }
 
         if (isAnnualLeaveType(leaveType)) {
           await syncAnnualLeaveUsedForStaff(senderId);
+        }
+
+        // 연차 부여/차감/사용 후 잔여연차 및 밸런스 테이블 재계산 트리거
+        try {
+          const { recalculateLeaveBalance } = await import('@/lib/annual-leave-balance');
+          await recalculateLeaveBalance(senderId);
+        } catch (recalcErr) {
+          console.error('[server-approval-processing] recalculateLeaveBalance 실패:', recalcErr);
         }
 
         steps.push('leave_attendance');

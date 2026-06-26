@@ -25,6 +25,7 @@ export interface LeaveRequest {
   reason?: string;
   status: LeaveStatus;
   created_at?: string;
+  days?: number;
 }
 
 export interface LeaveBalanceRow {
@@ -133,6 +134,7 @@ function normalizeRequest(row: Record<string, unknown>): LeaveRequest {
     reason: pickString(row.reason) ?? '',
     status: asLeaveStatus(row.status),
     created_at: pickString(row.created_at) ?? undefined,
+    days: row.days != null ? pickNumber(row.days) : undefined,
   };
 }
 
@@ -264,6 +266,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     leave_type: input.leaveType,
     start_date: input.startDate,
     end_date: input.endDate || input.startDate,
+    days: input.days,
     reason: input.reason || '',
     status: '대기' as LeaveStatus,
     created_at: new Date().toISOString(),

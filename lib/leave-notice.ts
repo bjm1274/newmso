@@ -14,6 +14,7 @@ export type LeaveRequestMetaSummary = {
   delegateDepartment: string;
   delegatePosition: string;
   delegateLabel: string;
+  days?: number;
 };
 
 function readMetaString(
@@ -84,6 +85,9 @@ export function extractLeaveRequestMeta(metaData: Record<string, unknown> | null
         .join(' ')
     : '';
 
+  const daysVal = metaData?.days;
+  const days = (typeof daysVal === 'number' && Number.isFinite(daysVal)) ? daysVal : undefined;
+
   return {
     startDate,
     endDate,
@@ -95,6 +99,7 @@ export function extractLeaveRequestMeta(metaData: Record<string, unknown> | null
     delegateDepartment,
     delegatePosition,
     delegateLabel,
+    days,
   };
 }
 
