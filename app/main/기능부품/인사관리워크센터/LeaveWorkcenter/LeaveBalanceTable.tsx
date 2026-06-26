@@ -3,13 +3,15 @@
 /**
  * 직원별 연차 현황 표 (LeaveBalanceTable)
  *
+ * - 검색바로 이름/부서 검색 기능 추가
  * - 행 클릭 → 빠른 신청 폼 prefill (onPick)
+ * - 행 더블클릭 → 상세 연차 사용/발생 내역 팝업 트리거 (onDoubleClick)
  * - 잔여 ≤ 3일 → danger 색, 소멸 임박 → warn 배지
  * - JM6: <button> 행, aria-label, 키보드 Tab 가능
  * - JM2: 행 memo로 불필요 리렌더 방지
  */
 
-import { memo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { LeaveStaffRow } from './data';
 
 interface Props {
@@ -17,6 +19,7 @@ interface Props {
   selectedStaffId?: string | null;
   loading?: boolean;
   onPick: (row: LeaveStaffRow) => void;
+  onDoubleClick: (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
 }
 
 function statusBadge(row: LeaveStaffRow) {
@@ -40,9 +43,10 @@ interface RowProps {
   row: LeaveStaffRow;
   active: boolean;
   onPick: (row: LeaveStaffRow) => void;
+  onDoubleClick: (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
 }
 
-const TableRow = memo(function TableRow({ row, active, onPick }: RowProps) {
+const TableRow = memo(function TableRow({ row, active, onPick, onDoubleClick }: RowProps) {
   const remainColor = row.remaining <= 3
     ? 'text-[#DC2626]'
     : 'text-[var(--accent)]';
@@ -50,6 +54,7 @@ const TableRow = memo(function TableRow({ row, active, onPick }: RowProps) {
   return (
     <tr
       onClick={() => onPick(row)}
+      onDoubleClick={(e) => onDoubleClick(row, e)}
       className={`border-b border-[var(--border)] last:border-b-0 transition-colors cursor-pointer bg-[var(--card)] ${
         active ? 'bg-[var(--muted)]' : 'hover:bg-[var(--muted)]/60'
       }`}
@@ -83,7 +88,19 @@ const TableRow = memo(function TableRow({ row, active, onPick }: RowProps) {
   );
 });
 
-function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick }: Props) {
+function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick, onDoubleClick }: Props) {
+  const [query, setQuery] = useState('');
+
+  const filteredRows = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return rows;
+    return rows.filter((row) => {
+      const name = (row.staff.name ?? '').toLowerCase();
+      const dept = (row.staff.department ?? '').toLowerCase();
+      return name.includes(trimmed) || dept.includes(trimmed);
+    });
+  }, [rows, query]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -106,29 +123,52 @@ function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick }: Prop
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="data-table w-full text-[12px]">
-        <thead className="sticky top-0 z-[1] bg-[var(--tab-bg)]">
-          <tr className="text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
-            <th className="sticky left-0 z-[2] bg-[var(--tab-bg)] px-3 py-2">이름</th>
-            <th className="px-3 py-2">부서</th>
-            <th className="px-3 py-2 text-center">부여</th>
-            <th className="px-3 py-2 text-center">사용</th>
-            <th className="px-3 py-2 text-center">잔여</th>
-            <th className="px-3 py-2">상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <TableRow
-              key={String(row.staff.id)}
-              row={row}
-              active={selectedStaffId === String(row.staff.id)}
-              onPick={onPick}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col min-h-0 w-full">
+      {/* 구성원 현황 스타일의 검색바 추가 */}
+      <div className="border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 shrink-0">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="이름·부서 검색"
+          aria-label="직원 검색"
+          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-1.5 text-[12px] outline-none focus:border-[var(--accent)]"
+        />
+      </div>
+
+      <div className="overflow-x-auto flex-1">
+        <table className="data-table w-full text-[12px]">
+          <thead className="sticky top-0 z-[1] bg-[var(--tab-bg)]">
+            <tr className="text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
+              <th className="sticky left-0 z-[2] bg-[var(--tab-bg)] px-3 py-2">이름</th>
+              <th className="px-3 py-2">부서</th>
+              <th className="px-3 py-2 text-center">부여</th>
+              <th className="px-3 py-2 text-center">사용</th>
+              <th className="px-3 py-2 text-center">잔여</th>
+              <th className="px-3 py-2">상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-[var(--toss-gray-4)] font-medium">
+                  검색 결과가 없습니다.
+                </td>
+              </tr>
+            ) : (
+              filteredRows.map((row) => (
+                <TableRow
+                  key={String(row.staff.id)}
+                  row={row}
+                  active={selectedStaffId === String(row.staff.id)}
+                  onPick={onPick}
+                  onDoubleClick={onDoubleClick}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

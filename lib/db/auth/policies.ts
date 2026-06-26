@@ -529,6 +529,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   // attendance / leave aux
   'attendance_deduction_rules',
   'leave_balances',
+  'leave_accruals',
   'unpaid_absence_records',
 
   // payroll aux

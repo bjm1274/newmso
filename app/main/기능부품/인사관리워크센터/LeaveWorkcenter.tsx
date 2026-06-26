@@ -82,6 +82,51 @@ export default function LeaveWorkcenter({
   const [approvalTab, setApprovalTab] = useState<'pending' | 'history'>('pending');
   const [actioningId, setActioningId] = useState<string | null>(null);
 
+  const [doubleClickedStaff, setDoubleClickedStaff] = useState<LeaveStaffRow | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number } | null>(null);
+  const [detailTab, setDetailTab] = useState<'usage' | 'grant'>('usage');
+  const [accrualList, setAccrualList] = useState<any[]>([]);
+  const [accrualLoading, setAccrualLoading] = useState(false);
+
+  const handleDoubleClick = useCallback(async (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => {
+    setDoubleClickedStaff(row);
+    setDetailTab('usage');
+    setAccrualList([]);
+    setAccrualLoading(true);
+
+    const popupWidth = 450;
+    const popupHeight = 350;
+    const x = Math.max(10, Math.min(event.clientX, window.innerWidth - popupWidth - 10));
+    const y = Math.max(10, Math.min(event.clientY, window.innerHeight - popupHeight - 10));
+    setPopupPosition({ x, y });
+
+    try {
+      const res = await fetch('/api/d1/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          table: 'leave_accruals',
+          where: [
+            { field: 'staff_id', op: 'eq', value: String(row.staff.id) }
+          ],
+          order: [
+            { field: 'created_at', ascending: false }
+          ]
+        })
+      });
+      const result = await res.json();
+      if (result.ok && Array.isArray(result.data)) {
+        setAccrualList(result.data);
+      } else {
+        console.error('자동발생 연차 조회 실패:', result.error);
+      }
+    } catch (err) {
+      console.error('자동발생 연차 API 에러:', err);
+    } finally {
+      setAccrualLoading(false);
+    }
+  }, []);
+
   const handleStatusUpdate = async (id: string, status: '승인' | '반려') => {
     setActioningId(id);
     try {
@@ -315,6 +360,22 @@ export default function LeaveWorkcenter({
       });
   }, [picked, data.requests]);
 
+  const staffLeaveHistory = useMemo(() => {
+    if (!doubleClickedStaff) return [];
+    return data.requests
+      .filter((r) => String(r.staff_id) === String(doubleClickedStaff.staff.id) && r.leave_type !== '연차(부여)')
+      .sort((a, b) => b.start_date.localeCompare(a.start_date));
+  }, [doubleClickedStaff, data.requests]);
+
+  const totalAccrued = useMemo(() => {
+    return accrualList.reduce((sum, item) => sum + Number(item.days || 0), 0);
+  }, [accrualList]);
+
+  const manualAdjustment = useMemo(() => {
+    if (!doubleClickedStaff) return 0;
+    return doubleClickedStaff.total - totalAccrued;
+  }, [doubleClickedStaff, totalAccrued]);
+
   // 캘린더용 entries — leave_requests의 start_date~end_date를 일자 단위로 펼침
   const calendarEntries = useMemo<LeaveCalendarEntry[]>(() => {
     const staffMap = new Map<string, string>();
@@ -412,6 +473,7 @@ export default function LeaveWorkcenter({
               selectedStaffId={picked ? String(picked.staff.id) : null}
               loading={loading}
               onPick={handlePick}
+              onDoubleClick={handleDoubleClick}
             />
           </WorkcenterSection>
 
@@ -753,6 +815,181 @@ export default function LeaveWorkcenter({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 더블클릭 상세 팝업창 */}
+      {doubleClickedStaff && popupPosition && (
+        <>
+          {/* Backdrop (클릭 시 닫힘) */}
+          <div
+            className="fixed inset-0 z-[130] bg-transparent"
+            onClick={() => {
+              setDoubleClickedStaff(null);
+              setPopupPosition(null);
+            }}
+          />
+          {/* Popup Container */}
+          <div
+            style={{
+              position: 'fixed',
+              left: `${popupPosition.x}px`,
+              top: `${popupPosition.y}px`,
+              width: '450px',
+              maxHeight: '350px',
+            }}
+            className="z-[140] flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 p-4 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-2 mb-3">
+              <div>
+                <h4 className="text-[13px] font-bold text-[var(--foreground)]">
+                  연차 상세 내역 — {doubleClickedStaff.staff.name}
+                </h4>
+                <p className="text-[10px] text-[var(--toss-gray-4)] mt-0.5">
+                  {doubleClickedStaff.staff.department ?? '부서 없음'} · 잔여 {doubleClickedStaff.remaining}일
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDoubleClickedStaff(null);
+                  setPopupPosition(null);
+                }}
+                className="text-[var(--toss-gray-4)] hover:text-red-500 text-lg font-bold px-1"
+                aria-label="상세 팝업 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Tab selector */}
+            <div className="flex gap-2 border-b border-[var(--border)] pb-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setDetailTab('usage')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-[var(--radius-md)] ${
+                  detailTab === 'usage'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                }`}
+              >
+                사용 내역 ({staffLeaveHistory.length}건)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailTab('grant')}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-[var(--radius-md)] ${
+                  detailTab === 'grant'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
+                }`}
+              >
+                발생 내역 ({accrualList.length + (manualAdjustment !== 0 ? 1 : 0)}건)
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar text-[11px]">
+              {accrualLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                </div>
+              ) : detailTab === 'usage' ? (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-[10px] text-[var(--toss-gray-4)] font-bold">
+                      <th className="pb-1">날짜</th>
+                      <th className="pb-1">유형</th>
+                      <th className="pb-1 text-center">일수</th>
+                      <th className="pb-1">사유</th>
+                      <th className="pb-1 text-right">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffLeaveHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-[var(--toss-gray-3)]">
+                          사용 내역이 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      staffLeaveHistory.map((h) => {
+                        const calculated = typeof h.days === 'number' && h.days > 0
+                          ? h.days
+                          : Math.max(1, calculateLeaveDays(h.start_date, h.end_date || h.start_date));
+                        
+                        let typeColor = 'text-blue-600';
+                        if (h.leave_type === '연차(과거사용)') typeColor = 'text-orange-600';
+                        else if (h.leave_type === '병가') typeColor = 'text-red-600';
+
+                        return (
+                          <tr key={h.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20">
+                            <td className="py-1.5 font-medium">{h.start_date}</td>
+                            <td className={`py-1.5 font-semibold ${typeColor}`}>{h.leave_type.replace('연차(과거사용)', '과거 소급')}</td>
+                            <td className="py-1.5 text-center font-bold">{calculated}일</td>
+                            <td className="py-1.5 truncate max-w-[80px]" title={h.reason}>{h.reason || '-'}</td>
+                            <td className="py-1.5 text-right font-semibold">
+                              <span className={h.status === '승인' ? 'text-green-600' : h.status === '반려' ? 'text-red-600' : 'text-orange-600'}>
+                                {h.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-[10px] text-[var(--toss-gray-4)] font-bold">
+                      <th className="pb-1">날짜</th>
+                      <th className="pb-1">발생 구분</th>
+                      <th className="pb-1 text-center">일수</th>
+                      <th className="pb-1">사유</th>
+                      <th className="pb-1 text-right">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* 수동 조정(부여/차감) 내역 표시 */}
+                    {manualAdjustment !== 0 && (
+                      <tr className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20 font-semibold">
+                        <td className="py-1.5">-</td>
+                        <td className="py-1.5 text-emerald-600">관리자 수동 조정 (부여/차감)</td>
+                        <td className={`py-1.5 text-center font-bold ${manualAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {manualAdjustment > 0 ? `+${manualAdjustment}` : manualAdjustment}일
+                        </td>
+                        <td className="py-1.5 text-[10px] text-[var(--toss-gray-4)]">관리자가 수동으로 총 연차 직접 변경</td>
+                        <td className="py-1.5 text-right text-green-600">완료</td>
+                      </tr>
+                    )}
+                    {/* 자동 발생(accruals) 내역 표시 */}
+                    {accrualList.length === 0 && manualAdjustment === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-[var(--toss-gray-3)]">
+                          발생 내역이 없습니다.
+                        </td>
+                      </tr>
+                    ) : (
+                      accrualList.map((g) => {
+                        const dateStr = (g.created_at || '').slice(0, 10) || '-';
+                        return (
+                          <tr key={g.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20">
+                            <td className="py-1.5">{dateStr}</td>
+                            <td className="py-1.5 font-semibold text-emerald-600">{g.kind === 'annual' ? '회계연도/입사일 연차' : '월차 (만근)'}</td>
+                            <td className="py-1.5 text-center font-bold">+{g.days}일</td>
+                            <td className="py-1.5 truncate max-w-[80px]" title={g.note}>{g.note || '-'}</td>
+                            <td className="py-1.5 text-right font-semibold text-green-600">완료</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </WorkcenterShell>
     </div>
