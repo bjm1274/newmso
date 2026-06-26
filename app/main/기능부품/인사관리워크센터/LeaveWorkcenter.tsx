@@ -101,6 +101,13 @@ export default function LeaveWorkcenter({
     setPopupPosition({ x, y });
 
     try {
+      // 상세 내역을 열 때 원격 D1의 잔여일수 및 발생량 실시간 동기화 처리
+      await fetch('/api/admin/annual-leave/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId: String(row.staff.id) })
+      }).catch(err => console.error('실시간 연차 동기화 실패:', err));
+
       const res = await fetch('/api/d1/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
