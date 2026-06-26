@@ -64,6 +64,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
 
   // 분석
   const [analyzing, setAnalyzing] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
   const [result, setResult] = useState<ConsultationResult | null>(null);
   const [sourceLabel, setSourceLabel] = useState('');
 
@@ -218,6 +219,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   // ─── 분석 실행 ──────────────────────────────────────────────────────────────
   const analyze = useCallback(async (blob: Blob, filename: string, name: string, chartNo: string) => {
     setAnalyzing(true);
+    setProgress(0);
     setResult(null);
     try {
       let mimeType = SUPPORTED_MIME[blob.type.split(';')[0]] || blob.type.split(';')[0] || 'audio/webm';
@@ -259,22 +261,36 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
       const uploadUrl = startRes.headers.get('X-Goog-Upload-URL');
       if (!uploadUrl) throw new Error('업로드 URL을 획득하지 못했습니다.');
 
-      // 3. 브라우저에서 Google Files API로 직접 데이터 스트리밍 업로드 (PUT)
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'X-Goog-Upload-Offset': '0',
-          'X-Goog-Upload-Command': 'upload, finalize',
-        },
-        body: blob,
+      // 3. 브라우저에서 Google Files API로 직접 데이터 스트리밍 업로드 (진행률 측정을 위해 XHR 사용)
+      const uploadData = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl, true);
+        xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+        xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setProgress(percent);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error('업로드 응답 파싱 실패'));
+            }
+          } else {
+            reject(new Error(`Google Files API 업로드 실패 (Status: ${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Google Files API 업로드 네트워크 오류'));
+        xhr.send(blob);
       });
 
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => '');
-        throw new Error(`Google Files API 업로드 실패: ${uploadRes.statusText} (${errText})`);
-      }
-
-      const uploadData = await uploadRes.json();
       const fileUri = uploadData.file.uri;
 
       // 4. 브라우저에서 직접 Gemini API 호출하여 요약 분석 수행
@@ -733,7 +749,11 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                           {analyzing ? (
                             <>
                               <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                              AI 분석 중... (30초~1분 소요)
+                              {progress < 100 ? (
+                                `음성 업로드 중... (${progress}%)`
+                              ) : (
+                                '업로드 완료, AI 분석 중...'
+                              )}
                             </>
                           ) : (
                             <>✨ AI로 상담 내용 분석하기</>
@@ -791,7 +811,11 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                         {analyzing ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            AI 분석 중... (30초~1분 소요)
+                            {progress < 100 ? (
+                              `음성 업로드 중... (${progress}%)`
+                            ) : (
+                              '업로드 완료, AI 분석 중...'
+                            )}
                           </>
                         ) : (
                           <>✨ AI로 상담 내용 분석하기</>
