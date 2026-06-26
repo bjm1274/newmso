@@ -368,7 +368,19 @@ export default function LeaveWorkcenter({
   }, [doubleClickedStaff, data.requests]);
 
   const totalAccrued = useMemo(() => {
-    return accrualList.reduce((sum, item) => sum + Number(item.days || 0), 0);
+    const annualItems = accrualList.filter((item) => item.kind === 'annual');
+    if (annualItems.length > 0) {
+      // 소급 적용으로 여러 연도의 연차가 존재할 경우, 당해 연도에 적용되는 가장 최근 N년차(기념일)의 발생분 1건만 인정합니다.
+      const sortedAnnuals = [...annualItems].sort((a, b) => {
+        const numA = Number(a.period_key?.replace('annual:', '')) || 0;
+        const numB = Number(b.period_key?.replace('annual:', '')) || 0;
+        return numB - numA;
+      });
+      return Number(sortedAnnuals[0].days || 0);
+    }
+    return accrualList
+      .filter((item) => item.kind === 'monthly')
+      .reduce((sum, item) => sum + Number(item.days || 0), 0);
   }, [accrualList]);
 
   const manualAdjustment = useMemo(() => {
