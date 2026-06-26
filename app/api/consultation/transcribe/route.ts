@@ -97,6 +97,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: '올바른 음성 파일 정보가 없습니다.' }, { status: 400 });
         }
 
+        let normalizedMimeType = String(mimeType || '').trim().toLowerCase().split(';')[0];
+        if (normalizedMimeType === 'audio/x-m4a' || normalizedMimeType === 'audio/m4a') {
+            normalizedMimeType = 'audio/mp4';
+        } else if (normalizedMimeType === 'audio/mp3') {
+            normalizedMimeType = 'audio/mpeg';
+        }
+
         if (fileSize > 100 * 1024 * 1024) {
             return NextResponse.json({ error: '파일 크기가 100MB를 초과합니다.' }, { status: 400 });
         }
@@ -119,7 +126,7 @@ export async function POST(req: Request) {
                 'X-Goog-Upload-Protocol': 'resumable',
                 'X-Goog-Upload-Command': 'start',
                 'X-Goog-Upload-Header-Content-Length': String(fileSize),
-                'X-Goog-Upload-Header-Content-Type': mimeType,
+                'X-Goog-Upload-Header-Content-Type': normalizedMimeType,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -157,7 +164,7 @@ export async function POST(req: Request) {
         googleFileName = uploadData.file.name; // files/xxx 형태
 
         // 4. Gemini Audio API 분석 실행
-        const rawText = await analyzeWithGemini(fileUri, mimeType, true);
+        const rawText = await analyzeWithGemini(fileUri, normalizedMimeType, true);
 
         // JSON 파싱 시도
         let parsed: Record<string, unknown>;

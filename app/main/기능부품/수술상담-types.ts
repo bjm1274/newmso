@@ -99,7 +99,10 @@ export const BADGE_MAP: Record<string, string> = {
 export const SUPPORTED_MIME: Record<string, string> = {
   'audio/webm': 'audio/webm',
   'audio/mp4':  'audio/mp4',
+  'audio/x-m4a': 'audio/mp4',
+  'audio/m4a':   'audio/mp4',
   'audio/mpeg': 'audio/mpeg',
+  'audio/mp3':  'audio/mpeg',
   'audio/wav':  'audio/wav',
   'audio/ogg':  'audio/ogg',
   'video/webm': 'video/webm',
