@@ -170,6 +170,11 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
       toast('지원하지 않는 파일 형식입니다. (mp3, mp4, wav, webm, ogg, m4a)', 'error');
       return;
     }
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 100) {
+      toast('파일 크기가 너무 큽니다. 100MB 이하로 업로드해주세요.', 'error');
+      return;
+    }
     setUploadFile(file);
     setResult(null);
   };
@@ -660,7 +665,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                         {uploadFile ? uploadFile.name : '음성 파일을 드래그하거나 클릭해서 선택'}
                       </p>
                       <p className="text-[11px] text-[var(--toss-gray-3)] font-medium">
-                        지원 형식: MP3, MP4, WAV, WebM, OGG, M4A · 최대 200MB
+                        지원 형식: MP3, MP4, WAV, WebM, OGG, M4A · 최대 100MB
                       </p>
                       {uploadFile && (
                         <span className="px-3 py-1 bg-green-500/20 text-green-700 text-[11px] font-bold rounded-full">

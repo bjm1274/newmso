@@ -105,10 +105,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: '음성 데이터가 없습니다.' }, { status: 400 });
         }
 
-        // 파일 크기 제한 (20MB base64 ≒ 15MB 원본)
+        // 파일 크기 제한 (100MB base64 ≒ 75MB 원본)
         const approxSizeMB = (audio.length * 0.75) / (1024 * 1024);
-        if (approxSizeMB > 20) {
-            return NextResponse.json({ error: '파일 크기가 너무 큽니다. 20MB 이하로 업로드해주세요.' }, { status: 400 });
+        if (approxSizeMB > 100) {
+            return NextResponse.json({ error: '파일 크기가 너무 큽니다. 100MB 이하로 업로드해주세요.' }, { status: 400 });
         }
 
         const rawText = await analyzeWithGemini(audio, mimeType);
