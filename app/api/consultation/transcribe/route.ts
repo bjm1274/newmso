@@ -38,7 +38,7 @@ const ANALYSIS_PROMPT = `당신은 한국 의료기관의 수술 상담 내용�
 4. 환자 이름, 주민번호 등 개인정보가 나와도 그대로 포함하세요.
 5. 음성이 불명확하거나 내용이 없는 항목은 빈 값으로 두세요.`;
 
-async function analyzeWithGemini(audioBase64: string, mimeType: string): Promise<string> {
+async function analyzeWithGemini(audioSource: string, mimeType: string, isFileUri: boolean): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.');
 
@@ -51,67 +51,113 @@ async function analyzeWithGemini(audioBase64: string, mimeType: string): Promise
                 generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
             });
 
+            const contentPart = isFileUri
+                ? { fileData: { fileUri: audioSource, mimeType } }
+                : { inlineData: { data: audioSource, mimeType } };
+
             const result = await withTimeout(
                 model.generateContent([
                     ANALYSIS_PROMPT,
-                    { inlineData: { data: audioBase64, mimeType } },
+                    contentPart,
                 ]),
                 60_000,
                 `Gemini[${modelName}]`,
             );
+
             const text = result.response.text();
             if (text) return text;
-        } catch (err: any) {
-            const msg = String(err?.message || '');
-            if (msg.includes('404') || msg.includes('not found')) continue;
-            if (msg.includes('responseMimeType')) {
-                // responseMimeType 미지원 모델 fallback (JSON 형식만 프롬프트로 강제)
-                try {
-                    const model2 = genAI.getGenerativeModel({ model: modelName, generationConfig: { temperature: 0.1 } });
-                    const result2 = await withTimeout(
-                        model2.generateContent([
-                            ANALYSIS_PROMPT,
-                            { inlineData: { data: audioBase64, mimeType } },
-                        ]),
-                        60_000,
-                        `Gemini[${modelName}-fallback]`,
-                    );
-                    const text2 = result2.response.text();
-                    if (text2) return text2;
-                } catch {
-                    continue;
-                }
-            }
-            throw err;
+        } catch (error) {
+            console.error(`Model ${modelName} failed:`, error);
         }
     }
-    throw new Error('모든 모델 호출에 실패했습니다.');
+    throw new Error('모든 Gemini 모델의 수술상담 분석 시도가 실패했습니다.');
 }
 
 export async function POST(req: Request) {
+    let googleFileName: string | null = null;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
     try {
-        const auth = await readAuthorizedExtraFeatureUser(req, '수술상담');
-        if (!auth.user || auth.status || auth.error) {
+        const authorized = await readAuthorizedExtraFeatureUser(req, '수술상담');
+        if (!authorized.user || authorized.status || authorized.error) {
             return NextResponse.json(
-                { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
-                { status: auth.status ?? 500 }
+                { error: authorized.status === 401 ? 'Unauthorized' : 'Forbidden' },
+                { status: authorized.status ?? 500 }
             );
         }
 
         const body = await req.json();
-        const { audio, mimeType } = body as { audio?: string; mimeType?: string };
+        const { audioUrl, mimeType, fileSize } = body as {
+            audioUrl?: string;
+            mimeType?: string;
+            fileSize?: number;
+        };
 
-        if (!audio || !mimeType) {
-            return NextResponse.json({ error: '음성 데이터가 없습니다.' }, { status: 400 });
+        if (!audioUrl || !mimeType || !fileSize) {
+            return NextResponse.json({ error: '올바른 음성 파일 정보가 없습니다.' }, { status: 400 });
         }
 
-        // 파일 크기 제한 (100MB base64 ≒ 75MB 원본)
-        const approxSizeMB = (audio.length * 0.75) / (1024 * 1024);
-        if (approxSizeMB > 100) {
-            return NextResponse.json({ error: '파일 크기가 너무 큽니다. 100MB 이하로 업로드해주세요.' }, { status: 400 });
+        if (fileSize > 100 * 1024 * 1024) {
+            return NextResponse.json({ error: '파일 크기가 100MB를 초과합니다.' }, { status: 400 });
         }
 
-        const rawText = await analyzeWithGemini(audio, mimeType);
+        // 1. R2로부터 오디오 스트림(ReadableStream) 획득
+        const r2Response = await fetch(audioUrl);
+        if (!r2Response.ok || !r2Response.body) {
+            return NextResponse.json({ error: `R2 파일 스트림 획득 실패 (Status: ${r2Response.status})` }, { status: 500 });
+        }
+
+        // 2. Google Gemini File API 업로드 세션 생성 (Resumable upload)
+        if (!apiKey) {
+            return NextResponse.json({ error: 'Gemini API 키가 설정되지 않았습니다.' }, { status: 500 });
+        }
+
+        const startUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
+        const startRes = await fetch(startUrl, {
+            method: 'POST',
+            headers: {
+                'X-Goog-Upload-Protocol': 'resumable',
+                'X-Goog-Upload-Command': 'start',
+                'X-Goog-Upload-Header-Content-Length': String(fileSize),
+                'X-Goog-Upload-Header-Content-Type': mimeType,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                file: {
+                    displayName: `consultation_${Date.now()}`
+                }
+            })
+        });
+
+        if (!startRes.ok) {
+            return NextResponse.json({ error: `Gemini File API 업로드 세션 생성 실패: ${startRes.statusText}` }, { status: 502 });
+        }
+
+        const uploadUrl = startRes.headers.get('X-Goog-Upload-URL');
+        if (!uploadUrl) {
+            return NextResponse.json({ error: 'Gemini File API 업로드 세션 URL을 획득하지 못했습니다.' }, { status: 502 });
+        }
+
+        // 3. R2 스트림을 Gemini File API에 스트리밍 업로드 (메모리 축적 없음)
+        const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+                'X-Goog-Upload-Offset': '0',
+                'X-Goog-Upload-Command': 'upload, finalize',
+            },
+            body: r2Response.body as any,
+        });
+
+        if (!uploadRes.ok) {
+            return NextResponse.json({ error: `Gemini File API 파일 스트리밍 업로드 실패: ${uploadRes.statusText}` }, { status: 502 });
+        }
+
+        const uploadData = await uploadRes.json() as { file: { name: string; uri: string } };
+        const fileUri = uploadData.file.uri;
+        googleFileName = uploadData.file.name; // files/xxx 형태
+
+        // 4. Gemini Audio API 분석 실행
+        const rawText = await analyzeWithGemini(fileUri, mimeType, true);
 
         // JSON 파싱 시도
         let parsed: Record<string, unknown>;
@@ -129,5 +175,13 @@ export async function POST(req: Request) {
             { error: msg.includes('API 키') || msg.includes('모델') ? msg : '음성 분석 중 오류가 발생했습니다.' },
             { status: 500 }
         );
+    } finally {
+        // 5. 구글 서버에 임시 업로드된 파일 잔여물 즉시 제거 (비동기 수행)
+        if (googleFileName && apiKey) {
+            const deleteUrl = `https://generativelanguage.googleapis.com/v1beta/${googleFileName}?key=${apiKey}`;
+            fetch(deleteUrl, { method: 'DELETE' }).catch(() => {
+                // deletion failure ignore
+            });
+        }
     }
 }

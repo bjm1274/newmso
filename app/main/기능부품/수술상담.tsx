@@ -191,22 +191,38 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     setAnalyzing(true);
     setResult(null);
     try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const dataUrl = reader.result as string;
-          resolve(dataUrl.split(',')[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
       const mimeType = SUPPORTED_MIME[blob.type.split(';')[0]] || blob.type.split(';')[0] || 'audio/webm';
 
+      // 1. R2 업로드 플랜 요청 (Presigned URL 획득)
+      const planRes = await fetch('/api/consultation/upload-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: filename,
+          mimeType,
+          fileSize: blob.size,
+        }),
+      });
+      const planData = await planRes.json();
+      if (!planRes.ok) throw new Error(planData.error || '업로드 준비 실패');
+
+      const { signedUrl, url } = planData;
+
+      // 2. 브라우저에서 R2 버킷으로 직접 PUT 업로드 (서버 메모리 부하 차단)
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': mimeType,
+        },
+        body: blob,
+      });
+      if (!uploadRes.ok) throw new Error('파일 업로드에 실패했습니다.');
+
+      // 3. R2에 업로드 완료된 URL을 이용하여 백엔드 분석 API 호출
       const res = await fetch('/api/consultation/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio: base64, mimeType }),
+        body: JSON.stringify({ audioUrl: url, mimeType, fileSize: blob.size }),
       });
 
       const data = await res.json();
