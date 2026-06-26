@@ -35,6 +35,7 @@ export interface LeaveBalanceRow {
   remaining_days: number;
   expiry_date: string | null;
   days_until_expiry: number;
+  updated_at?: string | null;
 }
 
 export interface LeaveStaffRow {
@@ -45,6 +46,7 @@ export interface LeaveStaffRow {
   daysUntilExpiry: number;
   expiryDate: string | null;
   pending: number;
+  updatedAt?: string | null;
 }
 
 export interface LeaveExpiryItem {
@@ -114,6 +116,7 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
   const expiryFallback = new Date(now.getFullYear(), 11, 31);
   const expiry = safeDate(expiryRaw, expiryFallback);
   const daysUntilExpiry = daysBetween(expiry, now);
+  const updatedAtRaw = pickString(row.updated_at);
   return {
     staff_id: staffId,
     total_days: total,
@@ -121,6 +124,7 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
     remaining_days: remaining,
     expiry_date: formatKoreanDateKey(expiry),
     days_until_expiry: daysUntilExpiry,
+    updated_at: updatedAtRaw,
   };
 }
 
@@ -222,6 +226,7 @@ export async function fetchLeaveData({
       daysUntilExpiry,
       expiryDate: expiry,
       pending: pendingByStaff.get(String(staff.id)) ?? 0,
+      updatedAt: balance?.updated_at ?? null,
     };
   });
 

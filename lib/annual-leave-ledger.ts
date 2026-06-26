@@ -15,9 +15,8 @@ export function isAnnualLeaveType(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
   if (!normalized) return false;
 
-  // '연차(이력)': 만료된 이전 사이클의 사용 이력 — 근태 화면엔 표시하되
-  // 현재 잔여 계산(annual_leave_used)에는 합산하지 않는다.
-  if (normalized.includes('이력')) return false;
+  // '연차(이력)': 과거 엑셀로 입력된 사용 내역('연차(이력)')도
+  // 현재 잔여 계산(annual_leave_used)에 정상 합산하여 잔여값을 차감하도록 변경합니다.
   if (normalized.includes('부여')) return false;
 
   return (
