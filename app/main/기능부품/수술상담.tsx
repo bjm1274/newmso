@@ -211,9 +211,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
       // 2. 브라우저에서 R2 버킷으로 직접 PUT 업로드 (서버 메모리 부하 차단)
       const uploadRes = await fetch(signedUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-        },
+        headers: planData.headers,
         body: blob,
       });
       if (!uploadRes.ok) throw new Error('파일 업로드에 실패했습니다.');
