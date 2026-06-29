@@ -28,7 +28,7 @@ const M_ICON_ALIAS: Record<string, string> = {
   user: 'User',
   users: 'Users',
   search: 'Search',
-  edit: 'Edit',
+  edit: 'edit',
   plus: 'Plus',
   send: 'Send',
   smile: 'Smile',

@@ -284,7 +284,6 @@ function SBoardBase({
         title="게시판"
         sub={company ?? ''}
         back={onBack}
-        backIcon="stop"
         actions={
           <>
             {isScheduleCat && (
