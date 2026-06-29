@@ -37,7 +37,7 @@ export default function 급여워크센터({ user, onBack }: 급여워크센터P
   return (
     <div className="m-screen">
       <MobileHeader title="급여 워크센터" sub={company || '인사관리'} back={onBack} />
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ overflowX: 'auto' }}>
         <PayrollWorkcenter selectedCo={company} user={user} />
       </div>
     </div>

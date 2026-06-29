@@ -741,6 +741,7 @@ async function evalPattern(
     const approver = getField<string>(row, fields.approver ?? 'current_approver_id');
     const me = erpStaffId(claims);
     if (me !== null && (sender === me || approver === me)) return true;
+    if (!erpCanManageCompany(claims)) return false;
     return erpCompanyMatches(claims, getField<string>(row, companyField));
   }
 

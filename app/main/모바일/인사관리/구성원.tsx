@@ -29,19 +29,24 @@ import {
   type LicenseRow,
 } from './data-hooks';
 import 발령탭 from './발령탭';
+import 징계탭 from './징계탭';
+import 사고보고서탭 from './사고보고서탭';
+import type { ErpUser } from '@/types';
 
-export type SHrMemberTab = 'list' | 'transfer' | 'edu';
+export type SHrMemberTab = 'list' | 'transfer' | 'disciplinary' | 'edu' | 'accident';
 
 export type SHrMemberProps = {
   company?: string;
+  user: ErpUser;
   onBack: () => void;
   onOpenForm: () => void;
+  onEditStaff?: (id: string) => void;
 };
 
-export default function 구성원({ company, onBack, onOpenForm }: SHrMemberProps) {
+export default function 구성원({ company, user, onBack, onOpenForm, onEditStaff }: SHrMemberProps) {
   const [tab, setTab] = useState<SHrMemberTab>('list');
   const [search, setSearch] = useState('');
-  const { staffs, loading } = useStaffList({ company });
+  const { staffs, loading } = useStaffList({ company, includeResigned: true });
 
   // 부서 그룹핑
   const grouped = useMemo(() => {
@@ -100,12 +105,30 @@ export default function 구성원({ company, onBack, onOpenForm }: SHrMemberProp
           </button>
           <button
             type="button"
+            className={tab === 'disciplinary' ? 'on' : ''}
+            onClick={() => setTab('disciplinary')}
+            role="tab"
+            aria-selected={tab === 'disciplinary'}
+          >
+            징계
+          </button>
+          <button
+            type="button"
             className={tab === 'edu' ? 'on' : ''}
             onClick={() => setTab('edu')}
             role="tab"
             aria-selected={tab === 'edu'}
           >
             교육·자격
+          </button>
+          <button
+            type="button"
+            className={tab === 'accident' ? 'on' : ''}
+            onClick={() => setTab('accident')}
+            role="tab"
+            aria-selected={tab === 'accident'}
+          >
+            사고보고서
           </button>
         </div>
       </div>
@@ -117,10 +140,13 @@ export default function 구성원({ company, onBack, onOpenForm }: SHrMemberProp
             search={search}
             onSearch={setSearch}
             loading={loading}
+            onRowClick={onEditStaff}
           />
         )}
         {tab === 'transfer' && <발령탭 company={company} />}
+        {tab === 'disciplinary' && <징계탭 staffs={staffs} company={company} user={user} />}
         {tab === 'edu' && <EduTab company={company} />}
+        {tab === 'accident' && <사고보고서탭 staffs={staffs} company={company} user={user} />}
       </div>
     </div>
   );
@@ -137,11 +163,13 @@ function ListTab({
   search,
   onSearch,
   loading,
+  onRowClick,
 }: {
   grouped: ListGroup[];
   search: string;
   onSearch: (v: string) => void;
   loading: boolean;
+  onRowClick?: (id: string) => void;
 }) {
   return (
     <div>
@@ -219,11 +247,23 @@ function ListTab({
               const tone =
                 status === '근무중' ? 'success' : status === '휴가' ? 'accent' : '';
               return (
-                <div key={String(m.id)} className="m-list-row">
+                <button
+                  key={String(m.id)}
+                  type="button"
+                  className="m-list-row"
+                  onClick={() => onRowClick?.(String(m.id))}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    cursor: onRowClick ? 'pointer' : 'default',
+                  }}
+                >
                   <MAvatar tone={pickAvatarTone(m.name)}>
                     {(m.name ?? '?').charAt(0)}
                   </MAvatar>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div className="lbl">{m.name}</div>
                     <div className="sub">
                       {(m.department ?? '미지정')} · {m.position ?? m.role ?? '직원'}
@@ -233,7 +273,7 @@ function ListTab({
                     <MChip tone={tone}>{status}</MChip>
                     <MIcon name="chevR" size={18} color="var(--z-400)" />
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

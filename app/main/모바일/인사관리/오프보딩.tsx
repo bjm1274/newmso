@@ -40,7 +40,7 @@ export default function 오프보딩({ company, onBack }: 오프보딩Props) {
   return (
     <div className="m-screen">
       <MobileHeader title="오프보딩" sub={company || '인사관리'} back={onBack} />
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ overflowX: 'auto' }}>
         {loading ? (
           <Loading />
         ) : (

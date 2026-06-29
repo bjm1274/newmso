@@ -15,21 +15,32 @@
  * JM6: progress aria-valuenow, button 시맨틱
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
-import { useMyLeaveBalance, type LeaveHistoryRow } from './data-hooks';
+import {
+  useMyLeaveBalance,
+  useStaffList,
+  canMutateTeamAbnormal,
+  type LeaveHistoryRow,
+} from './data-hooks';
+import 연차관리자 from './연차관리자';
+import type { ErpUser } from '@/types';
 
 export type SHrLeaveProps = {
   staffId: string | null;
+  company?: string;
+  user: ErpUser;
   onBack: () => void;
   onApply: () => void;
 };
 
-export default function 연차({ staffId, onBack, onApply }: SHrLeaveProps) {
+export default function 연차({ staffId, company, user, onBack, onApply }: SHrLeaveProps) {
+  const [mode, setMode] = useState<'my' | 'admin'>('my');
   const { data, loading } = useMyLeaveBalance(staffId);
+  const { staffs } = useStaffList({ company, includeResigned: false });
 
   const year = new Date().getFullYear();
   const monthly = useMemo(() => buildMonthly(data.history, year), [data.history, year]);
@@ -37,11 +48,43 @@ export default function 연차({ staffId, onBack, onApply }: SHrLeaveProps) {
 
   const progressPct = data.total > 0 ? Math.round((data.used / data.total) * 100) : 0;
 
+  const isHrAdmin = useMemo(() => canMutateTeamAbnormal(user), [user]);
+
+  const handleModeChange = (targetMode: 'my' | 'admin') => {
+    setMode(targetMode);
+  };
+
   return (
     <div className="m-screen">
-      <MobileHeader title="연차·휴가" sub={`${year}년 잔여`} back={onBack} />
+      <MobileHeader title={mode === 'admin' ? '전사 연차 관리' : '연차·휴가'} sub={`${year}년 잔여`} back={onBack} />
+      {isHrAdmin && (
+        <div style={{ padding: '8px 16px', background: 'var(--m-card)', borderBottom: '1px solid var(--m-border)' }}>
+          <div className="m-seg" role="tablist" aria-label="연차 보기 모드">
+            <button
+              type="button"
+              className={mode === 'my' ? 'on' : ''}
+              onClick={() => handleModeChange('my')}
+              role="tab"
+              aria-selected={mode === 'my'}
+            >
+              내 연차
+            </button>
+            <button
+              type="button"
+              className={mode === 'admin' ? 'on' : ''}
+              onClick={() => handleModeChange('admin')}
+              role="tab"
+              aria-selected={mode === 'admin'}
+            >
+              전사 관리
+            </button>
+          </div>
+        </div>
+      )}
       <div className="m-scroll">
-        {loading ? (
+        {mode === 'admin' ? (
+          <연차관리자 staffs={staffs} company={company} user={user} />
+        ) : loading ? (
           <div
             style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
           >
@@ -65,12 +108,14 @@ export default function 연차({ staffId, onBack, onApply }: SHrLeaveProps) {
           </>
         )}
       </div>
-      <div className="m-sticky-foot">
-        <MBtn block>휴가계획서</MBtn>
-        <MBtn block variant="primary" icon="plus" onClick={onApply}>
-          연차 신청
-        </MBtn>
-      </div>
+      {mode !== 'admin' && (
+        <div className="m-sticky-foot">
+          <MBtn block>휴가계획서</MBtn>
+          <MBtn block variant="primary" icon="plus" onClick={onApply}>
+            연차 신청
+          </MBtn>
+        </div>
+      )}
     </div>
   );
 }

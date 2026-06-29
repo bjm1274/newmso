@@ -13,7 +13,7 @@
  * JM6: chip-bar 버튼은 aria-pressed 사용.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -32,7 +32,10 @@ import {
   type LicenseRow,
   type MedicalDeviceRow,
   type ToneKind,
+  useStaffList,
+  canMutateTeamAbnormal,
 } from './data-hooks';
+import 복지관리자 from './복지관리자';
 
 export type SHrWelfareTab = 'family' | 'health' | 'cert' | 'dev';
 
@@ -44,11 +47,45 @@ export type SHrWelfareProps = {
 
 export default function 복지({ company, user, onBack }: SHrWelfareProps) {
   const [tab, setTab] = useState<SHrWelfareTab>('family');
-  const { data, loading } = useWelfareBundle(company);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [selectedWelfareItem, setSelectedWelfareItem] = useState<any>(null);
+
+  const { data, loading } = useWelfareBundle(company, reloadKey);
+  const { staffs } = useStaffList({ company, includeResigned: false });
+
+  const isHrAdmin = useMemo(() => canMutateTeamAbnormal(user), [user]);
+
+  const handleOpenCreate = () => {
+    setSelectedWelfareItem(null);
+    setShowAdminModal(true);
+  };
+
+  const handleOpenEdit = (item: any) => {
+    if (!isHrAdmin) return;
+    // data-hooks가 가공한 컬럼명을 매핑 보완해준다
+    setSelectedWelfareItem(item);
+    setShowAdminModal(true);
+  };
 
   return (
     <div className="m-screen">
-      <MobileHeader title="복지" sub={company ?? '복지·교육'} back={onBack} />
+      <MobileHeader
+        title="복지"
+        sub={company ?? '복지·교육'}
+        back={onBack}
+        actions={
+          isHrAdmin ? (
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              style={{ fontSize: 13, fontWeight: 700, color: 'var(--m-accent)' }}
+            >
+              등록
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="m-chip-bar" role="tablist" aria-label="복지 탭">
         {(
@@ -81,19 +118,29 @@ export default function 복지({ company, user, onBack }: SHrWelfareProps) {
           </div>
         ) : (
           <>
-            {tab === 'family' && <FamilyTab rows={data.family} />}
-            {tab === 'health' && <HealthTab rows={data.checkup} />}
-            {tab === 'cert' && <CertTab user={user} rows={data.license} />}
-            {tab === 'dev' && <DeviceTab rows={data.device} />}
+            {tab === 'family' && <FamilyTab rows={data.family} onRowClick={handleOpenEdit} />}
+            {tab === 'health' && <HealthTab rows={data.checkup} onRowClick={handleOpenEdit} />}
+            {tab === 'cert' && <CertTab user={user} rows={data.license} onRowClick={handleOpenEdit} />}
+            {tab === 'dev' && <DeviceTab rows={data.device} onRowClick={handleOpenEdit} />}
           </>
         )}
       </div>
+
+      {showAdminModal && (
+        <복지관리자
+          staffs={staffs}
+          type={tab}
+          initialData={selectedWelfareItem}
+          onClose={() => setShowAdminModal(false)}
+          onSuccess={() => setReloadKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }
 
 // ─── 경조사 ────────────────────────────────────────────────────
-function FamilyTab({ rows }: { rows: FamilyEventRow[] }) {
+function FamilyTab({ rows, onRowClick }: { rows: FamilyEventRow[]; onRowClick?: (item: any) => void }) {
   if (rows.length === 0) {
     return (
       <div
@@ -144,11 +191,17 @@ function FamilyTab({ rows }: { rows: FamilyEventRow[] }) {
       </div>
       <div className="m-card flush">
         {rows.map((r) => (
-          <div key={r.id} className="m-list-row">
+          <button
+            key={r.id}
+            type="button"
+            className="m-list-row"
+            onClick={() => onRowClick?.(r)}
+            style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: onRowClick ? 'pointer' : 'default' }}
+          >
             <MAvatar tone={pickAvatarTone(r.staff_name ?? '')}>
               {(r.staff_name ?? '?').charAt(0)}
             </MAvatar>
-            <div>
+            <div style={{ flex: 1 }}>
               <div className="lbl">
                 {r.staff_name ?? '직원'}{' '}
                 <MChip tone="accent">{r.event_type ?? '경조사'}</MChip>
@@ -161,7 +214,7 @@ function FamilyTab({ rows }: { rows: FamilyEventRow[] }) {
               {formatMoney(r.amount ?? 0)}
               <span className="u">원</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
       <div style={{ height: 24 }} />
@@ -170,7 +223,7 @@ function FamilyTab({ rows }: { rows: FamilyEventRow[] }) {
 }
 
 // ─── 건강검진 ──────────────────────────────────────────────────
-function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
+function HealthTab({ rows, onRowClick }: { rows: HealthCheckupRow[]; onRowClick?: (item: any) => void }) {
   const upcoming = rows
     .filter((r) => {
       const left = daysUntil(r.checkup_date);
@@ -187,7 +240,12 @@ function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
   return (
     <div style={{ padding: '14px 16px 0' }}>
       {next && (
-        <div className="m-card" style={{ padding: '16px 18px' }}>
+        <button
+          type="button"
+          className="m-card"
+          onClick={() => onRowClick?.(next)}
+          style={{ width: '100%', textAlign: 'left', padding: '16px 18px', display: 'block', cursor: onRowClick ? 'pointer' : 'default' }}
+        >
           <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 700 }}>
             다음 건강검진
           </div>
@@ -204,7 +262,7 @@ function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
           <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
             {next.vendor ?? '검진센터 미지정'} · {next.status ?? '예정'}
           </div>
-        </div>
+        </button>
       )}
 
       {others.length > 0 && (
@@ -224,16 +282,22 @@ function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
                       ? 'warning'
                       : 'accent';
               return (
-                <div key={r.id} className="m-list-row">
+                <button
+                  key={r.id}
+                  type="button"
+                  className="m-list-row"
+                  onClick={() => onRowClick?.(r)}
+                  style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: onRowClick ? 'pointer' : 'default' }}
+                >
                   <MAvatar tone={pickAvatarTone(r.staff_name ?? '')}>
                     {(r.staff_name ?? '?').charAt(0)}
                   </MAvatar>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div className="lbl">{r.staff_name ?? '직원'}</div>
                     <div className="sub">{formatDate(r.checkup_date)}</div>
                   </div>
                   <MChip tone={tone}>{left === null ? '-' : `D-${left}`}</MChip>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -258,7 +322,7 @@ function HealthTab({ rows }: { rows: HealthCheckupRow[] }) {
 }
 
 // ─── 면허·자격 ────────────────────────────────────────────────
-function CertTab({ user, rows }: { user: ErpUser; rows: LicenseRow[] }) {
+function CertTab({ user, rows, onRowClick }: { user: ErpUser; rows: LicenseRow[]; onRowClick?: (item: any) => void }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -351,11 +415,17 @@ function CertTab({ user, rows }: { user: ErpUser; rows: LicenseRow[] }) {
                     ? '3개월 내 만료'
                     : '정상';
           return (
-            <div key={r.id} className="m-list-row">
+            <button
+              key={r.id}
+              type="button"
+              className="m-list-row"
+              onClick={() => onRowClick?.(r)}
+              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: onRowClick ? 'pointer' : 'default' }}
+            >
               <div className={'ico-tile tone-' + (tone || 'success')}>
                 <MIcon name="badge" size={18} />
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="lbl">
                   {r.staff_name ?? '직원'}{' '}
                   <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
@@ -365,7 +435,7 @@ function CertTab({ user, rows }: { user: ErpUser; rows: LicenseRow[] }) {
                 <div className="sub">만료일 {formatDate(r.expiry_date)}</div>
               </div>
               <MChip tone={tone}>{dLabel}</MChip>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -375,7 +445,7 @@ function CertTab({ user, rows }: { user: ErpUser; rows: LicenseRow[] }) {
 }
 
 // ─── 의료기기 점검 ─────────────────────────────────────────────
-function DeviceTab({ rows }: { rows: MedicalDeviceRow[] }) {
+function DeviceTab({ rows, onRowClick }: { rows: MedicalDeviceRow[]; onRowClick?: (item: any) => void }) {
   if (rows.length === 0) {
     return (
       <div
@@ -406,18 +476,24 @@ function DeviceTab({ rows }: { rows: MedicalDeviceRow[] }) {
                 ? `${-left}일 지연`
                 : `${left}일 후`;
           return (
-            <div key={r.id} className="m-list-row">
+            <button
+              key={r.id}
+              type="button"
+              className="m-list-row"
+              onClick={() => onRowClick?.(r)}
+              style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: onRowClick ? 'pointer' : 'default' }}
+            >
               <div className={'ico-tile tone-' + (tone || '')}>
                 <MIcon name="settings" size={18} />
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div className="lbl">{r.device_name ?? '기기'}</div>
                 <div className="sub">
                   {(r.cycle ?? '주기 미정')} 점검 · {formatDate(r.next_check_date)}
                 </div>
               </div>
               <MChip tone={tone}>{dLabel}</MChip>
-            </div>
+            </button>
           );
         })}
       </div>

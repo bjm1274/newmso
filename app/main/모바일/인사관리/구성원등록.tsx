@@ -13,12 +13,13 @@
  * JM5: insert 직접하지 않고 상위 콜백에 위임. 권한 부여는 감사 대상이므로 PC 안내.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MIcon from '../공통/MIcon';
 import { toast } from '@/lib/toast';
+import { supabase } from '@/lib/supabase';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import { canAccessHrSection } from '@/lib/access-control';
 import {
@@ -38,6 +39,8 @@ export type SFormMemberProps = {
   user?: Record<string, unknown> | null;
   /** 등록 대상 회사. undefined/'전체' 면 회사 특정 불가로 차단. */
   company?: string;
+  /** 수정 대상 직원 ID. 전달 시 기존 정보를 수정합니다. */
+  editStaffId?: string | null;
 };
 
 type AuthLevel = 'employee' | 'team' | 'manager' | 'admin';
@@ -60,7 +63,7 @@ const DEPT_OPTIONS = ['경영지원팀', '영상의학팀', '간호부', '외래
 
 const STEP_TITLES = ['기본 정보', '계약·근무', '권한 설정'];
 
-export default function 구성원등록({ onBack, onCreated, user, company }: SFormMemberProps) {
+export default function 구성원등록({ onBack, onCreated, user, company, editStaffId }: SFormMemberProps) {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -84,6 +87,38 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
   });
   const fieldId = useFieldIdPrefix('form-member');
 
+  useEffect(() => {
+    if (!editStaffId) return;
+    const loadStaff = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('*')
+          .eq('id', editStaffId)
+          .single();
+        if (error) throw error;
+        if (data) {
+          setForm({
+            name: data.name || '',
+            emp: data.employee_no || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            dept: data.department || '경영지원팀',
+            role: data.position || '사원',
+            type: (data.employment_type || '정규직') as EmployType,
+            start: data.hire_date ? data.hire_date.replaceAll('-', '.') : '',
+            salary: data.salary ? String(data.salary) : '',
+            auth: (data.role || 'employee') as AuthLevel,
+          });
+        }
+      } catch (err) {
+        console.error('직원 정보 로드 실패:', err);
+        toast('직원 정보를 불러오지 못했습니다.', 'error');
+      }
+    };
+    void loadStaff();
+  }, [editStaffId]);
+
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -95,23 +130,20 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
 
     // 권한 가드: 인사 권한 미보유 또는 회사 미특정 시 등록 차단.
     if (!canRegister) {
-      toast('직원 등록 권한이 없습니다. 관리자에게 문의하세요.', 'error');
+      toast(editStaffId ? '직원 수정 권한이 없습니다. 관리자에게 문의하세요.' : '직원 등록 권한이 없습니다. 관리자에게 문의하세요.', 'error');
       return;
     }
     if (!hasValidCompany) {
-      toast('등록할 회사를 특정할 수 없습니다. PC에서 회사를 선택해 등록하세요.', 'error');
+      toast(editStaffId ? '수정할 회사를 특정할 수 없습니다.' : '등록할 회사를 특정할 수 없습니다. PC에서 회사를 선택해 등록하세요.', 'error');
       return;
     }
 
-    // 마지막 단계: staff_members insert (JM5: 주민번호 등 민감 정보 제외, 오프라인 큐 적용)
     if (!form.name.trim()) {
       toast('이름을 입력해주세요.', 'warning');
       return;
     }
     setSubmitting(true);
 
-    // JM5: payload에 토큰·주민번호·비밀번호 등 민감 정보 포함 금지.
-    // 연봉(salary)은 숫자 파싱 후 포함 — 큐에 저장될 수 있으므로 문자열 그대로 전달.
     const salaryNum = form.salary ? Number(form.salary.replace(/[^0-9]/g, '')) : null;
     const hireDate = form.start.replaceAll('.', '-');
 
@@ -130,28 +162,36 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
     if (form.email.trim()) payload.email = form.email.trim();
     if (salaryNum && salaryNum > 0) payload.salary = salaryNum;
 
-    const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
-      kind: 'insert',
+    const mutationOpts: any = {
       table: 'staff_members',
       payload,
-    });
+    };
+
+    if (editStaffId) {
+      mutationOpts.kind = 'update';
+      mutationOpts.match = { id: editStaffId };
+    } else {
+      mutationOpts.kind = 'insert';
+    }
+
+    const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>(mutationOpts);
 
     setSubmitting(false);
 
     if (error) {
-      toast(`직원 등록 실패: ${error}`, 'error');
+      toast(editStaffId ? `직원 수정 실패: ${error}` : `직원 등록 실패: ${error}`, 'error');
       return;
     }
     if (queued) {
-      toast('오프라인 — 직원 등록 대기 중', 'info');
+      toast(editStaffId ? '오프라인 — 직원 수정 대기 중' : '오프라인 — 직원 등록 대기 중', 'info');
       onBack();
       return;
     }
-    toast('직원이 등록되었습니다.', 'success');
+    toast(editStaffId ? '직원 정보가 수정되었습니다.' : '직원이 등록되었습니다.', 'success');
     const row = Array.isArray(data)
       ? (data as { id: string }[])[0]
       : (data as { id: string } | null);
-    const newId = String(row?.id ?? '');
+    const newId = String(row?.id ?? editStaffId ?? '');
     if (onCreated && newId) onCreated(newId);
     else onBack();
   };
@@ -160,9 +200,9 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
     <div className="m-screen">
       <MFormHeader
         onCancel={onBack}
-        title="구성원 등록"
+        title={editStaffId ? '구성원 수정' : '구성원 등록'}
         sub={`${step + 1}/3 · ${STEP_TITLES[step] ?? ''}`}
-        saveLabel={submitting ? '등록 중...' : step < 2 ? '다음' : '등록'}
+        saveLabel={submitting ? (editStaffId ? '수정 중...' : '등록 중...') : step < 2 ? '다음' : (editStaffId ? '수정' : '등록')}
         onSave={() => void handleSave()}
         saveDisabled={
           (step === 0 && form.name.trim() === '') ||
@@ -190,8 +230,8 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
           <MIcon name="alertTri" size={18} color="var(--m-warning)" />
           <span style={{ flex: 1 }}>
             {!canRegister
-              ? '직원 등록 권한이 없습니다. 등록은 인사 권한 보유자만 가능합니다.'
-              : '회사가 특정되지 않아 등록할 수 없습니다. PC에서 회사를 선택해 등록하세요.'}
+              ? (editStaffId ? '직원 수정 권한이 없습니다.' : '직원 등록 권한이 없습니다.')
+              : '회사가 특정되지 않아 저장할 수 없습니다.'}
           </span>
         </div>
       )}
@@ -211,7 +251,7 @@ export default function 구성원등록({ onBack, onCreated, user, company }: SF
             onClick={() => void handleSave()}
             disabled={submitting || (step === 2 && !canSubmit)}
           >
-            {submitting ? '등록 중...' : step < 2 ? '다음' : '등록 완료'}
+            {submitting ? (editStaffId ? '수정 중...' : '등록 중...') : step < 2 ? '다음' : (editStaffId ? '수정 완료' : '등록 완료')}
           </MBtn>
         </div>
       )}

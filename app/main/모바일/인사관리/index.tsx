@@ -103,6 +103,7 @@ export default function 인사관리({
   const [selectedCompany, setSelectedCompany] = useState<string | undefined>(
     typeof user.company === 'string' ? user.company : undefined
   );
+  const [editStaffId, setEditStaffId] = useState<string | null>(null);
 
   const staffId = typeof user.id === 'string' ? user.id : null;
   const staffName = typeof user.name === 'string' ? user.name : undefined;
@@ -130,15 +131,23 @@ export default function 인사관리({
       return (
         <구성원
           company={selectedCompany}
+          user={user}
           onBack={goBack}
-          onOpenForm={() => setView('form-member')}
+          onOpenForm={() => {
+            setEditStaffId(null);
+            setView('form-member');
+          }}
+          onEditStaff={(id) => {
+            setEditStaffId(id);
+            setView('form-member');
+          }}
         />
       );
     case 'attend':
-      return <근태 staffId={staffId} company={selectedCompany} onBack={goBack} />;
+      return <근태 staffId={staffId} company={selectedCompany} user={user} onBack={goBack} />;
     case 'leave':
       return (
-        <연차 staffId={staffId} onBack={goBack} onApply={() => setView('form-leave')} />
+        <연차 staffId={staffId} user={user} onBack={goBack} onApply={() => setView('form-leave')} />
       );
     case 'abnormal':
       return <근태이상 user={user} onBack={goBack} />;
@@ -147,13 +156,13 @@ export default function 인사관리({
     case 'welfare':
       return <복지 user={user} company={selectedCompany} onBack={goBack} />;
     case 'docs':
-      return <계약문서 staffId={staffId} onBack={goBack} />;
+      return <계약문서 staffId={staffId} user={user} onBack={goBack} />;
     case 'offboarding':
       return <오프보딩 company={selectedCompany} onBack={goBack} />;
     case 'archive':
       return <문서보관함 user={user} company={selectedCompany} onBack={goBack} />;
     case 'form-member':
-      return <구성원등록 onBack={goBack} user={user} company={selectedCompany} />;
+      return <구성원등록 onBack={goBack} user={user} company={selectedCompany} editStaffId={editStaffId} />;
     case 'form-leave':
       return (
         <연차신청 staffId={staffId} staffName={staffName} user={user} onBack={goBack} />

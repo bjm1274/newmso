@@ -22,27 +22,36 @@ import {
   useMyAttendanceMonth,
   useDerivedMonthKey,
   formatDateShort,
+  useStaffList,
+  canMutateTeamAbnormal,
   type AttendanceDailyRow,
 } from './data-hooks';
 import 근태조정신청 from './근태조정신청';
 import { CalTab } from './근태달력탭';
+import 근태관리자 from './근태관리자';
+import type { ErpUser } from '@/types';
 
 export type SHrAttendTab = 'dash' | 'schedule' | 'cal';
 
 export type SHrAttendProps = {
   staffId: string | null;
   company?: string;
+  user: ErpUser;
   onBack: () => void;
 };
 
-export default function 근태({ staffId, company, onBack }: SHrAttendProps) {
+export default function 근태({ staffId, company, user, onBack }: SHrAttendProps) {
+  const [mode, setMode] = useState<'my' | 'admin'>('my');
   const [tab, setTab] = useState<SHrAttendTab>('dash');
   const [cursor, setCursor] = useState(() => new Date());
   const [adjustDate, setAdjustDate] = useState<string | null>(null);
   const monthKey = useDerivedMonthKey(cursor);
   const { rows, loading } = useMyAttendanceMonth(staffId, monthKey);
+  const { staffs } = useStaffList({ company, includeResigned: false });
 
   const summary = useMemo(() => deriveMonthSummary(rows), [rows]);
+
+  const isHrAdmin = useMemo(() => canMutateTeamAbnormal(user), [user]);
 
   // 근태 조정 신청 폼으로 진입
   if (adjustDate && staffId) {
@@ -55,10 +64,14 @@ export default function 근태({ staffId, company, onBack }: SHrAttendProps) {
     );
   }
 
+  const handleModeChange = (targetMode: 'my' | 'admin') => {
+    setMode(targetMode);
+  };
+
   return (
     <div className="m-screen">
       <MobileHeader
-        title="근태"
+        title={mode === 'admin' ? '전사 근태 관리' : '근태'}
         sub={`${company ?? ''}${company ? ' · ' : ''}${cursor.getFullYear()}.${String(
           cursor.getMonth() + 1,
         ).padStart(2, '0')}`}
@@ -73,59 +86,90 @@ export default function 근태({ staffId, company, onBack }: SHrAttendProps) {
           </button>
         }
       />
-      <div
-        style={{
-          padding: '10px 16px 0',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
-      >
-        <div className="m-seg" role="tablist" aria-label="근태 탭">
-          <button
-            type="button"
-            className={tab === 'dash' ? 'on' : ''}
-            onClick={() => setTab('dash')}
-            role="tab"
-            aria-selected={tab === 'dash'}
-          >
-            대시
-          </button>
-          <button
-            type="button"
-            className={tab === 'schedule' ? 'on' : ''}
-            onClick={() => setTab('schedule')}
-            role="tab"
-            aria-selected={tab === 'schedule'}
-          >
-            근무표
-          </button>
-          <button
-            type="button"
-            className={tab === 'cal' ? 'on' : ''}
-            onClick={() => setTab('cal')}
-            role="tab"
-            aria-selected={tab === 'cal'}
-          >
-            달력
-          </button>
-        </div>
-      </div>
-      <div className="m-scroll">
-        {loading && (
-          <div
-            style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
-          >
-            불러오는 중...
+      {isHrAdmin && (
+        <div style={{ padding: '8px 16px', background: 'var(--m-card)', borderBottom: '1px solid var(--m-border)' }}>
+          <div className="m-seg" role="tablist" aria-label="근태 보기 모드">
+            <button
+              type="button"
+              className={mode === 'my' ? 'on' : ''}
+              onClick={() => handleModeChange('my')}
+              role="tab"
+              aria-selected={mode === 'my'}
+            >
+              내 근태
+            </button>
+            <button
+              type="button"
+              className={mode === 'admin' ? 'on' : ''}
+              onClick={() => handleModeChange('admin')}
+              role="tab"
+              aria-selected={mode === 'admin'}
+            >
+              전사 관리
+            </button>
           </div>
-        )}
-        {!loading && tab === 'dash' && (
-          <DashTab rows={rows} summary={summary} onAdjust={setAdjustDate} />
-        )}
-        {!loading && tab === 'schedule' && <ScheduleTab rows={rows} cursor={cursor} />}
-        {!loading && tab === 'cal' && (
-          <CalTab rows={rows} cursor={cursor} onChange={setCursor} />
-        )}
-      </div>
+        </div>
+      )}
+
+      {mode === 'admin' ? (
+        <근태관리자 staffs={staffs} company={company} user={user} />
+      ) : (
+        <>
+          <div
+            style={{
+              padding: '10px 16px 0',
+              background: 'var(--m-card)',
+              borderBottom: '1px solid var(--m-border)',
+            }}
+          >
+            <div className="m-seg" role="tablist" aria-label="근태 탭">
+              <button
+                type="button"
+                className={tab === 'dash' ? 'on' : ''}
+                onClick={() => setTab('dash')}
+                role="tab"
+                aria-selected={tab === 'dash'}
+              >
+                대시
+              </button>
+              <button
+                type="button"
+                className={tab === 'schedule' ? 'on' : ''}
+                onClick={() => setTab('schedule')}
+                role="tab"
+                aria-selected={tab === 'schedule'}
+              >
+                근무표
+              </button>
+              <button
+                type="button"
+                className={tab === 'cal' ? 'on' : ''}
+                onClick={() => setTab('cal')}
+                role="tab"
+                aria-selected={tab === 'cal'}
+              >
+                달력
+              </button>
+            </div>
+          </div>
+          <div className="m-scroll">
+            {loading && (
+              <div
+                style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
+              >
+                불러오는 중...
+              </div>
+            )}
+            {!loading && tab === 'dash' && (
+              <DashTab rows={rows} summary={summary} onAdjust={setAdjustDate} />
+            )}
+            {!loading && tab === 'schedule' && <ScheduleTab rows={rows} cursor={cursor} />}
+            {!loading && tab === 'cal' && (
+              <CalTab rows={rows} cursor={cursor} onChange={setCursor} />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

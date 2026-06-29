@@ -385,7 +385,7 @@ type WelfareBundle = {
   device: MedicalDeviceRow[];
 };
 
-export function useWelfareBundle(company: string | undefined) {
+export function useWelfareBundle(company: string | undefined, reloadKey?: number) {
   const [data, setData] = useState<WelfareBundle>({
     family: [],
     checkup: [],
@@ -487,7 +487,7 @@ export function useWelfareBundle(company: string | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [company]);
+  }, [company, reloadKey]);
 
   return { data, loading };
 }

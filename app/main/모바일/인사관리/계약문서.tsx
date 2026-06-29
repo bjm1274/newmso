@@ -14,14 +14,20 @@
  * JM5: 본인 staff_id만 조회. 권한이 없는 대상은 비노출.
  */
 
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, useRef, type ChangeEvent } from 'react';
 import { db } from '@/lib/db-client';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import { toast } from '@/lib/toast';
-import { useMyContractDocs, daysUntil, type MyDocRow } from './data-hooks';
+import {
+  useMyContractDocs,
+  daysUntil,
+  useStaffList,
+  canMutateTeamAbnormal,
+  type MyDocRow,
+} from './data-hooks';
 import { issueAndPrintMyCert } from '../내정보/cert-issue';
 import { uploadMyDocument } from '../내정보/doc-submit';
 import {
@@ -29,49 +35,91 @@ import {
   DOC_MAX_FILE_SIZE_LABEL,
   REQUIRED_DOC_CATEGORIES,
 } from '@/lib/document-submission-shared';
+import 계약문서관리자 from './계약문서관리자';
+import type { ErpUser } from '@/types';
 
 export type SHrDocsTab = 'mine' | 'cert' | 'ctr' | 'submit';
 
 export type SHrDocsProps = {
   staffId: string | null;
+  company?: string;
+  user: ErpUser;
   onBack: () => void;
 };
 
-export default function 계약문서({ staffId, onBack }: SHrDocsProps) {
+export default function 계약문서({ staffId, company, user, onBack }: SHrDocsProps) {
+  const [mode, setMode] = useState<'my' | 'admin'>('my');
   const [tab, setTab] = useState<SHrDocsTab>('mine');
+  const { staffs } = useStaffList({ company, includeResigned: false });
+
+  const isHrAdmin = useMemo(() => canMutateTeamAbnormal(user), [user]);
+
+  const handleModeChange = (targetMode: 'my' | 'admin') => {
+    setMode(targetMode);
+  };
 
   return (
     <div className="m-screen">
-      <MobileHeader title="계약·문서" sub="내 문서함" back={onBack} />
+      <MobileHeader title={mode === 'admin' ? '전사 계약·문서' : '계약·문서'} sub="내 문서함" back={onBack} />
+      {isHrAdmin && (
+        <div style={{ padding: '8px 16px', background: 'var(--m-card)', borderBottom: '1px solid var(--m-border)' }}>
+          <div className="m-seg" role="tablist" aria-label="계약 문서 보기 모드">
+            <button
+              type="button"
+              className={mode === 'my' ? 'on' : ''}
+              onClick={() => handleModeChange('my')}
+              role="tab"
+              aria-selected={mode === 'my'}
+            >
+              내 문서
+            </button>
+            <button
+              type="button"
+              className={mode === 'admin' ? 'on' : ''}
+              onClick={() => handleModeChange('admin')}
+              role="tab"
+              aria-selected={mode === 'admin'}
+            >
+              전사 관리
+            </button>
+          </div>
+        </div>
+      )}
 
-      <div className="m-chip-bar" role="tablist" aria-label="계약·문서 탭">
-        {(
-          [
-            { id: 'mine', label: '내 문서' },
-            { id: 'cert', label: '증명서' },
-            { id: 'ctr', label: '계약' },
-            { id: 'submit', label: '서류제출' },
-          ] as ReadonlyArray<{ id: SHrDocsTab; label: string }>
-        ).map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            className={tab === opt.id ? 'on' : ''}
-            onClick={() => setTab(opt.id)}
-            role="tab"
-            aria-selected={tab === opt.id}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      {mode === 'admin' ? (
+        <계약문서관리자 staffs={staffs} company={company} user={user} />
+      ) : (
+        <>
+          <div className="m-chip-bar" role="tablist" aria-label="계약·문서 탭">
+            {(
+              [
+                { id: 'mine', label: '내 문서' },
+                { id: 'cert', label: '증명서' },
+                { id: 'ctr', label: '계약' },
+                { id: 'submit', label: '서류제출' },
+              ] as ReadonlyArray<{ id: SHrDocsTab; label: string }>
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={tab === opt.id ? 'on' : ''}
+                onClick={() => setTab(opt.id)}
+                role="tab"
+                aria-selected={tab === opt.id}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
-      <div className="m-scroll">
-        {tab === 'mine' && <MineTab staffId={staffId} />}
-        {tab === 'cert' && <CertTab staffId={staffId} />}
-        {tab === 'ctr' && <ContractTab staffId={staffId} />}
-        {tab === 'submit' && <SubmitTab staffId={staffId} />}
-      </div>
+          <div className="m-scroll">
+            {tab === 'mine' && <MineTab staffId={staffId} />}
+            {tab === 'cert' && <CertTab staffId={staffId} />}
+            {tab === 'ctr' && <ContractTab staffId={staffId} />}
+            {tab === 'submit' && <SubmitTab staffId={staffId} />}
+          </div>
+        </>
+      )}
     </div>
   );
 }
