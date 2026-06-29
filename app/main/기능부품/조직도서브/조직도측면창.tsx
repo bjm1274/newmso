@@ -518,6 +518,20 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
       <line x1="15" x2="15.01" y1="9" y2="9" />
     </>
   ),
+  share: (
+    <>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </>
+  ),
+  'more-vertical': (
+    <>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </>
+  ),
 };
 
 export function MenuIcon({ name, className = 'h-5 w-5' }: { name?: string; className?: string }) {
@@ -601,6 +615,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Mic: 'mic',
   Moon: 'moon',
   MoreHorizontal: 'more',
+  MoreVertical: 'more-vertical',
   Package: 'inventory',
   Paperclip: 'paperclip',
   Pin: 'tag',
@@ -618,6 +633,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   SmilePlus: 'plus',
   SquarePen: 'square-pen',
   Star: 'tag',
+  Share2: 'share',
   Stethoscope: 'stethoscope',
   Tag: 'tag',
   Tags: 'tag',
