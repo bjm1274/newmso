@@ -270,7 +270,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
         return (
           <div style={{ marginTop: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)', marginBottom: 10, paddingLeft: 4 }}>
-              {y}년 {parseInt(m ?? '0')}월 {parseInt(d ?? '0')}일 일정 ({selectedEvents.length}건)
+              {y}년 {parseInt(m ?? '0')}월 {parseInt(d ?? '0')}일 {isMri ? 'MRI건수' : '수술건수'}: {selectedEvents.length}건
             </div>
             {selectedEvents.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
