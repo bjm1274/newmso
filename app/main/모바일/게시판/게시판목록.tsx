@@ -284,6 +284,7 @@ function SBoardBase({
         title="게시판"
         sub={company ?? ''}
         back={onBack}
+        backIcon="stop"
         actions={
           <>
             {isScheduleCat && (
@@ -292,8 +293,19 @@ function SBoardBase({
                 aria-label={calendarView ? '목록 보기' : '달력 보기'}
                 aria-pressed={calendarView}
                 onClick={() => setCalendarView((v) => !v)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: 'rgba(0, 0, 0, 0.03)',
+                  border: '1px solid rgba(0, 0, 0, 0.05)',
+                  cursor: 'pointer',
+                }}
               >
-                <MIcon name={calendarView ? 'list' : 'calendar'} size={20} />
+                <MIcon name={calendarView ? 'list' : 'calendar'} size={15} color="var(--z-600)" />
               </button>
             )}
             <button
@@ -306,11 +318,37 @@ function SBoardBase({
                   return !v;
                 });
               }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: 'rgba(0, 0, 0, 0.03)',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                cursor: 'pointer',
+              }}
             >
-              <MIcon name="search" size={20} />
+              <MIcon name="search" size={15} color="var(--z-600)" />
             </button>
-            <button type="button" onClick={onWrite} aria-label="새 글 작성">
-              <MIcon name="edit" size={20} />
+            <button
+              type="button"
+              onClick={onWrite}
+              aria-label="새 글 작성"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: 'rgba(0, 0, 0, 0.03)',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                cursor: 'pointer',
+              }}
+            >
+              <MIcon name="edit" size={15} color="var(--z-600)" />
             </button>
           </>
         }
@@ -362,7 +400,7 @@ function SBoardBase({
           scrollbarWidth: 'none',
         }}
       >
-        {BOARD_CATS.map((c) => {
+        {BOARD_CATS.filter((c) => c.id !== 'all').map((c) => {
           const active = cat === c.id;
           return (
             <button

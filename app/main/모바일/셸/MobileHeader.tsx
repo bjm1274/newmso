@@ -7,10 +7,11 @@ export type MobileHeaderProps = {
   /** 제목 위에 표시되는 작은 회색 라벨(모듈 카테고리). 허브 화면에서 사용. */
   eyebrow?: ReactNode;
   back?: () => void;
+  backIcon?: string;
   actions?: ReactNode;
 };
 
-export default function MobileHeader({ title, sub, eyebrow, back, actions }: MobileHeaderProps) {
+export default function MobileHeader({ title, sub, eyebrow, back, backIcon, actions }: MobileHeaderProps) {
   return (
     <div
       className="m-header macos-glass"
@@ -48,7 +49,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, actions }: Mob
             flexShrink: 0,
           }}
         >
-          <MIcon name="chevL" size={18} color="var(--z-600)" />
+          <MIcon name={backIcon || 'chevL'} size={18} color="var(--z-600)" />
         </button>
       )}
 

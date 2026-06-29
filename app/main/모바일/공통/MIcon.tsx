@@ -66,6 +66,7 @@ const M_ICON_ALIAS: Record<string, string> = {
   info: 'Info',
   x: 'X',
   eye: 'Eye',
+  stop: 'StopCircle',
   cameraOff: 'CameraOff',
   fileWarning: 'FileWarning',
   bot: 'Bot',
