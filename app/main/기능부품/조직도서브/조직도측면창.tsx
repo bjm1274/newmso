@@ -542,6 +542,9 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
       <line x1="3" x2="3.01" y1="18" y2="18" />
     </>
   ),
+  filter: (
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  ),
 };
 
 export function MenuIcon({ name, className = 'h-5 w-5' }: { name?: string; className?: string }) {
@@ -601,11 +604,13 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Eraser: 'eraser',
   Eye: 'search',
   FileBarChart: 'analytics',
+  FileCheck: 'approval',
   FileCheck2: 'document',
   FileClock: 'document',
   FilePenLine: 'document',
   FileText: 'document',
   FileWarning: 'alert',
+  Filter: 'filter',
   FolderOpen: 'folder',
   Forward: 'arrow-right',
   History: 'history',

@@ -13,7 +13,7 @@
  * JM6(label·input 연결, segment aria-current)
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
@@ -58,9 +58,56 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   const [start, setStart] = useState(today);
   const [end, setEnd] = useState(today);
   const [reason, setReason] = useState('');
+  const [delegateId, setDelegateId] = useState('');
   // 참조(CC) 수동 추가 — 자동 CC(회사 활성 직원 전체)에 더해 명시적으로 지정. 선택 사항.
   const [manualCcUsers, setManualCcUsers] = useState<CcPick[]>([]);
   const [ccPickerOpen, setCcPickerOpen] = useState(false);
+
+  const [staffs, setStaffs] = useState<StaffMember[]>([]);
+  const [staffsLoading, setStaffsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!company) return;
+    let cancelled = false;
+    (async () => {
+      setStaffsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('id, name, status, company, department, team, position, hire_date, resign_date')
+          .eq('company', company);
+        if (error || cancelled || !data) return;
+        setStaffs(data as StaffMember[]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setStaffsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [company]);
+
+  const leaveDelegateOptions = useMemo(() => {
+    const currentUserId = String(staffId || '').trim();
+
+    return staffs
+      .filter((staff) => {
+        const sId = String(staff?.id || '').trim();
+        if (!sId || sId === currentUserId) return false;
+        if (!isActiveStaff(staff)) return false;
+        return true;
+      })
+      .sort((left, right) => {
+        const leftDepartment = String(left?.department || left?.team || '').trim();
+        const rightDepartment = String(right?.department || right?.team || '').trim();
+        return (
+          leftDepartment.localeCompare(rightDepartment, 'ko-KR') ||
+          String(left?.name || '').localeCompare(String(right?.name || ''), 'ko-KR')
+        );
+      });
+  }, [staffId, staffs]);
 
   const base = useApprovalFormBase({ user, staffId, company });
   const {
@@ -165,6 +212,8 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         ccUsers = Array.from(byId.values());
       }
 
+      const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === delegateId);
+
       const { queued: apprQueued } = await submitApproval({
         typeName: '연차/휴가',
         title,
@@ -180,6 +229,10 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           endDate: end,
           reason: reason || '',
           leave_request_synced: leaveRequestInserted,
+          delegateId: delegateId || null,
+          delegateName: delegate?.name || '',
+          delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
+          delegatePosition: String(delegate?.position || '').trim(),
         },
       });
 
@@ -202,10 +255,10 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     } finally {
       setSubmitting(false);
     }
-  }, [staffId, start, end, kind, days, reason, manualCcUsers, approverLine, user, company, onSubmitted, submitApproval, setSubmitting, queuedAttachmentCount]);
+  }, [staffId, start, end, kind, days, reason, delegateId, leaveDelegateOptions, manualCcUsers, approverLine, user, company, onSubmitted, submitApproval, setSubmitting, queuedAttachmentCount]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MFormHeader
         onCancel={onCancel}
         title="연차/휴가 신청"
@@ -214,8 +267,14 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll">
-        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+      <div className="m-scroll" style={{ background: 'transparent' }}>
+        <div
+          className="macos-glass macos-squircle"
+          style={{
+            margin: '16px',
+            overflow: 'hidden',
+          }}
+        >
           <MField label="휴가 종류">
             <MSegRow
               value={kind}
@@ -224,9 +283,42 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
               ariaLabel="휴가 종류"
             />
           </MField>
+          <MField label="업무 대행자" htmlFor={fieldId('delegate')}>
+            <div style={{ padding: '6px 0' }}>
+              <select
+                id={fieldId('delegate')}
+                value={delegateId}
+                onChange={(e) => setDelegateId(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: 36,
+                  padding: '0 8px',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: 'var(--z-900)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.45)',
+                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                  outline: 'none',
+                }}
+              >
+                <option value="">대행자 선택 안함</option>
+                {leaveDelegateOptions.map((staff) => {
+                  const dept = String(staff.department || staff.team || '').trim();
+                  const pos = String(staff.position || '').trim();
+                  const details = [dept, pos].filter(Boolean).join(' / ');
+                  return (
+                    <option key={staff.id} value={staff.id}>
+                      {details ? `${staff.name} (${details})` : staff.name}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </MField>
           <MField label="시작일" required htmlFor={fieldId('start')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-              <MIcon name="calendar" size={16} color="var(--m-accent)" />
+              <span style={{ display: 'inline-flex' }}><MIcon name="calendar" size={16} color="var(--m-accent)" /></span>
               <MInput
                 id={fieldId('start')}
                 value={start}
@@ -243,7 +335,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
             sub={`총 ${days}일${kind === '반차' ? ' (반차)' : ''}`}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-              <MIcon name="calendar" size={16} color="var(--m-accent)" />
+              <span style={{ display: 'inline-flex' }}><MIcon name="calendar" size={16} color="var(--m-accent)" /></span>
               <MInput
                 id={fieldId('end')}
                 value={end}
@@ -264,37 +356,52 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                 width: '100%',
                 padding: '8px 0',
                 fontSize: 14,
+                fontWeight: 600,
                 fontFamily: 'inherit',
                 resize: 'none',
                 color: 'var(--z-900)',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
               }}
             />
           </MField>
         </div>
 
         {/* 결재선 미리보기 */}
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="lbl" style={{ flex: 1 }}>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>
               결재선 ({approverManual ? '직접 지정' : '자동 매핑'})
             </div>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={() => setPickerOpen(true)}
               aria-label="결재선 변경"
               style={{
                 fontSize: 12,
-                fontWeight: 800,
+                fontWeight: 900,
                 color: 'var(--m-accent)',
                 padding: '4px 8px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
               }}
             >
               변경
             </button>
           </div>
-          <MCard flush>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             {approverLoading ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
                 결재선을 불러오는 중…
               </div>
             ) : approverLine.length === 0 ? (
@@ -303,7 +410,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                   padding: '14px 16px',
                   background: 'var(--m-warning-soft)',
                   fontSize: 12,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: 'var(--m-warning)',
                   lineHeight: 1.55,
                 }}
@@ -329,54 +436,62 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                         gap: 12,
                         padding: '12px 16px',
                         borderBottom:
-                          i < approverLine.length - 1 ? '1px solid var(--m-border)' : 'none',
+                          i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
                         alignItems: 'center',
                       }}
                     >
                       <MAvatar tone="violet" size="sm">
                         {(a.name || '?').charAt(0)}
                       </MAvatar>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
                           {stepLabel}
                         </div>
-                        <div style={{ fontSize: 14, fontWeight: 800, marginTop: 1 }}>{a.name}</div>
+                        <div style={{ fontSize: 14, fontWeight: 900, marginTop: 1, color: 'var(--z-900)' }}>{a.name}</div>
                         {dept && (
-                          <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>
+                          <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 700 }}>
                             {dept}
                           </div>
                         )}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700 }}>대기</div>
+                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>대기</div>
                     </li>
                   );
                 })}
               </ol>
             )}
           </MCard>
-          <div style={{ padding: '6px 16px 0', fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+          <div style={{ padding: '6px 20px 0', fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
             {approverManual
               ? '결재선을 직접 지정했습니다. "기본값으로" 버튼으로 되돌릴 수 있어요.'
               : '직급 위계에 따라 자동 매핑되었습니다. "변경"으로 수정할 수 있어요.'}
           </div>
         </div>
 
-        {/* 참조(CC) — 추가 지정. 연차는 행정팀·회사 직원이 기본 참조됩니다. */}
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="lbl" style={{ flex: 1 }}>참조 추가 ({manualCcUsers.length})</div>
+        {/* 참조(CC) — 추가 지정 */}
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>참조 추가 ({manualCcUsers.length})</div>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={() => setCcPickerOpen(true)}
               aria-label="참조자 추가 또는 변경"
-              style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+              style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               {manualCcUsers.length > 0 ? '변경' : '추가'}
             </button>
           </div>
-          <MCard flush>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             {manualCcUsers.length === 0 ? (
-              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.55 }}>
+              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
                 연차 신청은 행정팀과 회사 직원에게 기본 참조됩니다. 추가로 참조할 직원을 지정할 수 있어요.
               </div>
             ) : (
@@ -386,19 +501,19 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                   return (
                     <li
                       key={c.id}
+                      className="macos-glass"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 8,
                         padding: '6px 12px 6px 6px',
-                        border: '1px solid var(--m-border)',
                         borderRadius: 999,
                       }}
                     >
                       <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                       <span style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 800 }}>{c.name}</span>
-                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6 }}>{dept}</span>}
+                        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>
+                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6, fontWeight: 800 }}>{dept}</span>}
                       </span>
                     </li>
                   );
@@ -409,7 +524,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         </div>
 
         {/* 첨부 파일 */}
-        <div className="m-section">
+        <div className="m-section" style={{ background: 'transparent', padding: '0 16px' }}>
           <AttachmentPicker onChange={setAttachments} />
         </div>
 

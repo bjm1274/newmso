@@ -44,10 +44,7 @@ export type SApprovalDocsProps = {
   completed: ApprovalRow[];
   loading: boolean;
   onOpen: (id: string) => void;
-  onNavInbox: () => void;
-  onNavSent: () => void;
-  onNavRef: () => void;
-  onNavWrite: () => void;
+  onBack: () => void;
 };
 
 export default function SApprovalDocs({
@@ -56,10 +53,7 @@ export default function SApprovalDocs({
   completed,
   loading,
   onOpen,
-  onNavInbox,
-  onNavSent,
-  onNavRef,
-  onNavWrite,
+  onBack,
 }: SApprovalDocsProps) {
   // 조회 조건: pending(선택중) → 조회 버튼으로 applied 반영 (PC 문서조회 흐름 재현)
   const [typeSel, setTypeSel] = useState('전체');
@@ -96,42 +90,19 @@ export default function SApprovalDocs({
   const doneList = useMemo(() => completed.filter(filterFn), [completed, filterFn]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="전자결재"
-        eyebrow="협업"
-        actions={
-          <button type="button" aria-label="결재 작성" onClick={onNavWrite}>
-            <MIcon name="edit" size={20} />
-          </button>
-        }
+        sub="문서 조회"
+        back={onBack}
       />
 
-      {/* 칩 네비 — 문서조회 active */}
-      <div className="m-chip-bar">
-        <button type="button" onClick={onNavInbox} aria-label="결재함">
-          결재함
-        </button>
-        <button type="button" onClick={onNavSent} aria-label="기안함">
-          기안함
-        </button>
-        <button type="button" onClick={onNavRef} aria-label="참조 문서함">
-          참조
-        </button>
-        <button type="button" onClick={onNavWrite} aria-label="작성하기">
-          작성
-        </button>
-        <button type="button" className="on" aria-label="문서 조회" aria-current="page">
-          문서 조회
-        </button>
-      </div>
-
-      {/* 조회 조건 */}
+      {/* 조회 조건 아크릴 카드 */}
       <div
+        className="macos-glass macos-squircle"
         style={{
-          padding: '12px 16px',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          padding: '14px 16px',
+          margin: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
@@ -140,7 +111,7 @@ export default function SApprovalDocs({
         <div>
           <label
             htmlFor="m-docs-type"
-            style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--z-500)', marginBottom: 6 }}
+            style={{ display: 'block', fontSize: 11, fontWeight: 900, color: 'var(--z-500)', marginBottom: 6 }}
           >
             문서 종류
           </label>
@@ -151,16 +122,17 @@ export default function SApprovalDocs({
               onChange={(e) => setTypeSel(e.target.value)}
               style={{
                 width: '100%',
-                height: 44,
+                height: 40,
                 appearance: 'none',
-                border: '1px solid var(--m-border)',
-                borderRadius: 'var(--m-radius-md)',
-                background: 'var(--m-card)',
-                padding: '0 38px 0 14px',
-                fontSize: 14,
-                fontWeight: 700,
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: 8,
+                background: 'rgba(255, 255, 255, 0.6)',
+                padding: '0 38px 0 12px',
+                fontSize: 13,
+                fontWeight: 900,
                 color: 'var(--z-900)',
                 fontFamily: 'inherit',
+                outline: 'none',
               }}
             >
               {typeOptions.map((t) => (
@@ -169,46 +141,87 @@ export default function SApprovalDocs({
                 </option>
               ))}
             </select>
-            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--z-400)' }}>
-              <MIcon name="chevD" size={18} />
+            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--z-500)', display: 'inline-flex' }}>
+              <MIcon name="chevD" size={15} />
             </span>
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--z-500)', marginBottom: 6 }}>
             조회 기간
           </div>
-          <div className="m-seg" role="radiogroup" aria-label="조회 기간">
-            {PERIOD_CHIPS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={periodSel === p.id ? 'on' : ''}
-                onClick={() => setPeriodSel(p.id)}
-                role="radio"
-                aria-checked={periodSel === p.id}
-              >
-                {p.label}
-              </button>
-            ))}
+          <div
+            role="radiogroup"
+            className="macos-glass"
+            style={{
+              display: 'flex',
+              padding: 3,
+              borderRadius: 16,
+              gap: 2,
+              border: '1px solid rgba(0, 0, 0, 0.03)',
+            }}
+          >
+            {PERIOD_CHIPS.map((p) => {
+              const on = periodSel === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="transition-all duration-150 active:scale-[0.98]"
+                  onClick={() => setPeriodSel(p.id)}
+                  role="radio"
+                  aria-checked={on}
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    padding: '6px 0',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    borderRadius: 12,
+                    border: 'none',
+                    background: on ? '#fff' : 'transparent',
+                    color: on ? 'var(--z-900)' : 'var(--z-600)',
+                    boxShadow: on ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <button
           type="button"
-          className="m-btn primary block"
+          className="transition-all active:scale-95 duration-100"
           onClick={() => setApplied({ type: typeSel, period: periodSel })}
           aria-label="조회"
+          style={{
+            height: 40,
+            borderRadius: 8,
+            background: '#007AFF',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 900,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0, 122, 255, 0.25)',
+          }}
         >
-          <MIcon name="search" size={18} />
+          <span style={{ display: 'inline-flex' }}><MIcon name="search" size={15} /></span>
           조회
         </button>
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {loading && progressList.length === 0 && doneList.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
             불러오는 중…
           </div>
         ) : (
@@ -257,17 +270,17 @@ function DocSection({
   emptyMsg: string;
 }) {
   return (
-    <div className="m-section">
-      <div className="m-section-h">
-        <div className="lbl">{title}</div>
-        <div className="cnt">{count}건</div>
+    <div className="m-section" style={{ background: 'transparent' }}>
+      <div className="m-section-h" style={{ background: 'transparent', padding: '8px 16px 4px' }}>
+        <div className="lbl" style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>{title}</div>
+        <div className="cnt" style={{ fontSize: 11, fontWeight: 900, color: 'var(--z-500)' }}>{count}건</div>
       </div>
       {rows.length === 0 ? (
-        <MCard style={{ textAlign: 'center', padding: '24px 16px', fontSize: 13, color: 'var(--z-500)', fontWeight: 600 }}>
+        <MCard className="macos-glass macos-squircle" style={{ textAlign: 'center', padding: '24px 16px', fontSize: 13, color: 'var(--z-500)', fontWeight: 800, margin: '0 16px' }}>
           {emptyMsg}
         </MCard>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '0 16px' }}>
           {rows.map((row) => (
             <ApprovalCard key={row.id} row={row} staffId={staffId} onOpen={() => onOpen(row.id)} />
           ))}

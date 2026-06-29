@@ -100,20 +100,29 @@ function KpiCardBase({ label, value, tone, icon }: KpiCardProps) {
   const color = tone === 'danger' ? 'var(--m-danger)' : 'var(--m-accent)';
   const toneClass = tone === 'danger' ? 'tone-danger' : 'tone-accent';
   return (
-    <MCard style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+    <MCard
+      className="macos-glass macos-squircle"
+      style={{
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        overflow: 'hidden',
+      }}
+    >
       {icon && (
-        <div className={'m-kpi-ico ' + toneClass}>
+        <span style={{ display: 'inline-flex' }} className={'m-kpi-ico ' + toneClass}>
           <MIcon name={icon} size={18} />
-        </div>
+        </span>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: 'var(--z-700)', fontWeight: 700 }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'var(--z-700)', fontWeight: 800 }}>{label}</div>
       </div>
       <div
         className="m-tnum"
         style={{
           fontSize: 22,
-          fontWeight: 800,
+          fontWeight: 900,
           letterSpacing: '-0.025em',
           color,
           display: 'flex',
@@ -123,7 +132,7 @@ function KpiCardBase({ label, value, tone, icon }: KpiCardProps) {
         }}
       >
         {value}
-        <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 700 }}>건</span>
+        <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 800 }}>건</span>
       </div>
     </MCard>
   );
@@ -156,21 +165,26 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
     position: 'relative',
     textAlign: 'left',
     width: '100%',
+    display: 'block',
+    outline: 'none',
+    cursor: 'pointer',
+    border: 'none',
+    background: 'transparent',
   };
   const stripStyle: CSSProperties = {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: 3,
-    borderRadius: '14px 0 0 14px',
+    top: 1,
+    left: 1,
+    bottom: 1,
+    width: 4,
+    borderRadius: '20px 0 0 20px',
     background: urgentTone === 'danger' ? 'var(--m-danger)' : 'var(--m-warning)',
   };
 
   return (
     <button
       type="button"
-      className="m-card"
+      className="macos-glass macos-squircle transition-all duration-150 active:scale-[0.98]"
       style={cardStyle}
       onClick={onOpen}
       aria-label={`${title} 상세 열기`}
@@ -182,9 +196,9 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
           <MChip tone={days >= 2 ? 'danger' : 'warning'}>+{days}일</MChip>
         )}
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
+        <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{ts}</span>
       </div>
-      <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.015em', lineHeight: 1.4 }}>
+      <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: '-0.015em', lineHeight: 1.4, color: 'var(--z-900)' }}>
         {title}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
@@ -192,15 +206,15 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
           {senderName.charAt(0) || '?'}
         </MAvatar>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700 }}>{senderName}</div>
+          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--z-800)' }}>{senderName}</div>
           {senderDept && (
-            <div style={{ fontSize: 11, color: 'var(--z-500)' }}>{senderDept}</div>
+            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{senderDept}</div>
           )}
         </div>
         {amount && (
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700 }}>금액</div>
-            <div className="m-tnum" style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)' }}>
+            <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>금액</div>
+            <div className="m-tnum" style={{ fontSize: 14, fontWeight: 900, color: 'var(--z-900)' }}>
               ₩ {amount}
             </div>
           </div>
@@ -210,11 +224,6 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
   );
 }
 
-// 변경 거의 없는 카드 — memo로 list 리렌더 비용 절감 (JM2)
 export const ApprovalCard = memo(ApprovalCardBase);
 
-// 카드 내부에서도 export 필요할 수 있어 ApprovalRow 재공개 — 의존성 최소화
-// (외부 import는 data-hooks에서 직접 받도록 유지)
-
-// MIcon은 import해서 사용하므로 일관성 확보 위해 retain
 export { MIcon };

@@ -19,6 +19,7 @@ import SApprovalLeaveForm from './연차신청폼';
 import SApprovalGenericForm from './일반기안폼';
 import SApprovalOvertimeForm from './연장근무폼';
 import SApprovalLeavePlanForm from './연차계획폼';
+import SApprovalAttendanceFixForm from './출결정정폼';
 import SApprovalDetail from './결재상세';
 import {
   useApprovalList,
@@ -102,8 +103,10 @@ export default function 결재({ user, sub }: 결재Props) {
     return rows.find((r) => String(r.id) === detailId) ?? null;
   }, [rows, detailId]);
 
+  let contentElement: React.ReactNode;
+
   if (view === 'detail' && detailId) {
-    return (
+    contentElement = (
       <SApprovalDetail
         staffId={staffId}
         staffName={staffName}
@@ -113,26 +116,19 @@ export default function 결재({ user, sub }: 결재Props) {
         onChanged={refetch}
       />
     );
-  }
-
-  if (view === 'docs') {
-    return (
+  } else if (view === 'docs') {
+    contentElement = (
       <SApprovalDocs
         staffId={staffId}
         inProgress={docProgress}
         completed={docCompleted}
         loading={loading}
         onOpen={handleOpen}
-        onNavInbox={() => setView('inbox')}
-        onNavSent={() => setView('sent')}
-        onNavRef={() => setView('ref')}
-        onNavWrite={() => setView('write')}
+        onBack={() => setView('inbox')}
       />
     );
-  }
-
-  if (view === 'sent') {
-    return (
+  } else if (view === 'sent') {
+    contentElement = (
       <SApprovalSent
         staffId={staffId}
         rows={sent}
@@ -142,10 +138,8 @@ export default function 결재({ user, sub }: 결재Props) {
         onWrite={() => setView('write')}
       />
     );
-  }
-
-  if (view === 'ref') {
-    return (
+  } else if (view === 'ref') {
+    contentElement = (
       <SApprovalRef
         staffId={staffId}
         rows={ref}
@@ -154,10 +148,8 @@ export default function 결재({ user, sub }: 결재Props) {
         onOpen={handleOpen}
       />
     );
-  }
-
-  if (view === 'write') {
-    return (
+  } else if (view === 'write') {
+    contentElement = (
       <SApprovalWrite
         onBack={() => setView('inbox')}
         onPick={(slug, name) => {
@@ -166,19 +158,18 @@ export default function 결재({ user, sub }: 결재Props) {
         }}
       />
     );
-  }
-
-  if (view === 'compose' && composeForm) {
+  } else if (view === 'compose' && composeForm) {
     const onCancel = () => setView('write');
     const onSubmitted = () => {
       refetch();
       setView('sent');
     };
     if (composeForm.slug === 'leave') {
-      return <SApprovalLeaveForm user={user} onCancel={onCancel} onSubmitted={onSubmitted} />;
-    }
-    if (composeForm.slug === 'overtime') {
-      return (
+      contentElement = <SApprovalLeaveForm user={user} onCancel={onCancel} onSubmitted={onSubmitted} />;
+    } else if (composeForm.slug === 'attendance_fix') {
+      contentElement = <SApprovalAttendanceFixForm user={user} onCancel={onCancel} onSubmitted={onSubmitted} />;
+    } else if (composeForm.slug === 'overtime') {
+      contentElement = (
         <SApprovalOvertimeForm
           user={user}
           formSlug={composeForm.slug}
@@ -187,9 +178,8 @@ export default function 결재({ user, sub }: 결재Props) {
           onSubmitted={onSubmitted}
         />
       );
-    }
-    if (composeForm.slug === 'annual_plan' || composeForm.slug === 'leave_promotion_notice') {
-      return (
+    } else if (composeForm.slug === 'annual_plan' || composeForm.slug === 'leave_promotion_notice') {
+      contentElement = (
         <SApprovalLeavePlanForm
           user={user}
           formSlug={composeForm.slug}
@@ -198,34 +188,50 @@ export default function 결재({ user, sub }: 결재Props) {
           onSubmitted={onSubmitted}
         />
       );
+    } else {
+      contentElement = (
+        <SApprovalGenericForm
+          user={user}
+          formSlug={composeForm.slug}
+          formName={composeForm.name}
+          onCancel={onCancel}
+          onSubmitted={onSubmitted}
+        />
+      );
     }
-    return (
-      <SApprovalGenericForm
-        user={user}
-        formSlug={composeForm.slug}
-        formName={composeForm.name}
-        onCancel={onCancel}
-        onSubmitted={onSubmitted}
+  } else {
+    contentElement = (
+      <SApproval
+        staffId={staffId}
+        rows={rows}
+        inbox={inbox}
+        progress={progress}
+        done={done}
+        refCount={ref.length}
+        sentCount={sent.length}
+        loading={loading}
+        onOpen={handleOpen}
+        onNavDocs={() => setView('docs')}
+        onNavSent={() => setView('sent')}
+        onNavRef={() => setView('ref')}
+        onNavWrite={() => setView('write')}
+        onRefresh={refetch}
       />
     );
   }
 
   return (
-    <SApproval
-      staffId={staffId}
-      rows={rows}
-      inbox={inbox}
-      progress={progress}
-      done={done}
-      refCount={ref.length}
-      sentCount={sent.length}
-      loading={loading}
-      onOpen={handleOpen}
-      onNavDocs={() => setView('docs')}
-      onNavSent={() => setView('sent')}
-      onNavRef={() => setView('ref')}
-      onNavWrite={() => setView('write')}
-      onRefresh={refetch}
-    />
+    <div
+      data-testid="approval-view"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+      }}
+    >
+      {contentElement}
+    </div>
   );
 }

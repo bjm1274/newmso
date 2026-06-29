@@ -174,13 +174,14 @@ export default function SApprovalApproverPicker({
           <SectionLabel>현재 결재선 ({line.length})</SectionLabel>
           {line.length === 0 ? (
             <div
+              className="macos-glass macos-squircle-sm"
               style={{
                 padding: '12px 14px',
                 fontSize: 12,
-                color: 'var(--z-500)',
-                background: 'var(--m-warning-soft)',
-                borderRadius: 'var(--m-radius-md)',
-                fontWeight: 700,
+                color: 'var(--z-600)',
+                background: 'rgba(255, 159, 10, 0.08)',
+                border: '1px solid rgba(255, 159, 10, 0.2)',
+                fontWeight: 800,
               }}
             >
               결재자를 한 명 이상 추가해 주세요.
@@ -197,27 +198,25 @@ export default function SApprovalApproverPicker({
                 return (
                   <li
                     key={a.id}
+                    className="macos-glass macos-squircle-sm"
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '32px 1fr auto',
                       gap: 10,
                       alignItems: 'center',
                       padding: '8px 10px',
-                      border: '1px solid var(--m-border)',
-                      borderRadius: 'var(--m-radius-md)',
-                      background: 'var(--m-card)',
                     }}
                   >
                     <MAvatar tone="violet" size="sm">
                       {(a.name || '?').charAt(0)}
                     </MAvatar>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700 }}>
+                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>
                         {stepLabel}
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 800 }}>{a.name}</div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{a.name}</div>
                       {(a.department || a.position) && (
-                        <div style={{ fontSize: 11, color: 'var(--z-500)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
                           {[a.department, a.position].filter(Boolean).join(' / ')}
                         </div>
                       )}
@@ -250,15 +249,19 @@ export default function SApprovalApproverPicker({
               })}
             </ol>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={resetToDefault}
               style={{
                 fontSize: 11,
-                fontWeight: 700,
+                fontWeight: 900,
                 color: 'var(--m-accent)',
                 padding: 6,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
               }}
               aria-label="결재선을 기본값으로 되돌리기"
             >
@@ -274,14 +277,13 @@ export default function SApprovalApproverPicker({
             결재자 검색
           </label>
           <div
+            className="macos-glass"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
               padding: '8px 12px',
-              border: '1px solid var(--m-border)',
-              borderRadius: 'var(--m-radius-md)',
-              background: 'var(--m-card)',
+              borderRadius: 10,
             }}
           >
             <MIcon name="search" size={14} color="var(--z-500)" />
@@ -297,7 +299,7 @@ export default function SApprovalApproverPicker({
                 outline: 'none',
                 background: 'transparent',
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 700,
                 color: 'var(--z-900)',
               }}
             />
@@ -317,7 +319,7 @@ export default function SApprovalApproverPicker({
                 <div
                   style={{
                     fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 900,
                     color: 'var(--z-500)',
                     padding: '6px 4px 4px',
                     letterSpacing: '0.04em',
@@ -329,6 +331,7 @@ export default function SApprovalApproverPicker({
                   <button
                     key={String(s.id)}
                     type="button"
+                    className="transition-all duration-150 active:bg-black/[0.04]"
                     onClick={() => addMember(s)}
                     style={memberRowStyle}
                     aria-label={`${s.name} 결재선에 추가`}
@@ -336,9 +339,9 @@ export default function SApprovalApproverPicker({
                     <MAvatar tone="blue" size="sm">
                       {(s.name || '?').charAt(0)}
                     </MAvatar>
-                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700 }}>{s.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--z-500)' }}>
+                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left', marginLeft: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
                         {[s.department, s.position].filter(Boolean).join(' / ') || ' '}
                       </div>
                     </div>
@@ -353,21 +356,28 @@ export default function SApprovalApproverPicker({
 
       {/* sticky apply */}
       <div
+        className="macos-glass"
         style={{
           position: 'sticky',
           bottom: 0,
           display: 'flex',
           gap: 8,
           padding: '10px 16px 14px',
-          background: 'var(--m-card)',
-          borderTop: '1px solid var(--m-border)',
+          borderTop: '1px solid rgba(255,255,255,0.4)',
         }}
       >
-        <button type="button" onClick={onClose} style={actionStyle('ghost')} aria-label="결재선 변경 취소">
+        <button
+          type="button"
+          className="macos-squircle-sm transition-all active:scale-[0.98] duration-100"
+          onClick={onClose}
+          style={actionStyle('ghost')}
+          aria-label="결재선 변경 취소"
+        >
           취소
         </button>
         <button
           type="button"
+          className="macos-squircle-sm transition-all active:scale-[0.98] duration-100"
           onClick={apply}
           disabled={line.length === 0}
           style={{
@@ -393,7 +403,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div
       style={{
         fontSize: 11,
-        fontWeight: 800,
+        fontWeight: 900,
         color: 'var(--z-500)',
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
@@ -419,6 +429,7 @@ function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: I
   return (
     <button
       type="button"
+      className="transition-all active:scale-90 duration-100"
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
@@ -428,8 +439,9 @@ function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: I
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 6,
-        background: 'transparent',
+        borderRadius: 8,
+        background: 'rgba(0, 0, 0, 0.03)',
+        border: '1px solid rgba(0, 0, 0, 0.05)',
         color,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -441,15 +453,13 @@ function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: I
 }
 
 const memberRowStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '32px 1fr auto',
-  gap: 10,
+  display: 'flex',
   width: '100%',
   alignItems: 'center',
-  padding: '8px 8px',
+  padding: '10px 8px',
   background: 'transparent',
   border: 'none',
-  borderBottom: '1px solid var(--m-border)',
+  borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
   cursor: 'pointer',
 };
 
@@ -458,21 +468,20 @@ const emptyStyle: CSSProperties = {
   padding: '20px 0',
   fontSize: 12,
   color: 'var(--z-500)',
-  fontWeight: 600,
+  fontWeight: 800,
 };
 
 function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
   const base: CSSProperties = {
     flex: 1,
-    height: 48,
-    borderRadius: 'var(--m-radius-lg)',
-    fontSize: 15,
-    fontWeight: 800,
+    height: 44,
+    fontSize: 14,
+    fontWeight: 900,
     cursor: 'pointer',
-    border: '1px solid var(--m-border)',
+    border: '1px solid rgba(0, 0, 0, 0.06)',
   };
   if (kind === 'primary') {
-    return { ...base, background: 'var(--m-accent)', color: '#fff', border: '1px solid var(--m-accent)' };
+    return { ...base, background: '#007AFF', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)' };
   }
-  return { ...base, background: 'transparent', color: 'var(--z-700)' };
+  return { ...base, background: 'rgba(255, 255, 255, 0.6)', color: 'var(--z-700)' };
 }

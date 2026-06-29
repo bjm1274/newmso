@@ -124,7 +124,7 @@ export default function SApprovalLeavePlanForm({
   }, [staffId, sortedDates, remaining, reason, approver, user, company, formSlug, formName, onSubmitted]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -133,40 +133,52 @@ export default function SApprovalLeavePlanForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll">
-        {/* 잔여 연차 요약 */}
+      <div className="m-scroll" style={{ background: 'transparent' }}>
+        {/* 잔여 연차 요약 배너 */}
         <div
+          className="macos-glass macos-squircle"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '12px 16px',
-            margin: '12px 16px 0',
-            borderRadius: 12,
-            background: 'var(--m-accent-soft)',
+            margin: '16px 16px 0',
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-700)' }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--z-700)' }}>
             {balLoading ? '잔여 연차 확인 중...' : `남은 연차 ${remaining}일`}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--m-accent)' }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#007AFF' }}>
             선택 {sortedDates.length} / {remaining}일
           </div>
         </div>
 
         {/* 달력 */}
-        <div className="m-section">
-          <div className="m-section-h">
-            <div className="lbl">사용 예정일 선택</div>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>사용 예정일 선택</div>
           </div>
-          <MCard style={{ padding: '12px 12px' }}>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              padding: '12px 12px',
+              margin: '0 16px',
+            }}
+          >
             <MultiDateCalendar selected={selected} onToggle={toggle} max={remaining} months={3} />
           </MCard>
         </div>
 
         {/* 사유 */}
-        <div className="m-section">
-          <MCard flush style={{ borderRadius: 0, border: 'none' }}>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             <MField label="사유" htmlFor="leaveplan-reason" sub="결재자에게 전달됩니다.">
               <textarea
                 id="leaveplan-reason"
@@ -178,9 +190,13 @@ export default function SApprovalLeavePlanForm({
                   width: '100%',
                   padding: '8px 0',
                   fontSize: 14,
+                  fontWeight: 600,
                   fontFamily: 'inherit',
                   resize: 'none',
                   color: 'var(--z-900)',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
                 }}
               />
             </MField>

@@ -134,31 +134,49 @@ export default function SApproval({
     [inbox]
   );
 
-  const subTitle = `내 결재 대기 ${inbox.length}건`;
-
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="전자결재"
-        sub={subTitle}
+        sub={`내 결재 대기 ${inbox.length}건`}
         actions={
-          <>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               type="button"
+              className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
               aria-label={searchOpen ? '검색 닫기' : '검색 열기'}
               aria-pressed={searchOpen}
               onClick={() => setSearchOpen((v) => !v)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 30,
+                height: 30,
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
-              <MIcon name="search" size={20} />
+              <MIcon name="search" size={15} color="var(--z-600)" />
             </button>
             <button
               type="button"
+              className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
               aria-label={`필터${activeFilterCount > 0 ? ` ${activeFilterCount}개 적용 중` : ''}`}
               aria-pressed={activeFilterCount > 0}
               onClick={() => setFilterOpen(true)}
-              style={{ position: 'relative' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 30,
+                height: 30,
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+              }}
             >
-              <MIcon name="filter" size={20} />
+              <MIcon name="filter" size={15} color="var(--z-600)" />
               {activeFilterCount > 0 && (
                 <span
                   aria-hidden="true"
@@ -166,14 +184,13 @@ export default function SApproval({
                     position: 'absolute',
                     top: -2,
                     right: -2,
-                    minWidth: 14,
-                    height: 14,
-                    padding: '0 3px',
+                    minWidth: 12,
+                    height: 12,
                     borderRadius: 999,
                     background: 'var(--m-accent)',
                     color: '#fff',
-                    fontSize: 9,
-                    fontWeight: 800,
+                    fontSize: 8,
+                    fontWeight: 900,
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -184,13 +201,41 @@ export default function SApproval({
                 </span>
               )}
             </button>
-            <button type="button" aria-label="새로고침" onClick={onRefresh}>
-              <MIcon name="refresh" size={20} />
+            <button
+              type="button"
+              className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+              aria-label="새로고침"
+              onClick={onRefresh}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 30,
+                height: 30,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <MIcon name="refresh" size={15} color="var(--z-600)" />
             </button>
-            <button type="button" aria-label="결재 작성" onClick={onNavWrite}>
-              <MIcon name="edit" size={20} />
+            <button
+              type="button"
+              className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+              aria-label="결재 작성"
+              onClick={onNavWrite}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 30,
+                height: 30,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <MIcon name="edit" size={15} color="var(--z-600)" />
             </button>
-          </>
+          </div>
         }
       />
 
@@ -203,14 +248,14 @@ export default function SApproval({
 
       {searchOpen && (
         <div
+          className="macos-glass"
           style={{
             height: 44,
             display: 'flex',
             alignItems: 'center',
             gap: 8,
             padding: '0 16px',
-            background: 'var(--m-card)',
-            borderBottom: '1px solid var(--m-border)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           }}
         >
           <MIcon name="search" size={16} color="var(--z-500)" />
@@ -237,63 +282,173 @@ export default function SApproval({
           />
           <button
             type="button"
+            className="transition-all active:scale-90"
             aria-label="검색 닫기"
             onClick={() => setSearchOpen(false)}
-            style={{ padding: 4, color: 'var(--z-500)' }}
+            style={{ padding: 4, color: 'var(--z-500)', background: 'transparent', border: 'none', cursor: 'pointer' }}
           >
             <MIcon name="x" size={18} />
           </button>
         </div>
       )}
 
-      <div className="m-chip-bar">
+      {/* 대 카테고리 가로 아크릴 칩 바 */}
+      <div
+        className="m-chip-bar macos-glass"
+        style={{
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          padding: '8px 16px',
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        }}
+      >
         <button
           type="button"
-          className="on"
+          className="macos-squircle-sm transition-all active:scale-95 duration-100"
           onClick={() => setSeg('inbox')}
           aria-label="결재함"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 900,
+            background: seg === 'inbox' ? '#007AFF' : 'rgba(255, 255, 255, 0.5)',
+            color: seg === 'inbox' ? '#fff' : 'var(--z-700)',
+            border: seg === 'inbox' ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            boxShadow: seg === 'inbox' ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
+          }}
         >
-          결재함<span className="cnt">{inbox.length}</span>
+          결재함<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{inbox.length}</span>
         </button>
-        <button type="button" onClick={onNavSent} aria-label="기안함">
-          기안함<span className="cnt">{sentCount}</span>
+        <button
+          type="button"
+          className="macos-squircle-sm transition-all active:scale-95 duration-100"
+          onClick={onNavSent}
+          aria-label="기안함"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 900,
+            background: 'rgba(255, 255, 255, 0.5)',
+            color: 'var(--z-700)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          기안함<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{sentCount}</span>
         </button>
-        <button type="button" onClick={onNavRef} aria-label="참조 문서함">
-          참조<span className="cnt">{refCount}</span>
+        <button
+          type="button"
+          className="macos-squircle-sm transition-all active:scale-95 duration-100"
+          onClick={onNavRef}
+          aria-label="참조 문서함"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 900,
+            background: 'rgba(255, 255, 255, 0.5)',
+            color: 'var(--z-700)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          참조<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{refCount}</span>
         </button>
-        <button type="button" onClick={onNavDocs} aria-label="문서 조회">
+        <button
+          type="button"
+          className="macos-squircle-sm transition-all active:scale-95 duration-100"
+          onClick={onNavDocs}
+          aria-label="문서 조회"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 900,
+            background: 'rgba(255, 255, 255, 0.5)',
+            color: 'var(--z-700)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
           문서 조회
         </button>
-        <button type="button" onClick={onNavWrite} aria-label="작성하기">
+        <button
+          type="button"
+          className="macos-squircle-sm transition-all active:scale-95 duration-100"
+          onClick={onNavWrite}
+          aria-label="작성하기"
+          style={{
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 900,
+            background: 'rgba(255, 255, 255, 0.5)',
+            color: 'var(--z-700)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
           작성
         </button>
       </div>
 
+      {/* 상태 세그먼트 전환 바 */}
       <div
         style={{
           padding: '10px 16px 6px',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          background: 'transparent',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
         }}
       >
-        <div className="m-seg" role="tablist" aria-label="결재 상태">
-          {(['inbox', 'progress', 'done'] as Seg[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={seg === s ? 'on' : ''}
-              onClick={() => setSeg(s)}
-              role="tab"
-              aria-selected={seg === s}
-            >
-              {SEG_LABEL[s]}{' '}
-              {s === 'inbox' ? inbox.length : s === 'progress' ? progress.length : done.length}
-            </button>
-          ))}
+        <div
+          role="tablist"
+          className="macos-glass macos-squircle"
+          style={{
+            display: 'flex',
+            padding: 3,
+            gap: 2,
+          }}
+        >
+          {(['inbox', 'progress', 'done'] as Seg[]).map((s) => {
+            const on = seg === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                className="transition-all duration-150 active:scale-[0.98]"
+                onClick={() => setSeg(s)}
+                role="tab"
+                aria-selected={on}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  padding: '7px 0',
+                  fontSize: 12,
+                  fontWeight: 900,
+                  borderRadius: 16,
+                  border: 'none',
+                  background: on ? '#fff' : 'transparent',
+                  color: on ? 'var(--z-900)' : 'var(--z-600)',
+                  boxShadow: on ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {SEG_LABEL[s]}{' '}
+                <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 2, fontWeight: 800 }}>
+                  {s === 'inbox' ? inbox.length : s === 'progress' ? progress.length : done.length}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {seg === 'inbox' && (
           <div style={{ padding: '12px 16px 0' }}>
             <div
@@ -319,18 +474,18 @@ export default function SApproval({
           }}
         >
           {loading && list.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
               불러오는 중…
             </div>
           )}
           {!loading && list.length === 0 && (
-            <MCard style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <MIcon
+            <MCard className="macos-glass macos-squircle" style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <span style={{ display: 'inline-flex', marginBottom: 8 }}><MIcon
                 name={searchQuery ? 'search' : activeFilterCount > 0 ? 'filter' : 'approval'}
                 size={24}
                 color="var(--z-400)"
-              />
-              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+              /></span>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)', lineHeight: 1.5 }}>
                 {searchQuery
                   ? `'${searchQuery}' 에 대한 결과가 없습니다`
                   : activeFilterCount > 0
@@ -356,4 +511,3 @@ export default function SApproval({
     </div>
   );
 }
-

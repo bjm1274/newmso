@@ -44,6 +44,8 @@ const FORM_CATEGORIES: FormCategory[] = [
     g: '인사/징계',
     items: [
       { slug: 'resignation', name: '사직서' },
+      { slug: 'retirement_pledge', name: '퇴직 서약서' },
+      { slug: 'severance_extension_agreement', name: '금품청산 지급기일 연장 동의서' },
       { slug: 'probation_evaluation', name: '수습직원평가서' },
       { slug: 'salary_increase_evaluation', name: '급여인상평가서' },
       { slug: 'contract_end_notice', name: '계약종료 통보' },
@@ -74,42 +76,75 @@ export type SApprovalWriteProps = {
 
 export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) {
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="결재 작성"
         sub="양식을 선택하세요"
         back={onBack}
         actions={
-          <button type="button" aria-label="검색">
-            <MIcon name="search" size={20} />
+          <button
+            type="button"
+            className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+            aria-label="검색"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="search" size={15} color="var(--z-600)" />
           </button>
         }
       />
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {FORM_CATEGORIES.map((cat) => (
-          <div key={cat.g} className="m-section">
-            <div className="m-section-h">
-              <div className="lbl">{cat.g}</div>
+          <div key={cat.g} className="m-section" style={{ background: 'transparent' }}>
+            <div className="m-section-h" style={{ background: 'transparent', padding: '8px 16px 4px' }}>
+              <div className="lbl" style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>{cat.g}</div>
             </div>
-            <MCard flush>
-              {cat.items.map((item) => (
+            <MCard
+              className="macos-glass macos-squircle"
+              style={{
+                overflow: 'hidden',
+                padding: 0,
+                margin: '0 16px',
+              }}
+            >
+              {cat.items.map((item, index) => (
                 <button
                   key={item.slug}
                   type="button"
-                  className="m-list-row"
-                  style={{ textAlign: 'left', width: '100%' }}
+                  className="m-list-row transition-all duration-150 active:bg-black/[0.04]"
+                  style={{
+                    textAlign: 'left',
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderBottom: index < cat.items.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    background: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderLeft: 'none',
+                    borderRight: 'none',
+                    borderTop: 'none',
+                  }}
                   onClick={() => onPick(item.slug, item.name)}
                   aria-label={`${item.name} 양식 선택`}
                 >
-                  <div className="ico-tile tone-accent">
-                    <MIcon name="fileText" size={18} />
+                  <div className="ico-tile tone-accent" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(0, 122, 255, 0.08)', color: '#007AFF' }}>
+                    <MIcon name="fileText" size={15} />
                   </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="lbl">{item.name}</div>
-                    <div className="sub">모바일에서 바로 작성</div>
+                  <div style={{ minWidth: 0, flex: 1, marginLeft: 12 }}>
+                    <div className="lbl" style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{item.name}</div>
+                    <div className="sub" style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800, marginTop: 2 }}>모바일에서 바로 작성</div>
                   </div>
-                  <MIcon name="chevR" size={18} color="var(--z-400)" />
+                  <MIcon name="chevR" size={15} color="var(--z-400)" />
                 </button>
               ))}
             </MCard>

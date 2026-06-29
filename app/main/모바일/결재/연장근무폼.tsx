@@ -173,7 +173,7 @@ export default function SApprovalOvertimeForm({
   }, [staffId, selectedRows, totalMinutes, approver, attachments, user, company, formSlug, formName, onSubmitted]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -182,13 +182,14 @@ export default function SApprovalOvertimeForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {/* 조회 */}
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="lbl" style={{ flex: 1 }}>연장근무 이력</div>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>연장근무 이력</div>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={loadOvertime}
               disabled={loading}
               aria-label="연장근무 이력 조회"
@@ -197,22 +198,32 @@ export default function SApprovalOvertimeForm({
                 alignItems: 'center',
                 gap: 4,
                 fontSize: 12,
-                fontWeight: 800,
+                fontWeight: 900,
                 color: 'var(--m-accent)',
                 padding: '4px 8px',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
               }}
             >
-              <MIcon name="refresh" size={14} />
+              <span style={{ display: 'inline-flex' }}><MIcon name="refresh" size={14} /></span>
               {loading ? '조회 중...' : '조회'}
             </button>
           </div>
-          <MCard flush>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             {!loaded ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
                 "조회"를 눌러 본인의 연장근무 이력을 불러오세요.
               </div>
             ) : records.length === 0 ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
                 최근 120일 내 연장근무 이력이 없습니다.
               </div>
             ) : (
@@ -233,8 +244,12 @@ export default function SApprovalOvertimeForm({
                           gap: 12,
                           alignItems: 'center',
                           padding: '12px 16px',
-                          borderBottom: i < records.length - 1 ? '1px solid var(--m-border)' : 'none',
-                          background: isSel ? 'var(--m-accent-soft)' : 'transparent',
+                          borderBottom: i < records.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
+                          background: isSel ? 'rgba(0, 122, 255, 0.06)' : 'transparent',
+                          cursor: 'pointer',
+                          borderLeft: 'none',
+                          borderRight: 'none',
+                          borderTop: 'none',
                         }}
                       >
                         <span
@@ -244,7 +259,7 @@ export default function SApprovalOvertimeForm({
                             height: 20,
                             borderRadius: 6,
                             border: isSel ? 'none' : '2px solid var(--z-300)',
-                            background: isSel ? 'var(--m-accent)' : 'transparent',
+                            background: isSel ? '#007AFF' : 'transparent',
                             display: 'grid',
                             placeItems: 'center',
                           }}
@@ -252,12 +267,12 @@ export default function SApprovalOvertimeForm({
                           {isSel && <MIcon name="check" size={14} color="#fff" />}
                         </span>
                         <span style={{ minWidth: 0 }}>
-                          <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>{r.date}</span>
-                          <span style={{ display: 'block', fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>
+                          <span style={{ display: 'block', fontSize: 14, fontWeight: 900, color: 'var(--z-900)' }}>{r.date}</span>
+                          <span style={{ display: 'block', fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 800 }}>
                             {timeOnly(r.checkIn)}~{timeOnly(r.checkOut)}
                           </span>
                         </span>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--m-accent)' }}>
+                        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--m-accent)' }}>
                           {hrs(r.minutes)}h
                         </span>
                       </button>
@@ -268,7 +283,7 @@ export default function SApprovalOvertimeForm({
             )}
           </MCard>
           {selectedRows.length > 0 && (
-            <div style={{ padding: '8px 16px 0', fontSize: 12, fontWeight: 700, color: 'var(--z-700)' }}>
+            <div style={{ padding: '8px 20px 0', fontSize: 12, fontWeight: 800, color: 'var(--z-700)' }}>
               선택 {selectedRows.length}건 · 총 {hrs(totalMinutes)}시간
             </div>
           )}
@@ -276,7 +291,7 @@ export default function SApprovalOvertimeForm({
 
         <ApproverLineSection approver={approver} staffId={staffId} company={company} />
 
-        <div className="m-section">
+        <div className="m-section" style={{ background: 'transparent', padding: '0 16px' }}>
           <AttachmentPicker onChange={setAttachments} />
         </div>
 

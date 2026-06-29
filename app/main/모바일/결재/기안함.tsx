@@ -109,33 +109,72 @@ export default function SApprovalSent({
   );
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="기안함"
         sub={`내가 올린 결재 · 총 ${rows.length}건`}
         back={onBack}
         actions={
-          <button type="button" aria-label="결재 작성" onClick={onWrite}>
-            <MIcon name="edit" size={20} />
+          <button
+            type="button"
+            className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+            aria-label="결재 작성"
+            onClick={onWrite}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="edit" size={15} color="var(--z-600)" />
           </button>
         }
       />
 
-      <div className="m-chip-bar">
-        {(['all', 'pending', 'approved', 'rejected'] as SentFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            className={filter === f ? 'on' : ''}
-            onClick={() => setFilter(f)}
-            aria-label={`${FILTER_LABEL[f]} 필터`}
-          >
-            {FILTER_LABEL[f]}<span className="cnt">{counts[f]}</span>
-          </button>
-        ))}
+      <div
+        className="m-chip-bar macos-glass"
+        style={{
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          padding: '8px 16px',
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {(['all', 'pending', 'approved', 'rejected'] as SentFilter[]).map((f) => {
+          const on = filter === f;
+          return (
+            <button
+              key={f}
+              type="button"
+              className="macos-squircle-sm transition-all active:scale-95 duration-100"
+              onClick={() => setFilter(f)}
+              aria-label={`${FILTER_LABEL[f]} 필터`}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 900,
+                background: on ? '#007AFF' : 'rgba(255, 255, 255, 0.5)',
+                color: on ? '#fff' : 'var(--z-700)',
+                border: on ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
+              }}
+            >
+              {FILTER_LABEL[f]}
+              <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{counts[f]}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         <div
           style={{
             padding: '14px 16px 16px',
@@ -145,14 +184,14 @@ export default function SApprovalSent({
           }}
         >
           {loading && filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
               불러오는 중…
             </div>
           )}
           {!loading && filtered.length === 0 && (
-            <MCard style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <MIcon name="edit" size={24} color="var(--z-400)" />
-              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+            <MCard className="macos-glass macos-squircle" style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <span style={{ display: 'inline-flex', marginBottom: 8 }}><MIcon name="edit" size={24} color="var(--z-400)" /></span>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)' }}>
                 기안 문서가 없습니다
               </div>
             </MCard>
@@ -167,28 +206,36 @@ export default function SApprovalSent({
               <button
                 key={row.id}
                 type="button"
-                className="m-card"
-                style={{ padding: '14px 16px', textAlign: 'left', width: '100%' }}
+                className="macos-glass macos-squircle transition-all duration-150 active:scale-[0.98]"
+                style={{
+                  padding: '14px 16px',
+                  textAlign: 'left',
+                  width: '100%',
+                  display: 'block',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  border: 'none',
+                }}
                 onClick={() => onOpen(row.id)}
                 aria-label={`${title} 상세 열기`}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <MChip tone={info.tone}>{info.label}</MChip>
                   <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
+                  <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{ts}</span>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.012em' }}>
+                <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: '-0.012em', color: 'var(--z-900)' }}>
                   {title}
                 </div>
                 {reject && (
-                  <div style={{ fontSize: 11, color: 'var(--m-danger)', fontWeight: 700, marginTop: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--m-danger)', fontWeight: 800, marginTop: 6 }}>
                     사유: {reject}
                   </div>
                 )}
                 {amount && (
                   <div
                     className="m-tnum"
-                    style={{ fontSize: 13, fontWeight: 800, marginTop: 8, color: 'var(--z-700)' }}
+                    style={{ fontSize: 13, fontWeight: 900, marginTop: 8, color: 'var(--z-700)' }}
                   >
                     ₩ {amount}
                   </div>

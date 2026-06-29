@@ -30,6 +30,7 @@ type ProblemDateItem = {
   label: string;
   checkIn?: string | null;
   checkOut?: string | null;
+  scheduledStart?: string | null;
 };
 
 type SApprovalAttendanceFixFormProps = {
@@ -83,6 +84,7 @@ export default function SApprovalAttendanceFixForm({
 
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
   const [problemDatesLoading, setProblemDatesLoading] = useState(false);
+  const [hasQueried, setHasQueried] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [correctionType, setCorrectionType] = useState(DEFAULT_CORRECTION_TYPE);
@@ -238,6 +240,13 @@ export default function SApprovalAttendanceFixForm({
         return startTime ? toMinutes(startTime) : null;
       };
 
+      const resolveScheduledStartTime = (dateStr: string): string | null => {
+        const sid = assignmentByDate.has(dateStr) ? assignmentByDate.get(dateStr) : defaultShiftId;
+        if (!sid || isOffShift(sid)) return null;
+        return String(shiftsMap.get(sid)?.start_time || '').trim() || null;
+      };
+
+      // 저장된 status에만 의존하지 않고, 실제 체크인(KST)이 예정 시작시각을 지났으면 지각으로 우선 표시.
       const isCheckInLate = (dateStr: string, checkInIso: string | null): boolean => {
         if (!checkInIso) return false;
         const startMin = resolveScheduledStartMin(dateStr);
@@ -261,6 +270,7 @@ export default function SApprovalAttendanceFixForm({
         const status = attendances?.status;
         const checkInIso = attendances?.check_in_time || attendance?.check_in || null;
         const checkOutIso = attendances?.check_out_time || attendance?.check_out || null;
+        const scheduledStart = resolveScheduledStartTime(dateStr);
 
         if (status !== 'absent' && attendance?.status !== '결근' && isCheckInLate(dateStr, checkInIso)) {
           nextProblemDates.set(dateStr, {
@@ -269,6 +279,7 @@ export default function SApprovalAttendanceFixForm({
             label: '지각',
             checkIn: checkInIso,
             checkOut: checkOutIso,
+            scheduledStart,
           });
           continue;
         }
@@ -282,6 +293,7 @@ export default function SApprovalAttendanceFixForm({
               label: '출퇴근 미체크',
               checkIn: null,
               checkOut: null,
+              scheduledStart,
             });
             continue;
           }
@@ -301,6 +313,7 @@ export default function SApprovalAttendanceFixForm({
             label: '결근',
             checkIn: checkInIso,
             checkOut: checkOutIso,
+            scheduledStart,
           });
           continue;
         }
@@ -312,6 +325,7 @@ export default function SApprovalAttendanceFixForm({
             label: '지각',
             checkIn: checkInIso,
             checkOut: checkOutIso,
+            scheduledStart,
           });
           continue;
         }
@@ -323,6 +337,7 @@ export default function SApprovalAttendanceFixForm({
             label: '조퇴',
             checkIn: checkInIso,
             checkOut: checkOutIso,
+            scheduledStart,
           });
           continue;
         }
@@ -334,6 +349,7 @@ export default function SApprovalAttendanceFixForm({
             label: '출퇴근 미체크',
             checkIn: null,
             checkOut: null,
+            scheduledStart,
           });
           continue;
         }
@@ -345,6 +361,7 @@ export default function SApprovalAttendanceFixForm({
             label: '출근 미기록',
             checkIn: null,
             checkOut: checkOutIso,
+            scheduledStart,
           });
         }
       }
@@ -352,16 +369,13 @@ export default function SApprovalAttendanceFixForm({
       setProblemDates(
         Array.from(nextProblemDates.values()).sort((a, b) => b.date.localeCompare(a.date)),
       );
+      setHasQueried(true);
     } catch (err) {
       console.error(err);
     } finally {
       setProblemDatesLoading(false);
     }
   }, [staffId]);
-
-  useEffect(() => {
-    fetchProblemDates();
-  }, [fetchProblemDates]);
 
   const toggleSelectedDate = (date: string) => {
     setSelectedDates((prev) =>
@@ -485,7 +499,7 @@ export default function SApprovalAttendanceFixForm({
   };
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MFormHeader
         onCancel={onCancel}
         title="출결정정 신청"
@@ -495,23 +509,25 @@ export default function SApprovalAttendanceFixForm({
         saveDisabled={!canSubmit || submitting}
       />
 
-      <div className="m-scroll">
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center' }}>
-            <div className="lbl" style={{ flex: 1 }}>정정 필요 날짜 (최근 60일)</div>
-            {problemDates.length > 0 && (
+      <div className="m-scroll" style={{ background: 'transparent' }}>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>정정 필요 날짜 (최근 60일)</div>
+            {hasQueried && !problemDatesLoading && problemDates.length > 0 && (
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button"
+                  className="transition-all active:scale-95"
                   onClick={handleSelectAll}
-                  style={{ fontSize: 11, fontWeight: 700, color: 'var(--m-accent)' }}
+                  style={{ fontSize: 11, fontWeight: 900, color: 'var(--m-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}
                 >
                   전체 선택
                 </button>
                 <button
                   type="button"
+                  className="transition-all active:scale-95"
                   onClick={handleClearAll}
-                  style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)' }}
+                  style={{ fontSize: 11, fontWeight: 900, color: 'var(--z-500)', background: 'transparent', border: 'none', cursor: 'pointer' }}
                 >
                   해제
                 </button>
@@ -519,24 +535,91 @@ export default function SApprovalAttendanceFixForm({
             )}
           </div>
 
-          {problemDatesLoading ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+          {!hasQueried && !problemDatesLoading ? (
+            <MCard
+              className="macos-glass macos-squircle"
+              style={{
+                margin: '0 16px',
+                padding: '24px 16px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  background: 'rgba(0, 122, 255, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 22,
+                }}
+              >
+                ⏰
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>출결 정정 대상 조회하기</div>
+                <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 4, fontWeight: 800, lineHeight: 1.5 }}>
+                  최근 60일간의 근태 기록을 분석하여 지각·조퇴·미체크 등 정정이 필요한 날짜들을 조회합니다.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={fetchProblemDates}
+                style={{
+                  marginTop: 4,
+                  padding: '10px 24px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: '#fff',
+                  background: '#007AFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                className="transition-all active:scale-95 duration-100"
+              >
+                조회하기
+              </button>
+            </MCard>
+          ) : problemDatesLoading ? (
+            <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
               출퇴근 기록 불러오는 중...
             </div>
           ) : problemDates.length === 0 ? (
-            <MCard style={{ padding: '24px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-500)' }}>
+            <MCard
+              className="macos-glass macos-squircle"
+              style={{
+                padding: '24px 16px',
+                textAlign: 'center',
+                margin: '0 16px',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-500)' }}>
                 정정 대상 기록이 없습니다.
               </div>
             </MCard>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, padding: '0 16px' }}>
               {problemDates.map((item) => {
                 const isSelected = selectedDates.includes(item.date);
                 const badge = REASON_BADGE[item.reason] ?? REASON_BADGE['미체크'];
                 const { short, day } = fmtDate(item.date);
                 const checkInTime = fmtTime(item.checkIn);
                 const checkOutTime = fmtTime(item.checkOut);
+                const schedStart = item.scheduledStart ? item.scheduledStart.slice(0, 5) : null;
+
+                let displayLabel = item.label;
+                if (item.reason === '지각' && schedStart && checkInTime) {
+                  displayLabel = `지각 (예정: ${schedStart} / 출근: ${checkInTime})`;
+                } else if (item.reason === '조퇴' && checkOutTime) {
+                  displayLabel = `조퇴 (퇴근: ${checkOutTime})`;
+                }
 
                 return (
                   <button
@@ -551,23 +634,25 @@ export default function SApprovalAttendanceFixForm({
                       padding: 12,
                       borderRadius: 12,
                       border: isSelected
-                        ? '2px solid var(--m-accent)'
-                        : '1px solid var(--m-border)',
+                        ? '2px solid #007AFF'
+                        : '1px solid rgba(255, 255, 255, 0.35)',
                       background: isSelected
-                        ? 'var(--m-accent-soft, #f0f7ff)'
-                        : 'var(--m-card)',
+                        ? 'rgba(0, 122, 255, 0.06)'
+                        : 'rgba(255, 255, 255, 0.45)',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                       textAlign: 'left',
+                      cursor: 'pointer',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 14, fontWeight: 800 }}>{short} ({day})</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--z-900)' }}>{short} ({day})</span>
                       <div
                         style={{
                           width: 14,
                           height: 14,
                           borderRadius: 4,
                           border: '1px solid var(--m-border)',
-                          background: isSelected ? 'var(--m-accent)' : 'transparent',
+                          background: isSelected ? '#007AFF' : 'transparent',
                         }}
                       />
                     </div>
@@ -577,14 +662,15 @@ export default function SApprovalAttendanceFixForm({
                         padding: '2px 6px',
                         borderRadius: 4,
                         fontSize: 10,
-                        fontWeight: 800,
+                        fontWeight: 900,
                         alignSelf: 'flex-start',
                         color: 'inherit',
                       }}
                     >
-                      {badge.icon} {item.label}
+                      {badge.icon} {displayLabel}
                     </span>
-                    <div style={{ fontSize: 10, color: 'var(--z-500)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {schedStart && <div style={{ color: '#007AFF', fontWeight: 900 }}>예정: {schedStart}</div>}
                       {checkInTime && <div>출근: {checkInTime}</div>}
                       {checkOutTime && <div>퇴근: {checkOutTime}</div>}
                       {!checkInTime && !checkOutTime && <div>기록 없음</div>}
@@ -598,7 +684,13 @@ export default function SApprovalAttendanceFixForm({
 
         {selectedDates.length > 0 && (
           <>
-            <div className="m-section">
+            <div
+              className="macos-glass macos-squircle"
+              style={{
+                margin: '16px',
+                overflow: 'hidden',
+              }}
+            >
               <MField label="정정 유형">
                 <MSegRow
                   value={correctionType}
@@ -623,32 +715,44 @@ export default function SApprovalAttendanceFixForm({
                     width: '100%',
                     padding: '8px 0',
                     fontSize: 14,
+                    fontWeight: 600,
                     fontFamily: 'inherit',
                     resize: 'none',
                     color: 'var(--z-900)',
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
                   }}
                 />
               </MField>
             </div>
 
             {/* 결재선 미리보기 */}
-            <div className="m-section">
-              <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="lbl" style={{ flex: 1 }}>
+            <div className="m-section" style={{ background: 'transparent' }}>
+              <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+                <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>
                   결재선 ({approverManual ? '직접 지정' : '자동 매핑'})
                 </div>
                 <button
                   type="button"
+                  className="transition-all active:scale-95"
                   onClick={() => setPickerOpen(true)}
                   aria-label="결재선 변경"
-                  style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+                  style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
                 >
                   변경
                 </button>
               </div>
-              <MCard flush>
+              <MCard
+                className="macos-glass macos-squircle"
+                style={{
+                  overflow: 'hidden',
+                  margin: '0 16px',
+                  padding: 0,
+                }}
+              >
                 {approverLoading ? (
-                  <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+                  <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
                     결재선을 불러오는 중...
                   </div>
                 ) : approverLine.length === 0 ? (
@@ -657,7 +761,7 @@ export default function SApprovalAttendanceFixForm({
                       padding: '14px 16px',
                       background: 'var(--m-warning-soft)',
                       fontSize: 12,
-                      fontWeight: 700,
+                      fontWeight: 800,
                       color: 'var(--m-warning)',
                       lineHeight: 1.55,
                     }}
@@ -678,21 +782,21 @@ export default function SApprovalAttendanceFixForm({
                             gridTemplateColumns: '40px 1fr auto',
                             gap: 12,
                             padding: '12px 16px',
-                            borderBottom: i < approverLine.length - 1 ? '1px solid var(--m-border)' : 'none',
+                            borderBottom: i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
                             alignItems: 'center',
                           }}
                         >
                           <MAvatar tone="violet" size="sm">
                             {(a.name || '?').charAt(0)}
                           </MAvatar>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{stepLabel}</div>
-                            <div style={{ fontSize: 14, fontWeight: 800, marginTop: 1 }}>{a.name}</div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{stepLabel}</div>
+                            <div style={{ fontSize: 14, fontWeight: 900, marginTop: 1, color: 'var(--z-900)' }}>{a.name}</div>
                             {dept && (
-                              <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>{dept}</div>
+                              <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 700 }}>{dept}</div>
                             )}
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700 }}>대기</div>
+                          <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>대기</div>
                         </li>
                       );
                     })}
@@ -702,21 +806,29 @@ export default function SApprovalAttendanceFixForm({
             </div>
 
             {/* 참조(CC) — 선택 사항 */}
-            <div className="m-section">
-              <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div className="lbl" style={{ flex: 1 }}>참조 ({ccUsers.length})</div>
+            <div className="m-section" style={{ background: 'transparent' }}>
+              <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+                <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>참조 ({ccUsers.length})</div>
                 <button
                   type="button"
+                  className="transition-all active:scale-95"
                   onClick={() => setCcPickerOpen(true)}
                   aria-label="참조자 추가 또는 변경"
-                  style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+                  style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
                 >
                   {ccUsers.length > 0 ? '변경' : '추가'}
                 </button>
               </div>
-              <MCard flush>
+              <MCard
+                className="macos-glass macos-squircle"
+                style={{
+                  overflow: 'hidden',
+                  margin: '0 16px',
+                  padding: 0,
+                }}
+              >
                 {ccUsers.length === 0 ? (
-                  <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.55 }}>
+                  <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
                     참조 지정 시 문서가 참조로 공유됩니다.
                   </div>
                 ) : (
@@ -726,19 +838,19 @@ export default function SApprovalAttendanceFixForm({
                       return (
                         <li
                           key={c.id}
+                          className="macos-glass"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 8,
                             padding: '6px 12px 6px 6px',
-                            border: '1px solid var(--m-border)',
                             borderRadius: 999,
                           }}
                         >
                           <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                           <span style={{ minWidth: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800 }}>{c.name}</span>
-                            {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6 }}>{dept}</span>}
+                            <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>
+                            {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6, fontWeight: 800 }}>{dept}</span>}
                           </span>
                         </li>
                       );

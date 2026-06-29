@@ -15,6 +15,7 @@ type ProblemDateItem = {
   label: string;
   checkIn?: string | null;
   checkOut?: string | null;
+  scheduledStart?: string | null;
 };
 
 type AttendanceCorrectionFormProps = {
@@ -79,6 +80,7 @@ export default function AttendanceCorrectionForm({
   const [corrections, setCorrections] = useState<any[]>([]);
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
   const [problemDatesLoading, setProblemDatesLoading] = useState(false);
+  const [hasQueried, setHasQueried] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [correctionType, setCorrectionType] = useState(DEFAULT_CORRECTION_TYPE);
@@ -208,6 +210,13 @@ export default function AttendanceCorrectionForm({
         const [h, m] = String(hhmm || '').slice(0, 5).split(':').map(Number);
         return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
       };
+
+      const resolveScheduledStartTime = (dateStr: string): string | null => {
+        const shiftId = assignmentByDate.has(dateStr) ? assignmentByDate.get(dateStr) : defaultShiftId;
+        if (!shiftId || isOffShift(shiftId)) return null;
+        return String(shiftsMap.get(shiftId)?.start_time || '').trim() || null;
+      };
+
       // 해당 날짜의 예정 근무 시작(분). OFF/미해석이면 null.
       const resolveScheduledStartMin = (dateStr: string): number | null => {
         const shiftId = assignmentByDate.has(dateStr) ? assignmentByDate.get(dateStr) : defaultShiftId;
@@ -242,10 +251,11 @@ export default function AttendanceCorrectionForm({
         const status = attendances?.status;
         const checkInIso = attendances?.check_in_time || attendance?.check_in || null;
         const checkOutIso = attendances?.check_out_time || attendance?.check_out || null;
+        const scheduledStart = resolveScheduledStartTime(dateStr);
 
         // 결근이 아닌데 실제 체크인이 예정 시작시각을 지났으면 지각으로 우선 표시.
         if (status !== 'absent' && attendance?.status !== '결근' && isCheckInLate(dateStr, checkInIso)) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
           continue;
         }
 
@@ -259,6 +269,7 @@ export default function AttendanceCorrectionForm({
               label: '출퇴근 미체크',
               checkIn: null,
               checkOut: null,
+              scheduledStart,
             });
             continue;
           }
@@ -271,31 +282,32 @@ export default function AttendanceCorrectionForm({
         ) continue;
 
         if (status === 'absent') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근', checkIn: checkInIso, checkOut: checkOutIso });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
           continue;
         }
 
         if (status === 'late' || attendance?.status === '지각') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
           continue;
         }
 
         if (status === 'early_leave' || attendance?.status === '조퇴') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '조퇴', label: '조퇴', checkIn: checkInIso, checkOut: checkOutIso });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '조퇴', label: '조퇴', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
           continue;
         }
 
         if (!attendance && !attendances) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크', checkIn: null, checkOut: null });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크', checkIn: null, checkOut: null, scheduledStart });
           continue;
         }
 
         if (!checkInIso) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미출근', label: '출근 미기록', checkIn: null, checkOut: checkOutIso });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '미출근', label: '출근 미기록', checkIn: null, checkOut: checkOutIso, scheduledStart });
         }
       }
 
       setProblemDates(Array.from(nextProblemDates.values()).sort((a, b) => b.date.localeCompare(a.date)));
+      setHasQueried(true);
     } finally {
       setProblemDatesLoading(false);
     }
@@ -306,8 +318,10 @@ export default function AttendanceCorrectionForm({
   }, [fetchCorrections]);
 
   useEffect(() => {
-    fetchProblemDates();
-  }, [fetchProblemDates]);
+    if (Array.isArray(initialSelectedDates) && initialSelectedDates.length > 0) {
+      fetchProblemDates();
+    }
+  }, [initialSelectedDates, fetchProblemDates]);
 
   useEffect(() => {
     if (!Array.isArray(initialSelectedDates) || initialSelectedDates.length === 0) return;
@@ -485,36 +499,64 @@ export default function AttendanceCorrectionForm({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-[var(--foreground)]">정정 필요 날짜</span>
                   <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">최근 60일</span>
-                  {!problemDatesLoading && problemDates.length > 0 && (
+                  {hasQueried && !problemDatesLoading && problemDates.length > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold">
                       {problemDates.length}건
                     </span>
                   )}
                 </div>
-                {problemDates.length > 0 && (
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  {hasQueried && !problemDatesLoading && (
                     <button
                       type="button"
-                      onClick={selectAll}
+                      onClick={fetchProblemDates}
                       className="text-[10px] font-bold text-[var(--accent)] hover:underline"
                     >
-                      전체 선택
+                      다시 조회
                     </button>
-                    {selectedDates.length > 0 && (
+                  )}
+                  {hasQueried && !problemDatesLoading && problemDates.length > 0 && (
+                    <div className="flex items-center gap-2 border-l border-[var(--border)] pl-3">
                       <button
                         type="button"
-                        onClick={clearAll}
-                        className="text-[10px] font-bold text-[var(--toss-gray-3)] hover:underline"
+                        onClick={selectAll}
+                        className="text-[10px] font-bold text-[var(--accent)] hover:underline"
                       >
-                        선택 해제
+                        전체 선택
                       </button>
-                    )}
-                  </div>
-                )}
+                      {selectedDates.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearAll}
+                          className="text-[10px] font-bold text-[var(--toss-gray-3)] hover:underline"
+                        >
+                          선택 해제
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {problemDatesLoading ? (
-                <div className="flex items-center gap-2 px-4 py-6 text-sm font-bold text-[var(--toss-gray-3)]">
+              {!hasQueried && !problemDatesLoading ? (
+                <div className="flex flex-col items-center justify-center p-8 text-center bg-[var(--tab-bg)]/30 border border-dashed border-[var(--border)] rounded-b-[var(--radius-md)]">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+                    <span className="text-xl">⏰</span>
+                  </div>
+                  <h5 className="text-xs font-black text-[var(--foreground)]">출결 정정 대상 조회하기</h5>
+                  <p className="mt-1 max-w-[320px] text-[10px] font-medium text-[var(--toss-gray-3)] leading-relaxed">
+                    조회 버튼을 클릭하면 최근 60일간의 근태 기록(출퇴근 로그)을 분석하여 지각·조퇴·미체크 등 정정이 필요한 내역을 불러옵니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fetchProblemDates}
+                    className="mt-4 min-h-[38px] rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+                  >
+                    조회하기
+                  </button>
+                </div>
+              ) : problemDatesLoading ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-bold text-[var(--toss-gray-3)]">
                   <span className="animate-spin text-base">⏳</span> 출퇴근 기록 불러오는 중...
                 </div>
               ) : problemDates.length === 0 ? (

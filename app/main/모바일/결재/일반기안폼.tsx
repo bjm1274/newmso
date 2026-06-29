@@ -162,7 +162,7 @@ export default function SApprovalGenericForm({
   ]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -171,8 +171,15 @@ export default function SApprovalGenericForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll">
-        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+      <div className="m-scroll" style={{ background: 'transparent' }}>
+        {/* 양식 입력란 macos-glass 위젯화 */}
+        <div
+          className="macos-glass macos-squircle"
+          style={{
+            margin: '16px',
+            overflow: 'hidden',
+          }}
+        >
           {showTitleInput && (
             <MField label="제목" required htmlFor={fieldId('title')}>
               <MInput
@@ -205,9 +212,13 @@ export default function SApprovalGenericForm({
                   width: '100%',
                   padding: '8px 0',
                   fontSize: 14,
+                  fontWeight: 600,
                   fontFamily: 'inherit',
                   resize: 'none',
                   color: 'var(--z-900)',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
                 }}
               />
             </MField>
@@ -215,23 +226,31 @@ export default function SApprovalGenericForm({
         </div>
 
         {/* 결재선 미리보기 */}
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="lbl" style={{ flex: 1 }}>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>
               결재선 ({approverManual ? '직접 지정' : '자동 매핑'})
             </div>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={() => setPickerOpen(true)}
               aria-label="결재선 변경"
-              style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+              style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               변경
             </button>
           </div>
-          <MCard flush>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             {approverLoading ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)' }}>
+              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
                 결재선을 불러오는 중...
               </div>
             ) : approverLine.length === 0 ? (
@@ -240,7 +259,7 @@ export default function SApprovalGenericForm({
                   padding: '14px 16px',
                   background: 'var(--m-warning-soft)',
                   fontSize: 12,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: 'var(--m-warning)',
                   lineHeight: 1.55,
                 }}
@@ -262,28 +281,28 @@ export default function SApprovalGenericForm({
                         gridTemplateColumns: '40px 1fr auto',
                         gap: 12,
                         padding: '12px 16px',
-                        borderBottom: i < approverLine.length - 1 ? '1px solid var(--m-border)' : 'none',
+                        borderBottom: i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
                         alignItems: 'center',
                       }}
                     >
                       <MAvatar tone="violet" size="sm">
                         {(a.name || '?').charAt(0)}
                       </MAvatar>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{stepLabel}</div>
-                        <div style={{ fontSize: 14, fontWeight: 800, marginTop: 1 }}>{a.name}</div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{stepLabel}</div>
+                        <div style={{ fontSize: 14, fontWeight: 900, marginTop: 1, color: 'var(--z-900)' }}>{a.name}</div>
                         {dept && (
-                          <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>{dept}</div>
+                          <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 700 }}>{dept}</div>
                         )}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700 }}>대기</div>
+                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>대기</div>
                     </li>
                   );
                 })}
               </ol>
             )}
           </MCard>
-          <div style={{ padding: '6px 16px 0', fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+          <div style={{ padding: '6px 20px 0', fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
             {approverManual
               ? '결재선을 직접 지정했습니다. "기본값으로" 버튼으로 되돌릴 수 있어요.'
               : '직급 위계에 따라 자동 매핑되었습니다. "변경"으로 수정할 수 있어요.'}
@@ -291,21 +310,29 @@ export default function SApprovalGenericForm({
         </div>
 
         {/* 참조(CC) — 선택 사항 */}
-        <div className="m-section">
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="lbl" style={{ flex: 1 }}>참조 ({ccUsers.length})</div>
+        <div className="m-section" style={{ background: 'transparent' }}>
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
+            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>참조 ({ccUsers.length})</div>
             <button
               type="button"
+              className="transition-all active:scale-95"
               onClick={() => setCcPickerOpen(true)}
               aria-label="참조자 추가 또는 변경"
-              style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', padding: '4px 8px' }}
+              style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               {ccUsers.length > 0 ? '변경' : '추가'}
             </button>
           </div>
-          <MCard flush>
+          <MCard
+            className="macos-glass macos-squircle"
+            style={{
+              overflow: 'hidden',
+              margin: '0 16px',
+              padding: 0,
+            }}
+          >
             {ccUsers.length === 0 ? (
-              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.55 }}>
+              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
                 참조자는 선택 사항입니다. 지정하면 해당 직원에게 문서가 참조로 공유됩니다.
               </div>
             ) : (
@@ -315,19 +342,19 @@ export default function SApprovalGenericForm({
                   return (
                     <li
                       key={c.id}
+                      className="macos-glass"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 8,
                         padding: '6px 12px 6px 6px',
-                        border: '1px solid var(--m-border)',
                         borderRadius: 999,
                       }}
                     >
                       <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                       <span style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 800 }}>{c.name}</span>
-                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6 }}>{dept}</span>}
+                        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>
+                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6, fontWeight: 800 }}>{dept}</span>}
                       </span>
                     </li>
                   );
@@ -338,7 +365,7 @@ export default function SApprovalGenericForm({
         </div>
 
         {/* 첨부 파일 */}
-        <div className="m-section">
+        <div className="m-section" style={{ background: 'transparent', padding: '0 16px' }}>
           <AttachmentPicker onChange={setAttachments} />
         </div>
 

@@ -55,8 +55,6 @@ export default function SApprovalRef({
     const ids = rows.map((r) => String(r.id));
     (async () => {
       try {
-        // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)
-        // approval_id 는 metadata JSON 안에 있고, 읽음 여부는 read_at 존재로 판별한다.
         const idSet = new Set(ids);
         const { data, error } = await d1.from('notifications')
           .select('metadata, read_at')
@@ -84,7 +82,7 @@ export default function SApprovalRef({
         }
         setReadMap(map);
       } catch {
-        // silent — 읽음 표시가 없어도 화면 동작
+        // silent
       }
     })();
     return () => {
@@ -97,35 +95,54 @@ export default function SApprovalRef({
   }, [rows, readMap]);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="참조 문서함"
         sub={`내가 참조 · ${unreadCount}건 미열람`}
         back={onBack}
         actions={
-          <button type="button" aria-label="필터">
-            <MIcon name="filter" size={20} />
+          <button
+            type="button"
+            className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+            aria-label="필터"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="filter" size={15} color="var(--z-600)" />
           </button>
         }
       />
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         <div style={{ padding: '14px 16px 16px' }}>
           {loading && rows.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
               불러오는 중…
             </div>
           )}
           {!loading && rows.length === 0 && (
-            <MCard style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <MIcon name="fileText" size={24} color="var(--z-400)" />
-              <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+            <MCard className="macos-glass macos-squircle" style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <span style={{ display: 'inline-flex', marginBottom: 8 }}><MIcon name="fileText" size={24} color="var(--z-400)" /></span>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)' }}>
                 참조 문서가 없습니다
               </div>
             </MCard>
           )}
           {rows.length > 0 && (
-            <MCard flush>
+            <MCard
+              className="macos-glass macos-squircle"
+              style={{
+                overflow: 'hidden',
+                padding: 0,
+              }}
+            >
               {rows.map((row) => {
                 const read = Boolean(readMap[String(row.id)]);
                 const tone = iconTone(row.status);
@@ -137,25 +154,37 @@ export default function SApprovalRef({
                   <button
                     key={row.id}
                     type="button"
-                    className="m-list-row"
+                    className="m-list-row transition-all duration-150 active:bg-black/[0.04]"
                     style={{
-                      background: read ? 'transparent' : 'var(--m-accent-soft)',
+                      background: read ? 'transparent' : 'rgba(0, 122, 255, 0.05)',
                       textAlign: 'left',
                       width: '100%',
+                      padding: '12px 16px',
+                      borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      borderLeft: 'none',
+                      borderRight: 'none',
+                      borderTop: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
                     }}
                     onClick={() => onOpen(row.id)}
                     aria-label={`${title} 참조 문서 열기${read ? '' : ', 미열람'}`}
                   >
-                    <div className={`ico-tile tone-${tone}`}>
+                    <div className={`ico-tile tone-${tone}`} aria-hidden="true" style={{ borderRadius: 8 }}>
                       <MIcon name="fileText" size={18} />
                     </div>
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, flex: 1, marginLeft: 12 }}>
                       <div className="lbl" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span
                           style={{
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            fontSize: 13,
+                            fontWeight: 900,
+                            color: 'var(--z-900)',
                           }}
                         >
                           {title}
@@ -167,19 +196,19 @@ export default function SApprovalRef({
                               width: 6,
                               height: 6,
                               borderRadius: 999,
-                              background: 'var(--m-accent)',
+                              background: '#007AFF',
                               flexShrink: 0,
                             }}
                           />
                         )}
                       </div>
-                      <div className="sub">
+                      <div className="sub" style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800, marginTop: 2 }}>
                         {sender}
                         {dept ? ` · ${dept}` : ''}
                         {ts ? ` · ${ts}` : ''}
                       </div>
                     </div>
-                    <MIcon name="chevR" size={18} color="var(--z-400)" />
+                    <MIcon name="chevR" size={15} color="var(--z-400)" />
                   </button>
                 );
               })}

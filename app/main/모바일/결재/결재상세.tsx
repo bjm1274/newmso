@@ -1,5 +1,4 @@
 'use client';
-// touch v2: force Turbopack chunk invalidation (2026-05-27 build cache stale)
 
 /**
  * SApprovalDetail — 결재 상세 (양식/결재선/코멘트 3 segment + sticky 푸터)
@@ -56,6 +55,11 @@ function pickAvatarTone(seed: string | null | undefined): MAvatarTone {
   return AVATAR_TONES[hash % AVATAR_TONES.length];
 }
 
+// MIcon span 래핑 경고 해결을 위해 helper
+function IconLabel({ name, size = 15, color }: { name: string; size?: number; color?: string }) {
+  return <span style={{ display: 'inline-flex' }}><MIcon name={name} size={size} color={color} /></span>;
+}
+
 function formatDateTime(iso?: string | null): string {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -96,40 +100,6 @@ function readHistory(row: ApprovalRow | null): CommentEntry[] {
       } as CommentEntry;
     })
     .filter((entry): entry is CommentEntry => entry !== null);
-}
-
-function readFormFields(row: ApprovalRow): Array<{ label: string; value: string; big?: boolean }> {
-  const meta = (row.meta_data ?? {}) as Record<string, unknown>;
-  const fields = meta.fields ?? meta.form_fields ?? meta.summary;
-  const rows: Array<{ label: string; value: string; big?: boolean }> = [];
-
-  if (Array.isArray(fields)) {
-    for (const f of fields) {
-      if (f && typeof f === 'object') {
-        const obj = f as Record<string, unknown>;
-        const label = String(obj.label ?? obj.name ?? '').trim();
-        const value = obj.value ?? obj.text;
-        if (label && value != null) {
-          rows.push({ label, value: String(value), big: false });
-        }
-      }
-    }
-  } else if (fields && typeof fields === 'object') {
-    for (const [key, value] of Object.entries(fields as Record<string, unknown>)) {
-      if (value == null || typeof value === 'object') continue;
-      rows.push({ label: key, value: String(value), big: false });
-    }
-  }
-
-  // 금액 강조
-  const amount = meta.total_amount ?? meta.amount;
-  if (amount != null) {
-    const num = typeof amount === 'number' ? amount : Number(String(amount).replace(/[^0-9.-]/g, ''));
-    if (Number.isFinite(num) && num !== 0) {
-      rows.push({ label: '금액', value: `₩ ${num.toLocaleString('ko-KR')}`, big: true });
-    }
-  }
-  return rows;
 }
 
 function statusChipTone(status?: string | null): MChipTone {
@@ -294,10 +264,10 @@ export default function SApprovalDetail({
 
   if (!row) {
     return (
-      <div className="m-screen">
+      <div className="m-screen" style={{ background: 'transparent' }}>
         <MobileHeader title="결재 상세" back={onBack} />
-        <div className="m-scroll">
-          <div style={{ textAlign: 'center', padding: '40px 16px', fontSize: 13, color: 'var(--z-500)' }}>
+        <div className="m-scroll" style={{ background: 'transparent' }}>
+          <div style={{ textAlign: 'center', padding: '40px 16px', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
             결재 문서를 불러오는 중…
           </div>
         </div>
@@ -309,14 +279,27 @@ export default function SApprovalDetail({
   const title = String(row.title || formName);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'transparent' }}>
       <MobileHeader
         title="결재 상세"
         sub={title}
         back={onBack}
         actions={
-          <button type="button" aria-label="더보기">
-            <MIcon name="moreV" size={20} />
+          <button
+            type="button"
+            className="macos-glass macos-squircle-sm transition-all active:scale-95 duration-100"
+            aria-label="더보기"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="moreV" size={15} color="var(--z-600)" />
           </button>
         }
       />
@@ -324,42 +307,57 @@ export default function SApprovalDetail({
       <div
         style={{
           padding: '10px 16px 0',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          background: 'transparent',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
         }}
       >
-        <div className="m-seg" role="tablist" aria-label="결재 상세 탭">
-          <button
-            type="button"
-            className={tab === 'form' ? 'on' : ''}
-            onClick={() => setTab('form')}
-            role="tab"
-            aria-selected={tab === 'form'}
-          >
-            양식
-          </button>
-          <button
-            type="button"
-            className={tab === 'line' ? 'on' : ''}
-            onClick={() => setTab('line')}
-            role="tab"
-            aria-selected={tab === 'line'}
-          >
-            결재선
-          </button>
-          <button
-            type="button"
-            className={tab === 'comment' ? 'on' : ''}
-            onClick={() => setTab('comment')}
-            role="tab"
-            aria-selected={tab === 'comment'}
-          >
-            코멘트 {comments.length || ''}
-          </button>
+        {/* 아크릴 세그먼트 탭바 */}
+        <div
+          role="tablist"
+          className="macos-glass macos-squircle"
+          aria-label="결재 상세 탭"
+          style={{
+            display: 'flex',
+            padding: 3,
+            gap: 2,
+          }}
+        >
+          {([
+            { id: 'form', label: '양식' },
+            { id: 'line', label: '결재선' },
+            { id: 'comment', label: `코멘트 ${comments.length || ''}` },
+          ] as const).map((t) => {
+            const on = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className="transition-all duration-150 active:scale-[0.98]"
+                onClick={() => setTab(t.id)}
+                role="tab"
+                aria-selected={on}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  padding: '7px 0',
+                  fontSize: 12,
+                  fontWeight: 900,
+                  borderRadius: 16,
+                  border: 'none',
+                  background: on ? '#fff' : 'transparent',
+                  color: on ? 'var(--z-900)' : 'var(--z-600)',
+                  boxShadow: on ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {tab === 'form' && (
           <FormTab row={row} title={title} formName={formName} staffMap={staffMap} />
         )}
@@ -371,7 +369,15 @@ export default function SApprovalDetail({
         )}
       </div>
 
-      <div className="m-sticky-foot">
+      {/* 푸터 영역 햅틱 아크릴 바 */}
+      <div
+        className="m-sticky-foot macos-glass"
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.4)',
+          boxShadow: '0 -4px 16px rgba(0,0,0,0.03)',
+          padding: '12px 16px 14px',
+        }}
+      >
         {canApprove ? (
           <>
             <MBtn block variant="danger" disabled={busy !== 'none'} onClick={() => setSheetAction('reject')}>
@@ -401,7 +407,7 @@ export default function SApprovalDetail({
             <MBtn block onClick={onBack}>
               닫기
             </MBtn>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 4, fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 4, fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
               <MChip tone={statusChipTone(status)}>{status || '상태 없음'}</MChip>
             </div>
           </>
@@ -431,7 +437,7 @@ export default function SApprovalDetail({
           }
           style={{ padding: '4px 20px 20px' }}
         >
-          <div style={{ fontSize: 12, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.6, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--z-600)', fontWeight: 800, lineHeight: 1.6, marginBottom: 12 }}>
             {sheetAction === 'approve'
               ? '승인 시 다음 결재자에게 자동 전달됩니다. 코멘트는 선택입니다.'
               : sheetAction === 'recall'
@@ -456,10 +462,11 @@ export default function SApprovalDetail({
             style={{
               width: '100%',
               padding: '10px 12px',
-              background: 'var(--m-bg)',
+              background: 'rgba(0, 0, 0, 0.02)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
               borderRadius: 10,
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               lineHeight: 1.55,
               resize: 'none',
               minHeight: 96,
@@ -573,7 +580,6 @@ function FormTab({
   );
 }
 
-
 // ─────────────────────────────────────────────
 // 하위 — 결재선 탭
 // ─────────────────────────────────────────────
@@ -591,7 +597,6 @@ function LineTab({
   staffMap: Record<string, StaffMember>;
   staffId: string | null;
 }) {
-  // 기안자 + 결재선을 timeline 으로 합성
   type Step = {
     id: string;
     who: string;
@@ -650,13 +655,19 @@ function LineTab({
   return (
     <div style={{ padding: '14px 16px 0' }}>
       {steps.length === 0 ? (
-        <MCard style={{ padding: '24px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+        <MCard className="macos-glass macos-squircle" style={{ textAlign: 'center', padding: '24px 16px' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)' }}>
             결재선이 지정되지 않았습니다
           </div>
         </MCard>
       ) : (
-        <MCard flush>
+        <MCard
+          className="macos-glass macos-squircle"
+          style={{
+            overflow: 'hidden',
+            padding: 0,
+          }}
+        >
           <ol style={{ listStyle: 'none' }} aria-label="결재 진행 순서">
             {steps.map((l, i) => (
               <li
@@ -666,7 +677,7 @@ function LineTab({
                   gridTemplateColumns: '48px 1fr auto',
                   gap: 12,
                   padding: '14px 16px',
-                  borderBottom: i < steps.length - 1 ? '1px solid var(--m-border)' : 'none',
+                  borderBottom: i < steps.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
                   position: 'relative',
                 }}
               >
@@ -683,22 +694,22 @@ function LineTab({
                         top: 32,
                         bottom: -14,
                         width: 1,
-                        background: 'var(--m-border)',
+                        background: 'rgba(0, 0, 0, 0.08)',
                         transform: 'translateX(-50%)',
                       }}
                     />
                   )}
                 </div>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{l.step}</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, marginTop: 1 }}>{l.who}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{l.step}</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, marginTop: 1, color: 'var(--z-900)' }}>{l.who}</div>
                   {l.dept && (
-                    <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1 }}>{l.dept}</div>
+                    <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 600 }}>{l.dept}</div>
                   )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <MChip tone={l.tone}>{l.state}</MChip>
-                  <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 700, marginTop: 4 }}>
                     {l.ts}
                   </div>
                 </div>
@@ -727,9 +738,9 @@ function CommentTab({
   return (
     <div style={{ padding: '14px 16px 0' }}>
       {filtered.length === 0 ? (
-        <MCard style={{ padding: '24px 16px', textAlign: 'center' }}>
-          <MIcon name="chat" size={24} color="var(--z-400)" />
-          <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--z-600)' }}>
+        <MCard className="macos-glass macos-squircle" style={{ padding: '24px 16px', textAlign: 'center' }}>
+          <IconLabel name="chat" size={24} color="var(--z-400)" />
+          <div style={{ marginTop: 8, fontSize: 13, fontWeight: 800, color: 'var(--z-600)' }}>
             코멘트가 없습니다
           </div>
         </MCard>
@@ -738,14 +749,23 @@ function CommentTab({
           const name = c.actor_name || (c.actor_id ? staffMap[c.actor_id]?.name : '') || '시스템';
           const tone = pickAvatarTone(c.actor_id || name);
           return (
-            <div key={c.id} style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            <div
+              key={c.id}
+              className="macos-glass macos-squircle"
+              style={{
+                display: 'flex',
+                gap: 10,
+                marginBottom: 12,
+                padding: '12px 14px',
+              }}
+            >
               <MAvatar tone={tone} size="sm">
                 {(name || '?').charAt(0)}
               </MAvatar>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <b style={{ fontSize: 12, fontWeight: 800 }}>{name}</b>
-                  <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
+                  <b style={{ fontSize: 12, fontWeight: 900, color: 'var(--z-900)' }}>{name}</b>
+                  <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
                     {formatDateTime(c.at)}
                   </span>
                   {c.action && c.action !== 'commented' && (
@@ -759,10 +779,11 @@ function CommentTab({
                     style={{
                       fontSize: 13,
                       color: 'var(--z-800)',
-                      marginTop: 3,
+                      marginTop: 6,
                       lineHeight: 1.55,
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
+                      fontWeight: 600,
                     }}
                   >
                     {c.note}
