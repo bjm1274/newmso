@@ -10,7 +10,7 @@
  * JM(파일당 500줄), JM2(필요한 칼럼만 select·useMemo), JM3(toast), JM6(button 시맨틱)
  */
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import {
@@ -246,8 +246,13 @@ function SBoardBase({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   // Phase: op/mri 일정 게시판 — 리스트 ↔ 달력 토글
-  const [calendarView, setCalendarView] = useState(false);
   const isScheduleCat = cat === 'op' || cat === 'mri';
+  const [calendarView, setCalendarView] = useState(isScheduleCat);
+
+  // 카테고리 전환 시 기본 뷰 모드 자동 동기화
+  useEffect(() => {
+    setCalendarView(isScheduleCat);
+  }, [cat, isScheduleCat]);
   const filtered = useMemo(() => {
     const byCat = filterByCat(posts, cat);
     const q = query.trim().toLowerCase();

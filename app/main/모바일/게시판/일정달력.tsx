@@ -34,6 +34,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [search, setSearch] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string>(() => toKey(new Date()));
 
   const { eventsByDate, days, month, hasAny } = useMemo(() => {
     const searchLower = search.trim().toLowerCase();
@@ -179,18 +180,30 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
           const inMonth = d.getMonth() === month;
           const events = eventsByDate[key] || [];
           const dow = d.getDay();
+          const isSelected = selectedDate === key;
           return (
             <div
               key={`${key}-${idx}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedDate(key)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedDate(key); }}
               style={{
                 minHeight: 72,
                 borderRight: (idx % 7) === 6 ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
                 borderBottom: idx < 35 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                 padding: 4,
-                background: inMonth ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.02)',
+                background: isSelected
+                  ? 'rgba(0, 122, 255, 0.15)'
+                  : inMonth
+                    ? 'rgba(255, 255, 255, 0.45)'
+                    : 'rgba(0, 0, 0, 0.02)',
+                boxShadow: isSelected ? 'inset 0 0 0 2px #007AFF' : 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
               }}
             >
               <div
@@ -250,6 +263,73 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
         })}
       </div>
 
+      {/* 선택일 일정 목록 */}
+      {(() => {
+        const selectedEvents = eventsByDate[selectedDate] || [];
+        const [y, m, d] = selectedDate.split('-');
+        return (
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)', marginBottom: 10, paddingLeft: 4 }}>
+              {y}년 {parseInt(m ?? '0')}월 {parseInt(d ?? '0')}일 일정 ({selectedEvents.length}건)
+            </div>
+            {selectedEvents.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selectedEvents.map((ev) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => onOpen(ev.id)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'rgba(255, 255, 255, 0.55)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: '#007AFF' }}>
+                        {ev.schedule_time || '시간 미지정'}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)' }}>
+                        {ev.author_name ?? ''}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--z-900)' }}>
+                      {ev.patient_name || ev.title}
+                    </div>
+                    {ev.content && (
+                      <div style={{ fontSize: 12, color: 'var(--z-600)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                        {ev.content}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '24px 0',
+                color: 'var(--z-400)',
+                fontSize: 12,
+                fontWeight: 700,
+                background: 'rgba(255, 255, 255, 0.25)',
+                borderRadius: 12,
+                border: '1px dashed rgba(0, 0, 0, 0.05)'
+              }}>
+                선택하신 날짜에 예정된 일정이 없습니다.
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {!hasAny && (
         <div
           style={{
@@ -258,6 +338,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
             fontSize: 13,
             color: 'var(--z-500)',
             fontWeight: 600,
+            marginTop: 20,
           }}
         >
           {isMri ? '등록된 MRI 일정이 없습니다.' : '등록된 수술 일정이 없습니다.'}
