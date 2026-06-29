@@ -22,6 +22,8 @@ type StaffLeaveBalance = {
   id?: string | null;
   annual_leave_total?: number | null;
   annual_leave_used?: number | null;
+  expired_days?: number | null;
+  compensated_days?: number | null;
 };
 
 type LeaveHistoryRow = {
@@ -127,7 +129,7 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
           return;
         }
 
-        const [{ data: staffData, error: staffError }, { data: leaveData, error: leaveError }] = await Promise.all([
+        const [{ data: staffData, error: staffError }, { data: leaveData, error: leaveError }, { data: balanceData, error: balanceError }] = await Promise.all([
           supabase
             .from('staff_members')
             .select('id, annual_leave_total, annual_leave_used')
@@ -139,10 +141,17 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
             .eq('staff_id', staffId)
             .order('start_date', { ascending: false })
             .order('created_at', { ascending: false }),
+          supabase
+            .from('leave_balances')
+            .select('expired_days, compensated_days')
+            .eq('staff_id', staffId)
+            .eq('year', new Date().getFullYear())
+            .maybeSingle(),
         ]);
 
         if (staffError) throw staffError;
         if (leaveError) throw leaveError;
+        if (balanceError) throw balanceError;
 
         const approvedRows = ((leaveData || []) as LeaveHistoryRow[]).filter(
           (row) =>
@@ -151,7 +160,12 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
         );
 
         if (!cancelled) {
-          setStaff((staffData as StaffLeaveBalance | null) || null);
+          const mergedStaff = {
+            ...(staffData as StaffLeaveBalance | null),
+            expired_days: balanceData?.expired_days ?? 0,
+            compensated_days: balanceData?.compensated_days ?? 0,
+          };
+          setStaff(mergedStaff);
           setRows(approvedRows);
         }
       } catch (loadError) {
@@ -194,7 +208,9 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
     Number(staff?.annual_leave_used ?? user?.annual_leave_used ?? 0),
     calculateApprovedAnnualLeaveUsage(yearRows as Record<string, unknown>[], currentYear)
   );
-  const remaining = Math.max(0, total - used);
+  const expired = Number(staff?.expired_days ?? 0);
+  const compensated = Number(staff?.compensated_days ?? 0);
+  const remaining = Math.max(0, total - used - expired - compensated);
 
   return (
     <div className="space-y-4">

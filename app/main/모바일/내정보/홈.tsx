@@ -20,7 +20,7 @@ import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import MIcon from '../공통/MIcon';
-import { useMonthlyAttendance, useTodayCounts } from './data-hooks';
+import { useMonthlyAttendance, useTodayCounts, useLeaveBalance } from './data-hooks';
 import type { MHomeSub, MTab } from '../셸/m-routes';
 
 import { toast } from '@/lib/toast';
@@ -168,6 +168,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const active = isActiveStaff(user);
   const counts = useTodayCounts(staffId);
   const { data: monthlyAttendance } = useMonthlyAttendance(staffId);
+  const { data: leaveBalance } = useLeaveBalance(staffId);
 
   const [quickItems, setQuickItems] = useState<QuickItem[]>([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
@@ -337,9 +338,11 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   }, [onSub, onSwitchTab]);
 
   /* 연차 잔여 (간이 계산) */
-  const leaveTotal = Number(user.annual_leave_total) || 15;
-  const leaveUsed = Number(user.annual_leave_used) || 0;
-  const leaveRemaining = Math.max(0, leaveTotal - leaveUsed);
+  const leaveTotal = leaveBalance ? leaveBalance.total_days : (Number(user.annual_leave_total) || 15);
+  const leaveUsed = leaveBalance ? leaveBalance.used_days : (Number(user.annual_leave_used) || 0);
+  const leaveExpired = leaveBalance ? leaveBalance.expired_days : 0;
+  const leaveCompensated = leaveBalance ? leaveBalance.compensated_days : 0;
+  const leaveRemaining = Math.max(0, leaveTotal - leaveUsed - leaveExpired - leaveCompensated);
   const lateCountLabel = monthlyAttendance ? `${monthlyAttendance.late}회` : '집계 중';
 
   return (

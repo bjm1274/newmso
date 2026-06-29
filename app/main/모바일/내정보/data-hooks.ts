@@ -164,7 +164,7 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
     (async () => {
       try {
         const currentYear = new Date().getFullYear();
-        const [staffRes, leaveRes] = await Promise.all([
+        const [staffRes, leaveRes, balanceRes] = await Promise.all([
           supabase
             .from('staff_members')
             .select('annual_leave_total, annual_leave_used')
@@ -176,10 +176,17 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
             .eq('staff_id', staffId)
             .order('start_date', { ascending: false })
             .limit(50),
+          supabase
+            .from('leave_balances')
+            .select('expired_days, compensated_days')
+            .eq('staff_id', staffId)
+            .eq('year', currentYear)
+            .maybeSingle(),
         ]);
         if (cancelled) return;
 
         const staff = (staffRes.data ?? {}) as { annual_leave_total?: number | null; annual_leave_used?: number | null };
+        const balance = (balanceRes.data ?? {}) as { expired_days?: number | null; compensated_days?: number | null };
         const rows = Array.isArray(leaveRes.data) ? (leaveRes.data as LeaveRequestRow[]) : [];
 
         const total = Number(staff.annual_leave_total ?? 0);
@@ -187,7 +194,9 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
           Number(staff.annual_leave_used ?? 0),
           calculateApprovedAnnualLeaveUsage(rows as Record<string, unknown>[], currentYear),
         );
-        const remaining = Math.max(0, total - used);
+        const expired = Number(balance?.expired_days ?? 0);
+        const compensated = Number(balance?.compensated_days ?? 0);
+        const remaining = Math.max(0, total - used - expired - compensated);
         const usageRate = total > 0 ? Math.round((used / total) * 100) : 0;
 
         const history: MyLeaveHistory[] = rows
@@ -256,3 +265,39 @@ export function useMyRecentCerts(
 
   return { rows, loading };
 }
+
+export type LeaveBalance = {
+  total_days: number;
+  used_days: number;
+  expired_days: number;
+  compensated_days: number;
+  remaining_days: number;
+};
+
+export function useLeaveBalance(staffId: string | null | undefined) {
+  const [data, setData] = useState<LeaveBalance | null>(null);
+
+  const fetcher = useCallback(async () => {
+    if (!staffId) return;
+    const currentYear = new Date().getFullYear();
+    try {
+      const { data: row, error } = await supabase
+        .from('leave_balances')
+        .select('total_days, used_days, expired_days, compensated_days, remaining_days')
+        .eq('staff_id', staffId)
+        .eq('year', currentYear)
+        .maybeSingle();
+      if (error) return;
+      setData(row as LeaveBalance | null);
+    } catch {
+      // silent
+    }
+  }, [staffId]);
+
+  useEffect(() => {
+    void fetcher();
+  }, [fetcher]);
+
+  return { data, refetch: fetcher };
+}
+
