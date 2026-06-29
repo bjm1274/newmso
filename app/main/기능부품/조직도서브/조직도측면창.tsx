@@ -532,6 +532,16 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
       <circle cx="12" cy="19" r="1" />
     </>
   ),
+  list: (
+    <>
+      <line x1="8" x2="21" y1="6" y2="6" />
+      <line x1="8" x2="21" y1="12" y2="12" />
+      <line x1="8" x2="21" y1="18" y2="18" />
+      <line x1="3" x2="3.01" y1="6" y2="6" />
+      <line x1="3" x2="3.01" y1="12" y2="12" />
+      <line x1="3" x2="3.01" y1="18" y2="18" />
+    </>
+  ),
 };
 
 export function MenuIcon({ name, className = 'h-5 w-5' }: { name?: string; className?: string }) {
@@ -604,6 +614,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Inbox: 'inbox',
   Keyboard: 'keyboard',
   LoaderCircle: 'loader',
+  List: 'list',
   Landmark: 'landmark',
   Lock: 'admin',
   LockKeyhole: 'admin',

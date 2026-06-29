@@ -250,10 +250,76 @@ function getAlbumPushContext(message: MessageRow) {
   };
 }
 
+const STATIC_WORKER_LABELS = [
+  "출근 완료", "모닝 커피", "넵!", "회의 중", "월루 중", "멘탈 붕괴", "분노", "눈물",
+  "점심시간!", "월급날", "퇴근", "종이비행기", "퇴사 마렵다", "감사합니다", "멘붕",
+  "체력 방전", "주말 언제 와?", "질문 있습니다", "최고", "주말 시작"
+];
+
+const STATIC_HOSPITAL_LABELS = [
+  "인계 중", "Full Bed", "정시 퇴근 기원", "CPR", "EHR 로딩 중", "당직 후", "믹스 중",
+  "환자 컴플레인", "폭풍 흡입", "수술 완료", "스테이션 지킴이", "멘탈 바사삭", "오더 확인",
+  "처치 중", "바이탈 정상", "출근 전", "선생님!", "칼퇴 성공", "커피 수혈", "오늘도 무사히"
+];
+
+const STATIC_CAT_LABELS = [
+  "미소 고양이", "하트 뿅뿅", "하트 날리기", "어리둥절", "시무룩", "곁눈질", "고민 중",
+  "방긋", "웃픈 고양이", "엉엉", "식은땀", "오싹", "겁먹음", "최고!",
+  "깜놀", "분노 폭발", "충격", "쿨쿨", "선글라스", "윙크 따봉", "흐뭇",
+  "메롱", "헤헤 메롱", "깜짝이야", "쉿", "만세 축하", "슬픈 눈물", "따봉 고양이"
+];
+
+const ANIM_EMOTICON_LABELS: Record<string, string> = {
+  "o-coffee": "커피수혈", "o-overtime": "야근각...", "o-leaveontime": "칼퇴!!", "o-monday": "월요병",
+  "o-meltdown": "멘붕", "o-meeting": "회의중...", "o-deadline": "마감임박", "o-boss": "상사눈치",
+  "o-praise": "칭찬받음", "o-swamped": "폭풍업무", "o-payday": "월급날", "o-angry": "빡침",
+  "o-sleepy": "졸림", "o-blank": "멍...", "o-wanttogo": "퇴근하고파", "o-lunch": "점심뭐먹지",
+  "o-fighting": "화이팅!", "o-existential": "현타옴", "o-approve": "결재부탁", "o-wfh": "칼답 대기",
+  "h-night": "야간당직", "h-rounds": "회진중", "h-emergency": "응급!!", "h-chart": "차트작성",
+  "h-inject": "주사들어갑니다", "h-care": "환자케어", "h-sanitize": "손소독", "h-mask": "마스크답답",
+  "h-codeblue": "코드블루", "h-shift": "교대요청", "h-hungry": "밥은언제", "h-counsel": "보호자상담",
+  "h-surgery": "수술중", "h-prescribe": "처방나갑니다", "h-off": "퇴근합니다", "h-thanks": "감사인사",
+  "h-burnout": "번아웃", "h-coffee": "카페인충전", "h-cheer": "화이팅!", "h-drowsy": "졸음쏟아짐",
+  "d-coding": "폭풍코딩", "d-bug": "버그발생!", "d-caffeine": "카페인 수혈", "d-compile": "컴파일중",
+  "d-release": "배포성공!!", "d-lgtm": "LGTM!", "d-serverdown": "서버 터짐", "d-headphones": "개발몰입",
+  "d-stackoverflow": "검색신공", "d-gitpush": "깃 푸시!", "d-turtle": "거북목 증후군", "d-specs": "기획 변경...",
+  "d-refactor": "리팩토링", "d-keyboard": "키보드 샷건", "d-zoom": "화상회의", "d-salary": "연봉협상",
+  "d-allnight": "철야코딩", "d-dbrecovery": "디비복구", "d-cleanup": "코드 정리", "d-approve": "승인대기"
+};
+
+function resolveStickerLabel(statId: string): string {
+  const isHospital = statId.startsWith('hospital-');
+  const isCat = statId.startsWith('cat-');
+  const num = parseInt(statId.split('-')[1], 10);
+  if (isNaN(num)) return statId;
+
+  if (isCat) {
+    return STATIC_CAT_LABELS[num - 1] || statId;
+  }
+  return isHospital
+    ? STATIC_HOSPITAL_LABELS[num - 1] || statId
+    : STATIC_WORKER_LABELS[num - 1] || statId;
+}
+
+function replaceEmoticonCodes(content: string): string {
+  return content.replace(/\[(emo|stat):([a-z0-9-]+)\]/g, (match, kind, id) => {
+    if (kind === 'emo') {
+      const label = ANIM_EMOTICON_LABELS[id];
+      return label ? `(이모티콘: ${label})` : `(이모티콘)`;
+    } else {
+      const label = resolveStickerLabel(id);
+      return label ? `(스티커: ${label})` : `(스티커)`;
+    }
+  });
+}
+
 function buildPreview(message: MessageRow) {
   const albumContext = getAlbumPushContext(message);
-  const content = String(message.content || '').trim();
-  if (content) return content.slice(0, 80);
+  let content = String(message.content || '').trim();
+  if (content) {
+    content = replaceEmoticonCodes(content);
+    return content.slice(0, 80);
+  }
   if (albumContext.isAlbumBatch && message.file_kind === 'image' && albumContext.albumTotal) {
     return `사진 ${albumContext.albumTotal}장을 보냈습니다.`;
   }
@@ -804,6 +870,24 @@ export async function dispatchChatPushForMessage(params: {
   let failed = 0;
   const expiredIds: string[] = [];
   const notificationTag = albumContext.notificationTag;
+
+  // 정적 스티커 단독 전송 시 이미지 URL 구성
+  let stickerImageUrl: string | undefined = undefined;
+  const trimmedContent = String(message.content || '').trim();
+  const soloStatMatch = trimmedContent.match(/^\[stat:([a-z0-9-]+)\]$/);
+  if (soloStatMatch) {
+    const statId = soloStatMatch[1];
+    const rawOrigin =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      '';
+    const siteUrl = String(rawOrigin).trim();
+    if (siteUrl) {
+      stickerImageUrl = `${siteUrl.replace(/\/$/, '')}/emoticon/static/${statId}.png`;
+    }
+  }
+
   const payloadData = buildChatNotificationMetadata({
     roomId: params.roomId,
     messageId: params.messageId,
@@ -824,6 +908,7 @@ export async function dispatchChatPushForMessage(params: {
     body: previewBody,
     tag: notificationTag,
     data: payloadData,
+    ...(stickerImageUrl ? { image: stickerImageUrl } : {}),
   });
   const fcmPayloadData = Object.entries(payloadData).reduce<Record<string, string>>(
     (acc, [key, value]) => {
@@ -843,6 +928,7 @@ export async function dispatchChatPushForMessage(params: {
         title,
         body: previewBody,
         data: fcmPayloadData,
+        ...(stickerImageUrl ? { image: stickerImageUrl } : {}),
       });
       sent += fcmResult.success.length;
       // error 토큰(400 페이로드·5xx·네트워크·OAuth 실패)은 유효할 수 있으므로 무효화하지 않는다.

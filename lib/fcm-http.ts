@@ -126,7 +126,7 @@ export type FcmSendResult =
 
 export async function sendFcmNotification(
   fcmToken: string,
-  payload: { title: string; body: string; data?: Record<string, string> },
+  payload: { title: string; body: string; data?: Record<string, string>; image?: string },
 ): Promise<FcmSendResult> {
   try {
     const sa = getServiceAccount();
@@ -136,6 +136,7 @@ export async function sendFcmNotification(
       ...(payload.data || {}),
       title: payload.title,
       body: payload.body,
+      ...(payload.image ? { image: payload.image } : {}),
     };
 
     const messageId = payload.data?.message_id || '';
@@ -144,10 +145,7 @@ export async function sendFcmNotification(
 
     const message: Record<string, unknown> = {
       token: fcmToken,
-      notification: {
-        title: payload.title,
-        body: payload.body,
-      },
+      // root notification 객체를 제외하여 Android/Web에서 Data-only 푸시로 전송
       data: messageData,
       webpush: {
         headers: { Urgency: 'high' },
@@ -156,12 +154,7 @@ export async function sendFcmNotification(
       android: {
         priority: 'high',
         ...(collapseKey ? { collapse_key: collapseKey } : {}),
-        notification: {
-          channel_id: 'high_importance_channel',
-          default_vibrate_timings: true,
-          notification_priority: 'PRIORITY_MAX',
-          visibility: 'PUBLIC',
-        },
+        // android.notification을 생략하여 OS 레벨의 강제 알림 노출 방지 (서비스워커가 알림 생성 및 클릭 이벤트 제어)
       },
       apns: {
         headers: {
@@ -170,7 +163,13 @@ export async function sendFcmNotification(
           ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}),
         },
         payload: {
-          aps: { 'content-available': 1 },
+          aps: {
+            'content-available': 1,
+            alert: {
+              title: payload.title,
+              body: payload.body,
+            },
+          },
         },
       },
     };
@@ -233,7 +232,7 @@ export async function sendFcmNotification(
 
 export async function sendFcmBatch(
   tokens: string[],
-  payload: { title: string; body: string; data?: Record<string, string> },
+  payload: { title: string; body: string; data?: Record<string, string>; image?: string },
 ): Promise<{ success: string[]; expired: string[]; error: string[] }> {
   const uniqueTokens = Array.from(new Set(tokens.filter(Boolean)));
   const results = await Promise.allSettled(

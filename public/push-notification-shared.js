@@ -422,6 +422,12 @@ function erpNormalizeNotificationPayload(raw) {
     nestedData.body ||
     '새 알림이 있습니다.';
 
+  const image =
+    payload.image ||
+    notification.image ||
+    nestedData.image ||
+    '';
+
   const messageId = nestedData.message_id || nestedData.id || payload.message_id || payload.id || '';
   const type = nestedData.type || payload.type || 'notification';
   const tag =
@@ -434,6 +440,7 @@ function erpNormalizeNotificationPayload(raw) {
     title,
     body,
     tag,
+    image,
     data: nestedData,
   };
 }
@@ -463,6 +470,7 @@ function erpBuildNotificationOptions(payload) {
     vibrate: [200, 100, 200, 100, 200],
     data: payload.data,
     actions,
+    ...(payload.image ? { image: payload.image } : {}),
   };
 }
 

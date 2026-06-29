@@ -222,11 +222,8 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                 {d.getDate()}
               </div>
               {events.slice(0, 3).map((ev) => (
-                <button
+                <div
                   key={String(ev.id)}
-                  type="button"
-                  onClick={() => onOpen(String(ev.id))}
-                  aria-label={`${ev.title} 일정 상세`}
                   style={{
                     width: '100%',
                     textAlign: 'left',
@@ -240,23 +237,26 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
                     textOverflow: 'ellipsis',
-                    border: 'none',
-                    cursor: 'pointer',
+                    pointerEvents: 'none',
                   }}
                 >
                   <span style={{ opacity: 0.8, marginRight: 2 }}>{ev.schedule_time || ''}</span>
                   {ev.patient_name || ev.title}
-                </button>
+                </div>
               ))}
               {events.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => events[0] && onOpen(String(events[0].id))}
-                  style={{ fontSize: 9, fontWeight: 800, color: '#007AFF', textAlign: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                  aria-label={`그 외 ${events.length - 3}건 더 보기`}
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: '#007AFF',
+                    textAlign: 'center',
+                    padding: '2px 0',
+                    pointerEvents: 'none',
+                  }}
                 >
                   +{events.length - 3}건
-                </button>
+                </div>
               )}
             </div>
           );

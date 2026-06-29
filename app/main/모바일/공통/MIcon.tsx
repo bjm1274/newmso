@@ -61,7 +61,7 @@ const M_ICON_ALIAS: Record<string, string> = {
   layers: 'Layers',
   box: 'Box',
   receipt: 'Receipt',
-  list: 'List',
+  list: 'list',
   grid: 'LayoutGrid',
   info: 'Info',
   x: 'X',
