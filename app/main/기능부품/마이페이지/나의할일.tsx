@@ -607,9 +607,9 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       {dialog}
 
       {/* 컨트롤 바 — 우선순위 5칩 + 일별/주간/월간 + 날짜 페이저 */}
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-[var(--shadow-xs)] sm:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="todo-control-card rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-[var(--shadow-xs)] sm:p-4">
+        <div className="todo-control-row flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="todo-filter-scroll flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={`todo-chip tone-${priToneMap.all}${priorityFilter === 'all' ? ' on' : ''}`}
@@ -629,7 +629,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="todo-view-actions flex items-center gap-2">
             <div className="seg">
               {(['day', 'week', 'month'] as const).map((range) => (
                 <button
@@ -848,7 +848,7 @@ function TodoItem({
         <span>◎ {assigneeLabel}</span>
         {repeatLabel ? <span>↻ {repeatLabel}</span> : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="todo-actions flex shrink-0 items-center gap-1.5">
         {isChatSource && onChatNavigate ? (
           <button
             type="button"

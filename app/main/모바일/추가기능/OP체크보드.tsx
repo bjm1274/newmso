@@ -15,6 +15,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
+import { logger } from '@/lib/logger';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import OPCard from './OP체크카드';
@@ -96,7 +97,7 @@ export default function OP체크보드({
           return cp;
         });
       } catch (err) {
-        console.warn('[mobile-addon] op state change', err);
+        logger.warn('[mobile-addon] op state change', err);
         toast('상태 변경에 실패했습니다.', 'error');
         setOptimistic((m) => {
           const cp = { ...m };

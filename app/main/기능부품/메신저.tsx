@@ -3051,7 +3051,7 @@ export default function ChatView({
 
       setSelectedStaffPresence(getPresenceMeta(snapshot));
     } catch (e) {
-      console.error('Failed to load attendance for staff profile:', e);
+      logger.warn('Failed to load attendance for staff profile:', e);
       setSelectedStaffPresence(getPresenceMeta(null));
     } finally {
       setIsLoadingPresence(false);

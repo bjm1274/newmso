@@ -26,6 +26,7 @@ export type BubbleListProps = {
   isGroupChat?: boolean;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
+  onEdit?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
   onBookmark: (message: ChatMessage) => void;
@@ -50,6 +51,7 @@ export default function BubbleList({
   isGroupChat = false,
   onToggleReaction,
   onReply,
+  onEdit,
   onImageLoad,
   onOpenBoardPost,
   onBookmark,
@@ -152,6 +154,7 @@ export default function BubbleList({
             fallbackMyName={userName}
             onToggleReaction={onToggleReaction}
             onReply={onReply}
+            onEdit={onEdit}
             onImageLoad={onImageLoad}
             onOpenBoardPost={onOpenBoardPost}
             onBookmark={onBookmark}

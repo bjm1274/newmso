@@ -15,6 +15,7 @@ const M_ICON_ALIAS: Record<string, string> = {
   clock: 'Clock',
   check: 'Check',
   checkCircle: 'CheckCircle',
+  checkSquare: 'CheckSquare',
   calendar: 'Calendar',
   won: 'CircleDollarSign',
   fileText: 'FileText',

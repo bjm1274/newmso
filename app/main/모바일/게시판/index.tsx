@@ -39,7 +39,7 @@ export type 게시판Props = {
 
 type View = 'home' | 'list' | 'detail' | 'write';
 
-export default function 게시판({ user, onBack, subView, setSubView, initialPostId, onConsumePostId }: 게시판Props) {
+function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsumePostId }: 게시판Props) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : null;
   const userCompany = typeof user.company === 'string' ? user.company : null;
@@ -248,3 +248,5 @@ export default function 게시판({ user, onBack, subView, setSubView, initialPo
     </div>
   );
 }
+
+export default MobileBoard;

@@ -54,8 +54,8 @@ export default function EmojiPicker({
         onClose();
       }
     };
-    window.addEventListener('keydown', onKey as any);
-    return () => window.removeEventListener('keydown', onKey as any);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   // 외부 클릭 닫기

@@ -36,7 +36,7 @@ function relativeTime(iso: string): string {
   return iso.slice(5, 10);
 }
 
-export default function 업무공유목록({
+function MobileTaskShareList({
   user,
   onBack,
   onOpenDetail,
@@ -67,11 +67,6 @@ export default function 업무공유목록({
         title="업무공유"
         sub={`${company ?? ''} · ${rows.length}건`}
         back={onBack}
-        actions={
-          <button type="button" aria-label="검색">
-            <MIcon name="search" size={20} />
-          </button>
-        }
       />
 
       <div className="m-chip-bar">
@@ -182,3 +177,5 @@ export default function 업무공유목록({
     </div>
   );
 }
+
+export default MobileTaskShareList;

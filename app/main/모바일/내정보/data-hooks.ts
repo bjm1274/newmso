@@ -65,6 +65,7 @@ export type TodayCounts = {
   unreadChat: number;
   newBoard: number;
   unreadAlert: number;
+  todoCount: number;
 };
 
 export function useTodayCounts(staffId: string | null | undefined): TodayCounts {
@@ -73,6 +74,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
     unreadChat: 0,
     newBoard: 0,
     unreadAlert: 0,
+    todoCount: 0,
   });
 
   useEffect(() => {
@@ -80,13 +82,18 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
     let cancelled = false;
     const fetchCounts = async () => {
       try {
-        const [approvalRes, unreadAlert] = await Promise.all([
+        const [approvalRes, unreadAlert, todoRes] = await Promise.all([
           supabase
             .from('approvals')
             .select('id', { count: 'exact', head: true })
             .eq('current_approver_id', staffId)
             .eq('status', '대기'),
           fetchUnreadNotificationCount(),
+          supabase
+            .from('todos')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', staffId)
+            .eq('completed', false),
         ]);
         if (cancelled) return;
         setCounts({
@@ -94,6 +101,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
           unreadChat: 0,
           newBoard: 0,
           unreadAlert,
+          todoCount: todoRes.count ?? 0,
         });
       } catch {
         // silent

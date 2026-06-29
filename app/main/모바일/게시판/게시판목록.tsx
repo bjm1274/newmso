@@ -110,11 +110,6 @@ function BoardHomeView({
             <div className="eyebrow">협업</div>
             <div className="title">게시판</div>
           </div>
-          <div className="msm-appbar-actions">
-            <button className="msm-ibtn" type="button" aria-label="검색">
-              <MIcon name="search" size={19} />
-            </button>
-          </div>
         </div>
       </div>
       <div className="m-scroll">

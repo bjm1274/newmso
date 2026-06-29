@@ -84,7 +84,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                     alignItems: 'center',
                     gap: 12,
                     padding: '14px 16px',
-                    borderBottom: '1px solid var(--m-border)',
+                    borderBottom: '1px solid var(--border)',
                     opacity: issuingId && !busy ? 0.5 : 1,
                     cursor: issuingId ? 'default' : 'pointer',
                   }}
@@ -93,8 +93,6 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                     style={{
                       width: 36,
                       height: 36,
-                      borderRadius: 10,
-                      background: 'var(--m-accent-soft)',
                       color: 'var(--m-accent)',
                       display: 'grid',
                       placeItems: 'center',
@@ -113,11 +111,12 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                   <span
                     style={{
                       fontSize: 11,
-                      fontWeight: 700,
-                      padding: '4px 12px',
+                      fontWeight: 800,
+                      padding: '4.5px 12px',
                       borderRadius: 999,
-                      background: 'var(--m-accent)',
-                      color: '#fff',
+                      background: 'rgba(29, 78, 216, 0.05)',
+                      color: 'var(--m-accent)',
+                      border: '1px solid rgba(29, 78, 216, 0.1)',
                     }}
                   >
                     {busy ? '발급 중…' : '발급'}
@@ -149,16 +148,14 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                   alignItems: 'center',
                   gap: 12,
                   padding: '14px 16px',
-                  borderBottom: '1px solid var(--m-border)',
+                  borderBottom: '1px solid var(--border)',
                 }}
               >
                 <div
                   style={{
                     width: 36,
                     height: 36,
-                    borderRadius: 10,
-                    background: 'var(--z-100)',
-                    color: 'var(--z-600)',
+                    color: 'var(--m-accent)',
                     display: 'grid',
                     placeItems: 'center',
                   }}

@@ -12,13 +12,54 @@ import {
 } from '@/lib/object-storage-url';
 import { supabase } from '@/lib/d1-supabase-compat';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import { toast } from '@/lib/toast';
-import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
+import { logger } from '@/lib/logger';
+import type { AttachmentItem } from '@/types';
 import { uploadBoardAttachmentFile } from '../게시판업로드';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import GuideDetailPanel from './GuideDetailPanel';
+import type {
+  GuideAudience,
+  GuideKind,
+  GuideLibraryProps as Props,
+  GuideMetaPayload,
+  GuideResource,
+  GuideRow,
+  GuideTask,
+  GuideTaskMetaPayload,
+  GuideTaskPriority,
+  OrgStaffRow,
+  OrgTeamRow,
+  TeamScope,
+} from './guide-types';
+import {
+  GUIDE_BOARD_TYPE,
+  GUIDE_DISPLAY_NAME,
+  GUIDE_POST_OPTIONAL_COLUMNS,
+  GUIDE_POST_REQUIRED_SELECT_COLUMNS,
+  GUIDE_TASK_BOARD_TYPE,
+  buildCompanyScopes,
+  buildGuideContent,
+  buildGuideTaskContent,
+  buildSelectColumns,
+  buildTeamKey,
+  formatDate,
+  formatDateOnly,
+  getGuideAudienceLabel,
+  getGuideKindLabel,
+  getTaskPriorityMeta,
+  inferAttachmentType,
+  matchesTeamScope,
+  normalizeGuideAudience,
+  normalizeGuideResource,
+  normalizeGuideTask,
+  normalizeGuideTaskPriority,
+  normalizeText,
+  parseKeywords,
+  runGuideMutation,
+  sortGuideTasks,
+} from './guide-utils';
 import { 
   Plus, 
   Search, 
@@ -33,347 +74,17 @@ import {
   FolderOpen
 } from 'lucide-react';
 
-const GUIDE_BOARD_TYPE = '업무가이드';
-const GUIDE_DISPLAY_NAME = '업무공유';
-const GUIDE_TASK_BOARD_TYPE = '업무가이드_팀할일';
-
-const ATTACHMENTS_META_PREFIX = '[[ATTACHMENTS_META]]';
-const ATTACHMENTS_META_SUFFIX = '[[/ATTACHMENTS_META]]';
-const GUIDE_META_PREFIX = '[[GUIDE_META]]';
-const GUIDE_META_SUFFIX = '[[/GUIDE_META]]';
-const GUIDE_TASK_META_PREFIX = '[[GUIDE_TASK_META]]';
-const GUIDE_TASK_META_SUFFIX = '[[/GUIDE_TASK_META]]';
-
-const GUIDE_POST_REQUIRED_SELECT_COLUMNS = [
-  'id',
-  'board_type',
-  'title',
-  'content',
-  'author_id',
-  'author_name',
-  'company',
-  'created_at',
-] as const;
-
-const GUIDE_POST_OPTIONAL_COLUMNS = ['updated_at', 'company_id', 'attachments'] as const;
-
 type QueryResult<T> = {
   data: T | null;
   error: unknown;
 };
 
-type GuideKind = 'education' | 'handover';
-type GuideAudience = 'new_hire' | 'current_staff' | 'all_staff';
-type GuideTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
-
-type GuideMetaPayload = {
-  kind?: GuideKind;
-  audience?: GuideAudience;
-  department?: string;
-  teamName?: string;
-  divisionName?: string;
-  companyName?: string;
-  keywords?: string[];
-};
-
-type GuideTaskMetaPayload = {
-  teamName?: string;
-  divisionName?: string;
-  companyName?: string;
-  dueDate?: string;
-  priority?: GuideTaskPriority;
-  isDone?: boolean;
-  completedAt?: string;
-  completedById?: string;
-  completedByName?: string;
-};
-
-type GuideRow = BoardPost & {
-  board_type?: string | null;
-  attachments?: AttachmentItem[] | null;
-  updated_at?: string | null;
-  company_id?: string | null;
-};
-
-type GuideResource = GuideRow & {
-  description: string;
-  attachments: AttachmentItem[];
-  kind: GuideKind;
-  audience: GuideAudience;
-  teamName: string;
-  divisionName: string;
-  companyName: string;
-  keywords: string[];
-  isNew?: boolean;
-};
-
-type GuideTask = GuideRow & {
-  note: string;
-  teamName: string;
-  divisionName: string;
-  companyName: string;
-  dueDate: string;
-  priority: GuideTaskPriority;
-  isDone: boolean;
-  completedAt: string;
-  completedById: string;
-  completedByName: string;
-};
-
-type OrgTeamRow = {
-  id?: string | null;
-  company_name?: string | null;
-  division?: string | null;
-  team_name?: string | null;
-  sort_order?: number | null;
-};
-
-type OrgStaffRow = {
-  id?: string | null;
-  company?: string | null;
-  company_id?: string | null;
-  department?: string | null;
-  status?: string | null;
-};
-
-type TeamScope = {
-  key: string;
-  companyName: string;
-  companyId: string;
-  divisionName: string;
-  teamName: string;
-  memberCount: number;
-};
-
-type CompanyScope = {
-  companyName: string;
-  companyId: string;
-  divisions: Array<{
-    name: string;
-    teams: TeamScope[];
-  }>;
-};
-
-type Props = {
-  user?: StaffMember | null;
-  selectedCo?: string | null;
-  selectedCompanyId?: string | null;
-};
-
-function normalizeText(value: unknown) {
-  return String(value || '').trim();
+function isGuideAudience(value: string): value is GuideAudience {
+  return value === 'new_hire' || value === 'current_staff' || value === 'all_staff';
 }
 
-function buildTeamKey(companyName: string, teamName: string) {
-  return `${normalizeText(companyName)}::${normalizeText(teamName)}`;
-}
-
-function buildSelectColumns(
-  requiredColumns: readonly string[],
-  optionalColumns: readonly string[] = [],
-  omittedColumns?: ReadonlySet<string>,
-) {
-  return [...requiredColumns, ...optionalColumns.filter((column) => !omittedColumns?.has(column))].join(', ');
-}
-
-function inferAttachmentType(nameOrUrl: string, explicitType?: string | null) {
-  const normalizedExplicitType = normalizeText(explicitType).toLowerCase();
-  if (normalizedExplicitType === 'image' || normalizedExplicitType === 'video' || normalizedExplicitType === 'file') {
-    return normalizedExplicitType;
-  }
-
-  const raw = normalizeText(nameOrUrl).toLowerCase();
-  const clean = raw.split('?')[0];
-  const ext = clean.includes('.') ? clean.slice(clean.lastIndexOf('.') + 1) : '';
-
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
-  if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
-  return 'file';
-}
-
-function extractMetaMarker<T>(value: unknown, prefix: string, suffix: string) {
-  const raw = String(value ?? '');
-  const start = raw.indexOf(prefix);
-  const end = raw.indexOf(suffix);
-  if (start < 0 || end < 0 || end <= start) {
-    return {
-      displayContent: raw.trim(),
-      meta: null as T | null,
-    };
-  }
-
-  const displayContent = `${raw.slice(0, start)}${raw.slice(end + suffix.length)}`.trim();
-  const metaText = raw.slice(start + prefix.length, end).trim();
-
-  try {
-    return {
-      displayContent,
-      meta: JSON.parse(metaText) as T,
-    };
-  } catch {
-    return {
-      displayContent,
-      meta: null as T | null,
-    };
-  }
-}
-
-function extractAttachmentMetaFromContent(value: unknown) {
-  const { displayContent, meta } = extractMetaMarker<AttachmentItem[]>(value, ATTACHMENTS_META_PREFIX, ATTACHMENTS_META_SUFFIX);
-  const attachments = Array.isArray(meta)
-    ? meta
-        .map((item) => ({
-          name: normalizeText(item?.name),
-          url: normalizeText(item?.url),
-          type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)),
-        }))
-        .filter((item) => item.name && item.url)
-    : [];
-
-  return { displayContent, attachments };
-}
-
-function buildAttachmentMetaContent(visibleContent: string, attachments: AttachmentItem[]) {
-  if (!attachments.length) return visibleContent.trim();
-
-  const normalizedVisibleContent = visibleContent.trim();
-  const payload = attachments
-    .map((item) => ({
-      name: normalizeText(item.name),
-      url: normalizeText(item.url),
-      type: inferAttachmentType(normalizeText(item.name || item.url), normalizeText(item.type)),
-    }))
-    .filter((item) => item.name && item.url);
-
-  if (!payload.length) return normalizedVisibleContent;
-  return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(payload)}${ATTACHMENTS_META_SUFFIX}`;
-}
-
-function extractGuideMetaFromContent(value: unknown) {
-  return extractMetaMarker<GuideMetaPayload>(value, GUIDE_META_PREFIX, GUIDE_META_SUFFIX);
-}
-
-function buildGuideContent(description: string, attachments: AttachmentItem[], meta: GuideMetaPayload | null) {
-  const attachmentContent = buildAttachmentMetaContent(description, attachments);
-  if (!meta) return attachmentContent;
-
-  const normalizedMeta: GuideMetaPayload = {
-    kind: meta.kind || 'education',
-    audience: meta.audience || 'all_staff',
-    department: normalizeText(meta.department) || undefined,
-    teamName: normalizeText(meta.teamName || meta.department) || undefined,
-    divisionName: normalizeText(meta.divisionName) || undefined,
-    companyName: normalizeText(meta.companyName) || undefined,
-    keywords: Array.isArray(meta.keywords)
-      ? meta.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean)
-      : undefined,
-  };
-
-  const hasExtraMeta =
-    normalizedMeta.teamName ||
-    normalizedMeta.divisionName ||
-    normalizedMeta.companyName ||
-    (normalizedMeta.keywords && normalizedMeta.keywords.length > 0) ||
-    normalizedMeta.kind !== 'education' ||
-    normalizedMeta.audience !== 'all_staff';
-
-  if (!hasExtraMeta) return attachmentContent;
-  return `${attachmentContent}${attachmentContent ? '\n' : ''}${GUIDE_META_PREFIX}${JSON.stringify(normalizedMeta)}${GUIDE_META_SUFFIX}`;
-}
-
-function extractGuideTaskMetaFromContent(value: unknown) {
-  return extractMetaMarker<GuideTaskMetaPayload>(value, GUIDE_TASK_META_PREFIX, GUIDE_TASK_META_SUFFIX);
-}
-
-function buildGuideTaskContent(note: string, meta: GuideTaskMetaPayload) {
-  const normalizedNote = note.trim();
-  const normalizedMeta: GuideTaskMetaPayload = {
-    teamName: normalizeText(meta.teamName) || undefined,
-    divisionName: normalizeText(meta.divisionName) || undefined,
-    companyName: normalizeText(meta.companyName) || undefined,
-    dueDate: normalizeText(meta.dueDate) || undefined,
-    priority: meta.priority || 'medium',
-    isDone: Boolean(meta.isDone),
-    completedAt: normalizeText(meta.completedAt) || undefined,
-    completedById: normalizeText(meta.completedById) || undefined,
-    completedByName: normalizeText(meta.completedByName) || undefined,
-  };
-
-  return `${normalizedNote}${normalizedNote ? '\n' : ''}${GUIDE_TASK_META_PREFIX}${JSON.stringify(normalizedMeta)}${GUIDE_TASK_META_SUFFIX}`;
-}
-
-function normalizeGuideKind(value: unknown): GuideKind {
-  return value === 'handover' ? 'handover' : 'education';
-}
-
-function normalizeGuideAudience(value: unknown): GuideAudience {
-  if (value === 'new_hire' || value === 'current_staff' || value === 'all_staff') return value;
-  return 'all_staff';
-}
-
-function normalizeGuideTaskPriority(value: unknown): GuideTaskPriority {
-  if (value === 'low' || value === 'medium' || value === 'high' || value === 'urgent') return value;
-  return 'medium';
-}
-
-function parseKeywords(value: string) {
-  return Array.from(new Set(value.split(',').map((keyword) => keyword.trim()).filter(Boolean)));
-}
-
-function normalizeGuideResource(post: GuideRow): GuideResource {
-  const { displayContent: attachmentContent, attachments: embeddedAttachments } = extractAttachmentMetaFromContent(post.content ?? '');
-  const { displayContent: description, meta } = extractGuideMetaFromContent(attachmentContent);
-  const attachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments)
-    .map((item) => ({
-      name: normalizeText(item?.name),
-      url: normalizeText(item?.url),
-      type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)),
-    }))
-    .filter((item) => item.name && item.url);
-
-  return {
-    ...post,
-    description,
-    attachments,
-    kind: normalizeGuideKind(meta?.kind),
-    audience: normalizeGuideAudience(meta?.audience),
-    teamName: normalizeText(meta?.teamName || meta?.department),
-    divisionName: normalizeText(meta?.divisionName),
-    companyName: normalizeText(meta?.companyName || post.company),
-    keywords: Array.isArray(meta?.keywords) ? meta.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean) : [],
-  };
-}
-
-function normalizeGuideTask(post: GuideRow): GuideTask {
-  const { displayContent: note, meta } = extractGuideTaskMetaFromContent(post.content ?? '');
-  return {
-    ...post,
-    note,
-    teamName: normalizeText(meta?.teamName),
-    divisionName: normalizeText(meta?.divisionName),
-    companyName: normalizeText(meta?.companyName || post.company),
-    dueDate: normalizeText(meta?.dueDate),
-    priority: normalizeGuideTaskPriority(meta?.priority),
-    isDone: Boolean(meta?.isDone),
-    completedAt: normalizeText(meta?.completedAt),
-    completedById: normalizeText(meta?.completedById),
-    completedByName: normalizeText(meta?.completedByName),
-  };
-}
-
-function formatDate(value: unknown) {
-  const raw = normalizeText(value);
-  if (!raw) return '';
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function isGuideKind(value: string): value is GuideKind {
+  return value === 'education' || value === 'handover';
 }
 
 function rel(dateStr: string | null | undefined) {
@@ -402,215 +113,6 @@ function rel(dateStr: string | null | undefined) {
   return `${mm}.${dd}`;
 }
 
-function formatDateOnly(value: unknown) {
-  const raw = normalizeText(value);
-  if (!raw) return '';
-  const parsed = new Date(`${raw}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleDateString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
-function getGuideKindLabel(kind: GuideKind) {
-  return kind === 'handover' ? '업무 인수인계' : '업무자료';
-}
-
-function getGuideAudienceLabel(audience: GuideAudience) {
-  switch (audience) {
-    case 'new_hire':
-      return '신규직원';
-    case 'current_staff':
-      return '기존직원';
-    default:
-      return '전체직원';
-  }
-}
-
-function getTaskPriorityMeta(priority: GuideTaskPriority) {
-  switch (priority) {
-    case 'urgent':
-      return { label: '긴급', className: 'badge-red' };
-    case 'high':
-      return { label: '높음', className: 'badge-yellow' };
-    case 'low':
-      return { label: '낮음', className: 'badge-gray' };
-    default:
-      return { label: '보통', className: 'badge-blue' };
-  }
-}
-
-function sortGuideTasks(tasks: GuideTask[]) {
-  return [...tasks].sort((left, right) => {
-    const doneDiff = Number(Boolean(left.isDone)) - Number(Boolean(right.isDone));
-    if (doneDiff !== 0) return doneDiff;
-
-    const leftDue = normalizeText(left.dueDate);
-    const rightDue = normalizeText(right.dueDate);
-    if (leftDue !== rightDue) {
-      if (!leftDue) return 1;
-      if (!rightDue) return -1;
-      return leftDue.localeCompare(rightDue);
-    }
-
-    const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1 } as const;
-    const priorityDiff = priorityWeight[right.priority] - priorityWeight[left.priority];
-    if (priorityDiff !== 0) return priorityDiff;
-
-    return String(right.created_at || '').localeCompare(String(left.created_at || ''));
-  });
-}
-
-async function runGuideMutation<T>(
-  mutation: (payload: Record<string, unknown>) => PromiseLike<any>,
-  payload: Record<string, unknown>,
-) {
-  let nextPayload = { ...payload };
-  let result = await mutation(nextPayload);
-  let guard = 0;
-
-  while (result?.error && guard < GUIDE_POST_OPTIONAL_COLUMNS.length) {
-    const missingColumn = GUIDE_POST_OPTIONAL_COLUMNS.find(
-      (column) => column in nextPayload && isMissingColumnError(result.error, column),
-    );
-    if (!missingColumn) break;
-
-    const { [missingColumn]: _removed, ...rest } = nextPayload;
-    nextPayload = rest;
-    result = await mutation(nextPayload);
-    guard += 1;
-  }
-
-  return { ...result, payload: nextPayload };
-}
-
-const isVisibleStaff = (status: unknown) => isActiveStaff({ status: status as string | null | undefined });
-
-function buildCompanyScopes(
-  orgTeams: OrgTeamRow[],
-  staffs: OrgStaffRow[],
-  resources: GuideResource[],
-  tasks: GuideTask[],
-) {
-  const teamMap = new Map<string, {
-    companyName: string;
-    companyId: string;
-    divisionName: string;
-    teamName: string;
-    sortOrder: number;
-    memberCount: number;
-  }>();
-
-  const companyIdByName = new Map<string, string>();
-  const memberCountByKey = new Map<string, number>();
-
-  staffs.filter((staff) => isVisibleStaff(staff.status)).forEach((staff) => {
-    const companyName = normalizeText(staff.company);
-    const companyId = normalizeText(staff.company_id);
-    const teamName = normalizeText(staff.department) || '미지정';
-    if (!companyName) return;
-    if (companyId && !companyIdByName.has(companyName)) {
-      companyIdByName.set(companyName, companyId);
-    }
-    const key = buildTeamKey(companyName, teamName);
-    memberCountByKey.set(key, (memberCountByKey.get(key) || 0) + 1);
-  });
-
-  let seedIndex = 0;
-  const ensureTeam = (companyName: string, companyId: string, divisionName: string, teamName: string, sortOrder?: number | null) => {
-    const normalizedCompanyName = normalizeText(companyName);
-    const normalizedTeamName = normalizeText(teamName) || '미지정';
-    if (!normalizedCompanyName || !normalizedTeamName) return;
-    const key = buildTeamKey(normalizedCompanyName, normalizedTeamName);
-    const nextCompanyId = normalizeText(companyId) || companyIdByName.get(normalizedCompanyName) || '';
-    if (!teamMap.has(key)) {
-      teamMap.set(key, {
-        companyName: normalizedCompanyName,
-        companyId: nextCompanyId,
-        divisionName: normalizeText(divisionName) || '기타',
-        teamName: normalizedTeamName,
-        sortOrder: typeof sortOrder === 'number' ? sortOrder : seedIndex,
-        memberCount: memberCountByKey.get(key) || 0,
-      });
-      seedIndex += 1;
-      return;
-    }
-
-    const current = teamMap.get(key)!;
-    teamMap.set(key, {
-      ...current,
-      companyId: current.companyId || nextCompanyId,
-      divisionName: current.divisionName === '기타' ? normalizeText(divisionName) || current.divisionName : current.divisionName,
-      sortOrder: typeof sortOrder === 'number' ? Math.min(current.sortOrder, sortOrder) : current.sortOrder,
-      memberCount: memberCountByKey.get(key) || current.memberCount,
-    });
-  };
-
-  orgTeams.forEach((row, index) => {
-    ensureTeam(row.company_name || '', '', row.division || '기타', row.team_name || '미지정', row.sort_order ?? index);
-  });
-  staffs.forEach((staff) => {
-    ensureTeam(staff.company || '', staff.company_id || '', '기타', staff.department || '미지정');
-  });
-  resources.forEach((resource) => {
-    ensureTeam(resource.companyName || resource.company || '', normalizeText(resource.company_id), resource.divisionName || '기타', resource.teamName || '미지정');
-  });
-  tasks.forEach((task) => {
-    ensureTeam(task.companyName || task.company || '', normalizeText(task.company_id), task.divisionName || '기타', task.teamName || '미지정');
-  });
-
-  const companyMap = new Map<string, CompanyScope>();
-  Array.from(teamMap.values())
-    .sort((left, right) => {
-      if (left.companyName !== right.companyName) return left.companyName.localeCompare(right.companyName, 'ko');
-      if (left.divisionName !== right.divisionName) return left.divisionName.localeCompare(right.divisionName, 'ko');
-      if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
-      return left.teamName.localeCompare(right.teamName, 'ko');
-    })
-    .forEach((team) => {
-      if (!companyMap.has(team.companyName)) {
-        companyMap.set(team.companyName, {
-          companyName: team.companyName,
-          companyId: team.companyId,
-          divisions: [],
-        });
-      }
-
-      const company = companyMap.get(team.companyName)!;
-      let division = company.divisions.find((item) => item.name === team.divisionName);
-      if (!division) {
-        division = { name: team.divisionName, teams: [] };
-        company.divisions.push(division);
-      }
-
-      division.teams.push({
-        key: buildTeamKey(team.companyName, team.teamName),
-        companyName: team.companyName,
-        companyId: team.companyId,
-        divisionName: team.divisionName,
-        teamName: team.teamName,
-        memberCount: team.memberCount,
-      });
-    });
-
-  return Array.from(companyMap.values());
-}
-
-function matchesCompanyScope(item: Pick<GuideRow, 'company' | 'company_id'>, companyName: string, companyId: string) {
-  const normalizedCompany = normalizeText(item.company);
-  if (!normalizedCompany) return true;
-  return normalizedCompany === companyName;
-}
-
-function matchesTeamScope(item: { companyName: string; company?: string | null; company_id?: string | null; teamName: string }, team: TeamScope) {
-  const normalizedItemTeam = normalizeText(item.teamName) || '미지정';
-  if (normalizedItemTeam !== team.teamName) return false;
-  return matchesCompanyScope(item, team.companyName, team.companyId);
-}
-
 export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Props) {
   const { dialog, openConfirm } = useActionDialog();
   const { data: appData } = useAppData();
@@ -623,7 +125,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       appData.staffs.map((s) => ({
         id: s.id ?? null,
         company: s.company ?? null,
-        company_id: (s as any).company_id ?? null,
+        company_id: s.company_id ?? null,
         department: s.department ?? null,
         status: s.status ?? null,
       })),
@@ -744,7 +246,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       setTeamTasks(sortGuideTasks(((taskResult.data || []) as GuideRow[]).map((item) => normalizeGuideTask(item))));
       setOrgTeams(((orgTeamResult.data || []) as OrgTeamRow[]) ?? []);
     } catch (error) {
-      console.error('guide workspace load failed', error);
+      logger.error('guide workspace load failed', error);
       toast(`${GUIDE_DISPLAY_NAME} 화면을 불러오지 못했습니다.`, 'error');
     } finally {
       setLoading(false);
@@ -1090,7 +592,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       resetComposer(targetTeam);
       setShowComposer(false);
     } catch (error) {
-      console.error('guide resource save failed', error);
+      logger.error('guide resource save failed', error);
       toast(error instanceof Error ? error.message : '업무자료 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSavingResource(false);
@@ -1146,7 +648,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       toast('업무자료를 삭제했습니다.', 'success');
       return true;
     } catch (error) {
-      console.error('guide resource delete failed', error);
+      logger.error('guide resource delete failed', error);
       toast('업무자료 삭제 중 오류가 발생했습니다.', 'error');
       return false;
     }
@@ -1252,7 +754,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
       resetTaskComposer();
     } catch (error) {
-      console.error('guide task save failed', error);
+      logger.error('guide task save failed', error);
       toast(error instanceof Error ? error.message : '팀 할일 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSavingTask(false);
@@ -1309,7 +811,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       }).eq('id', task.id);
       if (error) throw error;
     } catch (error) {
-      console.error('guide task toggle failed', error);
+      logger.error('guide task toggle failed', error);
       void loadGuideWorkspace();
     }
   }, [activeCompanyLabel, canWrite, currentUserId, loadGuideWorkspace, user?.name]);
@@ -1336,7 +838,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       }
       toast('팀 할일을 삭제했습니다.', 'success');
     } catch (error) {
-      console.error('guide task delete failed', error);
+      logger.error('guide task delete failed', error);
       toast('팀 할일 삭제 중 오류가 발생했습니다.', 'error');
     }
   }, [canManagePost, editingTaskId, resetTaskComposer]);
@@ -1505,7 +1007,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 
                 <select
                   value={audienceFilter}
-                  onChange={(event) => setAudienceFilter(event.target.value as any)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setAudienceFilter(value === 'all' || isGuideAudience(value) ? value : 'all');
+                  }}
                   className="h-9 rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-bold text-[var(--foreground)] outline-none cursor-pointer"
                 >
                   <option value="all">대상 — 전체</option>
@@ -1584,7 +1089,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--muted)] text-[var(--toss-gray-4)]">
                             {getGuideAudienceLabel(resource.audience)}
                           </span>
-                          {resource.isNew && (
+                          {Boolean(resource.isNew) && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500 text-white leading-none">
                               NEW
                             </span>
@@ -1963,7 +1468,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 <select
                   data-testid="guide-kind-select"
                   value={kind}
-                  onChange={(e) => setKind(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (isGuideKind(value)) setKind(value);
+                  }}
                   className="sr-only"
                 >
                   <option value="education">education</option>

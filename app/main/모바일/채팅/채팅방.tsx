@@ -25,6 +25,8 @@ import {
 import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { pokeChannel } from '@/lib/realtime-bus';
+import { logger } from '@/lib/logger';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MSheet from '../공통/MSheet';
@@ -60,6 +62,7 @@ import {
 import { toggleMobileReaction } from './반응';
 import {
   renameMobileRoom,
+  editMobileMessage,
   addMobileRoomMembers,
   removeMobileRoomMember,
   createMobilePoll,
@@ -71,6 +74,8 @@ import { ReactionDetailSheet, ReadStatusSheet } from './상세시트';
 import { ThreadSheet } from './스레드시트';
 import { AddMemberSheet } from './멤버관리시트';
 import { PollComposerSheet, PollCard } from './투표';
+import { MessageEditSheet } from './수정시트';
+import { triggerMobileChatPush } from './푸시트리거';
 
 export type SChatRoomProps = {
   user: ErpUser;
@@ -147,6 +152,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
 
   // 메시지 수정 시트
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   // 반응/읽음 상세 시트
   const [reactionDetailTarget, setReactionDetailTarget] = useState<ChatMessage | null>(null);
@@ -207,7 +214,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           content: `[퇴장] ${userName || '알 수 없음'}님이 채팅방을 나갔습니다.`,
         });
       } catch (noticeError) {
-        console.error('leave room system message error', noticeError);
+        logger.warn('leave room system message error', noticeError);
       }
       setLeaveConfirmOpen(false);
       setInfoOpen(false);
@@ -412,6 +419,29 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       void refresh();
     },
     [refresh, room.id, userId],
+  );
+
+  const handleSaveEditedMessage = useCallback(
+    async (message: ChatMessage, content: string) => {
+      setEditSaving(true);
+      try {
+        const result = await editMobileMessage({
+          messageId: String(message.id),
+          content,
+          roomId: String(room.id),
+        });
+        if (!result.ok) {
+          toast(result.error, 'error');
+          return;
+        }
+        toast('메시지가 수정되었습니다.', 'success');
+        setEditingMessage(null);
+        void refresh();
+      } finally {
+        setEditSaving(false);
+      }
+    },
+    [refresh, room.id],
   );
 
   // ── 투표 데이터 로드 (polls + poll_votes 집계) ──
@@ -693,7 +723,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     if (!forwardMessage || !userId) return;
     try {
       // 표준 messages 테이블 + 표준 writer 사용(비표준 chat_messages/message_type 제거).
-      const { error } = await insertChatMessageWithFallback(supabase, {
+      const { data, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(supabase, {
         room_id: String(targetRoom.id),
         sender_id: userId,
         content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
@@ -705,8 +735,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         album_id: null,
         album_index: null,
         album_total: null,
-      });
+      }, 'id, room_id');
       if (error) throw error;
+      pokeChannel(`mobile-chat-room-${targetRoom.id}`);
+      pokeChannel('mobile-chat-rooms-list');
+      if (data?.id && data?.room_id) {
+        triggerMobileChatPush(String(data.room_id), String(data.id));
+      }
       toast(`"${targetRoom.name || '채팅방'}"으로 메시지를 전달했습니다.`, 'success');
     } catch (err) {
       toast('메시지 전달 중 오류가 발생했습니다.', 'error');
@@ -714,7 +749,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       setIsForwardOpen(false);
       setForwardMessage(null);
     }
-  }, [forwardMessage, userId, userName]);
+  }, [forwardMessage, userId]);
 
   const placeholder = '메시지를 입력하세요.';
   const composerDisabled = uploading;
@@ -853,6 +888,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             setReplyTo(msg);
             setTimeout(() => composerInputRef.current?.focus(), 50);
           }}
+          onEdit={setEditingMessage}
           onImageLoad={scrollToBottom}
           onOpenBoardPost={onOpenBoardPost}
           onBookmark={handleToggleBookmark}
@@ -1461,6 +1497,14 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         memberIds={memberIds}
         staffs={staffs}
         onClose={() => setReadDetailTarget(null)}
+      />
+
+      {/* 메시지 수정 시트 */}
+      <MessageEditSheet
+        message={editingMessage}
+        saving={editSaving}
+        onClose={() => setEditingMessage(null)}
+        onSave={(message, content) => { void handleSaveEditedMessage(message, content); }}
       />
 
       {/* 스레드 시트 */}

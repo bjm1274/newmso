@@ -39,6 +39,7 @@ interface MessageActionsHostProps {
   /* 액션 콜백들 */
   onReact: (emoji: string) => void;
   onReply: () => void;
+  onEdit?: () => void;
   onCopy: () => void;
   onForward: () => void;
   onBookmark: () => void;
@@ -60,6 +61,7 @@ export default function MessageActionsHost({
   containerRef,
   onReact,
   onReply,
+  onEdit,
   onCopy,
   onForward,
   onBookmark,
@@ -239,12 +241,14 @@ export default function MessageActionsHost({
           onReact={handleReactClose}
           onAddEmoji={openPicker}
           onReply={onReply}
+          onEdit={onEdit}
           onCopy={onCopy}
           onForward={onForward}
           onBookmark={onBookmark}
           onTask={onTask}
           onDelete={onDelete}
           canDelete={canDelete ?? mine}
+          canEdit={Boolean(onEdit) && (canDelete ?? mine)}
           onReadDetail={onReadDetail}
           onOpenThread={onOpenThread}
           threadReplyCount={threadReplyCount}

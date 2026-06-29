@@ -31,6 +31,7 @@ export type MessageBubbleProps = {
   isGroupChat?: boolean;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onReply?: (message: ChatMessage) => void;
+  onEdit?: (message: ChatMessage) => void;
   onImageLoad?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
   replyTarget?: ChatMessage;
@@ -81,6 +82,7 @@ export default function MessageBubble({
   isGroupChat = false,
   onToggleReaction,
   onReply,
+  onEdit,
   onImageLoad,
   onOpenBoardPost,
   replyTarget,
@@ -151,6 +153,7 @@ export default function MessageBubble({
   }, [text]);
 
   const wasEdited = Boolean(message.edited_at);
+  const canEditMessage = mine && message.is_deleted !== true && !hasFile && !isSystemMessage && Boolean(text.trim());
 
   const handleCopy = useCallback(() => {
     if (text) {
@@ -167,6 +170,7 @@ export default function MessageBubble({
       testId={`chat-message-row-${message.id}`}
       onReact={(emoji) => onToggleReaction(String(message.id), emoji)}
       onReply={() => onReply?.(message)}
+      onEdit={canEditMessage && onEdit ? () => onEdit(message) : undefined}
       onCopy={handleCopy}
       onForward={() => onForward(message)}
       onBookmark={() => onBookmark(message)}

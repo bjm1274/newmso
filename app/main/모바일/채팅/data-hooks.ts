@@ -55,7 +55,7 @@ import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 type StaffDirectoryEntry = Pick<
   StaffMember,
-  'id' | 'name' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
+  'id' | 'name' | 'company' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
 >;
 
 export function useChatStaffDirectory(_company?: string | null) {
@@ -76,8 +76,8 @@ export function useChatStaffDirectory(_company?: string | null) {
           setStaffs([]);
           return;
         }
-        const normalized = data.map((staff) => normalizeProfileUser(staff));
-        setStaffs(normalized as any);
+        const normalized = data.map((staff) => normalizeProfileUser(staff) as StaffDirectoryEntry);
+        setStaffs(normalized);
       } catch {
         if (active) setStaffs([]);
       }
@@ -228,6 +228,11 @@ type UseChatMessagesResult = {
   replaceOptimistic: (tempId: string, real: ChatMessage) => void;
 };
 
+type RoomReadCursorRow = {
+  user_id?: string | null;
+  last_read_at?: string | null;
+};
+
 export function useMobileChatReadCounts(
   roomId: string | null,
   messages: ChatMessage[],
@@ -248,7 +253,7 @@ export function useMobileChatReadCounts(
         .in('user_id', memberIds);
 
       const counts: Record<string, number> = {};
-      const cursors = data || [];
+      const cursors = (Array.isArray(data) ? data : []) as RoomReadCursorRow[];
 
       messages.forEach((msg) => {
         const msgTime = new Date(msg.created_at || 0).getTime();
@@ -259,8 +264,9 @@ export function useMobileChatReadCounts(
 
         let readers = 0;
         recipientIds.forEach((mId) => {
-          const cursor = cursors.find((c: any) => String(c.user_id) === mId);
-          if (cursor && new Date(cursor.last_read_at).getTime() >= msgTime) {
+          const cursor = cursors.find((c) => String(c.user_id) === mId);
+          const cursorTime = cursor?.last_read_at ? new Date(cursor.last_read_at).getTime() : 0;
+          if (Number.isFinite(cursorTime) && cursorTime >= msgTime) {
             readers++;
           }
         });
@@ -679,7 +685,7 @@ export function getRoomTitle(
   staffs: StaffDirectoryEntry[],
   currentUserId: string | null | undefined,
 ): string {
-  return getRoomDisplayName(room, staffs as any, currentUserId);
+  return getRoomDisplayName(room, staffs as StaffMember[], currentUserId);
 }
 
 export function getRoomKind(room: ChatRoom): string {

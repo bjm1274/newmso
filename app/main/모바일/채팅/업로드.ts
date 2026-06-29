@@ -215,6 +215,7 @@ export async function sendMobileFileMessage(
         const insertPayloadTemplate: Record<string, unknown> = {
           room_id: input.roomId,
           sender_id: input.senderId,
+          file_kind: fileKind,
           message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
           file_url: '{fileUrl}',
           file_name: input.file.name,

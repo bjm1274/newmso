@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 내정보 라우터 — home/attend/leave/payslip/cert/edit/todo/notifSettings sub-route 전환.
+ * 내정보 라우터 — home/attend/leave/records/edit/todo/notifSettings sub-route 전환.
  * MobileShell이 tab === 'home' 일 때 마운트.
  * JM: 단일 책임 (분기만), ~60줄
  */
@@ -11,11 +11,10 @@ import type { MHomeSub, MTab } from '../셸/m-routes';
 import SHome from './홈';
 import SAttend from './출퇴근체크인';
 import 연차 from './연차';
-import 급여명세 from './급여명세';
-import 증명서 from './증명서';
 import 정보수정 from './정보수정';
 import 나의할일 from './나의할일';
 import 알림설정 from './알림설정';
+import { PayrollAndCertificatesHub } from '@/app/main/기능부품/마이페이지/마이페이지공통섹션';
 
 export type 내정보Props = {
   user: ErpUser;
@@ -25,10 +24,11 @@ export type 내정보Props = {
   onSwitchTab?: (tab: MTab, sub?: string) => void;
 };
 
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: 내정보Props) {
   const onBack = () => onSub(undefined);
+  const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
 
   let contentElement: React.ReactNode;
 
@@ -46,10 +46,15 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
     );
   } else if (sub === 'leave') {
     contentElement = <연차 user={user} onBack={onBack} />;
-  } else if (sub === 'payslip') {
-    contentElement = <급여명세 user={user} onBack={onBack} />;
-  } else if (sub === 'cert') {
-    contentElement = <증명서 user={user} onBack={onBack} />;
+  } else if (sub === 'records') {
+    contentElement = (
+      <PayrollAndCertificatesHub
+        user={user}
+        activeView={recordsView}
+        onBack={onBack}
+        onChangeView={setRecordsView}
+      />
+    );
   } else if (sub === 'edit') {
     contentElement = <정보수정 user={user} onBack={onBack} />;
   } else if (sub === 'todo') {

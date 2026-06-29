@@ -110,7 +110,37 @@ function MobileBottomTabBase({
   dots,
 }: MobileBottomTabProps) {
   return (
-    <nav className="m-bottom-tab" aria-label="주 네비게이션" data-testid="mobile-tabbar">
+    <nav
+      className="m-bottom-tab macos-glass"
+      aria-label="주 네비게이션"
+      data-testid="mobile-tabbar"
+      style={{
+        position: 'fixed',
+        bottom: '16px',
+        left: '16px',
+        right: '16px',
+        height: '64px',
+        borderRadius: '22px',
+        border: '1px solid rgba(255, 255, 255, 0.4)',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 10px',
+        overflowX: 'auto',
+        overflowY: 'hidden',
+        scrollbarWidth: 'none',
+        WebkitOverflowScrolling: 'touch',
+        zIndex: 999,
+        maskImage: 'linear-gradient(to right, transparent, white 6%, white 94%, transparent)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent, white 6%, white 94%, transparent)',
+      }}
+    >
+      <style>{`
+        .m-bottom-tab::-webkit-scrollbar {
+          display: none !important;
+        }
+      `}</style>
+
       {TABS.map((t) => {
         const on = t.id === active;
         const badgeCount = badges?.[t.id];
@@ -131,27 +161,119 @@ function MobileBottomTabBase({
             aria-current={on ? 'page' : undefined}
             aria-label={t.label}
             data-testid={testId}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 0,
+              padding: '6px 12px',
+              minWidth: '58px',
+              flexShrink: 0,
+              cursor: 'pointer',
+              outline: 'none',
+              position: 'relative',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: on ? 'scale(1.08) translateY(-1px)' : 'scale(1)',
+            }}
           >
-            <div className="ico-wrap">
+            <div
+              className="ico-wrap"
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: on ? 'var(--m-accent)' : 'var(--z-500)',
+                transition: 'color 0.2s ease',
+              }}
+            >
               <svg
                 width={22}
                 height={22}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={on ? 2.2 : 1.8}
+                strokeWidth={on ? 2.4 : 1.6}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
+                style={{
+                  filter: on ? 'drop-shadow(0 2px 8px rgba(0, 122, 255, 0.35))' : 'none',
+                }}
               >
                 {TAB_ICONS[t.id]}
               </svg>
-              {showDot && <span className="dot" />}
+              {showDot && (
+                <span
+                  className="dot"
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--m-accent)',
+                  }}
+                />
+              )}
               {typeof badgeCount === 'number' && badgeCount > 0 && (
-                <span className="badge">{badgeCount > 99 ? '99+' : badgeCount}</span>
+                <span
+                  className="badge"
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -10,
+                    minWidth: 16,
+                    height: 16,
+                    padding: '0 4px',
+                    borderRadius: 8,
+                    background: 'var(--m-danger)',
+                    color: '#ffffff',
+                    fontSize: 9,
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1,
+                    boxShadow: '0 2px 5px rgba(255, 59, 48, 0.3)',
+                  }}
+                >
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
               )}
             </div>
-            <span className="lab">{t.label}</span>
+            
+            {/* 맥OS 독 스타일 활성 인디케이터 라이트 닷 또는 레이블 */}
+            {on ? (
+              <span
+                className="macos-dock-indicator"
+                style={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: '50%',
+                  background: 'var(--m-accent)',
+                  boxShadow: '0 0 5px var(--m-accent)',
+                  marginTop: 6,
+                  display: 'block',
+                }}
+              />
+            ) : (
+              <span
+                className="lab"
+                style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  color: 'var(--z-500)',
+                  marginTop: 4,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {t.label}
+              </span>
+            )}
           </button>
         );
       })}

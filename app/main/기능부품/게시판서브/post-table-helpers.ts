@@ -5,6 +5,7 @@
  */
 
 import type { BoardPost } from '@/types';
+import { logger } from '@/lib/logger';
 
 export type SortKey = 'recent' | 'views' | 'likes' | 'comments';
 export type ReadFilter = 'all' | 'unread' | 'favorite';
@@ -34,8 +35,7 @@ export function readFavoritesFromStorage(): Set<string> {
     return new Set(parsed.filter((v): v is string => typeof v === 'string'));
   } catch (error) {
     // 격리: 로깅만, 사용자에게는 노출하지 않음
-    // eslint-disable-next-line no-console
-    console.warn('[board] favorites parse failed', error);
+    logger.warn('[board] favorites parse failed', error);
     return new Set();
   }
 }
@@ -45,8 +45,7 @@ export function writeFavoritesToStorage(ids: Set<string>): void {
   try {
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(ids)));
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('[board] favorites save failed', error);
+    logger.warn('[board] favorites save failed', error);
   }
 }
 

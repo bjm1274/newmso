@@ -30,12 +30,14 @@ export interface MessageContextMenuProps {
   onReact: (emoji: string) => void;
   onAddEmoji: (anchorX: number, anchorY: number) => void;
   onReply: () => void;
+  onEdit?: () => void;
   onCopy: () => void;
   onForward: () => void;
   onBookmark: () => void;
   onTask: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
+  canEdit?: boolean;
   onReadDetail?: () => void;
   onOpenThread?: () => void;
   threadReplyCount?: number;
@@ -48,12 +50,14 @@ export default function MessageContextMenu({
   onReact,
   onAddEmoji,
   onReply,
+  onEdit,
   onCopy,
   onForward,
   onBookmark,
   onTask,
   onDelete,
   canDelete = false,
+  canEdit = false,
   onReadDetail,
   onOpenThread,
   threadReplyCount,
@@ -196,6 +200,29 @@ export default function MessageContextMenu({
           <span>답글로 전송</span>
           <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">R</kbd>
         </button>
+        {onEdit && (
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!canEdit}
+            aria-disabled={!canEdit}
+            onClick={() => {
+              if (canEdit) {
+                onEdit();
+                onClose();
+              }
+            }}
+            className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors ${
+              canEdit
+                ? 'text-[var(--foreground)] hover:bg-[var(--muted)]'
+                : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
+            }`}
+          >
+            <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✎</span>
+            <span>메시지 수정</span>
+            <span />
+          </button>
+        )}
         <button
           type="button"
           role="menuitem"

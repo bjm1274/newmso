@@ -14,6 +14,8 @@
 //      - 사용자 동작 발생 또는 탭 포커스 시 즉시 연결 재수립 및 변경 사항 스캔
 // ============================================================
 
+import { logger } from './logger';
+
 export type Unsubscribe = () => void;
 export type RealtimeCallback = (payload: unknown) => void;
 export type RealtimeBatchCallback = (payloads: unknown[]) => void;
@@ -55,7 +57,7 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분
 let sseSource: EventSource | null = null;
 let sseErrorCount = 0;
 const MAX_SSE_ERRORS = 3;
-let useSSE = false;
+const useSSE = false;
 let sseSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Cross-Tab Leader Election & Self-Healing SSE
@@ -92,7 +94,7 @@ if (typeof window !== 'undefined') {
     const nextIsLeader = smallestId === myTabId;
     if (nextIsLeader !== isLeader) {
       isLeader = nextIsLeader;
-      console.log(`[polling-bus] Tab ${myTabId} leader status changed: ${isLeader}`);
+      logger.debug(`[polling-bus] Tab ${myTabId} leader status changed: ${isLeader}`);
       syncRealtimeConnections();
     }
   };
@@ -163,7 +165,7 @@ function ensureActivityHandlers(): void {
     lastActivityTime = Date.now();
     if (isIdle) {
       isIdle = false;
-      console.log('[polling-bus] User active, resuming real-time');
+      logger.debug('[polling-bus] User active, resuming real-time');
       syncRealtimeConnections();
       // 재개 즉시 전체 채널 한번 폴링하여 지연 시간 해소
       triggerImmediateSync();
@@ -179,7 +181,7 @@ function ensureActivityHandlers(): void {
   idleCheckTimer = setInterval(() => {
     if (!isIdle && Date.now() - lastActivityTime > IDLE_TIMEOUT_MS) {
       isIdle = true;
-      console.log('[polling-bus] User idle for 5 minutes, suspending real-time');
+      logger.debug('[polling-bus] User idle for 5 minutes, suspending real-time');
       syncRealtimeConnections();
     }
   }, 10000);
@@ -191,7 +193,7 @@ function ensureVisibilityHandler(): void {
   visibilityHandlerInstalled = true;
 
   document.addEventListener('visibilitychange', () => {
-    console.log(`[polling-bus] visibilitychange: ${document.visibilityState}`);
+    logger.debug(`[polling-bus] visibilitychange: ${document.visibilityState}`);
     syncRealtimeConnections();
     if (!isSuspended()) {
       triggerImmediateSync();
@@ -225,7 +227,7 @@ function processTailData(entry: ChannelEntry, tail: Record<string, string | null
     try {
       cb(payloads[payloads.length - 1]);
     } catch (err) {
-      console.warn('[polling-bus] single callback error', err);
+      logger.warn('[polling-bus] single callback error', err);
     }
   }
   if (entry.batchCallbacks.size > 0) {
@@ -233,7 +235,7 @@ function processTailData(entry: ChannelEntry, tail: Record<string, string | null
       try {
         cb(payloads);
       } catch (err) {
-        console.warn('[polling-bus] batch callback error', err);
+        logger.warn('[polling-bus] batch callback error', err);
       }
     }
   }
@@ -259,7 +261,7 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
       bc.postMessage({ type: 'change', tail: data.tail });
     }
   } catch (err) {
-    console.warn('[polling-bus] poll failed', err);
+    logger.warn('[polling-bus] poll failed', err);
   } finally {
     entry.inFlight = false;
   }
@@ -295,7 +297,7 @@ function syncSSEConnectionInternal() {
   // If not the leader, close EventSource connection
   if (!isLeader) {
     if (sseSource) {
-      console.log(`[polling-bus] Tab ${myTabId} (follower) closing EventSource connection`);
+      logger.debug(`[polling-bus] Tab ${myTabId} (follower) closing EventSource connection`);
       sseSource.close();
       sseSource = null;
     }
@@ -305,7 +307,7 @@ function syncSSEConnectionInternal() {
   // 중단 상태인 경우 SSE 닫기
   if (isSuspended()) {
     if (sseSource) {
-      console.log('[polling-bus] Suspended state: Closing EventSource connection');
+      logger.debug('[polling-bus] Suspended state: Closing EventSource connection');
       sseSource.close();
       sseSource = null;
     }
@@ -345,19 +347,19 @@ function syncSSEConnectionInternal() {
     } catch {
       // ignore parsing error
     }
-    console.log('[polling-bus] Subscribed tables changed, reconnecting EventSource');
+    logger.debug('[polling-bus] Subscribed tables changed, reconnecting EventSource');
     sseSource.close();
     sseSource = null;
   }
 
   try {
-    console.log(`[polling-bus] Connecting EventSource to ${targetUrl}`);
+    logger.debug(`[polling-bus] Connecting EventSource to ${targetUrl}`);
     sseSource = new EventSource(targetUrl, { withCredentials: true });
 
     sseSource.addEventListener('initial', (e: MessageEvent) => {
       try {
         const payload = JSON.parse(e.data) as { tail: Record<string, string | null> };
-        console.log('[polling-bus] SSE initial payload received:', payload);
+        logger.debug('[polling-bus] SSE initial payload received:', payload);
         // 채널들에 초기 상태 시드값 주입 (false positive 방지용)
         for (const entry of channelRegistry.values()) {
           for (const tableFilter of entry.tables) {
@@ -377,7 +379,7 @@ function syncSSEConnectionInternal() {
         sseActive = true;
         syncPollingIntervalsInternal();
       } catch (err) {
-        console.warn('[polling-bus] Failed to parse initial payload', err);
+        logger.warn('[polling-bus] Failed to parse initial payload', err);
       }
     });
 
@@ -397,12 +399,12 @@ function syncSSEConnectionInternal() {
         sseErrorCount = 0; // 에러 카운터 리셋
         sseActive = true;
       } catch (err) {
-        console.warn('[polling-bus] Failed to parse change payload', err);
+        logger.warn('[polling-bus] Failed to parse change payload', err);
       }
     });
 
     sseSource.onerror = (e) => {
-      console.warn('[polling-bus] EventSource error occurred', e);
+      logger.warn('[polling-bus] EventSource error occurred', e);
       sseErrorCount++;
       sseActive = false;
       if (sseSource) {
@@ -415,14 +417,14 @@ function syncSSEConnectionInternal() {
 
       // 지수 백오프로 재연결 시도
       const delay = Math.min(30000, 1000 * Math.pow(2, sseErrorCount));
-      console.log(`[polling-bus] Retrying EventSource in ${delay}ms`);
+      logger.debug(`[polling-bus] Retrying EventSource in ${delay}ms`);
       if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
       sseReconnectTimer = setTimeout(() => {
         syncRealtimeConnections();
       }, delay);
     };
   } catch (err) {
-    console.error('[polling-bus] EventSource initialization failed', err);
+    logger.error('[polling-bus] EventSource initialization failed', err);
     sseActive = false;
     syncPollingIntervalsInternal();
   }

@@ -4,11 +4,9 @@
  * 알림탭 — 독립 알림 탭 화면 (바텀탭 연동용).
  *   - 상단 큰 제목 '알림' + '모두 읽음' 버튼
  *   - 알림 리스트 (msm-list): unread 파란 틴트 배경, read 기본 카드 배경
- *   - 각 행: 톤 아이콘 타일 + 제목/본문 + 시간
- * 실제 notifications 테이블 연동(read_at 기반 읽음). D1 정본 스키마는 read_at 컬럼만 존재.
+ *   - 각 행: macOS Launchpad 디자인 팩과 일치된 스쿼클 젤리 아이콘 팩 연동
+ * 실제 notifications 테이블 연동(read_at 기반 읽음).
  * JM: 단일 책임 (알림 리스트 표시)
- * JM4: any 금지
- * JM6: button 시맨틱, aria-label
  */
 
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
@@ -29,13 +27,11 @@ import {
 } from '@/app/main/기능부품/알림시스템/notification-api';
 import MIcon from '../공통/MIcon';
 
-type Tone = 'accent' | 'success' | 'warn' | 'danger' | 'muted';
-
 /** 알림 항목 타입 */
 type NotifItem = {
   id: string;
   icon: string;
-  tone: Tone;
+  themeKey: string;
   title: string;
   body: string;
   time: string;
@@ -46,52 +42,56 @@ type NotifItem = {
   metadata: Record<string, unknown>;
 };
 
-const TONE_MAP: Record<Tone, { bg: string; fg: string }> = {
-  accent:  { bg: 'var(--m-accent-soft)', fg: 'var(--m-accent)' },
-  success: { bg: 'var(--m-success-soft)', fg: '#047857' },
-  warn:    { bg: 'var(--m-warning-soft)', fg: '#B45309' },
-  danger:  { bg: 'var(--m-danger-soft)', fg: 'var(--m-danger)' },
-  muted:   { bg: 'var(--z-100)', fg: 'var(--z-600)' },
+/** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 1대1 싱크) */
+const NOTIF_LAUNCHPAD_THEMES: Record<string, { bg: string; icon: string }> = {
+  approval:    { bg: 'linear-gradient(135deg, #007AFF, #0A55E1)', icon: 'checkCircle' },
+  inventory:   { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', icon: 'box' },
+  chat:        { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'chat' },
+  attendance:  { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'clock' },
+  payroll:     { bg: 'linear-gradient(135deg, #BF5AF2, #8F22D0)', icon: 'won' },
+  board:       { bg: 'linear-gradient(135deg, #30B0C7, #007A8D)', icon: 'fileText' },
+  default:     { bg: 'linear-gradient(135deg, #8E8E93, #636366)', icon: 'bell' },
 };
 
-/** notifications.type → 모바일 아이콘/톤 매핑 */
-function mapTypeToVisual(type: string): { icon: string; tone: Tone } {
+/** notifications.type → macOS 테마 키 맵핑 */
+function mapTypeToThemeKey(type: string): string {
   switch (type) {
     case 'approval':
     case '결재':
-      return { icon: 'checkCircle', tone: 'accent' };
+      return 'approval';
     case 'inventory':
     case '재고':
-      return { icon: 'box', tone: 'danger' };
+      return 'inventory';
     case 'message':
     case 'mention':
     case 'chat':
     case '채팅':
-      return { icon: 'chat', tone: 'success' };
+      return 'chat';
     case 'attendance':
     case '근태':
     case 'leave':
     case '연차':
-      return { icon: 'calendar', tone: 'accent' };
+      return 'attendance';
     case 'payroll':
     case '급여':
-      return { icon: 'won', tone: 'warn' };
+      return 'payroll';
     case 'board':
     case '게시판':
-      return { icon: 'fileText', tone: 'warn' };
+      return 'board';
     default:
-      return { icon: 'bell', tone: 'muted' };
+      return 'default';
   }
 }
 
 function normalizeRow(row: NotificationRecord): NotifItem {
   const type = toNotificationText(row.type, 'notification', true);
-  const visual = mapTypeToVisual(type);
+  const themeKey = mapTypeToThemeKey(type);
+  const visual = NOTIF_LAUNCHPAD_THEMES[themeKey] || NOTIF_LAUNCHPAD_THEMES.default;
   const created = toNotificationText(row.created_at, '');
   return {
     id: toNotificationText(row.id, '', true),
     icon: visual.icon,
-    tone: visual.tone,
+    themeKey,
     title: toNotificationText(row.title, '알림'),
     body: toNotificationText(row.body, ''),
     time: created ? timeAgo(created) : '',
@@ -131,7 +131,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
     return () => { cancelledRef.current = true; };
   }, [fetchNotifs]);
 
-  // 수정 F: NOTIFICATION_LIST_UPDATED_EVENT 리스너 — 실시간 갱신
+  // 실시간 갱신 리스너
   useEffect(() => {
     if (!staffId || typeof window === 'undefined') return;
     const handler = () => { void fetchNotifs(); };
@@ -146,17 +146,13 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
     emitNotificationReadEvent();
   }, [staffId]);
 
-  // 탭 시: (1) 읽음 처리 → (2) 알림 종류에 맞는 모바일 탭/서브뷰로 이동.
-  // PC NotificationInbox와 동일하게 resolveNotificationTarget(type, metadata)로 목적지를 산출하고,
-  // PC의 router.push(href) 대신 모바일 NavigationContext(setMainMenu/setSubView)로 탭을 전환한다.
-  // (MobileShell이 mainMenu 변화를 감지해 route.tab을 동기화한다.)
+  // 탭 시 라우팅 전환
   const handleTapItem = useCallback(async (item: NotifItem) => {
     const { id } = item;
     setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
     await markNotificationAsRead(id).catch(() => null);
     emitNotificationReadEvent();
 
-    // 목적지 결정 — PC와 동일한 매핑 엔진 재사용.
     const target = resolveNotificationTarget(item.type, item.metadata);
     switch (target.kind) {
       case 'chat':
@@ -174,7 +170,6 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
         if (target.boardType) setSubView(target.boardType);
         break;
       case 'menu':
-        // target.menu는 이미 한글 메뉴 라벨(채팅/전자결재/게시판/재고관리/내정보/알림/관리자).
         setMainMenu(target.menu);
         if (target.subView) setSubView(target.subView);
         break;
@@ -183,7 +178,6 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
         break;
       case 'notifications':
       default:
-        // 알림 화면 자체이므로 이동하지 않는다(읽음 처리만).
         break;
     }
   }, [setMainMenu, setSubView]);
@@ -191,27 +185,46 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
   const unreadCount = notifs.filter((n) => n.unread).length;
 
   return (
-    <div className="m-screen">
-      {/* 타이틀 바 — 헤더 없음, 직접 구성 */}
+    <div
+      className="m-screen"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* macOS 윈도우 스타일 타이틀 바 */}
       <div
+        className="macos-glass"
         style={{
           padding: '18px 20px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
         }}
       >
-        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em' }}>
+        <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* macOS 신호등 제어 단추 */}
+          <div style={{ display: 'flex', gap: 5.5, marginRight: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F56', display: 'block', border: '0.5px solid #E0443E' }} />
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E', display: 'block', border: '0.5px solid #DEA123' }} />
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27C93F', display: 'block', border: '0.5px solid #1AAB29' }} />
+          </div>
           알림
           {unreadCount > 0 && (
             <span
               style={{
-                marginLeft: 8,
-                fontSize: 13,
-                fontWeight: 700,
-                color: 'var(--m-accent)',
+                fontSize: 11.5,
+                fontWeight: 800,
+                color: '#fff',
+                background: 'var(--m-accent)',
+                padding: '1px 6px',
+                borderRadius: '6px',
+                lineHeight: 1.25,
               }}
             >
               {unreadCount}
@@ -224,12 +237,15 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
           aria-label="모두 읽음 처리"
           disabled={unreadCount === 0}
           style={{
-            fontSize: 13,
-            fontWeight: 700,
+            fontSize: 12,
+            fontWeight: 800,
             color: unreadCount > 0 ? 'var(--m-accent)' : 'var(--z-400)',
-            padding: '6px 12px',
-            borderRadius: 8,
-            background: unreadCount > 0 ? 'var(--m-accent-tint)' : 'transparent',
+            padding: '5px 12px',
+            borderRadius: '999px',
+            background: unreadCount > 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0, 0, 0, 0.03)',
+            border: unreadCount > 0 ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid rgba(0, 0, 0, 0.05)',
+            cursor: unreadCount > 0 ? 'pointer' : 'default',
+            transition: 'all 0.2s ease',
           }}
         >
           모두 읽음
@@ -237,7 +253,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
       </div>
 
       {/* 알림 리스트 */}
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {loading ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13 }}>
             불러오는 중…
@@ -247,14 +263,14 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
             받은 알림이 없습니다.
           </div>
         ) : (
-        <div className="msm-list" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="msm-list" style={{ padding: '16px 16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {notifs.map((n) => {
-            const tone = TONE_MAP[n.tone];
+            const theme = NOTIF_LAUNCHPAD_THEMES[n.themeKey] || NOTIF_LAUNCHPAD_THEMES.default;
             return (
               <button
                 key={n.id}
                 type="button"
-                className="msm-row"
+                className="msm-row macos-glass macos-squircle-sm"
                 onClick={() => { void handleTapItem(n); }}
                 aria-label={`${n.title} — ${n.body}`}
                 style={{
@@ -263,26 +279,34 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                   display: 'grid',
                   gridTemplateColumns: '42px 1fr auto',
                   alignItems: 'start',
-                  gap: 12,
+                  gap: 14,
                   padding: '14px 16px',
-                  borderRadius: 14,
-                  border: `1px solid ${n.unread ? '#CADCFE' : 'var(--m-border)'}`,
-                  background: n.unread ? 'var(--m-accent-tint)' : 'var(--m-card)',
+                  border: n.unread
+                    ? '1px solid rgba(59, 130, 246, 0.45)'
+                    : '1px solid rgba(0, 0, 0, 0.07)',
+                  background: n.unread
+                    ? 'rgba(59, 130, 246, 0.06)'
+                    : 'rgba(255, 255, 255, 0.65)',
+                  boxShadow: n.unread
+                    ? '0 4px 16px rgba(59, 130, 246, 0.05)'
+                    : '0 4px 12px rgba(0, 0, 0, 0.02)',
                   cursor: 'pointer',
+                  transition: 'all 0.23s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
                 }}
               >
-                {/* lead — 톤 아이콘 */}
+                {/* lead — macOS 젤리 아이콘 팩과 1대1 매치된 톤 아이콘 */}
                 <div
-                  className="lead"
+                  className="lead macos-squircle-sm"
                   style={{
                     width: 42,
                     height: 42,
-                    borderRadius: 12,
-                    background: tone.bg,
-                    color: tone.fg,
+                    background: theme.bg,
+                    color: '#ffffff',
                     display: 'grid',
                     placeItems: 'center',
                     flexShrink: 0,
+                    boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.25), 0 3px 8px rgba(0,0,0,0.12)',
                   }}
                 >
                   <MIcon name={n.icon} size={20} />
@@ -293,9 +317,10 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                   <div
                     className="nm"
                     style={{
-                      fontSize: 14,
-                      fontWeight: 700,
-                      letterSpacing: '-0.012em',
+                      fontSize: 13.5,
+                      fontWeight: 800,
+                      color: 'var(--foreground)',
+                      letterSpacing: '-0.015em',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
@@ -304,10 +329,11 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                     {n.unread && (
                       <span
                         style={{
-                          width: 7,
-                          height: 7,
+                          width: 6.5,
+                          height: 6.5,
                           borderRadius: '50%',
                           background: 'var(--m-accent)',
+                          boxShadow: '0 0 6px var(--m-accent)',
                           flexShrink: 0,
                         }}
                       />
@@ -317,11 +343,11 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                   <div
                     className="sub"
                     style={{
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: 'var(--z-500)',
-                      marginTop: 3,
-                      fontWeight: 500,
-                      lineHeight: 1.4,
+                      marginTop: 4,
+                      fontWeight: 600,
+                      lineHeight: 1.45,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
@@ -335,14 +361,14 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                 <div
                   className="meta"
                   style={{
-                    paddingTop: 2,
+                    paddingTop: 3,
                   }}
                 >
                   <span
                     className="time"
                     style={{
-                      fontSize: 11,
-                      fontWeight: 600,
+                      fontSize: 10.5,
+                      fontWeight: 700,
                       color: 'var(--z-400)',
                       whiteSpace: 'nowrap',
                     }}

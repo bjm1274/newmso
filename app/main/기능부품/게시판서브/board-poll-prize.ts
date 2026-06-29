@@ -32,6 +32,11 @@ export type BoardPoll = {
   prizeWinners?: BoardPollPrizeWinner[];
 };
 
+type PrizeStaffRow = {
+  id: string | null;
+  name: string | null;
+};
+
 // ─── Fisher-Yates 셔플 (순수 함수) ───────────────────────────────────────────
 
 function fisherYatesShuffle<T>(arr: T[]): T[] {
@@ -117,10 +122,9 @@ export async function drawBoardPollPrize(
       throw staffError;
     }
 
+    const staffList = (Array.isArray(staffRows) ? staffRows : []) as PrizeStaffRow[];
     const winners: BoardPollPrizeWinner[] = selectedIds.map((id) => {
-      const found = ((staffRows as any) ?? []).find(
-        (s: { id: unknown; name: unknown }) => String(s.id) === id,
-      );
+      const found = staffList.find((s) => String(s.id) === id);
       return { id, name: String(found?.name ?? '알 수 없음') };
     });
 

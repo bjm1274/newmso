@@ -3,6 +3,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { compareStaffMembers, isMessageReadByCursor } from './메신저유틸';
 
@@ -151,7 +152,7 @@ export function useChatMessageEditing({
 
       setEditHistoryEntries(parsedEntries.length > 0 ? parsedEntries : fallbackEntries);
     } catch (error) {
-      console.error('openEditHistory error', error);
+      logger.warn('openEditHistory error', error);
       setEditHistoryEntries(fallbackEntries);
       if (!fallbackEntries.length) {
         toast('수정 이력을 불러오지 못했습니다.', 'error');
@@ -224,7 +225,7 @@ export function useChatMessageEditing({
         }),
       }]);
     } catch (auditError) {
-      console.error('message edit audit log insert failed', auditError);
+      logger.warn('message edit audit log insert failed', auditError);
     }
   }, [auditUserId, auditUserName, closeEditingMessage, currentUserId, editingMessage, editingMessageDraft, fallbackUserId, fetchData, selectedRoomId, setMessages, setPersistedPinnedMessages, syncRoomSummaryFromMessages]);
 

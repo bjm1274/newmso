@@ -14,6 +14,7 @@ import type { ErpUser, StaffMember } from '@/types';
 import { db, d1 } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
+import { logger } from '@/lib/logger';
 import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import MobileHeader from '../셸/MobileHeader';
@@ -111,7 +112,7 @@ export default function OP체크상세({
         }),
       );
     } catch (err) {
-      console.warn('[mobile-addon] op detail load', err);
+      logger.warn('[mobile-addon] op detail load', err);
     } finally {
       setLoading(false);
     }
@@ -146,7 +147,7 @@ export default function OP체크상세({
       });
       if (error) {
         const err = new Error(error);
-        console.warn('[mobile-addon] checklist save', err);
+        logger.warn('[mobile-addon] checklist save', err);
         throw err;
       }
       return { queued };
@@ -228,16 +229,16 @@ export default function OP체크상세({
           const { error: notiErr } = await d1.from('notifications').insert(rows);
           if (notiErr) {
             // 알림은 보조 — 실패해도 상태 전환은 유지
-            console.warn('[mobile-addon] op ready notify', notiErr);
+            logger.warn('[mobile-addon] op ready notify', notiErr);
           }
         }
       } catch (notiErr) {
-        console.warn('[mobile-addon] op ready notify load', notiErr);
+        logger.warn('[mobile-addon] op ready notify load', notiErr);
       }
 
       toast('준비 완료로 변경했습니다.', 'success');
     } catch (err) {
-      console.warn('[mobile-addon] op ready toggle', err);
+      logger.warn('[mobile-addon] op ready toggle', err);
       setLocalState(prev); // 롤백
       toast('상태 변경에 실패했습니다.', 'error');
     } finally {

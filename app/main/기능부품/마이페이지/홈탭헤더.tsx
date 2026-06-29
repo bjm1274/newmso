@@ -75,7 +75,20 @@ function HomeTabHeader({
                   {positionAndDept}
                 </span>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              
+              {/* 모바일 화면용 사번 및 입사일 정보 상시 노출 */}
+              <div className="mt-2.5 flex flex-col gap-0.5 text-[11px] font-semibold text-[var(--toss-gray-3)] sm:hidden">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--toss-gray-4)] font-bold">사번</span>
+                  <span className="font-extrabold text-[var(--foreground)]" style={{ fontFeatureSettings: '"tnum"' }}>{employeeNo}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--toss-gray-4)] font-bold">입사일</span>
+                  <span className="font-extrabold text-[var(--foreground)]" style={{ fontFeatureSettings: '"tnum"' }}>{joinedAtLabel}</span>
+                </div>
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className={
                     isRetired

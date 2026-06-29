@@ -26,7 +26,7 @@ type NewChatTab = 'member' | 'org' | 'channel';
 export type SFormChatProps = {
   user: ErpUser;
   onBack: () => void;
-  onCreated: (roomId: string) => void;
+  onCreated: (roomId: string, room?: ChatRoom) => void;
 };
 
 export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
@@ -99,7 +99,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
       if (isDirect) {
         const existing = await findExistingDirectRoom(memberIds);
         if (existing) {
-          onCreated(String(existing.id));
+          onCreated(String(existing.id), existing);
           return;
         }
       }
@@ -117,7 +117,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         toast(result.error || '대화방 생성에 실패했어요.', 'error');
         return;
       }
-      onCreated(String(result.room.id));
+      onCreated(String(result.room.id), result.room as unknown as ChatRoom);
     } catch (err) {
       const message = err instanceof Error ? err.message : '대화방 생성 실패';
       toast(message, 'error');

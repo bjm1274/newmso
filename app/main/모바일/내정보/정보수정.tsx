@@ -23,6 +23,7 @@ import {
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { hasPermission } from '@/lib/access-control';
+import { useActionDialog } from '@/app/components/useActionDialog';
 
 function getInitial(name?: string | null) {
   return String(name || '').trim().slice(0, 1) || '나';
@@ -84,6 +85,69 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
     phone: typeof user.phone === 'string' ? user.phone : null,
   }));
   const [saving, setSaving] = useState(false);
+
+  const { dialog, openPrompt } = useActionDialog();
+
+  const handleChangePassword = useCallback(async () => {
+    const currentPassword = await openPrompt({
+      title: '비밀번호 변경',
+      description: '현재 비밀번호를 먼저 입력해 주세요.',
+      confirmText: '다음',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '현재 비밀번호',
+    });
+    if (!currentPassword) return;
+
+    const nextPassword = await openPrompt({
+      title: '새 비밀번호',
+      description: '앞으로 로그인할 때 사용할 새 비밀번호를 입력해 주세요.',
+      confirmText: '다음',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '새 비밀번호',
+      helperText: '4자 이상 입력해 주세요.',
+    });
+    if (!nextPassword) return;
+    if (nextPassword.trim().length < 4) {
+      toast('새 비밀번호는 4자 이상 입력해 주세요.', 'warning');
+      return;
+    }
+
+    const nextPasswordConfirm = await openPrompt({
+      title: '새 비밀번호 확인',
+      description: '새 비밀번호를 한 번 더 입력해 주세요.',
+      confirmText: '변경',
+      cancelText: '취소',
+      inputType: 'password',
+      required: true,
+      placeholder: '새 비밀번호 확인',
+    });
+    if (!nextPasswordConfirm) return;
+
+    if (nextPassword !== nextPasswordConfirm) {
+      toast('새 비밀번호가 서로 일치하지 않습니다.', 'warning');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword: nextPassword }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        toast(payload?.error || '비밀번호 변경에 실패했습니다.', 'error');
+        return;
+      }
+      toast('비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용해 주세요.', 'success');
+    } catch {
+      toast('비밀번호 변경 중 오류가 발생했습니다.', 'error');
+    }
+  }, [openPrompt]);
 
   // 최신 정보를 staff_members에서 로드(세션 user가 stale일 수 있음).
   useEffect(() => {
@@ -329,6 +393,33 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
               />
             </div>
           </div>
+
+          {/* 비밀번호 변경 영역 */}
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 18 }}>
+            <div style={labelStyle}>로그인 보안</div>
+            <button
+              type="button"
+              onClick={handleChangePassword}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: 'var(--page-bg)',
+                color: 'var(--m-accent)',
+                border: '1px solid var(--border)',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+                width: '100%',
+                justifyContent: 'center',
+              }}
+            >
+              <MIcon name="shield" size={16} />
+              비밀번호 변경하기
+            </button>
+          </div>
         </div>
 
         {/* 안내 + 저장 버튼 */}
@@ -362,6 +453,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
           </button>
         </div>
       </div>
+      {dialog}
     </div>
   );
 }

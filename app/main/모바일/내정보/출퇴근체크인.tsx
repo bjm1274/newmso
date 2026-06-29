@@ -499,14 +499,41 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     : !withinRange ? `반경 ${ALLOWED_DISTANCE_M}m 안으로 이동 후 시도`
     : '탭하면 즉시 기록됩니다';
 
-  const gradient =
-    state === 'before' ? 'linear-gradient(135deg, #2563EB, #1D4ED8)' :
-    state === 'in'     ? 'linear-gradient(135deg, #F59E0B, #D97706)' :
-                         'linear-gradient(135deg, #10B981, #059669)';
-  const shadow =
-    state === 'before' ? '0 12px 24px rgba(37,99,235,0.25)' :
-    state === 'in'     ? '0 12px 24px rgba(245,158,11,0.25)' :
-                         '0 12px 24px rgba(16,185,129,0.25)';
+  // macOS 스타일 동적 그라데이션 유리 배경 및 테두리 설정
+  const glassBackground =
+    state === 'before'
+      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.16) 0%, rgba(37, 99, 235, 0.28) 100%)'
+      : state === 'in'
+      ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(217, 119, 6, 0.28) 100%)'
+      : 'linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(5, 150, 105, 0.28) 100%)';
+
+  const glassBorder =
+    state === 'before'
+      ? '1px solid rgba(59, 130, 246, 0.35)'
+      : state === 'in'
+      ? '1px solid rgba(245, 158, 11, 0.35)'
+      : '1px solid rgba(16, 185, 129, 0.35)';
+
+  const iconBg =
+    state === 'before'
+      ? 'rgba(59, 130, 246, 0.18)'
+      : state === 'in'
+      ? 'rgba(245, 158, 11, 0.18)'
+      : 'rgba(16, 185, 129, 0.18)';
+
+  const iconColor =
+    state === 'before'
+      ? '#3b82f6'
+      : state === 'in'
+      ? '#f59e0b'
+      : '#10b981';
+
+  const switchBg =
+    state === 'before'
+      ? 'rgba(120, 120, 128, 0.2)'
+      : state === 'in'
+      ? '#f59e0b'
+      : '#10b981';
 
   return (
     <div className="m-screen">
@@ -531,15 +558,95 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
             {clock.ampm} <span style={{ color: 'var(--m-accent)' }}>{clock.hm}</span>
             <span style={{ fontSize: 24, color: 'var(--z-400)' }}>:{clock.ss}</span>
           </div>
+          {/* macOS 스타일 미니멀 신호 게이지 위젯 */}
           <div
             role="status"
             aria-live="polite"
-            style={{ marginTop: 14, display: 'inline-flex' }}
+            className="macos-glass macos-squircle-sm"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '10px 14px',
+              gap: '12px',
+              maxWidth: '320px',
+              margin: '16px auto 0',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
+            }}
           >
-            <MChip tone={gpsTone} dot>{gpsLabel}</MChip>
+            {/* 신호 게이지 막대 4개 */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2.5px', height: '14px', width: '20px' }}>
+              {[1, 2, 3, 4].map((bar) => {
+                const height = 4 + (bar - 1) * 3; // 4px, 7px, 10px, 13px
+                let active = false;
+                let color = 'rgba(120, 120, 128, 0.2)';
+
+                if (gpsTone === 'success') {
+                  active = true;
+                  color = 'var(--m-success)'; // 녹색 활성 (#10b981 등)
+                } else if (gpsTone === 'warning') {
+                  active = bar <= 2;
+                  color = '#f59e0b'; // 황색 활성
+                } else {
+                  active = bar === 1;
+                  color = 'var(--m-danger)'; // 적색 활성 (#ef4444 등)
+                }
+
+                return (
+                  <span
+                    key={bar}
+                    style={{
+                      display: 'block',
+                      width: '3px',
+                      height: `${height}px`,
+                      backgroundColor: active ? color : 'rgba(120, 120, 128, 0.2)',
+                      borderRadius: '1.5px',
+                      transition: 'background-color 0.25s ease',
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* 정보 영역 */}
+            <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--z-800)', lineHeight: 1.2 }}>
+                {status === 'success' && withinRange ? '내장 GPS 인증 장치' : '위치 수신 센서'}
+              </div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--z-500)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  marginTop: '1px',
+                  fontWeight: 600,
+                }}
+              >
+                {gpsLabel}
+              </div>
+            </div>
+
+            {/* 우측 칩 라벨 */}
+            <div
+              style={{
+                fontSize: '10px',
+                fontWeight: 800,
+                color: gpsTone === 'success' ? 'var(--m-success)' : gpsTone === 'warning' ? '#f59e0b' : 'var(--m-danger)',
+                padding: '2px 6px',
+                borderRadius: '6px',
+                backgroundColor:
+                  gpsTone === 'success' ? 'rgba(16, 185, 129, 0.1)' :
+                  gpsTone === 'warning' ? 'rgba(245, 158, 11, 0.1)' :
+                                          'rgba(239, 68, 68, 0.1)',
+              }}
+            >
+              {status === 'success' && withinRange ? '연결됨' : '대기'}
+            </div>
           </div>
           {accuracyTooLow && (
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--m-warning)', fontWeight: 700 }}>
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--m-warning)', fontWeight: 700 }}>
               위치 정확도 낮음 (±{Math.round(coords!.accuracy)}m) · 야외에서 다시 시도하세요
             </div>
           )}
@@ -580,30 +687,80 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           </div>
         )}
 
-        {/* 큰 체크인 버튼 */}
+        {/* macOS 제어 센터 스타일 출퇴근 위젯 박스 */}
         <div style={{ padding: '18px 20px 6px' }}>
           <button
             type="button"
             onClick={handleAction}
             disabled={!canAct || state === 'done'}
             aria-label={btnLabel}
+            className="macos-glass macos-squircle"
             style={{
               width: '100%',
-              aspectRatio: '1.6',
-              borderRadius: 24,
-              background: gradient,
-              color: '#fff',
-              border: 0,
-              boxShadow: shadow,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
-              opacity: !canAct || state === 'done' ? 0.85 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              padding: '18px 20px',
+              gap: '16px',
+              background: glassBackground,
+              border: glassBorder,
+              textAlign: 'left',
+              cursor: !canAct || state === 'done' ? 'default' : 'pointer',
+              opacity: !canAct || state === 'done' ? 0.75 : 1,
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            <MIcon name="clock" size={48} strokeWidth={1.4} />
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>
-              {submitting ? '처리 중…' : btnLabel}
+            {/* 왼쪽: 둥근 모양의 활성 상태 아이콘 백그라운드 */}
+            <div
+              className="macos-squircle-sm"
+              style={{
+                width: '46px',
+                height: '46px',
+                backgroundColor: iconBg,
+                color: iconColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.25s ease, color 0.25s ease',
+              }}
+            >
+              <MIcon name="clock" size={24} />
             </div>
-            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>{btnSub}</div>
+
+            {/* 중앙: 텍스트 정보 */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--z-900)', letterSpacing: '-0.02em' }}>
+                {submitting ? '처리 중…' : btnLabel}
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--z-500)', opacity: 0.9 }}>
+                {btnSub}
+              </div>
+            </div>
+
+            {/* 오른쪽: macOS 스타일의 스위치(Switch) 인디케이터 */}
+            <div
+              style={{
+                width: '36px',
+                height: '20px',
+                borderRadius: '10px',
+                backgroundColor: switchBg,
+                position: 'relative',
+                transition: 'background-color 0.25s ease',
+              }}
+            >
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fff',
+                  position: 'absolute',
+                  top: '2px',
+                  left: state === 'before' ? '2px' : '18px',
+                  transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)',
+                }}
+              />
+            </div>
           </button>
         </div>
         <div style={{ padding: '0 24px', marginTop: 4, marginBottom: 8, fontSize: 11, color: 'var(--z-500)', lineHeight: '1.4', textAlign: 'center' }}>
@@ -674,12 +831,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           </div>
         </div>
 
-        {/* 위치 새로고침 보조 */}
-        <div style={{ padding: '18px 20px 4px' }}>
-          <MBtn block icon="mapPin" onClick={requestLocation} disabled={status === 'requesting'}>
-            {status === 'requesting' ? '위치 확인 중…' : '위치 새로고침'}
-          </MBtn>
-        </div>
+
       </div>
     </div>
   );

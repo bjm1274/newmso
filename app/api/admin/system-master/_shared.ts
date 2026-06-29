@@ -20,7 +20,7 @@ export const OPERATION_CRONS = [
   { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리' },
   { path: '/api/cron/chat-push-dispatch', schedule: '매일 08:00', label: '채팅 푸시 큐 백업 처리' },
   { path: '/api/cron/leave-notice-announcements', schedule: '매일 09:00', label: '연차 휴무 공지메시지 발송' },
-  { path: '/api/cron/birthday-announcements', schedule: '매일 09:00', label: '생일자 복지 등록 및 축하 공지 발송' },
+  { path: '/api/cron/birthday-announcements', schedule: '매일 09:00', label: '생일 및 경조사 축하 공지 발송' },
   { path: '/api/cron/todo-reminders', schedule: '매시간', label: '할일 리마인더 처리' },
 ] as const;
 

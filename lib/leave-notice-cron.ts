@@ -101,7 +101,16 @@ async function fetchApprovedLeaveApprovals(db: D1Db): Promise<LeaveApprovalRow[]
       .where(
         and(
           eq(approvalsTable.status, '승인'),
-          inArray(approvalsTable.type, ['연차/휴가', '휴가신청']),
+          inArray(approvalsTable.type, [
+            '연차/휴가',
+            '휴가신청',
+            '경조사',
+            '경조사신청',
+            '경조휴가',
+            '병가',
+            '병가신청',
+            '특별휴가',
+          ]),
         ),
       )
       .orderBy(desc(approvalsTable.created_at))
@@ -205,7 +214,8 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
   let skipped = 0;
   let failed = 0;
   const errors: string[] = [];
-  const nowIso = now.toISOString();
+  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함
+  const nowIso = `${targetDate}T00:00:00.000Z`;
 
   for (const approval of dueApprovals) {
     const metaData =

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { logger } from '@/lib/logger';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -39,7 +40,7 @@ type Detail = {
   attachments: { name: string; size: string; kind: string }[];
 };
 
-export default function 업무공유상세({
+function MobileTaskShareDetail({
   user,
   postId,
   onBack,
@@ -99,7 +100,7 @@ export default function 업무공유상세({
         })),
       );
     } catch (err) {
-      console.warn('[mobile-addon] share detail load', err);
+      logger.warn('[mobile-addon] share detail load', err);
     } finally {
       setLoading(false);
     }
@@ -127,7 +128,7 @@ export default function 업무공유상세({
       toast('댓글을 등록했습니다.', 'success');
       void load();
     } catch (err) {
-      console.warn('[mobile-addon] share comment send', err);
+      logger.warn('[mobile-addon] share comment send', err);
       toast('댓글 등록에 실패했습니다.', 'error');
     } finally {
       setSending(false);
@@ -151,12 +152,6 @@ export default function 업무공유상세({
         title="업무공유"
         sub={`${detail.tag} · ${detail.author}`}
         back={onBack}
-        actions={
-          <>
-            <button type="button" aria-label="북마크"><MIcon name="bookmark" size={20} /></button>
-            <button type="button" aria-label="공유"><MIcon name="share" size={20} /></button>
-          </>
-        }
       />
 
       <div className="m-scroll">
@@ -336,3 +331,5 @@ export default function 업무공유상세({
     </div>
   );
 }
+
+export default MobileTaskShareDetail;

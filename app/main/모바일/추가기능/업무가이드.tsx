@@ -43,7 +43,7 @@ function detectCategory(title: string, body: string): CatId {
   return 'all';
 }
 
-export default function 업무가이드({ user, onBack }: { user: ErpUser; onBack: () => void }) {
+function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }) {
   // Fetch guides from all companies
   const { rows, loading } = useTaskGuides({ company: undefined });
   const [cat, setCat] = useState<CatId>('all');
@@ -107,11 +107,6 @@ export default function 업무가이드({ user, onBack }: { user: ErpUser; onBac
         title="업무가이드"
         sub={`${selectedCo} · ${filtered.length}개 문서`}
         back={onBack}
-        actions={
-          <button type="button" aria-label="검색">
-            <MIcon name="search" size={20} />
-          </button>
-        }
       />
 
       {/* 회사 & 부서 필터 셀렉터 */}
@@ -303,3 +298,5 @@ export default function 업무가이드({ user, onBack }: { user: ErpUser; onBac
     </div>
   );
 }
+
+export default MobileTaskGuide;

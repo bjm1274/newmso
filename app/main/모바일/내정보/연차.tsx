@@ -42,12 +42,13 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
             margin: '16px 16px 0',
             padding: '28px 24px',
             borderRadius: 20,
-            background: 'linear-gradient(135deg, #10B981, #059669)',
-            color: '#fff',
+            background: 'var(--page-bg)',
+            border: '1px solid var(--border)',
+            color: 'var(--foreground)',
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-500)' }}>
             {currentYear}년 잔여 연차
           </div>
           <div
@@ -57,12 +58,13 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
               letterSpacing: '-0.04em',
               marginTop: 8,
               fontFeatureSettings: '"tnum"',
+              color: 'var(--m-accent)',
             }}
           >
             {loading ? '—' : remaining}{' '}
-            <span style={{ fontSize: 20, opacity: 0.7 }}>/ {total}일</span>
+            <span style={{ fontSize: 20, color: 'var(--z-500)', fontWeight: 600 }}>/ {total}일</span>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.75, marginTop: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--z-600)', marginTop: 6 }}>
             사용 {used}일 · 소진율 {usageRate}%
           </div>
         </div>
@@ -116,16 +118,14 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
                     alignItems: 'center',
                     gap: 12,
                     padding: '14px 16px',
-                    borderBottom: '1px solid var(--m-border)',
+                    borderBottom: '1px solid var(--border)',
                   }}
                 >
                   <div
                     style={{
                       width: 36,
                       height: 36,
-                      borderRadius: 10,
-                      background: 'var(--m-success-soft)',
-                      color: 'var(--m-success)',
+                      color: 'var(--m-accent)',
                       display: 'grid',
                       placeItems: 'center',
                     }}

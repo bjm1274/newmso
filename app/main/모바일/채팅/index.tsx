@@ -30,7 +30,7 @@ export type 채팅Props = {
   onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
-export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
+function MobileChat({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
@@ -97,10 +97,12 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
     setView('new');
   }, []);
 
-  const handleCreated = useCallback((roomId: string) => {
+  const handleCreated = useCallback((roomId: string, room?: ChatRoom) => {
+    setSelectedRoom(room ?? null);
     setSelectedRoomId(roomId);
     setView('room');
-  }, []);
+    void refreshRooms();
+  }, [refreshRooms]);
 
   let contentElement: React.ReactNode;
 
@@ -138,3 +140,5 @@ export default function 채팅({ user, rooms: propsRooms, refreshRooms: propsRef
     </div>
   );
 }
+
+export default MobileChat;

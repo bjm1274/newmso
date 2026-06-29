@@ -4,10 +4,13 @@ import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
   messages as messagesTable,
   staff_members as staffMembersTable,
+  congratulations_condolences as welfareTable,
   getD1Binding,
   getD1Drizzle,
   updateChatRoomLastMessage,
   eq,
+  and,
+  ne,
   sql,
 } from '@/lib/db';
 import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
@@ -20,6 +23,7 @@ export type BirthdayAnnouncementsResult = {
   processedCount: number;
   addedToWelfare: number;
   postedToChat: number;
+  postedWelfareEvents?: number;
   errors: string[];
 };
 
@@ -157,12 +161,91 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
     }
   }
 
+  // 3) Process other family events from congratulations_condolences table
+  let postedWelfareEvents = 0;
+  try {
+    const welfareEvents = await db
+      .select({
+        id: welfareTable.id,
+        staff_name: welfareTable.staff_name,
+        company: welfareTable.company,
+        department: welfareTable.department,
+        event_type: welfareTable.event_type,
+        event_date: welfareTable.event_date,
+        relation: welfareTable.relation,
+        recipient: welfareTable.recipient,
+        memo: welfareTable.memo,
+      })
+      .from(welfareTable)
+      .where(
+        and(
+          eq(welfareTable.event_date, kstDateStr),
+          ne(welfareTable.event_type, '생일')
+        )
+      );
+
+    for (const event of welfareEvents) {
+      const eventMessageId = buildDeterministicWelfareEventMessageId(event.id, kstDateStr);
+      
+      const eventContent = formatWelfareEventNoticeMessage({
+        eventType: event.event_type || '경조사',
+        employeeName: event.staff_name || '직원',
+        department: event.department || '',
+        company: event.company || 'SY INC.',
+        relation: event.relation || '본인',
+        recipient: event.recipient || '',
+        eventDate: event.event_date || kstDateStr,
+        memo: event.memo || '',
+      });
+
+      const eventMessageRow = {
+        id: eventMessageId,
+        room_id: NOTICE_ROOM_ID,
+        sender_id: null,
+        sender_name: '공지봇',
+        content: eventContent,
+        created_at: nowIso,
+      };
+
+      try {
+        const inserted = await db
+          .insert(messagesTable)
+          .values(eventMessageRow)
+          .onConflictDoNothing()
+          .returning({ id: messagesTable.id });
+
+        const duplicateMessage = inserted.length === 0;
+
+        if (!duplicateMessage) {
+          await updateChatRoomLastMessage(db, {
+            room_id: NOTICE_ROOM_ID,
+            created_at: nowIso,
+            content: eventContent,
+          });
+          await enqueueChatPushJob({
+            messageId: eventMessageId,
+            roomId: NOTICE_ROOM_ID,
+            senderId: null,
+          }).catch((err) => {
+            console.warn('[birthday-announcements] Failed to enqueue welfare chat push job', err);
+          });
+          postedWelfareEvents += 1;
+        }
+      } catch (err) {
+        errors.push(`Welfare event chat error for ${event.staff_name} (${event.event_type}): ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } catch (err) {
+    errors.push(`Welfare event fetch error: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   return {
     ok: true,
     targetDate: kstDateStr,
     processedCount: birthdayStaffs.length,
     addedToWelfare,
     postedToChat,
+    postedWelfareEvents,
     errors,
   };
 }
@@ -174,4 +257,69 @@ function buildDeterministicId(namespace: string, staffId: string, year: string) 
   bytes[8] = (bytes[8] & 0x3f) | 0x80; // Set variant
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function buildDeterministicWelfareEventMessageId(welfareId: string, eventDate: string) {
+  const source = `erp-welfare-event:${welfareId}:${eventDate}`;
+  const bytes = createHash('sha256').update(source).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50; // Set version to 5
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // Set variant
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function formatWelfareEventNoticeMessage(event: {
+  eventType: string;
+  employeeName: string;
+  department: string;
+  company: string;
+  relation: string;
+  recipient: string;
+  eventDate: string;
+  memo: string;
+}) {
+  const companyLabel = event.company || 'SY INC.';
+  const deptLabel = event.department ? `${event.department} ` : '';
+  const relationLabel = event.relation || '본인';
+  const recipientLabel = event.recipient ? ` (${event.recipient})` : '';
+  const memoLabel = event.memo ? `\n• 비고: ${event.memo}` : '';
+  
+  if (event.eventType === '결혼') {
+    return [
+      `🎉 [경조사 알림] 임직원 [ ${companyLabel} ] ${deptLabel}${event.employeeName}님의 결혼 소식을 전해드립니다.`,
+      `• 일시: ${event.eventDate}`,
+      `• 대상: ${relationLabel}${recipientLabel}${memoLabel}`,
+      '',
+      '새롭게 시작하는 두 사람의 앞날에 따뜻한 축복을 보내주시기 바랍니다. 🤵👰'
+    ].join('\n');
+  }
+  
+  if (event.eventType.includes('사망') || event.eventType.includes('부고')) {
+    return [
+      `🙏 [경조사 알림] 임직원 [ ${companyLabel} ] ${deptLabel}${event.employeeName}님의 부고를 전해드립니다.`,
+      `• 일시: ${event.eventDate}`,
+      `• 대상: ${relationLabel}${recipientLabel}${memoLabel}`,
+      '',
+      '삼가 고인의 명복을 빌며, 임직원 여러분의 따뜻한 위로를 부탁드립니다. 🖤'
+    ].join('\n');
+  }
+
+  if (event.eventType === '출산') {
+    return [
+      `🎉 [경조사 알림] 임직원 [ ${companyLabel} ] ${deptLabel}${event.employeeName}님의 득남/득녀(출산) 소식을 전해드립니다.`,
+      `• 일시: ${event.eventDate}`,
+      `• 대상: ${relationLabel}${recipientLabel}${memoLabel}`,
+      '',
+      '새로운 가족의 탄생을 진심으로 축하하며, 행복과 건강을 기원합니다. 👶'
+    ].join('\n');
+  }
+
+  const prefix = event.eventType.includes('회갑') || event.eventType.includes('칠순') || event.eventType.includes('입학') || event.eventType.includes('졸업') ? '🎉' : '📢';
+  return [
+    `${prefix} [경조사 알림] 임직원 [ ${companyLabel} ] ${deptLabel}${event.employeeName}님의 경조사(${event.eventType}) 소식을 전해드립니다.`,
+    `• 일시: ${event.eventDate}`,
+    `• 대상: ${relationLabel}${recipientLabel}${memoLabel}`,
+    '',
+    '기쁜 일은 함께 축하하고, 뜻깊은 날에 따뜻한 격려를 보내주시기 바랍니다. ✨'
+  ].join('\n');
 }

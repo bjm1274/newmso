@@ -49,7 +49,16 @@ export async function POST(req: NextRequest) {
       .where(
         and(
           eq(approvalsTable.status, '승인'),
-          inArray(approvalsTable.type, ['연차/휴가', '휴가신청']),
+          inArray(approvalsTable.type, [
+            '연차/휴가',
+            '휴가신청',
+            '경조사',
+            '경조사신청',
+            '경조휴가',
+            '병가',
+            '병가신청',
+            '특별휴가',
+          ]),
         ),
       );
 

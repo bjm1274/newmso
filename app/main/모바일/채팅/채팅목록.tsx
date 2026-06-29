@@ -83,6 +83,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
         created_by: userId,
       });
       if (result.ok && result.room) {
+        await onRefresh().catch(() => undefined);
         onOpen(String(result.room.id));
       } else {
         toast(result.error || '대화방 연결 실패', 'error');
