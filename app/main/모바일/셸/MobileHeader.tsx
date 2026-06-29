@@ -1,12 +1,3 @@
-'use client';
-
-/**
- * MobileHeader — 모바일 상단 헤더.
- * 뒤로가기·제목·서브타이틀·우상단 액션 버튼 슬롯.
- * JM: 단일 책임, ~60줄
- * JM6: back은 aria-label="뒤로", 버튼 시맨틱
- */
-
 import type { ReactNode } from 'react';
 import MIcon from '../공통/MIcon';
 
@@ -21,23 +12,102 @@ export type MobileHeaderProps = {
 
 export default function MobileHeader({ title, sub, eyebrow, back, actions }: MobileHeaderProps) {
   return (
-    <div className="m-header">
+    <div
+      className="m-header macos-glass"
+      style={{
+        padding: '16px 20px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 99,
+        background: 'rgba(255, 255, 255, 0.65)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+      }}
+    >
+
+
       {back && (
         <button
           type="button"
-          className="back"
           onClick={back}
           aria-label="뒤로"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
         >
-          <MIcon name="chevL" size={22} />
+          <MIcon name="chevL" size={18} color="var(--z-600)" />
         </button>
       )}
+
       <div style={{ flex: 1, minWidth: 0 }}>
-        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
-        <div className="title">{title}</div>
-        {sub && <div className="sub">{sub}</div>}
+        {eyebrow && (
+          <div
+            className="eyebrow"
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: 'var(--z-500)',
+              letterSpacing: 0.5,
+              textTransform: 'uppercase',
+              marginBottom: 1,
+            }}
+          >
+            {eyebrow}
+          </div>
+        )}
+        <div
+          className="title"
+          style={{
+            fontSize: 16.5,
+            fontWeight: 800,
+            color: 'var(--foreground)',
+            letterSpacing: '-0.02em',
+            lineHeight: 1.25,
+          }}
+        >
+          {title}
+        </div>
+        {sub && (
+          <div
+            className="sub"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--z-500)',
+              marginTop: 2,
+            }}
+          >
+            {sub}
+          </div>
+        )}
       </div>
-      {actions && <div className="actions">{actions}</div>}
+
+      {actions && (
+        <div
+          className="actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

@@ -132,16 +132,13 @@ export default function EmojiPicker({
       ref={containerRef}
       role="dialog"
       aria-label="이모지 선택"
+      className="macos-glass macos-squircle"
       style={{
         position: 'fixed',
         left: 12,
         right: 12,
         bottom: bottomOffset,
         zIndex: 60,
-        background: 'var(--m-card)',
-        border: '1px solid var(--m-border)',
-        borderRadius: 16,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.16)',
         padding: 10,
         display: 'flex',
         flexDirection: 'column',
@@ -173,8 +170,8 @@ export default function EmojiPicker({
             height: 34,
             width: '100%',
             borderRadius: 8,
-            border: '1px solid var(--m-border)',
-            background: 'var(--m-bg)',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
+            background: 'rgba(255, 255, 255, 0.4)',
             color: 'var(--z-900)',
             paddingLeft: 30,
             paddingRight: 10,
@@ -186,7 +183,7 @@ export default function EmojiPicker({
         />
       </div>
 
-      {/* 📁 카테고리 탭 목록 (가로 스크롤 가능) */}
+      {/* 📁 카테고리 탭 목록 (Segmented Control 스타일) */}
       {!query && (
         <div
           role="tablist"
@@ -195,9 +192,10 @@ export default function EmojiPicker({
             display: 'flex',
             gap: 2,
             overflowX: 'auto',
-            paddingBottom: 6,
-            marginBottom: 6,
-            borderBottom: '1px solid var(--m-border)',
+            padding: 3,
+            marginBottom: 8,
+            background: 'rgba(0, 0, 0, 0.05)',
+            borderRadius: 10,
             whiteSpace: 'nowrap',
             scrollbarWidth: 'none',
           }}
@@ -219,16 +217,18 @@ export default function EmojiPicker({
                 }}
                 style={{
                   minWidth: 36,
-                  height: 32,
-                  borderRadius: 8,
+                  height: 28,
+                  borderRadius: 7,
                   fontSize: 15,
                   display: 'grid',
                   placeItems: 'center',
-                  background: active ? 'var(--accent-tint)' : 'transparent',
-                  color: active ? 'var(--m-accent)' : 'var(--z-600)',
+                  background: active ? '#ffffff' : 'transparent',
+                  color: active ? '#007AFF' : 'var(--z-600)',
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)' : 'none',
                   border: 0,
                   cursor: 'pointer',
                   flexShrink: 0,
+                  transition: 'all 0.15s ease-in-out',
                 }}
                 title={cat.label}
               >
@@ -270,14 +270,16 @@ export default function EmojiPicker({
                 onMouseEnter={() => setHoveredIdx(idx)}
                 onTouchStart={() => setHoveredIdx(idx)}
                 aria-label={`${entry.name} 선택`}
+                className={isEmoticonCat ? 'macos-glass macos-squircle-sm' : ''}
                 style={{
                   aspectRatio: '1',
                   borderRadius: isEmoticonCat ? 10 : 6,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: isEmoticonCat ? 'var(--m-card)' : 'transparent',
-                  border: isEmoticonCat ? '1px solid var(--m-border)' : '0',
+                  background: isEmoticonCat ? 'rgba(255, 255, 255, 0.65)' : 'transparent',
+                  border: '0',
+                  boxShadow: isEmoticonCat ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
                   cursor: 'pointer',
                   padding: isEmoticonCat ? 5 : 2,
                   boxSizing: 'border-box',
@@ -363,10 +365,11 @@ export default function EmojiPicker({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'var(--m-bg)',
+                background: 'rgba(255, 255, 255, 0.4)',
                 borderRadius: 6,
                 overflow: 'hidden',
                 flexShrink: 0,
+                border: '1px solid rgba(0,0,0,0.05)',
               }}
             >
               {activeEntry.e.startsWith('[emo:') ? (
@@ -460,16 +463,17 @@ export default function EmojiPicker({
         <button
           type="button"
           onClick={onClose}
+          className="macos-glass macos-squircle-sm"
           style={{
             fontSize: 11.5,
             fontWeight: 'bold',
-            color: 'var(--z-500)',
-            padding: '5px 10px',
-            borderRadius: 6,
-            background: 'var(--m-bg)',
-            border: '1px solid var(--m-border)',
+            color: 'var(--z-700)',
+            padding: '5px 12px',
+            background: 'rgba(255, 255, 255, 0.65)',
+            border: 'none',
             cursor: 'pointer',
             flexShrink: 0,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
           }}
         >
           닫기

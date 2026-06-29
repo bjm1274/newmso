@@ -39,70 +39,80 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
   const admin = isAdmin(user);
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'linear-gradient(135deg, rgba(240, 244, 255, 0.6) 0%, rgba(228, 235, 250, 0.6) 50%, rgba(245, 240, 255, 0.6) 100%)' }}>
       <MobileHeader title="웹팩스" sub="외부 시스템 연동" back={onBack} />
-      <div className="m-scroll">
-        <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div className="m-scroll" style={{ background: 'transparent', padding: '16px 16px 24px' }}>
+        <div className="macos-glass macos-squircle" style={{ padding: '32px 20px', textAlign: 'center', marginBottom: 20 }}>
           <div
             aria-hidden="true"
+            className="macos-squircle"
             style={{
-              width: 80,
-              height: 80,
-              borderRadius: 24,
+              width: 72,
+              height: 72,
               background: 'var(--m-accent-soft)',
               color: 'var(--m-accent)',
               display: 'grid',
               placeItems: 'center',
-              margin: '0 auto 18px',
+              margin: '0 auto 16px',
+              boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)',
             }}
           >
-            <MIcon name="send" size={36} strokeWidth={1.4} />
+            <MIcon name="send" size={32} strokeWidth={1.4} />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.025em' }}>웹팩스</div>
+          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--z-900)' }}>웹팩스</div>
           <div
             style={{
               fontSize: 13,
-              color: 'var(--z-500)',
-              fontWeight: 600,
-              marginTop: 6,
-              lineHeight: 1.55,
-              padding: '0 12px',
+              color: 'var(--z-600)',
+              fontWeight: 500,
+              marginTop: 8,
+              lineHeight: 1.6,
+              padding: '0 8px',
             }}
           >
             발수신 팩스 관리는 외부 시스템(WebFax+)에서 처리됩니다.
             <br />
             모바일에서는 알림만 받을 수 있습니다.
           </div>
-          <div style={{ marginTop: 18, padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {enabled && WEBFAX_URL ? (
               <a
                 href={WEBFAX_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="m-btn primary block"
+                className="m-btn primary block macos-squircle-sm"
                 aria-label="웹팩스 외부 시스템 새 창으로 열기"
-                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                style={{
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  height: 44,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
               >
                 <MIcon name="send" size={16} />
                 외부 시스템 열기
               </a>
             ) : (
-              <MBtn variant="primary" icon="send" block disabled>
+              <MBtn variant="primary" className="macos-squircle-sm" icon="send" block disabled>
                 외부 시스템 열기 (미설정)
               </MBtn>
             )}
-            <MBtn icon="bell" block>
+            <MBtn icon="bell" className="macos-squircle-sm" block>
               모바일 알림만 받기
             </MBtn>
           </div>
           {!enabled && (
             <div
+              className="macos-glass macos-squircle-sm"
               style={{
-                marginTop: 14,
+                marginTop: 18,
                 padding: '12px 14px',
-                background: 'var(--m-bg-soft, var(--z-100))',
-                border: '1px solid var(--m-border)',
-                borderRadius: 12,
+                border: '1px solid rgba(255, 149, 0, 0.3)',
+                background: 'rgba(255, 149, 0, 0.08)',
                 fontSize: 12,
                 lineHeight: 1.55,
                 color: 'var(--z-700)',
@@ -111,7 +121,8 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
               role="status"
               aria-live="polite"
             >
-              <div style={{ fontWeight: 800, color: 'var(--z-900)', marginBottom: 4 }}>
+              <div style={{ fontWeight: 800, color: 'var(--z-900)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <MIcon name="info" size={14} color="#FF9500" />
                 외부 시스템 URL 미설정
               </div>
               {admin ? (
@@ -127,11 +138,11 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
         </div>
 
         <div className="m-section">
-          <div className="m-section-h">
-            <div className="lbl">최근 활동</div>
+          <div className="m-section-h" style={{ padding: '0 8px', marginBottom: 10 }}>
+            <div className="lbl" style={{ fontSize: 14, fontWeight: 700 }}>최근 활동</div>
           </div>
-          <div className="m-card flush" style={{ margin: '0 16px' }}>
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 12 }}>
+          <div className="macos-glass macos-squircle" style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ color: 'var(--z-500)', fontSize: 12 }}>
               외부 시스템 연동 후 표시됩니다.
             </div>
           </div>

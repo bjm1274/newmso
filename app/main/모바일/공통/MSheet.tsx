@@ -41,23 +41,28 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
       <div
         style={{ flex: 1, background: 'rgba(0,0,0,0.4)' }}
         aria-hidden="true"
+        onClick={onClose}
       />
       <div
+        className="macos-glass"
         style={{
-          background: 'var(--m-card)',
-          borderTopLeftRadius: 'var(--m-radius-xl)',
-          borderTopRightRadius: 'var(--m-radius-xl)',
-          boxShadow: 'var(--m-shadow-pop)',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          borderLeft: 'none',
+          borderRight: 'none',
+          borderBottom: 'none',
           maxHeight: '85vh',
           display: 'flex', flexDirection: 'column',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
-          <span style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--z-200)' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 6px' }}>
+          <span style={{ width: 36, height: 5, borderRadius: 999, background: 'rgba(0,0,0,0.15)' }} />
         </div>
         {title && (
-          <div style={{ padding: '4px 20px 12px', fontSize: 15, fontWeight: 800, letterSpacing: '-0.018em' }}>
+          <div style={{ padding: '4px 20px 12px', fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--z-900)' }}>
             {title}
           </div>
         )}

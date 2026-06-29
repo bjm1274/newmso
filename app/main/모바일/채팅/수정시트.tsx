@@ -34,8 +34,8 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
 
   return (
     <MSheet open={!!message} onClose={handleClose} title="메시지 수정">
-      <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <p style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.5 }}>
+      <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <p style={{ fontSize: 13, color: 'var(--z-500)', fontWeight: 500, lineHeight: 1.5, textAlign: 'center' }}>
           전송한 메시지를 수정하면 모든 참여자에게 바로 반영됩니다.
         </p>
         <textarea
@@ -45,34 +45,42 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
           aria-label="수정할 메시지"
           placeholder="수정할 메시지를 입력해 주세요"
           disabled={saving}
+          className="macos-squircle-sm"
           style={{
             width: '100%',
-            padding: '12px',
+            padding: '14px',
             fontSize: 14,
             fontFamily: 'inherit',
-            background: 'var(--m-bg)',
-            border: '1px solid var(--m-border)',
-            borderRadius: 10,
+            background: 'rgba(120, 120, 128, 0.08)',
+            border: '1px solid rgba(120, 120, 128, 0.15)',
             outline: 'none',
             resize: 'none',
             color: 'var(--z-900)',
+            transition: 'border-color 0.2s',
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#007AFF';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
           }}
         />
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <button
             type="button"
             onClick={handleClose}
             disabled={saving}
+            className="macos-squircle-sm"
             style={{
               flex: 1,
-              padding: '12px',
-              borderRadius: 10,
-              background: 'var(--m-bg)',
-              color: 'var(--z-700)',
-              fontSize: 13,
-              fontWeight: 800,
+              padding: '13px',
+              background: 'rgba(120, 120, 128, 0.16)',
+              color: 'var(--z-800)',
+              fontSize: 14,
+              fontWeight: 600,
               border: 'none',
               cursor: saving ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s',
             }}
           >
             취소
@@ -81,17 +89,19 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
             type="button"
             onClick={() => message && onSave(message, draft)}
             disabled={saving || !draft.trim()}
+            className="macos-squircle-sm"
             style={{
               flex: 1,
-              padding: '12px',
-              borderRadius: 10,
-              background: draft.trim() ? 'var(--m-accent)' : 'var(--z-300)',
-              color: '#fff',
-              fontSize: 13,
-              fontWeight: 800,
+              padding: '13px',
+              background: draft.trim() ? 'linear-gradient(135deg, #007AFF, #0A55E1)' : 'rgba(120, 120, 128, 0.08)',
+              color: draft.trim() ? '#fff' : 'rgba(120, 120, 128, 0.35)',
+              fontSize: 14,
+              fontWeight: 600,
               border: 'none',
               cursor: saving || !draft.trim() ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1,
+              boxShadow: draft.trim() ? '0 4px 12px rgba(0, 122, 255, 0.3)' : 'none',
+              transition: 'all 0.2s',
             }}
           >
             {saving ? '저장 중…' : '저장'}

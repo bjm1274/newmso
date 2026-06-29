@@ -58,42 +58,106 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
   };
 
   return (
-    <div className="m-screen">
+    <div className="m-screen" style={{ background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.4) 0%, rgba(253, 244, 245, 0.4) 50%, rgba(240, 253, 244, 0.4) 100%)' }}>
       <MobileHeader title="마감보고" sub={`${company ?? ''} · 일/주/월`} back={onBack} />
 
       <div
         style={{
-          padding: '10px 16px 0',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          padding: '12px 16px',
+          background: 'transparent',
         }}
       >
-        <div className="m-seg">
-          <button type="button" className={tab === 'today' ? 'on' : ''} onClick={() => setTab('today')}>일 마감</button>
-          <button type="button" className={tab === 'week' ? 'on' : ''} onClick={() => setTab('week')}>주 마감</button>
-          <button type="button" className={tab === 'month' ? 'on' : ''} onClick={() => setTab('month')}>월 마감</button>
+        <div
+          className="m-seg macos-glass"
+          style={{
+            padding: '2px',
+            background: 'rgba(255, 255, 255, 0.55)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            display: 'flex',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+          }}
+        >
+          <button
+            type="button"
+            className={tab === 'today' ? 'on' : ''}
+            onClick={() => setTab('today')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: tab === 'today' ? 700 : 500,
+              color: tab === 'today' ? '#007aff' : 'var(--z-600)',
+              background: tab === 'today' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
+              boxShadow: tab === 'today' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
+              border: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            일 마감
+          </button>
+          <button
+            type="button"
+            className={tab === 'week' ? 'on' : ''}
+            onClick={() => setTab('week')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: tab === 'week' ? 700 : 500,
+              color: tab === 'week' ? '#007aff' : 'var(--z-600)',
+              background: tab === 'week' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
+              boxShadow: tab === 'week' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
+              border: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            주 마감
+          </button>
+          <button
+            type="button"
+            className={tab === 'month' ? 'on' : ''}
+            onClick={() => setTab('month')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: '10px',
+              fontSize: '13px',
+              fontWeight: tab === 'month' ? 700 : 500,
+              color: tab === 'month' ? '#007aff' : 'var(--z-600)',
+              background: tab === 'month' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
+              boxShadow: tab === 'month' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
+              border: 'none',
+              transition: 'all 0.2s',
+            }}
+          >
+            월 마감
+          </button>
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px 0' }}>
+      <div style={{ padding: '0 16px 12px' }}>
         <div
-          className="m-card"
+          className="macos-glass macos-squircle-sm"
           style={{
             padding: '12px 14px',
-            background: 'var(--m-warning-soft)',
-            borderColor: 'transparent',
+            background: 'rgba(245, 158, 11, 0.08)',
+            borderColor: 'rgba(245, 158, 11, 0.2)',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
+            boxShadow: '0 4px 16px 0 rgba(245, 158, 11, 0.04)',
           }}
         >
-          <MIcon name="alertTri" size={18} color="var(--m-warning)" />
+          <MIcon name="alertTri" size={18} color="rgba(217, 119, 6, 0.85)" />
           <div
             style={{
               flex: 1,
               fontSize: 12,
               fontWeight: 700,
-              color: 'var(--m-warning)',
+              color: 'rgba(217, 119, 6, 0.95)',
             }}
           >
             Chart 시스템으로 이관 예정 — 2026 Q4
@@ -101,7 +165,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
         </div>
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {loading && (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
             불러오는 중…
@@ -109,21 +173,22 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
         )}
         {tab === 'today' && day && !loading && (
           <>
-            <div style={{ padding: '14px 16px 0' }}>
-              <div className="m-card" style={{ padding: '14px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{day.date} 일 마감</div>
+            <div style={{ padding: '0 16px 14px' }}>
+              <div className="macos-glass macos-squircle" style={{ padding: '16px', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)' }}>
+                <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 700 }}>{day.date} 일 마감</div>
                 <div
                   className="m-tnum"
                   style={{
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: 800,
+                    color: 'var(--foreground)',
                     letterSpacing: '-0.025em',
-                    marginTop: 4,
+                    marginTop: 6,
                   }}
                 >
                   ₩ {fmt(day.total)}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <MChip tone="success" dot>
                     현금 합계 일치
                   </MChip>
@@ -134,71 +199,89 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               </div>
             </div>
             <div className="m-section">
-              <div className="m-section-h">
-                <div className="lbl">제출 체크리스트 {day.items.length}항목</div>
+              <div className="m-section-h" style={{ margin: '0 16px 8px' }}>
+                <div className="lbl" style={{ fontWeight: 700, fontSize: 13 }}>제출 체크리스트 {day.items.length}항목</div>
               </div>
-              <div className="m-card flush" style={{ margin: '0 16px' }}>
+              <div className="macos-glass macos-squircle" style={{ margin: '0 16px', overflow: 'hidden', boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)' }}>
                 {day.items.length === 0 && (
                   <div style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 12 }}>
                     체크리스트가 없습니다.
                   </div>
                 )}
-                {day.items.map((r) => (
-                  <MListRow
+                {day.items.map((r, idx) => (
+                  <div
                     key={r.id}
-                    icon={r.status === '완료' ? 'check' : 'clock'}
-                    iconTone={r.tone}
-                    label={r.title}
-                    rightSlot={<MChip tone={r.tone}>{r.status}</MChip>}
-                  />
+                    style={{
+                      borderBottom: idx === day.items.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
+                    }}
+                  >
+                    <MListRow
+                      icon={r.status === '완료' ? 'check' : 'clock'}
+                      iconTone={r.tone}
+                      label={r.title}
+                      rightSlot={<MChip tone={r.tone}>{r.status}</MChip>}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
           </>
         )}
         {tab === 'week' && (
-          <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ padding: '0 16px 14px' }}>
             <div
+              className="macos-glass macos-squircle-sm"
               style={{
                 padding: '16px',
-                background: 'var(--m-accent-soft)',
-                borderRadius: 'var(--m-radius-lg)',
-                color: 'var(--m-accent)',
+                background: 'rgba(0, 122, 255, 0.08)',
+                borderColor: 'rgba(0, 122, 255, 0.2)',
+                color: '#007aff',
                 fontSize: 12,
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
+                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)',
               }}
             >
-              <MIcon name="info" size={16} />
+              <MIcon name="info" size={16} color="#007aff" />
               주간 마감 현황은 데스크톱에서 확인하세요. 모바일은 오늘 체크리스트만 제공합니다.
             </div>
           </div>
         )}
         {tab === 'month' && (
-          <div style={{ padding: '14px 16px 0' }}>
+          <div style={{ padding: '0 16px 14px' }}>
             <div
+              className="macos-glass macos-squircle-sm"
               style={{
                 padding: '16px',
-                background: 'var(--m-accent-soft)',
-                borderRadius: 'var(--m-radius-lg)',
-                color: 'var(--m-accent)',
+                background: 'rgba(0, 122, 255, 0.08)',
+                borderColor: 'rgba(0, 122, 255, 0.2)',
+                color: '#007aff',
                 fontSize: 12,
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
+                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)',
               }}
             >
-              <MIcon name="info" size={16} />
+              <MIcon name="info" size={16} color="#007aff" />
               월 마감 보고서·차트는 데스크톱에서 PDF 발행
             </div>
           </div>
         )}
       </div>
 
-      <div className="m-sticky-foot">
+      <div
+        className="m-sticky-foot macos-glass"
+        style={{
+          borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+          background: 'rgba(255, 255, 255, 0.7)',
+          backdropFilter: 'blur(20px)',
+          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
+        }}
+      >
         <MBtn block icon="download">초안 보기</MBtn>
         <MBtn
           block

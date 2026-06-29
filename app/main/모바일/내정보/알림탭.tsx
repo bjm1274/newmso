@@ -208,12 +208,6 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
         }}
       >
         <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* macOS 신호등 제어 단추 */}
-          <div style={{ display: 'flex', gap: 5.5, marginRight: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F56', display: 'block', border: '0.5px solid #E0443E' }} />
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E', display: 'block', border: '0.5px solid #DEA123' }} />
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27C93F', display: 'block', border: '0.5px solid #1AAB29' }} />
-          </div>
           알림
           {unreadCount > 0 && (
             <span

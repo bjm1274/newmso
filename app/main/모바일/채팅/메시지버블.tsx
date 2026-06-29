@@ -190,7 +190,7 @@ export default function MessageBubble({
           padding: '4px 0',
           opacity: swiping ? 0.9 : 1,
           transition: 'opacity 0.2s, background-color 0.5s',
-          backgroundColor: highlighted ? 'var(--m-accent-soft, rgba(0,0,0,0.05))' : 'transparent',
+          backgroundColor: highlighted ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
         }}
       >
         {!mine && (
@@ -261,16 +261,21 @@ export default function MessageBubble({
               data-testid={`chat-message-${message.id}`}
               style={{
                 padding: (imageMode || isEmoticonOrSticker) && !replyTarget ? 0 : '10px 14px',
-                borderRadius: 16,
+                borderRadius: 18,
                 background: (imageMode || isEmoticonOrSticker) && !replyTarget
                   ? 'transparent'
                   : mine
-                    ? 'var(--m-accent)'
-                    : 'var(--m-card)',
+                    ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
+                    : 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: !(imageMode || isEmoticonOrSticker) || replyTarget
+                  ? mine
+                    ? undefined
+                    : 'blur(12px)'
+                  : undefined,
                 color: mine && !((imageMode || isEmoticonOrSticker) && !replyTarget) ? '#fff' : 'var(--z-900)',
-                border: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 0 : '1px solid var(--m-border)',
-                borderBottomRightRadius: mine ? 4 : 16,
-                borderBottomLeftRadius: mine ? 16 : 4,
+                border: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 0 : '1px solid rgba(255, 255, 255, 0.3)',
+                borderBottomRightRadius: mine ? 4 : 18,
+                borderBottomLeftRadius: mine ? 18 : 4,
                 fontSize: 14,
                 lineHeight: 1.5,
                 fontWeight: 500,
@@ -280,19 +285,20 @@ export default function MessageBubble({
                 overflow: 'hidden',
                 minWidth: 0,
                 flexShrink: 1,
+                boxShadow: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? undefined : '0 4px 12px rgba(0, 0, 0, 0.05)',
               }}
             >
               {replyTarget && (
                 <div style={{
-                  background: mine ? 'rgba(255,255,255,0.15)' : 'var(--m-bg)',
+                  background: mine ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)',
                   borderRadius: 8,
                   padding: '6px 10px',
                   fontSize: 12,
-                  borderLeft: `3px solid ${mine ? 'rgba(255,255,255,0.8)' : 'var(--m-accent)'}`,
-                  color: mine ? 'rgba(255,255,255,0.9)' : 'var(--z-600)',
+                  borderLeft: `3px solid ${mine ? 'rgba(255, 255, 255, 0.8)' : '#007AFF'}`,
+                  color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
                   marginBottom: 8,
                 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : 'var(--m-accent)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : '#007AFF' }}>
                     {replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장
                   </div>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9 }}>
@@ -432,11 +438,11 @@ export default function MessageBubble({
                       gap: 3,
                       padding: '2px 7px',
                       borderRadius: 999,
-                      background: 'var(--accent-tint)',
-                      color: 'var(--m-accent)',
+                      background: mineReaction ? 'rgba(0, 122, 255, 0.15)' : 'rgba(0, 0, 0, 0.04)',
+                      color: mineReaction ? '#007AFF' : 'var(--z-700)',
                       fontSize: 11,
                       fontWeight: 700,
-                      border: mineReaction ? '1px solid var(--m-accent)' : '1px solid transparent',
+                      border: mineReaction ? '1px solid rgba(0, 122, 255, 0.3)' : '1px solid transparent',
                       cursor: 'pointer',
                     }}
                   >

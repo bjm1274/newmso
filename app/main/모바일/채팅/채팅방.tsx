@@ -755,10 +755,47 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const composerDisabled = uploading;
 
   return (
-    <div className="m-screen">
-      <div className="m-header" style={{ paddingBottom: 10 }}>
-        <button type="button" className="back" onClick={onBack} aria-label="뒤로">
-          <MIcon name="chevL" size={22} />
+    <div
+      className="m-screen"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        className="macos-glass"
+        style={{
+          padding: '16px 20px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 99,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="뒤로"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            cursor: 'pointer',
+          }}
+        >
+          <MIcon name="chevL" size={18} color="var(--z-600)" />
         </button>
         <MAvatar tone={headerTone} size="sm">
           {isNotice ? (
@@ -782,9 +819,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         </MAvatar>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 4 }}>
           <div
-            className="title"
             style={{
-              fontSize: 15,
+              fontSize: 14.5,
+              fontWeight: 800,
+              color: 'var(--foreground)',
+              letterSpacing: '-0.015em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -792,7 +831,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           >
             {title}
           </div>
-          <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 1.5 }}>
             <span
               style={{
                 width: 6,
@@ -807,20 +846,34 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             실시간 연결됨
           </div>
         </div>
-        <div className="actions">
-          <button type="button" aria-label="상세메뉴" onClick={() => setInfoOpen(true)}>
-            <MIcon name="menu" size={20} />
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            aria-label="상세메뉴"
+            onClick={() => setInfoOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="menu" size={18} color="var(--z-600)" />
           </button>
         </div>
       </div>
-
 
       <div
         ref={scrollRef}
         className="m-scroll"
         onScroll={handleScroll}
         data-testid="chat-message-list"
-        style={{ background: 'var(--m-bg)', padding: '12px 12px 6px' }}
+        style={{ background: 'transparent', padding: '12px 12px 6px' }}
       >
         {hasMore && loadingOlder && (
           <div
@@ -915,9 +968,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       />
 
       <div
+        className="macos-glass"
         style={{
-          background: 'var(--m-card)',
-          borderTop: '1px solid var(--m-border)',
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(0, 0, 0, 0.05)',
           padding: '8px 12px 12px',
         }}
       >
@@ -953,11 +1008,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     flexShrink: 0,
                     padding: '6px 12px',
                     borderRadius: 999,
-                    background: 'var(--m-bg)',
+                    background: 'rgba(0, 0, 0, 0.03)',
                     color: 'var(--z-700)',
                     fontSize: 12,
                     fontWeight: 700,
-                    border: '1px solid var(--m-border)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
                     cursor: composerDisabled ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',
                   }}
@@ -976,13 +1031,13 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               justifyContent: 'space-between',
               padding: '6px 10px',
               marginBottom: 8,
-              background: 'var(--m-bg)',
+              background: 'rgba(0, 0, 0, 0.04)',
               borderRadius: 8,
-              borderLeft: '3px solid var(--m-accent)',
+              borderLeft: '3px solid #007AFF',
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--m-accent)', marginBottom: 2 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#007AFF', marginBottom: 2 }}>
                 {replyTo.sender_name || staffs.find((s) => String(s.id) === String(replyTo.sender_id))?.name || '알 수 없음'}에게 답장
               </div>
               <div style={{ fontSize: 12, color: 'var(--z-600)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1010,7 +1065,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            background: 'var(--m-bg)',
+            background: 'rgba(0, 0, 0, 0.04)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
             borderRadius: 22,
             padding: '4px 6px 4px 12px',
           }}
@@ -1025,7 +1081,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               height: 32,
               display: 'grid',
               placeItems: 'center',
-              color: uploading ? 'var(--m-accent)' : 'var(--z-500)',
+              color: uploading ? '#007AFF' : 'var(--z-500)',
               cursor: composerDisabled ? 'not-allowed' : 'pointer',
             }}
           >
@@ -1035,7 +1091,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 style={{
                   width: 16,
                   height: 16,
-                  border: '2px solid var(--m-accent)',
+                  border: '2px solid #007AFF',
                   borderTopColor: 'transparent',
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite',
@@ -1097,7 +1153,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               height: 32,
               display: 'grid',
               placeItems: 'center',
-              color: emojiOpen ? 'var(--m-accent)' : 'var(--z-500)',
+              color: emojiOpen ? '#007AFF' : 'var(--z-500)',
               cursor: composerDisabled ? 'not-allowed' : 'pointer',
             }}
           >
@@ -1114,11 +1170,16 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               width: 36,
               height: 36,
               borderRadius: '50%',
-              background: hasText && !composerDisabled ? 'var(--m-accent)' : 'var(--z-300)',
+              background: hasText && !composerDisabled
+                ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
+                : 'rgba(0, 0, 0, 0.1)',
               color: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: hasText && !composerDisabled ? '0 2px 8px rgba(0, 122, 255, 0.35)' : undefined,
+              border: 'none',
+              cursor: hasText && !composerDisabled ? 'pointer' : 'not-allowed',
             }}
           >
             <MIcon name="send" size={16} />
@@ -1127,7 +1188,15 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       </div>
 
       <MSheet open={actionSheetOpen} onClose={() => setActionSheetOpen(false)} title="추가 기능">
-        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="macos-glass" style={{
+          padding: '8px 20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(30px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
           <button
             type="button"
             onClick={() => {
@@ -1137,12 +1206,12 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'var(--m-bg)', border: 'none',
+              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
           >
-            <MIcon name="image" size={24} color="var(--m-accent)" />
+            <MIcon name="image" size={24} color="#007AFF" />
             사진 / 파일 전송
           </button>
           <button
@@ -1154,21 +1223,29 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'var(--m-bg)', border: 'none',
+              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
           >
-            <MIcon name="list" size={24} color="var(--m-accent)" />
+            <MIcon name="list" size={24} color="#007AFF" />
             새 투표 만들기
           </button>
         </div>
       </MSheet>
 
       <MSheet open={infoOpen} onClose={() => setInfoOpen(false)} title="대화방 상세 정보">
-        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="macos-glass" style={{
+          padding: '8px 20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(30px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
           {/* Section 1: 대화방 개요 */}
-          <div style={{ background: 'var(--m-bg)', padding: '14px', borderRadius: 12 }}>
+          <div style={{ background: 'rgba(0, 0, 0, 0.03)', padding: '14px', borderRadius: 12, border: '1px solid rgba(0, 0, 0, 0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: 'var(--z-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
               {canRenameRoom && (
@@ -1186,8 +1263,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     gap: 3,
                     padding: '5px 10px',
                     borderRadius: 8,
-                    background: 'var(--m-accent-soft)',
-                    color: 'var(--m-accent)',
+                    background: 'rgba(0, 122, 255, 0.1)',
+                    color: '#007AFF',
                     fontSize: 11,
                     fontWeight: 800,
                     border: 'none',
@@ -1222,7 +1299,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               />
               <span style={{
                 position: 'absolute', inset: 0, borderRadius: 24,
-                background: roomNotifyOn ? 'var(--m-accent)' : 'var(--z-300)', transition: '0.2s',
+                background: roomNotifyOn ? '#007AFF' : 'rgba(0, 0, 0, 0.15)', transition: '0.2s',
               }}>
                 <span style={{
                   position: 'absolute', left: 4, bottom: 4, width: 16, height: 16,
@@ -1233,7 +1310,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             </label>
           </div>
 
-          <div style={{ height: 1, background: 'var(--m-border)' }} />
+          <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
           {/* Section 3: 상단 공지 */}
           <div>
@@ -1241,12 +1318,12 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               <span style={{ fontSize: 11 }}>📌</span>
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>상단 공지</div>
             </div>
-            <div style={{ padding: '10px 12px', background: 'var(--m-bg)', borderRadius: 10, fontSize: 12, color: 'var(--z-500)', fontWeight: 600 }}>
+            <div style={{ padding: '10px 12px', background: 'rgba(0, 0, 0, 0.03)', borderRadius: 10, fontSize: 12, color: 'var(--z-500)', fontWeight: 600, border: '1px solid rgba(0, 0, 0, 0.02)' }}>
               등록된 대화방 공지가 없습니다.
             </div>
           </div>
 
-          <div style={{ height: 1, background: 'var(--m-border)' }} />
+          <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
           {/* Section 4: 참여자 목록 */}
           <div>
@@ -1263,8 +1340,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     gap: 3,
                     padding: '5px 10px',
                     borderRadius: 8,
-                    background: 'var(--m-accent-soft)',
-                    color: 'var(--m-accent)',
+                    background: 'rgba(0, 122, 255, 0.1)',
+                    color: '#007AFF',
                     fontSize: 11,
                     fontWeight: 800,
                     border: 'none',
@@ -1297,7 +1374,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)' }}>
                         {member.name}
-                        {isMe && <span style={{ marginLeft: 6, fontSize: 10, background: 'var(--m-accent-soft)', color: 'var(--m-accent)', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>나</span>}
+                        {isMe && <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(0, 122, 255, 0.1)', color: '#007AFF', padding: '2px 6px', borderRadius: 6, fontWeight: 700 }}>나</span>}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 2 }}>
                         {member.department || '부서 없음'} · {member.position || '직급 없음'}
@@ -1331,7 +1408,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             </div>
           </div>
 
-          <div style={{ height: 1, background: 'var(--m-border)' }} />
+          <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
           {/* Section 5: 공유된 사진 및 파일 */}
           <div>
@@ -1341,11 +1418,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>첨부된 항목이 없습니다.</div>
               )}
               {attachments.slice(0, 9).map((att) => (
-                <div key={att.id} style={{ aspectRatio: 1, borderRadius: 8, background: 'var(--m-bg)', overflow: 'hidden', position: 'relative' }}>
+                <div key={att.id} className="macos-glass" style={{ aspectRatio: 1, borderRadius: 8, background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)', overflow: 'hidden', position: 'relative' }}>
                   {/\.(png|jpg|jpeg|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(att.file_url!) ? (
                     <img src={att.file_url!} alt="첨부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(att.file_url!, '_blank')} />
                   ) : (
-                    <div onClick={() => window.open(att.file_url!, '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--m-accent)' }}>
+                    <div onClick={() => window.open(att.file_url!, '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#007AFF' }}>
                       <MIcon name="file" size={24} />
                       <span style={{ fontSize: 9, marginTop: 4, width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{att.file_name || '파일'}</span>
                     </div>
@@ -1355,7 +1432,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             </div>
           </div>
 
-          <div style={{ height: 1, background: 'var(--m-border)' }} />
+          <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
           {/* Section 6: 방 나가기 */}
           <button
@@ -1371,8 +1448,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               width: '100%',
               padding: '12px',
               borderRadius: 10,
-              background: 'var(--m-accent-soft)',
-              color: 'var(--m-accent)',
+              background: 'rgba(0, 122, 255, 0.1)',
+              color: '#007AFF',
               fontSize: 13,
               fontWeight: 800,
               border: 'none',
@@ -1386,7 +1463,15 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       </MSheet>
 
       <MSheet open={leaveConfirmOpen} onClose={() => setLeaveConfirmOpen(false)} title="채팅방 나가기">
-        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="macos-glass" style={{
+          padding: '8px 20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(30px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
           <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.6 }}>
             이 채팅방에서 나갑니다.
             <br />
@@ -1401,11 +1486,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: 'var(--m-bg)',
+                background: 'rgba(0, 0, 0, 0.04)',
                 color: 'var(--z-700)',
                 fontSize: 13,
                 fontWeight: 800,
-                border: 'none',
+                border: '1px solid rgba(0, 0, 0, 0.02)',
                 cursor: leaving ? 'not-allowed' : 'pointer',
               }}
             >
@@ -1419,7 +1504,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: 'var(--m-danger, #ef4444)',
+                background: 'linear-gradient(135deg, #FF3B30, #D00F0F)',
                 color: '#fff',
                 fontSize: 13,
                 fontWeight: 800,
@@ -1442,7 +1527,14 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         }}
         title="메시지 전달"
       >
-        <div style={{ padding: '8px 20px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
+        <div className="macos-glass" style={{
+          padding: '8px 20px 24px',
+          maxHeight: '60vh',
+          overflowY: 'auto',
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(30px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
           <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, marginBottom: 12 }}>
             전달할 채팅방을 선택해 주세요.
           </div>
@@ -1457,8 +1549,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     width: '100%',
                     padding: '14px 16px',
                     textAlign: 'left',
-                    background: 'var(--m-card)',
-                    border: '1px solid var(--m-border)',
+                    background: 'rgba(255, 255, 255, 0.65)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)',
                     borderRadius: 12,
                     fontSize: 13,
                     fontWeight: 800,
@@ -1538,7 +1630,15 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
       {/* 방 이름 수정 시트 */}
       <MSheet open={renameOpen} onClose={() => { if (!renameSaving) setRenameOpen(false); }} title="채팅방 이름 수정">
-        <div style={{ padding: '8px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="macos-glass" style={{
+          padding: '8px 20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(30px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
+        }}>
           <input
             value={renameDraft}
             onChange={(e) => setRenameDraft(e.target.value)}
@@ -1550,8 +1650,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               padding: '12px',
               fontSize: 14,
               fontFamily: 'inherit',
-              background: 'var(--m-bg)',
-              border: '1px solid var(--m-border)',
+              background: 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
               borderRadius: 10,
               outline: 'none',
               color: 'var(--z-900)',
@@ -1566,11 +1666,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: 'var(--m-bg)',
+                background: 'rgba(0, 0, 0, 0.04)',
                 color: 'var(--z-700)',
                 fontSize: 13,
                 fontWeight: 800,
-                border: 'none',
+                border: '1px solid rgba(0, 0, 0, 0.02)',
                 cursor: renameSaving ? 'not-allowed' : 'pointer',
               }}
             >
@@ -1584,7 +1684,9 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: renameDraft.trim() ? 'var(--m-accent)' : 'var(--z-300)',
+                background: renameDraft.trim()
+                  ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
+                  : 'rgba(0, 0, 0, 0.1)',
                 color: '#fff',
                 fontSize: 13,
                 fontWeight: 800,

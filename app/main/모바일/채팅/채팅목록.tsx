@@ -172,24 +172,24 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       {searchOpen && (
         <div
+          className="macos-glass"
           style={{
-            height: 44,
+            height: 48,
             padding: '6px 16px',
-            background: 'var(--m-card)',
-            borderBottom: '1px solid var(--m-border)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
           }}
         >
           <label
+            className="macos-squircle-sm"
             style={{
               flex: 1,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: 'var(--m-bg)',
-              borderRadius: 10,
+              background: 'rgba(0, 0, 0, 0.04)',
               padding: '6px 12px',
             }}
           >
@@ -221,11 +221,13 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                   width: 18,
                   height: 18,
                   borderRadius: '50%',
-                  background: 'var(--z-300)',
+                  background: 'var(--z-400)',
                   color: '#fff',
                   display: 'grid',
                   placeItems: 'center',
                   flexShrink: 0,
+                  border: 'none',
+                  cursor: 'pointer',
                 }}
               >
                 <MIcon name="x" size={11} />
@@ -235,22 +237,25 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
         </div>
       )}
       <div
+        className="macos-glass"
         style={{
           display: 'flex',
           alignItems: 'center',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-          paddingRight: 12,
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+          padding: '8px 12px 8px 16px',
         }}
       >
         <div
-          className="m-chip-bar"
+          className="m-seg macos-glass macos-squircle-sm"
           role="tablist"
           aria-label="채팅 필터"
           style={{
             flex: 1,
-            borderBottom: 0,
-            paddingRight: 8,
+            background: 'rgba(0, 0, 0, 0.04)',
+            border: 'none',
+            padding: '2px',
+            display: 'flex',
+            marginRight: 8,
           }}
         >
           <ChipBtn label="채팅" active={tab === 'chat'} onClick={() => setTab('chat')} />
@@ -264,11 +269,20 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
           <ChipBtn label="1:1" active={tab === 'direct'} onClick={() => setTab('direct')} />
         </div>
         <button
-          className="msm-ibtn"
+          className="msm-ibtn macos-glass macos-squircle-sm"
           type="button"
           onClick={() => setSearchOpen((prev) => !prev)}
           aria-label="검색"
-          style={{ flexShrink: 0 }}
+          style={{
+            flexShrink: 0,
+            width: 32,
+            height: 32,
+            display: 'grid',
+            placeItems: 'center',
+            background: searchOpen ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+          }}
         >
           <MIcon name="search" size={20} />
         </button>
@@ -281,25 +295,37 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
             {searchQuery && matchedStaffs.length > 0 && (
               <>
                 <div className="msm-sec"><div className="msm-sec-t">직원 ({matchedStaffs.length})</div></div>
-                <div className="m-card flush" style={{ margin: '0 16px 12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 12 }}>
                   {matchedStaffs.map((staff) => {
                     const name = staff.name || '직원';
                     const tone = pickAvatarTone(String(staff.id) + name);
                     return (
-                      <button
-                        key={String(staff.id)}
-                        type="button"
-                        className="m-list-row"
-                        onClick={() => handleStartDirectChat(String(staff.id), name)}
-                        style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                      >
-                        <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
-                        <div>
-                          <div className="lbl">{name}</div>
-                          <div className="sub">{staff.department} · {staff.position || '직원'}</div>
-                        </div>
-                        <MIcon name="chat" size={18} color="var(--m-accent)" />
-                      </button>
+                      <div key={String(staff.id)} style={{ padding: '0 16px 8px' }}>
+                        <button
+                          type="button"
+                          className="m-list-row macos-glass macos-squircle-sm"
+                          onClick={() => handleStartDirectChat(String(staff.id), name)}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '12px 16px',
+                            border: 'none',
+                          }}
+                        >
+                          <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
+                          <div style={{ flex: 1 }}>
+                            <div className="lbl" style={{ fontWeight: 700 }}>{name}</div>
+                            <div className="sub" style={{ fontSize: 11, color: 'var(--z-500)' }}>
+                              {staff.department} · {staff.position || '직원'}
+                            </div>
+                          </div>
+                          <MIcon name="chat" size={18} color="var(--m-accent)" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -443,59 +469,61 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
   const tone = pickAvatarTone(hit.roomId + roomTitle);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`${roomTitle} 대화 열기`}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '40px 1fr auto',
-        gap: 12,
-        alignItems: 'flex-start',
-        padding: '10px 16px',
-        borderBottom: last ? 'none' : '1px solid var(--m-border)',
-        background: 'var(--m-card)',
-        width: '100%',
-        textAlign: 'left',
-      }}
-    >
-      <MAvatar tone={tone}>
-        <span>{roomTitle.charAt(0) || '방'}</span>
-      </MAvatar>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <span
+    <div style={{ padding: '0 16px 8px' }}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${roomTitle} 대화 열기`}
+        className="macos-glass macos-squircle-sm"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '40px 1fr auto',
+          gap: 12,
+          alignItems: 'flex-start',
+          padding: '12px 16px',
+          width: '100%',
+          textAlign: 'left',
+          border: 'none',
+        }}
+      >
+        <MAvatar tone={tone}>
+          <span>{roomTitle.charAt(0) || '방'}</span>
+        </MAvatar>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flex: '0 1 auto',
+                minWidth: 0,
+              }}
+            >
+              {roomTitle}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>{senderName}</span>
+          </div>
+          <div
             style={{
-              fontSize: 13,
-              fontWeight: 800,
-              whiteSpace: 'nowrap',
+              fontSize: 12,
+              color: 'var(--z-700)',
+              marginTop: 2,
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: '0 1 auto',
-              minWidth: 0,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              wordBreak: 'break-word',
             }}
           >
-            {roomTitle}
-          </span>
-          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>{senderName}</span>
+            {renderSnippet(hit.content, query)}
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: 'var(--z-700)',
-            marginTop: 2,
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            wordBreak: 'break-word',
-          }}
-        >
-          {renderSnippet(hit.content, query)}
-        </div>
-      </div>
-      <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, flexShrink: 0, marginTop: 2 }}>{ts}</span>
-    </button>
+        <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, flexShrink: 0, marginTop: 2 }}>{ts}</span>
+      </button>
+    </div>
   );
 }
 
@@ -506,7 +534,18 @@ function ChipBtn({ label, active, onClick }: ChipBtnProps) {
       type="button"
       role="tab"
       aria-selected={active}
-      className={active ? 'on' : ''}
+      className={active ? 'on macos-glass macos-squircle-sm' : 'macos-squircle-sm'}
+      style={{
+        flex: 1,
+        border: 'none',
+        padding: '6px 2px',
+        fontSize: '12px',
+        fontWeight: active ? 700 : 500,
+        color: active ? 'var(--z-900)' : 'var(--z-600)',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        background: 'transparent',
+      }}
       onClick={onClick}
     >
       {label}
@@ -550,92 +589,96 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
   const peerName = peer ? peer.name : '';
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`${title} 채팅방 열기`}
-      data-testid={`chat-room-${room.id}`}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '52px 1fr auto',
-        gap: 12,
-        alignItems: 'center',
-        padding: '12px 16px',
-        borderBottom: last ? 'none' : '1px solid var(--m-border)',
-        background: 'var(--m-card)',
-        width: '100%',
-        textAlign: 'left',
-      }}
-    >
-      <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
-        {isNotice ? (
-          <MIcon name="bell" size={16} color="#fff" />
-        ) : peerPhotoUrl ? (
-          <img
-            src={peerPhotoUrl}
-            alt={peerName || title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: 'inherit',
-            }}
-          />
-        ) : isGroup ? (
-          <span>{getGroupChatRoomBadgeText(title)}</span>
-        ) : (
-          <span>{title.charAt(0) || '방'}</span>
-        )}
-      </MAvatar>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 800,
-              letterSpacing: '-0.012em',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              flex: '0 1 auto',
-              minWidth: 0,
-            }}
-          >
-            {title}
-          </span>
-          {memberCount > 0 && (
-            <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>
-              {memberCount}명
+    <div style={{ padding: '0 16px 8px' }}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`${title} 채팅방 열기`}
+        data-testid={`chat-room-${room.id}`}
+        className="macos-glass macos-squircle-sm"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '52px 1fr auto',
+          gap: 12,
+          alignItems: 'center',
+          padding: '14px 16px',
+          width: '100%',
+          textAlign: 'left',
+          border: 'none',
+          transition: 'transform 0.15s ease, background-color 0.15s ease',
+        }}
+      >
+        <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
+          {isNotice ? (
+            <MIcon name="bell" size={16} color="#fff" />
+          ) : peerPhotoUrl ? (
+            <img
+              src={peerPhotoUrl}
+              alt={peerName || title}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 'inherit',
+              }}
+            />
+          ) : isGroup ? (
+            <span>{getGroupChatRoomBadgeText(title)}</span>
+          ) : (
+            <span>{title.charAt(0) || '방'}</span>
+          )}
+        </MAvatar>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: '-0.012em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flex: '0 1 auto',
+                minWidth: 0,
+                color: 'var(--z-900)',
+              }}
+            >
+              {title}
+            </span>
+            {memberCount > 0 && (
+              <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0 }}>
+                {memberCount}명
+              </span>
+            )}
+            <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0, marginLeft: 'auto' }}>
+              {kind}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--z-600)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 220,
+              }}
+            >
+              {lastMsg || <span style={{ color: 'var(--z-400)' }}>대화 시작 전</span>}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
+          {unread > 0 && (
+            <span className="msm-unread" aria-label={`안 읽음 ${unread}건`}>
+              {unread > 99 ? '99+' : unread}
             </span>
           )}
-          <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600, flexShrink: 0, marginLeft: 'auto' }}>
-            {kind}
-          </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
-          <span
-            style={{
-              fontSize: 12,
-              color: 'var(--z-600)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: 220,
-            }}
-          >
-            {lastMsg || <span style={{ color: 'var(--z-400)' }}>대화 시작 전</span>}
-          </span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-        <span style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
-        {unread > 0 && (
-          <span className="msm-unread" aria-label={`안 읽음 ${unread}건`}>
-            {unread > 99 ? '99+' : unread}
-          </span>
-        )}
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -665,19 +708,18 @@ function OrgBrowseTab({
       {groups.map((g) => {
         const isExpanded = expanded[g.department] !== false;
         return (
-          <div key={g.department} style={{ marginBottom: 6 }}>
+          <div key={g.department} style={{ margin: '0 16px 10px' }}>
             <button
               type="button"
               onClick={() => toggle(g.department)}
+              className="macos-glass macos-squircle-sm"
               style={{
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '12px 16px',
-                background: 'var(--m-card)',
                 border: 'none',
-                borderBottom: '1px solid var(--m-border)',
                 cursor: 'pointer',
                 textAlign: 'left',
               }}
@@ -694,7 +736,7 @@ function OrgBrowseTab({
             </button>
             
             {isExpanded && (
-              <div className="m-card flush" style={{ margin: '4px 16px 12px', borderTop: 'none' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                 {g.members.map((m) => {
                   const name = m.name || '직원';
                   const tone = pickAvatarTone(String(m.id) + name);
@@ -702,14 +744,23 @@ function OrgBrowseTab({
                     <button
                       key={String(m.id)}
                       type="button"
-                      className="m-list-row"
+                      className="m-list-row macos-glass macos-squircle-sm"
                       onClick={() => onStartChat(String(m.id), name)}
-                      style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 16px',
+                        border: 'none',
+                      }}
                     >
                       <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
-                      <div>
-                        <div className="lbl">{name}</div>
-                        <div className="sub">
+                      <div style={{ flex: 1 }}>
+                        <div className="lbl" style={{ fontWeight: 700 }}>{name}</div>
+                        <div className="sub" style={{ fontSize: 11, color: 'var(--z-500)' }}>
                           {g.department} · {m.position || '직원'}
                         </div>
                       </div>

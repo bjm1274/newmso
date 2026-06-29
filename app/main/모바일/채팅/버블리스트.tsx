@@ -181,10 +181,10 @@ function SystemBubble({ label }: { label: string }) {
           display: 'inline-block',
           padding: '4px 12px',
           borderRadius: 999,
-          background: 'var(--z-200)',
+          background: 'rgba(0, 0, 0, 0.04)',
           fontSize: 11,
-          fontWeight: 800,
-          color: 'var(--z-600)',
+          fontWeight: 600,
+          color: 'rgba(0, 0, 0, 0.5)',
         }}
       >
         {label}

@@ -136,13 +136,23 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         saveDisabled={saveDisabled}
       />
       <div
+        className="macos-glass"
         style={{
-          padding: '10px 16px 0',
-          background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
+          padding: '10px 16px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
         }}
       >
-        <div className="m-seg" role="tablist" aria-label="대화 방식">
+        <div
+          className="m-seg macos-glass macos-squircle-sm"
+          role="tablist"
+          aria-label="대화 방식"
+          style={{
+            background: 'rgba(0, 0, 0, 0.04)',
+            border: 'none',
+            padding: '2px',
+            display: 'flex',
+          }}
+        >
           <SegBtn label="구성원" active={tab === 'member'} onClick={() => setTab('member')} />
           <SegBtn label="조직도" active={tab === 'org'} onClick={() => setTab('org')} />
           <SegBtn label="채널 생성" active={tab === 'channel'} onClick={() => setTab('channel')} />
@@ -159,20 +169,20 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
 
       {tab !== 'channel' && (
         <div
+          className="macos-glass"
           style={{
             padding: '10px 16px',
-            background: 'var(--m-card)',
-            borderBottom: '1px solid var(--m-border)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
           }}
         >
           <label
+            className="macos-squircle-sm"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: 'var(--m-bg)',
-              borderRadius: 10,
-              padding: '8px 12px',
+              background: 'rgba(0, 0, 0, 0.04)',
+              padding: '6px 12px',
             }}
           >
             <MIcon name="search" size={16} color="var(--z-500)" />
@@ -182,7 +192,16 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
               onChange={(e) => setQ(e.target.value)}
               placeholder="이름·부서·직급으로 검색"
               aria-label="이름·부서·직급 검색"
-              style={{ flex: 1, fontSize: 14, fontFamily: 'inherit', width: '100%' }}
+              style={{
+                flex: 1,
+                fontSize: 14,
+                fontFamily: 'inherit',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                width: '100%',
+                color: 'var(--z-900)',
+              }}
             />
           </label>
         </div>
@@ -230,18 +249,55 @@ type FormHeaderProps = {
 };
 
 function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHeaderProps) {
-  const cancelStyle: React.CSSProperties = { color: 'var(--z-700)', fontSize: 14, fontWeight: 700, padding: '0 4px' };
-  const saveStyle: React.CSSProperties = {
-    color: saveDisabled ? 'var(--z-400)' : 'var(--m-accent)',
-    fontSize: 14, fontWeight: 800, padding: '0 4px',
-  };
   return (
-    <div className="m-header" style={{ paddingTop: 18, paddingBottom: 14 }}>
-      <button type="button" onClick={onCancel} aria-label="취소" style={cancelStyle}>취소</button>
+    <div
+      className="m-header macos-glass"
+      style={{
+        padding: '16px 16px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onCancel}
+        aria-label="취소"
+        className="macos-squircle-sm"
+        style={{
+          color: 'var(--z-700)',
+          fontSize: 14,
+          fontWeight: 600,
+          padding: '6px 12px',
+          background: 'rgba(0, 0, 0, 0.04)',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        취소
+      </button>
       <div style={{ flex: 1, textAlign: 'center' }}>
-        <div className="title" style={{ fontSize: 15 }}>{title}</div>
+        <div className="title" style={{ fontSize: 16, fontWeight: 700, color: 'var(--z-900)' }}>
+          {title}
+        </div>
       </div>
-      <button type="button" onClick={onSave} disabled={saveDisabled} aria-label={saveLabel} style={saveStyle}>
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saveDisabled}
+        aria-label={saveLabel}
+        className="macos-squircle-sm"
+        style={{
+          color: saveDisabled ? 'var(--z-400)' : '#ffffff',
+          fontSize: 14,
+          fontWeight: 700,
+          padding: '6px 14px',
+          background: saveDisabled ? 'rgba(0, 0, 0, 0.04)' : 'linear-gradient(135deg, #007AFF, #0A55E1)',
+          border: 'none',
+          cursor: saveDisabled ? 'default' : 'pointer',
+          transition: 'all 0.2s ease',
+        }}
+      >
         {saveLabel}
       </button>
     </div>
@@ -255,7 +311,18 @@ function SegBtn({ label, active, onClick }: SegBtnProps) {
       type="button"
       role="tab"
       aria-selected={active}
-      className={active ? 'on' : ''}
+      className={active ? 'on macos-glass macos-squircle-sm' : 'macos-squircle-sm'}
+      style={{
+        flex: 1,
+        border: 'none',
+        padding: '6px 2px',
+        fontSize: '12px',
+        fontWeight: active ? 700 : 500,
+        color: active ? 'var(--z-900)' : 'var(--z-600)',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        background: 'transparent',
+      }}
       onClick={onClick}
     >
       {label}
@@ -271,38 +338,57 @@ type PickedChipRowProps = {
   onRemove: (id: string) => void;
 };
 
-const PICKED_ROW_STYLE: React.CSSProperties = {
-  padding: '10px 16px', background: 'var(--m-card)',
-  borderBottom: '1px solid var(--m-border)',
-  display: 'flex', gap: 6, overflowX: 'auto',
-};
-const PICKED_CHIP_STYLE: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '4px 6px 4px 8px', background: 'var(--m-accent-soft)',
-  borderRadius: 999, fontSize: 12, fontWeight: 800,
-  color: 'var(--m-accent)', flex: '0 0 auto',
-};
-const PICKED_X_STYLE: React.CSSProperties = {
-  width: 18, height: 18, borderRadius: '50%',
-  background: 'var(--m-accent)', color: '#fff',
-  display: 'grid', placeItems: 'center',
-};
-
 function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
   return (
-    <div style={PICKED_ROW_STYLE} role="list" aria-label="선택된 구성원">
+    <div
+      className="macos-glass"
+      style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+        display: 'flex',
+        gap: 8,
+        overflowX: 'auto',
+      }}
+      role="list"
+      aria-label="선택된 구성원"
+    >
       {pickedIds.map((id) => {
         const name = staffs.find((s) => String(s.id) === String(id))?.name || '직원';
         return (
-          <div key={id} role="listitem" style={PICKED_CHIP_STYLE}>
+          <div
+            key={id}
+            role="listitem"
+            className="macos-squircle-sm"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px 4px 10px',
+              background: 'rgba(0, 122, 255, 0.1)',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#007AFF',
+              flex: '0 0 auto',
+            }}
+          >
             {name}
             <button
               type="button"
               aria-label={`${name} 선택 취소`}
               onClick={() => onRemove(id)}
-              style={PICKED_X_STYLE}
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: '#007AFF',
+                color: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
-              <MIcon name="x" size={11} />
+              <MIcon name="x" size={9} />
             </button>
           </div>
         );
@@ -342,10 +428,10 @@ function MemberTab({ groups, picked, onToggle, empty }: MemberTabProps) {
   }
 
   return (
-    <div>
+    <div style={{ paddingTop: 8 }}>
       {groups.map((group) => (
-        <div key={group.department}>
-          <div style={{ padding: '14px 16px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div key={group.department} style={{ marginBottom: 12 }}>
+          <div style={{ padding: '4px 20px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span
               style={{
                 fontSize: 11,
@@ -361,7 +447,7 @@ function MemberTab({ groups, picked, onToggle, empty }: MemberTabProps) {
               {group.members.length}명
             </span>
           </div>
-          <div className="m-card flush" style={{ margin: '0 16px' }}>
+          <div>
             {group.members.map((member) => (
               <MemberRow
                 key={String(member.id)}
@@ -389,30 +475,50 @@ type MemberRowProps = {
 function MemberRow({ member, department, checked, onToggle }: MemberRowProps) {
   const name = member.name || '이름 없음';
   const tone = pickAvatarTone(String(member.id) + name);
-  const checkStyle: React.CSSProperties = {
-    width: 22, height: 22, borderRadius: 6,
-    border: checked ? 'none' : '1.5px solid var(--z-300)',
-    background: checked ? 'var(--m-accent)' : 'transparent',
-    color: '#fff', display: 'grid', placeItems: 'center',
-  };
+  
   return (
-    <button
-      type="button"
-      className="m-list-row"
-      onClick={onToggle}
-      aria-pressed={checked}
-      aria-label={`${name} 선택 토글`}
-      style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
-    >
-      <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
-      <div>
-        <div className="lbl">{name}</div>
-        <div className="sub">{department} · {member.position || '직원'}</div>
-      </div>
-      <span style={checkStyle} aria-hidden="true">
-        {checked && <MIcon name="check" size={14} />}
-      </span>
-    </button>
+    <div style={{ padding: '0 16px 8px' }}>
+      <button
+        type="button"
+        className="m-list-row macos-glass macos-squircle-sm"
+        onClick={onToggle}
+        aria-pressed={checked}
+        aria-label={`${name} 선택 토글`}
+        style={{
+          width: '100%',
+          textAlign: 'left',
+          cursor: 'pointer',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          border: 'none',
+        }}
+      >
+        <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
+        <div style={{ flex: 1 }}>
+          <div className="lbl" style={{ fontWeight: 700 }}>{name}</div>
+          <div className="sub" style={{ fontSize: 11, color: 'var(--z-500)' }}>{department} · {member.position || '직원'}</div>
+        </div>
+        <span
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            border: checked ? 'none' : '1.5px solid var(--z-300)',
+            background: checked ? 'linear-gradient(135deg, #007AFF, #0A55E1)' : 'transparent',
+            color: '#fff',
+            display: 'grid',
+            placeItems: 'center',
+            boxShadow: checked ? '0 2px 5px rgba(0, 122, 255, 0.3)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+          aria-hidden="true"
+        >
+          {checked && <MIcon name="check" size={12} color="#ffffff" />}
+        </span>
+      </button>
+    </div>
   );
 }
 
