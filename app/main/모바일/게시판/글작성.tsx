@@ -272,18 +272,45 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
   };
 
   return (
-    <div className="m-screen">
+    <div
+      className="m-screen"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* FormHeader */}
-      <div className="m-header" style={{ justifyContent: 'space-between' }}>
+      <div
+        className="macos-glass"
+        style={{
+          padding: '16px 20px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+      >
         <button
           type="button"
           onClick={onCancel}
           aria-label="취소"
-          style={{ fontSize: 14, fontWeight: 700, color: 'var(--z-700)', padding: '6px 4px' }}
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: 'var(--z-700)',
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            padding: '5px 12px',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
         >
           취소
         </button>
-        <div className="title" style={{ flex: 'unset', textAlign: 'center' }}>
+        <div style={{ flex: 1, textAlign: 'center', fontSize: 14.5, fontWeight: 900, color: 'var(--foreground)', letterSpacing: '-0.015em' }}>
           {isEdit ? '게시글 수정' : '새 글 작성'}
         </div>
         <button
@@ -292,22 +319,36 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
           disabled={!canSubmit}
           aria-label={isEdit ? '수정' : '게시'}
           style={{
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 800,
-            color: canSubmit ? 'var(--m-accent)' : 'var(--z-400)',
-            padding: '6px 4px',
+            background: canSubmit ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
+            color: canSubmit ? '#fff' : 'var(--z-400)',
+            border: 'none',
+            padding: '5px 12px',
+            borderRadius: 8,
+            cursor: 'pointer',
             opacity: submitting ? 0.5 : 1,
+            boxShadow: canSubmit ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none',
           }}
         >
           {submitting ? '저장중…' : isEdit ? '수정' : '게시'}
         </button>
       </div>
 
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         {/* 카테고리 + 제목 + 본문 */}
-        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+        <div
+          className="macos-glass macos-squircle-sm"
+          style={{
+            margin: '16px',
+            background: 'rgba(255, 255, 255, 0.65)',
+            border: '1px solid rgba(255, 255, 255, 0.35)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+            overflow: 'hidden',
+          }}
+        >
           {/* 카테고리 — EDIT 모드는 게시판 이동 금지(고정 표시) */}
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--m-border)' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 8 }}>
               카테고리
             </div>
@@ -322,13 +363,16 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
                     aria-pressed={on}
                     disabled={isEdit && !on}
                     style={{
-                      padding: '8px 12px',
-                      borderRadius: 999,
+                      padding: '6px 12px',
+                      borderRadius: 8,
                       fontSize: 12,
-                      fontWeight: 700,
-                      background: on ? 'var(--m-accent)' : 'var(--m-bg)',
+                      fontWeight: 800,
+                      background: on ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
                       color: on ? '#fff' : 'var(--z-700)',
                       opacity: isEdit && !on ? 0.4 : 1,
+                      border: 'none',
+                      cursor: isEdit && !on ? 'not-allowed' : 'pointer',
+                      boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none',
                     }}
                   >
                     {c.label}
@@ -339,7 +383,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
           </div>
 
           {/* 제목 */}
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--m-border)' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
             <label
               htmlFor="board-title-input"
               style={{ display: 'block', fontSize: 11, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}
@@ -352,13 +396,13 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
               onChange={(e) => set('title', e.target.value)}
               placeholder={isScheduleCat ? '예: 슬관절 내시경 / 요추 MRI' : '제목을 입력하세요'}
               autoFocus
-              style={{ width: '100%', padding: '6px 0', fontSize: 16, fontWeight: 700, color: 'var(--z-900)' }}
+              style={{ width: '100%', padding: '6px 0', fontSize: 15.5, fontWeight: 800, color: 'var(--z-900)', background: 'transparent', border: 'none', outline: 'none' }}
             />
           </div>
 
           {/* 본문 — 일정 게시판은 차트번호를 일정입력에서 받으므로 숨김 */}
           {!isScheduleCat && (
-            <div style={{ padding: '14px 16px 0' }}>
+            <div style={{ padding: '14px 16px 6px' }}>
               <label htmlFor="board-body-input" style={{ position: 'absolute', left: -9999 }}>본문</label>
               <textarea
                 id="board-body-input"
@@ -366,7 +410,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
                 value={form.body}
                 onChange={(e) => set('body', e.target.value)}
                 placeholder="본문을 입력하세요"
-                style={{ width: '100%', padding: '4px 0 16px', fontSize: 14, fontFamily: 'inherit', resize: 'none', color: 'var(--z-900)', lineHeight: 1.7, minHeight: 200 }}
+                style={{ width: '100%', padding: '4px 0 16px', fontSize: 14, fontFamily: 'inherit', resize: 'none', color: 'var(--z-900)', lineHeight: 1.7, minHeight: 200, background: 'transparent', border: 'none', outline: 'none' }}
               />
             </div>
           )}

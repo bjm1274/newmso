@@ -78,22 +78,24 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
   return (
     <div style={{ padding: '12px 12px 24px' }}>
       {/* 헤더: 월 + 이동 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--z-900)', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--z-900)', flex: 1, letterSpacing: '-0.02em' }}>
           {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
         </div>
         <button
           type="button"
           onClick={() => goMonth(-1)}
           aria-label="이전 달"
-          style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid var(--m-border)', display: 'grid', placeItems: 'center', background: 'var(--m-card)' }}
+          className="macos-glass macos-squircle-sm"
+          style={{ width: 34, height: 34, border: '1px solid rgba(0, 0, 0, 0.05)', display: 'grid', placeItems: 'center', background: 'rgba(255, 255, 255, 0.55)', cursor: 'pointer' }}
         >
-          <MIcon name="chevL" size={18} />
+          <MIcon name="chevL" size={16} color="var(--z-600)" />
         </button>
         <button
           type="button"
           onClick={goToday}
-          style={{ height: 34, padding: '0 12px', borderRadius: 10, border: '1px solid var(--m-border)', background: 'var(--m-card)', fontSize: 12, fontWeight: 800, color: 'var(--z-700)' }}
+          className="macos-glass macos-squircle-sm"
+          style={{ height: 34, padding: '0 12px', border: '1px solid rgba(0, 0, 0, 0.05)', background: 'rgba(255, 255, 255, 0.55)', fontSize: 12, fontWeight: 800, color: 'var(--z-700)', cursor: 'pointer' }}
         >
           오늘
         </button>
@@ -101,31 +103,45 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
           type="button"
           onClick={() => goMonth(1)}
           aria-label="다음 달"
-          style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid var(--m-border)', display: 'grid', placeItems: 'center', background: 'var(--m-card)' }}
+          className="macos-glass macos-squircle-sm"
+          style={{ width: 34, height: 34, border: '1px solid rgba(0, 0, 0, 0.05)', display: 'grid', placeItems: 'center', background: 'rgba(255, 255, 255, 0.55)', cursor: 'pointer' }}
         >
-          <MIcon name="chevR" size={18} />
+          <MIcon name="chevR" size={16} color="var(--z-600)" />
         </button>
       </div>
 
       {/* 검색 */}
-      <input
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="환자명·차트번호 검색"
-        aria-label="일정 검색"
+      <div
+        className="macos-glass macos-squircle-sm"
         style={{
-          width: '100%',
-          height: 38,
-          padding: '0 12px',
-          borderRadius: 10,
-          border: '1px solid var(--m-border)',
-          background: 'var(--m-card)',
-          fontSize: 14,
-          marginBottom: 10,
-          outline: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          background: 'rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          padding: '6px 12px',
+          height: 36,
+          marginBottom: 12,
         }}
-      />
+      >
+        <span style={{ marginRight: 6, display: 'flex', alignItems: 'center' }}><MIcon name="search" size={15} color="var(--z-500)" /></span>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="환자명·차트번호 검색"
+          aria-label="일정 검색"
+          style={{
+            flex: 1,
+            fontSize: 13,
+            fontFamily: 'inherit',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: 'var(--z-900)',
+            width: '100%',
+          }}
+        />
+      </div>
 
       {/* 요일 헤더 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 2 }}>
@@ -147,12 +163,15 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
 
       {/* 날짜 그리드 */}
       <div
+        className="macos-glass"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
-          border: '1px solid var(--m-border)',
-          borderRadius: 12,
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          borderRadius: 14,
           overflow: 'hidden',
+          background: 'rgba(255, 255, 255, 0.35)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
         }}
       >
         {days.map((d, idx) => {
@@ -165,10 +184,10 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
               key={`${key}-${idx}`}
               style={{
                 minHeight: 72,
-                borderRight: (idx % 7) === 6 ? 'none' : '1px solid var(--m-border)',
-                borderBottom: idx < 35 ? '1px solid var(--m-border)' : 'none',
-                padding: 3,
-                background: inMonth ? 'var(--m-card)' : 'var(--m-bg)',
+                borderRight: (idx % 7) === 6 ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+                borderBottom: idx < 35 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                padding: 4,
+                background: inMonth ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.02)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2,
@@ -176,14 +195,14 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
             >
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
+                  fontSize: 10.5,
+                  fontWeight: 800,
                   color: !inMonth
                     ? 'var(--z-400)'
                     : dow === 0
-                      ? 'var(--m-danger, #ef4444)'
+                      ? '#FF3B30'
                       : dow === 6
-                        ? 'var(--m-accent)'
+                        ? '#007AFF'
                         : 'var(--z-800)',
                 }}
               >
@@ -198,19 +217,21 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                   style={{
                     width: '100%',
                     textAlign: 'left',
-                    borderRadius: 5,
-                    background: 'var(--m-accent-soft)',
-                    padding: '2px 3px',
+                    borderRadius: 6,
+                    background: 'rgba(0, 122, 255, 0.08)',
+                    padding: '3px 4px',
                     fontSize: 9,
-                    fontWeight: 700,
-                    color: 'var(--z-800)',
+                    fontWeight: 800,
+                    color: '#007AFF',
                     lineHeight: 1.2,
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
                     textOverflow: 'ellipsis',
+                    border: 'none',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span style={{ color: 'var(--m-accent)' }}>{ev.schedule_time || ''}</span>{' '}
+                  <span style={{ opacity: 0.8, marginRight: 2 }}>{ev.schedule_time || ''}</span>
                   {ev.patient_name || ev.title}
                 </button>
               ))}
@@ -218,7 +239,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                 <button
                   type="button"
                   onClick={() => events[0] && onOpen(String(events[0].id))}
-                  style={{ fontSize: 9, fontWeight: 800, color: 'var(--m-accent)', textAlign: 'center' }}
+                  style={{ fontSize: 9, fontWeight: 800, color: '#007AFF', textAlign: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
                   aria-label={`그 외 ${events.length - 3}건 더 보기`}
                 >
                   +{events.length - 3}건

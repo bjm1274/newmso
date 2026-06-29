@@ -25,7 +25,19 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
   ref,
 ) {
   return (
-    <div className="m-sticky-foot" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+    <div
+      className="m-sticky-foot macos-glass"
+      style={{
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        gap: 6,
+        background: 'rgba(255, 255, 255, 0.72)',
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)',
+        borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+        padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 12px))',
+      }}
+    >
       {replyTo && (
         <div
           role="status"
@@ -33,12 +45,12 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            padding: '6px 10px',
-            background: 'var(--m-accent-soft)',
-            color: 'var(--m-accent)',
-            borderRadius: 8,
+            padding: '6px 12px',
+            background: 'rgba(0, 122, 255, 0.08)',
+            color: '#007AFF',
+            borderRadius: 10,
             fontSize: 12,
-            fontWeight: 700,
+            fontWeight: 800,
           }}
         >
           <span aria-hidden>↳</span>
@@ -50,16 +62,18 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             onClick={onReplyCancel}
             aria-label="답글 취소"
             style={{
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: '50%',
-              background: 'var(--m-bg)',
-              color: 'var(--z-600)',
+              background: 'rgba(0, 122, 255, 0.15)',
+              color: '#007AFF',
               display: 'grid',
               placeItems: 'center',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
-            <MIcon name="x" size={12} />
+            <MIcon name="x" size={10} />
           </button>
         </div>
       )}
@@ -69,7 +83,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          background: 'var(--m-bg)',
+          background: 'rgba(0, 0, 0, 0.04)',
           borderRadius: 22,
           padding: '4px 6px 4px 12px',
         }}
@@ -95,7 +109,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
                 ? `${currentUserName}님, 댓글 입력`
                 : '댓글 입력'
           }
-          style={{ flex: 1, padding: '8px 0', fontSize: 14, fontFamily: 'inherit' }}
+          style={{ flex: 1, padding: '8px 0', fontSize: 13.5, fontFamily: 'inherit', background: 'transparent', border: 'none', outline: 'none', color: 'var(--z-900)' }}
           disabled={sending}
         />
         <button
@@ -107,11 +121,14 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             width: 32,
             height: 32,
             borderRadius: '50%',
-            background: draft.trim() ? 'var(--m-accent)' : 'var(--z-300)',
-            color: '#fff',
+            background: draft.trim() ? '#007AFF' : 'rgba(0, 0, 0, 0.08)',
+            color: draft.trim() ? '#fff' : 'var(--z-400)',
             display: 'grid',
             placeItems: 'center',
             opacity: sending ? 0.5 : 1,
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: draft.trim() ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
           }}
         >
           <MIcon name="send" size={14} />

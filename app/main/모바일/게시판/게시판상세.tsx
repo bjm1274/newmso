@@ -324,28 +324,105 @@ export default function SBoardDetail({
   };
 
   return (
-    <div className="m-screen">
-      <MobileHeader
-        title={headerTitle}
-        back={onBack}
-        actions={
-          <>
-            <button type="button" aria-label="공유" onClick={() => void handleShare()}>
-              <MIcon name="share" size={20} />
-            </button>
-            <button
-              type="button"
-              aria-label="더보기"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(true)}
-            >
-              <MIcon name="moreV" size={20} />
-            </button>
-          </>
-        }
-      />
-      <div className="m-scroll">
+    <div
+      className="m-screen"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        className="macos-glass"
+        style={{
+          padding: '16px 20px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 99,
+          background: 'rgba(255, 255, 255, 0.65)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="뒤로"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
+            cursor: 'pointer',
+          }}
+        >
+          <MIcon name="chevL" size={18} color="var(--z-600)" />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 14.5,
+              fontWeight: 800,
+              color: 'var(--foreground)',
+              letterSpacing: '-0.015em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {headerTitle}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            aria-label="공유"
+            onClick={() => void handleShare()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="share" size={18} color="var(--z-600)" />
+          </button>
+          <button
+            type="button"
+            aria-label="더보기"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: 'rgba(0, 0, 0, 0.03)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              cursor: 'pointer',
+            }}
+          >
+            <MIcon name="moreV" size={18} color="var(--z-600)" />
+          </button>
+        </div>
+      </div>
+      <div className="m-scroll" style={{ background: 'transparent' }}>
         <div style={{ padding: '16px 16px 0' }}>
           <BoardDetailHeader
             post={post}

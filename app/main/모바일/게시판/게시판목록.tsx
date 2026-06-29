@@ -103,61 +103,127 @@ function BoardHomeView({
   onOpenCategory: (catId: BoardCatId) => void;
 }) {
   return (
-    <div className="m-screen">
-      <div className="msm-appbar">
-        <div className="msm-appbar-inner">
-          <div>
-            <div className="eyebrow">협업</div>
-            <div className="title">게시판</div>
-          </div>
+    <div
+      className="m-screen"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        className="macos-glass"
+        style={{
+          padding: '16px 20px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>협업</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--foreground)', letterSpacing: '-0.02em', marginTop: 1 }}>게시판</div>
         </div>
       </div>
-      <div className="m-scroll">
-        <div className="msm-sec">
-          <div className="msm-sec-t">카테고리</div>
+      <div className="m-scroll" style={{ background: 'transparent', padding: '12px 0 24px' }}>
+        <div style={{ padding: '4px 20px 10px', fontSize: 12, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '-0.01em' }}>
+          카테고리
         </div>
-        <div className="msm-list">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {HOME_CATEGORIES.map((c) => {
             const unread = countUnread(posts, c.id);
             return (
               <button
                 key={c.id}
                 type="button"
-                className="msm-list-row"
+                className="macos-glass macos-squircle-sm"
                 onClick={() => onOpenCategory(c.id)}
                 aria-label={`${c.label}${unread > 0 ? ` ${unread}건 안 읽음` : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 16px',
+                  margin: '0 16px 8px',
+                  background: 'rgba(255, 255, 255, 0.65)',
+                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: 'calc(100% - 32px)',
+                }}
               >
-                <div className={`msm-quick-ic tone-${c.tone}`}>
-                  <MIcon name={c.icon} size={18} />
+                <div
+                  className="macos-squircle-sm"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: c.tone === 'accent' ? 'rgba(0, 122, 255, 0.12)' :
+                                c.tone === 'success' ? 'rgba(52, 199, 89, 0.12)' :
+                                c.tone === 'warn' ? 'rgba(255, 149, 0, 0.12)' :
+                                c.tone === 'danger' ? 'rgba(255, 59, 48, 0.12)' :
+                                'rgba(0, 0, 0, 0.05)',
+                    color: c.tone === 'accent' ? '#007AFF' :
+                           c.tone === 'success' ? '#34C759' :
+                           c.tone === 'warn' ? '#FF9500' :
+                           c.tone === 'danger' ? '#FF3B30' :
+                           'var(--z-600)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <MIcon name={c.icon} size={16} />
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.012em' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--z-900)', letterSpacing: '-0.01em' }}>
                     {c.label}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 1.5 }}>
+                    {c.subtitle}
                   </div>
                 </div>
                 {unread > 0 && (
-                  <span className="msm-unread">{unread}</span>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 999,
+                      background: 'linear-gradient(135deg, #FF3B30, #FF453A)',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: '#fff',
+                      boxShadow: '0 2px 6px rgba(255, 59, 48, 0.25)',
+                      marginRight: 4,
+                    }}
+                  >
+                    {unread}
+                  </span>
                 )}
-                <MIcon name="chevR" size={16} color="var(--z-400)" />
+                <MIcon name="chevR" size={14} color="var(--z-400)" />
               </button>
             );
           })}
         </div>
         {/* 전체 보기 링크 */}
-        <div style={{ padding: '12px 16px' }}>
+        <div style={{ padding: '8px 16px 0' }}>
           <button
             type="button"
             onClick={() => onOpenCategory('all')}
+            className="macos-glass macos-squircle-sm"
             style={{
               width: '100%',
               padding: '12px 16px',
-              background: 'var(--m-card)',
-              border: '1px solid var(--m-border)',
-              borderRadius: 'var(--m-radius-lg)',
+              background: 'rgba(0, 122, 255, 0.08)',
+              border: '1px solid rgba(0, 122, 255, 0.15)',
               fontSize: 13,
-              fontWeight: 700,
-              color: 'var(--m-accent)',
+              fontWeight: 800,
+              color: '#007AFF',
               textAlign: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0, 122, 255, 0.05)',
             }}
           >
             전체 글 보기
@@ -212,7 +278,15 @@ function SBoardBase({
   }
 
   return (
-    <div className="m-screen" data-variant="mobile">
+    <div
+      className="m-screen"
+      data-variant="mobile"
+      style={{
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="게시판"
@@ -250,40 +324,93 @@ function SBoardBase({
         }
       />
       {searchOpen && (
-        <div style={{ padding: '8px 16px' }}>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="제목·내용·작성자 검색"
-            aria-label="게시글 검색"
-            autoFocus
+        <div style={{ padding: '8px 16px 4px' }}>
+          <div
+            className="macos-glass macos-squircle-sm"
             style={{
-              width: '100%',
-              height: 38,
-              padding: '0 12px',
-              borderRadius: 10,
-              border: '1px solid var(--m-border, #e5e7eb)',
-              background: 'var(--m-card, #fff)',
-              fontSize: 14,
-              outline: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              background: 'rgba(0, 0, 0, 0.04)',
+              border: '1px solid rgba(0, 0, 0, 0.05)',
+              padding: '6px 12px',
+              height: 36,
             }}
-          />
+          >
+            <span style={{ marginRight: 6, display: 'flex', alignItems: 'center' }}><MIcon name="search" size={15} color="var(--z-500)" /></span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="제목·내용·작성자 검색"
+              aria-label="게시글 검색"
+              autoFocus
+              style={{
+                flex: 1,
+                fontSize: 13,
+                fontFamily: 'inherit',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: 'var(--z-900)',
+                width: '100%',
+              }}
+            />
+          </div>
         </div>
       )}
-      <div className="m-chip-bar">
-        {BOARD_CATS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={cat === c.id ? 'on' : ''}
-            onClick={() => onCat(c.id)}
-            aria-pressed={cat === c.id}
-          >
-            {c.label}
-            <span className="cnt">{countByCat(posts, c.id)}</span>
-          </button>
-        ))}
+      <div
+        className="m-chip-bar macos-glass"
+        style={{
+          background: 'rgba(255, 255, 255, 0.4)',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          padding: '8px 16px',
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        }}
+      >
+        {BOARD_CATS.map((c) => {
+          const active = cat === c.id;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              className={`macos-squircle-sm ${active ? 'on' : ''}`}
+              onClick={() => onCat(c.id)}
+              aria-pressed={active}
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 800,
+                borderRadius: 8,
+                background: active ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
+                color: active ? '#fff' : 'var(--z-700)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                whiteSpace: 'nowrap',
+                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
+              }}
+            >
+              {c.label}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  opacity: 0.8,
+                  background: active ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.05)',
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                }}
+              >
+                {countByCat(posts, c.id)}
+              </span>
+            </button>
+          );
+        })}
       </div>
       <div className="m-scroll" ref={containerRef} style={{ overscrollBehaviorY: 'contain' }}>
         {isScheduleCat && calendarView ? (

@@ -94,8 +94,13 @@ function CommentBody({
       style={{
         display: 'flex',
         gap: 10,
-        marginBottom: 12,
-        paddingLeft: isReply ? 32 : 0,
+        marginBottom: 10,
+        marginLeft: isReply ? 24 : 0,
+        padding: '10px 14px',
+        borderRadius: 14,
+        background: isReply ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.65)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
         position: 'relative',
       }}
     >
@@ -104,11 +109,11 @@ function CommentBody({
           aria-hidden
           style={{
             position: 'absolute',
-            left: 12,
-            top: 6,
-            color: 'var(--z-400)',
-            fontSize: 13,
-            fontWeight: 700,
+            left: -14,
+            top: 14,
+            color: 'rgba(0, 122, 255, 0.4)',
+            fontSize: 12,
+            fontWeight: 800,
           }}
         >
           ↳
@@ -116,9 +121,9 @@ function CommentBody({
       )}
       <MAvatar tone={tone} size="sm">{initial}</MAvatar>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <b style={{ fontSize: 12, fontWeight: 800 }}>{name}</b>
-          <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>{ts}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <b style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--z-900)' }}>{name}</b>
+          <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 700 }}>{ts}</span>
           {!isReply && (
             <button
               type="button"
@@ -126,10 +131,14 @@ function CommentBody({
               aria-label={`${name}에게 답글 작성`}
               style={{
                 marginLeft: 'auto',
-                fontSize: 11,
-                color: 'var(--m-accent)',
-                fontWeight: 700,
-                padding: '2px 4px',
+                fontSize: 10.5,
+                color: '#007AFF',
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: 4,
+                background: 'rgba(0, 122, 255, 0.06)',
+                border: 'none',
+                cursor: 'pointer',
               }}
             >
               답글
@@ -142,28 +151,33 @@ function CommentBody({
               aria-label="댓글 삭제"
               style={{
                 marginLeft: isReply ? 'auto' : 0,
-                fontSize: 11,
-                color: 'var(--m-danger, #ef4444)',
-                fontWeight: 700,
-                padding: '2px 4px',
+                fontSize: 10.5,
+                color: 'var(--danger)',
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: 4,
+                background: 'rgba(255, 59, 48, 0.06)',
+                border: 'none',
+                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 2,
               }}
             >
-              <MIcon name="trash" size={12} />
+              <MIcon name="trash" size={11} color="var(--danger)" />
               삭제
             </button>
           )}
         </div>
         <div
           style={{
-            fontSize: 13,
+            fontSize: 12.5,
             color: 'var(--z-800)',
-            marginTop: 3,
-            lineHeight: 1.55,
+            marginTop: 4,
+            lineHeight: 1.5,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
+            fontWeight: 500,
           }}
         >
           {body}

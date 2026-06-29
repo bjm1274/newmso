@@ -28,25 +28,33 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
     const isOp = cat === 'op';
     return (
       <div
-        className="m-card"
+        className="macos-glass macos-squircle-sm"
         data-variant="mobile"
-        style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}
+        style={{
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          background: 'rgba(255, 255, 255, 0.65)',
+          border: '1px solid rgba(255, 255, 255, 0.35)',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+        }}
       >
         <button
           type="button"
           onClick={onOpen}
           aria-label={`${post.title} 상세 보기`}
-          style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}
+          style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)', lineHeight: 1.4 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)', lineHeight: 1.4, letterSpacing: '-0.015em' }}>
                 {post.title}
               </div>
               <div style={{ fontSize: 11, color: 'var(--m-accent)', fontWeight: 800, marginTop: 4 }}>
                 {post.patient_name || '환자명 미지정'}
                 {post.content && (
-                  <span style={{ color: 'var(--z-500)', marginLeft: 6 }}>
+                  <span style={{ color: 'var(--z-500)', marginLeft: 6, fontWeight: 600 }}>
                     | 차트번호: {post.content}
                   </span>
                 )}
@@ -64,20 +72,20 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               gap: 8,
               paddingTop: 10,
               marginTop: 10,
-              borderTop: '1px solid var(--m-border)',
+              borderTop: '1px solid rgba(0, 0, 0, 0.06)',
             }}
           >
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>날짜</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_date || '-'}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>날짜</div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_date || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>시간</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_time || '-'}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>시간</div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>{post.schedule_time || '-'}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-400)', textTransform: 'uppercase' }}>위치</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-800)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.schedule_room || '-'}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>위치</div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--z-800)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{post.schedule_room || '-'}</div>
             </div>
           </div>
 
@@ -93,7 +101,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
         </button>
 
         <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 2 }}>
-          <span style={{ fontSize: 11, color: 'var(--z-400)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ fontSize: 11, color: 'var(--z-450)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
             <MIcon name="user" size={11} /> {views}
           </span>
         </div>
@@ -103,15 +111,23 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
 
   return (
     <div
-      className="m-card"
+      className="macos-glass macos-squircle-sm"
       data-variant="mobile"
-      style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}
+      style={{
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        background: 'rgba(255, 255, 255, 0.65)',
+        border: '1px solid rgba(255, 255, 255, 0.35)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+      }}
     >
       <button
         type="button"
         onClick={onOpen}
         aria-label={`${post.title} 상세 보기`}
-        style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%' }}
+        style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 0, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           {isPinned && <MIcon name="pin" size={12} color="var(--m-accent)" />}
@@ -119,11 +135,11 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
             data-testid={`board-post-status-pill-${post.id}`}
             style={{
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 800,
               padding: '2px 6px',
-              borderRadius: 4,
-              background: 'var(--accent-tint)',
-              color: 'var(--m-accent)',
+              borderRadius: 6,
+              background: 'rgba(0, 122, 255, 0.08)',
+              color: '#007AFF',
             }}
           >
             {post.status || '게시중'}
@@ -131,7 +147,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
           {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
             <span
               data-testid={`board-post-attachment-indicator-${post.id}`}
-              style={{ fontSize: 12, color: 'var(--z-400)' }}
+              style={{ fontSize: 12, color: 'var(--z-450)' }}
             >
               📎
             </span>
@@ -139,7 +155,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
           <div style={{ flex: 1 }} />
           <span
             data-testid={`board-post-date-${post.id}`}
-            style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}
+            style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}
           >
             {formatShortDate(post.created_at as string | null)}
           </span>
@@ -160,22 +176,22 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            marginTop: 8,
+            marginTop: 10,
             fontSize: 11,
             color: 'var(--z-500)',
-            fontWeight: 600,
+            fontWeight: 700,
           }}
         >
           <MAvatar tone={tone} size="sm">{initial}</MAvatar>
-          <b style={{ color: 'var(--z-700)' }}>{authorName}</b>
+          <b style={{ color: 'var(--z-750)' }}>{authorName}</b>
           {post.company && (
             <>
               <span style={{ color: 'var(--z-400)' }}>·</span>
-              <span>{String(post.company)}</span>
+              <span style={{ color: 'var(--z-550)' }}>{String(post.company)}</span>
             </>
           )}
           <div style={{ flex: 1 }} />
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--z-500)' }}>
             <MIcon name="user" size={11} />
             {views}
           </span>
@@ -184,7 +200,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               display: 'inline-flex',
               alignItems: 'center',
               gap: 3,
-              color: commentCount > 0 ? 'var(--m-accent)' : 'var(--z-500)',
+              color: commentCount > 0 ? '#007AFF' : 'var(--z-500)',
             }}
           >
             <MIcon name="chat" size={11} />
