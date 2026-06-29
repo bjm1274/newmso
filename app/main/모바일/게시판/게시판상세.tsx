@@ -327,7 +327,7 @@ export default function SBoardDetail({
     <div
       className="m-screen"
       style={{
-        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        background: 'transparent',
         display: 'flex',
         flexDirection: 'column',
       }}

@@ -11,7 +11,7 @@ import type { BoardCatId } from './data-hooks';
 
 const ANONYMOUS_ALLOWED_CATS = new Set<BoardCatId>(['free']);
 // 투표/설문은 일정 게시판(op/mri)에는 부적합 → 그 외 카테고리에서만 노출
-const POLL_ALLOWED_CATS = new Set<BoardCatId>(['notice', 'free', 'voice', 'event', 'suggest', 'share', 'meal']);
+const POLL_ALLOWED_CATS = new Set<BoardCatId>(['notice', 'free', 'event', 'share']);
 
 /** 투표 작성 상태 — 글작성.tsx가 소유, 옵션 패널은 표시·편집만 */
 export type PollDraft = {

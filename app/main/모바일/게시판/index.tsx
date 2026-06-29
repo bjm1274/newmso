@@ -243,7 +243,16 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   }
 
   return (
-    <div data-testid="board-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div
+      data-testid="board-view"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+      }}
+    >
       {contentElement}
     </div>
   );

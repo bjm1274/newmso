@@ -36,8 +36,6 @@ type BoardCategory = {
 const HOME_CATEGORIES: BoardCategory[] = [
   { id: 'notice',  label: '공지사항',     subtitle: '병원 공지 · 전달사항',      icon: 'bell',     tone: 'warn' },
   { id: 'free',    label: '자유게시판',   subtitle: '자유 토론 · 소통',           icon: 'chat',     tone: 'success' },
-  { id: 'voice',   label: '익명소리함',   subtitle: '익명으로 의견 전달',         icon: 'chat',     tone: 'accent' },
-  { id: 'suggest', label: '직원제안함',   subtitle: '개선 · 제안 접수',           icon: 'bookmark', tone: 'warn' },
   { id: 'event',   label: '경조사 소식',  subtitle: '경조사 안내',                icon: 'bookmark', tone: 'danger' },
   { id: 'op',      label: '수술 일정',    subtitle: '수술 스케줄 공유',           icon: 'calendar', tone: 'danger' },
   { id: 'mri',     label: 'MRI 일정',     subtitle: 'MRI 스케줄 · 판독 대기',    icon: 'calendar', tone: 'accent' },
@@ -81,12 +79,6 @@ export type SBoardProps = {
 // ─── 필터 유틸 ────────────────────────────────────────────
 function filterByCat(posts: BoardListPost[], cat: BoardCatId): BoardListPost[] {
   if (cat === 'all') return posts;
-  if (cat === 'meal') {
-    return posts.filter((p) => {
-      const tags = Array.isArray(p.tags) ? p.tags.map((t) => String(t)) : [];
-      return tags.includes('식단') || /식단/.test(String(p.title ?? ''));
-    });
-  }
   return posts.filter((p) => boardTypeToCat(p.board_type as string | null) === cat);
 }
 
@@ -106,7 +98,7 @@ function BoardHomeView({
     <div
       className="m-screen"
       style={{
-        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        background: 'transparent',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -282,7 +274,7 @@ function SBoardBase({
       className="m-screen"
       data-variant="mobile"
       style={{
-        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
+        background: 'transparent',
         display: 'flex',
         flexDirection: 'column',
       }}

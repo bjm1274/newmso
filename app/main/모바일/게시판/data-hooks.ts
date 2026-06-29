@@ -34,18 +34,15 @@ export type BoardCatId =
   | 'all'
   | 'notice'
   | 'free'
-  | 'voice'
   | 'event'
   | 'op'
   | 'mri'
-  | 'suggest'
-  | 'share'
-  | 'meal';
+  | 'share';
 
 export type BoardCatDef = {
   id: BoardCatId;
   label: string;
-  /** supabase board_type 값(=PC와 동일). all/meal은 mapping 없음 */
+  /** supabase board_type 값(=PC와 동일). all은 mapping 없음 */
   boardType?: string;
   tone?: 'accent' | 'success' | 'warning' | 'danger' | '';
 };
@@ -54,13 +51,10 @@ export const BOARD_CATS: BoardCatDef[] = [
   { id: 'all',     label: '전체',     tone: '' },
   { id: 'notice',  label: '공지',     boardType: '공지사항', tone: 'accent' },
   { id: 'free',    label: '자유',     boardType: '자유게시판', tone: '' },
-  { id: 'voice',   label: '소리함',   boardType: '익명소리함', tone: 'accent' },
   { id: 'event',   label: '경조사',   boardType: '경조사', tone: 'warning' },
   { id: 'op',      label: '수술일정', boardType: '수술일정', tone: 'success' },
   { id: 'mri',     label: 'MRI일정',  boardType: 'MRI일정', tone: 'success' },
-  { id: 'suggest', label: '제안함',   boardType: '직원제안함', tone: 'warning' },
   { id: 'share',   label: '업무공유', boardType: '업무가이드', tone: 'warning' },
-  { id: 'meal',    label: '식단',     tone: '' }, // 별도 board 없음 → 자유 안의 '식단' 태그
 ];
 
 const LIST_BOARD_TYPES = BOARD_CATS
