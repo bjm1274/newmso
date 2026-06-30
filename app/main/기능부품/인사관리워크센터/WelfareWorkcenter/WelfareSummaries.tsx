@@ -46,8 +46,7 @@ function pickFamilyTone(kind: string): 'success' | 'muted' | 'warn' {
 const FAMILY_CHIP_CLS: Record<FamilyEvent['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  warn: 'bg-amber-500/15 text-amber-700',
-};
+  warn: 'bg-amber-500/15 text-amber-700' };
 
 export function WelfareFamilySummary() {
   const [events, setEvents] = useState<FamilyEvent[]>([]);
@@ -74,8 +73,7 @@ export function WelfareFamilySummary() {
             staffName: String(row.staff_name ?? '직원'),
             kind: String(row.event_type ?? '기타'),
             date: formatDateCompact(row.event_date),
-            tone: pickFamilyTone(String(row.event_type ?? '')),
-          })),
+            tone: pickFamilyTone(String(row.event_type ?? '')) })),
         );
       } catch (error) {
         if (cancelled) return;
@@ -153,15 +151,13 @@ interface CheckupCounts {
 const CHECKUP_STATUS_TONE: Record<string, CheckupRow['tone']> = {
   완료: 'success',
   예약: 'warn',
-  미수검: 'danger',
-};
+  미수검: 'danger' };
 
 const CHECKUP_TONE_CLS: Record<CheckupRow['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 export function WelfareCheckupSummary() {
   const [rows, setRows] = useState<CheckupRow[]>([]);
@@ -204,8 +200,7 @@ export function WelfareCheckupSummary() {
           place: String(r.place ?? '-'),
           when: formatDateCompact(r.scheduled_date),
           status: String(r.status ?? '미수검'),
-          tone: CHECKUP_STATUS_TONE[String(r.status ?? '')] ?? 'muted',
-        }));
+          tone: CHECKUP_STATUS_TONE[String(r.status ?? '')] ?? 'muted' }));
         setRows(display);
       } catch (error) {
         if (cancelled) return;
@@ -307,8 +302,7 @@ const LICENSE_TONE_CLS: Record<LicenseCardData['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 function pickLicenseTone(days: number | null): LicenseCardData['tone'] {
   if (days === null) return 'success';
@@ -358,8 +352,7 @@ export function WelfareLicenseSummary() {
             sub: String(r.sub_category ?? ''),
             exp: formatLicenseExp(expDateStr, days),
             days,
-            tone: pickLicenseTone(days),
-          };
+            tone: pickLicenseTone(days) };
         });
         items.sort((a, b) => {
           const order = { danger: 0, warn: 1, success: 2, muted: 3 } as const;
@@ -444,8 +437,7 @@ const DEVICE_TONE_CLS: Record<DeviceRow['tone'], string> = {
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
   muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  success: 'bg-emerald-500/15 text-emerald-700',
-};
+  success: 'bg-emerald-500/15 text-emerald-700' };
 
 function formatDate(value: unknown): string {
   if (!value) return '-';
@@ -493,8 +485,7 @@ export function WelfareDeviceSummary() {
               next: formatDate(r.next_inspection_date),
               who: String(r.manager_name ?? '내부 관리'),
               status,
-              tone,
-            };
+              tone };
           }),
         );
       } catch (error) {

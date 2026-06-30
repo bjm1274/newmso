@@ -10,8 +10,7 @@ export const TAX_FREE_LEGAL_LIMITS = {
   research: { limit: 200_000, name: '연구활동비', basis: '소득세법' },
   uniform: { limit: 300_000, name: '출장·업무용품', basis: '소득세법' },
   congratulations: { limit: 500_000, name: '경조사비', basis: '소득세법' },
-  housing: { limit: 700_000, name: '기숙사·주택보조비', basis: '소득세법' },
-} as const;
+  housing: { limit: 700_000, name: '기숙사·주택보조비', basis: '소득세법' } } as const;
 
 export const MINIMUM_WAGE_2025 = 10_030;
 export const MINIMUM_WAGE_2026 = 10_320;

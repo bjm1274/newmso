@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { EMPLOYEE_INSURANCE_RATES_2026 } from '@/lib/payroll-insurance-rates';
 
 export interface TaxInsuranceRates {
@@ -47,8 +47,7 @@ export const DEFAULT_TAX_INSURANCE_RATES: TaxInsuranceRates = {
   long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
   employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
   income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
-  configured: false,
-};
+  configured: false };
 
 const TAX_INSURANCE_RATES_CACHE_TTL_MS = 5 * 60 * 1000;
 const taxInsuranceRatesCache = new Map<string, { rates: TaxInsuranceRates; cachedAt: number }>();
@@ -118,8 +117,7 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
     formula_base_income: formulaBaseIncome ?? undefined,
     formula_multiplier: formulaMultiplier ?? undefined,
     formula_rate: formulaRate ?? undefined,
-    official: entry.official === true,
-  };
+    official: entry.official === true };
 }
 
 function isDetailedBracket(entries: IncomeTaxBracketEntry[]) {
@@ -344,8 +342,7 @@ function normalizeRates(row: any | null | undefined, configured: boolean): TaxIn
   if (!source) {
     return {
       ...DEFAULT_TAX_INSURANCE_RATES,
-      configured,
-    };
+      configured };
   }
 
   const normalizedNationalPensionRate = Number(
@@ -379,8 +376,7 @@ function normalizeRates(row: any | null | undefined, configured: boolean): TaxIn
         ? Math.max(normalizedEmploymentInsuranceRate, EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance)
         : normalizedEmploymentInsuranceRate,
     income_tax_bracket: resolveIncomeTaxBracket(source),
-    configured,
-  };
+    configured };
 }
 
 export async function fetchTaxInsuranceRates(
@@ -394,7 +390,7 @@ export async function fetchTaxInsuranceRates(
     return cached.rates;
   }
 
-  const companyRes = await supabase
+  const companyRes = await db
     .from('tax_insurance_rates')
     .select('*')
     .eq('company_name', companyScope)
@@ -402,7 +398,7 @@ export async function fetchTaxInsuranceRates(
     .maybeSingle();
 
   const fetchFallbackRates = () =>
-    supabase
+    db
       .from('tax_insurance_rates')
       .select('*')
       .eq('company_name', '전체')
@@ -425,8 +421,7 @@ export async function fetchTaxInsuranceRates(
         resolvedRates = {
           ...companyRates,
           income_tax_bracket: fallbackRates.income_tax_bracket,
-          configured: true,
-        };
+          configured: true };
         taxInsuranceRatesCache.set(cacheKey, { rates: resolvedRates, cachedAt: Date.now() });
         return resolvedRates;
       }

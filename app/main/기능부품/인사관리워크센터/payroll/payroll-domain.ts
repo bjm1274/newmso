@@ -8,19 +8,17 @@
  *
  * KPI / 점검 감지는 ./payroll-kpi.ts 로 분리.
  *
- * JM: 단일 책임 — 표 빌더 순수 함수만, supabase·DOM 의존 없음
+ * JM: 단일 책임 — 표 빌더 순수 함수만, db·DOM 의존 없음
  * JM4: any 금지, 모든 input/output 타입 export
  * JM5: 정수 누적만 (Math.floor)
  */
 
 import {
   calculateEmployeeInsuranceDeductions,
-  calculateIndustrialAccidentInsurance,
-} from '@/lib/payroll-insurance-rates';
+  calculateIndustrialAccidentInsurance } from '@/lib/payroll-insurance-rates';
 import {
   calculateHourlyRateFromMonthlySalary,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import { calculateAge } from './payroll-policy';
 import type { PayrollWorkcenterData } from './payroll-fetch';
 
@@ -51,8 +49,7 @@ export function buildLedgerRows(data: PayrollWorkcenterData): LedgerRowComputed[
         deduction: 0,
         net: 0,
         status: '미정산',
-        hasRecord: false,
-      };
+        hasRecord: false };
     }
     const allowance =
       r.meal_allowance +
@@ -73,8 +70,7 @@ export function buildLedgerRows(data: PayrollWorkcenterData): LedgerRowComputed[
       deduction: r.total_deduction,
       net: r.net_pay,
       status: r.status || '확정',
-      hasRecord: true,
-    };
+      hasRecord: true };
   });
 }
 
@@ -102,8 +98,7 @@ export function calculateInsuranceRows(
           national: acc.national + r.national_pension,
           health: acc.health + r.health_insurance,
           longTerm: acc.longTerm + r.long_term_care,
-          employment: acc.employment + r.employment_insurance,
-        }),
+          employment: acc.employment + r.employment_insurance }),
         { national: 0, health: 0, longTerm: 0, employment: 0 },
       )
     : (() => {
@@ -112,8 +107,7 @@ export function calculateInsuranceRows(
           national: d.nationalPension,
           health: d.healthInsurance,
           longTerm: d.longTermCare,
-          employment: d.employmentInsurance,
-        };
+          employment: d.employmentInsurance };
       })();
 
   const accident = calculateIndustrialAccidentInsurance(taxableSum, companyName);
@@ -131,40 +125,35 @@ export function calculateInsuranceRows(
       rateEmployer: data.policy.insuranceEmployer.nationalPension,
       amountEmployee: empSum.national,
       amountEmployer: employerNational,
-      total: empSum.national + employerNational,
-    },
+      total: empSum.national + employerNational },
     {
       name: '건강보험',
       rateEmployee: data.policy.insuranceEmployee.healthInsurance,
       rateEmployer: data.policy.insuranceEmployer.healthInsurance,
       amountEmployee: empSum.health,
       amountEmployer: employerHealth,
-      total: empSum.health + employerHealth,
-    },
+      total: empSum.health + employerHealth },
     {
       name: '장기요양',
       rateEmployee: data.policy.insuranceEmployee.longTermCare,
       rateEmployer: data.policy.insuranceEmployer.longTermCare,
       amountEmployee: empSum.longTerm,
       amountEmployer: employerLongTerm,
-      total: empSum.longTerm + employerLongTerm,
-    },
+      total: empSum.longTerm + employerLongTerm },
     {
       name: '고용보험',
       rateEmployee: data.policy.insuranceEmployee.employmentInsurance,
       rateEmployer: data.policy.insuranceEmployer.employmentInsuranceMin,
       amountEmployee: empSum.employment,
       amountEmployer: employerEmployment,
-      total: empSum.employment + employerEmployment,
-    },
+      total: empSum.employment + employerEmployment },
     {
       name: `산재보험 (${accident.industryLabel})`,
       rateEmployee: 0,
       rateEmployer: accident.employerRate,
       amountEmployee: 0,
       amountEmployer: accident.employerAmount,
-      total: accident.employerAmount,
-    },
+      total: accident.employerAmount },
   ];
 }
 
@@ -196,8 +185,7 @@ export function buildMinWageRows(data: PayrollWorkcenterData): MinWageRowCompute
         monthlySalary: monthly,
         hourly,
         gap,
-        status,
-      };
+        status };
     })
     .filter((r) => r.monthlySalary > 0)
     .sort((a, b) => a.hourly - b.hourly);
@@ -235,8 +223,7 @@ export function buildWagePeakRows(data: PayrollWorkcenterData, today: Date = new
         ratio: stage.ratio,
         ratioLabel: stage.label,
         originalSalary: original,
-        peakedSalary: Math.floor(original * stage.ratio),
-      };
+        peakedSalary: Math.floor(original * stage.ratio) };
     })
     .filter((r): r is WagePeakRow => r !== null);
 }
@@ -271,8 +258,7 @@ export function buildUnpaidRows(data: PayrollWorkcenterData): UnpaidDetailRow[] 
         prevAmount: prev.night_duty_allowance,
         curAmount: 0,
         diff: prev.night_duty_allowance,
-        tone: 'danger',
-      });
+        tone: 'danger' });
     }
     if (prev.overtime_pay > 0 && r.overtime_pay === 0) {
       out.push({
@@ -283,8 +269,7 @@ export function buildUnpaidRows(data: PayrollWorkcenterData): UnpaidDetailRow[] 
         prevAmount: prev.overtime_pay,
         curAmount: 0,
         diff: prev.overtime_pay,
-        tone: 'warn',
-      });
+        tone: 'warn' });
     }
   });
   return out;
@@ -322,8 +307,7 @@ export function buildAbsenceRows(data: PayrollWorkcenterData): AbsenceDetailRow[
         prevBase: prev.base_salary,
         curBase: r.base_salary,
         deduction,
-        estimatedDays,
-      });
+        estimatedDays });
     }
   });
   return out;

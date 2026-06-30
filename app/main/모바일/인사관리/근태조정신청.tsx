@@ -5,7 +5,7 @@
  *
  * attendance_adjustments insert.
  *  - 직원이 본인 근태 보정 신청 (지각·조퇴·미체크 사유/정정 요청)
- *  - 오프라인 시 enqueueSupabaseMutation으로 큐잉
+ *  - 오프라인 시 enqueueD1Mutation으로 큐잉
  *
  * JM: 단일 책임 (~120줄)
  * JM3: try/catch — validation 에러 vs 네트워크 에러 분리
@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { MFormHeader, MField, MInput, MSegRow, useFieldIdPrefix } from './form-helpers';
 
 export type AdjustKind = '지각' | '조퇴' | '미체크' | '기타';
@@ -59,14 +59,12 @@ export default function 근태조정신청({ staffId, targetDate, onBack }: SHrA
         original_date: targetDate,
         correction_type: kind,
         reason: noteText ? `${reason.trim()} (${noteText})` : reason.trim(),
-        status: '대기',
-      };
+        status: '대기' };
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'attendance_corrections',
-        payload,
-      });
+        payload });
 
       if (error) {
         toast(`근태 조정 신청 실패: ${error}`, 'error');
@@ -99,7 +97,7 @@ export default function 근태조정신청({ staffId, targetDate, onBack }: SHrA
         saveDisabled={!canSubmit}
       />
       <div className="m-scroll" aria-busy={submitting}>
-        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+        <div className="m-card flush macos-glass macos-squircle" style={{ borderRadius: 0, border: 'none' }}>
           <MField label="조정 유형">
             <MSegRow
               value={kind}
@@ -130,8 +128,7 @@ export default function 근태조정신청({ staffId, targetDate, onBack }: SHrA
                 fontSize: 14,
                 fontFamily: 'inherit',
                 resize: 'none',
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             />
           </MField>
         </div>

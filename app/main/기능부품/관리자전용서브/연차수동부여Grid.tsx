@@ -87,8 +87,7 @@ export default function ManualGrantGrid({
   getCompensated,
   getRemaining,
   setField,
-  onSaveOne,
-}: ManualGrantGridProps) {
+  onSaveOne }: ManualGrantGridProps) {
   const numberInput = (
     staff: any,
     key: keyof EditState,
@@ -124,8 +123,7 @@ export default function ManualGrantGrid({
       showOnMobile: false,
       render: (staff) => (
         <span className="font-bold text-[var(--foreground)]">{staff.name}</span>
-      ),
-    },
+      ) },
     {
       id: 'company',
       label: '회사/부서',
@@ -133,8 +131,7 @@ export default function ManualGrantGrid({
         <span className="text-xs text-[var(--toss-gray-3)]">
           {staff.company} / {staff.department || '-'}
         </span>
-      ),
-    },
+      ) },
     {
       id: 'hire',
       label: '입사일',
@@ -142,8 +139,7 @@ export default function ManualGrantGrid({
         <span className="text-xs text-[var(--toss-gray-4)]">
           {staff.hire_date || staff.join_date || staff.joined_at || '-'}
         </span>
-      ),
-    },
+      ) },
     {
       id: 'cycle',
       label: '부여 기간',
@@ -161,33 +157,28 @@ export default function ManualGrantGrid({
             </span>
           </div>
         );
-      },
-    },
+      } },
     {
       id: 'total',
       label: '부여',
       width: '96px',
-      render: (staff) => numberInput(staff, 'total', getTotal(staff), `${staff.name} 부여 연차`),
-    },
+      render: (staff) => numberInput(staff, 'total', getTotal(staff), `${staff.name} 부여 연차`) },
     {
       id: 'used',
       label: '사용',
       width: '96px',
-      render: (staff) => numberInput(staff, 'used', getUsed(staff), `${staff.name} 사용 연차`),
-    },
+      render: (staff) => numberInput(staff, 'used', getUsed(staff), `${staff.name} 사용 연차`) },
     {
       id: 'expired',
       label: '소멸',
       width: '96px',
-      render: (staff) => numberInput(staff, 'expired', getExpired(staff), `${staff.name} 소멸 연차`),
-    },
+      render: (staff) => numberInput(staff, 'expired', getExpired(staff), `${staff.name} 소멸 연차`) },
     {
       id: 'compensated',
       label: '수당지급',
       width: '96px',
       render: (staff) =>
-        numberInput(staff, 'compensated', getCompensated(staff), `${staff.name} 수당지급 연차`),
-    },
+        numberInput(staff, 'compensated', getCompensated(staff), `${staff.name} 수당지급 연차`) },
     {
       id: 'remaining',
       label: '잔여',
@@ -201,8 +192,7 @@ export default function ManualGrantGrid({
         >
           {getRemaining(staff).toFixed(1)}일
         </span>
-      ),
-    },
+      ) },
   ];
 
   return (

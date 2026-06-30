@@ -24,14 +24,12 @@ import {
   KpiGrid,
   SmBtn,
   TabBar,
-  WorkcenterHeader,
-} from './admin-workcenter-common';
+  WorkcenterHeader } from './admin-workcenter-common';
 import {
   ADMIN_WORKCENTERS,
   type AdminKpi,
   type AuditLogRow,
-  type ChipTone,
-} from './admin-types';
+  type ChipTone } from './admin-types';
 import { FALLBACK_ANOMALIES, FALLBACK_PAYROLL_OUTLIERS } from './AuditWorkcenter/fallback';
 
 const Loading = () => (
@@ -43,12 +41,10 @@ const Loading = () => (
 // ─── 기존 풀화면 컴포넌트 (감사 로그 탭에서만 재사용) ─────────
 const AccessAuditLog = dynamic(() => import('../관리자전용서브/감사로그통합뷰어').then((mod) => mod.AccessAuditLog), {
   ssr: false,
-  loading: Loading,
-});
+  loading: Loading });
 const AuditLogViewer = dynamic(() => import('../관리자전용서브/감사로그통합뷰어').then((mod) => mod.AuditLogViewer), {
   ssr: false,
-  loading: Loading,
-});
+  loading: Loading });
 
 // ─── 신규 워크센터 전용 3탭 (AuditWorkcenter/ 폴더) ───────────
 // Turbopack의 react-loadable-manifest는 한글 폴더+영문 하위 경로 dynamic을 처리 못 함 (byte boundary panic).
@@ -65,29 +61,25 @@ const FALLBACK_KPI: AdminKpi[] = [
     label: '오늘 로그',
     value: '0',
     unit: '건',
-    sub: '로그인 0 · 수정 0 · 조회 0',
-  },
+    sub: '로그인 0 · 수정 0 · 조회 0' },
   {
     label: '이상 감지',
     value: '0',
     unit: '건',
     sub: '이상 감지 기록 없음',
-    tone: 'success',
-  },
+    tone: 'success' },
   {
     label: '급여 이상치',
     value: '0',
     unit: '건',
     sub: '전월 대비 이상치 없음',
-    tone: 'success',
-  },
+    tone: 'success' },
   {
     label: '마지막 백업',
     value: '-',
     unit: '',
     sub: '자동 백업 정보 없음',
-    tone: 'warn',
-  },
+    tone: 'warn' },
 ];
 
 interface ApiSummary {
@@ -109,8 +101,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
       label: '오늘 로그',
       value: s.todayLogs.toLocaleString('ko-KR'),
       unit: '건',
-      sub: s.todayLogsSub ?? FALLBACK_KPI[0].sub,
-    });
+      sub: s.todayLogsSub ?? FALLBACK_KPI[0].sub });
   } else {
     out.push(FALLBACK_KPI[0]);
   }
@@ -121,8 +112,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
       value: String(s.anomalyCount),
       unit: '건',
       sub: s.anomalySub ?? FALLBACK_KPI[1].sub,
-      tone: s.anomalyCount > 0 ? 'warn' : 'success',
-    });
+      tone: s.anomalyCount > 0 ? 'warn' : 'success' });
   } else {
     out.push(FALLBACK_KPI[1]);
   }
@@ -133,8 +123,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
       value: String(s.payrollOutlierCount),
       unit: '건',
       sub: s.payrollOutlierSub ?? FALLBACK_KPI[2].sub,
-      tone: s.payrollOutlierCount > 0 ? 'danger' : 'success',
-    });
+      tone: s.payrollOutlierCount > 0 ? 'danger' : 'success' });
   } else {
     out.push(FALLBACK_KPI[2]);
   }
@@ -147,8 +136,7 @@ function buildKpiFromSummary(s: ApiSummary): AdminKpi[] {
       value: String(s.lastBackupHoursAgo),
       unit: '시간 전',
       sub: s.lastBackupSub ?? FALLBACK_KPI[3].sub,
-      tone,
-    });
+      tone });
   } else {
     out.push(FALLBACK_KPI[3]);
   }

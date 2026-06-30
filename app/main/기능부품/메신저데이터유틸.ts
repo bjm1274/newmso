@@ -1,13 +1,12 @@
 'use client';
 
 import { buildChatMessageSelect, CHAT_MESSAGE_OPTIONAL_COLUMNS } from '@/lib/chat-query-columns';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ChatRoom } from '@/types';
 import {
   NOTICE_ROOM_ID,
   getConversationRoomIdSet,
-  normalizeMemberIds,
-} from './메신저유틸';
+  normalizeMemberIds } from './메신저유틸';
 
 type ChatDataClient = {
   from: (table: string) => any;
@@ -118,8 +117,7 @@ export async function selectChatMessagesWithFallback<TData>(
     (omittedColumns) =>
       execute({
         omittedColumns,
-        selectClause: buildChatMessageSelect(omittedColumns),
-      }),
+        selectClause: buildChatMessageSelect(omittedColumns) }),
     [...CHAT_MESSAGE_OPTIONAL_COLUMNS],
     { cacheKey: 'chat:messages:select' },
   );
@@ -164,8 +162,7 @@ export async function fetchChatUnreadCountsByRoom(
   const queriedCounts = await fetchUnreadCountsForRoomIds(client, {
     roomIds: queryRoomIds,
     userId: normalizedUserId,
-    cursorMap,
-  });
+    cursorMap });
   const queriedEntries = Object.entries(queriedCounts);
 
   const activeEntries: Array<[string, number]> = roomIds

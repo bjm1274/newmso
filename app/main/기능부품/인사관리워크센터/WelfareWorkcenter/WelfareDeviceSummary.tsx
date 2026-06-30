@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface DeviceRow {
   id: string;
@@ -27,8 +27,7 @@ const TONE_CLS: Record<DeviceRow['tone'], string> = {
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
   muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  success: 'bg-emerald-500/15 text-emerald-700',
-};
+  success: 'bg-emerald-500/15 text-emerald-700' };
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -66,7 +65,7 @@ export default function WelfareDeviceSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('medical_devices')
           .select('id, name, location, last_inspection_date, next_inspection_date, manager_name')
           .order('next_inspection_date', { ascending: true, nullsFirst: false })
@@ -86,8 +85,7 @@ export default function WelfareDeviceSummary() {
               next: formatDate(r.next_inspection_date),
               who: String(r.manager_name ?? '내부 관리'),
               status,
-              tone,
-            };
+              tone };
           }),
         );
       } catch (error) {

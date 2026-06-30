@@ -15,19 +15,17 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { bindMockChatMessageInsert } from '@/app/main/기능부품/메신저테스트이벤트';
 import {
   pokeChannel,
   subscribeRealtime,
-  type TableFilter,
-} from '@/lib/realtime-bus';
+  type TableFilter } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
 import {
   fetchChatUnreadCountsByRoom,
-  selectChatMessagesWithFallback,
-} from '@/app/main/기능부품/메신저데이터유틸';
+  selectChatMessagesWithFallback } from '@/app/main/기능부품/메신저데이터유틸';
 import {
   NOTICE_ROOM_ID,
   buildChatMessageInsertPayload,
@@ -40,8 +38,7 @@ import {
   toChatDate,
   getDirectRoomMembersKey,
   getConversationUnreadCountForRoom,
-  type MessageRetryPayload,
-} from '@/app/main/기능부품/메신저유틸';
+  type MessageRetryPayload } from '@/app/main/기능부품/메신저유틸';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { escapeLikePattern } from '@/lib/like-escape';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
@@ -68,7 +65,7 @@ export function useChatStaffDirectory(_company?: string | null) {
     let active = true;
     (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
         if (!active) return;
@@ -162,19 +159,17 @@ export function useChatRoomsForMobile(
 
       let counts: Record<string, number> = {};
       try {
-        counts = await fetchChatUnreadCountsByRoom(supabase, {
+        counts = await fetchChatUnreadCountsByRoom(db, {
           rooms: dedupedList,
           userId: currentUserId,
-          activeRoomId: activeRoomId ?? null,
-        });
+          activeRoomId: activeRoomId ?? null });
       } catch {
         counts = {};
       }
       const sorted = sortChatRoomsWithNoticeFirst(dedupedList);
       const merged: MobileChatRoom[] = sorted.map((room) => ({
         ...room,
-        unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms),
-      }));
+        unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms) }));
       setRooms(merged);
     } catch {
       setRooms([]);
@@ -246,7 +241,7 @@ export function useMobileChatReadCounts(
       return;
     }
     const fetchCursors = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('room_read_cursors')
         .select('user_id, last_read_at')
         .eq('room_id', roomId)
@@ -321,7 +316,7 @@ export function useChatMessagesForRoom(
     try {
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
-          supabase
+          db
             .from('messages')
             .select(selectClause)
             .eq('room_id', currentRoomId)
@@ -367,7 +362,7 @@ export function useChatMessagesForRoom(
     try {
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
-          supabase
+          db
             .from('messages')
             .select(selectClause)
             .eq('room_id', currentRoomId)
@@ -461,8 +456,7 @@ export function useChatMessagesForRoom(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomIds: [roomId], readAt: lastReadAt }),
-          credentials: 'same-origin',
-        });
+          credentials: 'same-origin' });
         pokeChannel('mobile-chat-rooms-list');
       } catch {
         // silent
@@ -550,7 +544,7 @@ export function useChatMessageSearch(
           const chunk = ids.slice(i, i + MESSAGE_SEARCH_ROOM_CHUNK);
           const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
             ({ omittedColumns, selectClause }) => {
-              let q = supabase
+              let q = db
                 .from('messages')
                 .select(selectClause)
                 .in('room_id', chunk)
@@ -573,8 +567,7 @@ export function useChatMessageSearch(
               content: String(m.content || ''),
               senderId: (m.sender_id as string | null | undefined) ?? null,
               senderName: (m.sender_name as string | null | undefined) ?? null,
-              createdAt: (m.created_at as string | null | undefined) ?? null,
-            });
+              createdAt: (m.created_at as string | null | undefined) ?? null });
           });
         }
 
@@ -635,13 +628,12 @@ export async function sendMobileTextMessage(
     replyToId: input.replyToId || null,
     albumId: null,
     albumIndex: null,
-    albumTotal: null,
-  };
+    albumTotal: null };
   const payload = buildChatMessageInsertPayload(input.senderId, retryPayload);
 
   try {
     const { data, error } = await insertChatMessageWithFallback<ChatMessage>(
-      supabase,
+      db,
       payload,
     );
     if (error || !data) {
@@ -713,8 +705,7 @@ export function formatChatTimestamp(value: string | null | undefined): string {
       timeZone: CHAT_TIME_ZONE,
       hour: '2-digit',
       minute: '2-digit',
-      hour12: false,
-    });
+      hour12: false });
   }
   const yesterdayKey = formatKoreanDateKey(new Date(Date.now() - 86_400_000));
   if (dayKey === yesterdayKey) return '어제';
@@ -729,8 +720,7 @@ export function formatBubbleTimestamp(value: string | null | undefined): string 
     timeZone: CHAT_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-  });
+    hour12: false });
 }
 
 export function formatBubbleDateLabel(value: string | null | undefined): string {
@@ -740,8 +730,7 @@ export function formatBubbleDateLabel(value: string | null | undefined): string 
   const dayKey = formatKoreanDateKey(dt);
   const weekday = new Intl.DateTimeFormat('ko-KR', {
     timeZone: CHAT_TIME_ZONE,
-    weekday: 'long',
-  }).format(dt);
+    weekday: 'long' }).format(dt);
   return `${Number(dayKey.slice(5, 7))}월 ${Number(dayKey.slice(8, 10))}일 (${weekday})`;
 }
 

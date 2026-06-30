@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
@@ -43,7 +43,7 @@ export function useStaffList(options: StaffListOptions = {}) {
     const run = async () => {
       setLoading(true);
       try {
-        let query = supabase
+        let query = db
           .from('staff_members')
           .select(
             'id, name, company, department, position, role, status, employee_no, hire_date, resign_date, phone, email, extension, photo_url',
@@ -103,8 +103,7 @@ export function useMyLeaveBalance(staffId: string | null) {
     total: 0,
     used: 0,
     remaining: 0,
-    history: [],
-  });
+    history: [] });
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
@@ -116,12 +115,12 @@ export function useMyLeaveBalance(staffId: string | null) {
     setLoading(true);
     try {
       const [staffRes, leaveRes] = await Promise.all([
-        supabase
+        db
           .from('staff_members')
           .select('annual_leave_total, annual_leave_used')
           .eq('id', staffId)
           .maybeSingle(),
-        supabase
+        db
           .from('leave_requests')
           .select('id, leave_type, start_date, end_date, status, reason, created_at')
           .eq('staff_id', staffId)
@@ -142,8 +141,7 @@ export function useMyLeaveBalance(staffId: string | null) {
           return v === '승인' || v === '반려' ? v : '대기';
         })(),
         reason: typeof row.reason === 'string' ? row.reason : null,
-        created_at: typeof row.created_at === 'string' ? row.created_at : null,
-      }));
+        created_at: typeof row.created_at === 'string' ? row.created_at : null }));
       setData({ total, used, remaining, history });
     } catch (err) {
       console.error('[mobile-hr] my leave load failed', err);
@@ -195,7 +193,7 @@ export function useMyAttendanceMonth(staffId: string | null, monthKey: string) {
         }
         const first = new Date(year, month - 1, 1).toLocaleDateString('en-CA');
         const last = new Date(year, month, 0).toLocaleDateString('en-CA');
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('attendance')
           .select('date, check_in, check_out, status')
           .eq('staff_id', staffId)
@@ -207,8 +205,7 @@ export function useMyAttendanceMonth(staffId: string | null, monthKey: string) {
           date: String(r.date ?? ''),
           check_in: typeof r.check_in === 'string' ? r.check_in : null,
           check_out: typeof r.check_out === 'string' ? r.check_out : null,
-          status: typeof r.status === 'string' ? r.status : null,
-        }));
+          status: typeof r.status === 'string' ? r.status : null }));
         setRows(list);
       } catch (err) {
         if (!cancelled) {
@@ -250,24 +247,21 @@ export function deriveAbnormalRows(rows: AttendanceDailyRow[]): AbnormalRow[] {
         kind: 'late',
         reason: null,
         check_in: r.check_in,
-        check_out: r.check_out,
-      });
+        check_out: r.check_out });
     } else if (status === 'early_leave') {
       out.push({
         date: r.date,
         kind: 'early_leave',
         reason: null,
         check_in: r.check_in,
-        check_out: r.check_out,
-      });
+        check_out: r.check_out });
     } else if (status === 'missing') {
       out.push({
         date: r.date,
         kind: 'missing',
         reason: null,
         check_in: r.check_in,
-        check_out: r.check_out,
-      });
+        check_out: r.check_out });
     }
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -300,7 +294,7 @@ export function useMyContractDocs(staffId: string | null) {
       }
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('document_repository')
           .select('id, title, category, file_url, created_at')
           .eq('created_by', staffId)
@@ -315,8 +309,7 @@ export function useMyContractDocs(staffId: string | null) {
             doc_type: typeof r.category === 'string' ? r.category : null,
             file_url: typeof r.file_url === 'string' ? r.file_url : null,
             file_size: null,
-            created_at: typeof r.created_at === 'string' ? r.created_at : null,
-          })),
+            created_at: typeof r.created_at === 'string' ? r.created_at : null })),
         );
       } catch (err) {
         if (!cancelled) {
@@ -390,8 +383,7 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
     family: [],
     checkup: [],
     license: [],
-    device: [],
-  });
+    device: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -401,7 +393,7 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
       try {
         const useCompany = Boolean(company) && company !== '전체';
 
-        let familyQ = supabase
+        let familyQ = db
           .from('congratulations_condolences')
           .select(
             'id, staff_id, staff_name, event_type, event_date, amount, relation, status, company',
@@ -410,7 +402,7 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
           .limit(30);
         if (useCompany) familyQ = familyQ.eq('company', company!);
 
-        let checkupQ = supabase
+        let checkupQ = db
           .from('health_checkups')
           .select('id, staff_id, staff_name, checkup_date, status, vendor, company')
           .order('checkup_date', { ascending: false })
@@ -418,13 +410,13 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
         if (useCompany) checkupQ = checkupQ.eq('company', company!);
 
         // 정본 테이블은 staff_licenses 이며 staff_name/status/company 컬럼이 없다.
-        const licenseQ = supabase
+        const licenseQ = db
           .from('staff_licenses')
           .select('id, staff_id, license_name, expiry_date')
           .order('expiry_date', { ascending: true })
           .limit(30);
 
-        const deviceQ = supabase
+        const deviceQ = db
           .from('medical_devices')
           .select('id, name, model, next_inspection_date, cycle')
           .order('next_inspection_date', { ascending: true })
@@ -447,33 +439,28 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
             event_date: typeof r.event_date === 'string' ? r.event_date : null,
             amount: typeof r.amount === 'number' ? r.amount : null,
             relation: typeof r.relation === 'string' ? r.relation : null,
-            status: typeof r.status === 'string' ? r.status : null,
-          })),
+            status: typeof r.status === 'string' ? r.status : null })),
           checkup: ((checkupRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,
             staff_name: typeof r.staff_name === 'string' ? r.staff_name : null,
             checkup_date: typeof r.checkup_date === 'string' ? r.checkup_date : null,
             status: typeof r.status === 'string' ? r.status : null,
-            vendor: typeof r.vendor === 'string' ? r.vendor : null,
-          })),
+            vendor: typeof r.vendor === 'string' ? r.vendor : null })),
           license: ((licenseRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,
             staff_name: typeof r.staff_name === 'string' ? r.staff_name : null,
             license_name: typeof r.license_name === 'string' ? r.license_name : null,
             expiry_date: typeof r.expiry_date === 'string' ? r.expiry_date : null,
-            status: typeof r.status === 'string' ? r.status : null,
-          })),
+            status: typeof r.status === 'string' ? r.status : null })),
           device: ((deviceRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             device_name: typeof r.name === 'string' ? r.name : null,
             vendor: null,
             next_check_date: typeof r.next_inspection_date === 'string' ? r.next_inspection_date : null,
             cycle: typeof r.cycle === 'number' ? `${r.cycle}개월` : (typeof r.cycle === 'string' ? r.cycle : null),
-            status: '정상',
-          })),
-        });
+            status: '정상' })) });
       } catch (err) {
         if (!cancelled) {
           console.error('[mobile-hr] welfare bundle load failed', err);
@@ -542,7 +529,7 @@ export function usePayrollSlips(staffId: string | null) {
       setLoading(true);
       try {
         const [recordRes, notifRes] = await Promise.all([
-          supabase
+          db
             .from('payroll_records')
             .select('*')
             .eq('staff_id', staffId)
@@ -579,8 +566,7 @@ export function usePayrollSlips(staffId: string | null) {
             local_tax: numField(r, 'local_tax'),
             net_pay: numField(r, 'net_pay'),
             status: typeof r.status === 'string' ? r.status : null,
-            record_type: typeof r.record_type === 'string' ? r.record_type : null,
-          })),
+            record_type: typeof r.record_type === 'string' ? r.record_type : null })),
         );
       } catch (err) {
         if (!cancelled) {
@@ -673,8 +659,7 @@ export type AbnormalActionResult = {
 const KIND_LABEL_KO: Record<TeamAbnormalKind, string> = {
   late: '지각',
   early_leave: '조퇴',
-  missing: '미체크',
-};
+  missing: '미체크' };
 
 /**
  * 다종 abnormal 알림 본문 합성.
@@ -809,8 +794,7 @@ export async function requestAttendanceClarification(input: {
       body,
       type: 'attendance',
       read_at: null,
-      created_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString() });
     if (error) throw error;
     clarifySentAt.set(key, Date.now());
     return { ok: true };
@@ -863,8 +847,7 @@ export async function requestAttendanceClarificationMulti(input: {
       body,
       type: 'attendance',
       read_at: null,
-      created_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString() });
     if (error) throw error;
     clarifySentAt.set(key, Date.now());
     return { ok: true };
@@ -901,7 +884,7 @@ export async function resolveTeamAbnormalForStaff(input: {
     const sinceStr = since.toLocaleDateString('en-CA');
 
     // 1) 어떤 날짜가 abnormal 인지 식별 — attendance(단수) 기준
-    const { data: rawDates, error: fetchErr } = await supabase
+    const { data: rawDates, error: fetchErr } = await db
       .from('attendance')
       .select('date, status')
       .eq('staff_id', targetStaffId)
@@ -923,7 +906,7 @@ export async function resolveTeamAbnormalForStaff(input: {
     }
 
     // 2) attendance(단수) — 마이페이지가 즉시 보는 테이블
-    const { error: updErr } = await supabase
+    const { error: updErr } = await db
       .from('attendance')
       .update({ status: '정상' })
       .eq('staff_id', targetStaffId)
@@ -932,7 +915,7 @@ export async function resolveTeamAbnormalForStaff(input: {
 
     // 3) attendances(복수) — PC 워크센터가 보는 테이블.
     //    정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없으므로 status 만 갱신한다.
-    const { error: updAttendancesErr } = await supabase
+    const { error: updAttendancesErr } = await db
       .from('attendances')
       .update({ status: 'present' })
       .eq('staff_id', targetStaffId)
@@ -948,9 +931,7 @@ export async function resolveTeamAbnormalForStaff(input: {
           detail: {
             staffId: targetStaffId,
             dates,
-            source: 'mobile-abnormal',
-          },
-        }),
+            source: 'mobile-abnormal' } }),
       );
     }
 
@@ -1013,7 +994,7 @@ export function useTeamAbnormalByDay(
         since.setDate(since.getDate() - 30);
         const sinceStr = since.toLocaleDateString('en-CA');
 
-        let staffQ = supabase
+        let staffQ = db
           .from('staff_members')
           .select('id, name, department')
           .order('name')
@@ -1029,8 +1010,7 @@ export function useTeamAbnormalByDay(
           if (!id) continue;
           staffMap.set(id, {
             name: pickStringSafe(row.name) || '직원',
-            dept: pickStringSafe(row.department) || '미지정',
-          });
+            dept: pickStringSafe(row.department) || '미지정' });
         }
 
         const staffIds = Array.from(staffMap.keys());
@@ -1041,7 +1021,7 @@ export function useTeamAbnormalByDay(
 
         // 정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없다.
         // 지각/조퇴는 status 와 check_in/out 누락 여부로 판정한다.
-        const { data: attRows, error: attErr } = await supabase
+        const { data: attRows, error: attErr } = await db
           .from('attendances')
           .select('staff_id, work_date, status, check_in_time, check_out_time')
           .in('staff_id', staffIds)
@@ -1083,8 +1063,7 @@ export function useTeamAbnormalByDay(
             earlyLeaveMinutes,
             missingCount,
             hasCheckIn,
-            hasCheckOut,
-          });
+            hasCheckOut });
         }
 
         list.sort((a, b) => {
@@ -1142,8 +1121,7 @@ export async function requestAttendanceClarificationDaily(input: {
     date,
     lateMin: lateMinutes,
     earlyMin: earlyLeaveMinutes,
-    missing: missingCount,
-  });
+    missing: missingCount });
 
   try {
     const { error } = await d1.from('notifications').insert({
@@ -1152,8 +1130,7 @@ export async function requestAttendanceClarificationDaily(input: {
       body,
       type: 'attendance',
       read_at: null,
-      created_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString() });
     if (error) throw error;
     clarifySentAt.set(key, Date.now());
     return { ok: true };
@@ -1184,7 +1161,7 @@ export async function resolveTeamAbnormalForStaffOnDate(input: {
 
   try {
     // attendance(단수)
-    const { error: updErr } = await supabase
+    const { error: updErr } = await db
       .from('attendance')
       .update({ status: '정상' })
       .eq('staff_id', targetStaffId)
@@ -1195,7 +1172,7 @@ export async function resolveTeamAbnormalForStaffOnDate(input: {
     }
 
     // attendances(복수) — late_minutes/early_leave_minutes 컬럼 부재로 status 만 갱신
-    const { error: updAttErr } = await supabase
+    const { error: updAttErr } = await db
       .from('attendances')
       .update({ status: 'present' })
       .eq('staff_id', targetStaffId)
@@ -1210,9 +1187,7 @@ export async function resolveTeamAbnormalForStaffOnDate(input: {
           detail: {
             staffId: targetStaffId,
             dates: [date],
-            source: 'mobile-abnormal-daily',
-          },
-        }),
+            source: 'mobile-abnormal-daily' } }),
       );
     }
 

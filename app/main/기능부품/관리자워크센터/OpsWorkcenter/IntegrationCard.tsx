@@ -12,7 +12,7 @@ import { memo } from 'react';
 import { Chip, SmBtn } from '../admin-workcenter-common';
 import type { ChipTone } from '../admin-types';
 
-// 벤더 식별자 — supabase external_integrations.vendor 와 1:1 매칭
+// 벤더 식별자 — db external_integrations.vendor 와 1:1 매칭
 export type IntegrationVendor =
   | 'kakao'
   | 'naver-works'
@@ -24,7 +24,7 @@ export type IntegrationVendor =
 export type IntegrationStatus = 'connected' | 'disconnected' | 'pending';
 
 export interface Integration {
-  /** 안정적인 식별자 — supabase row id 또는 fallback key */
+  /** 안정적인 식별자 — db row id 또는 fallback key */
   id: string;
   vendor: IntegrationVendor;
   /** 벤더 표시 이름 (예: 카카오 알림톡) */
@@ -65,8 +65,7 @@ function IntegrationCardImpl({
   integration,
   onConfigure,
   onConnect,
-  onDisconnect,
-}: IntegrationCardProps) {
+  onDisconnect }: IntegrationCardProps) {
   const { name, sub, status, lastSyncedLabel } = integration;
   const meta = statusMeta(status);
 

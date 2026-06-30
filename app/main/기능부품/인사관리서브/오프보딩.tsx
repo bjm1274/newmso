@@ -13,8 +13,7 @@ import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
   isMissingColumnError,
   withMissingColumnFallback,
-  withMissingColumnsFallback,
-} from '@/lib/supabase-compat';
+  withMissingColumnsFallback } from '@/lib/db-compat';
 import { patchChatRoom } from '@/lib/chat-write-service';
 import {
   countChecklistDone,
@@ -23,8 +22,7 @@ import {
   isChecklistComplete,
   normalizeChecklistItems,
   toggleChecklistItem,
-  type ChecklistItem,
-} from '@/lib/hr-checklists';
+  type ChecklistItem } from '@/lib/hr-checklists';
 import type { StaffMember } from '@/types';
 
 type Props = {
@@ -122,8 +120,7 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
       if (!result.ok) {
         cleanupWarnings.push({
           target: `chat_rooms.${room.id}`,
-          error: result.error,
-        });
+          error: result.error });
       } else {
         removedCount++;
       }
@@ -142,8 +139,7 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
 export default function OffboardingView({
   staffs = [],
   selectedCo = '전체',
-  onRefresh,
-}: Props) {
+  onRefresh }: Props) {
   const router = useRouter();
   const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<TabKey>('active');
@@ -231,8 +227,7 @@ export default function OffboardingView({
             checklist_type: '퇴사' as const,
             items: getDefaultChecklist('퇴사'),
             target_date: getChecklistTargetDate('퇴사', resignedAt),
-            completed_at: null,
-          };
+            completed_at: null };
         });
 
         const { data: createdRows, error: createError } = await db
@@ -315,8 +310,7 @@ export default function OffboardingView({
     const payload: Record<string, unknown> = {
       staff_id: staffId,
       checklist_type: '퇴사',
-      items,
-    };
+      items };
 
     if (targetDate) {
       payload.target_date = targetDate;
@@ -360,8 +354,7 @@ export default function OffboardingView({
       title: '오프보딩 시작',
       description: `[${staff.name}]님의 오프보딩을 시작합니다.\n퇴사 예정일: ${exitDate}\n사유: ${reason}`,
       confirmText: '시작',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -373,16 +366,14 @@ export default function OffboardingView({
         offboarding_original_status: staff.status || '재직',
         offboarding_original_role: staff.role || 'staff',
         offboarding_started_at: new Date().toISOString(),
-        offboarding_reason: reason,
-      };
+        offboarding_reason: reason };
 
       const { error } = await db
         .from('staff_members')
         .update({
           status: '퇴사예정',
           resigned_at: exitDate,
-          permissions: nextPermissions,
-        })
+          permissions: nextPermissions })
         .eq('id', selectedStaff);
 
       if (error) throw error;
@@ -401,15 +392,12 @@ export default function OffboardingView({
           ...buildAuditDiff(
             {
               status: staff.status || null,
-              resigned_at: staff.resigned_at || null,
-            },
+              resigned_at: staff.resigned_at || null },
             {
               status: '퇴사예정',
-              resigned_at: exitDate,
-            },
+              resigned_at: exitDate },
             ['status', 'resigned_at'],
-          ),
-        },
+          ) },
         actor.userId,
         actor.userName,
       );
@@ -432,8 +420,7 @@ export default function OffboardingView({
       title: '퇴사 예정 취소',
       description: `${staff.name}님의 퇴사 예정 상태를 취소합니다.\n진행 중인 퇴사 체크리스트와 예정 정보가 정리됩니다.`,
       confirmText: '취소 처리',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setLoading(true);
     const actor = readClientAuditActor();
@@ -454,8 +441,7 @@ export default function OffboardingView({
           status: restoredStatus,
           role: restoredRole,
           resigned_at: null,
-          permissions: nextPermissions,
-        })
+          permissions: nextPermissions })
         .eq('id', staff.id);
 
       if (error) throw error;
@@ -475,15 +461,12 @@ export default function OffboardingView({
           ...buildAuditDiff(
             {
               status: staff.status || null,
-              resigned_at: staff.resigned_at || null,
-            },
+              resigned_at: staff.resigned_at || null },
             {
               status: restoredStatus,
-              resigned_at: null,
-            },
+              resigned_at: null },
             ['status', 'resigned_at'],
-          ),
-        },
+          ) },
         actor.userId,
         actor.userName,
       );
@@ -523,8 +506,7 @@ export default function OffboardingView({
       title: '최종 퇴사 처리',
       description: `${staff.name}님의 최종 퇴사 처리를 완료합니다.\n권한과 알림 구독이 정리되며 직원 상태가 퇴사로 변경됩니다.`,
       confirmText: '퇴사 처리',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -545,8 +527,7 @@ export default function OffboardingView({
             status: '퇴사',
             role: 'inactive',
             resigned_at: staff.resigned_at || finalizedAt.slice(0, 10),
-            permissions: nextPermissions,
-          };
+            permissions: nextPermissions };
 
           if (!omittedColumns.has('force_logout_at')) {
             payload.force_logout_at = finalizedAt;
@@ -575,15 +556,12 @@ export default function OffboardingView({
           ...buildAuditDiff(
             {
               status: staff.status || null,
-              role: staff.role || null,
-            },
+              role: staff.role || null },
             {
               status: '퇴사',
-              role: 'inactive',
-            },
+              role: 'inactive' },
             ['status', 'role'],
-          ),
-        },
+          ) },
         actor.userId,
         actor.userName,
       );
@@ -603,8 +581,7 @@ export default function OffboardingView({
       title: '퇴사 처리 취소 및 복구',
       description: `[${staff.name}]님의 퇴사 처리를 취소하고 재직 상태로 복구하시겠습니까?\n계정 권한이 다시 활성화됩니다.`,
       confirmText: '재직 복구',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -627,8 +604,7 @@ export default function OffboardingView({
           status: restoredStatus,
           role: restoredRole,
           resigned_at: null,
-          permissions: nextPermissions,
-        })
+          permissions: nextPermissions })
         .eq('id', staff.id);
 
       if (staffUpdateError) throw staffUpdateError;
@@ -649,15 +625,12 @@ export default function OffboardingView({
           ...buildAuditDiff(
             {
               status: staff.status || null,
-              role: staff.role || null,
-            },
+              role: staff.role || null },
             {
               status: restoredStatus,
-              role: restoredRole,
-            },
+              role: restoredRole },
             ['status', 'role'],
-          ),
-        },
+          ) },
         actor.userId,
         actor.userName,
       );
@@ -677,23 +650,19 @@ export default function OffboardingView({
       key: 'name',
       label: '직원명',
       primary: true,
-      render: (s) => <span className="font-bold text-[var(--foreground)]">{s.name}</span>,
-    },
+      render: (s) => <span className="font-bold text-[var(--foreground)]">{s.name}</span> },
     {
       key: 'department',
       label: '부서 / 회사',
-      render: (s) => `${s.department || '부서 미지정'} / ${s.company}`,
-    },
+      render: (s) => `${s.department || '부서 미지정'} / ${s.company}` },
     {
       key: 'hire_date',
       label: '입사일',
-      render: (s) => getDisplayText(s.hire_date),
-    },
+      render: (s) => getDisplayText(s.hire_date) },
     {
       key: 'resigned_at',
       label: '퇴사일',
-      render: (s) => getDisplayText(s.resigned_at),
-    },
+      render: (s) => getDisplayText(s.resigned_at) },
     {
       key: 'status',
       label: '상태',
@@ -701,8 +670,7 @@ export default function OffboardingView({
         <span className="rounded-lg bg-[var(--tab-bg)] px-2 py-1 text-[11px] font-bold text-[var(--foreground)]">
           {getDisplayText(s.status, '퇴사')}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'actions',
       label: '관리',
@@ -715,8 +683,7 @@ export default function OffboardingView({
         >
           재직 복구
         </button>
-      ),
-    },
+      ) },
   ], [loading]);
 
 

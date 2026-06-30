@@ -100,8 +100,7 @@ export default function MobileSalarySlip({
   record,
   availableMonths,
   selectedYearMonth,
-  onSelectMonth,
-}: MobileSalarySlipProps) {
+  onSelectMonth }: MobileSalarySlipProps) {
   const deductionDetail = useMemo(() => {
     if (!record?.deduction_detail) return {};
     if (typeof record.deduction_detail === 'object') return record.deduction_detail;
@@ -125,16 +124,14 @@ export default function MobileSalarySlip({
       night_work_allowance: staff?.night_work_allowance || 0,
       holiday_work_allowance: staff?.holiday_work_allowance || 0,
       annual_leave_pay: staff?.annual_leave_pay || 0,
-      manual_extra_allowance: 0,
-    };
+      manual_extra_allowance: 0 };
     return {
       position_allowance: Number(source.position_allowance || 0),
       overtime_allowance: Number(source.overtime_allowance || 0),
       night_work_allowance: Number(source.night_work_allowance || 0),
       holiday_work_allowance: Number(source.holiday_work_allowance || 0),
       annual_leave_pay: Number(source.annual_leave_pay || 0),
-      manual_extra_allowance: Number(source.manual_extra_allowance || 0),
-    };
+      manual_extra_allowance: Number(source.manual_extra_allowance || 0) };
   }, [deductionDetail, staff]);
 
   const resolvedAgreedOvertime = useMemo(() => {

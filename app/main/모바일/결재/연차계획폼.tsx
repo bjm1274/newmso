@@ -6,7 +6,7 @@
  * 잔여 연차(useMyLeaveBalance)를 기준으로, 달력에서 남은 연차 일수만큼만 날짜를 선택.
  * 선택 날짜를 기준으로 기안 상신. annual_plan / leave_promotion_notice 공용.
  *
- * 데이터: @/lib/supabase = D1 shim. JM: 단일 책임, JM3(try/catch+toast), JM4(any 금지)
+ * 데이터: @/lib/db = D1 shim. JM: 단일 책임, JM3(try/catch+toast), JM4(any 금지)
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -25,8 +25,7 @@ export default function SApprovalLeavePlanForm({
   formSlug,
   formName,
   onCancel,
-  onSubmitted,
-}: {
+  onSubmitted }: {
   user: ErpUser;
   formSlug: string;
   formName: string;
@@ -107,9 +106,7 @@ export default function SApprovalLeavePlanForm({
           plan_dates: sortedDates,
           plan_days: sortedDates.length,
           leave_remaining_at_draft: remaining,
-          reason: reason.trim() || null,
-        },
-      });
+          reason: reason.trim() || null } });
       toast(
         queued ? '오프라인 — 기안이 동기화 대기 중입니다.' : `${formName}이(가) 결재선에 올라갔습니다.`,
         queued ? 'warning' : 'success',
@@ -142,8 +139,7 @@ export default function SApprovalLeavePlanForm({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '12px 16px',
-            margin: '16px 16px 0',
-          }}
+            margin: '16px 16px 0' }}
         >
           <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--z-700)' }}>
             {balLoading ? '잔여 연차 확인 중...' : `남은 연차 ${remaining}일`}
@@ -162,8 +158,7 @@ export default function SApprovalLeavePlanForm({
             className="macos-glass macos-squircle"
             style={{
               padding: '12px 12px',
-              margin: '0 16px',
-            }}
+              margin: '0 16px' }}
           >
             <MultiDateCalendar selected={selected} onToggle={toggle} max={remaining} months={3} />
           </MCard>
@@ -176,8 +171,7 @@ export default function SApprovalLeavePlanForm({
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             <MField label="사유" htmlFor="leaveplan-reason" sub="결재자에게 전달됩니다.">
               <textarea
@@ -196,8 +190,7 @@ export default function SApprovalLeavePlanForm({
                   color: 'var(--z-900)',
                   background: 'transparent',
                   border: 'none',
-                  outline: 'none',
-                }}
+                  outline: 'none' }}
               />
             </MField>
           </MCard>

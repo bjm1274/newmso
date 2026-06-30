@@ -7,8 +7,7 @@ import {
   selectStaffCredentialsByEmployeeNoD1,
   selectStaffCredentialsByNameD1,
   type StaffCredentialRow,
-  verifyStoredPassword,
-} from '@/lib/staff-password';
+  verifyStoredPassword } from '@/lib/staff-password';
 
 function isUuidLike(value: string | null | undefined) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));

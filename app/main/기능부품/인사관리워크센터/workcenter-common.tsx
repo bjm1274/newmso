@@ -53,16 +53,14 @@ const KPI_TONE_BORDER: Record<KpiTone, string> = {
   accent: 'border-[var(--accent)]',
   success: 'border-[#10B981]',
   warn: 'border-[#F59E0B]',
-  danger: 'border-[#EF4444]',
-};
+  danger: 'border-[#EF4444]' };
 
 const KPI_TONE_VALUE: Record<KpiTone, string> = {
   neutral: 'text-[var(--foreground)]',
   accent: 'text-[var(--accent)]',
   success: 'text-[#10B981]',
   warn: 'text-[#D97706]',
-  danger: 'text-[#DC2626]',
-};
+  danger: 'text-[#DC2626]' };
 
 // ─── KPI Row (4-col grid, 반응형) ─────────────────────────────────
 export function WorkcenterKpiRow({ items }: { items: WorkcenterKpi[] }) {
@@ -103,8 +101,7 @@ export function WorkcenterTabBar<T extends string>({
   tabs,
   activeTab,
   onChange,
-  label,
-}: {
+  label }: {
   tabs: WorkcenterTab<T>[];
   activeTab: T;
   onChange: (id: T) => void;
@@ -152,8 +149,7 @@ export function WorkcenterTabBar<T extends string>({
 // ─── 백버튼 (모듈 상세 → 워크센터 대시보드) ─────────────────────────
 export function WorkcenterBackButton({
   onClick,
-  label = '워크센터 대시보드',
-}: {
+  label = '워크센터 대시보드' }: {
   onClick: () => void;
   label?: string;
 }) {
@@ -175,8 +171,7 @@ export function WorkcenterDarkBanner({
   kicker,
   title,
   description,
-  actions,
-}: {
+  actions }: {
   kicker?: string;
   title: string;
   description?: string;
@@ -208,8 +203,7 @@ export function WorkcenterDarkBannerCta({
   onClick,
   variant = 'primary',
   type = 'button',
-  ariaLabel,
-}: {
+  ariaLabel }: {
   children: React.ReactNode;
   onClick?: () => void;
   variant?: 'primary' | 'ghost';
@@ -235,8 +229,7 @@ export function WorkcenterDarkBannerCta({
 // ─── Workcenter Shell (헤더 + 본문 정렬) ────────────────────────
 export function WorkcenterShell({
   children,
-  headerExtra,
-}: {
+  headerExtra }: {
   children: React.ReactNode;
   headerExtra?: React.ReactNode;
 }) {
@@ -303,8 +296,7 @@ export class WorkcenterEmbed extends React.Component<
 // ─── 빈 상태 (탭 본문이 아직 없을 때 placeholder) ─────────────────
 export function WorkcenterEmpty({
   title,
-  description,
-}: {
+  description }: {
   title: string;
   description?: string;
 }) {
@@ -329,8 +321,7 @@ export function WorkcenterSection({
   title,
   rightSlot,
   children,
-  padded = true,
-}: {
+  padded = true }: {
   title?: string;
   rightSlot?: React.ReactNode;
   children: React.ReactNode;

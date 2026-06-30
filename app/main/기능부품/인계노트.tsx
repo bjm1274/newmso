@@ -3,8 +3,8 @@ import { toast } from '@/lib/toast';
 
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { toDateKey } from '@/lib/date-utils';
 import {
   buildBedKey,
@@ -23,8 +23,7 @@ import {
   type HandoverNote,
   type HandoverNoteRow,
   type HandoverNoteScope,
-  type HandoverRoomConfig,
-} from '@/lib/handover-notes';
+  type HandoverRoomConfig } from '@/lib/handover-notes';
 
 type Props = { user?: any };
 type BedOption = {
@@ -119,15 +118,13 @@ function fullDateLabel(date: Date) {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    weekday: 'long',
-  });
+    weekday: 'long' });
 }
 
 function compareDateKeys(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
     numeric: true,
-    sensitivity: 'base',
-  });
+    sensitivity: 'base' });
 }
 
 function previousDateKey(value: string) {
@@ -157,8 +154,7 @@ function emptySummary(): Summary {
 function compareRooms(left?: string | null, right?: string | null) {
   return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
     numeric: true,
-    sensitivity: 'base',
-  });
+    sensitivity: 'base' });
 }
 
 function buildEpisodeRenderKey(bedKey: string, startDate: string, patientKey?: string | null, patientName?: string | null) {
@@ -178,9 +174,7 @@ function createRoom(roomNumber: string, capacity: number, admissionDate: string)
     beds: Array.from({ length: capacity }, (_, index) => ({
       bedNumber: index + 1,
       patientName: '',
-      admissionDate,
-    })),
-  };
+      admissionDate })) };
 }
 
 export default function HandoverNotes({ user }: Props) {
@@ -225,8 +219,7 @@ export default function HandoverNotes({ user }: Props) {
       const nextSnapshot: RoomConfigSnapshot = {
         dateKey: note.handover_date,
         createdAt: note.created_at || null,
-        rooms: parseRoomConfigsFromNote(note),
-      };
+        rooms: parseRoomConfigsFromNote(note) };
 
       const currentSnapshot = latestByDate.get(note.handover_date);
       const currentTime = currentSnapshot ? new Date(currentSnapshot.createdAt || 0).getTime() : -1;
@@ -259,7 +252,7 @@ export default function HandoverNotes({ user }: Props) {
     try {
       // /api/d1/query 라우트의 MAX_LIMIT=1000 (app/api/d1/query/route.ts).
       // 1500 호출 시 zod 검증 실패 → 400 Invalid payload (PostgREST 시절 잔재).
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
@@ -314,11 +307,10 @@ export default function HandoverNotes({ user }: Props) {
               const payload: Record<string, any> = {
                 content: roomContent,
                 author_id: user?.id || currentConfigNote.author_id || 'unknown',
-                author_name: user?.name || currentConfigNote.author_name || '이름 없음',
-              };
+                author_name: user?.name || currentConfigNote.author_name || '이름 없음' };
               if (!omittedColumns.has('note_scope')) payload.note_scope = 'general';
               if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
-              return supabase.from('handover_notes').update(payload).eq('id', currentConfigNote.id).select('*').single();
+              return db.from('handover_notes').update(payload).eq('id', currentConfigNote.id).select('*').single();
             },
             ['note_scope', 'handover_date'],
           )
@@ -331,11 +323,10 @@ export default function HandoverNotes({ user }: Props) {
                 shift: 'System',
                 priority: 'Normal',
                 is_completed: false,
-                created_at: new Date().toISOString(),
-              };
+                created_at: new Date().toISOString() };
               if (!omittedColumns.has('note_scope')) payload.note_scope = 'general';
               if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
-              return supabase.from('handover_notes').insert([payload]).select('*').single();
+              return db.from('handover_notes').insert([payload]).select('*').single();
             },
             ['note_scope', 'handover_date'],
           );
@@ -407,8 +398,7 @@ export default function HandoverNotes({ user }: Props) {
           latestVersion: version,
           count: 1,
           latestCreatedAt: note.created_at || null,
-          latestAuthorName: note.author_name || null,
-        });
+          latestAuthorName: note.author_name || null });
         return;
       }
 
@@ -479,8 +469,7 @@ export default function HandoverNotes({ user }: Props) {
             bedNumber: bed.bedNumber,
             patientName,
             patientKey: buildPatientKey(patientName),
-            admissionDate,
-          });
+            admissionDate });
         });
       });
 
@@ -516,8 +505,7 @@ export default function HandoverNotes({ user }: Props) {
             patientName: nextPatientName,
             patientKey: nextBed.patientKey,
             startDate: nextAdmissionDate,
-            endDate: null,
-          };
+            endDate: null };
 
           episodes.push(nextEpisode);
           activeEpisodes.set(bedKey, nextEpisode);
@@ -581,8 +569,7 @@ export default function HandoverNotes({ user }: Props) {
           formatPatientBedLabel({
             roomNumber: episode.roomNumber,
             bedNumber: episode.bedNumber,
-            patientName: episode.patientName,
-          }),
+            patientName: episode.patientName }),
           ...notesForEpisode.map((note) => buildHandoverSearchText(note)),
         ]
           .join(' ')
@@ -598,16 +585,14 @@ export default function HandoverNotes({ user }: Props) {
           label: formatPatientBedLabel({
             roomNumber: episode.roomNumber,
             bedNumber: episode.bedNumber,
-            patientName: episode.patientName,
-          }),
+            patientName: episode.patientName }),
           roomNumber: episode.roomNumber,
           bedNumber: episode.bedNumber,
           patientName: episode.patientName,
           patientKey: episode.patientKey,
           startDate: episode.startDate,
           endDate: episode.endDate,
-          notes: notesForEpisode,
-        };
+          notes: notesForEpisode };
       })
       .filter((group): group is PatientGroup => !!group);
 
@@ -646,8 +631,7 @@ export default function HandoverNotes({ user }: Props) {
         bedNumber: group.bedNumber,
         patientName: group.patientName,
         admissionDate: group.startDate,
-        label: group.label,
-      }))
+        label: group.label }))
       .forEach((option) => {
         if (!dedupedOptions.has(option.selectionKey)) {
           dedupedOptions.set(option.selectionKey, option);
@@ -710,8 +694,7 @@ export default function HandoverNotes({ user }: Props) {
         title: '병상 설정 닫기',
         description: '저장하지 않은 병상 설정이 있습니다. 닫으시겠습니까?',
         confirmText: '닫기',
-        tone: 'danger',
-      });
+        tone: 'danger' });
       if (!confirmed) {
         return;
       }
@@ -765,9 +748,7 @@ export default function HandoverNotes({ user }: Props) {
             bedNumber: index + 1,
             patientName: room.beds.find((bed) => bed.bedNumber === index + 1)?.patientName || '',
             admissionDate:
-              room.beds.find((bed) => bed.bedNumber === index + 1)?.admissionDate || selectedDateKey,
-          })),
-        };
+              room.beds.find((bed) => bed.bedNumber === index + 1)?.admissionDate || selectedDateKey })) };
       }),
     );
   }
@@ -783,11 +764,9 @@ export default function HandoverNotes({ user }: Props) {
               ? {
                   ...bed,
                   patientName,
-                  admissionDate: patientName.trim() ? bed.admissionDate || selectedDateKey : null,
-                }
+                  admissionDate: patientName.trim() ? bed.admissionDate || selectedDateKey : null }
               : bed,
-          ),
-        };
+          ) };
       }),
     );
   }
@@ -802,11 +781,9 @@ export default function HandoverNotes({ user }: Props) {
             bed.bedNumber === bedNumber
               ? {
                   ...bed,
-                  admissionDate: normalizeDateKey(value),
-                }
+                  admissionDate: normalizeDateKey(value) }
               : bed,
-          ),
-        };
+          ) };
       }),
     );
   }
@@ -846,16 +823,14 @@ export default function HandoverNotes({ user }: Props) {
                   handoverDate: selectedDateKey,
                   roomNumber,
                   roomCapacity,
-                  bedNumber,
-                })
+                  bedNumber })
               : trimmedContent,
             author_id: user?.id || 'unknown',
             author_name: user?.name || '이름 없음',
             shift,
             priority,
             is_completed: false,
-            created_at: new Date().toISOString(),
-          };
+            created_at: new Date().toISOString() };
 
           if (!omittedColumns.has('patient_name')) payload.patient_name = noteScope === 'patient' ? patientName : null;
           if (!omittedColumns.has('patient_key')) payload.patient_key = noteScope === 'patient' ? buildPatientKey(patientName) : null;
@@ -866,7 +841,7 @@ export default function HandoverNotes({ user }: Props) {
           if (!omittedColumns.has('bed_number')) payload.bed_number = noteScope === 'patient' ? bedNumber : null;
           if (!omittedColumns.has('bed_key')) payload.bed_key = noteScope === 'patient' ? buildBedKey(roomNumber, bedNumber) : null;
 
-          return supabase.from('handover_notes').insert([payload]).select('*').single();
+          return db.from('handover_notes').insert([payload]).select('*').single();
         },
         ['patient_name', 'patient_key', 'note_scope', 'handover_date', 'room_number', 'room_capacity', 'bed_number', 'bed_key'],
       );
@@ -928,8 +903,7 @@ export default function HandoverNotes({ user }: Props) {
         confirmText: '저장',
         required: true,
         maxLength: 60,
-        tone: 'accent',
-      })) || '',
+        tone: 'accent' })) || '',
     ).trim();
     if (!templateName) return;
 
@@ -961,23 +935,21 @@ export default function HandoverNotes({ user }: Props) {
                   handoverDate: selectedDateKey,
                   handoverKind: 'template',
                   templateName,
-                  templateVersion: nextVersion,
-                })
+                  templateVersion: nextVersion })
               : trimmedContent,
             author_id: user?.id || 'unknown',
             author_name: user?.name || '이름 없음',
             shift,
             priority,
             is_completed: false,
-            created_at: new Date().toISOString(),
-          };
+            created_at: new Date().toISOString() };
 
           if (!omittedColumns.has('note_scope')) payload.note_scope = noteScope;
           if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
           if (!omittedColumns.has('template_name')) payload.template_name = templateName;
           if (!omittedColumns.has('template_version')) payload.template_version = nextVersion;
 
-          return supabase.from('handover_notes').insert([payload]).select('*').single();
+          return db.from('handover_notes').insert([payload]).select('*').single();
         },
         ['patient_name', 'patient_key', 'note_scope', 'handover_date', 'room_number', 'room_capacity', 'bed_number', 'bed_key', 'template_name', 'template_version'],
       );
@@ -1025,7 +997,7 @@ export default function HandoverNotes({ user }: Props) {
     setNotes((prev) => prev.map((note) => (note.id === targetNote.id ? { ...note, is_completed: true } : note)));
 
     try {
-      const { error } = await supabase.from('handover_notes').update({ is_completed: true }).eq('id', targetNote.id);
+      const { error } = await db.from('handover_notes').update({ is_completed: true }).eq('id', targetNote.id);
       if (error) throw error;
     } catch (error) {
       console.error('인계노트 완료 처리 실패:', error);
@@ -1066,12 +1038,10 @@ export default function HandoverNotes({ user }: Props) {
                   handoverDate: targetNote.handover_date,
                   roomNumber: targetNote.room_number,
                   roomCapacity: targetNote.room_capacity,
-                  bedNumber: targetNote.bed_number,
-                })
-              : trimmedContent,
-          };
+                  bedNumber: targetNote.bed_number })
+              : trimmedContent };
 
-          return supabase.from('handover_notes').update(payload).eq('id', targetNote.id).select('*').single();
+          return db.from('handover_notes').update(payload).eq('id', targetNote.id).select('*').single();
         },
         ['patient_name', 'patient_key', 'note_scope', 'handover_date', 'room_number', 'room_capacity', 'bed_number', 'bed_key'],
       );
@@ -1099,14 +1069,13 @@ export default function HandoverNotes({ user }: Props) {
       title: '인계노트 삭제',
       description: '이 인계노트를 삭제합니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!shouldDelete) return;
 
     setNoteMutationId(targetNote.id);
 
     try {
-      const { error } = await supabase.from('handover_notes').delete().eq('id', targetNote.id);
+      const { error } = await db.from('handover_notes').delete().eq('id', targetNote.id);
       if (error) throw error;
 
       setNotes((prev) => prev.filter((note) => note.id !== targetNote.id));

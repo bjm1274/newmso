@@ -77,8 +77,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
         file: f,
         state: 'uploading' as const,
         fileUrl: null,
-        errorMsg: null,
-      }));
+        errorMsg: null }));
 
       updateEntries((prev) => [...prev, ...newEntries]);
 
@@ -122,8 +121,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
           filename: file.name,
           mimeType: mime,
           planRequester: 'approval',
-          planParams: approvalId ? { approvalId } : {},
-        });
+          planParams: approvalId ? { approvalId } : {} });
 
         if (result.uploaded) {
           updateEntries((prev) =>
@@ -172,8 +170,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 4px 6px',
-        }}
+          padding: '0 4px 6px' }}
       >
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', letterSpacing: '0.03em' }}>
           첨부 파일 {entries.length > 0 ? `${entries.length}/${MAX_FILES}` : `(최대 ${MAX_FILES}개)`}
@@ -203,8 +200,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                 padding: '10px 12px',
                 background: 'var(--m-bg)',
                 borderRadius: 10,
-                border: '1px solid var(--m-border)',
-              }}
+                border: '1px solid var(--m-border)' }}
             >
               <div
                 style={{
@@ -229,8 +225,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                         ? 'var(--m-warning)'
                         : entry.state === 'error'
                           ? 'var(--m-danger)'
-                          : 'var(--m-accent)',
-                }}
+                          : 'var(--m-accent)' }}
                 aria-hidden="true"
               >
                 <MIcon
@@ -254,8 +249,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                     color: 'var(--z-900)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                    whiteSpace: 'nowrap' }}
                 >
                   {entry.file.name}
                 </div>
@@ -279,8 +273,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                   color: 'var(--z-400)',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
               >
                 <MIcon name="x" size={16} />
               </button>
@@ -309,8 +302,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
               overflow: 'hidden',
               clip: 'rect(0,0,0,0)',
               whiteSpace: 'nowrap',
-              borderWidth: 0,
-            }}
+              borderWidth: 0 }}
             aria-label="첨부 파일 선택"
           />
           <label
@@ -327,8 +319,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
               fontSize: 13,
               fontWeight: 700,
               color: 'var(--m-accent)',
-              background: 'var(--m-accent-soft)',
-            }}
+              background: 'var(--m-accent-soft)' }}
           >
             <MIcon name="paperclip" size={16} />
             파일 첨부 (사진·PDF·문서)

@@ -5,8 +5,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   popups as popupsTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 const R2_BUCKET = 'pchos-files';
 
@@ -90,8 +89,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const typedPopup: PopupRow = {
       id: rows[0].id,
       title: rows[0].title ?? null,
-      media_url: rows[0].media_url ?? null,
-    };
+      media_url: rows[0].media_url ?? null };
 
     await db.delete(popupsTable).where(eq(popupsTable.id, popupId));
 
@@ -99,8 +97,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!objectKey) {
       return NextResponse.json({
         success: true,
-        warning: `"${typedPopup.title || '제목 없음'}" 팝업은 삭제되었지만 저장소 파일 경로를 확인하지 못해 파일은 유지되었습니다.`,
-      });
+        warning: `"${typedPopup.title || '제목 없음'}" 팝업은 삭제되었지만 저장소 파일 경로를 확인하지 못해 파일은 유지되었습니다.` });
     }
 
     try {
@@ -109,14 +106,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       const message = storageError instanceof Error ? storageError.message : String(storageError);
       return NextResponse.json({
         success: true,
-        warning: `"${typedPopup.title || '제목 없음'}" 팝업은 삭제되었지만 파일 정리에 실패했습니다: ${message}`,
-      });
+        warning: `"${typedPopup.title || '제목 없음'}" 팝업은 삭제되었지만 파일 정리에 실패했습니다: ${message}` });
     }
 
     return NextResponse.json({
       success: true,
-      message: `"${typedPopup.title || '제목 없음'}" 팝업이 삭제되었습니다.`,
-    });
+      message: `"${typedPopup.title || '제목 없음'}" 팝업이 삭제되었습니다.` });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '팝업 삭제 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

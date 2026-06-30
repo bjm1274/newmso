@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
@@ -13,8 +13,7 @@ import {
   useTeamAbnormalByDay,
   requestAttendanceClarificationDaily,
   resolveTeamAbnormalForStaffOnDate,
-  pickAvatarTone,
-} from './data-hooks';
+  pickAvatarTone } from './data-hooks';
 
 interface AdminAttendProps {
   staffs: StaffMember[];
@@ -49,7 +48,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
   const fetchTodayStatus = async () => {
     setTodayLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendances')
         .select('*')
         .eq('work_date', formattedToday);
@@ -95,8 +94,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
       checkInCount,
       lateCount,
       absentCount,
-      leaveCount,
-    };
+      leaveCount };
   }, [activeStaffs, todayAttendances]);
 
   // 2. 근태이상 감지 탭 데이터 연동
@@ -110,8 +108,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
       date: row.date,
       lateMinutes: row.lateMinutes,
       earlyLeaveMinutes: row.earlyLeaveMinutes,
-      missingCount: row.missingCount,
-    });
+      missingCount: row.missingCount });
 
     if (result.ok) {
       toast(`${row.staffName}님께 사유 요청 알림을 발송했습니다.`, 'success');
@@ -127,8 +124,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
     const result = await resolveTeamAbnormalForStaffOnDate({
       user,
       targetStaffId: row.staffId,
-      date: row.date,
-    });
+      date: row.date });
 
     if (result.ok) {
       toast(`${row.staffName}님의 근태이상을 정상 처리했습니다.`, 'success');
@@ -145,8 +141,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
         style={{
           padding: '10px 16px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="근태 관리 탭">
           <button
@@ -191,8 +186,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
               background: 'var(--m-card)',
               padding: '10px 14px',
               borderRadius: 12,
-              border: '1px solid var(--m-border)',
-            }}
+              border: '1px solid var(--m-border)' }}
           >
             <button
               type="button"
@@ -217,8 +211,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: 8,
-              marginBottom: 12,
-            }}
+              marginBottom: 12 }}
           >
             <MKpi icon="users" label="총원" value={String(stats.total)} unit="명" sub="재직 기준" tone="accent" />
             <MKpi icon="checkCircle" label="출근" value={String(stats.checkInCount)} unit="명" sub={`지각 ${stats.lateCount}명`} tone="success" />
@@ -239,7 +232,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
               등록된 재직 직원이 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {activeStaffs.map((s) => {
                 const row = todayAttendances.find((a) => a.staff_id === s.id);
                 const status = row ? String(row.status || '').trim() : '결근';
@@ -254,8 +247,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
                   absent: 'danger',
                   결근: 'danger',
                   leave: 'accent',
-                  휴가: 'accent',
-                };
+                  휴가: 'accent' };
 
                 return (
                   <div key={s.id} className="m-list-row">
@@ -283,7 +275,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
       {subTab === 'roster' && (
         <div style={{ padding: '14px 16px 0' }}>
           {/* 간단 근무표 달력/목록 형태 */}
-          <div className="m-card" style={{ padding: 14, marginBottom: 12 }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>전사 근무 스케줄 관리</div>
             <p style={{ fontSize: 11, color: 'var(--z-600)', margin: '0 0 10px 0', lineHeight: '1.4' }}>
               모바일 기기에서 전체 직원들의 근무 조 편성 내역을 확인합니다.
@@ -291,7 +283,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
             </p>
           </div>
 
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {activeStaffs.slice(0, 30).map((s) => (
               <div key={s.id} className="m-list-row">
                 <MAvatar tone={pickAvatarTone(s.name)}>{s.name.charAt(0)}</MAvatar>
@@ -310,7 +302,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
 
       {subTab === 'abnormal' && (
         <div style={{ padding: '14px 16px 0' }}>
-          <div className="m-card" style={{ padding: 14, marginBottom: 12, background: 'var(--m-warning-soft)', borderColor: 'transparent' }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12, background: 'var(--m-warning-soft)', borderColor: 'transparent' }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-warning)', marginBottom: 4 }}>
               최근 30일 근태이상 자동 감지
             </div>
@@ -328,7 +320,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
               최근 30일 동안 발생한 근태이상이 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {abnormalRows.map((r, idx) => {
                 const label =
                   r.lateMinutes > 0
@@ -364,8 +356,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
                           background: 'white',
                           fontSize: 11,
                           fontWeight: 700,
-                          color: 'var(--z-700)',
-                        }}
+                          color: 'var(--z-700)' }}
                       >
                         사유 요청
                       </button>
@@ -379,8 +370,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
                           background: 'var(--m-accent-soft)',
                           fontSize: 11,
                           fontWeight: 700,
-                          color: 'var(--m-accent)',
-                        }}
+                          color: 'var(--m-accent)' }}
                       >
                         정상 보정
                       </button>

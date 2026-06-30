@@ -29,8 +29,7 @@ export default function BodyPartSheet({ open, onClose, selectedId, onSelect }: B
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 8,
-          padding: '0 16px 24px',
-        }}
+          padding: '0 16px 24px' }}
       >
         {BODY_PARTS.map((part) => {
           const on = selectedId === part.id;
@@ -49,8 +48,7 @@ export default function BodyPartSheet({ open, onClose, selectedId, onSelect }: B
                 padding: '14px 8px',
                 borderRadius: 12,
                 border: on ? '1.5px solid var(--m-accent)' : '1px solid var(--m-border)',
-                background: on ? 'var(--m-accent-soft)' : 'var(--m-card)',
-              }}
+                background: on ? 'var(--m-accent-soft)' : 'var(--m-card)' }}
             >
               <span aria-hidden style={{ fontSize: 22 }}>{part.emoji}</span>
               <span style={{ fontSize: 12, fontWeight: 800, color: on ? 'var(--m-accent)' : 'var(--z-800)' }}>

@@ -54,8 +54,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
               display: 'grid',
               placeItems: 'center',
               margin: '0 auto 16px',
-              boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)',
-            }}
+              boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)' }}
           >
             <MIcon name="send" size={32} strokeWidth={1.4} />
           </div>
@@ -67,8 +66,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
               fontWeight: 500,
               marginTop: 8,
               lineHeight: 1.6,
-              padding: '0 8px',
-            }}
+              padding: '0 8px' }}
           >
             발수신 팩스 관리는 외부 시스템(WebFax+)에서 처리됩니다.
             <br />
@@ -90,8 +88,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
                   gap: 6,
                   height: 44,
                   fontSize: 14,
-                  fontWeight: 600,
-                }}
+                  fontWeight: 600 }}
               >
                 <MIcon name="send" size={16} />
                 외부 시스템 열기
@@ -116,8 +113,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
                 fontSize: 12,
                 lineHeight: 1.55,
                 color: 'var(--z-700)',
-                textAlign: 'left',
-              }}
+                textAlign: 'left' }}
               role="status"
               aria-live="polite"
             >

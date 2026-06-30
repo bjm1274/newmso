@@ -21,8 +21,7 @@ export function MessengerAvatar({
   imageClassName = '',
   decorative = false,
   alt,
-  fallbackText,
-}: MessengerAvatarProps) {
+  fallbackText }: MessengerAvatarProps) {
   const resolvedName = String(name || '').trim();
   const resolvedAlt = decorative
     ? ''
@@ -55,8 +54,7 @@ type MessengerStatusUserRowProps = {
 
 export function MessengerStatusUserRow({
   staff,
-  tone = 'default',
-}: MessengerStatusUserRowProps) {
+  tone = 'default' }: MessengerStatusUserRowProps) {
   const containerClass =
     tone === 'success'
       ? 'flex items-center gap-3 rounded-xl bg-[var(--tab-bg)] p-2 dark:bg-zinc-800/30'

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { calculateLeaveDays, isAnnualLeaveType, isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
 import { isActiveStaff } from '@/lib/active-staff';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
@@ -86,20 +86,20 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
 
         const currentYear = new Date().getFullYear();
         const [{ data, error }, { data: auditData, error: auditError }, { data: balanceData, error: balanceError }] = await Promise.all([
-          supabase
+          db
             .from('leave_requests')
             .select('id, staff_id, leave_type, start_date, end_date, status, reason, approved_at')
             .in('staff_id', staffIds)
             .order('approved_at', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false }),
-          supabase
+          db
             .from('audit_logs')
             .select('id, action, target_id, user_name, created_at, details')
             .eq('target_type', 'leave_request')
             .eq('action', 'leave_request_status_updated')
             .order('created_at', { ascending: false })
             .limit(200),
-          supabase
+          db
             .from('leave_balances')
             .select('staff_id, expired_days, compensated_days')
             .in('staff_id', staffIds)
@@ -120,8 +120,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         ((balanceData || []) as LeaveBalanceRow[]).forEach((row) => {
           nextBalances[String(row.staff_id)] = {
             expired: Number(row.expired_days) || 0,
-            compensated: Number(row.compensated_days) || 0,
-          };
+            compensated: Number(row.compensated_days) || 0 };
         });
 
         if (active) {
@@ -176,8 +175,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
             expired,
             compensated,
             remaining: Math.max(0, total - used - expired - compensated),
-            approvedCount: approvedRows.length,
-          };
+            approvedCount: approvedRows.length };
         })
         .sort((a, b) => a.staff.name.localeCompare(b.staff.name, 'ko')),
     [approvedAnnualLeaveRows, balancesByStaff, filteredStaffs]
@@ -191,50 +189,42 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         key: 'name',
         label: '직원',
         primary: true,
-        render: (row) => <span className="font-semibold text-[var(--foreground)]">{row.staff.name}</span>,
-      },
+        render: (row) => <span className="font-semibold text-[var(--foreground)]">{row.staff.name}</span> },
       {
         key: 'company',
         label: '회사/부서',
         render: (row) =>
-          `${row.staff.company || '회사 미지정'} / ${row.staff.department || '부서 미지정'}`,
-      },
+          `${row.staff.company || '회사 미지정'} / ${row.staff.department || '부서 미지정'}` },
       {
         key: 'total',
         label: '총 연차',
         align: 'right',
-        render: (row) => <span className="font-semibold">{row.total.toFixed(1)}</span>,
-      },
+        render: (row) => <span className="font-semibold">{row.total.toFixed(1)}</span> },
       {
         key: 'used',
         label: '사용',
         align: 'right',
-        render: (row) => <span className="font-semibold text-[var(--accent)]">{row.used.toFixed(1)}</span>,
-      },
+        render: (row) => <span className="font-semibold text-[var(--accent)]">{row.used.toFixed(1)}</span> },
       {
         key: 'expired',
         label: '소멸',
         align: 'right',
-        render: (row) => <span className="font-semibold text-red-500">{row.expired.toFixed(1)}</span>,
-      },
+        render: (row) => <span className="font-semibold text-red-500">{row.expired.toFixed(1)}</span> },
       {
         key: 'compensated',
         label: '수당지급',
         align: 'right',
-        render: (row) => <span className="font-semibold text-amber-600">{row.compensated.toFixed(1)}</span>,
-      },
+        render: (row) => <span className="font-semibold text-amber-600">{row.compensated.toFixed(1)}</span> },
       {
         key: 'remaining',
         label: '잔여',
         align: 'right',
-        render: (row) => <span className="font-semibold text-green-600">{row.remaining.toFixed(1)}</span>,
-      },
+        render: (row) => <span className="font-semibold text-green-600">{row.remaining.toFixed(1)}</span> },
       {
         key: 'approvedCount',
         label: '승인 건수',
         align: 'right',
-        render: (row) => <span className="text-[var(--toss-gray-4)]">{row.approvedCount}</span>,
-      },
+        render: (row) => <span className="text-[var(--toss-gray-4)]">{row.approvedCount}</span> },
     ],
     []
   );
@@ -258,8 +248,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
               ? details.annual_leave_used_recalculated
               : null,
           actor: row.user_name || '시스템',
-          createdAt: row.created_at,
-        };
+          createdAt: row.created_at };
       }),
     [filteredStaffs, rollbackAudits]
   );

@@ -39,8 +39,7 @@ export function extractScheduleMetaFromContent(value: unknown) {
   if (start < 0 || end < 0 || end <= start) {
     return {
       displayContent: stripHiddenMetaBlocks(raw),
-      meta: null as Record<string, unknown> | null,
-    };
+      meta: null as Record<string, unknown> | null };
   }
 
   const displayContent = stripHiddenMetaBlocks(
@@ -50,13 +49,11 @@ export function extractScheduleMetaFromContent(value: unknown) {
   try {
     return {
       displayContent,
-      meta: JSON.parse(metaText) as Record<string, unknown>,
-    };
+      meta: JSON.parse(metaText) as Record<string, unknown> };
   } catch {
     return {
       displayContent,
-      meta: null as Record<string, unknown> | null,
-    };
+      meta: null as Record<string, unknown> | null };
   }
 }
 
@@ -76,8 +73,7 @@ export function mapSchedulePost(post: BoardPost): LinkedSchedulePost {
     surgery_inpatient: Boolean(post.surgery_inpatient ?? meta?.inpatient ?? false),
     surgery_guardian: Boolean(post.surgery_guardian ?? meta?.guardian ?? false),
     surgery_caregiver: Boolean(post.surgery_caregiver ?? meta?.caregiver ?? false),
-    surgery_transfusion: Boolean(post.surgery_transfusion ?? meta?.transfusion ?? false),
-  };
+    surgery_transfusion: Boolean(post.surgery_transfusion ?? meta?.transfusion ?? false) };
 }
 
 export function getScheduleStatusOrder(status: unknown) {
@@ -159,8 +155,7 @@ export function formatDateLabel(dateText: string) {
     return new Intl.DateTimeFormat('ko-KR', {
       month: 'long',
       day: 'numeric',
-      weekday: 'short',
-    }).format(new Date(`${dateText}T00:00:00`));
+      weekday: 'short' }).format(new Date(`${dateText}T00:00:00`));
   } catch {
     return dateText;
   }

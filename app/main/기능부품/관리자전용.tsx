@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import {
   ADMIN_ANALYSIS_TABS,
@@ -14,8 +14,7 @@ import {
   type AdminAnalysisTabId,
   type AdminAuditTabId,
   type AdminOperationsTabId,
-  type AdminOuterTabId,
-} from '../admin-menu-config';
+  type AdminOuterTabId } from '../admin-menu-config';
 
 import dynamic from 'next/dynamic';
 import { hasSystemMasterPermission } from '@/lib/system-master';
@@ -31,8 +30,7 @@ const ADMIN_WORKCENTER_SECTION: Record<AdminWorkcenterId, AdminOuterTabId> = {
   roles: '직원권한',
   ops: '운영설정',
   forms: '문서양식',
-  audit: '감사센터',
-};
+  audit: '감사센터' };
 
 // ── 서브뷰 lazy 로드 (관리자 메뉴 번들 최소화) ──
 const AdminSubViewLoading = () => (
@@ -73,8 +71,7 @@ function InnerTabBar({
   tabs,
   activeTab,
   onChange,
-  testIdPrefix,
-}: {
+  testIdPrefix }: {
   title: string;
   tabs: { id: string; label: string; icon: string }[];
   activeTab: string;
@@ -215,7 +212,7 @@ export default function AdminView(props: Record<string, unknown>) {
     if (activeTab !== '경영분석' || analysisTab !== '경영대시보드') return;
 
     const fetchInventory = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('inventory')
         .select('id, item_name, quantity, min_quantity, company, department');
       setInventory(data || []);
@@ -261,8 +258,7 @@ export default function AdminView(props: Record<string, unknown>) {
       const featureNames = {
         exec: '경영 분석',
         company: '회사 관리',
-        forms: '결재 양식 관리',
-      };
+        forms: '결재 양식 관리' };
       return <DesktopOnlyNotice feature={featureNames[initialTab] || '관리자 워크센터'} />;
     }
 

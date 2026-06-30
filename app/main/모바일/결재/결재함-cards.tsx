@@ -107,8 +107,7 @@ function KpiCardBase({ label, value, tone, icon }: KpiCardProps) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        overflow: 'hidden',
-      }}
+        overflow: 'hidden' }}
     >
       {icon && (
         <span style={{ display: 'inline-flex' }} className={'m-kpi-ico ' + toneClass}>
@@ -128,8 +127,7 @@ function KpiCardBase({ label, value, tone, icon }: KpiCardProps) {
           display: 'flex',
           alignItems: 'baseline',
           gap: 2,
-          flexShrink: 0,
-        }}
+          flexShrink: 0 }}
       >
         {value}
         <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 800 }}>건</span>
@@ -169,8 +167,7 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
     outline: 'none',
     cursor: 'pointer',
     border: 'none',
-    background: 'transparent',
-  };
+    background: 'transparent' };
   const stripStyle: CSSProperties = {
     position: 'absolute',
     top: 1,
@@ -178,8 +175,7 @@ function ApprovalCardBase({ row, staffId, onOpen }: ApprovalCardProps) {
     bottom: 1,
     width: 4,
     borderRadius: '20px 0 0 20px',
-    background: urgentTone === 'danger' ? 'var(--m-danger)' : 'var(--m-warning)',
-  };
+    background: urgentTone === 'danger' ? 'var(--m-danger)' : 'var(--m-warning)' };
 
   return (
     <button

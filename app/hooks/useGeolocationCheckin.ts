@@ -41,14 +41,12 @@ export type UseGeolocationCheckinResult = GeolocationCheckinState & {
 const DEFAULT_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 10_000,
-  maximumAge: 60_000,
-};
+  maximumAge: 60_000 };
 
 const INITIAL_STATE: GeolocationCheckinState = {
   status: 'idle',
   coords: null,
-  error: null,
-};
+  error: null };
 
 export function useGeolocationCheckin(
   options: PositionOptions = DEFAULT_OPTIONS,
@@ -62,8 +60,7 @@ export function useGeolocationCheckin(
       setState({
         status: 'error',
         coords: null,
-        error: '브라우저가 위치 정보를 지원하지 않습니다.',
-      });
+        error: '브라우저가 위치 정보를 지원하지 않습니다.' });
       return;
     }
 
@@ -74,10 +71,8 @@ export function useGeolocationCheckin(
           coords: {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-          },
-          error: null,
-        });
+            accuracy: pos.coords.accuracy },
+          error: null });
       },
       (err) => {
         const denied = err.code === err.PERMISSION_DENIED;
@@ -86,8 +81,7 @@ export function useGeolocationCheckin(
           coords: null,
           error: denied
             ? '위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.'
-            : err.message || '위치 정보를 가져오지 못했습니다.',
-        });
+            : err.message || '위치 정보를 가져오지 못했습니다.' });
       },
       options,
     );

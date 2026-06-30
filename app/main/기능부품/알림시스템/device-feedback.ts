@@ -38,8 +38,7 @@ function getNotificationHapticPattern(type: string) {
 export function playIncomingNotificationFeedback({
   type,
   allowSound,
-  allowVibration,
-}: {
+  allowVibration }: {
   type: string;
   allowSound: boolean;
   allowVibration: boolean;

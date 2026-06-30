@@ -14,8 +14,7 @@ import { buildStorageInlineUrl } from '@/lib/object-storage-url';
 export function AttachmentRow({
   attachment,
   onOpen,
-  onDownload,
-}: {
+  onDownload }: {
   attachment: SafeAttachment;
   onOpen: () => void;
   onDownload: () => void;
@@ -33,8 +32,7 @@ export function AttachmentRow({
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        borderBottom: '1px solid var(--m-border)',
-      }}
+        borderBottom: '1px solid var(--m-border)' }}
     >
       <button
         type="button"
@@ -51,8 +49,7 @@ export function AttachmentRow({
             color: 'var(--m-accent)',
             display: 'grid',
             placeItems: 'center',
-            flexShrink: 0,
-          }}
+            flexShrink: 0 }}
         >
           <MIcon name="fileText" size={18} />
         </span>
@@ -64,8 +61,7 @@ export function AttachmentRow({
               fontWeight: 700,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
+              textOverflow: 'ellipsis' }}
           >
             {attachment.name}
           </span>
@@ -90,8 +86,7 @@ export function AttachmentRow({
 
 export function ImageAttachment({
   attachment,
-  onOpen,
-}: {
+  onOpen }: {
   attachment: SafeAttachment;
   onOpen: () => void;
 }) {
@@ -110,8 +105,7 @@ export function ImageAttachment({
         marginBottom: 8,
         padding: 0,
         border: 'none',
-        background: 'transparent',
-      }}
+        background: 'transparent' }}
     >
       <img
         src={inlineUrl}
@@ -123,8 +117,7 @@ export function ImageAttachment({
           height: 'auto',
           borderRadius: 12,
           display: 'block',
-          background: 'var(--m-bg)',
-        }}
+          background: 'var(--m-bg)' }}
       />
     </button>
   );

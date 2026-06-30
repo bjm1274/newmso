@@ -2,8 +2,7 @@ import {
   normalizeApprovalLineIds,
   resolveApprovalLineIds,
   resolveStoredCurrentApproverId,
-  resolveEffectiveApproverIdCore,
-} from '@/lib/approval-shared';
+  resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
 
 // 결재 공용 순수 유틸은 lib/approval-shared.ts 로 통합 — 기존 export 경로 유지를 위해 re-export.
 export { normalizeApprovalLineIds, resolveApprovalLineIds, resolveStoredCurrentApproverId };

@@ -35,8 +35,7 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
       aria-label={title || '시트'}
       style={{
         position: 'fixed', inset: 0, zIndex: 1500,
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-      }}
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
     >
       <div
         style={{ flex: 1, background: 'rgba(0,0,0,0.4)' }}
@@ -55,8 +54,7 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
           borderBottom: 'none',
           maxHeight: '85vh',
           display: 'flex', flexDirection: 'column',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
+          paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 6px' }}>
           <span style={{ width: 36, height: 5, borderRadius: 999, background: 'rgba(0,0,0,0.15)' }} />

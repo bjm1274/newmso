@@ -7,7 +7,7 @@
  */
 
 import { fetcher } from '@/lib/fetcher';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 const STAFF_TTL = 300_000; // 5분 — 직원 정보 변경 빈도 낮음
 
@@ -26,7 +26,7 @@ export async function fetchStaffsBasic(): Promise<StaffBasic[]> {
   return fetcher(
     'staff:basic:all',
     async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('staff_members')
         .select('id, name, position, department, company');
       return (data ?? []) as StaffBasic[];
@@ -47,7 +47,7 @@ export async function fetchHistoricalStaffNames(
   return fetcher(
     `staff:historical-names:${sortedKey}`,
     async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('audit_logs')
         .select('user_id, user_name, created_at')
         .in('user_id', unresolvedIds)

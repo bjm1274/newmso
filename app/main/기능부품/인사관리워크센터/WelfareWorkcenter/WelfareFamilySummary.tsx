@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface FamilyEvent {
   id: string;
@@ -40,8 +40,7 @@ function formatDateCompact(value: unknown): string {
 const CHIP_CLS: Record<FamilyEvent['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  warn: 'bg-amber-500/15 text-amber-700',
-};
+  warn: 'bg-amber-500/15 text-amber-700' };
 
 export default function WelfareFamilySummary() {
   const [events, setEvents] = useState<FamilyEvent[]>([]);
@@ -54,7 +53,7 @@ export default function WelfareFamilySummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('congratulations_condolences')
           .select('id, staff_name, event_type, event_date')
           .order('event_date', { ascending: false })
@@ -68,8 +67,7 @@ export default function WelfareFamilySummary() {
             staffName: String(row.staff_name ?? '직원'),
             kind: String(row.event_type ?? '기타'),
             date: formatDateCompact(row.event_date),
-            tone: pickTone(String(row.event_type ?? '')),
-          })),
+            tone: pickTone(String(row.event_type ?? '')) })),
         );
       } catch (error) {
         if (cancelled) return;

@@ -11,8 +11,7 @@ import {
   ne,
   isNull,
   asc,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
@@ -166,8 +165,7 @@ export async function POST(request: NextRequest) {
         device_id: deviceId,
         platform,
         user_agent: userAgent,
-        created_at: new Date().toISOString(),
-      })
+        created_at: new Date().toISOString() })
       .onConflictDoUpdate({
         target: [push_subscriptions.staff_id, push_subscriptions.endpoint],
         set: {
@@ -176,9 +174,7 @@ export async function POST(request: NextRequest) {
           fcm_token: sql`excluded.fcm_token`,
           device_id: sql`excluded.device_id`,
           platform: sql`excluded.platform`,
-          user_agent: sql`excluded.user_agent`,
-        },
-      });
+          user_agent: sql`excluded.user_agent` } });
 
     if (fcmToken) {
       // 같은 fcm_token이 같은 staff의 다른 endpoint에 남아 있으면 dedupe
@@ -198,8 +194,7 @@ export async function POST(request: NextRequest) {
     const allSubs = await db
       .select({
         id: push_subscriptions.id,
-        created_at: push_subscriptions.created_at,
-      })
+        created_at: push_subscriptions.created_at })
       .from(push_subscriptions)
       .where(eq(push_subscriptions.staff_id, staffId))
       .orderBy(asc(push_subscriptions.created_at));

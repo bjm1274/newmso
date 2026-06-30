@@ -9,8 +9,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,8 +56,7 @@ export async function POST(request: NextRequest) {
     vapidPublicKey: vapidPublic ? `${vapidPublic.slice(0, 10)}...` : '❌ 없음',
     vapidPrivateKey: vapidPrivate ? '✅ 설정됨' : '❌ 없음 (Cloudflare에 추가 필요)',
     vapidSubject: vapidSubject || '❌ 없음 (Cloudflare에 추가 필요)',
-    firebaseServiceAccount: firebaseSA ? '✅ 설정됨' : '❌ 없음 (Cloudflare에 추가 필요)',
-  };
+    firebaseServiceAccount: firebaseSA ? '✅ 설정됨' : '❌ 없음 (Cloudflare에 추가 필요)' };
 
   // ── 2. DB 구독 정보 확인 ──
   let subs: SubRow[] | null = null;
@@ -71,8 +69,7 @@ export async function POST(request: NextRequest) {
         endpoint: pushSubscriptionsTable.endpoint,
         p256dh: pushSubscriptionsTable.p256dh,
         auth: pushSubscriptionsTable.auth,
-        fcm_token: pushSubscriptionsTable.fcm_token,
-      })
+        fcm_token: pushSubscriptionsTable.fcm_token })
       .from(pushSubscriptionsTable)
       .where(eq(pushSubscriptionsTable.staff_id, staffId));
     subs = rows as SubRow[];
@@ -82,15 +79,13 @@ export async function POST(request: NextRequest) {
     endpoint: String(s.endpoint || '').slice(0, 60) + '...',
     hasP256dh: Boolean(s.p256dh),
     hasAuth: Boolean(s.auth),
-    hasFcmToken: Boolean(s.fcm_token),
-  }));
+    hasFcmToken: Boolean(s.fcm_token) }));
 
   if (!subs || subs.length === 0) {
     return NextResponse.json({
       ok: false,
       reason: '구독 정보 없음. 클라이언트에서 "푸시 다시 연결" 버튼을 눌러주세요.',
-      diagnostics,
-    });
+      diagnostics });
   }
 
   const results: any[] = [];
@@ -104,8 +99,7 @@ export async function POST(request: NextRequest) {
         title: '🔔 푸시 연결 테스트',
         body: '[Web Push] 서버→기기 연결이 정상입니다!',
         tag: `self-test-webpush-${Date.now()}`,
-        data: { type: 'notification', source: 'self-test' },
-      });
+        data: { type: 'notification', source: 'self-test' } });
 
       for (const sub of subs as any[]) {
         if (!sub.p256dh || !sub.auth || !/^https?:\/\//i.test(String(sub.endpoint))) continue;
@@ -139,9 +133,7 @@ export async function POST(request: NextRequest) {
             body: '[FCM] 서버→기기 FCM 연결이 정상입니다!',
             data: {
               type: 'notification',
-              tag: `self-test-fcm-${Date.now()}`,
-            },
-          });
+              tag: `self-test-fcm-${Date.now()}` } });
           results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok });
         } catch (err: any) {
           results.push({ method: 'fcm', token: String(sub.fcm_token).slice(0, 20), ok: false, error: String(err?.message || err) });
@@ -161,6 +153,5 @@ export async function POST(request: NextRequest) {
     diagnostics,
     summary: anyOk
       ? '✅ 최소 1개 경로로 푸시 발송 성공. 기기 알림창을 확인하세요.'
-      : '❌ 모든 경로 실패. diagnostics를 확인하세요.',
-  });
+      : '❌ 모든 경로 실패. diagnostics를 확인하세요.' });
 }

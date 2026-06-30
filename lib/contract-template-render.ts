@@ -2,8 +2,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
   resolveWeeklyWorkingHours,
-  resolveWorkingDaysPerWeek,
-} from '@/lib/payroll-working-hours';
+  resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { buildShiftContractVariables } from '@/lib/contract-shift-rotation';
 import {
   cleanOptionalText,
@@ -12,8 +11,7 @@ import {
   getStaffLicenseDate,
   getStaffLicenseNo,
   getStaffProbationMonths,
-  getStaffProbationPercent,
-} from '@/lib/staff-meta';
+  getStaffProbationPercent } from '@/lib/staff-meta';
 
 const OPTIONAL_ALLOWANCE_FIELDS = [
   { token: '{{position_allowance}}', labels: ['직책수당'] },
@@ -289,8 +287,7 @@ export function fillEmploymentContractTemplate(
   const getSalaryAmount = (fieldName: string) => {
     const alternates: Record<string, string[]> = {
       agreed_overtime_allowance: ['overtime_allowance'],
-      agreed_night_allowance: ['night_work_allowance', 'night_duty_allowance'],
-    };
+      agreed_night_allowance: ['night_work_allowance', 'night_duty_allowance'] };
     const tryResolve = (source: Record<string, unknown>) => {
       let val = toMoneyNumber(source[fieldName]);
       if (val === 0 && alternates[fieldName]) {
@@ -317,8 +314,7 @@ export function fillEmploymentContractTemplate(
     '{{other_taxfree}}': getSalaryAmount('other_taxfree'),
     '{{agreed_overtime_allowance}}': getSalaryAmount('agreed_overtime_allowance'),
     '{{agreed_night_allowance}}': getSalaryAmount('agreed_night_allowance'),
-    '{{night_duty_allowance}}': getSalaryAmount('night_duty_allowance'),
-  };
+    '{{night_duty_allowance}}': getSalaryAmount('night_duty_allowance') };
 
   const weeklyWorkHours = resolveWeeklyWorkingHours(
     safeContract,
@@ -451,8 +447,7 @@ export function fillEmploymentContractTemplate(
     contract_start: formatDate(safeContract.contract_start_date || safeUser.joined_at || salarySource.join_date),
     contract_end: contractEndDate || (isFixedTerm ? '계약만료일' : '정년도달시'),
     conditions_applied_at: formatDate(safeContract.conditions_applied_at || salarySource.effective_date),
-    today: formatDate(safeContract.requested_at || new Date()),
-  };
+    today: formatDate(safeContract.requested_at || new Date()) };
 
   const probationMonthsNum = getStaffProbationMonths(
     { probation_months: safeContract.probation_months },
@@ -541,12 +536,11 @@ export function fillEmploymentContractTemplate(
     대표자: vars.company_ceo,
     사업자등록번호: vars.company_business_no,
     주소: vars.company_address,
-    전화번호: vars.company_phone,
-  };
+    전화번호: vars.company_phone };
 
   Object.entries(companyLineValues).forEach(([label, value]) => {
     if (!value) return;
-    const re = new RegExp(`(${label}\\s*:\\s*)(?:_{2,}|\\s{2,})(?=\\s|$)`, 'g');
+    const re = new RegExp(`(${label}\\s*:\\s*)(?:_{2 }|\\s{2 })(?=\\s|$)`, 'g');
     result = result.replace(re, `$1${value}`);
   });
 

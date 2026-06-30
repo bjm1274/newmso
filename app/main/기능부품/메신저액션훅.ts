@@ -3,14 +3,13 @@
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { ChatMessage, ChatRoom } from '@/types';
 import {
   getConversationRoomIdsByRoomId,
   NOTICE_ROOM_ID,
   writeStoredBookmarks,
-  writeStoredPinnedIds,
-} from './메신저유틸';
+  writeStoredPinnedIds } from './메신저유틸';
 
 type UseChatMessageActionsParams = {
   currentUserId: string | null | undefined;
@@ -64,15 +63,14 @@ export function useChatMessageActions({
   persistRoomReadCursors,
   broadcastChatSync,
   auditUserId,
-  auditUserName,
-}: UseChatMessageActionsParams) {
+  auditUserName }: UseChatMessageActionsParams) {
   const { dialog, openConfirm } = useActionDialog();
   const actorId = currentUserId || fallbackUserId || '';
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!actorId) return;
     try {
-      const { data: myReaction } = await supabase
+      const { data: myReaction } = await db
         .from('message_reactions')
         .select('id')
         .eq('message_id', messageId)
@@ -81,14 +79,14 @@ export function useChatMessageActions({
         .maybeSingle();
 
       if (myReaction) {
-        await supabase
+        await db
           .from('message_reactions')
           .delete()
           .eq('message_id', messageId)
           .eq('user_id', actorId)
           .eq('emoji', emoji);
       } else {
-        await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: actorId, emoji }]);
+        await db.from('message_reactions').insert([{ message_id: messageId, user_id: actorId, emoji }]);
       }
       if (refreshVisibleMessageReactions) {
         await refreshVisibleMessageReactions();
@@ -106,7 +104,7 @@ export function useChatMessageActions({
     const isPinned = pinnedIds.includes(normalizedMessageId);
     try {
       if (isPinned) {
-        const { error } = await supabase
+        const { error } = await db
           .from('pinned_messages')
           .delete()
           .eq('room_id', selectedRoomId)
@@ -115,9 +113,9 @@ export function useChatMessageActions({
         setPinnedIds([]);
         writeStoredPinnedIds(selectedRoomId, []);
       } else {
-        const { error: clearError } = await supabase.from('pinned_messages').delete().eq('room_id', selectedRoomId);
+        const { error: clearError } = await db.from('pinned_messages').delete().eq('room_id', selectedRoomId);
         if (clearError) throw clearError;
-        const { error: insertError } = await supabase
+        const { error: insertError } = await db
           .from('pinned_messages')
           .insert([{ room_id: selectedRoomId, message_id: normalizedMessageId, pinned_by: actorId || null }]);
         if (insertError) throw insertError;
@@ -146,19 +144,18 @@ export function useChatMessageActions({
         throw new Error('missing-user');
       }
       if (isBookmarked) {
-        const { error } = await supabase
+        const { error } = await db
           .from('message_bookmarks')
           .delete()
           .eq('user_id', effectiveTodoUserId)
           .eq('message_id', normalizedMessageId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('message_bookmarks').insert([
+        const { error } = await db.from('message_bookmarks').insert([
           {
             user_id: effectiveTodoUserId,
             message_id: normalizedMessageId,
-            room_id: selectedRoomId,
-          },
+            room_id: selectedRoomId },
         ]);
         if (error) throw error;
       }
@@ -202,8 +199,7 @@ export function useChatMessageActions({
       title: '메시지 삭제',
       description: '이 메시지를 삭제합니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     let nextMessagesSnapshot: ChatMessage[] = [];
@@ -224,10 +220,10 @@ export function useChatMessageActions({
     );
     syncRoomSummaryFromMessages(message.room_id || selectedRoomId, nextMessagesSnapshot);
 
-    await supabase.from('messages').update({ is_deleted: true }).eq('id', message.id);
+    await db.from('messages').update({ is_deleted: true }).eq('id', message.id);
 
     try {
-      await supabase.from('audit_logs').insert([
+      await db.from('audit_logs').insert([
         {
           user_id: auditUserId,
           user_name: auditUserName,
@@ -236,9 +232,7 @@ export function useChatMessageActions({
           target_id: message.id,
           details: JSON.stringify({
             room_id: selectedRoomId,
-            content: message.content,
-          }),
-        },
+            content: message.content }) },
       ]);
     } catch {
       // 감사로그 실패는 사용자 흐름을 막지 않는다.
@@ -251,6 +245,5 @@ export function useChatMessageActions({
     togglePin,
     toggleBookmark,
     markMessageRead,
-    deleteMessage,
-  };
+    deleteMessage };
 }

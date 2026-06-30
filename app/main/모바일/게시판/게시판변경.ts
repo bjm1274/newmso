@@ -10,7 +10,7 @@
  * JM: 단일 책임 (변경 계층), JM3(try/catch + toast), JM4(any 금지)
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem } from '@/types';
 import { buildAttachmentMetaContent } from '@/app/main/기능부품/게시판공통';
@@ -27,8 +27,7 @@ export function normalizePoll(poll: BoardPollInput | null | undefined): BoardPol
     question: String(poll.question ?? '').trim(),
     options,
     anonymous: Boolean(poll.anonymous),
-    multiple: Boolean(poll.multiple),
-  };
+    multiple: Boolean(poll.multiple) };
   if (poll.prize && poll.prize.name.trim() && poll.prize.winnerCount >= 1) {
     normalized.prize = { winnerCount: poll.prize.winnerCount, name: poll.prize.name.trim() };
   }
@@ -50,8 +49,7 @@ export async function updateBoardPost(input: UpdateBoardPostInput): Promise<bool
           name: String(a?.name ?? '').trim(),
           url: String(a?.url ?? '').trim(),
           type: String(a?.type ?? '').trim() || undefined,
-          size: typeof a?.size === 'number' ? a.size : undefined,
-        }))
+          size: typeof a?.size === 'number' ? a.size : undefined }))
         .filter((a) => a.name && a.url)
     : [];
 
@@ -73,7 +71,7 @@ export async function updateBoardPost(input: UpdateBoardPostInput): Promise<bool
   if (poll !== undefined) payload.poll = normalizedPoll ?? null;
 
   try {
-    let { error } = await supabase.from('board_posts').update(payload).eq('id', postId);
+    let { error } = await db.from('board_posts').update(payload).eq('id', postId);
     if (error) {
       const msg = String((error as { message?: string }).message ?? '');
       const optional: Array<keyof UpdatePayload> = ['attachments', 'poll'];
@@ -81,7 +79,7 @@ export async function updateBoardPost(input: UpdateBoardPostInput): Promise<bool
       if (toOmit.length > 0) {
         const retryPayload: UpdatePayload = { ...payload };
         toOmit.forEach((k) => { delete retryPayload[k]; });
-        const retry = await supabase.from('board_posts').update(retryPayload).eq('id', postId);
+        const retry = await db.from('board_posts').update(retryPayload).eq('id', postId);
         error = retry.error;
       }
     }
@@ -100,7 +98,7 @@ export async function updateBoardPost(input: UpdateBoardPostInput): Promise<bool
 export async function deleteBoardPost(postId: string): Promise<boolean> {
   if (!postId) return false;
   try {
-    const { error } = await supabase.from('board_posts').delete().eq('id', postId);
+    const { error } = await db.from('board_posts').delete().eq('id', postId);
     if (error) throw error;
     return true;
   } catch (err) {
@@ -118,8 +116,8 @@ export async function deleteBoardComment(commentId: string): Promise<boolean> {
   if (!commentId) return false;
   try {
     // 답글 먼저 삭제 (PC와 동일 순서)
-    await supabase.from('board_post_comments').delete().eq('parent_comment_id', commentId);
-    const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
+    await db.from('board_post_comments').delete().eq('parent_comment_id', commentId);
+    const { error } = await db.from('board_post_comments').delete().eq('id', commentId);
     if (error) throw error;
     return true;
   } catch (err) {
@@ -165,7 +163,7 @@ export async function togglePollVote(
     next[key] = [...(next[key] || []), userId];
   }
   try {
-    const { error } = await supabase
+    const { error } = await db
       .from('board_posts')
       .update({ poll_votes: next })
       .eq('id', postId);

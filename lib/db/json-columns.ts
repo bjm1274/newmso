@@ -39,5 +39,4 @@ export const JSON_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   tax_reports: ['data'],
   virtual_account_deposits: ['raw_payload'],
   wiki_document_versions: ['tags', 'editor_ids'],
-  wiki_documents: ['tags', 'editor_ids'],
-};
+  wiki_documents: ['tags', 'editor_ids'] };

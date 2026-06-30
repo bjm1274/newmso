@@ -38,8 +38,7 @@ type Props = ActionDialogState & {
 const toneClassNameMap: Record<ActionDialogTone, string> = {
   default: 'bg-[var(--foreground)] text-white hover:opacity-95',
   accent: 'bg-[var(--accent)] text-white hover:opacity-95',
-  danger: 'bg-red-600 text-white hover:bg-red-700',
-};
+  danger: 'bg-red-600 text-white hover:bg-red-700' };
 
 export default function ActionDialog({
   open,
@@ -60,8 +59,7 @@ export default function ActionDialog({
   largeText = false,
   onCancel,
   onConfirm,
-  mobileVariant = 'sheet',
-}: Props) {
+  mobileVariant = 'sheet' }: Props) {
   const isMobile = useIsMobile();
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);

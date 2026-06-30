@@ -13,8 +13,7 @@ const AppDataContext = createContext<AppDataState | null>(null);
 
 export function AppDataProvider({
   value,
-  children,
-}: {
+  children }: {
   value: AppDataState;
   children: React.ReactNode;
 }) {

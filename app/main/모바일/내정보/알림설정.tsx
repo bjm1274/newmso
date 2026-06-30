@@ -15,8 +15,7 @@ import {
   readPushDebugLog,
   saveNotifSettings,
   sendNotification,
-  type PushConnectionStatus,
-} from '../../기능부품/알림시스템';
+  type PushConnectionStatus } from '../../기능부품/알림시스템';
 import { normalizeKeywordList } from '../../기능부품/알림시스템/filter-helpers';
 import { timeAgo } from '@/lib/notification-utils';
 
@@ -136,8 +135,7 @@ function MobileNotificationSettings({ user, onBack }: 알림설정Props) {
       await initNotificationService({
         staffId: userId,
         requestPermission:
-          currentStatus.permission !== 'granted' && currentStatus.permission !== 'denied',
-      });
+          currentStatus.permission !== 'granted' && currentStatus.permission !== 'denied' });
     } catch {
       setPushStatusError('푸시 재연결에 실패했습니다.');
     } finally {
@@ -191,9 +189,7 @@ function MobileNotificationSettings({ user, onBack }: 알림설정Props) {
         tag: 'erp-push-popup-self-test',
         data: {
           type: 'notification',
-          source: 'push-popup-self-test',
-        },
-      });
+          source: 'push-popup-self-test' } });
       setPushTestResult('테스트 알림을 보냈습니다. 기기 알림창을 확인해 주세요.');
     } catch {
       setPushTestResult('테스트 팝업 호출에 실패했습니다.');

@@ -59,8 +59,7 @@ export function ChatsPanel({
   onFocusFlaggedChats,
   onDeleteRoom,
   onDeleteEmptyRooms,
-  onDeleteMessage,
-}: ChatsPanelProps) {
+  onDeleteMessage }: ChatsPanelProps) {
   return (
     <section className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
       <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">

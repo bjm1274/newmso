@@ -120,26 +120,22 @@ function liveKpiItems(d: ReturnType<typeof useExecOverview>): AdminKpi[] {
       label: '결재 대기',
       value: d.loading ? '…' : String(d.pendingApprovalCount),
       unit: '건',
-      sub: '승인 대기 중',
-    },
+      sub: '승인 대기 중' },
     {
       label: '현금 잔고',
       value: d.loading ? '…' : toMillionStr(d.cashBalance),
       unit: 'M원',
-      sub: d.cashCompanyCount > 0 ? `오늘 마감 ${d.cashCompanyCount}개 법인 합산` : '오늘 마감 등록 없음',
-    },
+      sub: d.cashCompanyCount > 0 ? `오늘 마감 ${d.cashCompanyCount}개 법인 합산` : '오늘 마감 등록 없음' },
     {
       label: '재직 직원',
       value: d.loading ? '…' : String(d.activeStaffCount),
       unit: '명',
-      sub: '전사 합산',
-    },
+      sub: '전사 합산' },
     {
       label: `이번 달 인건비`,
       value: d.loading ? '…' : toMillionStr(totalLabor),
       unit: 'M원',
-      sub: `${d.yearMonth} 급여명세 기준`,
-    },
+      sub: `${d.yearMonth} 급여명세 기준` },
   ];
 }
 
@@ -148,8 +144,7 @@ const ExecHero = memo(function ExecHero({
   loading,
   totalLabor,
   corpCount,
-  onTabChange,
-}: {
+  onTabChange }: {
   yearMonth: string;
   loading: boolean;
   totalLabor: number;

@@ -6,8 +6,7 @@ import {
   MONTHLY_STANDARD_HOURS,
   WEEKLY_MAX_HOURS,
   ANNUAL_LEAVE_FIRST_YEAR,
-  ANNUAL_LEAVE_AFTER_ONE,
-} from '@/lib/tax-free-limits';
+  ANNUAL_LEAVE_AFTER_ONE } from '@/lib/tax-free-limits';
 
 export default function LegalStandardsPanel() {
   const items = [
@@ -18,9 +17,7 @@ export default function LegalStandardsPanel() {
       rows: Object.entries(TAX_FREE_LEGAL_LIMITS).map(([k, v]) => ({
         label: v.name,
         value: `${(v as any).limit.toLocaleString()}원`,
-        sub: v.basis,
-      })),
-    },
+        sub: v.basis })) },
   ];
 
   return (

@@ -58,9 +58,7 @@ export function useKoreanImeGuard(): KoreanImeGuard {
         },
         onCompositionEnd: () => {
           isComposingRef.current = false;
-        },
-      },
-    }),
+        } } }),
     [],
   );
 

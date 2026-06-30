@@ -11,7 +11,7 @@
  *  - 품목명 · SKU · 카테고리 · 단위 · 단가 · 안전재고 · 주거래처
  *  - DesktopHint: CSV 일괄 업로드는 데스크톱
  *
- * 데이터: supabase.from('inventory').insert (PC 패턴 동일 — 물품등록.tsx)
+ * 데이터: db.from('inventory').insert (PC 패턴 동일 — 물품등록.tsx)
  *
  * JM: ~330줄
  * JM3: try/catch + toast (필드 검증·insert 실패 모두 분기)
@@ -22,7 +22,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -31,8 +31,7 @@ import {
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 
 export type ItemUnit = '개' | '팩' | '박스' | 'EA';
 const CATEGORIES = ['의료소모품', '영상의학', '의약품', '멸균/소독', '사무용품'] as const;
@@ -44,8 +43,7 @@ const CATEGORY_TO_DB: Record<ItemCat, string> = {
   영상의학: '의료기기',
   의약품: '약품',
   '멸균/소독': '소모품',
-  사무용품: '사무용품',
-};
+  사무용품: '사무용품' };
 
 type FormState = {
   name: string;
@@ -66,8 +64,7 @@ const INITIAL: FormState = {
   price: '',
   safety: '',
   vendor: '',
-  imgAttached: false,
-};
+  imgAttached: false };
 
 type InventoryInsertPayload = {
   item_name: string;
@@ -137,15 +134,13 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
         insurance_code: v.sku.trim() || null,
         company,
         department: typeof user.department === 'string' ? user.department : '',
-        is_udi: false,
-      };
+        is_udi: false };
 
-      const { queued, error } = await enqueueSupabaseMutation<{ id: string }[]>({
+      const { queued, error } = await enqueueD1Mutation<{ id: string }[]>({
         kind: 'insert',
         table: 'inventory',
         payload: payload as unknown as Record<string, unknown>,
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) {
         toast(`저장 실패: ${error}`, 'error');
@@ -180,8 +175,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
           style={{
             padding: '18px 16px',
             background: 'var(--m-card)',
-            borderBottom: '1px solid var(--m-border)',
-          }}
+            borderBottom: '1px solid var(--m-border)' }}
         >
           <div style={{ display: 'flex', gap: 10 }}>
             <button
@@ -201,8 +195,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
-                border: v.imgAttached ? 'none' : '1px dashed var(--z-300)',
-              }}
+                border: v.imgAttached ? 'none' : '1px dashed var(--z-300)' }}
             >
               <MIcon name="image" size={22} />
               <span style={{ fontSize: 11, fontWeight: 700 }}>
@@ -223,8 +216,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
-                border: '1px dashed var(--m-accent)',
-              }}
+                border: '1px dashed var(--m-accent)' }}
             >
               <MIcon name="qr" size={22} />
               <span style={{ fontSize: 11, fontWeight: 800 }}>QR/바코드 스캔</span>
@@ -261,8 +253,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
                 display: 'flex',
                 gap: 6,
                 marginTop: 4,
-                flexWrap: 'wrap',
-              }}
+                flexWrap: 'wrap' }}
               role="radiogroup"
               aria-label="카테고리"
             >
@@ -279,8 +270,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
                     fontSize: 12,
                     fontWeight: 700,
                     background: v.cat === c ? 'var(--m-accent)' : 'var(--m-bg)',
-                    color: v.cat === c ? '#fff' : 'var(--z-700)',
-                  }}
+                    color: v.cat === c ? '#fff' : 'var(--z-700)' }}
                 >
                   {c}
                 </button>
@@ -335,8 +325,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                padding: '6px 0',
-              }}
+                padding: '6px 0' }}
             >
               <MAvatar tone="cyan" size="sm">
                 {(v.vendor || '?').charAt(0)}
@@ -353,8 +342,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
 
         <div
           style={{
-            padding: '14px 16px 24px',
-          }}
+            padding: '14px 16px 24px' }}
         >
           <div
             style={{
@@ -366,8 +354,7 @@ export default function 물품등록({ user, onBack }: 물품등록Props) {
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
-            }}
+              gap: 8 }}
           >
             <MIcon name="info" size={14} />
             품목 다량 등록·CSV 일괄 업로드는 데스크톱에서

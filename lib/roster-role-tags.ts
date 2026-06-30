@@ -90,8 +90,7 @@ export function mergeRosterRoleTagOptions(...groups: Array<Array<RosterRoleTagOp
         typeof entry === 'string'
           ? {
               value: entry,
-              label: entry,
-            }
+              label: entry }
           : entry;
       const normalized = normalizeRoleTagToken(option.value);
       if (!normalized || seen.has(normalized)) return;
@@ -99,8 +98,7 @@ export function mergeRosterRoleTagOptions(...groups: Array<Array<RosterRoleTagOp
       merged.push({
         value: option.value,
         label: option.label || option.value,
-        aliases: uniqueByNormalizedValue(option.aliases || []),
-      });
+        aliases: uniqueByNormalizedValue(option.aliases || []) });
     });
   });
 

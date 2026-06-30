@@ -12,8 +12,7 @@ import {
   getBoardPostPreview,
   getBoardStatusTone,
   isScheduledNoticePending,
-  normalizeBoardPostStatus,
-} from '../게시판-view-utils';
+  normalizeBoardPostStatus } from '../게시판-view-utils';
 
 interface BoardMobilePostCardProps {
   post: BoardPost;
@@ -34,8 +33,7 @@ export default function BoardMobilePostCard({
   noticeVisibilityTick,
   myLikedPostIds,
   onSelectPost,
-  onToggleLike,
-}: BoardMobilePostCardProps) {
+  onToggleLike }: BoardMobilePostCardProps) {
   const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
   const isPendingScheduledNotice = isScheduledNoticePending(post, noticeVisibilityTick);
   const hasAttachments = (Array.isArray(post.attachments) ? post.attachments : []).length > 0;

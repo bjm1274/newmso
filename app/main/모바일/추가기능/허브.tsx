@@ -47,8 +47,7 @@ const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
   discharge: { bg: 'linear-gradient(135deg, #8A8A8F, #5C5C60)', icon: 'fileText' },
   mri:       { bg: 'linear-gradient(135deg, #00C7BE, #00968F)', icon: 'calendar' },
   share:     { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'fileText' },
-  guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' },
-};
+  guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' } };
 
 type QuickItem = {
   id: AddonModuleKey;
@@ -68,8 +67,7 @@ const GROUPS: QuickGroup[] = [
       { id: 'consult',   label: '수술상담' },
       { id: 'opboard',   label: 'OP체크' },
       { id: 'discharge', label: '퇴원심사' },
-    ],
-  },
+    ] },
   {
     title: '운영',
     items: [
@@ -77,8 +75,7 @@ const GROUPS: QuickGroup[] = [
       { id: 'worknow',   label: '근무현황' },
       { id: 'inventory', label: '부서별재고' },
       { id: 'parking',   label: '주차관제' },
-    ],
-  },
+    ] },
   {
     title: '정산·문서',
     items: [
@@ -86,8 +83,7 @@ const GROUPS: QuickGroup[] = [
       { id: 'closing', label: '마감보고' },
       { id: 'eval',     label: '직원평가' },
       { id: 'webfax',   label: '웹팩스' },
-    ],
-  },
+    ] },
 ];
 
 export type 허브Props = {
@@ -103,8 +99,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       {/* 앱바 (macOS 윈도우 스타일 헤더) */}
       <div
@@ -117,8 +112,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           position: 'sticky',
           top: 0,
-          zIndex: 10,
-        }}
+          zIndex: 10 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {onBack ? (
@@ -135,8 +129,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                 borderRadius: 8,
                 background: 'rgba(0, 0, 0, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.05)',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="chevL" size={18} color="var(--z-600)" />
             </button>
@@ -159,8 +152,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
             borderRadius: '50%',
             background: 'rgba(0,0,0,0.03)',
             border: '1px solid rgba(0,0,0,0.05)',
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           <MIcon name="search" size={15} color="var(--z-600)" />
         </button>
@@ -177,8 +169,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 10,
-              }}
+                gap: 10 }}
             >
               {group.items.map((item) => {
                 const theme = ADDON_THEMES[item.id] || ADDON_THEMES.org;
@@ -199,8 +190,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                       border: '1px solid rgba(0, 0, 0, 0.06)',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
                       cursor: 'pointer',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}
                   >
                     <div
                       className="lead macos-squircle-sm"
@@ -213,8 +203,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                         placeItems: 'center',
                         flexShrink: 0,
                         boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.25), 0 3px 8px rgba(0,0,0,0.1)',
-                        marginBottom: 8,
-                      }}
+                        marginBottom: 8 }}
                     >
                       <MIcon name={theme.icon} size={20} />
                     </div>
@@ -224,8 +213,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                         fontWeight: 800,
                         color: 'var(--foreground)',
                         letterSpacing: '-0.03em',
-                        whiteSpace: 'nowrap',
-                      }}
+                        whiteSpace: 'nowrap' }}
                     >
                       {item.label}
                     </div>

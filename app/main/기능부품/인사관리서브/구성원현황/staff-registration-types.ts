@@ -58,8 +58,7 @@ export function createEmptyLicenseRow(isPrimary = false): LicenseRow {
     expiry_date: '',
     issuing_body: '',
     memo: '',
-    is_primary: isPrimary,
-  };
+    is_primary: isPrimary };
 }
 
 // ─── 직종 ──────────────────────────────────────────────────────────────────────
@@ -132,8 +131,7 @@ export function validateStaffRegistration(
     if (primaryCount !== 1) {
       return {
         ok: false,
-        message: '면허/자격증을 1개 이상 입력한 경우 대표 면허를 1개 지정해야 합니다',
-      };
+        message: '면허/자격증을 1개 이상 입력한 경우 대표 면허를 1개 지정해야 합니다' };
     }
   }
 
@@ -144,8 +142,7 @@ export function validateStaffRegistration(
     if (primaryCount !== 1) {
       return {
         ok: false,
-        message: '직종을 선택한 경우 주직종을 1개 지정해야 합니다',
-      };
+        message: '직종을 선택한 경우 주직종을 1개 지정해야 합니다' };
     }
   }
 
@@ -156,8 +153,7 @@ export function validateStaffRegistration(
     if (primaryCount !== 1) {
       return {
         ok: false,
-        message: '근무유형을 선택한 경우 주근무유형을 1개 지정해야 합니다',
-      };
+        message: '근무유형을 선택한 경우 주근무유형을 1개 지정해야 합니다' };
     }
   }
 

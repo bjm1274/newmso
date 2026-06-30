@@ -1,9 +1,9 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/db-compat';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { useState, useEffect, useMemo } from 'react';
-import { d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { resolveWeeklyWorkingHours, resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getStaffProbationMonths, toIntegerOrFallback } from '@/lib/staff-meta';
 import { getPrimaryShiftBatch } from '@/lib/staff-shift-resolver';
@@ -19,8 +19,7 @@ export default function ContractMain({
   selectedCo,
   onRefresh,
   showAdminPolicyTabs = true,
-  showTemplateEditor = true,
-}: Record<string, unknown>) {
+  showTemplateEditor = true }: Record<string, unknown>) {
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);

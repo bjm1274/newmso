@@ -46,8 +46,7 @@ export default function ClosureItemsGrid({ items, updateItem, removeItem }: Prop
             placeholder="환자명"
           />
         </>
-      ),
-    },
+      ) },
     {
       id: 'amount',
       label: '금액',
@@ -72,8 +71,7 @@ export default function ClosureItemsGrid({ items, updateItem, removeItem }: Prop
             className="w-full bg-transparent outline-none font-bold text-blue-600 text-right"
           />
         </>
-      ),
-    },
+      ) },
     {
       id: 'payment_method',
       label: '수납방식',
@@ -96,8 +94,7 @@ export default function ClosureItemsGrid({ items, updateItem, removeItem }: Prop
             ))}
           </select>
         </>
-      ),
-    },
+      ) },
     {
       id: 'receipt_type',
       label: '항목',
@@ -120,8 +117,7 @@ export default function ClosureItemsGrid({ items, updateItem, removeItem }: Prop
             ))}
           </select>
         </>
-      ),
-    },
+      ) },
     {
       id: 'memo',
       label: '메모',
@@ -140,8 +136,7 @@ export default function ClosureItemsGrid({ items, updateItem, removeItem }: Prop
             placeholder="비고"
           />
         </>
-      ),
-    },
+      ) },
   ];
 
   return (

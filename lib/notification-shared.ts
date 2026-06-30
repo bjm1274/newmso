@@ -14,8 +14,7 @@ import {
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
   inArray,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import type { D1Database } from '@cloudflare/workers-types';
 
 /**

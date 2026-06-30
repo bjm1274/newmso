@@ -2,7 +2,7 @@
 // lib/chat-rooms-client.ts
 // 클라이언트가 chat_rooms를 변경할 때 사용하는 fetch 래퍼.
 //
-// Phase 2.11 — 클라이언트가 supabase.from('chat_rooms').insert/update를
+// Phase 2.11 — 클라이언트가 db.from('chat_rooms').insert/update를
 // 직접 호출하던 곳을 이 헬퍼로 위임. 서버 라우트가 dual-write 미러를
 // 책임진다.
 // ============================================================
@@ -53,8 +53,7 @@ export async function createOrUpsertChatRoom(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{ ok?: boolean; room?: ChatRoomRow; error?: string }>(res);
   if (!res.ok || !data?.ok) {
     return { ok: false, error: data?.error || `HTTP ${res.status}` };
@@ -70,8 +69,7 @@ export async function patchChatRoom(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{ ok?: boolean; error?: string }>(res);
   if (!res.ok || !data?.ok) {
     return { ok: false, error: data?.error || `HTTP ${res.status}` };

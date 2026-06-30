@@ -9,8 +9,7 @@ import {
   renderReportInfoHtml,
   renderSupplyRequestItemsHtml,
   renderRosterInfoHtml,
-  renderEmployeeEvaluationHtml,
-} from './ApprovalMetaPanels';
+  renderEmployeeEvaluationHtml } from './ApprovalMetaPanels';
 
 type ApprovalTemplateMeta = {
   slug?: string | null;
@@ -75,8 +74,7 @@ function buildApprovalStaffSnapshotMap(params: {
       name: staff.name || '',
       position: staff.position || null,
       company: staff.company || null,
-      department: staff.department || null,
-    });
+      department: staff.department || null });
   });
 
   approvalLineEntries.forEach((entry) => {
@@ -89,8 +87,7 @@ function buildApprovalStaffSnapshotMap(params: {
       name,
       position: resolveApprovalLineEntryText(entry, 'position') || null,
       company: resolveApprovalLineEntryText(entry, 'company') || null,
-      department: resolveApprovalLineEntryText(entry, 'department') || null,
-    });
+      department: resolveApprovalLineEntryText(entry, 'department') || null });
   });
 
   approvalHistory.forEach((entry) => {
@@ -153,8 +150,7 @@ window.onload = () => window.print();
   const approvalStaffSnapshotMap = buildApprovalStaffSnapshotMap({
     approvalDirectoryStaffs,
     approvalLineEntries,
-    approvalHistory: editHistory,
-  });
+    approvalHistory: editHistory });
 
   const formatTime = (value: string | null | undefined) => {
     if (!value) return '';
@@ -165,8 +161,7 @@ window.onload = () => window.print();
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit',
-    });
+      minute: '2-digit' });
   };
 
   const renderApprovalBox = (params: {
@@ -217,8 +212,7 @@ window.onload = () => window.print();
     stepLabel: '1단계 기안',
     name: String(item?.sender_name || '').trim() || '기안자',
     position: String(item?.sender_position || '').trim(),
-    timeText: formatTime(String(item?.created_at || '') || draftEntry?.at || null),
-  });
+    timeText: formatTime(String(item?.created_at || '') || draftEntry?.at || null) });
 
   type ApprovalComment = { stepLabel: string; name: string; comment: string };
   const approvalComments: ApprovalComment[] = [];
@@ -262,8 +256,7 @@ window.onload = () => window.print();
         stepLabel,
         name,
         position,
-        timeText: formatTime(history?.at || null),
-      });
+        timeText: formatTime(history?.at || null) });
     })
     .filter(Boolean)
     .join('');

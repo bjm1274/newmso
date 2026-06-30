@@ -12,8 +12,7 @@ import {
   canAccessInventorySection,
   canAccessMainMenu,
   canAccessMyPageTab,
-  canAccessFinanceSection,
-} from '@/lib/access-control';
+  canAccessFinanceSection } from '@/lib/access-control';
 
 export const FAVORITES_KEY = 'erp_mypage_favorites';
 
@@ -24,8 +23,7 @@ export const PENDING_INNER_TAB_KEYS = {
   contract: 'erp_contract_pending_initial_tab',
   inventory: 'erp_inventory_pending_initial_tab',
   approval: 'erp_approval_pending_initial_tab',
-  board: 'erp_board_pending_initial_tab',
-} as const;
+  board: 'erp_board_pending_initial_tab' } as const;
 
 export type MypageTabId =
   | 'profile' | 'commute' | 'todo' | 'leave'
@@ -91,8 +89,7 @@ export const INNER_TAB_CATALOG: Record<string, InnerTabCatalogEntry> = {
       { id: '통상임금', label: '통상임금 계산기' },
       { id: '미지급수당', label: '미지급 수당 알림' },
       { id: '무급결근차감', label: '무급 결근 차감' },
-    ],
-  },
+    ] },
   '인사관리/근태': {
     pendingKey: 'attendance',
     tabs: [
@@ -103,32 +100,27 @@ export const INNER_TAB_CATALOG: Record<string, InnerTabCatalogEntry> = {
       { id: '근태이상분석', label: '근태이상 분석' },
       { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터' },
       { id: '근무형태이력', label: '근무형태 이력' },
-    ],
-  },
+    ] },
   '인사관리/계약': {
     pendingKey: 'contract',
     tabs: [
       { id: '기본', label: '계약서 관리' },
       { id: '계약서생성기', label: '계약서 생성기' },
-    ],
-  },
+    ] },
   '재고관리/발주': {
     pendingKey: 'inventory',
     tabs: [
       { id: '발주', label: '구매/발주' },
       { id: '거래처', label: '거래처/명세서' },
       { id: '납품확인서', label: '납품확인서' },
-    ],
-  },
+    ] },
   '재고관리/자산': {
     pendingKey: 'inventory',
     tabs: [
       { id: '자산', label: '품목/자산' },
       { id: '카테고리', label: '카테고리' },
       { id: 'UDI', label: 'UDI' },
-    ],
-  },
-};
+    ] } };
 
 export function getSubMenuOptions(mainMenu: MainMenuId): { subView: string; label: string; icon?: string }[] {
   const items = (SUB_MENUS as Record<string, { id: string; label: string; icon?: string; hidden?: boolean }[]>)[mainMenu];
@@ -173,8 +165,7 @@ const MAIN_MENU_ICON_FALLBACK: Record<MainMenuId, string> = {
   인사관리: 'Users',
   재고관리: 'Package',
   관리자: 'Settings',
-  재무회계: 'Landmark',
-};
+  재무회계: 'Landmark' };
 
 export function buildSubMenuEntry(mainMenu: MainMenuId, subView: string, innerTab?: string): FavoriteEntry | null {
   const options = getSubMenuOptions(mainMenu);
@@ -192,8 +183,7 @@ export function buildSubMenuEntry(mainMenu: MainMenuId, subView: string, innerTa
       subView,
       innerTab,
       label: `${mainMenu} · ${matched.label} · ${innerMatched.label}`,
-      icon,
-    };
+      icon };
     return { ...body, id: buildEntryId(body) } as FavoriteEntry;
   }
 
@@ -202,8 +192,7 @@ export function buildSubMenuEntry(mainMenu: MainMenuId, subView: string, innerTa
     mainMenu,
     subView,
     label: `${mainMenu} · ${matched.label}`,
-    icon,
-  };
+    icon };
   return { ...body, id: buildEntryId(body) } as FavoriteEntry;
 }
 
@@ -242,8 +231,7 @@ const LEGACY_FAVORITE_ID_TO_ENTRY: Record<string, () => FavoriteEntry | null> = 
   menu_approval: () => buildSubMenuEntry('전자결재', '기안함'),
   menu_hr: () => buildSubMenuEntry('인사관리', '구성원'),
   menu_inventory: () => buildSubMenuEntry('재고관리', '현황'),
-  menu_admin: () => buildMenuEntry('관리자'),
-};
+  menu_admin: () => buildMenuEntry('관리자') };
 
 function normalizeStoredEntry(value: unknown): FavoriteEntry | null {
   if (!value) return null;
@@ -297,23 +285,20 @@ const HR_SUBVIEW_TO_PERM: Record<string, string> = {
   경조사: 'hr_경조사',
   '자격·안전센터': '자격·안전센터',
   계약: 'hr_계약',
-  문서센터: '문서센터',
-};
+  문서센터: '문서센터' };
 
 const APPROVAL_SUBVIEW_TO_PERM: Record<string, string> = {
   기안함: 'approval_기안함',
   결재함: 'approval_결재함',
   '참조 문서함': 'approval_참조문서함',
-  작성하기: 'approval_작성하기',
-};
+  작성하기: 'approval_작성하기' };
 
 const INVENTORY_SUBVIEW_TO_PERM: Record<string, string> = {
   현황: 'inventory_현황',
   등록: 'inventory_등록',
   발주: 'inventory_발주',
   자산: 'inventory_자산',
-  월마감: 'inventory_월마감',
-};
+  월마감: 'inventory_월마감' };
 
 const FINANCE_SUBVIEW_TO_PERM: Record<string, string> = {
   복식부기: 'finance_복식부기',
@@ -327,8 +312,7 @@ const FINANCE_SUBVIEW_TO_PERM: Record<string, string> = {
   closing: 'finance_결산',
   'cash-flow': 'finance_자금흐름',
   depreciation: 'finance_감가상각',
-  'purchase-ledger': 'finance_매입원장',
-};
+  'purchase-ledger': 'finance_매입원장' };
 
 export function canAccessFavoriteEntry(user: UserLike, entry: FavoriteEntry): boolean {
   if (entry.kind === 'mypage') {

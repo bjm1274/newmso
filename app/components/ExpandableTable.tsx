@@ -30,8 +30,7 @@ export type ExpandableTableProps<T> = {
 const alignClass: Record<NonNullable<ExpandableColumn<unknown>['align']>, string> = {
   left: 'text-left',
   right: 'text-right',
-  center: 'text-center',
-};
+  center: 'text-center' };
 
 function getCellValue<T>(row: T, col: ExpandableColumn<T>): ReactNode {
   if (col.render) return col.render(row);
@@ -103,8 +102,7 @@ export function ExpandableTable<T>({
   onFilterChange,
   emptyMessage = '표시할 데이터가 없습니다.',
   className = '',
-  hasExpandable,
-}: ExpandableTableProps<T>) {
+  hasExpandable }: ExpandableTableProps<T>) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(defaultExpandedIds));
   const [filters, setFilters] = useState<Record<string, string>>({});
 

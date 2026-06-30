@@ -40,8 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     const upstream = await fetch(fileUrl, {
-      signal: AbortSignal.timeout(30_000),
-    }).catch(() => null);
+      signal: AbortSignal.timeout(30_000) }).catch(() => null);
 
     if (!upstream?.ok || !upstream.body) {
       return NextResponse.json({ error: '파일을 찾을 수 없습니다.' }, { status: 404 });
@@ -65,8 +64,7 @@ export async function GET(request: NextRequest) {
 
     return new NextResponse(upstream.body, {
       status: 200,
-      headers,
-    });
+      headers });
   } catch (err) {
     const message = err instanceof Error ? err.message : '다운로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

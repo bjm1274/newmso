@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
@@ -9,8 +9,7 @@ import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 const EVENT_TYPES = ['생일', '결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
 const AMOUNT_GUIDE: Record<string, string> = {
     '생일': '30,000~50,000', '결혼': '50,000~100,000', '출산': '50,000',
-    '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정',
-};
+    '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
 
 type CongratRecord = {
     id: string;
@@ -40,8 +39,7 @@ type FormState = {
 
 const INITIAL_FORM: FormState = {
     staff_id: '', event_type: '결혼', event_date: '', amount: 0,
-    relation: '', recipient: '', memo: '', wreath_sent: false,
-};
+    relation: '', recipient: '', memo: '', wreath_sent: false };
 
 const COLUMNS: Column<CongratRecord>[] = [
     {
@@ -54,8 +52,7 @@ const COLUMNS: Column<CongratRecord>[] = [
                 <br />
                 <span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span>
             </span>
-        ),
-    },
+        ) },
     {
         key: 'event_type',
         label: '유형',
@@ -67,14 +64,12 @@ const COLUMNS: Column<CongratRecord>[] = [
             }`}>
                 {r.event_type}
             </span>
-        ),
-    },
+        ) },
     {
         key: 'event_date',
         label: '일자',
         render: (r) => <span className="text-[var(--toss-gray-4)]">{r.event_date}</span>,
-        showOnMobile: false,
-    },
+        showOnMobile: false },
     {
         key: 'relation',
         label: '관계/대상',
@@ -83,21 +78,18 @@ const COLUMNS: Column<CongratRecord>[] = [
                 {r.relation}{r.recipient ? ` (${r.recipient})` : ''}
             </span>
         ),
-        showOnMobile: false,
-    },
+        showOnMobile: false },
     {
         key: 'amount',
         label: '경조금',
         align: 'right',
-        render: (r) => <span className="font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</span>,
-    },
+        render: (r) => <span className="font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</span> },
     {
         key: 'wreath_sent',
         label: '화환',
         align: 'center',
         showOnMobile: false,
-        render: (r) => <span>{r.wreath_sent ? '🌸' : '—'}</span>,
-    },
+        render: (r) => <span>{r.wreath_sent ? '🌸' : '—'}</span> },
     {
         key: 'status',
         label: '상태',
@@ -108,8 +100,7 @@ const COLUMNS: Column<CongratRecord>[] = [
             }`}>
                 {r.status || '지급대기'}
             </span>
-        ),
-    },
+        ) },
 ];
 
 export default function CongratulationsCondolences({ staffs = [], selectedCo }: Record<string, unknown>) {
@@ -122,7 +113,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
     useEffect(() => { fetchRecords(); }, []);
 
     const fetchRecords = async () => {
-        const { data } = await supabase.from('congratulations_condolences').select('*').order('event_date', { ascending: false });
+        const { data } = await db.from('congratulations_condolences').select('*').order('event_date', { ascending: false });
         if (data) setRecords(data as CongratRecord[]);
     };
 
@@ -189,8 +180,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                         recipient: staff.name,
                         amount: 50000,
                         wreath_sent: false,
-                        status: '지급대기',
-                    } as any);
+                        status: '지급대기' } as any);
                 }
             }
         }
@@ -214,9 +204,8 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
             staff_name: staff.name,
             company: staff.company,
             department: (staff.department as string) || '',
-            status: '지급완료',
-        };
-        const { data, error } = await supabase.from('congratulations_condolences').insert([newRec]).select();
+            status: '지급완료' };
+        const { data, error } = await db.from('congratulations_condolences').insert([newRec]).select();
         if (error) {
             toast('경조사 기록 저장 실패: ' + (error.message || ''), 'error');
             return;

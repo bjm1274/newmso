@@ -1,16 +1,14 @@
 import {
   appendApprovalHistory,
   getApprovalRevision,
-  lockApprovalMeta,
-} from '@/lib/approval-workflow';
+  lockApprovalMeta } from '@/lib/approval-workflow';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import {
   normalizeApprovalLineIds,
   resolveStoredCurrentApproverId,
   resolveEffectiveApproverIdCore,
-  buildApprovalHistoryEntryCore,
-} from '@/lib/approval-shared';
+  buildApprovalHistoryEntryCore } from '@/lib/approval-shared';
 import {
   approvals as approvalsTable,
   staff_members as staffMembersTable,
@@ -18,8 +16,7 @@ import {
   eq,
   inArray,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
 
 type ApprovalRow = Record<string, unknown>;
@@ -133,14 +130,12 @@ function buildNextApprovalMetaData(
   let nextMetaData = appendApprovalHistory(baseMetaData, {
     ...buildApprovalHistoryEntry(actor, action, options?.note),
     current_approver_id: options?.currentApproverId ?? null,
-    revision: options?.revision ?? null,
-  });
+    revision: options?.revision ?? null });
 
   if (options?.lock) {
     nextMetaData = appendApprovalHistory(lockApprovalMeta(nextMetaData, actor.id), {
       ...buildApprovalHistoryEntry(actor, 'locked', '결재 완료 문서 잠금'),
-      revision: options?.revision ?? null,
-    });
+      revision: options?.revision ?? null });
   }
 
   return nextMetaData;
@@ -167,13 +162,11 @@ function applyDelegationMeta(
       ...metaData,
       delegated_from_id: currentApproverId,
       delegated_to_id: effectiveApproverId,
-      delegated_at: new Date().toISOString(),
-    },
+      delegated_at: new Date().toISOString() },
     {
       ...buildApprovalHistoryEntry(actor, 'delegated', `${currentApproverId} -> ${effectiveApproverId}`),
       current_approver_id: effectiveApproverId,
-      revision: getApprovalRevision(metaData),
-    }
+      revision: getApprovalRevision(metaData) }
   );
 }
 
@@ -297,8 +290,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Approval id is missing.',
-    } satisfies ApprovalTransitionResult;
+      error: 'Approval id is missing.' } satisfies ApprovalTransitionResult;
   }
 
   if (!actor.id) {
@@ -312,8 +304,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Unauthorized',
-    } satisfies ApprovalTransitionResult;
+      error: 'Unauthorized' } satisfies ApprovalTransitionResult;
   }
 
   if (itemStatus !== '대기') {
@@ -327,8 +318,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Approval is not pending.',
-    } satisfies ApprovalTransitionResult;
+      error: 'Approval is not pending.' } satisfies ApprovalTransitionResult;
   }
 
   const storedCurrentApproverId = resolveStoredCurrentApproverId(item);
@@ -343,8 +333,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Current approver is missing.',
-    } satisfies ApprovalTransitionResult;
+      error: 'Current approver is missing.' } satisfies ApprovalTransitionResult;
   }
 
   const lineIds = resolveApprovalLineIds({
@@ -352,8 +341,7 @@ async function transitionSingleApproval(params: {
     current_approver_id: storedCurrentApproverId,
     approver_line: normalizeApprovalLineIds(item.approver_line ?? (item.meta_data as Record<string, unknown> | null | undefined)?.approver_line).length > 0
       ? (item.approver_line ?? (item.meta_data as Record<string, unknown> | null | undefined)?.approver_line)
-      : [storedCurrentApproverId],
-  });
+      : [storedCurrentApproverId] });
 
   const currentIndex = lineIds.findIndex((id) => String(id) === String(storedCurrentApproverId));
   if (currentIndex === -1) {
@@ -367,8 +355,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Current approver is not in approver line.',
-    } satisfies ApprovalTransitionResult;
+      error: 'Current approver is not in approver line.' } satisfies ApprovalTransitionResult;
   }
 
   const staffMap = await fetchStaffMap(
@@ -388,8 +375,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Only the current approver can act on this approval.',
-    } satisfies ApprovalTransitionResult;
+      error: 'Only the current approver can act on this approval.' } satisfies ApprovalTransitionResult;
   }
 
   const baseMetaData = applyDelegationMeta(
@@ -407,16 +393,13 @@ async function transitionSingleApproval(params: {
       note: reason || '반려',
       lock: true,
       currentApproverId: effectiveCurrentApproverId,
-      revision,
-    });
+      revision });
 
     await updateApprovalRecord(approvalId, {
       status: '반려',
       meta_data: {
         ...nextRejectedMetaData,
-        reject_reason: reason || null,
-      },
-    });
+        reject_reason: reason || null } });
 
     // Fix A: 기안자에게 반려 알림 전송
     try {
@@ -432,9 +415,7 @@ async function transitionSingleApproval(params: {
           metadata: {
             approval_id: approvalId,
             actor_id: actor.id,
-            actor_name: actor.name,
-          },
-        } satisfies NotificationRow]);
+            actor_name: actor.name } } satisfies NotificationRow]);
       }
     } catch {
       // 알림 실패는 결재 처리에 영향 없음
@@ -449,8 +430,7 @@ async function transitionSingleApproval(params: {
       nextApproverId: null,
       alreadyProcessed: false,
       warnings: [],
-      supplySummary: null,
-    } satisfies ApprovalTransitionResult;
+      supplySummary: null } satisfies ApprovalTransitionResult;
   }
 
   const isFinalApproval = currentIndex === lineIds.length - 1;
@@ -475,22 +455,16 @@ async function transitionSingleApproval(params: {
             note: finalApprovalNote,
             lock: true,
             currentApproverId: effectiveCurrentApproverId,
-            revision,
-          }),
-          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}),
-        },
-      }
+            revision }),
+          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}) } }
     : {
         current_approver_id: nextApproverId,
         meta_data: {
           ...buildNextApprovalMetaData(baseMetaData, actor, 'approved_step', {
             note: stepApprovalNote,
             currentApproverId: nextApproverId,
-            revision,
-          }),
-          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}),
-        },
-      };
+            revision }),
+          ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}) } };
 
   const updatedApproval = await updateApprovalRecord(approvalId, updateData);
 
@@ -508,9 +482,7 @@ async function transitionSingleApproval(params: {
           metadata: {
             approval_id: approvalId,
             actor_id: actor.id,
-            actor_name: actor.name,
-          },
-        } satisfies NotificationRow]);
+            actor_name: actor.name } } satisfies NotificationRow]);
       }
     } catch {
       // 알림 실패는 결재 처리에 영향 없음
@@ -525,14 +497,12 @@ async function transitionSingleApproval(params: {
       nextApproverId: nextApproverId || null,
       alreadyProcessed: false,
       warnings: [],
-      supplySummary: null,
-    } satisfies ApprovalTransitionResult;
+      supplySummary: null } satisfies ApprovalTransitionResult;
   }
 
   const finalizedApproval = (updatedApproval || {
     ...item,
-    ...updateData,
-  }) as ApprovalRow;
+    ...updateData }) as ApprovalRow;
   const processingResult = await processFinalApprovalEffects(
     finalizedApproval,
     actor.id
@@ -547,8 +517,7 @@ async function transitionSingleApproval(params: {
     nextApproverId: null,
     alreadyProcessed: processingResult.alreadyProcessed,
     warnings: processingResult.warnings,
-    supplySummary: (processingResult.supplySummary as Record<string, unknown> | null) || null,
-  } satisfies ApprovalTransitionResult;
+    supplySummary: (processingResult.supplySummary as Record<string, unknown> | null) || null } satisfies ApprovalTransitionResult;
 }
 
 export async function transitionApprovals(params: {
@@ -569,9 +538,7 @@ export async function transitionApprovals(params: {
         successCount: 0,
         failCount: 0,
         finalApprovalCount: 0,
-        warningCount: 0,
-      } satisfies ApprovalTransitionSummary,
-    };
+        warningCount: 0 } satisfies ApprovalTransitionSummary };
   }
 
   const d1 = await getD1Binding();
@@ -611,8 +578,7 @@ export async function transitionApprovals(params: {
         alreadyProcessed: false,
         warnings: [],
         supplySummary: null,
-        error: 'Approval not found.',
-      });
+        error: 'Approval not found.' });
       continue;
     }
 
@@ -623,8 +589,7 @@ export async function transitionApprovals(params: {
           actor,
           action,
           rejectReason,
-          approveComment,
-        })
+          approveComment })
       );
     } catch (error) {
       results.push({
@@ -637,8 +602,7 @@ export async function transitionApprovals(params: {
         alreadyProcessed: false,
         warnings: [],
         supplySummary: null,
-        error: error instanceof Error ? error.message : 'Transition failed.',
-      });
+        error: error instanceof Error ? error.message : 'Transition failed.' });
     }
   }
 
@@ -666,7 +630,5 @@ export async function transitionApprovals(params: {
       successCount,
       failCount,
       finalApprovalCount,
-      warningCount,
-    } satisfies ApprovalTransitionSummary,
-  };
+      warningCount } satisfies ApprovalTransitionSummary };
 }

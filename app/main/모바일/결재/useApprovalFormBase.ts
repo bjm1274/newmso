@@ -14,9 +14,9 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
@@ -90,7 +90,7 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     (async () => {
       setApproverLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
@@ -132,8 +132,7 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
         url: a.fileUrl as string,
         mimeType: a.file.type || null,
         size: Number.isFinite(a.file.size) ? a.file.size : null,
-        uploadedAt: new Date().toISOString(),
-      }));
+        uploadedAt: new Date().toISOString() }));
   }, [attachments]);
 
   // ── 결재선 피커 onApply 핸들러 ──
@@ -169,8 +168,7 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
         companyId: user.company_id != null ? String(user.company_id) : null,
         departmentName: senderDepartment || null,
         userPermissions:
-          (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null,
-      });
+          (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
 
       const meta: Record<string, unknown> = {
         form_slug: params.formSlug,
@@ -183,15 +181,13 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
           name: a.name || '',
           position: a.position || null,
           department: a.department || null,
-          company: a.company || null,
-        })),
+          company: a.company || null })),
         approver_line_source: approverManual ? 'mobile_manual' : 'mobile_auto',
         revision: 1,
         source_approval_id: null,
         previous_doc_number: null,
         client_origin: 'mobile',
-        ...params.extraMeta,
-      };
+        ...params.extraMeta };
 
       // 첨부 — PC와 동일하게 meta_data.attachments(정본 shape: name/url/mimeType/size)에 기록.
       // 업로드 완료(done)된 항목만 저장. 오프라인 대기(queued)는 URL 미정이라 제외.
@@ -219,10 +215,8 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
           actor_name: senderName,
           note: '모바일 최초 상신',
           current_approver_id: firstApproverId,
-          revision: 1,
-        }),
-        status: '대기',
-      };
+          revision: 1 }),
+        status: '대기' };
       if (user.company_id != null) {
         row.company_id = user.company_id;
       }
@@ -230,11 +224,10 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
         row.doc_number = docNumber;
       }
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'approvals',
-        payload: row,
-      });
+        payload: row });
       if (error) throw new Error(error);
 
       return { queued };
@@ -263,6 +256,5 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     submitApproval,
 
     /** 첨부 중 오프라인 대기 항목 수 */
-    queuedAttachmentCount: attachments.filter((a) => a.state === 'queued').length,
-  };
+    queuedAttachmentCount: attachments.filter((a) => a.state === 'queued').length };
 }

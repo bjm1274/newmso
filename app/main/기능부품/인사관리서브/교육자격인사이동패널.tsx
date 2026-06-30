@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 export default function CertTransferPanel({ staffId, staffName }: { staffId: string; staffName: string }) {
   const [certs, setCerts] = useState<any[]>([]);
@@ -9,8 +9,8 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
   useEffect(() => {
     if (!staffId) return;
     (async () => {
-      const { data: c } = await supabase.from('staff_licenses').select('id, license_name, issuing_body, issued_date, expiry_date').eq('staff_id', staffId).order('issued_date', { ascending: false });
-      const { data: t } = await supabase.from('staff_transfer_history').select('*').eq('staff_id', staffId).order('effective_date', { ascending: false });
+      const { data: c } = await db.from('staff_licenses').select('id, license_name, issuing_body, issued_date, expiry_date').eq('staff_id', staffId).order('issued_date', { ascending: false });
+      const { data: t } = await db.from('staff_transfer_history').select('*').eq('staff_id', staffId).order('effective_date', { ascending: false });
       setCerts(c || []);
       setTransfers(t || []);
     })();

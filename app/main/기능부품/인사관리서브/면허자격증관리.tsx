@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { canAccessHrSection } from '@/lib/access-control';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { z } from 'zod';
 import { LICENSE_TYPE_OPTIONS } from './구성원현황/staff-registration-types';
 import {
@@ -12,8 +12,7 @@ import {
   computeCENextDue,
   getRenewalRule,
   type LicenseStatus,
-  type CEDueStatus,
-} from '@/lib/license-renewal-policy';
+  type CEDueStatus } from '@/lib/license-renewal-policy';
 import LicenseCEReviewModal from './면허보수교육검토';
 import SegmentedDateInput from '@/app/components/SegmentedDateInput';
 
@@ -23,8 +22,7 @@ import SegmentedDateInput from '@/app/components/SegmentedDateInput';
 const JobCategorySchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
-  name: z.string(),
-});
+  name: z.string() });
 type JobCategory = z.infer<typeof JobCategorySchema>;
 
 // ---------------------------------------------------------------------------
@@ -34,14 +32,12 @@ const STATUS_COLORS: Record<LicenseStatus, string> = {
   valid: 'bg-green-500/20 text-green-700',
   expiring: 'bg-orange-500/20 text-orange-700',
   expired: 'bg-red-500/20 text-red-600',
-  unknown: 'bg-gray-500/20 text-gray-600',
-};
+  unknown: 'bg-gray-500/20 text-gray-600' };
 const STATUS_LABELS: Record<LicenseStatus, string> = {
   valid: '유효',
   expiring: '만료 임박',
   expired: '만료',
-  unknown: '확인 필요',
-};
+  unknown: '확인 필요' };
 
 // ---------------------------------------------------------------------------
 // 면허/자격증 row 타입
@@ -78,8 +74,7 @@ interface EnrichedLicense extends LicenseRow {
 export default function LicenseManager({
   staffs = [],
   selectedCo,
-  user,
-}: {
+  user }: {
   staffs: Record<string, unknown>[];
   selectedCo: string;
   user: Record<string, unknown> | null | undefined;
@@ -101,8 +96,7 @@ export default function LicenseManager({
     expiry_date: '',
     renewed_date: '',
     issuing_body: '',
-    memo: '',
-  });
+    memo: '' });
   const [customLicenseName, setCustomLicenseName] = useState('');
   const [staffSearchTerm, setStaffSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
@@ -137,13 +131,13 @@ export default function LicenseManager({
   })();
 
   const fetchLicenses = useCallback(async () => {
-    const { data } = await supabase.from('staff_licenses').select('*').order('expiry_date');
+    const { data } = await db.from('staff_licenses').select('*').order('expiry_date');
     setLicenses(data ?? []);
   }, []);
 
   // 면허별 마지막 승인된 보수교육 이수일 조회
   const fetchLastCE = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('license_continuing_education')
       .select('license_id, education_date')
       .eq('status', 'approved')
@@ -160,7 +154,7 @@ export default function LicenseManager({
   }, []);
 
   const fetchJobCategories = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('job_categories')
       .select('id, code, name')
       .order('display_order');
@@ -172,7 +166,7 @@ export default function LicenseManager({
   const fetchStaffJobMap = useCallback(async () => {
     const staffIds = filteredStaffs.map((s) => String(s.id));
     if (staffIds.length === 0) return;
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_job_categories')
       .select('staff_id, job_category_id')
       .in('staff_id', staffIds);
@@ -208,14 +202,12 @@ export default function LicenseManager({
       license_type: l.license_type,
       expiry_date: l.expiry_date,
       renewed_date: l.renewed_date,
-      issued_date: l.issued_date,
-    });
+      issued_date: l.issued_date });
     const ceDue = computeCENextDue({
       license_type: l.license_type,
       last_ce_date: lastCEMap[l.id] ?? null,
       renewed_date: l.renewed_date,
-      issued_date: l.issued_date,
-    });
+      issued_date: l.issued_date });
     return {
       ...l,
       status: computed.status,
@@ -226,8 +218,7 @@ export default function LicenseManager({
       ceDueStatus: ceDue.status,
       ceDaysLeft: ceDue.daysLeft,
       ceLabel: ceDue.ceLabel,
-      staff: filteredStaffs.find((s) => String(s.id) === String(l.staff_id)),
-    };
+      staff: filteredStaffs.find((s) => String(s.id) === String(l.staff_id)) };
   });
 
   // 재직자(filteredStaffs) ID 집합 — 퇴사자 자격증은 목록에서 제외
@@ -262,7 +253,7 @@ export default function LicenseManager({
   // 보수교육 검토 대기 건수
   const fetchPendingCECount = useCallback(async () => {
     if (!canEdit) return;
-    const { count } = await supabase
+    const { count } = await db
       .from('license_continuing_education')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending');
@@ -282,8 +273,7 @@ export default function LicenseManager({
       expiry_date: '',
       renewed_date: '',
       issuing_body: '',
-      memo: '',
-    });
+      memo: '' });
     setCustomLicenseName('');
     setStaffSearchTerm('');
     setShowModal(true);
@@ -318,8 +308,7 @@ export default function LicenseManager({
       expiry_date: String(l.expiry_date ?? ''),
       renewed_date: String(l.renewed_date ?? ''),
       issuing_body: String(l.issuing_body ?? ''),
-      memo: String(l.memo ?? ''),
-    });
+      memo: String(l.memo ?? '') });
     setCustomLicenseName(custom);
     setStaffSearchTerm('');
     setShowModal(true);
@@ -344,12 +333,11 @@ export default function LicenseManager({
         license_type: form.license_type || null,
         issued_date: form.issued_date || null,
         expiry_date: form.expiry_date || null,
-        renewed_date: form.renewed_date || null,
-      };
+        renewed_date: form.renewed_date || null };
       if (editId) {
-        await supabase.from('staff_licenses').update(payload).eq('id', editId);
+        await db.from('staff_licenses').update(payload).eq('id', editId);
       } else {
-        await supabase.from('staff_licenses').insert([payload]);
+        await db.from('staff_licenses').insert([payload]);
       }
       setShowModal(false);
       void fetchLicenses();
@@ -367,10 +355,9 @@ export default function LicenseManager({
       title: '면허·자격증 삭제',
       description: `${String(target?.license_name ?? '선택한 면허·자격증')} 기록을 삭제합니다.\n만료 알림과 자격 현황에서 제거됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
-    await supabase.from('staff_licenses').delete().eq('id', id);
+    await db.from('staff_licenses').delete().eq('id', id);
     void fetchLicenses();
   };
 

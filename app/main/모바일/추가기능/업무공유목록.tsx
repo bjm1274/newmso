@@ -39,8 +39,7 @@ function relativeTime(iso: string): string {
 function MobileTaskShareList({
   user,
   onBack,
-  onOpenDetail,
-}: {
+  onOpenDetail }: {
   user: ErpUser;
   onBack: () => void;
   onOpenDetail: (id: string) => void;
@@ -54,8 +53,7 @@ function MobileTaskShareList({
       all: rows.length,
       handoff: rows.filter((r) => r.tag.includes('인수') || r.tag.includes('인계')).length,
       todo: rows.filter((r) => r.tag.includes('할일')).length,
-      asset: rows.filter((r) => r.tag.includes('자료')).length,
-    }),
+      asset: rows.filter((r) => r.tag.includes('자료')).length }),
     [rows],
   );
 
@@ -126,8 +124,7 @@ function MobileTaskShareList({
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical' as const,
-                    overflow: 'hidden',
-                  }}
+                    overflow: 'hidden' }}
                 >
                   {p.body}
                 </div>
@@ -140,8 +137,7 @@ function MobileTaskShareList({
                   marginTop: 8,
                   fontSize: 11,
                   color: 'var(--z-500)',
-                  fontWeight: 600,
-                }}
+                  fontWeight: 600 }}
               >
                 <MAvatar tone={pickTone(p.author_id || p.id)} size="sm">
                   {p.author.charAt(0)}
@@ -162,8 +158,7 @@ function MobileTaskShareList({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 3,
-                      color: p.comments > 5 ? 'var(--m-accent)' : 'var(--z-500)',
-                    }}
+                      color: p.comments > 5 ? 'var(--m-accent)' : 'var(--z-500)' }}
                   >
                     <MIcon name="chat" size={11} />
                     {p.comments}

@@ -7,17 +7,22 @@
 // 워크센터 ID & 메타
 // ─────────────────────────────────────────────────
 
-export const STOCK_WORKCENTER_IDS = ['status', 'io', 'item', 'analyze'] as const;
+export const STOCK_WORKCENTER_IDS = [
+  'status',
+  'inout',
+  'order',
+  'audit',
+  'udi',
+  'master',
+  'analyze',
+] as const;
 export type StockWorkcenterId = (typeof STOCK_WORKCENTER_IDS)[number];
 
 export type StockWorkcenterMeta = {
   id: StockWorkcenterId;
   label: string;
-  /** 통합 전 원본 화면 라벨 (배너 chips — 코드에는 절대 노출하지 않음, 메타 보존용) */
   merge: readonly string[];
-  /** 원본 화면 개수 */
   cnt: number;
-  /** ★ 표시 */
   primary?: boolean;
 };
 
@@ -29,52 +34,73 @@ export const STOCK_WORKCENTER_META: Record<StockWorkcenterId, StockWorkcenterMet
     cnt: 4,
     primary: true,
   },
-  io: {
-    id: 'io',
-    label: '입출고·발주',
-    merge: ['입출고관리', '구매 발주', '거래처관리', '명세서관리', '납품확인서'],
-    cnt: 5,
+  inout: {
+    id: 'inout',
+    label: '입출고 관리',
+    merge: ['입출고관리', '입출고 이력'],
+    cnt: 2,
   },
-  item: {
-    id: 'item',
-    label: '물품·자산',
-    merge: ['물품등록', '카테고리관리', '품목자산', '자산 QR', 'UDI 관리'],
-    cnt: 5,
+  order: {
+    id: 'order',
+    label: '구매/발주',
+    merge: ['구매 발주', '납품확인서'],
+    cnt: 2,
+  },
+  audit: {
+    id: 'audit',
+    label: '실사/이관',
+    merge: ['재고 실사', '재고 이관'],
+    cnt: 2,
+  },
+  udi: {
+    id: 'udi',
+    label: 'UDI/규정',
+    merge: ['UDI 관리', 'UDI 공급내역 보고'],
+    cnt: 2,
+  },
+  master: {
+    id: 'master',
+    label: '기준 정보',
+    merge: ['물품등록', '카테고리관리', '품목자산', '자산 QR', '거래처관리', '명세서관리'],
+    cnt: 6,
   },
   analyze: {
     id: 'analyze',
-    label: '분석·마감',
-    merge: ['ABC 분석', '재고 수요예측', '재고 실사', '월마감', '소모품 통계', 'AS·반품'],
-    cnt: 6,
+    label: '분석/마감',
+    merge: ['ABC 분석', '재고 수요예측', '월마감', '소모품 통계', 'AS·반품'],
+    cnt: 5,
   },
 };
 
-// 기존 한글 id(현황·등록·발주·자산·월마감 등) → 워크센터 id 호환 매핑
+// 기존 한글 id(현황·등록·발주·자산·월마감 등) → 7대 워크센터 id 매핑
 export const LEGACY_TO_WORKCENTER: Record<string, StockWorkcenterId> = {
   // 정식
   status: 'status',
-  io: 'io',
-  item: 'item',
+  inout: 'inout',
+  order: 'order',
+  audit: 'audit',
+  udi: 'udi',
+  master: 'master',
   analyze: 'analyze',
   // 기존 한글 한 글자/짧은 키
   현황: 'status',
   내부서재고: 'status',
   유통기한: 'status',
   재고알림: 'status',
-  등록: 'io',
-  이력: 'io',
-  발주: 'io',
-  스캔: 'io',
-  거래처: 'io',
-  명세서: 'io',
-  납품확인서: 'io',
-  이관: 'io',
-  자산: 'item',
-  비품대여설정: 'item',
-  카테고리: 'item',
-  UDI: 'item',
+  등록: 'inout',
+  이력: 'inout',
+  발주: 'order',
+  스캔: 'master',
+  거래처: 'master',
+  명세서: 'master',
+  납품확인서: 'order',
+  이관: 'audit',
+  자산: 'master',
+  비품대여설정: 'master',
+  카테고리: 'master',
+  UDI: 'udi',
   월마감: 'analyze',
-  재고실사: 'analyze',
+  재고실사: 'audit',
   소모품통계: 'analyze',
   AS반품: 'analyze',
   수요예측: 'analyze',
@@ -116,8 +142,7 @@ export const STATUS_SCOPE_LABEL: Record<StatusScope, string> = {
   my: '내 부서',
   low: '부족',
   zero: '재고 0',
-  expire: '유효기간',
-};
+  expire: '유효기간' };
 
 // ─────────────────────────────────────────────────
 // io 워크센터 — 행 타입

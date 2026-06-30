@@ -21,14 +21,12 @@ interface Props {
 const SEV_DOT: Record<Severity, string> = {
   관찰: 'bg-[var(--accent)]',
   주의: 'bg-[#F59E0B]',
-  경고: 'bg-[#EF4444]',
-};
+  경고: 'bg-[#EF4444]' };
 
 const SEV_BADGE: Record<Severity, string> = {
   관찰: 'badge badge-blue',
   주의: 'badge badge-yellow',
-  경고: 'badge badge-red',
-};
+  경고: 'badge badge-red' };
 
 function PatternList({ items, onResolve, onReason }: {
   items: AbnormalPattern[];

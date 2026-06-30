@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 
 // ---------------------------------------------------------------------------
@@ -21,8 +21,7 @@ const JobCategorySchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   name: z.string(),
-  display_order: z.number().optional(),
-});
+  display_order: z.number().optional() });
 
 const RequiredTrainingSchema = z.object({
   id: z.string().uuid(),
@@ -31,19 +30,16 @@ const RequiredTrainingSchema = z.object({
   training_code: z.string(),
   training_name: z.string(),
   mandatory: z.boolean(),
-  obligation_type: z.enum(['legal', 'recommended']),
-});
+  obligation_type: z.enum(['legal', 'recommended']) });
 
 const StaffJobCatSchema = z.object({
   staff_id: z.string(),
-  job_category_id: z.string().uuid(),
-});
+  job_category_id: z.string().uuid() });
 
 const StaffTrainingSchema = z.object({
   staff_id: z.string(),
   training_code: z.string(),
-  status: z.string(),
-});
+  status: z.string() });
 
 type JobCategory = z.infer<typeof JobCategorySchema>;
 type RequiredTraining = z.infer<typeof RequiredTrainingSchema>;
@@ -129,16 +125,16 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
         { data: sjcData, error: sjcErr },
         { data: stData, error: stErr },
       ] = await Promise.all([
-        supabase.from('job_categories').select('id, code, name, display_order').order('display_order'),
-        supabase
+        db.from('job_categories').select('id, code, name, display_order').order('display_order'),
+        db
           .from('job_category_required_trainings')
           .select('id, job_category_id, applies_to_all, training_code, training_name, mandatory, obligation_type')
           .eq('mandatory', true),
-        supabase
+        db
           .from('staff_job_categories')
           .select('staff_id, job_category_id')
           .in('staff_id', activeStaffIds),
-        supabase
+        db
           .from('staff_trainings')
           .select('staff_id, training_code, status')
           .in('staff_id', activeStaffIds),
@@ -238,8 +234,7 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
             totalStaff: total,
             completedStaff: completed,
             rate: total > 0 ? Math.round((completed / total) * 100) : 0,
-            pendingStaffIds: pending,
-          });
+            pendingStaffIds: pending });
         }
       }
 
@@ -318,8 +313,7 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
             </div>
           ),
           shortLabel: name,
-          data: { code },
-        };
+          data: { code } };
       }),
     [trainingCodes, trainingNameMap, trainingObligationMap]
   );

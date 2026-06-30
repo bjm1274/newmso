@@ -13,8 +13,7 @@ import {
   isOffShiftForDate,
   resolveAttendanceStatusWithLeave,
   resolveLeaveStatusForDate,
-  type ApprovedLeaveRow,
-} from './근태관리메인-내부유틸';
+  type ApprovedLeaveRow } from './근태관리메인-내부유틸';
 
 type CalendarCell = {
   key: string;
@@ -72,8 +71,7 @@ export default function AttendanceCalendarView({
   daysArray,
   weekDates,
   shiftAssignments,
-  shiftLookup,
-}: AttendanceCalendarViewProps) {
+  shiftLookup }: AttendanceCalendarViewProps) {
   const dayPanelColumns = useMemo((): Column<StaffMember>[] => [
     {
       key: 'name',
@@ -86,8 +84,7 @@ export default function AttendanceCalendarView({
             {s.department} · {s.position}
           </span>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'status',
       label: '상태',
@@ -107,8 +104,7 @@ export default function AttendanceCalendarView({
             {meta.label}
           </span>
         );
-      },
-    },
+      } },
     {
       key: 'time',
       label: '출퇴근 시간',
@@ -117,8 +113,7 @@ export default function AttendanceCalendarView({
         const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }) : '-';
         const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }) : '-';
         return <span className="font-mono text-sm font-bold text-foreground">{checkIn} / {checkOut}</span>;
-      },
-    },
+      } },
     {
       key: 'work_minutes',
       label: '근무 시간',
@@ -129,8 +124,7 @@ export default function AttendanceCalendarView({
             {formatAttendanceMinutes(att?.work_hours_minutes)}
           </span>
         );
-      },
-    },
+      } },
   ], [attendanceMap, selectedDate, approvedLeaves, shiftAssignments, shiftLookup]);
 
   // 일별 출퇴근 현황 정렬 상태: 기본 부서→직급→이름, 토글로 이름·상태·출근시각 정렬 가능
@@ -138,8 +132,7 @@ export default function AttendanceCalendarView({
   type DayPanelSortDir = 'asc' | 'desc';
   const [dayPanelSort, setDayPanelSort] = useState<{ key: DayPanelSortKey; dir: DayPanelSortDir }>({
     key: 'default',
-    dir: 'asc',
-  });
+    dir: 'asc' });
 
   const nameCollator = useMemo(
     () => new Intl.Collator('ko-KR', { numeric: true, sensitivity: 'base' }),
@@ -157,8 +150,7 @@ export default function AttendanceCalendarView({
       sick_leave: 4,
       half_leave: 4,
       holiday: 5,
-      missing: 6,
-    }),
+      missing: 6 }),
     [],
   );
 
@@ -229,8 +221,7 @@ export default function AttendanceCalendarView({
         dateStr,
         day: Number(dateStr.slice(-2)),
         weekday: new Date(dateStr).getDay(),
-        isWeekend: isWeekendDate(dateStr),
-      }));
+        isWeekend: isWeekendDate(dateStr) }));
     }
 
     return daysArray.map((day) => {
@@ -240,8 +231,7 @@ export default function AttendanceCalendarView({
         dateStr,
         day,
         weekday: new Date(dateStr).getDay(),
-        isWeekend: isWeekendDate(dateStr),
-      };
+        isWeekend: isWeekendDate(dateStr) };
     });
   }, [calendarDetailView, daysArray, selectedMonth, weekDates]);
 

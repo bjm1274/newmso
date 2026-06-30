@@ -36,8 +36,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
       ok: false,
       type,
       error: 'Cloudflare R2 configuration is missing.',
-      hint: 'R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY 환경변수를 설정해 주세요.',
-    };
+      hint: 'R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY 환경변수를 설정해 주세요.' };
   }
 
   const d1 = await getD1Binding();
@@ -46,8 +45,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
       ok: false,
       type,
       error: 'D1 binding not available',
-      hint: 'Cloudflare Workers 환경에서만 백업을 실행할 수 있습니다.',
-    };
+      hint: 'Cloudflare Workers 환경에서만 백업을 실행할 수 있습니다.' };
   }
 
   const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
@@ -95,14 +93,12 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
       ok: false,
       type,
       error: message,
-      hint: `R2 버킷 '${R2_BUCKET}'에 backup/ prefix로 쓸 수 있는지 확인하세요.`,
-    };
+      hint: `R2 버킷 '${R2_BUCKET}'에 backup/ prefix로 쓸 수 있는지 확인하세요.` };
   }
 
   return {
     ok: true,
     type,
     path: objectKey,
-    tables: Object.keys(data).length,
-  };
+    tables: Object.keys(data).length };
 }

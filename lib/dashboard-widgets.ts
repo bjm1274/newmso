@@ -37,8 +37,7 @@ export const WIDGET_DEFINITIONS: Record<WidgetType, { label: string; icon: strin
   attendance_rate: { label: '출근율', icon: '🕐', defaultSize: 'sm', description: '오늘 출근률' },
   monthly_revenue: { label: '월 수익', icon: '💰', defaultSize: 'md', description: '이번 달 매출 요약' },
   leave_usage: { label: '연차 소진율', icon: '🏖️', defaultSize: 'sm', description: '전사 연차 사용률' },
-  recent_notifications: { label: '최근 알림', icon: '🔔', defaultSize: 'lg', description: '최근 10개 알림' },
-};
+  recent_notifications: { label: '최근 알림', icon: '🔔', defaultSize: 'lg', description: '최근 10개 알림' } };
 
 export const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'w1', type: 'staff_count', title: '직원 현황', size: 'sm', position: 0 },

@@ -81,8 +81,7 @@ export function getStaffPromotionSchedule(
     step1Date: step1,
     step2Date: step2,
     targetYear: expiryDate.getFullYear(),
-    daysUntilExpiry,
-  };
+    daysUntilExpiry };
 }
 
 /**

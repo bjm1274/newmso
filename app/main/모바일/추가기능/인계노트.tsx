@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -22,8 +22,7 @@ import {
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 import { useHandoverNotes, todayISO } from './data-hooks';
 
 type View = 'day' | 'week' | 'all';
@@ -40,8 +39,7 @@ const HANDOVER_INITIAL: HandoverFormState = {
   title: '',
   body: '',
   shift: 'Day',
-  priority: 'Normal',
-};
+  priority: 'Normal' };
 
 function dateKey(value: string | null | undefined): string {
   if (!value) return '';
@@ -106,8 +104,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
         style={{
           padding: '10px 16px 0',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg">
           <button type="button" className={view === 'day' ? 'on' : ''} onClick={() => setView('day')}>오늘</button>
@@ -138,8 +135,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
                     fontSize: 12,
                     background: 'var(--m-card)',
                     borderRadius: 'var(--m-radius-lg)',
-                    border: '1px solid var(--m-border)',
-                  }}
+                    border: '1px solid var(--m-border)' }}
                 >
                   오늘 공통 인계가 없습니다.
                 </div>
@@ -166,8 +162,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
                       fontSize: 11,
                       color: 'var(--z-500)',
                       fontWeight: 600,
-                      marginTop: 6,
-                    }}
+                      marginTop: 6 }}
                   >
                     {n.author} {n.is_completed ? '· 확인 완료' : ''}
                   </div>
@@ -236,8 +231,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
                       fontSize: 12,
                       color: 'var(--z-700)',
                       marginTop: 6,
-                      lineHeight: 1.55,
-                    }}
+                      lineHeight: 1.55 }}
                   >
                     {n.body}
                   </div>
@@ -260,8 +254,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
 // ─── 인계노트 작성 폼 ─────────────────────────────────────────
 function HandoverNoteForm({
   user,
-  onClose,
-}: {
+  onClose }: {
   user: ErpUser;
   onClose: () => void;
 }) {
@@ -293,15 +286,13 @@ function HandoverNoteForm({
         shift: v.shift,
         priority: v.priority,
         is_completed: 0,
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'handover_notes',
         payload,
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
       if (queued) { toast('오프라인 — 인계노트 대기 중', 'info'); onClose(); return; }

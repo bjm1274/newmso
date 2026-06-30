@@ -21,8 +21,7 @@ export function formatKoreanDateKey(date: Date): string {
     timeZone: SEOUL_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+    day: '2-digit' }).format(date);
 }
 
 /** KST 기준 'YYYY-MM' 반환 (월 단위 키). */
@@ -36,8 +35,7 @@ export function formatKoreanTimeLabel(date: Date = new Date()): string {
     timeZone: SEOUL_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date);
+    hourCycle: 'h23' }).format(date);
 }
 
 /** ko-KR 로케일 + KST timezone 적용한 사용자 친화 라벨. */

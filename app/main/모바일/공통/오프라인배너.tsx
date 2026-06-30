@@ -90,8 +90,7 @@ export default function 오프라인배너() {
         fontWeight: 700,
         textAlign: 'center',
         padding: '7px 16px',
-        letterSpacing: '-0.01em',
-      }}
+        letterSpacing: '-0.01em' }}
     >
       {buildText()}
     </div>

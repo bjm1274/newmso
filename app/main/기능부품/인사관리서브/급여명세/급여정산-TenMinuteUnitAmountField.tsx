@@ -12,8 +12,7 @@ export function TenMinuteUnitAmountField({
   labelClassName,
   inputClassName,
   allowManualAmountInput = false,
-  multiplier,
-}: {
+  multiplier }: {
   label: string;
   value: number | '';
   hourlyRate: number;

@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -22,8 +22,7 @@ export default function AttendanceDeductionRules(props: AttendanceDeductionRules
 function AttendanceDeductionRulesDesktop({
   selectedCo = '전체',
   compact = false,
-  disabled = false,
-}: AttendanceDeductionRulesProps) {
+  disabled = false }: AttendanceDeductionRulesProps) {
   const [rules, setRules] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,18 +35,17 @@ function AttendanceDeductionRulesDesktop({
       return;
     }
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await db
       .from('attendance_deduction_rules')
       .select('*')
       .eq('company_name', companyName)
       .maybeSingle();
     if (data) setRules({ ...data, company_name: companyName });
     else {
-      const { data: all } = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').maybeSingle();
+      const { data: all } = await db.from('attendance_deduction_rules').select('*').eq('company_name', '전체').maybeSingle();
       setRules({
         ...(all || { late_deduction_type: 'fixed', late_deduction_amount: 10000, early_leave_deduction_type: 'fixed', early_leave_deduction_amount: 10000 }),
-        company_name: companyName,
-      });
+        company_name: companyName });
     }
     setLoading(false);
   }, [companyName, disabled]);
@@ -61,15 +59,14 @@ function AttendanceDeductionRulesDesktop({
     if (!rules) return;
     setSaving(true);
     try {
-      await supabase.from('attendance_deduction_rules').upsert({
+      await db.from('attendance_deduction_rules').upsert({
         company_name: companyName,
         late_deduction_type: rules.late_deduction_type,
         late_deduction_amount: rules.late_deduction_amount || 0,
         early_leave_deduction_type: rules.early_leave_deduction_type,
         early_leave_deduction_amount: rules.early_leave_deduction_amount || 0,
         absent_use_daily_rate: rules.absent_use_daily_rate !== false,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'company_name' });
+        updated_at: new Date().toISOString() }, { onConflict: 'company_name' });
       toast('저장되었습니다.', 'success');
     } catch (e) {
       toast('저장 실패', 'error');

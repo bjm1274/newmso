@@ -24,8 +24,7 @@ export const MIME_BY_EXTENSION: Record<string, string> = {
   pdf: 'application/pdf',
   txt: 'text/plain',
   csv: 'text/csv',
-  zip: 'application/zip',
-};
+  zip: 'application/zip' };
 
 /**
  * File 객체에서 확장자를 추출 (소문자). 없으면 빈 문자열.

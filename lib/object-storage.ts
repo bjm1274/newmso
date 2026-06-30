@@ -73,8 +73,7 @@ function formatAmzDate(date: Date): { amzDate: string; dateStamp: string } {
   const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, '');
   return {
     amzDate: iso,
-    dateStamp: iso.slice(0, 8),
-  };
+    dateStamp: iso.slice(0, 8) };
 }
 
 function buildCanonicalQueryString(params: Array<[string, string]>): string {
@@ -93,8 +92,7 @@ async function createR2PresignedUrl({
   objectKey,
   expiresIn,
   headers = {},
-  query = [],
-}: {
+  query = [] }: {
   method: 'GET' | 'PUT';
   bucket: string;
   objectKey: string;
@@ -177,8 +175,7 @@ function getR2Config(): R2Config | null {
     accessKeyId,
     secretAccessKey,
     chatBucket: String(process.env.R2_CHAT_BUCKET || DEFAULT_R2_CHAT_BUCKET).trim() || DEFAULT_R2_CHAT_BUCKET,
-    publicBaseUrl,
-  };
+    publicBaseUrl };
 }
 
 export function isR2ChatStorageEnabled(): boolean {
@@ -214,8 +211,7 @@ export function buildR2AccessUrl(bucket: string, objectKey: string): string {
   const params = new URLSearchParams({
     provider: 'r2',
     bucket,
-    key: objectKey,
-  });
+    key: objectKey });
   return `${INTERNAL_OBJECT_PROXY_PATH}?${params.toString()}`;
 }
 
@@ -282,15 +278,13 @@ export async function createChatAttachmentUploadPlan(
 
   const headers = {
     'content-type': mimeType,
-    'cache-control': DEFAULT_CACHE_CONTROL,
-  };
+    'cache-control': DEFAULT_CACHE_CONTROL };
   const signedUrl = await createR2PresignedUrl({
     method: 'PUT',
     bucket: config.chatBucket,
     objectKey,
     expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
-    headers,
-  });
+    headers });
 
   return {
     provider: 'r2',
@@ -298,8 +292,7 @@ export async function createChatAttachmentUploadPlan(
     path: objectKey,
     signedUrl,
     headers,
-    url: buildR2AccessUrl(config.chatBucket, objectKey),
-  };
+    url: buildR2AccessUrl(config.chatBucket, objectKey) };
 }
 
 export async function uploadChatAttachmentToR2(
@@ -319,17 +312,13 @@ export async function uploadChatAttachmentToR2(
     expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
     headers: {
       'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL,
-    },
-  });
+      'cache-control': DEFAULT_CACHE_CONTROL } });
   const response = await fetch(signedUrl, {
     method: 'PUT',
     headers: {
       'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL,
-    },
-    body: body as BodyInit,
-  });
+      'cache-control': DEFAULT_CACHE_CONTROL },
+    body: body as BodyInit });
   if (!response.ok) {
     throw new Error(`Cloudflare R2 upload failed with status ${response.status}.`);
   }
@@ -338,8 +327,7 @@ export async function uploadChatAttachmentToR2(
     provider: 'r2',
     bucket: config.chatBucket,
     path: objectKey,
-    url: buildR2AccessUrl(config.chatBucket, objectKey),
-  };
+    url: buildR2AccessUrl(config.chatBucket, objectKey) };
 }
 
 /**
@@ -364,17 +352,13 @@ export async function uploadToR2(
     expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
     headers: {
       'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL,
-    },
-  });
+      'cache-control': DEFAULT_CACHE_CONTROL } });
   const response = await fetch(signedUrl, {
     method: 'PUT',
     headers: {
       'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL,
-    },
-    body: body as BodyInit,
-  });
+      'cache-control': DEFAULT_CACHE_CONTROL },
+    body: body as BodyInit });
   if (!response.ok) {
     throw new Error(`Cloudflare R2 upload failed with status ${response.status}.`);
   }
@@ -383,8 +367,7 @@ export async function uploadToR2(
     provider: 'r2',
     bucket,
     path: objectKey,
-    url: buildR2AccessUrl(bucket, objectKey),
-  };
+    url: buildR2AccessUrl(bucket, objectKey) };
 }
 
 /**
@@ -455,6 +438,5 @@ export async function createR2DownloadUrl(
     expiresIn: DEFAULT_DOWNLOAD_EXPIRATION_SECONDS,
     query: options?.downloadFileName
       ? [['response-content-disposition', buildResponseContentDisposition(options.downloadFileName)]]
-      : [],
-  });
+      : [] });
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   countChecklistDone,
   getDefaultChecklist,
@@ -11,8 +11,7 @@ import {
   syncChecklistWithContract,
   toggleChecklistItem,
   type ChecklistItem,
-  type ChecklistType,
-} from '@/lib/hr-checklists';
+  type ChecklistType } from '@/lib/hr-checklists';
 
 type Props = {
   staffId: string;
@@ -64,8 +63,7 @@ export default function OnboardingChecklist({
   type,
   joinedAt,
   company,
-  position,
-}: Props) {
+  position }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>(getDefaultChecklist(type));
   const [targetDate, setTargetDate] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,13 +79,13 @@ export default function OnboardingChecklist({
         { data: checklistData, error: checklistError },
         { data: contractData, error: contractError },
       ] = await Promise.all([
-        supabase
+        db
           .from('onboarding_checklists')
           .select('items, target_date, completed_at')
           .eq('staff_id', staffId)
           .eq('checklist_type', type)
           .maybeSingle(),
-        supabase
+        db
           .from('employment_contracts')
           .select('id, contract_type, status, requested_at, signed_at')
           .eq('staff_id', staffId)
@@ -113,8 +111,7 @@ export default function OnboardingChecklist({
             ? {
                 status: contractData.status,
                 requestedAt: contractData.requested_at,
-                signedAt: contractData.signed_at,
-              }
+                signedAt: contractData.signed_at }
             : null,
         );
         const nextTargetDate = checklistData?.target_date ?? fallbackTargetDate;
@@ -128,7 +125,7 @@ export default function OnboardingChecklist({
           JSON.stringify(nextItems) !== JSON.stringify(normalizedItems);
 
         if (shouldPersistChecklist) {
-          const { error: initializeError } = await supabase
+          const { error: initializeError } = await db
             .from('onboarding_checklists')
             .upsert(
               {
@@ -136,8 +133,7 @@ export default function OnboardingChecklist({
                 checklist_type: type,
                 items: nextItems,
                 target_date: nextTargetDate,
-                completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
-              },
+                completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null },
               { onConflict: 'staff_id,checklist_type' },
             );
 
@@ -169,7 +165,7 @@ export default function OnboardingChecklist({
 
   const persistChecklist = async (nextItems: ChecklistItem[]) => {
     setSaving(true);
-    const { error } = await supabase
+    const { error } = await db
       .from('onboarding_checklists')
       .upsert(
         {
@@ -177,8 +173,7 @@ export default function OnboardingChecklist({
           checklist_type: type,
           items: nextItems,
           target_date: targetDate,
-          completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null,
-        },
+          completed_at: isChecklistComplete(nextItems) ? new Date().toISOString() : null },
         { onConflict: 'staff_id,checklist_type' },
       );
     setSaving(false);

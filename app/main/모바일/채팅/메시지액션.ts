@@ -19,7 +19,7 @@
  * 제약: JM(단일 책임 + 500줄 이내), JM3(try/catch + 호출측 toast), JM4(any 금지).
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { pokeChannel } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
@@ -38,7 +38,7 @@ function errMessage(error: unknown, fallback: string): string {
 
 // ─────────────────────────────────────────────
 // 메시지 수정 — PC 메신저상태훅.saveEditedMessage 미러
-//   supabase.from('messages').update({ content, edited_at }).eq('id', …)
+//   db.from('messages').update({ content, edited_at }).eq('id', …)
 // ─────────────────────────────────────────────
 
 export async function editMobileMessage(input: {
@@ -51,7 +51,7 @@ export async function editMobileMessage(input: {
   if (!input.messageId) return { ok: false, error: '메시지 정보가 올바르지 않습니다.' };
   try {
     const editedAt = new Date().toISOString();
-    const { error } = await supabase
+    const { error } = await db
       .from('messages')
       .update({ content: next, edited_at: editedAt })
       .eq('id', input.messageId);
@@ -95,7 +95,7 @@ async function insertRoomSystemMessage(
   content: string,
 ): Promise<void> {
   const { data } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(
-    supabase,
+    db,
     {
       room_id: roomId,
       sender_id: senderId,
@@ -107,8 +107,7 @@ async function insertRoomSystemMessage(
       reply_to_id: null,
       album_id: null,
       album_index: null,
-      album_total: null,
-    },
+      album_total: null },
     'id, room_id',
   );
   if (data?.room_id) pokeChannel(`mobile-chat-room-${roomId}`);
@@ -216,13 +215,12 @@ export async function createMobilePoll(input: {
   try {
     const meta: PollMeta = {};
     if (input.deadlineAt && input.deadlineAt.trim()) meta.deadlineAt = input.deadlineAt.trim();
-    const { error } = await supabase.from('polls').insert([
+    const { error } = await db.from('polls').insert([
       {
         room_id: input.roomId,
         creator_id: input.creatorId,
         question: buildPollQuestionContent(question, meta),
-        options,
-      },
+        options },
     ]);
     if (error) return { ok: false, error: errMessage(error, '투표 생성에 실패했습니다.') };
     pokeChannel(`mobile-chat-room-${input.roomId}`);
@@ -240,12 +238,11 @@ export async function voteMobilePoll(input: {
 }): Promise<ActionResult> {
   if (!input.pollId || !input.userId) return { ok: false, error: '투표 정보가 올바르지 않습니다.' };
   try {
-    const { error } = await supabase.from('poll_votes').upsert(
+    const { error } = await db.from('poll_votes').upsert(
       {
         poll_id: input.pollId,
         user_id: input.userId,
-        option_index: input.optionIndex,
-      },
+        option_index: input.optionIndex },
       { onConflict: 'poll_id,user_id' },
     );
     if (error) return { ok: false, error: errMessage(error, '투표에 실패했습니다.') };
@@ -271,7 +268,7 @@ export async function fetchRoomPolls(
   const empty: RoomPollsResult = { polls: [], voteCounts: {}, myVotes: {} };
   if (!roomId) return empty;
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('polls')
       .select(POLL_SELECT)
       .eq('room_id', roomId)
@@ -284,13 +281,12 @@ export async function fetchRoomPolls(
       creator_id: String(row.creator_id || ''),
       question: String(row.question || ''),
       options: normalizePollOptions(row.options),
-      created_at: (row.created_at as string | null | undefined) ?? null,
-    }));
+      created_at: (row.created_at as string | null | undefined) ?? null }));
 
     const pollIds = polls.map((p) => p.id).filter(Boolean);
     if (pollIds.length === 0) return { polls, voteCounts: {}, myVotes: {} };
 
-    const { data: votes } = await supabase
+    const { data: votes } = await db
       .from('poll_votes')
       .select('poll_id, option_index, user_id')
       .in('poll_id', pollIds);

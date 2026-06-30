@@ -4,14 +4,13 @@ import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 import { toDateKey } from '@/lib/date-utils';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   isRelationMarkedMissing,
   rememberMissingRelation,
-  withMissingColumnsFallback,
-} from '@/lib/supabase-compat';
+  withMissingColumnsFallback } from '@/lib/db-compat';
 import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
@@ -19,8 +18,7 @@ import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/
 import {
   AttachmentListCard,
   getMessageDisplayText,
-  getAttachmentDisplayName,
-} from './메신저첨부';
+  getAttachmentDisplayName } from './메신저첨부';
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
 import { MessengerComposer, type MessengerComposerHandle } from './메신저컴포저';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
@@ -53,8 +51,7 @@ import {
   useThreadOverviews,
   useThreadMessages,
   useThreadSummaries,
-  type MediaFilter,
-} from './메신저파생훅';
+  type MediaFilter } from './메신저파생훅';
 import { ChatRealtimeState, useRealtimeConnectionMeta, useRoomNotificationSetting } from './메신저구독훅';
 import { useChatRoomNavigation } from './메신저방전환훅';
 import { useChatMessageEditing, useChatMobileBackLayer, useReadStatusModal } from './메신저상태훅';
@@ -72,8 +69,7 @@ import MessengerOperationsCenter from './메신저운영센터';
 import {
   buildRetryQueueMessage,
   getDueChatRetryQueueEntries,
-  readChatRetryQueue,
-} from './메신저재시도큐';
+  readChatRetryQueue } from './메신저재시도큐';
 import { MessengerTimeline, type MessengerTimelineItem } from './메신저타임라인';
 import { StaffDetailModal, getPresenceMeta, type PresenceMeta, type AttendanceSnapshot } from './메신저섹션/StaffDetailModal';
 import { ChatRoomHeader } from './메신저섹션/ChatRoomHeader';
@@ -115,8 +111,7 @@ import {
   writeStoredPinnedIds,
   type ThreadPreference,
   type MessageRetryPayload,
-  type RoomPreference,
-} from './메신저유틸';
+  type RoomPreference } from './메신저유틸';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
 
 type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
@@ -169,8 +164,7 @@ export default function ChatView({
   onConsumeOpenChatRoomId,
   onOpenBoardPost,
   shareTarget,
-  onConsumeShareTarget,
-}: ChatViewProps) {
+  onConsumeShareTarget }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
   const lastScrolledMsgIdRef = useRef<string | null>(null);
@@ -237,7 +231,7 @@ export default function ChatView({
   const chatRoomsRef = useRef<ChatRoom[]>([]);
   const messagesRef = useRef<ChatMessage[]>([]);
   const deliveryStatesRef = useRef<Record<string, DeliveryState>>({});
-  const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const presenceChannelRef = useRef<ReturnType<typeof db.channel> | null>(null);
   // typingChannelRef, typingPeersTimeoutRef, lastTypingEmitAtRef 제거됨.
   // D1 polling 기반 typing은 useChatTypingD1(useChatRealtimeBridge 내부)이 전담.
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -296,8 +290,7 @@ export default function ChatView({
       window.history.pushState({
         ...(window.history.state ?? {}),
         __erpMobileChatRoomOpen: true,
-        __erpMobileChatRoomToken: Date.now(),
-      }, '');
+        __erpMobileChatRoomToken: Date.now() }, '');
       mobileChatHistoryEntryActiveRef.current = true;
     } catch {
     }
@@ -331,8 +324,7 @@ export default function ChatView({
         id: staffId,
         name: String(normalized?.name ?? staff.name ?? ''),
         company: String(normalized?.company ?? staff.company ?? ''),
-        photo_url: normalized?.photo_url ?? staff.photo_url ?? null,
-      });
+        photo_url: normalized?.photo_url ?? staff.photo_url ?? null });
     });
     return Array.from(merged.values());
   }, [chatDirectoryStaffs, staffs]);
@@ -376,8 +368,7 @@ export default function ChatView({
       if (knownStaff) {
         return {
           ...knownStaff,
-          photo_url: getProfilePhotoUrl(knownStaff),
-        };
+          photo_url: getProfilePhotoUrl(knownStaff) };
       }
       if (String(staffId) === String(user?.id) && user?.name) {
         return {
@@ -386,8 +377,7 @@ export default function ChatView({
           company: user.company || '',
           department: user.department || '',
           position: user.position || '',
-          photo_url: getProfilePhotoUrl(user),
-        };
+          photo_url: getProfilePhotoUrl(user) };
       }
       const safeName = String(fallbackName || '').trim();
       if (!safeName) return null;
@@ -397,8 +387,7 @@ export default function ChatView({
         company: '',
         department: '',
         position: '',
-        photo_url: null,
-      };
+        photo_url: null };
     },
     [findKnownStaffById, user?.avatar_url, user?.company, user?.department, user?.id, user?.name, user?.position]
   );
@@ -413,8 +402,7 @@ export default function ChatView({
           company: '',
           department: '',
           position: '',
-          photo_url: null,
-        };
+          photo_url: null };
       }
       return {
         id: memberId,
@@ -422,8 +410,7 @@ export default function ChatView({
         company: '',
         department: '',
         position: '',
-        photo_url: null,
-      };
+        photo_url: null };
     },
     [resolveStaffProfile, user?.id]
   );
@@ -458,7 +445,7 @@ export default function ChatView({
               ...(omittedColumns.has('last_seen_at') ? [] : ['last_seen_at']),
               ...(omittedColumns.has('permissions') ? [] : ['permissions']),
             ];
-            return supabase
+            return db
               .from('staff_members')
               .select(selectColumns.join(', ')) as PromiseLike<{
                 data: StaffMember[] | null;
@@ -503,12 +490,10 @@ export default function ChatView({
   const retryQueueActorId = effectiveChatUserId || user?.id || null;
   const {
     roomNotifyOn,
-    toggleRoomNotify,
-  } = useRoomNotificationSetting({
+    toggleRoomNotify } = useRoomNotificationSetting({
     selectedRoomId,
     effectiveChatUserId,
-    userId: user?.id,
-  });
+    userId: user?.id });
   const getEffectiveRoomMemberIds = useCallback((room: ChatRoom | null | undefined) => {
     if (!room) return [];
     if (String(room.id) === NOTICE_ROOM_ID) return noticeRoomMemberIds;
@@ -556,13 +541,11 @@ export default function ChatView({
     readUsers,
     unreadLoading,
     closeReadStatusModal,
-    loadReadStatusForMessage,
-  } = useReadStatusModal({
+    loadReadStatusForMessage } = useReadStatusModal({
     selectedRoom,
     allKnownStaffs,
     roomReadCursorMap,
-    getEffectiveRoomMemberIds,
-  });
+    getEffectiveRoomMemberIds });
   const handleRoomChangeCleanup = useCallback((mode: 'full' | 'room-switch' = 'full') => {
     if (mode === 'full') {
       setMessages([]);
@@ -693,8 +676,7 @@ export default function ChatView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomIds: normalizedRoomIds, readAt: readAt ?? undefined }),
-        credentials: 'same-origin',
-      });
+        credentials: 'same-origin' });
       const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
       return Boolean(res.ok && json?.ok);
     } catch {
@@ -705,8 +687,7 @@ export default function ChatView({
     setRoom,
     scrollToBottom,
     handleRoomListClick,
-    updateScrollPositionState,
-  } = useChatRoomNavigation({
+    updateScrollPositionState } = useChatRoomNavigation({
     selectedRoomId,
     selectedRoomIdRef,
     chatRoomsRef,
@@ -730,8 +711,7 @@ export default function ChatView({
       markConversationNotificationsAsReadRef.current(roomIds, readAt),
     broadcastChatSync: (action, roomId) =>
       broadcastChatSyncRef.current(action, roomId),
-    onRoomChangeCleanup: handleRoomChangeCleanup,
-  });
+    onRoomChangeCleanup: handleRoomChangeCleanup });
   setRoomRef.current = setRoom;
 
   const tryScrollToLoadedMessage = useCallback((roomId: string, messageId?: string | null) => {
@@ -779,7 +759,7 @@ export default function ChatView({
         return sourceRooms;
       }
 
-      const { data: roomMessages, error } = await supabase
+      const { data: roomMessages, error } = await db
         .from('messages')
         .select('room_id, sender_id, created_at')
         .in('room_id', orphanRoomIds)
@@ -803,7 +783,7 @@ export default function ChatView({
         const inferredMembers = Array.from(senderIdsByRoom.get(roomId) || []);
         if (inferredMembers.length !== 2) continue;
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await db
           .from('chat_rooms')
           .update({ members: inferredMembers })
           .eq('id', roomId);
@@ -813,8 +793,7 @@ export default function ChatView({
         if (roomIndex >= 0) {
           repairedRooms[roomIndex] = {
             ...repairedRooms[roomIndex],
-            members: inferredMembers,
-          };
+            members: inferredMembers };
         }
       }
 
@@ -906,13 +885,11 @@ export default function ChatView({
     persistPinnedRoomOrder,
     toggleRoomPinned,
     movePinnedRoom,
-    toggleRoomHidden,
-  } = useChatRoomPreferences({
+    toggleRoomHidden } = useChatRoomPreferences({
     roomPrefsUserId,
     pinnedRoomOrder,
     setRoomPrefs,
-    setPinnedRoomOrder,
-  });
+    setPinnedRoomOrder });
 
   const markConversationNotificationsAsRead = useCallback(async (
     roomIds: Array<string | null | undefined>,
@@ -997,8 +974,7 @@ export default function ChatView({
           senderName: String(metadata.sender_name || row.title || '알 수 없음').replace(/^📣\s*/, '').trim() || '알 수 없음',
           body: String(row.body || '').trim() || '멘션 메시지',
           createdAt: String(row.created_at || '').trim(),
-          unread: !row.read_at,
-        } satisfies MessengerMentionInboxItem;
+          unread: !row.read_at } satisfies MessengerMentionInboxItem;
       }).filter((item: MessengerMentionInboxItem) => item.id && item.roomId && item.messageId);
 
       setMentionInboxItems(nextItems);
@@ -1062,8 +1038,7 @@ export default function ChatView({
             body: String(row.body || '').trim() || '스레드 답글',
             createdAt: String(row.created_at || '').trim(),
             unread: !row.read_at,
-            followed,
-          } satisfies MessengerThreadInboxItem;
+            followed } satisfies MessengerThreadInboxItem;
         })
         .filter((item: MessengerThreadInboxItem | null): item is MessengerThreadInboxItem => Boolean(item?.id && item.roomId && item.messageId))
         .reduce((acc: MessengerThreadInboxItem[], item: MessengerThreadInboxItem) => {
@@ -1106,16 +1081,13 @@ export default function ChatView({
           detail: {
             action,
             roomId: roomId || selectedRoomId || null,
-            at: Date.now(),
-          },
-        }));
+            at: Date.now() } }));
       }
       if (!syncChannelRef.current) return;
       syncChannelRef.current.postMessage({
         action,
         roomId: roomId || selectedRoomId || null,
-        at: Date.now(),
-      });
+        at: Date.now() });
     } catch {
       // ignore
     }
@@ -1128,8 +1100,7 @@ export default function ChatView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         keepalive: true,
-        body: JSON.stringify({ roomId, messageId }),
-      });
+        body: JSON.stringify({ roomId, messageId }) });
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -1146,8 +1117,7 @@ export default function ChatView({
     effectiveChatUserId,
     userName: user?.name,
     setTypingUsers,
-    typingClearRef,
-  });
+    typingClearRef });
 
   const handleComposerChange = useCallback((value: string, caret: number) => {
     // value/inputMsgRef는 컴포저 내부에서 이미 갱신. 부모는 멘션 인식과
@@ -1184,7 +1154,7 @@ export default function ChatView({
     }
     // 2) DB에서 최신 설정 로드 (chat_room_prefs 테이블이 없으면 graceful skip)
     if (roomPrefsUserId && !isRelationMarkedMissing('chat_room_prefs')) {
-      void supabase
+      void db
         .from('chat_room_prefs')
         .select('room_id, pinned, hidden')
         .eq('user_id', roomPrefsUserId)
@@ -1221,8 +1191,7 @@ export default function ChatView({
         next[entry.id] = {
           status: next[entry.id]?.status === 'sending' ? 'sending' : 'failed',
           retryPayload: entry.payload,
-          error: entry.error,
-        };
+          error: entry.error };
       });
       return next;
     });
@@ -1267,8 +1236,7 @@ export default function ChatView({
     buildPreviewItem: buildAttachmentPreviewItem,
     openPreviewGallery: openAttachmentPreviewGallery,
     openPreview: openAttachmentPreview,
-    closePreview: closeAttachmentPreview,
-  } = attachmentPreviewController;
+    closePreview: closeAttachmentPreview } = attachmentPreviewController;
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
   // 조직도 기반 초대 모달의 부서 펼침 상태
@@ -1332,13 +1300,11 @@ export default function ChatView({
     handleSlashFormFieldChange,
     openSlashDraftFromText,
     handleSubmitAnnualLeaveDraft,
-    handleSubmitPurchaseDraft,
-  } = useChatWorkflowDrafts({
+    handleSubmitPurchaseDraft } = useChatWorkflowDrafts({
     selectedRoomId,
     effectiveChatUserId,
     user,
-    fetchData: () => fetchDataRef.current?.(),
-  });
+    fetchData: () => fetchDataRef.current?.() });
   const {
     updateUnreadForRooms,
     syncChatRoomsState,
@@ -1350,8 +1316,7 @@ export default function ChatView({
     refreshVisibleMessageBookmarks,
     refreshRoomPinnedMessages,
     refreshRoomPolls,
-    loadMessagesAroundMessage,
-  } = useChatRoomDataSync({
+    loadMessagesAroundMessage } = useChatRoomDataSync({
     selectedRoomId,
     selectedRoomIdRef,
     chatRoomsRef,
@@ -1381,8 +1346,7 @@ export default function ChatView({
     setReactions,
     setReactionUsersByMessage,
     setPolls,
-    setPollVotes,
-  });
+    setPollVotes });
 
   const claimIncomingRealtimeMessage = useCallback((messageId: string | null | undefined) => {
     const nextId = String(messageId || '').trim();
@@ -1470,8 +1434,7 @@ export default function ChatView({
                 ...room,
                 last_message: previewText || room.last_message,
                 last_message_preview: previewText || room.last_message_preview,
-                last_message_at: row.created_at || new Date().toISOString(),
-              }
+                last_message_at: row.created_at || new Date().toISOString() }
             : room
         )
       );
@@ -1485,8 +1448,7 @@ export default function ChatView({
         if (prev.some((message: ChatMessage) => String(message.id) === String(row.id))) return prev;
         const newMsg = {
           ...row,
-          staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
-        };
+          staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null } };
         const optimisticIndex = prev.findIndex((message: ChatMessage) => {
           if (!String(message.id || '').startsWith('temp-')) return false;
           if (String(message.room_id || '') !== String(row.room_id || '')) return false;
@@ -1544,8 +1506,7 @@ export default function ChatView({
     if (!isOwnMessage) {
       setRoomUnreadCounts((prev) => ({
         ...prev,
-        [roomId]: Math.max(1, (prev[roomId] || 0) + 1),
-      }));
+        [roomId]: Math.max(1, (prev[roomId] || 0) + 1) }));
     }
   }, [
     broadcastChatSync,
@@ -1567,7 +1528,7 @@ export default function ChatView({
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const { data } = await selectChatMessagesWithFallback<ChatMessage>(({ selectClause }) =>
-          supabase
+          db
             .from('messages')
             .select(selectClause)
             .eq('id', targetMessageId)
@@ -1595,7 +1556,7 @@ export default function ChatView({
     if (haveSameMembers(currentMemberIds, noticeRoomMemberIds)) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('chat_rooms')
         .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
         .eq('id', NOTICE_ROOM_ID);
@@ -1635,8 +1596,7 @@ export default function ChatView({
           const result = await patchChatRoom(String(existingSelfRoom.id), {
             name: SELF_ROOM_NAME,
             type: 'direct',
-            members: nextMembers,
-          });
+            members: nextMembers });
           if (!result.ok) throw new Error(result.error);
         } catch (error) {
           logger.error('나와의 채팅방 업데이트 실패:', error);
@@ -1663,8 +1623,7 @@ export default function ChatView({
         const result = await createOrUpsertChatRoom({
           name: SELF_ROOM_NAME,
           type: 'direct',
-          members: [currentUserId],
-        });
+          members: [currentUserId] });
         if (!result.ok || !result.room) throw new Error(result.error || 'Self chat create failed');
         return [...sourceRooms, result.room as unknown as ChatRoom];
       } catch (error) {
@@ -1892,7 +1851,7 @@ export default function ChatView({
     let active = true;
     const loadRooms = async () => {
       try {
-        const { data: noticeRoom } = await supabase
+        const { data: noticeRoom } = await db
           .from('chat_rooms')
           .select('id')
           .eq('id', NOTICE_ROOM_ID)
@@ -1903,14 +1862,12 @@ export default function ChatView({
             id: NOTICE_ROOM_ID,
             name: NOTICE_ROOM_NAME,
             type: 'notice',
-            members: noticeRoomMemberIds,
-          });
+            members: noticeRoomMemberIds });
         } else {
           await patchChatRoom(NOTICE_ROOM_ID, {
             name: NOTICE_ROOM_NAME,
             type: 'notice',
-            members: noticeRoomMemberIds,
-          });
+            members: noticeRoomMemberIds });
         }
 
         const roomResult = await fetchAllChatRooms({ force: true });
@@ -1986,8 +1943,7 @@ export default function ChatView({
     scheduleRealtimeReconnect,
     isRoomInSelectedConversation,
     fetchMessageByIdWithRetry,
-    sortChatRoomsWithNoticeFirst,
-  });
+    sortChatRoomsWithNoticeFirst });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2187,8 +2143,7 @@ export default function ChatView({
     selectedRoom,
     allKnownStaffs,
     effectiveChatUserId,
-    getRoomDisplayName,
-  });
+    getRoomDisplayName });
   const selectedRoomPreference = selectedRoomId ? (roomPrefs[selectedRoomId] || {}) : {};
   const selectedRoomNotificationMode = useMemo(
     () => normalizeRoomNotificationMode(selectedRoomPreference.notifyMode),
@@ -2261,8 +2216,7 @@ export default function ChatView({
     roomLabelMap,
     sidebarRoomItems,
     visibleRoomIds,
-    forwardTargetRoomItems,
-  } = useChatSidebarState({
+    forwardTargetRoomItems } = useChatSidebarState({
     chatRooms,
     selectedRoomId,
     selectedRoom,
@@ -2279,8 +2233,7 @@ export default function ChatView({
     pinnedRoomOrder,
     setPinnedRoomOrder,
     roomPrefsUserId,
-    roomUnreadCounts,
-  });
+    roomUnreadCounts });
   const {
     dialog: roomActionDialog,
     handleLeaveRoom,
@@ -2291,8 +2244,7 @@ export default function ChatView({
     handleCancelEditingRoomName,
     createGroupChat,
     openDirectChat,
-    handleSubmitAddMembers,
-  } = useChatRoomManagement({
+    handleSubmitAddMembers } = useChatRoomManagement({
     addMemberSelectingIds,
     closeAddMemberModal,
     closeGroupModal,
@@ -2316,8 +2268,7 @@ export default function ChatView({
     setShowDrawer,
     setViewMode,
     triggerChatPush,
-    user,
-  });
+    user });
   const {
     showGlobalSearch,
     globalSearchQuery,
@@ -2341,8 +2292,7 @@ export default function ChatView({
     handleGlobalSearch,
     saveCurrentSearch,
     removeSavedSearch,
-    applySavedSearch,
-  } = useChatGlobalSearch({
+    applySavedSearch } = useChatGlobalSearch({
     allKnownStaffs,
     effectiveChatUserId,
     resolveStaffProfile,
@@ -2357,8 +2307,7 @@ export default function ChatView({
     visibleRoomIds,
     roomLabelMap,
     roomPrefs,
-    roomPrefsUserId,
-  });
+    roomPrefsUserId });
   const {
     editingMessage,
     editingMessageDraft,
@@ -2370,8 +2319,7 @@ export default function ChatView({
     closeEditingMessage,
     openEditHistory,
     closeEditHistory,
-    saveEditedMessage,
-  } = useChatMessageEditing({
+    saveEditedMessage } = useChatMessageEditing({
     currentUserId: effectiveChatUserId,
     fallbackUserId: user?.id,
     auditUserId: user?.id,
@@ -2381,8 +2329,7 @@ export default function ChatView({
     fetchData,
     syncRoomSummaryFromMessages,
     setMessages,
-    setPersistedPinnedMessages,
-  });
+    setPersistedPinnedMessages });
   closeEditingMessageRef.current = closeEditingMessage;
   closeEditHistoryRef.current = closeEditHistory;
   const closeMobileChatBackLayer = useChatMobileBackLayer({
@@ -2412,8 +2359,7 @@ export default function ChatView({
     showGlobalSearch,
     closeGlobalSearch,
     showGroupModal,
-    closeGroupModal,
-  });
+    closeGroupModal });
   closeMobileChatBackLayerRef.current = closeMobileChatBackLayer;
   const typingNoticeText = useChatTypingNoticeText(typingUsers);
   const openDateJumpPicker = useCallback((dateKey?: string) => {
@@ -2461,8 +2407,7 @@ export default function ChatView({
     roomMembers,
     effectiveChatUserId,
     resolveStaffProfile,
-    isStaffCurrentlyOnline,
-  });
+    isStaffCurrentlyOnline });
   const realtimeConnectionMeta = useRealtimeConnectionMeta(
     selectedRoomId,
     globalRealtimeState,
@@ -2502,8 +2447,7 @@ export default function ChatView({
               ).replace(/\s+/g, ' ').trim() || '스레드 답글',
             createdAt: String(latestMessage.created_at || thread.rootMessage.created_at || ''),
             unread: true,
-            followed: followedThreadIds.has(thread.rootId),
-          } satisfies MessengerThreadInboxItem;
+            followed: followedThreadIds.has(thread.rootId) } satisfies MessengerThreadInboxItem;
         }),
     [followedThreadIds, resolveStaffProfile, selectedRoomId, selectedRoomLabel, threadOverviews],
   );
@@ -2590,8 +2534,7 @@ export default function ChatView({
     updateRoomPreference(selectedRoomId, {
       notifyMode: willEnable
         ? (selectedRoomNotificationMode === 'mute' ? 'all' : selectedRoomNotificationMode)
-        : 'mute',
-    });
+        : 'mute' });
   }, [
     roomNotifyOn,
     selectedRoomId,
@@ -2606,15 +2549,13 @@ export default function ChatView({
       notifyKeyword:
         mode === 'keyword'
           ? normalizeRoomNotificationKeyword(selectedRoomNotificationKeyword)
-          : selectedRoomNotificationKeyword,
-    });
+          : selectedRoomNotificationKeyword });
   }, [selectedRoomId, selectedRoomNotificationKeyword, updateRoomPreference]);
   const handleRoomNotificationKeywordChange = useCallback((value: string) => {
     if (!selectedRoomId) return;
     updateRoomPreference(selectedRoomId, {
       notifyMode: 'keyword',
-      notifyKeyword: normalizeRoomNotificationKeyword(value),
-    });
+      notifyKeyword: normalizeRoomNotificationKeyword(value) });
   }, [selectedRoomId, updateRoomPreference]);
   const { handleSendMessage, sendWardQuickReply, retryFailedMessage, retryAllFailedMessages } = useChatMessageSending({
     selectedRoomId,
@@ -2640,8 +2581,7 @@ export default function ChatView({
     broadcastChatSync,
     emitTypingState,
     triggerChatPush,
-    openSlashDraftFromText,
-  });
+    openSlashDraftFromText });
   useEffect(() => {
     if (!retryQueueActorId || !selectedRoomId || typeof window === 'undefined') return;
 
@@ -2680,8 +2620,7 @@ export default function ChatView({
     retryFailedAttachmentUpload,
     retryAllFailedAttachmentUploads,
     dismissFailedAttachmentUpload,
-    clearAllFailedAttachmentUploads,
-  } = useChatUploads({
+    clearAllFailedAttachmentUploads } = useChatUploads({
     selectedRoomId,
     actorId: roomPrefsUserId,
     replyToId: replyTo?.id ? String(replyTo.id) : null,
@@ -2690,8 +2629,7 @@ export default function ChatView({
     inputMsgRef,
     setInputMsg,
     handleSendMessage,
-    scrollToBottom,
-  });
+    scrollToBottom });
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -2715,8 +2653,7 @@ export default function ChatView({
     sharedFilePreviewMessages,
     sharedLinkPreviewMessages,
     openMediaArchive,
-    openAttachmentPreviewForMessage,
-  } = useChatMediaPreviewState({
+    openAttachmentPreviewForMessage } = useChatMediaPreviewState({
     messages,
     noticeMessages,
     mediaFilter,
@@ -2725,8 +2662,7 @@ export default function ChatView({
     setShowMediaPanel,
     buildAttachmentPreviewItem,
     openAttachmentPreviewGallery,
-    openAttachmentPreview,
-  });
+    openAttachmentPreview });
   const noticeReadStats = useMemo(() => {
     const audienceMembers = roomMembers.filter(
       (member): member is StaffMember =>
@@ -2738,8 +2674,7 @@ export default function ChatView({
         readCount: 0,
         unreadCount: 0,
         recipientCount: audienceMembers.length,
-        unreadMembers: [] as StaffMember[],
-      };
+        unreadMembers: [] as StaffMember[] };
     }
 
     const unreadMembers = audienceMembers.filter(
@@ -2750,8 +2685,7 @@ export default function ChatView({
       readCount: Math.max(0, audienceMembers.length - unreadMembers.length),
       unreadCount: unreadMembers.length,
       recipientCount: audienceMembers.length,
-      unreadMembers,
-    };
+      unreadMembers };
   }, [currentNoticeMessage, roomMembers, roomReadCursorMap]);
   const openCurrentNoticeReadStatus = useCallback(() => {
     if (!currentNoticeMessage) return;
@@ -2792,10 +2726,7 @@ export default function ChatView({
           notificationType: 'message',
           extra: {
             reminder_kind: 'pinned_notice',
-            room_name: selectedRoomLabel || null,
-          },
-        }),
-      }));
+            room_name: selectedRoomLabel || null } }) }));
 
       const { error } = await d1.from('notifications').insert(payload);
       if (error) throw error;
@@ -2815,15 +2746,13 @@ export default function ChatView({
     fetchDataRef,
     fetchMessageByIdWithRetry,
     roomPrefsUserId,
-    triggerChatPush,
-  });
+    triggerChatPush });
 
   const mentionCandidates = useChatMentionCandidates({
     showMentionList,
     mentionQuery,
     roomMembers,
-    staffs,
-  });
+    staffs });
 
   const {
     dialog: messageActionDialog,
@@ -2831,8 +2760,7 @@ export default function ChatView({
     togglePin,
     toggleBookmark,
     markMessageRead,
-    deleteMessage,
-  } = useChatMessageActions({
+    deleteMessage } = useChatMessageActions({
     currentUserId: effectiveChatUserId,
     fallbackUserId: user?.id,
     effectiveTodoUserId,
@@ -2855,8 +2783,7 @@ export default function ChatView({
     persistRoomReadCursors,
     broadcastChatSync,
     auditUserId: user?.id,
-    auditUserName: user?.name,
-  });
+    auditUserName: user?.name });
 
   // 타임라인/컴포저 props 안정화 콜백 (입력 시 매 키마다 발생하는
   // 부모 re-render 영향으로 memo()가 무효화되는 것을 막기 위함)
@@ -2895,15 +2822,13 @@ export default function ChatView({
 
   const {
     activeMessageHighlightQuery,
-    combinedTimeline,
-  } = useChatTimelineItems({
+    combinedTimeline } = useChatTimelineItems({
     messages,
     polls,
     selectedRoomId,
     deferredChatSearch,
     transientHighlightQuery,
-    effectiveChatUserId,
-  });
+    effectiveChatUserId });
   const failedMessageIdsInSelectedRoom = useMemo(
     () =>
       messages
@@ -2924,8 +2849,7 @@ export default function ChatView({
     handleForwardToRoom,
     openReadStatusPanel,
     openThreadPanel,
-    deleteMessageFromActions,
-  } = useChatMessageWorkflow({
+    deleteMessageFromActions } = useChatMessageWorkflow({
     activeActionMsg,
     effectiveTodoUserId,
     effectiveChatUserId,
@@ -2943,8 +2867,7 @@ export default function ChatView({
       markMessageRead,
       loadReadStatusForMessage,
     deleteMessage,
-    triggerChatPush,
-  });
+    triggerChatPush });
   const openTrackedThreadPanel = useCallback((message: ChatMessage) => {
     const resolvedRoot = resolveThreadRootForMessage(message);
     const rootId = String(resolvedRoot.id || message.id || '').trim();
@@ -2953,9 +2876,7 @@ export default function ChatView({
         ...threadPrefs,
         [rootId]: {
           ...(threadPrefs[rootId] || {}),
-          lastOpenedAt: new Date().toISOString(),
-        },
-      });
+          lastOpenedAt: new Date().toISOString() } });
     }
     openThreadPanel(message);
   }, [openThreadPanel, persistThreadPreferences, resolveThreadRootForMessage, threadPrefs]);
@@ -2972,9 +2893,7 @@ export default function ChatView({
       [rootId]: {
         ...currentPreference,
         followed: nextFollowed,
-        lastOpenedAt: new Date().toISOString(),
-      },
-    };
+        lastOpenedAt: new Date().toISOString() } };
     persistThreadPreferences(nextPreferences);
     toast(nextFollowed ? '이 스레드 알림을 켰습니다.' : '이 스레드 알림을 껐습니다.', 'success');
   }, [persistThreadPreferences, resolveThreadRootForMessage, threadPrefs]);
@@ -3002,8 +2921,7 @@ export default function ChatView({
     const params = new URLSearchParams({
       open_menu: '채팅',
       open_chat_room: String(message.room_id || ''),
-      open_msg: String(message.id || ''),
-    });
+      open_msg: String(message.id || '') });
     const baseUrl = `${window.location.origin}/main?${params.toString()}`;
 
     try {
@@ -3021,13 +2939,13 @@ export default function ChatView({
     try {
       const todayKey = toDateKey(new Date());
       const [attRes, legacyAttRes] = await Promise.allSettled([
-        supabase
+        db
           .from('attendance')
           .select('staff_id, date, check_in, check_out, status')
           .eq('date', todayKey)
           .eq('staff_id', staff.id)
           .maybeSingle(),
-        supabase
+        db
           .from('attendances')
           .select('staff_id, work_date, check_in_time, check_out_time, status')
           .eq('work_date', todayKey)
@@ -3045,8 +2963,7 @@ export default function ChatView({
           ...snapshot,
           ...row,
           staff_id: String(row.staff_id),
-          date: snapshot?.date ?? row.work_date ?? todayKey,
-        };
+          date: snapshot?.date ?? row.work_date ?? todayKey };
       }
 
       setSelectedStaffPresence(getPresenceMeta(snapshot));

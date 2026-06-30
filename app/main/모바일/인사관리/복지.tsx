@@ -33,8 +33,7 @@ import {
   type MedicalDeviceRow,
   type ToneKind,
   useStaffList,
-  canMutateTeamAbnormal,
-} from './data-hooks';
+  canMutateTeamAbnormal } from './data-hooks';
 import 복지관리자 from './복지관리자';
 
 export type SHrWelfareTab = 'family' | 'health' | 'cert' | 'dev';
@@ -155,21 +154,19 @@ function FamilyTab({ rows, onRowClick }: { rows: FamilyEventRow[]; onRowClick?: 
   return (
     <div style={{ padding: '14px 16px 0' }}>
       <div
-        className="m-card"
+        className="m-card macos-glass macos-squircle-sm"
         style={{
           padding: '14px 16px',
           marginBottom: 12,
           background: 'var(--m-accent-soft)',
-          borderColor: 'transparent',
-        }}
+          borderColor: 'transparent' }}
       >
         <div
           style={{
             fontSize: 11,
             fontWeight: 800,
             color: 'var(--m-accent)',
-            letterSpacing: '0.04em',
-          }}
+            letterSpacing: '0.04em' }}
         >
           최근 경조사 지원
         </div>
@@ -180,8 +177,7 @@ function FamilyTab({ rows, onRowClick }: { rows: FamilyEventRow[]; onRowClick?: 
             fontWeight: 800,
             letterSpacing: '-0.025em',
             color: 'var(--m-accent)',
-            marginTop: 4,
-          }}
+            marginTop: 4 }}
         >
           ₩ {formatMoney(totalAmount)}
           <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 6, color: 'var(--z-600)' }}>
@@ -189,7 +185,7 @@ function FamilyTab({ rows, onRowClick }: { rows: FamilyEventRow[]; onRowClick?: 
           </span>
         </div>
       </div>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {rows.map((r) => (
           <button
             key={r.id}
@@ -242,7 +238,7 @@ function HealthTab({ rows, onRowClick }: { rows: HealthCheckupRow[]; onRowClick?
       {next && (
         <button
           type="button"
-          className="m-card"
+          className="m-card macos-glass macos-squircle-sm"
           onClick={() => onRowClick?.(next)}
           style={{ width: '100%', textAlign: 'left', padding: '16px 18px', display: 'block', cursor: onRowClick ? 'pointer' : 'default' }}
         >
@@ -254,8 +250,7 @@ function HealthTab({ rows, onRowClick }: { rows: HealthCheckupRow[]; onRowClick?
               fontSize: 18,
               fontWeight: 800,
               marginTop: 4,
-              letterSpacing: '-0.02em',
-            }}
+              letterSpacing: '-0.02em' }}
           >
             {formatDate(next.checkup_date)}
           </div>
@@ -270,7 +265,7 @@ function HealthTab({ rows, onRowClick }: { rows: HealthCheckupRow[]; onRowClick?
           <div className="m-section-h" style={{ padding: '18px 0 8px' }}>
             <div className="lbl">예정 검진</div>
           </div>
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {others.map((r) => {
               const left = daysUntil(r.checkup_date);
               const tone: ToneKind =
@@ -310,8 +305,7 @@ function HealthTab({ rows, onRowClick }: { rows: HealthCheckupRow[]; onRowClick?
             padding: 20,
             textAlign: 'center',
             color: 'var(--z-500)',
-            fontSize: 13,
-          }}
+            fontSize: 13 }}
         >
           예정된 건강검진이 없습니다.
         </div>
@@ -339,8 +333,7 @@ function CertTab({ user, rows, onRowClick }: { user: ErpUser; rows: LicenseRow[]
         staffName,
         company: companyName,
         file,
-        category: '면허자격',
-      });
+        category: '면허자격' });
     } finally {
       setUploading(false);
     }
@@ -349,7 +342,7 @@ function CertTab({ user, rows, onRowClick }: { user: ErpUser; rows: LicenseRow[]
   if (rows.length === 0) {
     return (
       <div style={{ padding: '14px 16px 0' }}>
-        <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+        <div className="m-card macos-glass macos-squircle-sm" style={{ padding: '14px 16px', marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>면허·자격 갱신 증빙 서류 제출</div>
           <MBtn
             variant="primary"
@@ -380,7 +373,7 @@ function CertTab({ user, rows, onRowClick }: { user: ErpUser; rows: LicenseRow[]
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
-      <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+      <div className="m-card macos-glass macos-squircle-sm" style={{ padding: '14px 16px', marginBottom: 12 }}>
         <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>면허·자격 갱신 증빙 서류 제출</div>
         <MBtn
           variant="primary"
@@ -400,7 +393,7 @@ function CertTab({ user, rows, onRowClick }: { user: ErpUser; rows: LicenseRow[]
           onChange={(e) => void handleFileChange(e)}
         />
       </div>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {rows.map((r) => {
           const left = daysUntil(r.expiry_date);
           const tone = expiryTone(left);
@@ -458,7 +451,7 @@ function DeviceTab({ rows, onRowClick }: { rows: MedicalDeviceRow[]; onRowClick?
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {rows.map((r) => {
           const left = daysUntil(r.next_check_date);
           const tone =

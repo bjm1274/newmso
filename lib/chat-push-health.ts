@@ -9,14 +9,13 @@ import {
   lte,
   asc,
   and,
-  sql,
-} from './db';
+  sql } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 // ─────────────────────────────────────────────────────────────
 // Phase 8-H — 서버 측 read 호출 D1 binding 직접 사용
 // 외부 시그니처(collectChatPushQueueHealth)는 그대로 유지.
-// supabase 인자는 더 이상 쿼리에 쓰이지 않지만 호환을 위해 받음(_supabase).
+// db 인자는 더 이상 쿼리에 쓰이지 않지만 호환을 위해 받음(_supabase).
 // ─────────────────────────────────────────────────────────────
 
 type D1MissingTableError = { code: 'D1_MISSING_TABLE' };
@@ -63,8 +62,7 @@ function emptyQueueHealth(migrationReady = true): ChatPushQueueHealth {
     retrying: 0,
     deadLettered: 0,
     inFlight: 0,
-    oldestPendingAt: '',
-  };
+    oldestPendingAt: '' };
 }
 
 async function requireD1ForChatPushHealth(label: string) {
@@ -117,8 +115,7 @@ async function collectLegacyQueueHealth(
         id: chatPushJobsTable.id,
         created_at: chatPushJobsTable.created_at,
         processed_at: chatPushJobsTable.processed_at,
-        attempt_count: chatPushJobsTable.attempt_count,
-      })
+        attempt_count: chatPushJobsTable.attempt_count })
       .from(chatPushJobsTable)
       .limit(5000);
   } catch (err) {
@@ -147,13 +144,12 @@ async function collectLegacyQueueHealth(
     },
     {
       ...emptyQueueHealth(false),
-      total: Number(totalCount || rows.length),
-    },
+      total: Number(totalCount || rows.length) },
   );
 }
 
-// 호출지(예: app/api/admin/notifications/push-health)는 기존엔 supabase
-// 클라이언트를 인자로 넘겨 주었다. 본 함수는 더 이상 supabase로 쿼리하지
+// 호출지(예: app/api/admin/notifications/push-health)는 기존엔 db
+// 클라이언트를 인자로 넘겨 주었다. 본 함수는 더 이상 db로 쿼리하지
 // 않지만 외부 시그니처 유지를 위해 인자를 받아 두고 무시한다.
 export async function collectChatPushQueueHealth(_supabase: unknown): Promise<ChatPushQueueHealth> {
   const db = await requireD1ForChatPushHealth('collectChatPushQueueHealth');
@@ -224,8 +220,7 @@ export async function collectChatPushQueueHealth(_supabase: unknown): Promise<Ch
     retrying: getCount(retrying),
     deadLettered: getCount(deadLettered),
     inFlight: getCount(inFlight),
-    oldestPendingAt,
-  };
+    oldestPendingAt };
 }
 
 // 이전 시그니처/타입 호환을 위한 export — 사용처 없음.

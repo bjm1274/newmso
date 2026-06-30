@@ -113,8 +113,7 @@ function renderInline(tokens: InlineToken[]): ReactNode[] {
             padding: '1px 5px',
             borderRadius: 4,
             background: 'var(--m-bg)',
-            color: 'var(--m-accent)',
-          }}
+            color: 'var(--m-accent)' }}
         >
           {tok.value}
         </code>
@@ -221,8 +220,7 @@ function BoardMarkdownBase({ source }: BoardMarkdownProps) {
         color: 'var(--z-700)',
         lineHeight: 1.75,
         fontWeight: 500,
-        wordBreak: 'break-word',
-      }}
+        wordBreak: 'break-word' }}
     >
       {grouped.map((g, idx) => {
         if ('items' in g) {
@@ -297,8 +295,7 @@ function BoardMarkdownBase({ source }: BoardMarkdownProps) {
                 padding: '4px 12px',
                 borderLeft: '3px solid var(--m-border)',
                 color: 'var(--z-600)',
-                fontStyle: 'italic',
-              }}
+                fontStyle: 'italic' }}
             >
               {renderInline(tokenizeInline(g.text))}
             </blockquote>

@@ -52,8 +52,7 @@ export default function MRI일정({ user, onBack }: { user: ErpUser; onBack: () 
         style={{
           padding: '10px 16px 0',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg">
           <button type="button" className={tab === 'today' ? 'on' : ''} onClick={() => setTab('today')}>
@@ -82,8 +81,7 @@ export default function MRI일정({ user, onBack }: { user: ErpUser; onBack: () 
                   marginBottom: 12,
                   background: 'var(--m-accent)',
                   borderColor: 'transparent',
-                  color: '#fff',
-                }}
+                  color: '#fff' }}
               >
                 <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 800, letterSpacing: '0.04em' }}>
                   현재 촬영중
@@ -109,8 +107,7 @@ export default function MRI일정({ user, onBack }: { user: ErpUser; onBack: () 
                     display: 'grid',
                     gridTemplateColumns: '52px 1fr auto',
                     gap: 12,
-                    alignItems: 'center',
-                  }}
+                    alignItems: 'center' }}
                 >
                   <div className="m-tnum" style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-700)' }}>
                     {m.time}
@@ -122,8 +119,7 @@ export default function MRI일정({ user, onBack }: { user: ErpUser; onBack: () 
                         fontSize: 11,
                         color: 'var(--z-500)',
                         fontWeight: 600,
-                        marginTop: 1,
-                      }}
+                        marginTop: 1 }}
                     >
                       {m.exam} · {m.department}
                     </div>

@@ -12,8 +12,7 @@ export function getMonthBoundaries(yearMonth: string): { startDate: string; endD
   const lastDay = new Date(year, month, 0).getDate();
   return {
     startDate: `${yearMonth}-01`,
-    endDate: `${yearMonth}-${String(lastDay).padStart(2, '0')}`,
-  };
+    endDate: `${yearMonth}-${String(lastDay).padStart(2, '0')}` };
 }
 
 /**

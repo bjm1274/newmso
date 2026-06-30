@@ -25,8 +25,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to process birthday announcements',
-      },
+        error: error instanceof Error ? error.message : 'Failed to process birthday announcements' },
       { status: 500 },
     );
   }

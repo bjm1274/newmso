@@ -2,8 +2,8 @@
 import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { isMissingColumnError } from '@/lib/db-compat';
 import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
 
@@ -67,16 +67,14 @@ const REASON_BADGE: Record<string, { bg: string; text: string; icon: string }> =
   지각:   { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', icon: '⏰' },
   조퇴:   { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', icon: '🚶' },
   미체크: { bg: 'bg-slate-100 dark:bg-slate-800',    text: 'text-slate-600 dark:text-slate-400', icon: '❓' },
-  미출근: { bg: 'bg-orange-100 dark:bg-orange-900/30',text: 'text-orange-600 dark:text-orange-400',icon: '⚠️' },
-};
+  미출근: { bg: 'bg-orange-100 dark:bg-orange-900/30',text: 'text-orange-600 dark:text-orange-400',icon: '⚠️' } };
 
 export default function AttendanceCorrectionForm({
   user,
   initialSelectedDates = [],
   onConsumeInitialSelectedDates,
   setExtraData,
-  setFormTitle,
-}: AttendanceCorrectionFormProps) {
+  setFormTitle }: AttendanceCorrectionFormProps) {
   const [corrections, setCorrections] = useState<any[]>([]);
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
   const [problemDatesLoading, setProblemDatesLoading] = useState(false);
@@ -90,12 +88,12 @@ export default function AttendanceCorrectionForm({
   const fetchCorrections = useCallback(async () => {
     const { data } = await withAttendanceCorrectionsFallback<any[]>(
       () =>
-        supabase
+        db
           .from('attendance_corrections')
           .select('*')
           .order('requested_at', { ascending: false }),
       () =>
-        supabase
+        db
           .from('attendance_corrections')
           .select('*')
           .order('created_at', { ascending: false }),
@@ -128,13 +126,13 @@ export default function AttendanceCorrectionForm({
         // staff_shift_assignments(is_primary) → staff_members.shift_id 폴백
         primaryShiftId,
       ] = await Promise.all([
-        supabase.from('attendance').select('staff_id, date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
-        supabase.from('attendances').select('staff_id, work_date, status, check_in_time, check_out_time').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        db.from('attendance').select('staff_id, date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
+        db.from('attendances').select('staff_id, work_date, status, check_in_time, check_out_time').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
         withAttendanceCorrectionsFallback<any[]>(
-          () => supabase.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
-          () => supabase.from('attendance_corrections').select('original_date').eq('staff_id', user.id),
+          () => db.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
+          () => db.from('attendance_corrections').select('original_date').eq('staff_id', user.id),
         ).then((r) => r),
-        supabase.from('shift_assignments').select('work_date, shift_id').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        db.from('shift_assignments').select('work_date, shift_id').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
         getPrimaryShift(String(user.id)),
       ]);
 
@@ -150,7 +148,7 @@ export default function AttendanceCorrectionForm({
       );
       const shiftsMap = new Map<string, any>();
       if (shiftIdSet.size > 0) {
-        const { data: shiftRows } = await supabase
+        const { data: shiftRows } = await db
           .from('work_shifts')
           .select('id, name, shift_type, start_time, weekly_work_days, is_weekend_work')
           .in('id', Array.from(shiftIdSet));
@@ -269,8 +267,7 @@ export default function AttendanceCorrectionForm({
               label: '출퇴근 미체크',
               checkIn: null,
               checkOut: null,
-              scheduledStart,
-            });
+              scheduledStart });
             continue;
           }
         }
@@ -349,8 +346,7 @@ export default function AttendanceCorrectionForm({
       form_name: '출결정정',
       correction_dates: selectedDates,
       correction_type: correctionType,
-      correction_reason: reason,
-    });
+      correction_reason: reason });
   }, [selectedDates, correctionType, reason, setExtraData]);
 
   useEffect(() => {
@@ -385,16 +381,15 @@ export default function AttendanceCorrectionForm({
         reason: reason.trim(),
         correction_type: correctionType,
         requested_at: requestedAt,
-        status: '대기',
-      }));
+        status: '대기' }));
 
       const { error } = await withAttendanceCorrectionsFallback<null>(
-        () => supabase.from('attendance_corrections').insert(rows),
+        () => db.from('attendance_corrections').insert(rows),
         () => {
           const legacyRows = rows.map(
             ({ attendance_date, requested_at, ...rest }) => rest
           );
-          return supabase.from('attendance_corrections').insert(legacyRows);
+          return db.from('attendance_corrections').insert(legacyRows);
         }
       );
       if (error) throw error;
@@ -421,17 +416,16 @@ export default function AttendanceCorrectionForm({
     const statusMap: Record<string, { att: string; atts: string }> = {
       정상반영: { att: '정상', atts: 'present' },
       지각처리: { att: '지각', atts: 'late' },
-      결근처리: { att: '결근', atts: 'absent' },
-    };
+      결근처리: { att: '결근', atts: 'absent' } };
 
     const { att, atts } = statusMap[correctionTypeValue] || statusMap[DEFAULT_CORRECTION_TYPE];
 
-    await supabase.from('attendance').upsert(
+    await db.from('attendance').upsert(
       { staff_id: staffId, date: dateStr, status: att },
       { onConflict: 'staff_id,date' }
     );
 
-    await supabase.from('attendances').upsert(
+    await db.from('attendances').upsert(
       { staff_id: staffId, work_date: dateStr, status: atts },
       { onConflict: 'staff_id,work_date' }
     );

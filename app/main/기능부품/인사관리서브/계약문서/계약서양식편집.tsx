@@ -1,13 +1,12 @@
 'use client';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
   CONTRACT_TEMPLATE_VARIABLES as VARIABLES,
   DEFAULT_CONTRACT_TEMPLATE as DEFAULT_TEMPLATE,
-  upgradeLegacyContractTemplate,
-} from '@/lib/contract-template-defaults';
+  upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
 import { escapeHtml } from '@/lib/escape-html';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -15,8 +14,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   사업자: 'bg-violet-50 text-violet-700 border-violet-200',
   계약: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   임금: 'bg-orange-500/10 text-orange-700 border-orange-500/20',
-  근무: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-};
+  근무: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
 
 interface TemplateEditorProps {
   selectedCo?: string;
@@ -41,7 +39,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
 
   const loadTemplate = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await db
       .from('contract_templates')
       .select('template_content, seal_url')
       .eq('company_name', targetCompany)
@@ -60,7 +58,7 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
     setSaving(true);
     const normalizedTemplateContent = upgradeLegacyContractTemplate(templateContent);
     setTemplateContent(normalizedTemplateContent);
-    const { error } = await supabase
+    const { error } = await db
       .from('contract_templates')
       .upsert(
         { company_name: targetCompany, template_content: normalizedTemplateContent, seal_url: sealUrl, updated_at: new Date().toISOString() },

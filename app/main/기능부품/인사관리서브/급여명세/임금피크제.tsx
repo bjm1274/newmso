@@ -23,26 +23,22 @@ const WAGE_PEAK_COLUMNS: Column<EnrichedStaff>[] = [
   { key: 'position', label: '직위', align: 'left' },
   {
     key: 'base', label: '기본급', align: 'right',
-    render: (r) => r.base.toLocaleString(),
-  },
+    render: (r) => r.base.toLocaleString() },
   {
     key: 'rate', label: '적용 비율', align: 'center',
     render: (r) => (
       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${r.isPeakTarget ? 'bg-orange-500/20 text-orange-700' : 'bg-green-500/20 text-green-700'}`}>
         {Math.round(r.rate * 100)}%
       </span>
-    ),
-  },
+    ) },
   {
     key: 'adjustedSalary', label: '적용 후 급여', align: 'right',
-    render: (r) => <span className="font-bold">{r.adjustedSalary.toLocaleString()}</span>,
-  },
+    render: (r) => <span className="font-bold">{r.adjustedSalary.toLocaleString()}</span> },
   {
     key: 'reduction', label: '월 감액', align: 'right',
     render: (r) => r.reduction > 0
       ? <span className="text-red-500">-{r.reduction.toLocaleString()}</span>
-      : '-',
-  },
+      : '-' },
 ];
 
 const DEFAULT_STEPS = [
@@ -103,8 +99,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo }: { staffs
       rate,
       adjustedSalary,
       reduction,
-      isPeakTarget,
-    };
+      isPeakTarget };
   });
 
   const peakTargets = enriched.filter(s => s.isPeakTarget);

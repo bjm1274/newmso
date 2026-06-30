@@ -15,10 +15,10 @@ try {
   }
 
   console.log('Running build:cloudflare...');
-  execSync('npm run build:cloudflare', { stdio: 'inherit' });
+  execSync('npm.cmd run build:cloudflare', { stdio: 'inherit' });
 
   console.log('Running deploy:cloudflare...');
-  execSync('npm run deploy:cloudflare', { stdio: 'inherit' });
+  execSync('npm.cmd run deploy:cloudflare', { stdio: 'inherit' });
 
   console.log('Deployment completed successfully!');
 } catch (error) {

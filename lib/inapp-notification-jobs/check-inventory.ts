@@ -11,15 +11,13 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import {
   getD1Binding,
   getD1Drizzle,
   inventory as inventoryTable,
   staff_members as staffMembersTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 type InventoryRow = {
   id: string;
@@ -62,8 +60,7 @@ async function loadInventoryRecipients(): Promise<string[]> {
     .select({
       id: staffMembersTable.id,
       department: staffMembersTable.department,
-      permissions: staffMembersTable.permissions,
-    })
+      permissions: staffMembersTable.permissions })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.status, '재직'));
   // D1에서 permissions는 TEXT(JSON) → parsePermissions가 문자열도 처리하므로 그대로 전달 가능
@@ -97,8 +94,7 @@ export async function checkInventoryLowStock(): Promise<CheckJobResult> {
       quantity: inventoryTable.quantity,
       stock: inventoryTable.stock,
       min_stock: inventoryTable.min_stock,
-      min_quantity: inventoryTable.min_quantity,
-    })
+      min_quantity: inventoryTable.min_quantity })
     .from(inventoryTable)
     .limit(1000);
   const items = d1Rows as InventoryRow[];
@@ -145,10 +141,8 @@ export async function checkInventoryLowStock(): Promise<CheckJobResult> {
           item_id: item.id,
           stock,
           min_stock: minStock,
-          dedupe_key: dedupeKey,
-        },
-        read_at: null,
-      });
+          dedupe_key: dedupeKey },
+        read_at: null });
     }
   }
 

@@ -3,8 +3,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export type StaffCredentialRow = {
   id: string;
@@ -28,14 +27,12 @@ export async function verifyStoredPassword(storedPassword: string, inputPassword
   if (storedPassword.startsWith('$2')) {
     return {
       ok: await bcrypt.compare(inputPassword, storedPassword),
-      needsHashUpgrade: false,
-    };
+      needsHashUpgrade: false };
   }
 
   return {
     ok: storedPassword === inputPassword,
-    needsHashUpgrade: storedPassword === inputPassword,
-  };
+    needsHashUpgrade: storedPassword === inputPassword };
 }
 
 // ----------------------------------------------------------------
@@ -53,8 +50,7 @@ export async function selectStaffCredentialByIdD1(staffId: string): Promise<Staf
       name: staffMembersTable.name,
       employee_no: staffMembersTable.employee_no,
       password: staffMembersTable.password,
-      passwd: staffMembersTable.passwd,
-    })
+      passwd: staffMembersTable.passwd })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.id, staffId))
     .limit(1);
@@ -65,8 +61,7 @@ export async function selectStaffCredentialByIdD1(staffId: string): Promise<Staf
     name: row.name ?? null,
     employee_no: row.employee_no ?? null,
     password: row.password ?? null,
-    passwd: row.passwd ?? null,
-  };
+    passwd: row.passwd ?? null };
 }
 
 /** D1에서 staff_members 비밀번호 행 목록 조회 (by employee_no) */
@@ -80,8 +75,7 @@ export async function selectStaffCredentialsByEmployeeNoD1(employeeNo: string): 
       name: staffMembersTable.name,
       employee_no: staffMembersTable.employee_no,
       password: staffMembersTable.password,
-      passwd: staffMembersTable.passwd,
-    })
+      passwd: staffMembersTable.passwd })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.employee_no, employeeNo))
     .limit(3);
@@ -90,8 +84,7 @@ export async function selectStaffCredentialsByEmployeeNoD1(employeeNo: string): 
     name: row.name ?? null,
     employee_no: row.employee_no ?? null,
     password: row.password ?? null,
-    passwd: row.passwd ?? null,
-  }));
+    passwd: row.passwd ?? null }));
 }
 
 /** D1에서 staff_members 비밀번호 행 목록 조회 (by name) */
@@ -105,8 +98,7 @@ export async function selectStaffCredentialsByNameD1(name: string): Promise<Staf
       name: staffMembersTable.name,
       employee_no: staffMembersTable.employee_no,
       password: staffMembersTable.password,
-      passwd: staffMembersTable.passwd,
-    })
+      passwd: staffMembersTable.passwd })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.name, name))
     .limit(5);
@@ -115,8 +107,7 @@ export async function selectStaffCredentialsByNameD1(name: string): Promise<Staf
     name: row.name ?? null,
     employee_no: row.employee_no ?? null,
     password: row.password ?? null,
-    passwd: row.passwd ?? null,
-  }));
+    passwd: row.passwd ?? null }));
 }
 
 // ----------------------------------------------------------------

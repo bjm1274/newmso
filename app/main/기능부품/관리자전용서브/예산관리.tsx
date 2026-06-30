@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -13,8 +13,7 @@ const BudgetBarChart = dynamic(() => import('./charts/BudgetBarChart'), {
     <div className="flex h-[260px] items-center justify-center text-xs text-[var(--toss-gray-3)]">
       차트를 불러오는 중...
     </div>
-  ),
-});
+  ) });
 
 const BUDGET_ITEMS = ['인건비', '운영비', '장비', '기타'] as const;
 type BudgetItem = typeof BUDGET_ITEMS[number];
@@ -58,8 +57,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
     item: '인건비' as BudgetItem,
-    amount: '',
-  });
+    amount: '' });
 
   // 집행 등록 상태
   const [executions, setExecutions] = useState<BudgetExecution[]>([]);
@@ -68,8 +66,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
     item: '인건비' as BudgetItem,
     amount: '',
     date: getKoreanTodayString(),
-    memo: '',
-  });
+    memo: '' });
 
   const [showExecForm, setShowExecForm] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -87,8 +84,8 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
     (async () => {
       // MSO 설계상 회사 격리 불필요 — 전사 조회(필터 없음).
       const [{ data: settingRows }, { data: execRows }] = await Promise.all([
-        supabase.from('budget_settings').select('*'),
-        supabase.from('budget_executions').select('*'),
+        db.from('budget_settings').select('*'),
+        db.from('budget_executions').select('*'),
       ]);
       if (!alive) return;
       setSettings(
@@ -99,8 +96,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
           month: Number(r.month),
           item: r.item as BudgetItem,
           amount: Number(r.amount) || 0,
-          createdAt: r.created_at ?? '',
-        })),
+          createdAt: r.created_at ?? '' })),
       );
       setExecutions(
         ((execRows as any[]) ?? []).map(r => ({
@@ -111,8 +107,7 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
           // DB 컬럼 exec_date → UI 모델 date 로 매핑
           date: r.exec_date ?? '',
           memo: r.memo ?? '',
-          createdAt: r.created_at ?? '',
-        })),
+          createdAt: r.created_at ?? '' })),
       );
     })();
     return () => {
@@ -130,24 +125,22 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       month: settingForm.month,
       item: settingForm.item,
       amount: Number(settingForm.amount),
-      createdAt: new Date().toISOString(),
-    };
+      createdAt: new Date().toISOString() };
     setSettings(prev => [...prev, newItem]);
     setSettingForm(f => ({ ...f, amount: '', dept: '' }));
-    await supabase.from('budget_settings').insert({
+    await db.from('budget_settings').insert({
       id: newItem.id,
       company: null,
       dept: newItem.dept,
       year: newItem.year,
       month: newItem.month,
       item: newItem.item,
-      amount: newItem.amount,
-    });
+      amount: newItem.amount });
   };
 
   const handleDeleteSetting = async (id: string) => {
     setSettings(prev => prev.filter(s => s.id !== id));
-    await supabase.from('budget_settings').delete().eq('id', id);
+    await db.from('budget_settings').delete().eq('id', id);
   };
 
   const handleAddExecution = async () => {
@@ -160,12 +153,11 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       amount: Number(execForm.amount),
       date: execForm.date,
       memo: execForm.memo,
-      createdAt: new Date().toISOString(),
-    };
+      createdAt: new Date().toISOString() };
     setExecutions(prev => [...prev, newExec]);
     setExecForm(f => ({ ...f, amount: '', memo: '' }));
     setShowExecForm(false);
-    await supabase.from('budget_executions').insert({
+    await db.from('budget_executions').insert({
       id: newExec.id,
       company: null,
       dept: newExec.dept,
@@ -173,13 +165,12 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       amount: newExec.amount,
       // UI 모델 date → DB 컬럼 exec_date 로 매핑
       exec_date: newExec.date,
-      memo: newExec.memo,
-    });
+      memo: newExec.memo });
   };
 
   const handleDeleteExecution = async (id: string) => {
     setExecutions(prev => prev.filter(e => e.id !== id));
-    await supabase.from('budget_executions').delete().eq('id', id);
+    await db.from('budget_executions').delete().eq('id', id);
   };
 
   // 집행 현황 차트 데이터 생성

@@ -7,8 +7,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+  type ReactNode } from 'react';
 import { useIsMobile } from './useIsMobile';
 
 export type KpiTrend = 'up' | 'down' | 'flat';
@@ -33,8 +32,7 @@ export type SwipeableKpiCardsProps = {
 const trendStyles: Record<KpiTrend, { text: string; bg: string; symbol: string }> = {
   up: { text: 'text-[var(--success)]', bg: 'bg-[var(--success-light)]', symbol: '▲' },
   down: { text: 'text-[var(--danger)]', bg: 'bg-[var(--danger-light)]', symbol: '▼' },
-  flat: { text: 'text-[var(--zinc-500)]', bg: 'bg-[var(--tab-bg)]', symbol: '–' },
-};
+  flat: { text: 'text-[var(--zinc-500)]', bg: 'bg-[var(--tab-bg)]', symbol: '–' } };
 
 function KpiCardItem({ card, isActive }: { card: KpiCard; isActive: boolean }) {
   const trend = card.delta ? trendStyles[card.delta.trend] : null;
@@ -83,8 +81,7 @@ function KpiCardItem({ card, isActive }: { card: KpiCard; isActive: boolean }) {
 export function SwipeableKpiCards({
   cards,
   className = '',
-  ariaLabel = 'KPI 지표 카드',
-}: SwipeableKpiCardsProps) {
+  ariaLabel = 'KPI 지표 카드' }: SwipeableKpiCardsProps) {
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -197,8 +194,7 @@ export function SwipeableKpiCards({
         style={{
           scrollSnapType: 'x mandatory',
           WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-        }}
+          scrollbarWidth: 'none' }}
       >
         {cards.map((card, idx) => (
           <div

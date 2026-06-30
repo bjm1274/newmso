@@ -3,9 +3,9 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
@@ -80,8 +80,7 @@ function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
     saturday.setDate(sunday.getDate() + 6);
     return {
       start: sunday.toLocaleDateString('en-CA'),
-      end: saturday.toLocaleDateString('en-CA'),
-    };
+      end: saturday.toLocaleDateString('en-CA') };
   }
 
   const year = baseDate.getFullYear();
@@ -89,8 +88,7 @@ function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
   const lastDay = new Date(year, baseDate.getMonth() + 1, 0).getDate();
   return {
     start: `${year}-${month}-01`,
-    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}`,
-  };
+    end: `${year}-${month}-${String(lastDay).padStart(2, '0')}` };
 }
 
 function getPriorityMeta(priority: unknown) {
@@ -147,8 +145,7 @@ function formatReminder(value: unknown) {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit',
-  });
+    minute: '2-digit' });
 }
 
 function getNextTaskDate(taskDate: string, repeatType: TodoRepeatType | undefined) {
@@ -199,12 +196,11 @@ async function resolveTodoChatSource(task: TodoRow) {
   if (!sourceMessageId) {
     return {
       roomId: sourceRoomId,
-      messageId: '',
-    };
+      messageId: '' };
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('messages')
       .select('id, room_id')
       .eq('id', sourceMessageId)
@@ -216,14 +212,12 @@ async function resolveTodoChatSource(task: TodoRow) {
     const resolvedRoomId = String(sourceMessage?.room_id || '').trim();
     return {
       roomId: resolvedRoomId || sourceRoomId,
-      messageId: String(sourceMessage?.id || sourceMessageId).trim(),
-    };
+      messageId: String(sourceMessage?.id || sourceMessageId).trim() };
   } catch {
     if (!sourceRoomId) return null;
     return {
       roomId: sourceRoomId,
-      messageId: sourceMessageId,
-    };
+      messageId: sourceMessageId };
   }
 }
 
@@ -321,7 +315,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
     try {
       setLoading(true);
-      let query = supabase
+      let query = db
         .from('todos')
         .select('*')
         .eq('user_id', userId);
@@ -376,8 +370,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       priority: newPriority,
       reminder_at: reminderAt,
       repeat_type: newRepeatType,
-      assignee_kind: newAssigneeKind,
-    };
+      assignee_kind: newAssigneeKind };
 
     const payload: Record<string, unknown> = {
       user_id: effectiveUserId,
@@ -387,8 +380,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       priority: newPriority,
       reminder_at: reminderAt,
       repeat_type: newRepeatType,
-      assignee_kind: newAssigneeKind,
-    };
+      assignee_kind: newAssigneeKind };
 
     setTasks((prev) => sortTasks([optimisticTask, ...prev]));
     setNewTask('');
@@ -401,7 +393,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     try {
       const result = await withMissingColumnsFallback(
         (omittedColumns) =>
-          supabase
+          db
             .from('todos')
             .insert([normalizeTodoPayload(payload, omittedColumns)])
             .select()
@@ -435,7 +427,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     );
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('todos')
         .update({ is_complete: !currentStatus })
         .eq('id', taskId);
@@ -448,7 +440,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
           let duplicateRows: Array<{ id: string | number }> = [];
           const duplicateQuery = () =>
-            supabase
+            db
               .from('todos')
               .select('id')
               .eq('user_id', effectiveUserId)
@@ -481,12 +473,11 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
               source_message_id: targetTask.source_message_id || null,
               source_room_id: targetTask.source_room_id || null,
               repeat_parent_id: repeatParentId,
-              repeat_generated_from_id: String(targetTask.id),
-            };
+              repeat_generated_from_id: String(targetTask.id) };
 
             const recurringResult = await withMissingColumnsFallback(
               (omittedColumns) =>
-                supabase
+                db
                   .from('todos')
                   .insert([normalizeTodoPayload(recurringPayload, omittedColumns)]),
               [...OPTIONAL_TODO_COLUMNS]
@@ -515,13 +506,12 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       description: '이 할일을 삭제할까요?',
       confirmText: '삭제',
       cancelText: '취소',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!shouldDelete) return;
 
     setTasks((prev) => prev.filter((task) => String(task.id) !== String(taskId)));
     try {
-      const { error } = await supabase.from('todos').delete().eq('id', taskId);
+      const { error } = await db.from('todos').delete().eq('id', taskId);
       if (error) throw error;
     } catch (error) {
       console.error('[나의할일] 삭제 실패:', error);
@@ -543,7 +533,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
     if (String(task.source_room_id || '').trim() !== resolvedSource.roomId) {
       void (async () => {
-        await supabase
+        await db
           .from('todos')
           .update({ source_room_id: resolvedSource.roomId })
           .eq('id', task.id);
@@ -578,8 +568,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     urgent: 'danger',
     high: 'warn',
     medium: 'accent',
-    low: 'muted',
-  };
+    low: 'muted' };
   const allOpenCount = tasks.filter((t) => !t.is_complete).length;
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     const ac = Number(Boolean(a.is_complete));
@@ -816,8 +805,7 @@ function TodoItem({
   priToneMap,
   onToggle,
   onDelete,
-  onChatNavigate,
-}: {
+  onChatNavigate }: {
   task: TodoRow;
   priToneMap: Record<TodoPriority | 'all', 'accent' | 'danger' | 'warn' | 'muted'>;
   onToggle: (id: string | number, currentStatus: boolean) => void;

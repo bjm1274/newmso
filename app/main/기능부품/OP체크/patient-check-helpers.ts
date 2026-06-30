@@ -51,8 +51,7 @@ export function buildPatientCheckSignature(state: PatientCheckState | null) {
       : [],
     surgery_started_at: state.surgery_started_at || null,
     surgery_ended_at: state.surgery_ended_at || null,
-    ward_message_sent_at: state.ward_message_sent_at || null,
-  });
+    ward_message_sent_at: state.ward_message_sent_at || null });
 }
 
 export function buildWardMessageContent(messageText: string, checkForm: PatientCheckState | null) {
@@ -65,8 +64,7 @@ export function buildWardMessageContent(messageText: string, checkForm: PatientC
     chart_no: stripHiddenMetaBlocks(checkForm?.chart_no),
     surgery_name: stripHiddenMetaBlocks(checkForm?.surgery_name),
     schedule_room: stripHiddenMetaBlocks(checkForm?.schedule_room || '미정') || '미정',
-    schedule_time: stripHiddenMetaBlocks(checkForm?.schedule_time || '미정') || '미정',
-  };
+    schedule_time: stripHiddenMetaBlocks(checkForm?.schedule_time || '미정') || '미정' };
 
   return `${normalizedText}\n${WARD_MESSAGE_META_PREFIX}${JSON.stringify(meta)}${WARD_MESSAGE_META_SUFFIX}`;
 }
@@ -88,21 +86,18 @@ export function buildWardMessageTemplateOptions(checkForm: PatientCheckState | n
       label: '기본 안내',
       text:
         `[수술실 메시지] ${patientLabel} ${surgeryName} 수술 준비가 완료되었습니다.\n` +
-        `환자 처치 후 수술실로 올려주세요.\n${scheduleLabel}`,
-    },
+        `환자 처치 후 수술실로 올려주세요.\n${scheduleLabel}` },
     {
       id: 'move-request',
       label: '이동 요청',
       text:
         `[수술실 이동 요청] ${patientLabel} ${surgeryName} 준비 완료되었습니다.\n` +
-        `지금 수술실로 이동 부탁드립니다.\n${scheduleLabel}`,
-    },
+        `지금 수술실로 이동 부탁드립니다.\n${scheduleLabel}` },
     {
       id: 'after-treatment',
       label: '검사 후 이동',
       text:
         `[수술실 이동 요청] ${patientLabel} ${surgeryName} 예정입니다.\n` +
-        `검사/처치 완료 후 수술실로 올려주세요.\n${scheduleLabel}`,
-    },
+        `검사/처치 완료 후 수술실로 올려주세요.\n${scheduleLabel}` },
   ];
 }

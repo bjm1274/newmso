@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -44,8 +44,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['messages', 'message_reads', 'room_notification_settings', 'chat_rooms'],
     recovery: '백업 파일 또는 DB 스냅샷 없이는 대화 이력 복원이 어렵습니다.',
     confirmationText: '채팅 초기화',
-    dangerLevel: 'critical',
-  },
+    dangerLevel: 'critical' },
   {
     type: 'inventory',
     label: '재고 현황 및 입출고 로그 전체 삭제',
@@ -53,8 +52,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['inventory_logs', 'inventory'],
     recovery: '재고 기준 수량과 이력 재입력이 필요할 수 있습니다.',
     confirmationText: '재고 초기화',
-    dangerLevel: 'critical',
-  },
+    dangerLevel: 'critical' },
   {
     type: 'board',
     label: '게시판 게시물 전체 삭제',
@@ -62,8 +60,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['posts', 'board_post_comments', 'board_posts'],
     recovery: '공지와 댓글 이력은 백업 기준으로만 복구할 수 있습니다.',
     confirmationText: '게시판 초기화',
-    dangerLevel: 'critical',
-  },
+    dangerLevel: 'critical' },
   {
     type: 'schedule',
     label: '수술일정 및 MRI일정표 전체 삭제',
@@ -71,8 +68,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['board_posts: 수술일정, MRI일정표, mri'],
     recovery: '운영 일정이 즉시 사라지므로 최근 백업 여부를 먼저 확인해야 합니다.',
     confirmationText: '일정 초기화',
-    dangerLevel: 'critical',
-  },
+    dangerLevel: 'critical' },
   {
     type: 'system_logs',
     label: '시스템 활동 및 접속 로그 초기화',
@@ -80,8 +76,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['audit_logs'],
     recovery: '감사 추적 자료가 사라지므로 별도 보관본이 필요합니다.',
     confirmationText: '로그 초기화',
-    dangerLevel: 'warning',
-  },
+    dangerLevel: 'warning' },
   {
     type: 'expired_contracts',
     label: '30일 경과 미체결 계약서 초안 일괄 삭제',
@@ -89,8 +84,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['employment_contracts: status=pending, created_at<30일'],
     recovery: '체결 전 초안만 삭제되지만 재생성이 필요할 수 있습니다.',
     confirmationText: '계약 초안 삭제',
-    dangerLevel: 'warning',
-  },
+    dangerLevel: 'warning' },
   {
     type: 'expired_popups',
     label: '비활성화된 홈페이지 팝업 데이터 정리',
@@ -98,8 +92,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['popups: is_active=false'],
     recovery: '비활성 팝업 템플릿을 다시 사용할 수 없습니다.',
     confirmationText: '팝업 정리',
-    dangerLevel: 'warning',
-  },
+    dangerLevel: 'warning' },
   {
     type: 'force_logout',
     label: '모든 시스템 접속자 강제 로그아웃',
@@ -107,8 +100,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['system_configs: min_auth_time'],
     recovery: '데이터 삭제는 없지만 전체 사용자의 진행 중 작업이 끊길 수 있습니다.',
     confirmationText: '전체 로그아웃',
-    dangerLevel: 'warning',
-  },
+    dangerLevel: 'warning' },
   {
     type: 'staff',
     label: '관리자 제외 전 직원 계정 및 데이터 삭제',
@@ -117,8 +109,7 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['staff_members 및 직원 연결 업무 데이터', '서버 reset-staff 정책 범위'],
     recovery: '가장 위험한 초기화입니다. 실행 직전 전체 백업을 권장합니다.',
     confirmationText: '직원 데이터 초기화',
-    dangerLevel: 'critical',
-  },
+    dangerLevel: 'critical' },
 ];
 
 function formatDateTime(value?: string | null) {
@@ -157,7 +148,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
     const loadLatestBackup = async () => {
       setBackupLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('backup_restore_runs')
           .select('file_name,status,total_tables,total_rows,started_at,finished_at')
           .order('started_at', { ascending: false })
@@ -197,8 +188,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
     const res = await fetch('/api/admin/verify-unlock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
+      body: JSON.stringify({ password }) });
     const data = await res.json().catch(() => ({ ok: false }));
     if (data.ok) {
       setIsUnlocked(true);
@@ -216,8 +206,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
       const res = await fetch('/api/admin/verify-unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
+        body: JSON.stringify({ password }) });
       const data = await res.json().catch(() => ({ ok: false }));
       return res.ok && data?.ok === true;
     } catch {
@@ -253,8 +242,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         const res = await fetch('/api/admin/data-reset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type }),
-        });
+          body: JSON.stringify({ type }) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) {
           throw new Error(data?.error || `HTTP ${res.status}`);
@@ -264,8 +252,7 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         const res = await fetch('/api/admin/reset-staff', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password }),
-        });
+          body: JSON.stringify({ password }) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
         toast((data?.message || '삭제 완료') + " 페이지를 새로고침합니다.", 'success');
@@ -434,8 +421,7 @@ function ResetButton({
   badge,
   disabled,
   loading,
-  dangerLevel,
-}: {
+  dangerLevel }: {
   onClick: () => void;
   label: string;
   badge?: string;

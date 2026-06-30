@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, memo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toDateKey } from '@/lib/date-utils';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnFallback } from '@/lib/db-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
 import { getStaffShiftsBatch, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
@@ -78,8 +78,7 @@ const BAND_ORDER: Record<ShiftBand, number> = {
   E: 1,
   N: 2,
   OTHER: 3,
-  NONE: 4,
-};
+  NONE: 4 };
 
 
 function shiftTimeLabel(value?: string | null) {
@@ -98,8 +97,7 @@ function formatDisplayDate(date: Date) {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    weekday: 'long',
-  });
+    weekday: 'long' });
 }
 
 function formatMonthLabel(date: Date) {
@@ -119,8 +117,7 @@ function formatClockLabel(value?: string | null) {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
-        timeZone: 'Asia/Seoul',
-      });
+        timeZone: 'Asia/Seoul' });
     }
   }
   const timeMatch = raw.match(/(\d{2}:\d{2})/);
@@ -239,8 +236,7 @@ function WorkStatus({ user }: { user?: any }) {
     const end = getMonthEnd(selectedDate);
     return {
       startKey: toDateKey(start),
-      endKey: toDateKey(end),
-    };
+      endKey: toDateKey(end) };
   }, [selectedDate]);
 
   useEffect(() => {
@@ -250,37 +246,37 @@ function WorkStatus({ user }: { user?: any }) {
       setLoading(true);
       try {
         const [shiftRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
-          supabase
+          db
             .from('work_shifts')
             .select('id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work')
             .eq('is_active', true),
           withMissingColumnFallback(
             () =>
-              supabase
+              db
                 .from('shift_assignments')
                 .select('staff_id, shift_id, shift_name, work_date')
                 .gte('work_date', queryRange.startKey)
                 .lte('work_date', queryRange.endKey),
             () =>
-              supabase
+              db
                 .from('shift_assignments')
                 .select('staff_id, shift_id, work_date')
                 .gte('work_date', queryRange.startKey)
                 .lte('work_date', queryRange.endKey),
             'shift_name',
           ),
-          supabase
+          db
             .from('attendance')
             .select('staff_id, date, check_in, check_out, status')
             .eq('date', todayKey),
           withMissingColumnFallback(
             () =>
-              supabase
+              db
                 .from('attendances')
                 .select('staff_id, work_date, check_in_time, check_out_time, status, current_status')
                 .eq('work_date', todayKey),
             () =>
-              supabase
+              db
                 .from('attendances')
                 .select('staff_id, work_date, check_in_time, check_out_time, status')
                 .eq('work_date', todayKey),
@@ -295,15 +291,14 @@ function WorkStatus({ user }: { user?: any }) {
             ? (shiftRes.value.data as WorkShiftRow[])
             : [],
         );
-        // AppDataContext.staffs[]에서 가져옴 (별도 supabase 호출 제거)
+        // AppDataContext.staffs[]에서 가져옴 (별도 db 호출 제거)
         const loadedStaffs = appData.staffs.map((s) => ({
           id: s.id,
           name: s.name ?? null,
           shift_id: (s as any).shift_id ?? null,
           department: s.department ?? null,
           position: s.position ?? null,
-          status: s.status ?? null,
-        })) as StaffRow[];
+          status: s.status ?? null })) as StaffRow[];
         setStaffs(loadedStaffs);
 
         // 직원 목록 확정 후 다중 근무유형 배치 조회 (N+1 방지)
@@ -348,8 +343,7 @@ function WorkStatus({ user }: { user?: any }) {
             // current_status: attendances에만 존재하는 컬럼 — undefined면 existing 유지
             current_status: row.current_status !== undefined
               ? row.current_status
-              : existing?.current_status ?? null,
-          });
+              : existing?.current_status ?? null });
         });
 
         setTodayAttendance(Array.from(mergedAttendance.values()));
@@ -491,8 +485,7 @@ function WorkStatus({ user }: { user?: any }) {
       return {
         shiftId: entry.shiftId,
         name: shift?.name ?? entry.shiftId,
-        isPrimary: entry.isPrimary,
-      };
+        isPrimary: entry.isPrimary };
     });
   };
 
@@ -502,8 +495,7 @@ function WorkStatus({ user }: { user?: any }) {
   ) => {
     const shift = resolveAssignedShift(assignment, shiftLookup, {
       fallbackShiftId,
-      workDate: assignment?.work_date,
-    });
+      workDate: assignment?.work_date });
     const assignedShiftName = String(assignment?.shift_name || '').trim();
     const shiftId =
       String(
@@ -519,8 +511,7 @@ function WorkStatus({ user }: { user?: any }) {
         assignedShiftName ||
         (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
       timeRange: formatShiftRange(shift),
-      band: inferShiftBand(shift),
-    };
+      band: inferShiftBand(shift) };
   };
 
   const activeStaffs = useMemo(() => {
@@ -566,8 +557,7 @@ function WorkStatus({ user }: { user?: any }) {
           band: display.band,
           items: items.sort((left, right) =>
             String(left.staff.name || '').localeCompare(String(right.staff.name || ''), 'ko'),
-          ),
-        };
+          ) };
       })
       .sort((left, right) => {
         if (BAND_ORDER[left.band] !== BAND_ORDER[right.band]) {
@@ -659,8 +649,7 @@ function WorkStatus({ user }: { user?: any }) {
         staffs: group.staffs.sort((left, right) =>
           String(left.name || '').localeCompare(String(right.name || ''), 'ko'),
         ),
-        activeStaffIds,
-      };
+        activeStaffIds };
     });
 
     baseRows.sort((left, right) => {
@@ -675,8 +664,7 @@ function WorkStatus({ user }: { user?: any }) {
         ? baseRows
             .map((row) => ({
               ...row,
-              staffs: row.staffs.filter((staff) => activeStaffIds.has(staff.id)),
-            }))
+              staffs: row.staffs.filter((staff) => activeStaffIds.has(staff.id)) }))
             .filter((row) => row.staffs.length > 0)
         : baseRows;
 
@@ -705,8 +693,7 @@ function WorkStatus({ user }: { user?: any }) {
       rows,
       hasExplicitAssignments,
       counts: visibleCounts,
-      activeStaffCount: activeStaffIds.size,
-    };
+      activeStaffCount: activeStaffIds.size };
   }, [assignmentCountsByDate, assignments, selectedDateKey, shiftLookup, showActiveOnly, staffMap, staffShiftMap, todayAttendance, todayKey]);
 
   return (

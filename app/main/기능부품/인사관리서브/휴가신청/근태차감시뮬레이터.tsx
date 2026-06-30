@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import { calculateAttendanceDeduction, type AttendanceRecord, type DeductionRule } from '@/lib/attendance-deduction';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -27,8 +27,7 @@ const EMPTY_RULE: DeductionRule = {
   late_deduction_amount: 10000,
   early_leave_deduction_type: 'fixed',
   early_leave_deduction_amount: 10000,
-  absent_use_daily_rate: true,
-};
+  absent_use_daily_rate: true };
 
 const ATTENDANCE_REQUIRED_COLUMNS = [
   'staff_id',
@@ -53,8 +52,7 @@ function normalizeQueryError(error: unknown) {
     return {
       name: error.name,
       message: error.message,
-      stack: error.stack,
-    };
+      stack: error.stack };
   }
 
   if (error && typeof error === 'object') {
@@ -63,8 +61,7 @@ function normalizeQueryError(error: unknown) {
       code: record.code ?? null,
       message: String(record.message ?? ''),
       details: String(record.details ?? ''),
-      hint: String(record.hint ?? ''),
-    };
+      hint: String(record.hint ?? '') };
   }
 
   return { message: String(error ?? 'unknown error') };
@@ -72,8 +69,7 @@ function normalizeQueryError(error: unknown) {
 
 export default function AttendanceDeductionSimulator({
   staffs,
-  selectedCo,
-}: AttendanceDeductionSimulatorProps) {
+  selectedCo }: AttendanceDeductionSimulatorProps) {
   const [selectedMonth, setSelectedMonth] = useState(getKoreanMonthString());
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [baseSalary, setBaseSalary] = useState<number>(0);
@@ -107,7 +103,7 @@ export default function AttendanceDeductionSimulator({
     const fetchRule = async () => {
       try {
         const companies = selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('attendance_deduction_rules')
           .select('*')
           .in('company_name', companies)
@@ -125,8 +121,7 @@ export default function AttendanceDeductionSimulator({
             late_deduction_amount: Number(preferred.late_deduction_amount || 0),
             early_leave_deduction_type: preferred.early_leave_deduction_type || 'fixed',
             early_leave_deduction_amount: Number(preferred.early_leave_deduction_amount || 0),
-            absent_use_daily_rate: preferred.absent_use_daily_rate ?? true,
-          });
+            absent_use_daily_rate: preferred.absent_use_daily_rate ?? true });
         }
       } catch (error) {
         console.error('근태 차감 규칙 조회 실패:', error);
@@ -160,7 +155,7 @@ export default function AttendanceDeductionSimulator({
       try {
         const { data: attendanceRows, error: attendanceError } = await withMissingColumnsFallback(
           (omittedColumns) =>
-            supabase
+            db
               .from('attendances')
               .select(buildSelectColumns(ATTENDANCE_REQUIRED_COLUMNS, ATTENDANCE_OPTIONAL_COLUMNS, omittedColumns))
               .eq('staff_id', selectedStaffId)
@@ -171,7 +166,7 @@ export default function AttendanceDeductionSimulator({
 
         if (attendanceError) throw attendanceError;
 
-        const { data: shiftRows, error: shiftError } = await supabase
+        const { data: shiftRows, error: shiftError } = await db
           .from('shift_assignments')
           .select('staff_id, work_date, shift_id')
           .eq('staff_id', selectedStaffId)
@@ -183,8 +178,7 @@ export default function AttendanceDeductionSimulator({
             month: selectedMonth,
             staffId: selectedStaffId,
             selectedCo,
-            error: normalizeQueryError(shiftError),
-          });
+            error: normalizeQueryError(shiftError) });
         }
 
         const normalizedAttendanceRows = (attendanceRows || []) as unknown as AttendanceRecord[];
@@ -198,8 +192,7 @@ export default function AttendanceDeductionSimulator({
           month: selectedMonth,
           staffId: selectedStaffId,
           selectedCo,
-          error: normalizeQueryError(error),
-        });
+          error: normalizeQueryError(error) });
         if (active) {
           setRecords([]);
           setScheduledWorkDays(0);

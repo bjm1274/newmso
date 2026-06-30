@@ -12,8 +12,7 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -22,8 +21,7 @@ import {
   gte,
   lte,
   isNull,
-  isNotNull,
-} from '@/lib/db';
+  isNotNull } from '@/lib/db';
 
 type EducationRow = {
   id: string;
@@ -49,8 +47,7 @@ export async function checkEducationDeadline(): Promise<CheckJobResult> {
       education_name: educationRecordsTable.education_name,
       deadline: educationRecordsTable.deadline,
       completed_at: educationRecordsTable.completed_at,
-      status: educationRecordsTable.status,
-    })
+      status: educationRecordsTable.status })
     .from(educationRecordsTable)
     .where(
       and(
@@ -91,10 +88,8 @@ export async function checkEducationDeadline(): Promise<CheckJobResult> {
         type: 'education',
         record_id: row.id,
         deadline: row.deadline,
-        dedupe_key: dedupeKey,
-      },
-      read_at: null,
-    });
+        dedupe_key: dedupeKey },
+      read_at: null });
   }
 
   if (toInsert.length === 0) {

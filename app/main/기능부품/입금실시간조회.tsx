@@ -7,8 +7,7 @@ import {
   getDepositStatusLabel,
   getMatchStatusLabel,
   toAmountNumber,
-  type VirtualAccountDepositRow,
-} from '@/lib/virtual-account-deposits';
+  type VirtualAccountDepositRow } from '@/lib/virtual-account-deposits';
 
 type DepositDraft = {
   patient_name: string;
@@ -32,8 +31,7 @@ function formatDateTime(value: string | null | undefined) {
   if (Number.isNaN(parsed.getTime())) return value;
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(parsed);
+    timeStyle: 'short' }).format(parsed);
 }
 
 function getDepositStatusClass(status: string | null | undefined) {
@@ -63,8 +61,7 @@ function createDraft(row: VirtualAccountDepositRow): DepositDraft {
     matched_target_type: row.matched_target_type || '',
     matched_target_id: row.matched_target_id || '',
     matched_note: row.matched_note || '',
-    match_status: row.match_status || 'unmatched',
-  };
+    match_status: row.match_status || 'unmatched' };
 }
 
 const TOSS_BANK_ACCOUNT = '1002-4939-3286';
@@ -88,8 +85,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     patient_name: '',
     transaction_label: '',
     matched_note: '',
-    deposited_at: new Date().toISOString().slice(0, 16),
-  });
+    deposited_at: new Date().toISOString().slice(0, 16) });
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState('');
 
@@ -122,8 +118,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
       if (matchStatus !== 'all') params.set('matchStatus', matchStatus);
 
       const response = await fetch(`/api/payments/virtual-account-deposits?${params.toString()}`, {
-        cache: 'no-store',
-      });
+        cache: 'no-store' });
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
@@ -182,9 +177,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...manualForm,
-          deposited_at: manualForm.deposited_at ? new Date(manualForm.deposited_at).toISOString() : undefined,
-        }),
-      });
+          deposited_at: manualForm.deposited_at ? new Date(manualForm.deposited_at).toISOString() : undefined }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '등록 실패');
       setManualForm({ depositor_name: '', amount: '', patient_name: '', transaction_label: '', matched_note: '', deposited_at: new Date().toISOString().slice(0, 16) });
@@ -204,8 +197,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
       title: '입금 내역 삭제',
       description: `${target?.patient_name || '선택한 입금 내역'}을 삭제합니다.\n수동 등록 내역에서 제거됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     const res = await fetch(`/api/payments/virtual-account-deposits?id=${id}`, { method: 'DELETE' });
     if (res.ok) await loadDeposits({ silent: true });
@@ -234,17 +226,13 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
             bankCode: 'TOSS',
             bank: '토스뱅크',
             customerName: '테스트입금자',
-            dueDate: new Date(Date.now() + 86400000).toISOString(),
-          },
-          approvedAt: new Date().toISOString(),
-        },
-      };
+            dueDate: new Date(Date.now() + 86400000).toISOString() },
+          approvedAt: new Date().toISOString() } };
 
       const res = await fetch(`/api/payments/virtual-account-webhook?provider=toss`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testPayload),
-      });
+        body: JSON.stringify(testPayload) });
       const data = await res.json();
       if (res.ok) {
         setWebhookTestResult({ ok: true, msg: `✅ 테스트 성공! 입금 ID: ${data.depositId ?? '-'}` });
@@ -282,11 +270,8 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
           matched_target_type: '',
           matched_target_id: '',
           matched_note: '',
-          match_status: 'unmatched',
-        }),
-        [field]: value,
-      },
-    }));
+          match_status: 'unmatched' }),
+        [field]: value } }));
   };
 
   const handleSave = async (row: VirtualAccountDepositRow) => {
@@ -298,13 +283,10 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
       const response = await fetch('/api/payments/virtual-account-deposits', {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: row.id,
-          ...draft,
-        }),
-      });
+          ...draft }) });
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -315,8 +297,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
       setRows((prev) => prev.map((item) => (item.id === row.id ? saved : item)));
       setDrafts((prev) => ({
         ...prev,
-        [row.id]: createDraft(saved),
-      }));
+        [row.id]: createDraft(saved) }));
     } catch (saveError) {
       const message =
         saveError instanceof Error ? saveError.message : '입금 매칭 저장에 실패했습니다.';
@@ -485,8 +466,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                     <p>• 사업자등록증 / 통장사본 (토스뱅크 {TOSS_BANK_ACCOUNT}) 필요</p>
                     <p>• 심사 후 <strong>시크릿 키(Secret Key)</strong>와 <strong>클라이언트 키</strong> 발급</p>
                   </div>
-                ),
-              },
+                ) },
               {
                 step: 2,
                 title: '웹훅 URL 등록',
@@ -501,8 +481,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                       발급받은 웹훅 시크릿을 환경변수 VIRTUAL_ACCOUNT_WEBHOOK_TOKEN에 설정하세요
                     </p>
                   </div>
-                ),
-              },
+                ) },
               {
                 step: 3,
                 title: 'Cloudflare 환경변수 등록',
@@ -517,8 +496,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                       <p className="text-[var(--toss-gray-3)]">= 가맹점 가입 후 발급받은 시크릿 키</p>
                     </div>
                   </div>
-                ),
-              },
+                ) },
               {
                 step: 4,
                 title: '가상계좌 발급 → 입금 자동 수신',
@@ -530,8 +508,7 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                     <p>정산금은 지정한 <strong>토스뱅크 {TOSS_BANK_ACCOUNT}</strong> 계좌로 입금</p>
                     <p className="text-emerald-700 font-semibold">✅ 웹훅 테스트 버튼으로 미리 동작 확인 가능</p>
                   </div>
-                ),
-              },
+                ) },
             ].map(({ step, title, color, content }) => (
               <div key={step} className={`rounded-xl border p-3.5 ${
                 color === 'blue' ? 'bg-blue-500/10 border-blue-500/20' :

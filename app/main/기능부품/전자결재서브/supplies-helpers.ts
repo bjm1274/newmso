@@ -10,16 +10,14 @@ import {
   normalizeInventoryUnit,
   normalizeSupplyRequestCategory,
   type SupplyRequestCategory,
-  type SupplyRequestItemUnit,
-} from '@/app/main/inventory-utils';
+  type SupplyRequestItemUnit } from '@/app/main/inventory-utils';
 
 // 표·드롭다운에서 노출되는 카테고리/단위는 inventory-utils의 좁은 union을 기준으로 한다.
 // 새 양식(2026-05-18) 사양은 더 넓은 카테고리·단위를 요구하나, ledger·검증 로직이
 // 기존 union에 묶여 있으므로 호환을 위해 union을 그대로 사용한다.
 export type {
   SupplyRequestCategory,
-  SupplyRequestItemUnit,
-};
+  SupplyRequestItemUnit };
 
 export type InventoryCatalogItem = {
   name: string;
@@ -67,8 +65,7 @@ export function defaultRow(
     category: '',
     purpose: '',
     suggestions: [],
-    ...overrides,
-  };
+    ...overrides };
 }
 
 /** unknown 입력을 안전하게 SupplyRow로. (임시저장 복원·외부 데이터 진입점) */
@@ -82,8 +79,7 @@ export function buildRowFromUnknown(input: unknown): SupplyRow {
     category: normalizeSupplyRequestCategory(
       row.category || row.item_category || row.classification,
     ),
-    purpose: String(row.purpose || row.reason || '').trim(),
-  });
+    purpose: String(row.purpose || row.reason || '').trim() });
 }
 
 /** 빈 마지막 행을 통계 카드 추가 시 보존하기 위한 의미 판단. */

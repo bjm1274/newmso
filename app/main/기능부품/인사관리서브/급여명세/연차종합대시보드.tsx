@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -58,8 +58,7 @@ function PromotionBadge({ status }: PromotionBadgeProps) {
     '1차통보': 'badge badge-yellow',
     '2차통보': 'badge badge-red',
     계획서제출: 'badge badge-blue',
-    소멸: 'badge',
-  };
+    소멸: 'badge' };
   const somelClass = status === '소멸' ? 'badge bg-[var(--muted)] text-[var(--toss-gray-3)]' : map[status];
   return <span className={somelClass}>{status}</span>;
 }
@@ -69,8 +68,7 @@ function PromotionBadge({ status }: PromotionBadgeProps) {
 export default function LeaveDashboard({
   staffs = [],
   selectedCo,
-  currentUser,
-}: Record<string, unknown>) {
+  currentUser }: Record<string, unknown>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [byDept, setByDept] = useState<DeptStat[]>([]);
   const [promotionLogs, setPromotionLogs] = useState<PromotionLog[]>([]);
@@ -79,7 +77,7 @@ export default function LeaveDashboard({
   // 촉진 로그 조회
   useEffect(() => {
     void Promise.resolve(
-      supabase
+      db
         .from('annual_leave_promotion_logs')
         .select('staff_id, stage, plan_submitted_at, expiry_date, notified_at')
     ).then(({ data }) => {
@@ -110,8 +108,7 @@ export default function LeaveDashboard({
         total: v.total,
         used: v.used,
         remain: Math.max(0, v.total - v.used),
-        expiring: 0,
-      })),
+        expiring: 0 })),
     );
   }, [_staffs, selectedCo]);
 
@@ -133,7 +130,7 @@ export default function LeaveDashboard({
     if (!planDates.trim()) return toast('사용 예정일(계획)을 입력해주세요.', 'warning');
     setSubmitting(true);
     try {
-      await supabase.from('approvals').insert([
+      await db.from('approvals').insert([
         {
           sender_id: staff.id,
           sender_name: staff.name,
@@ -142,8 +139,7 @@ export default function LeaveDashboard({
           title: `[제출] ${staff.name} 연차 사용 계획서`,
           content: `미사용 연차 ${remain}일에 대한 사용 계획서입니다.\n\n사용 예정일/계획:\n${planDates}\n\n비고:\n${planReason}`,
           status: '대기',
-          meta_data: { type: 'annual_leave_plan', remaining: remain },
-        },
+          meta_data: { type: 'annual_leave_plan', remaining: remain } },
       ]);
       toast('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)', 'success');
       setPlanModalStaffId(null);
@@ -216,8 +212,7 @@ export default function LeaveDashboard({
             label: '인원',
             val: filteredStaffs.length,
             unit: '명',
-            color: 'text-[var(--foreground)]',
-          },
+            color: 'text-[var(--foreground)]' },
           {
             label: '총 연차',
             val: filteredStaffs.reduce(
@@ -225,8 +220,7 @@ export default function LeaveDashboard({
               0,
             ),
             unit: '일',
-            color: 'text-[var(--accent)]',
-          },
+            color: 'text-[var(--accent)]' },
           {
             label: '사용',
             val: filteredStaffs.reduce(
@@ -234,8 +228,7 @@ export default function LeaveDashboard({
               0,
             ),
             unit: '일',
-            color: 'text-amber-600',
-          },
+            color: 'text-amber-600' },
           {
             label: '잔여',
             val: filteredStaffs.reduce(
@@ -249,8 +242,7 @@ export default function LeaveDashboard({
               0,
             ),
             unit: '일',
-            color: 'text-emerald-600',
-          },
+            color: 'text-emerald-600' },
         ].map((stat, i) => (
           <div
             key={i}

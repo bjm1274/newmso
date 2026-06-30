@@ -38,8 +38,7 @@ function MListRowBase({
   ariaLabel,
   badge,
   badgeTone = '',
-  rightSlot,
-}: MListRowProps) {
+  rightSlot }: MListRowProps) {
   const content = (
     <>
       <div className={'ico-tile' + (iconTone ? ' tone-' + iconTone : '')}>

@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { asString, pickNumber, pickString, type Row } from '../../기능부품/재고관리워크센터/data-helpers';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -54,8 +54,7 @@ const USAGE_EMPTY: UsageStatsData = {
   prevTotalAmount: 0,
   logCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 /** 사용(소모)으로 간주하는 변동 유형: 출고/사용/소모/반품 제외(반품은 별도 탭). */
 function isConsumption(r: Row): boolean {
@@ -92,7 +91,7 @@ export function useUsageStats(): UsageStatsData {
     const load = async () => {
       try {
         const sinceIso = new Date(Date.now() - 2 * THIRTY_DAYS_MS).toISOString();
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('inventory_logs')
           .select('change_type, type, quantity, unit_price, department, created_at, prev_quantity, next_quantity')
           .gte('created_at', sinceIso)
@@ -141,8 +140,7 @@ export function useUsageStats(): UsageStatsData {
             dept,
             amount: v.amount,
             count: v.count,
-            delta: v.amount - (prev.get(dept) ?? 0),
-          }))
+            delta: v.amount - (prev.get(dept) ?? 0) }))
           .sort((a, b) => b.amount - a.amount)
           .slice(0, 8);
 
@@ -152,8 +150,7 @@ export function useUsageStats(): UsageStatsData {
           prevTotalAmount,
           logCount,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '사용 통계를 불러오지 못했습니다.';
@@ -195,8 +192,7 @@ const RETURNS_EMPTY: ReturnsData = {
   count30: 0,
   qty30: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 function isReturn(r: Row): boolean {
   return asString(r['change_type'] ?? r['type']).includes('반품');
@@ -210,7 +206,7 @@ export function useReturnsData(): ReturnsData {
 
     const load = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('inventory_logs')
           .select('change_type, type, quantity, department, actor_name, notes, created_at')
           .order('created_at', { ascending: false })
@@ -230,8 +226,7 @@ export function useReturnsData(): ReturnsData {
           qty: Math.abs(pickNumber(r, ['quantity', 'amount', 'qty'], 0)),
           dept: pickString(r, ['department', 'location'], '-'),
           who: pickString(r, ['actor_name'], '-'),
-          note: pickString(r, ['notes'], ''),
-        }));
+          note: pickString(r, ['notes'], '') }));
 
         let count30 = 0;
         let qty30 = 0;

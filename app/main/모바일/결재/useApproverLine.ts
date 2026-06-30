@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import { toApproverPick, type ApproverPick } from './결재선피커';
@@ -40,7 +40,7 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
     (async () => {
       setApproverLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
@@ -90,6 +90,5 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
     approverManual,
     pickerOpen,
     setPickerOpen,
-    applyPick,
-  };
+    applyPick };
 }

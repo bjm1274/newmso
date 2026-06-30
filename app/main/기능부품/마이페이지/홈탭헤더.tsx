@@ -36,8 +36,7 @@ const toneToIconClass: Record<HomeKpiTone, string> = {
   success: 'success',
   warn: 'warn',
   danger: 'danger',
-  muted: 'muted',
-};
+  muted: 'muted' };
 
 function HomeTabHeader({
   name,
@@ -48,8 +47,7 @@ function HomeTabHeader({
   isRetired,
   initial,
   avatarUrl,
-  kpis,
-}: HomeTabHeaderProps) {
+  kpis }: HomeTabHeaderProps) {
   return (
     <>
       {/* 프로필 카드 — 좌·우 split 1장 */}

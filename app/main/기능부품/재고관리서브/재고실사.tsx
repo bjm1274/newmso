@@ -1,9 +1,10 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useMemo } from 'react';
+import { db } from '@/lib/db-client';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
+import { StockChangePreview } from './InventoryComponents';
 
 type CountItem = { id: string; item_name: string; category: string; company: string; expected: number; actual: string; };
 
@@ -14,6 +15,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [report, setReport] = useState<any[] | null>(null);
+  const [lastFocusedItemId, setLastFocusedItemId] = useState<string | null>(null);
 
   const startSession = () => {
     const list: CountItem[] = inventory.map(item => ({
@@ -22,8 +24,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
       category: item.category || '-',
       company: item.company || '-',
       expected: getItemQuantity(item),
-      actual: '',
-    }));
+      actual: '' }));
     setItems(list);
     setSessionStarted(true);
     setReport(null);
@@ -43,17 +44,20 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
     return Boolean(
       validateInventoryQuantity(item.actual, {
         label: '실물 수량',
-        allowEmpty: true,
-      }).error,
+        allowEmpty: true }).error,
     );
   });
   const discrepancies = items.filter((item) => {
     const { quantity } = validateInventoryQuantity(item.actual, {
       label: '실물 수량',
-      allowEmpty: true,
-    });
+      allowEmpty: true });
     return quantity !== null && quantity !== item.expected;
   });
+
+  const focusedItem = useMemo(() => {
+    if (!lastFocusedItemId) return null;
+    return items.find((it) => it.id === lastFocusedItemId) || null;
+  }, [lastFocusedItemId, items]);
 
   const handleComplete = async () => {
     if (invalidEntries.length > 0) {
@@ -73,8 +77,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           '미입력 품목은 이번 실사 기록에서 제외됩니다.',
         ].join('\n'),
         confirmText: '완료 진행',
-        tone: 'accent',
-      });
+        tone: 'accent' });
       if (!confirmed) return;
     }
     setSaving(true);
@@ -82,20 +85,18 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
       const entered = items.flatMap((item) => {
         const { quantity } = validateInventoryQuantity(item.actual, {
           label: '실물 수량',
-          allowEmpty: true,
-        });
+          allowEmpty: true });
 
         return quantity === null ? [] : [{
           ...item,
-          actualQuantity: quantity,
-        }];
+          actualQuantity: quantity }];
       });
       const discrepancyList = entered.filter(item => item.actualQuantity !== item.expected);
 
       // 차이 있는 품목만 DB 업데이트
       for (const item of discrepancyList) {
-        await supabase.from('inventory').update({ quantity: item.actualQuantity, stock: item.actualQuantity }).eq('id', item.id);
-        await supabase.from('inventory_logs').insert([{
+        await db.from('inventory').update({ quantity: item.actualQuantity, stock: item.actualQuantity }).eq('id', item.id);
+        await db.from('inventory_logs').insert([{
           item_id: item.id,
           inventory_id: item.id,
           type: '실사조정',
@@ -104,13 +105,12 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           prev_quantity: item.expected,
           next_quantity: item.actualQuantity,
           actor_name: user?.name,
-          company: item.company,
-        }]);
+          company: item.company }]);
       }
 
       // 실사 기록 저장
       try {
-        await supabase.from('inventory_count_sessions').insert([{
+        await db.from('inventory_count_sessions').insert([{
           conducted_by: user?.id,
           conducted_name: user?.name,
           total_items: entered.length,
@@ -121,10 +121,8 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             category: item.category,
             expected: item.expected,
             actual: item.actualQuantity,
-            diff: item.actualQuantity - item.expected,
-          })),
-          created_at: new Date().toISOString(),
-        }]);
+            diff: item.actualQuantity - item.expected })),
+          created_at: new Date().toISOString() }]);
       } catch {
         // inventory_count_sessions 테이블 미존재 시 무시 (선택적 기록)
       }
@@ -134,8 +132,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         category: item.category,
         expected: item.expected,
         actual: item.actualQuantity,
-        diff: item.actualQuantity - item.expected,
-      })));
+        diff: item.actualQuantity - item.expected })));
       fetchInventory();
       setSessionStarted(false);
     } catch (err) {
@@ -244,6 +241,19 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         )}
       </div>
 
+      {focusedItem && focusedItem.actual !== '' && !Number.isNaN(parseInt(focusedItem.actual, 10)) && (
+        <div className="animate-in fade-in duration-200">
+          <StockChangePreview
+            itemName={focusedItem.item_name}
+            beforeQty={focusedItem.expected}
+            afterQty={parseInt(focusedItem.actual, 10) || 0}
+            unit="EA"
+            type="실사"
+            extraInfo={`분류: ${focusedItem.category} | 소속: ${focusedItem.company}`}
+          />
+        </div>
+      )}
+
       <div className="flex gap-3">
         <input
           type="text"
@@ -269,8 +279,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                   `입력 완료 ${enteredCount}건, 차이 발견 ${discrepancies.length}건이 모두 사라집니다.`,
                 ].join('\n'),
                 confirmText: '중단',
-                tone: 'danger',
-              });
+                tone: 'danger' });
               if (!confirmed) return;
               setSessionStarted(false);
               setItems([]);
@@ -303,6 +312,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                     type="text"
                     value={row.actual}
                     onChange={e => setActual(row.id, e.target.value)}
+                    onFocus={() => setLastFocusedItemId(row.id)}
                     className="w-20 px-2 py-1 rounded border border-[var(--border)] text-center text-[12px] font-bold"
                     placeholder="-"
                   />

@@ -17,8 +17,7 @@ import {
   BOARD_CATS,
   type BoardCatId,
   type BoardListPost,
-  boardTypeToCat,
-} from './data-hooks';
+  boardTypeToCat } from './data-hooks';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 import BoardScheduleCalendar from './일정달력';
@@ -89,8 +88,7 @@ function countByCat(posts: BoardListPost[], cat: BoardCatId): number {
 // ─── 카테고리 홈 뷰 ──────────────────────────────────────
 function BoardHomeView({
   posts,
-  onOpenCategory,
-}: {
+  onOpenCategory }: {
   posts: BoardListPost[];
   onOpenCategory: (catId: BoardCatId) => void;
 }) {
@@ -100,8 +98,7 @@ function BoardHomeView({
       style={{
         background: 'transparent',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <div
         className="macos-glass"
@@ -112,8 +109,7 @@ function BoardHomeView({
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           background: 'rgba(255, 255, 255, 0.55)',
           backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}
+          WebkitBackdropFilter: 'blur(20px)' }}
       >
         <div>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>협업</div>
@@ -145,8 +141,7 @@ function BoardHomeView({
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  width: 'calc(100% - 32px)',
-                }}
+                  width: 'calc(100% - 32px)' }}
               >
                 <div
                   className="macos-squircle-sm"
@@ -165,8 +160,7 @@ function BoardHomeView({
                            c.tone === 'warn' ? '#FF9500' :
                            c.tone === 'danger' ? '#FF3B30' :
                            'var(--z-600)',
-                    flexShrink: 0,
-                  }}
+                    flexShrink: 0 }}
                 >
                   <MIcon name={c.icon} size={16} />
                 </div>
@@ -188,8 +182,7 @@ function BoardHomeView({
                       fontWeight: 800,
                       color: '#fff',
                       boxShadow: '0 2px 6px rgba(255, 59, 48, 0.25)',
-                      marginRight: 4,
-                    }}
+                      marginRight: 4 }}
                   >
                     {unread}
                   </span>
@@ -215,8 +208,7 @@ function BoardHomeView({
               color: '#007AFF',
               textAlign: 'center',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0, 122, 255, 0.05)',
-            }}
+              boxShadow: '0 4px 12px rgba(0, 122, 255, 0.05)' }}
           >
             전체 글 보기
           </button>
@@ -241,8 +233,7 @@ function SBoardBase({
   onRefresh,
   showHome,
   onOpenCategory,
-  company,
-}: SBoardProps) {
+  company }: SBoardProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   // Phase: op/mri 일정 게시판 — 리스트 ↔ 달력 토글
@@ -266,8 +257,7 @@ function SBoardBase({
 
   const { containerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh: onRefresh ?? (() => Promise.resolve()),
-    enabled: !!onRefresh,
-  });
+    enabled: !!onRefresh });
 
   // Phase 6: 카테고리 홈 뷰
   if (showHome && onOpenCategory) {
@@ -281,8 +271,7 @@ function SBoardBase({
       style={{
         background: 'transparent',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
@@ -306,8 +295,7 @@ function SBoardBase({
                   borderRadius: 8,
                   background: 'rgba(0, 0, 0, 0.03)',
                   border: '1px solid rgba(0, 0, 0, 0.05)',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
               >
                 <MIcon name={calendarView ? 'list' : 'calendar'} size={15} color="var(--z-600)" />
               </button>
@@ -331,8 +319,7 @@ function SBoardBase({
                 borderRadius: 8,
                 background: 'rgba(0, 0, 0, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.05)',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="search" size={15} color="var(--z-600)" />
             </button>
@@ -349,8 +336,7 @@ function SBoardBase({
                 borderRadius: 8,
                 background: 'rgba(0, 0, 0, 0.03)',
                 border: '1px solid rgba(0, 0, 0, 0.05)',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="edit" size={15} color="var(--z-600)" />
             </button>
@@ -367,8 +353,7 @@ function SBoardBase({
               background: 'rgba(0, 0, 0, 0.04)',
               border: '1px solid rgba(0, 0, 0, 0.05)',
               padding: '6px 12px',
-              height: 36,
-            }}
+              height: 36 }}
           >
             <span style={{ marginRight: 6, display: 'flex', alignItems: 'center' }}><MIcon name="search" size={15} color="var(--z-500)" /></span>
             <input
@@ -386,8 +371,7 @@ function SBoardBase({
                 border: 'none',
                 outline: 'none',
                 color: 'var(--z-900)',
-                width: '100%',
-              }}
+                width: '100%' }}
             />
           </div>
         </div>
@@ -401,8 +385,7 @@ function SBoardBase({
           display: 'flex',
           gap: 6,
           overflowX: 'auto',
-          scrollbarWidth: 'none',
-        }}
+          scrollbarWidth: 'none' }}
       >
         {BOARD_CATS.filter((c) => c.id !== 'all').map((c) => {
           const active = cat === c.id;
@@ -426,8 +409,7 @@ function SBoardBase({
                 alignItems: 'center',
                 gap: 4,
                 whiteSpace: 'nowrap',
-                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
-              }}
+                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
             >
               {c.label}
               <span
@@ -437,8 +419,7 @@ function SBoardBase({
                   opacity: 0.8,
                   background: active ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.05)',
                   padding: '1px 5px',
-                  borderRadius: 4,
-                }}
+                  borderRadius: 4 }}
               >
                 {countByCat(posts, c.id)}
               </span>

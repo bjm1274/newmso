@@ -10,14 +10,12 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import {
   getD1Binding,
   getD1Drizzle,
   payroll_records as payrollRecordsTable,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 
 type PayrollRow = {
   id: string;
@@ -38,8 +36,7 @@ export async function checkPayrollSettled(): Promise<CheckJobResult> {
       id: payrollRecordsTable.id,
       staff_id: payrollRecordsTable.staff_id,
       year_month: payrollRecordsTable.year_month,
-      net_pay: payrollRecordsTable.net_pay,
-    })
+      net_pay: payrollRecordsTable.net_pay })
     .from(payrollRecordsTable)
     .where(gte(payrollRecordsTable.created_at, cutoff))
     .limit(500);
@@ -76,10 +73,8 @@ export async function checkPayrollSettled(): Promise<CheckJobResult> {
         type: 'payroll',
         record_id: row.id,
         year_month: ym,
-        dedupe_key: dedupeKey,
-      },
-      read_at: null,
-    });
+        dedupe_key: dedupeKey },
+      read_at: null });
   }
 
   if (toInsert.length === 0) {

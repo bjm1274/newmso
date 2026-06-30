@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type AnyRecord = Record<string, unknown>;
@@ -22,16 +22,14 @@ const ASSET_COLUMNS: Column<AssetItem>[] = [
     label: '분류',
     render: (row) => (
       <span className="text-[11px] font-bold text-[var(--accent)]">{row.category}</span>
-    ),
-  },
+    ) },
   {
     key: 'item_name',
     label: '자산명',
     primary: true,
     render: (row) => (
       <span className="text-xs font-bold text-[var(--foreground)]">{row.item_name}</span>
-    ),
-  },
+    ) },
   {
     key: 'quantity',
     label: '잔여 수량',
@@ -39,8 +37,7 @@ const ASSET_COLUMNS: Column<AssetItem>[] = [
       <span className="text-xs font-bold text-[var(--toss-gray-4)]">
         {Number(row.quantity ?? row.stock ?? 0)}
       </span>
-    ),
-  },
+    ) },
   {
     key: '_qr',
     label: '관리',
@@ -53,8 +50,7 @@ const ASSET_COLUMNS: Column<AssetItem>[] = [
       >
         QR 출력
       </button>
-    ),
-  },
+    ) },
 ];
 
 // Mock Component for QR Asset Manager
@@ -83,8 +79,8 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
             const newStock = (Number(scanResult.quantity ?? scanResult.stock ?? 0)) - 1;
             if (newStock < 0) return toast('이미 대여중이거나 재고가 없습니다.', 'warning');
 
-            await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', scanResult.id);
-            await supabase.from('inventory_logs').insert([{
+            await db.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', scanResult.id);
+            await db.from('inventory_logs').insert([{
                 item_id: scanResult.id,
                 inventory_id: scanResult.id,
                 type: '대여',
@@ -106,8 +102,8 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
     const handleReturn = async (item: AssetItem) => {
         try {
             const newStock = (Number(item.quantity ?? item.stock ?? 0)) + 1;
-            await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
-            await supabase.from('inventory_logs').insert([{
+            await db.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
+            await db.from('inventory_logs').insert([{
                 item_id: item.id,
                 inventory_id: item.id,
                 type: '반납',
@@ -139,7 +135,11 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
 
             {activeTab === '대시보드' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-1 border border-[var(--border)] bg-[var(--card)] rounded-[var(--radius-lg)] p-4 shadow-sm flex flex-col items-center justify-center text-center space-y-3">
+                    {/* BarcodeScanPanel */}
+                    <div className="lg:col-span-1 border border-[var(--border)] bg-[var(--card)] rounded-[var(--radius-lg)] p-4 shadow-sm flex flex-col items-center justify-center text-center space-y-3 macos-glass">
+                        <div className="w-full flex items-center justify-between pb-1 border-b border-[var(--border)] mb-1">
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">BarcodeScanPanel</span>
+                        </div>
                         <div className="w-48 h-48 bg-[var(--tab-bg)] rounded-2xl border-2 border-dashed border-[var(--border)] flex items-center justify-center relative overflow-hidden">
                             {scannerActive ? (
                                 <div className="absolute inset-0 bg-black flex flex-col items-center justify-center">
@@ -153,7 +153,7 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                             )}
                         </div>
                         <div>
-                            <h3 className="text-sm font-black text-[var(--foreground)]">기기 QR 스캔</h3>
+                            <h3 className="text-sm font-black text-[var(--foreground)]">기기 QR/바코드 스캔</h3>
                             <p className="text-xs font-medium text-[var(--toss-gray-3)] mt-1">노트북, 법인카드 등에 부착된<br />QR이나 바코드를 스캔하세요.</p>
                         </div>
                         <button
@@ -200,6 +200,22 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                                     keyField="id"
                                     emptyMessage="자산이 없습니다."
                                 />
+                            </div>
+                        </div>
+
+                        {/* InvoiceExtractionPanel */}
+                        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden p-4 macos-glass mt-4 flex flex-col gap-2">
+                            <div className="flex items-center justify-between pb-1 border-b border-[var(--border)]">
+                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">InvoiceExtractionPanel</span>
+                                <span className="px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)] text-[9px] font-bold">OCR 시뮬레이터</span>
+                            </div>
+                            <h3 className="text-sm font-black text-[var(--foreground)] mt-1">📄 거래명세서/인수증 자동 추출</h3>
+                            <p className="text-xs text-[var(--toss-gray-3)] font-medium leading-relaxed">
+                                물품 인수증 또는 거래명세서 파일을 업로드하시면 품목명, 단가, 수량을 자동으로 판독하여 입고 대기 목록에 추가합니다.
+                            </p>
+                            <div className="border border-dashed border-[var(--border)] rounded-xl py-6 flex flex-col items-center justify-center bg-[var(--tab-bg)] cursor-pointer hover:border-[var(--accent)] transition-all">
+                                <span className="text-2xl mb-1">📤</span>
+                                <span className="text-xs font-bold text-[var(--toss-gray-4)]">거래명세서 파일 드래그 또는 클릭하여 업로드</span>
                             </div>
                         </div>
                     </div>

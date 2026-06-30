@@ -13,8 +13,7 @@ export default function MFeatureScreen({
   title,
   sub,
   onBack,
-  children,
-}: {
+  children }: {
   title: string;
   sub?: string;
   onBack: () => void;

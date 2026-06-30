@@ -138,48 +138,37 @@ const loadGeminiAssistantView = () => import('./Gemini어시스턴트');
 
 const WorkStatusView = dynamic(loadWorkStatusView, {
   ssr: false,
-  loading: () => <SubviewLoading label="근무현황" />,
-});
+  loading: () => <SubviewLoading label="근무현황" /> });
 const HandoverNotesView = dynamic(loadHandoverNotesView, {
   ssr: false,
-  loading: () => <SubviewLoading label="인계노트" />,
-});
+  loading: () => <SubviewLoading label="인계노트" /> });
 const DischargeReviewView = dynamic(loadDischargeReviewView, {
   ssr: false,
-  loading: () => <SubviewLoading label="퇴원심사" />,
-});
+  loading: () => <SubviewLoading label="퇴원심사" /> });
 const ClosingReportView = dynamic(loadClosingReportView, {
   ssr: false,
-  loading: () => <SubviewLoading label="마감보고" />,
-});
+  loading: () => <SubviewLoading label="마감보고" /> });
 const StaffEvaluationView = dynamic(loadStaffEvaluationView, {
   ssr: false,
-  loading: () => <SubviewLoading label="직원평가" />,
-});
+  loading: () => <SubviewLoading label="직원평가" /> });
 const RealtimeDepositView = dynamic(loadRealtimeDepositView, {
   ssr: false,
-  loading: () => <SubviewLoading label="입금 실시간 조회" />,
-});
+  loading: () => <SubviewLoading label="입금 실시간 조회" /> });
 const SurgeryConsultationView = dynamic(loadSurgeryConsultationView, {
   ssr: false,
-  loading: () => <SubviewLoading label="수술상담 AI 분석" />,
-});
+  loading: () => <SubviewLoading label="수술상담 AI 분석" /> });
 const OperationCheckView = dynamic(loadOperationCheckView, {
   ssr: false,
-  loading: () => <SubviewLoading label="OP체크" />,
-});
+  loading: () => <SubviewLoading label="OP체크" /> });
 const EslManagerView = dynamic(loadEslManagerView, {
   ssr: false,
-  loading: () => <SubviewLoading label="ESL 관리" />,
-});
+  loading: () => <SubviewLoading label="ESL 관리" /> });
 const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
-  loading: () => <SubviewLoading label="조직도" />,
-});
+  loading: () => <SubviewLoading label="조직도" /> });
 const GeminiAssistantView = dynamic(loadGeminiAssistantView, {
   ssr: false,
-  loading: () => <SubviewLoading label="Gemini AI 비서" />,
-});
+  loading: () => <SubviewLoading label="Gemini AI 비서" /> });
 
 export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   조직도: loadOrgChartView,
@@ -192,8 +181,7 @@ export const EXTRA_FEATURE_LOADERS: Record<string, () => Promise<unknown>> = {
   수술상담: loadSurgeryConsultationView,
   OP체크: loadOperationCheckView,
   ESL관리: loadEslManagerView,
-  Gemini비서: loadGeminiAssistantView,
-};
+  Gemini비서: loadGeminiAssistantView };
 
 export type FeatureCard = {
   id: string;
@@ -236,8 +224,7 @@ export function FeatureShell({
   children,
   onBack,
   maxWidth = 'max-w-5xl',
-  boxed = false,
-}: {
+  boxed = false }: {
   children: ReactNode;
   onBack: () => void;
   maxWidth?: string;
@@ -288,8 +275,7 @@ export function ExtraFeatureSubview({
   selectedCo,
   selectedCompanyId,
   orgChartCompany,
-  setOrgChartCompany,
-}: ExtraFeatureSubviewProps) {
+  setOrgChartCompany }: ExtraFeatureSubviewProps) {
   if (subView === '조직도') {
     return (
       <FeatureShell onBack={onBack} maxWidth="max-w-7xl">

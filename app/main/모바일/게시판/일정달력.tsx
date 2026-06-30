@@ -121,8 +121,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
           border: '1px solid rgba(0, 0, 0, 0.05)',
           padding: '6px 12px',
           height: 36,
-          marginBottom: 12,
-        }}
+          marginBottom: 12 }}
       >
         <span style={{ marginRight: 6, display: 'flex', alignItems: 'center' }}><MIcon name="search" size={15} color="var(--z-500)" /></span>
         <input
@@ -139,8 +138,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
             border: 'none',
             outline: 'none',
             color: 'var(--z-900)',
-            width: '100%',
-          }}
+            width: '100%' }}
         />
       </div>
 
@@ -154,8 +152,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
               fontSize: 11,
               fontWeight: 800,
               padding: '4px 0',
-              color: i === 0 ? 'var(--m-danger, #ef4444)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)',
-            }}
+              color: i === 0 ? 'var(--m-danger, #ef4444)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)' }}
           >
             {d}
           </div>
@@ -172,8 +169,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
           borderRadius: 14,
           overflow: 'hidden',
           background: 'rgba(255, 255, 255, 0.35)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
-        }}
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)' }}
       >
         {days.map((d, idx) => {
           const key = toKey(d);
@@ -203,8 +199,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                 flexDirection: 'column',
                 gap: 2,
                 cursor: 'pointer',
-                transition: 'all 150ms ease',
-              }}
+                transition: 'all 150ms ease' }}
             >
               <div
                 style={{
@@ -216,8 +211,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                       ? '#FF3B30'
                       : dow === 6
                         ? '#007AFF'
-                        : 'var(--z-800)',
-                }}
+                        : 'var(--z-800)' }}
               >
                 {d.getDate()}
               </div>
@@ -237,8 +231,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
                     textOverflow: 'ellipsis',
-                    pointerEvents: 'none',
-                  }}
+                    pointerEvents: 'none' }}
                 >
                   <span style={{ opacity: 0.8, marginRight: 2 }}>{ev.schedule_time || ''}</span>
                   {ev.patient_name || ev.title}
@@ -252,8 +245,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                     color: '#007AFF',
                     textAlign: 'center',
                     padding: '2px 0',
-                    pointerEvents: 'none',
-                  }}
+                    pointerEvents: 'none' }}
                 >
                   +{events.length - 3}건
                 </div>
@@ -290,8 +282,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                       flexDirection: 'column',
                       gap: 6,
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-                    }}
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <span style={{ fontSize: 13, fontWeight: 900, color: '#007AFF' }}>
@@ -338,8 +329,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
             fontSize: 13,
             color: 'var(--z-500)',
             fontWeight: 600,
-            marginTop: 20,
-          }}
+            marginTop: 20 }}
         >
           {isMri ? '등록된 MRI 일정이 없습니다.' : '등록된 수술 일정이 없습니다.'}
           <br />

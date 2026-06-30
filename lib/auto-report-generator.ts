@@ -15,8 +15,7 @@ import {
   payroll_records as payrollRecordsTable,
   eq,
   and,
-  inArray,
-} from './db';
+  inArray } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 export type ReportType = 'monthly_hr' | 'monthly_payroll' | 'quarterly_inventory' | 'quarterly_business';
@@ -67,8 +66,7 @@ export async function generateMonthlyHRReport(
           department: staffMembersTable.department,
           position: staffMembersTable.position,
           status: staffMembersTable.status,
-          permissions: staffMembersTable.permissions,
-        })
+          permissions: staffMembersTable.permissions })
         .from(staffMembersTable)
         .where(eq(staffMembersTable.company, companyId))
     : await db
@@ -77,8 +75,7 @@ export async function generateMonthlyHRReport(
           department: staffMembersTable.department,
           position: staffMembersTable.position,
           status: staffMembersTable.status,
-          permissions: staffMembersTable.permissions,
-        })
+          permissions: staffMembersTable.permissions })
         .from(staffMembersTable);
 
   const list = rows ?? [];
@@ -103,9 +100,7 @@ export async function generateMonthlyHRReport(
       byDepartment: byDept,
       byStatus,
       byEmploymentType: byType,
-      generatedAt: new Date().toISOString(),
-    },
-  };
+      generatedAt: new Date().toISOString() } };
 }
 
 /**
@@ -123,8 +118,7 @@ export async function generateMonthlyPayrollReport(
       total_taxable: payrollRecordsTable.total_taxable,
       total_deduction: payrollRecordsTable.total_deduction,
       net_pay: payrollRecordsTable.net_pay,
-      status: payrollRecordsTable.status,
-    })
+      status: payrollRecordsTable.status })
     .from(payrollRecordsTable)
     .where(
       and(
@@ -148,9 +142,7 @@ export async function generateMonthlyPayrollReport(
       totalTaxable: Math.round(totalTaxable),
       totalDeduction: Math.round(totalDeduction),
       totalNetPay: Math.round(totalNetPay),
-      generatedAt: new Date().toISOString(),
-    },
-  };
+      generatedAt: new Date().toISOString() } };
 }
 
 /**
@@ -167,8 +159,7 @@ export async function notifyRecipients(
     monthly_hr: '월간 인사현황',
     monthly_payroll: '월간 급여 요약',
     quarterly_inventory: '분기 재고 현황',
-    quarterly_business: '분기 경영 보고서',
-  };
+    quarterly_business: '분기 경영 보고서' };
 
   const label = typeLabels[reportType] || reportType;
 
@@ -177,8 +168,7 @@ export async function notifyRecipients(
     type: '보고서',
     title: `${label} 보고서 생성 완료`,
     body: `${period} ${label} 보고서가 자동 생성되었습니다. 관리자 메뉴에서 확인하세요.`,
-    read_at: null,
-  }));
+    read_at: null }));
 
   // D1 직접 insert — insertNotificationsOrThrow 가 metadata jsonb→text 변환 처리
   await insertNotificationsOrThrow(rows as unknown as Record<string, unknown>[]);

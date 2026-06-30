@@ -20,8 +20,7 @@ import SApprovalFilterSheet, {
   EMPTY_FILTER,
   countActiveFilters,
   resolvePeriodCutoff,
-  type ApprovalFilterState,
-} from './필터시트';
+  type ApprovalFilterState } from './필터시트';
 import { ApprovalCard, KpiCard, elapsedDays } from './결재함-cards';
 
 type Seg = 'inbox' | 'progress' | 'done';
@@ -29,8 +28,7 @@ type Seg = 'inbox' | 'progress' | 'done';
 const SEG_LABEL: Record<Seg, string> = {
   inbox: '받은 결재',
   progress: '진행',
-  done: '완료',
-};
+  done: '완료' };
 
 export type SApprovalProps = {
   staffId: string | null;
@@ -62,8 +60,7 @@ export default function SApproval({
   onNavSent,
   onNavRef,
   onNavWrite,
-  onRefresh,
-}: SApprovalProps) {
+  onRefresh }: SApprovalProps) {
   const [seg, setSeg] = useState<Seg>('inbox');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -154,8 +151,7 @@ export default function SApproval({
                 width: 30,
                 height: 30,
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="search" size={15} color="var(--z-600)" />
             </button>
@@ -173,8 +169,7 @@ export default function SApproval({
                 height: 30,
                 border: 'none',
                 cursor: 'pointer',
-                position: 'relative',
-              }}
+                position: 'relative' }}
             >
               <MIcon name="filter" size={15} color="var(--z-600)" />
               {activeFilterCount > 0 && (
@@ -194,8 +189,7 @@ export default function SApproval({
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    lineHeight: 1,
-                  }}
+                    lineHeight: 1 }}
                 >
                   {activeFilterCount}
                 </span>
@@ -213,8 +207,7 @@ export default function SApproval({
                 width: 30,
                 height: 30,
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="refresh" size={15} color="var(--z-600)" />
             </button>
@@ -230,8 +223,7 @@ export default function SApproval({
                 width: 30,
                 height: 30,
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="edit" size={15} color="var(--z-600)" />
             </button>
@@ -255,8 +247,7 @@ export default function SApproval({
             alignItems: 'center',
             gap: 8,
             padding: '0 16px',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-          }}
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}
         >
           <MIcon name="search" size={16} color="var(--z-500)" />
           <label htmlFor="m-approval-search" style={{ position: 'absolute', left: -10000 }}>
@@ -277,8 +268,7 @@ export default function SApproval({
               fontSize: 14,
               fontWeight: 600,
               color: 'var(--z-900)',
-              padding: '6px 0',
-            }}
+              padding: '6px 0' }}
           />
           <button
             type="button"
@@ -301,8 +291,7 @@ export default function SApproval({
           display: 'flex',
           gap: 6,
           overflowX: 'auto',
-          scrollbarWidth: 'none',
-        }}
+          scrollbarWidth: 'none' }}
       >
         <button
           type="button"
@@ -318,8 +307,7 @@ export default function SApproval({
             border: seg === 'inbox' ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            boxShadow: seg === 'inbox' ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
-          }}
+            boxShadow: seg === 'inbox' ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
         >
           결재함<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{inbox.length}</span>
         </button>
@@ -336,8 +324,7 @@ export default function SApproval({
             color: 'var(--z-700)',
             border: '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+            whiteSpace: 'nowrap' }}
         >
           기안함<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{sentCount}</span>
         </button>
@@ -354,8 +341,7 @@ export default function SApproval({
             color: 'var(--z-700)',
             border: '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+            whiteSpace: 'nowrap' }}
         >
           참조<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{refCount}</span>
         </button>
@@ -372,8 +358,7 @@ export default function SApproval({
             color: 'var(--z-700)',
             border: '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+            whiteSpace: 'nowrap' }}
         >
           문서 조회
         </button>
@@ -390,8 +375,7 @@ export default function SApproval({
             color: 'var(--z-700)',
             border: '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
+            whiteSpace: 'nowrap' }}
         >
           작성
         </button>
@@ -402,8 +386,7 @@ export default function SApproval({
         style={{
           padding: '10px 16px 6px',
           background: 'transparent',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        }}
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}
       >
         <div
           role="tablist"
@@ -411,8 +394,7 @@ export default function SApproval({
           style={{
             display: 'flex',
             padding: 3,
-            gap: 2,
-          }}
+            gap: 2 }}
         >
           {(['inbox', 'progress', 'done'] as Seg[]).map((s) => {
             const on = seg === s;
@@ -435,8 +417,7 @@ export default function SApproval({
                   background: on ? '#fff' : 'transparent',
                   color: on ? 'var(--z-900)' : 'var(--z-600)',
                   boxShadow: on ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
               >
                 {SEG_LABEL[s]}{' '}
                 <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 2, fontWeight: 800 }}>
@@ -456,8 +437,7 @@ export default function SApproval({
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 gap: 8,
-                marginBottom: 12,
-              }}
+                marginBottom: 12 }}
             >
               <KpiCard label="대기" value={inbox.length} tone="accent" icon="approval" />
               <KpiCard label="24h 초과" value={overdueCount} tone="danger" icon="clock" />
@@ -470,8 +450,7 @@ export default function SApproval({
             padding: '0 16px 16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-          }}
+            gap: 10 }}
         >
           {loading && list.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>

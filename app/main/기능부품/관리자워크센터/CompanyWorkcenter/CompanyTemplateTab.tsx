@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_TEMPLATES } from './fallback-data';
 import type { TemplateItem } from './types';
@@ -87,8 +87,7 @@ async function loadTemplates(): Promise<TemplateItem[]> {
         version: 'v1.0',
         used,
         lastDate: formatDate(r.updated_at),
-        companyName,
-      };
+        companyName };
     });
   } catch (err) {
     console.error('Error loading contract templates:', err);

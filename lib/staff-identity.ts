@@ -1,5 +1,5 @@
 import { normalizeProfileUser } from '@/lib/profile-photo';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 type UserLikeRecord = Record<string, unknown>;
 type CachedIdentityLookup = {
@@ -48,7 +48,7 @@ function buildIdentityCacheKey(input: UserLikeRecord) {
 
 async function tryResolveByColumn(column: string, value: string) {
   if (!value) return null;
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('staff_members')
     .select('*')
     .eq(column, value)
@@ -98,8 +98,7 @@ export async function resolveStaffLike(input: UserLikeRecord | null | undefined)
   const row = await inFlight;
   staffIdentityCache.set(cacheKey, {
     expiresAt: Date.now() + STAFF_IDENTITY_CACHE_MS,
-    row,
-  });
+    row });
 
   return row
     ? normalizeProfileUser({ ...normalized, ...row }) as UserLikeRecord

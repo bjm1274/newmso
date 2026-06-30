@@ -30,7 +30,7 @@ import WelfareFamilySummary from './WelfareWorkcenter/WelfareFamilySummary';
 import WelfareCheckupSummary from './WelfareWorkcenter/WelfareCheckupSummary';
 import WelfareLicenseSummary from './WelfareWorkcenter/WelfareLicenseSummary';
 import WelfareDeviceSummary from './WelfareWorkcenter/WelfareDeviceSummary';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterEmbed,
@@ -38,8 +38,7 @@ import {
   WorkcenterShell,
   WorkcenterTabBar,
   type WorkcenterKpi,
-  type WorkcenterTab,
-} from './workcenter-common';
+  type WorkcenterTab } from './workcenter-common';
 import WelfareExpiryBoard from './WelfareWorkcenter/WelfareExpiryBoard';
 import type { WelfareTabId } from './WelfareWorkcenter/types';
 import WelfareCalendar from './WelfareWorkcenter/WelfareCalendar';
@@ -103,8 +102,7 @@ const INITIAL_COUNTS: WelfareCounts = {
   checkupTarget: 0,
   checkupDone: 0,
   licenseExpiring: 0,
-  deviceDue: 0,
-};
+  deviceDue: 0 };
 
 // ─── DB row 타입 (KPI 집계용) ───────────────────────────────────────
 interface CondolenceLite {
@@ -149,8 +147,7 @@ export default function WelfareWorkcenter({
   staffs = [],
   selectedCo,
   user = null,
-  initialTab = 'calendar',
-}: WelfareWorkcenterProps) {
+  initialTab = 'calendar' }: WelfareWorkcenterProps) {
   const [tab, setTab] = useState<WelfareTabId>(initialTab);
   const [counts, setCounts] = useState<WelfareCounts>(INITIAL_COUNTS);
   const [countsReady, setCountsReady] = useState(false);
@@ -183,19 +180,19 @@ export default function WelfareWorkcenter({
         const monthEndExclusive = `${nyyyy}-${nmm}-01`;
 
         const [famRes, chkRes, licRes, devRes] = await Promise.all([
-          supabase
+          db
             .from('congratulations_condolences')
             .select('event_date, event_type')
             .gte('event_date', monthStart)
             .lt('event_date', monthEndExclusive),
-          supabase
+          db
             .from('health_checkups')
             .select('status, staff_id'),
-          supabase
+          db
             .from('staff_licenses')
             .select('expiry_date')
             .not('expiry_date', 'is', null),
-          supabase
+          db
             .from('medical_devices')
             .select('next_inspection_date')
             .not('next_inspection_date', 'is', null),
@@ -268,8 +265,7 @@ export default function WelfareWorkcenter({
           checkupTarget: activeStaffs.length,
           checkupDone,
           licenseExpiring,
-          deviceDue,
-        });
+          deviceDue });
       } catch (err) {
         // JM3: 카운트 실패해도 화면은 살아 있어야 한다.
         console.error('[WelfareWorkcenter] KPI fetch failed', err);
@@ -293,8 +289,7 @@ export default function WelfareWorkcenter({
         label: '이번달 경조사',
         value: fmt(counts.familyThisMonth),
         unit: '건',
-        sub: '결혼·상조·출산 합계',
-      },
+        sub: '결혼·상조·출산 합계' },
       {
         key: 'checkup',
         label: '건강검진 대상자',
@@ -306,24 +301,21 @@ export default function WelfareWorkcenter({
               0,
             )}`
           : '데이터 불러오는 중',
-        tone: 'success',
-      },
+        tone: 'success' },
       {
         key: 'license',
         label: '면허 만료 임박',
         value: fmt(counts.licenseExpiring),
         unit: '건',
         sub: '90일 이내 갱신 권고',
-        tone: 'warn',
-      },
+        tone: 'warn' },
       {
         key: 'device',
         label: '의료기기 점검 필요',
         value: fmt(counts.deviceDue),
         unit: '건',
         sub: '90일 이내 점검·지연',
-        tone: 'danger',
-      },
+        tone: 'danger' },
     ];
   }, [counts, countsReady]);
 
@@ -332,8 +324,7 @@ export default function WelfareWorkcenter({
     () =>
       staffs.map((s) => ({
         id: String(s.id),
-        name: s.name,
-      })),
+        name: s.name })),
     [staffs],
   );
 

@@ -8,7 +8,7 @@
  * - AbortController로 다중 호출 race 보호 (JM2/JM3).
  */
 
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
@@ -124,8 +124,7 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
     remaining_days: remaining,
     expiry_date: formatKoreanDateKey(expiry),
     days_until_expiry: daysUntilExpiry,
-    updated_at: updatedAtRaw,
-  };
+    updated_at: updatedAtRaw };
 }
 
 function normalizeRequest(row: Record<string, unknown>): LeaveRequest {
@@ -138,8 +137,7 @@ function normalizeRequest(row: Record<string, unknown>): LeaveRequest {
     reason: pickString(row.reason) ?? '',
     status: asLeaveStatus(row.status),
     created_at: pickString(row.created_at) ?? undefined,
-    days: row.days != null ? pickNumber(row.days) : undefined,
-  };
+    days: row.days != null ? pickNumber(row.days) : undefined };
 }
 
 // ─── fetch ────────────────────────────────────────────────────────
@@ -152,8 +150,7 @@ export interface FetchLeaveDataOptions {
 export async function fetchLeaveData({
   staffs,
   selectedCo,
-  signal,
-}: FetchLeaveDataOptions): Promise<LeaveDataResult> {
+  signal }: FetchLeaveDataOptions): Promise<LeaveDataResult> {
   const targetStaff = staffs.filter((staff) => {
     if (!isActiveStaff(staff)) return false;
     if (selectedCo && selectedCo !== '전체' && staff.company !== selectedCo) return false;
@@ -166,18 +163,17 @@ export async function fetchLeaveData({
       rows: [],
       expiryItems: [],
       requests: [],
-      totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 },
-    };
+      totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 } };
   }
 
   const now = new Date();
   const [balanceRes, requestRes] = await Promise.all([
-    supabase
+    db
       .from('leave_balances')
       .select('*')
       .in('staff_id', staffIds)
       .eq('year', now.getFullYear()),
-    supabase
+    db
       .from('leave_requests')
       .select('id, staff_id, leave_type, start_date, end_date, reason, status, created_at')
       .in('staff_id', staffIds),
@@ -226,8 +222,7 @@ export async function fetchLeaveData({
       daysUntilExpiry,
       expiryDate: expiry,
       pending: pendingByStaff.get(String(staff.id)) ?? 0,
-      updatedAt: balance?.updated_at ?? null,
-    };
+      updatedAt: balance?.updated_at ?? null };
   });
 
   const expiryItems: LeaveExpiryItem[] = rows
@@ -236,8 +231,7 @@ export async function fetchLeaveData({
       staff: row.staff,
       remaining: row.remaining,
       daysUntilExpiry: row.daysUntilExpiry,
-      expiryDate: row.expiryDate,
-    }))
+      expiryDate: row.expiryDate }))
     .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
 
   const totals = rows.reduce(
@@ -274,20 +268,19 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     days: input.days,
     reason: input.reason || '',
     status: '대기' as LeaveStatus,
-    created_at: new Date().toISOString(),
-  };
-  const { error } = await supabase.from('leave_requests').insert(payload);
+    created_at: new Date().toISOString() };
+  const { error } = await db.from('leave_requests').insert(payload);
   if (error) throw new Error(error.message);
 
   // 전자결재(approvals)에도 함께 기안 상신 등록
   try {
-    const { data: staffData } = await supabase
+    const { data: staffData } = await db
       .from('staff_members')
       .select('name, company, company_id, department, position')
       .eq('id', input.staffId)
       .maybeSingle();
 
-    const { data: adminData } = await supabase
+    const { data: adminData } = await db
       .from('staff_members')
       .select('id, name')
       .or("role.eq.admin,permissions->>admin.eq.true")
@@ -322,7 +315,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       created_at: new Date().toISOString()
     };
 
-    await supabase.from('approvals').insert(approvalPayload);
+    await db.from('approvals').insert(approvalPayload);
 
     // 수정 E: 결재자 즉시 알림 — approver_line 첫 번째 staffId에게 알림 발송
     const firstApproverId: string | null = approvalPayload.meta_data.approver_line?.[0] ?? null;
@@ -334,8 +327,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
           body: `${staffName}님이 연차를 신청했습니다`,
           type: 'approval',
           read_at: null,
-          created_at: new Date().toISOString(),
-        });
+          created_at: new Date().toISOString() });
       } catch (notifErr) {
         console.error('결재자 알림 발송 중 오류:', notifErr);
       }
@@ -356,7 +348,6 @@ export async function sendExpiryAlert(staffId: string, remaining: number, expiry
     body: `보유 연차 ${remaining}일이 ${expiryLabel}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,
     type: 'attendance',
     read_at: null,
-    created_at: new Date().toISOString(),
-  });
+    created_at: new Date().toISOString() });
   if (error) throw new Error(error.message);
 }

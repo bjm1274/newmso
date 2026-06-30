@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 
@@ -49,7 +49,7 @@ export default function DisciplinaryBoard({ staffs, selectedCo, user }: Discipli
   const fetchCommittees = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
+      let query = db
         .from('disciplinary_committees')
         .select('*')
         .order('created_at', { ascending: false });
@@ -104,10 +104,9 @@ export default function DisciplinaryBoard({ staffs, selectedCo, user }: Discipli
         reason: newReason.trim(),
         committee_members: JSON.stringify(selectedMembers),
         status: '대기',
-        company: selectedCo && selectedCo !== '전체' ? selectedCo : (targetStaff?.company || '전체'),
-      };
+        company: selectedCo && selectedCo !== '전체' ? selectedCo : (targetStaff?.company || '전체') };
 
-      const { error } = await supabase
+      const { error } = await db
         .from('disciplinary_committees')
         .insert([insertData]);
 
@@ -145,10 +144,9 @@ export default function DisciplinaryBoard({ staffs, selectedCo, user }: Discipli
       const updateData: Record<string, any> = {
         status: editStatus,
         result_type: editStatus === '의결완료' ? editResultType : null,
-        result_details: editStatus === '의결완료' ? editResultDetails.trim() : null,
-      };
+        result_details: editStatus === '의결완료' ? editResultDetails.trim() : null };
 
-      const { error } = await supabase
+      const { error } = await db
         .from('disciplinary_committees')
         .update(updateData)
         .eq('id', selectedCommittee.id);
@@ -211,8 +209,7 @@ export default function DisciplinaryBoard({ staffs, selectedCo, user }: Discipli
                     대기: 'bg-amber-100 text-amber-800',
                     진행중: 'bg-blue-100 text-blue-800',
                     의결완료: 'bg-emerald-100 text-emerald-800',
-                    취소: 'bg-slate-100 text-slate-500',
-                  };
+                    취소: 'bg-slate-100 text-slate-500' };
 
                   return (
                     <tr

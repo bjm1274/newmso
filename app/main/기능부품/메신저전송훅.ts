@@ -7,7 +7,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { SendMessageOptions } from './메신저메시지서비스';
 import {
   NOTICE_ROOM_ID,
@@ -15,12 +15,10 @@ import {
   getConversationRoomIdsByRoomId,
   shouldTriggerImmediateChatPush,
   sortChatRoomsWithNoticeFirst,
-  type MessageRetryPayload,
-} from './메신저유틸';
+  type MessageRetryPayload } from './메신저유틸';
 import {
   removeChatRetryQueueEntry,
-  upsertFailedChatRetryEntry,
-} from './메신저재시도큐';
+  upsertFailedChatRetryEntry } from './메신저재시도큐';
 
 export type { SendMessageOptions } from './메신저메시지서비스';
 
@@ -81,8 +79,7 @@ export function useChatMessageSending({
   broadcastChatSync,
   emitTypingState,
   triggerChatPush,
-  openSlashDraftFromText,
-}: UseChatMessageSendingParams) {
+  openSlashDraftFromText }: UseChatMessageSendingParams) {
   const handleSendMessage = useCallback(async ({
     fileUrl,
     fileSizeBytes,
@@ -94,8 +91,7 @@ export function useChatMessageSending({
     replyToIdOverride,
     albumId,
     albumIndex,
-    albumTotal,
-  }: SendMessageOptions = {}): Promise<boolean> => {
+    albumTotal }: SendMessageOptions = {}): Promise<boolean> => {
     const actorId = effectiveChatUserId || user?.id;
     if (!user || !actorId) return false;
 
@@ -150,8 +146,7 @@ export function useChatMessageSending({
       replyToId: resolvedReplyToId,
       albumId: resolvedAlbumId,
       albumIndex: resolvedAlbumIndex,
-      albumTotal: resolvedAlbumTotal,
-    };
+      albumTotal: resolvedAlbumTotal };
     const insertPayload = buildChatMessageInsertPayload(actorId, retrySnapshot);
 
     const optimisticId = retryMessageId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -160,8 +155,7 @@ export function useChatMessageSending({
       ...insertPayload,
       created_at: new Date().toISOString(),
       is_deleted: false,
-      staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
-    } as ChatMessage;
+      staff: { name: user.name, photo_url: getProfilePhotoUrl(user) } } as ChatMessage;
 
     if (retryMessageId) {
       setMessages((prev) =>
@@ -180,9 +174,7 @@ export function useChatMessageSending({
       [optimisticId]: {
         status: 'sending',
         retryPayload: retrySnapshot,
-        error: null,
-      },
-    }));
+        error: null } }));
 
     if (!retryMessageId) {
       const activeRoomId = String(selectedRoomIdRef.current || '');
@@ -210,14 +202,13 @@ export function useChatMessageSending({
     }
     emitTypingState(false);
 
-    const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(supabase, insertPayload);
+    const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(db, insertPayload);
 
     if (!error && inserted) {
       removeChatRetryQueueEntry(actorId, optimisticId);
       const optimisticInsertedMessage = {
         ...inserted,
-        staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
-      } as ChatMessage;
+        staff: { name: user.name, photo_url: getProfilePhotoUrl(user) } } as ChatMessage;
 
       setMessages((prev) => {
         const seenIds = new Set<string>();
@@ -239,8 +230,7 @@ export function useChatMessageSending({
         next[String(inserted.id)] = {
           status: 'sent',
           retryPayload: retrySnapshot,
-          error: null,
-        };
+          error: null };
         return next;
       });
 
@@ -268,8 +258,7 @@ export function useChatMessageSending({
                     resolvedFileUrl,
                     room.last_message_preview,
                   ),
-                  last_message_at: inserted.created_at || new Date().toISOString(),
-                }
+                  last_message_at: inserted.created_at || new Date().toISOString() }
               : room,
           ),
         );
@@ -285,8 +274,7 @@ export function useChatMessageSending({
       if (shouldTriggerImmediateChatPush({
         albumId: inserted.album_id,
         albumIndex: inserted.album_index,
-        albumTotal: inserted.album_total,
-      })) {
+        albumTotal: inserted.album_total })) {
         void triggerChatPush(String(inserted.room_id), String(inserted.id));
       }
       return true;
@@ -297,15 +285,12 @@ export function useChatMessageSending({
       [optimisticId]: {
         status: 'failed',
         retryPayload: retrySnapshot,
-        error: error?.message || '메시지 전송 실패',
-      },
-    }));
+        error: error?.message || '메시지 전송 실패' } }));
     upsertFailedChatRetryEntry(actorId, {
       id: optimisticId,
       payload: retrySnapshot,
       error: error?.message || '메시지 전송 실패',
-      createdAt: optimisticMessage.created_at,
-    });
+      createdAt: optimisticMessage.created_at });
     console.error('message send failed', error);
     return false;
   }, [
@@ -342,8 +327,7 @@ export function useChatMessageSending({
       await handleSendMessage({
         contentOverride: replyText,
         clearComposerIfUnchangedFrom: '__ward-quick-reply__',
-        replyToIdOverride: messageId,
-      });
+        replyToIdOverride: messageId });
     } finally {
       setWardQuickReplySendingMessageId(null);
     }
@@ -367,6 +351,5 @@ export function useChatMessageSending({
     handleSendMessage,
     sendWardQuickReply,
     retryFailedMessage,
-    retryAllFailedMessages,
-  };
+    retryAllFailedMessages };
 }

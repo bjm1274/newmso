@@ -13,8 +13,7 @@ import {
   license_continuing_education as licenseCETable,
   eq,
   and,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -29,8 +28,7 @@ const PostSchema = z.object({
   license_name_hint: z.string().max(200).optional(),
   file_url: z.string().url('파일 URL이 올바르지 않습니다.'),
   file_name: z.string().max(300).optional(),
-  memo: z.string().max(1000).optional(),
-});
+  memo: z.string().max(1000).optional() });
 
 export async function GET(req: Request) {
   try {
@@ -102,8 +100,7 @@ export async function POST(req: Request) {
       file_url: parsed.data.file_url,
       file_name: parsed.data.file_name ?? null,
       memo: parsed.data.memo ?? null,
-      status: 'pending',
-    };
+      status: 'pending' };
 
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-ce] D1 binding not available (POST)');
@@ -114,8 +111,7 @@ export async function POST(req: Request) {
       ...newRow,
       submitted_at: now,
       created_at: now,
-      updated_at: now,
-    });
+      updated_at: now });
     // D1에서 삽입된 행을 반환
     const rows = await db
       .select()

@@ -11,8 +11,7 @@ export const approval_delegationRelations = relations(approval_delegation, ({one
 		fields: [approval_delegation.delegator_id],
 		references: [staff_members.id],
 		relationName: "approval_delegation_delegator_id_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const staff_membersRelations = relations(staff_members, ({one, many}) => ({
 	approval_delegations_delegate_id: many(approval_delegation, {
@@ -196,8 +195,7 @@ export const staff_membersRelations = relations(staff_members, ({one, many}) => 
 	}),
 	wiki_folders_created_by: many(wiki_folders, {
 		relationName: "wiki_folders_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const approvalsRelations = relations(approvals, ({one, many}) => ({
 	staff_member: one(staff_members, {
@@ -212,8 +210,7 @@ export const approvalsRelations = relations(approvals, ({one, many}) => ({
 	inventory_logs: many(inventory_logs),
 	inventory_transfers: many(inventory_transfers),
 	purchase_orders: many(purchase_orders),
-	staff_transfer_histories: many(staff_transfer_history),
-}));
+	staff_transfer_histories: many(staff_transfer_history) }));
 
 export const companiesRelations = relations(companies, ({one, many}) => ({
 	approvals: many(approvals),
@@ -239,8 +236,7 @@ export const companiesRelations = relations(companies, ({one, many}) => ({
 	payrolls: many(payroll),
 	posts: many(posts),
 	roster_policy_settings: many(roster_policy_settings),
-	staff_members: many(staff_members),
-}));
+	staff_members: many(staff_members) }));
 
 export const attendanceRelations = relations(attendance, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -250,15 +246,13 @@ export const attendanceRelations = relations(attendance, ({one}) => ({
 	company: one(companies, {
 		fields: [attendance.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const backup_restore_runsRelations = relations(backup_restore_runs, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [backup_restore_runs.requested_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const board_post_commentsRelations = relations(board_post_comments, ({one, many}) => ({
 	board_post: one(board_posts, {
@@ -276,8 +270,7 @@ export const board_post_commentsRelations = relations(board_post_comments, ({one
 	staff_member: one(staff_members, {
 		fields: [board_post_comments.author_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const board_postsRelations = relations(board_posts, ({one, many}) => ({
 	board_post_comments: many(board_post_comments),
@@ -285,8 +278,7 @@ export const board_postsRelations = relations(board_posts, ({one, many}) => ({
 	company: one(companies, {
 		fields: [board_posts.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const board_post_readsRelations = relations(board_post_reads, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -296,8 +288,7 @@ export const board_post_readsRelations = relations(board_post_reads, ({one}) => 
 	board_post: one(board_posts, {
 		fields: [board_post_reads.post_id],
 		references: [board_posts.id]
-	}),
-}));
+	}) }));
 
 export const certificate_issuancesRelations = relations(certificate_issuances, ({one}) => ({
 	staff_member_staff_id: one(staff_members, {
@@ -309,8 +300,7 @@ export const certificate_issuancesRelations = relations(certificate_issuances, (
 		fields: [certificate_issuances.issued_by],
 		references: [staff_members.id],
 		relationName: "certificate_issuances_issued_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const chat_messagesRelations = relations(chat_messages, ({one, many}) => ({
 	staff_member: one(staff_members, {
@@ -321,15 +311,13 @@ export const chat_messagesRelations = relations(chat_messages, ({one, many}) => 
 		fields: [chat_messages.room_id],
 		references: [chat_rooms.id]
 	}),
-	message_reads: many(message_reads),
-}));
+	message_reads: many(message_reads) }));
 
 export const chat_roomsRelations = relations(chat_rooms, ({many}) => ({
 	chat_messages: many(chat_messages),
 	chat_push_jobs: many(chat_push_jobs),
 	messenger_drive_links: many(messenger_drive_links),
-	scheduled_messages: many(scheduled_messages),
-}));
+	scheduled_messages: many(scheduled_messages) }));
 
 export const chat_push_jobsRelations = relations(chat_push_jobs, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -343,8 +331,7 @@ export const chat_push_jobsRelations = relations(chat_push_jobs, ({one}) => ({
 	message: one(messages, {
 		fields: [chat_push_jobs.message_id],
 		references: [messages.id]
-	}),
-}));
+	}) }));
 
 export const messagesRelations = relations(messages, ({one, many}) => ({
 	chat_push_jobs: many(chat_push_jobs),
@@ -357,33 +344,28 @@ export const messagesRelations = relations(messages, ({one, many}) => ({
 	messages: many(messages, {
 		relationName: "messages_reply_to_id_messages_id"
 	}),
-	scheduled_messages: many(scheduled_messages),
-}));
+	scheduled_messages: many(scheduled_messages) }));
 
 export const chat_room_prefsRelations = relations(chat_room_prefs, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [chat_room_prefs.user_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const corporate_card_transactionsRelations = relations(corporate_card_transactions, ({one}) => ({
 	corporate_card: one(corporate_cards, {
 		fields: [corporate_card_transactions.card_id],
 		references: [corporate_cards.id]
-	}),
-}));
+	}) }));
 
 export const corporate_cardsRelations = relations(corporate_cards, ({many}) => ({
-	corporate_card_transactions: many(corporate_card_transactions),
-}));
+	corporate_card_transactions: many(corporate_card_transactions) }));
 
 export const daily_checksRelations = relations(daily_checks, ({one}) => ({
 	daily_closure: one(daily_closures, {
 		fields: [daily_checks.closure_id],
 		references: [daily_closures.id]
-	}),
-}));
+	}) }));
 
 export const daily_closuresRelations = relations(daily_closures, ({one, many}) => ({
 	daily_checks: many(daily_checks),
@@ -395,15 +377,13 @@ export const daily_closuresRelations = relations(daily_closures, ({one, many}) =
 	company: one(companies, {
 		fields: [daily_closures.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const daily_closure_itemsRelations = relations(daily_closure_items, ({one}) => ({
 	daily_closure: one(daily_closures, {
 		fields: [daily_closure_items.closure_id],
 		references: [daily_closures.id]
-	}),
-}));
+	}) }));
 
 export const department_private_inventory_itemsRelations = relations(department_private_inventory_items, ({one, many}) => ({
 	staff_member_updated_by: one(staff_members, {
@@ -420,8 +400,7 @@ export const department_private_inventory_itemsRelations = relations(department_
 		fields: [department_private_inventory_items.company_id],
 		references: [companies.id]
 	}),
-	department_private_inventory_logs: many(department_private_inventory_logs),
-}));
+	department_private_inventory_logs: many(department_private_inventory_logs) }));
 
 export const department_private_inventory_logsRelations = relations(department_private_inventory_logs, ({one}) => ({
 	department_private_inventory_item: one(department_private_inventory_items, {
@@ -435,58 +414,49 @@ export const department_private_inventory_logsRelations = relations(department_p
 	staff_member: one(staff_members, {
 		fields: [department_private_inventory_logs.actor_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const device_inspectionsRelations = relations(device_inspections, ({one}) => ({
 	medical_device: one(medical_devices, {
 		fields: [device_inspections.device_id],
 		references: [medical_devices.id]
-	}),
-}));
+	}) }));
 
 export const medical_devicesRelations = relations(medical_devices, ({many}) => ({
-	device_inspections: many(device_inspections),
-}));
+	device_inspections: many(device_inspections) }));
 
 export const document_versionsRelations = relations(document_versions, ({one}) => ({
 	document_repository: one(document_repository, {
 		fields: [document_versions.document_id],
 		references: [document_repository.id]
-	}),
-}));
+	}) }));
 
 export const document_repositoryRelations = relations(document_repository, ({many}) => ({
-	document_versions: many(document_versions),
-}));
+	document_versions: many(document_versions) }));
 
 export const education_recordsRelations = relations(education_records, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [education_records.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const employment_contractsRelations = relations(employment_contracts, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [employment_contracts.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const freelancer_paymentsRelations = relations(freelancer_payments, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [freelancer_payments.created_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const insurance_recordsRelations = relations(insurance_records, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [insurance_records.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const inventoryRelations = relations(inventory, ({one, many}) => ({
 	supplier: one(suppliers, {
@@ -499,16 +469,14 @@ export const inventoryRelations = relations(inventory, ({one, many}) => ({
 	}),
 	inventory_cost_entries: many(inventory_cost_entries),
 	inventory_price_histories: many(inventory_price_history),
-	inventory_receipts: many(inventory_receipts),
-}));
+	inventory_receipts: many(inventory_receipts) }));
 
 export const suppliersRelations = relations(suppliers, ({many}) => ({
 	inventories: many(inventory),
 	inventory_cost_entries: many(inventory_cost_entries),
 	inventory_price_histories: many(inventory_price_history),
 	inventory_receipts: many(inventory_receipts),
-	purchase_orders: many(purchase_orders),
-}));
+	purchase_orders: many(purchase_orders) }));
 
 export const inventory_categoriesRelations = relations(inventory_categories, ({one, many}) => ({
 	inventory_category: one(inventory_categories, {
@@ -518,8 +486,7 @@ export const inventory_categoriesRelations = relations(inventory_categories, ({o
 	}),
 	inventory_categories: many(inventory_categories, {
 		relationName: "inventory_categories_parent_id_inventory_categories_id"
-	}),
-}));
+	}) }));
 
 export const inventory_closing_snapshotsRelations = relations(inventory_closing_snapshots, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -529,8 +496,7 @@ export const inventory_closing_snapshotsRelations = relations(inventory_closing_
 	company: one(companies, {
 		fields: [inventory_closing_snapshots.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const inventory_cost_entriesRelations = relations(inventory_cost_entries, ({one}) => ({
 	supplier: one(suppliers, {
@@ -556,8 +522,7 @@ export const inventory_cost_entriesRelations = relations(inventory_cost_entries,
 	approval: one(approvals, {
 		fields: [inventory_cost_entries.approval_id],
 		references: [approvals.id]
-	}),
-}));
+	}) }));
 
 export const purchase_ordersRelations = relations(purchase_orders, ({one, many}) => ({
 	inventory_cost_entries: many(inventory_cost_entries),
@@ -601,15 +566,13 @@ export const purchase_ordersRelations = relations(purchase_orders, ({one, many})
 		fields: [purchase_orders.approved_by],
 		references: [staff_members.id],
 		relationName: "purchase_orders_approved_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const inventory_count_sessionsRelations = relations(inventory_count_sessions, ({one}) => ({
 	company: one(companies, {
 		fields: [inventory_count_sessions.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const inventory_logsRelations = relations(inventory_logs, ({one}) => ({
 	purchase_order: one(purchase_orders, {
@@ -627,8 +590,7 @@ export const inventory_logsRelations = relations(inventory_logs, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [inventory_logs.actor_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const inventory_price_historyRelations = relations(inventory_price_history, ({one}) => ({
 	supplier: one(suppliers, {
@@ -646,8 +608,7 @@ export const inventory_price_historyRelations = relations(inventory_price_histor
 	inventory: one(inventory, {
 		fields: [inventory_price_history.inventory_item_id],
 		references: [inventory.id]
-	}),
-}));
+	}) }));
 
 export const inventory_receiptsRelations = relations(inventory_receipts, ({one}) => ({
 	supplier: one(suppliers, {
@@ -661,8 +622,7 @@ export const inventory_receiptsRelations = relations(inventory_receipts, ({one})
 	staff_member: one(staff_members, {
 		fields: [inventory_receipts.created_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const inventory_transfersRelations = relations(inventory_transfers, ({one}) => ({
 	purchase_order: one(purchase_orders, {
@@ -672,27 +632,23 @@ export const inventory_transfersRelations = relations(inventory_transfers, ({one
 	approval: one(approvals, {
 		fields: [inventory_transfers.approval_id],
 		references: [approvals.id]
-	}),
-}));
+	}) }));
 
 export const job_category_required_trainingsRelations = relations(job_category_required_trainings, ({one}) => ({
 	job_category: one(job_categories, {
 		fields: [job_category_required_trainings.job_category_id],
 		references: [job_categories.id]
-	}),
-}));
+	}) }));
 
 export const job_categoriesRelations = relations(job_categories, ({many}) => ({
 	job_category_required_trainings: many(job_category_required_trainings),
-	staff_job_categories: many(staff_job_categories),
-}));
+	staff_job_categories: many(staff_job_categories) }));
 
 export const leave_balancesRelations = relations(leave_balances, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [leave_balances.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const leave_requestsRelations = relations(leave_requests, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -702,8 +658,7 @@ export const leave_requestsRelations = relations(leave_requests, ({one}) => ({
 	company: one(companies, {
 		fields: [leave_requests.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const license_continuing_educationRelations = relations(license_continuing_education, ({one}) => ({
 	staff_member_reviewed_by: one(staff_members, {
@@ -724,26 +679,22 @@ export const license_continuing_educationRelations = relations(license_continuin
 		fields: [license_continuing_education.staff_id],
 		references: [staff_members.id],
 		relationName: "license_continuing_education_staff_id_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const staff_licensesRelations = relations(staff_licenses, ({many}) => ({
-	license_continuing_educations: many(license_continuing_education),
-}));
+	license_continuing_educations: many(license_continuing_education) }));
 
 export const meeting_bookingsRelations = relations(meeting_bookings, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [meeting_bookings.booker_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const message_bookmarksRelations = relations(message_bookmarks, ({one}) => ({
 	message: one(messages, {
 		fields: [message_bookmarks.message_id],
 		references: [messages.id]
-	}),
-}));
+	}) }));
 
 export const message_readsRelations = relations(message_reads, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -753,8 +704,7 @@ export const message_readsRelations = relations(message_reads, ({one}) => ({
 	chat_message: one(chat_messages, {
 		fields: [message_reads.message_id],
 		references: [chat_messages.id]
-	}),
-}));
+	}) }));
 
 export const messenger_drive_linksRelations = relations(messenger_drive_links, ({one}) => ({
 	staff_member_updated_by: one(staff_members, {
@@ -770,23 +720,20 @@ export const messenger_drive_linksRelations = relations(messenger_drive_links, (
 		fields: [messenger_drive_links.created_by],
 		references: [staff_members.id],
 		relationName: "messenger_drive_links_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const notificationsRelations = relations(notifications, ({one, many}) => ({
 	staff_member: one(staff_members, {
 		fields: [notifications.user_id],
 		references: [staff_members.id]
 	}),
-	todo_reminder_logs: many(todo_reminder_logs),
-}));
+	todo_reminder_logs: many(todo_reminder_logs) }));
 
 export const op_check_templatesRelations = relations(op_check_templates, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [op_check_templates.created_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const op_patient_checksRelations = relations(op_patient_checks, ({one}) => ({
 	staff_member_updated_by: one(staff_members, {
@@ -798,8 +745,7 @@ export const op_patient_checksRelations = relations(op_patient_checks, ({one}) =
 		fields: [op_patient_checks.created_by],
 		references: [staff_members.id],
 		relationName: "op_patient_checks_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payrollRelations = relations(payroll, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -809,15 +755,13 @@ export const payrollRelations = relations(payroll, ({one}) => ({
 	company: one(companies, {
 		fields: [payroll.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const payroll_approval_logsRelations = relations(payroll_approval_logs, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [payroll_approval_logs.actor_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const payroll_approval_workflowsRelations = relations(payroll_approval_workflows, ({one}) => ({
 	staff_member_step2_actor_id: one(staff_members, {
@@ -829,8 +773,7 @@ export const payroll_approval_workflowsRelations = relations(payroll_approval_wo
 		fields: [payroll_approval_workflows.step1_actor_id],
 		references: [staff_members.id],
 		relationName: "payroll_approval_workflows_step1_actor_id_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payroll_bonus_itemsRelations = relations(payroll_bonus_items, ({one}) => ({
 	staff_member_staff_id: one(staff_members, {
@@ -842,8 +785,7 @@ export const payroll_bonus_itemsRelations = relations(payroll_bonus_items, ({one
 		fields: [payroll_bonus_items.created_by],
 		references: [staff_members.id],
 		relationName: "payroll_bonus_items_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payroll_calendar_itemsRelations = relations(payroll_calendar_items, ({one}) => ({
 	staff_member_updated_by: one(staff_members, {
@@ -855,8 +797,7 @@ export const payroll_calendar_itemsRelations = relations(payroll_calendar_items,
 		fields: [payroll_calendar_items.created_by],
 		references: [staff_members.id],
 		relationName: "payroll_calendar_items_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payroll_deduction_controlsRelations = relations(payroll_deduction_controls, ({one}) => ({
 	staff_member_staff_id: one(staff_members, {
@@ -868,8 +809,7 @@ export const payroll_deduction_controlsRelations = relations(payroll_deduction_c
 		fields: [payroll_deduction_controls.created_by],
 		references: [staff_members.id],
 		relationName: "payroll_deduction_controls_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payroll_locksRelations = relations(payroll_locks, ({one}) => ({
 	staff_member_reopen_reviewed_by: one(staff_members, {
@@ -881,15 +821,13 @@ export const payroll_locksRelations = relations(payroll_locks, ({one}) => ({
 		fields: [payroll_locks.reopen_requested_by],
 		references: [staff_members.id],
 		relationName: "payroll_locks_reopen_requested_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const payroll_policy_versionsRelations = relations(payroll_policy_versions, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [payroll_policy_versions.created_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const payroll_retro_adjustmentsRelations = relations(payroll_retro_adjustments, ({one}) => ({
 	staff_member_staff_id: one(staff_members, {
@@ -901,26 +839,22 @@ export const payroll_retro_adjustmentsRelations = relations(payroll_retro_adjust
 		fields: [payroll_retro_adjustments.created_by],
 		references: [staff_members.id],
 		relationName: "payroll_retro_adjustments_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const poll_votesRelations = relations(poll_votes, ({one}) => ({
 	poll: one(polls, {
 		fields: [poll_votes.poll_id],
 		references: [polls.id]
-	}),
-}));
+	}) }));
 
 export const pollsRelations = relations(polls, ({many}) => ({
-	poll_votes: many(poll_votes),
-}));
+	poll_votes: many(poll_votes) }));
 
 export const postsRelations = relations(posts, ({one}) => ({
 	company: one(companies, {
 		fields: [posts.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const roster_approval_requestsRelations = relations(roster_approval_requests, ({one}) => ({
 	staff_member_rejected_by: one(staff_members, {
@@ -937,8 +871,7 @@ export const roster_approval_requestsRelations = relations(roster_approval_reque
 		fields: [roster_approval_requests.requested_by],
 		references: [staff_members.id],
 		relationName: "roster_approval_requests_requested_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const roster_policy_settingsRelations = relations(roster_policy_settings, ({one}) => ({
 	staff_member_updated_by: one(staff_members, {
@@ -954,8 +887,7 @@ export const roster_policy_settingsRelations = relations(roster_policy_settings,
 	company: one(companies, {
 		fields: [roster_policy_settings.company_id],
 		references: [companies.id]
-	}),
-}));
+	}) }));
 
 export const roster_swap_requestsRelations = relations(roster_swap_requests, ({one}) => ({
 	staff_member_rejected_by: one(staff_members, {
@@ -981,14 +913,12 @@ export const roster_swap_requestsRelations = relations(roster_swap_requests, ({o
 		fields: [roster_swap_requests.requested_by],
 		references: [staff_members.id],
 		relationName: "roster_swap_requests_requested_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const work_shiftsRelations = relations(work_shifts, ({many}) => ({
 	roster_swap_requests: many(roster_swap_requests),
 	staff_members: many(staff_members),
-	staff_shift_assignments: many(staff_shift_assignments),
-}));
+	staff_shift_assignments: many(staff_shift_assignments) }));
 
 export const scheduled_messagesRelations = relations(scheduled_messages, ({one}) => ({
 	chat_room: one(chat_rooms, {
@@ -998,15 +928,13 @@ export const scheduled_messagesRelations = relations(scheduled_messages, ({one})
 	message: one(messages, {
 		fields: [scheduled_messages.reply_to_id],
 		references: [messages.id]
-	}),
-}));
+	}) }));
 
 export const staff_certificationsRelations = relations(staff_certifications, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [staff_certifications.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const staff_evaluationsRelations = relations(staff_evaluations, ({one}) => ({
 	staff_member_staff_id: one(staff_members, {
@@ -1018,8 +946,7 @@ export const staff_evaluationsRelations = relations(staff_evaluations, ({one}) =
 		fields: [staff_evaluations.evaluator_id],
 		references: [staff_members.id],
 		relationName: "staff_evaluations_evaluator_id_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const staff_job_categoriesRelations = relations(staff_job_categories, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -1029,15 +956,13 @@ export const staff_job_categoriesRelations = relations(staff_job_categories, ({o
 	job_category: one(job_categories, {
 		fields: [staff_job_categories.job_category_id],
 		references: [job_categories.id]
-	}),
-}));
+	}) }));
 
 export const staff_preferred_offRelations = relations(staff_preferred_off, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [staff_preferred_off.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const staff_shift_assignmentsRelations = relations(staff_shift_assignments, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -1047,15 +972,13 @@ export const staff_shift_assignmentsRelations = relations(staff_shift_assignment
 	work_shift: one(work_shifts, {
 		fields: [staff_shift_assignments.shift_id],
 		references: [work_shifts.id]
-	}),
-}));
+	}) }));
 
 export const staff_trainingsRelations = relations(staff_trainings, ({one}) => ({
 	staff_member: one(staff_members, {
 		fields: [staff_trainings.staff_id],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const staff_transfer_historyRelations = relations(staff_transfer_history, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -1065,8 +988,7 @@ export const staff_transfer_historyRelations = relations(staff_transfer_history,
 	approval: one(approvals, {
 		fields: [staff_transfer_history.approval_id],
 		references: [approvals.id]
-	}),
-}));
+	}) }));
 
 export const todo_reminder_logsRelations = relations(todo_reminder_logs, ({one}) => ({
 	staff_member: one(staff_members, {
@@ -1076,8 +998,7 @@ export const todo_reminder_logsRelations = relations(todo_reminder_logs, ({one})
 	notification: one(notifications, {
 		fields: [todo_reminder_logs.notification_id],
 		references: [notifications.id]
-	}),
-}));
+	}) }));
 
 export const wiki_document_versionsRelations = relations(wiki_document_versions, ({one, many}) => ({
 	wiki_document_version: one(wiki_document_versions, {
@@ -1095,8 +1016,7 @@ export const wiki_document_versionsRelations = relations(wiki_document_versions,
 	staff_member: one(staff_members, {
 		fields: [wiki_document_versions.created_by],
 		references: [staff_members.id]
-	}),
-}));
+	}) }));
 
 export const wiki_documentsRelations = relations(wiki_documents, ({one, many}) => ({
 	wiki_document_versions: many(wiki_document_versions),
@@ -1113,8 +1033,7 @@ export const wiki_documentsRelations = relations(wiki_documents, ({one, many}) =
 		fields: [wiki_documents.created_by],
 		references: [staff_members.id],
 		relationName: "wiki_documents_created_by_staff_members_id"
-	}),
-}));
+	}) }));
 
 export const wiki_foldersRelations = relations(wiki_folders, ({one, many}) => ({
 	wiki_documents: many(wiki_documents),
@@ -1127,5 +1046,4 @@ export const wiki_foldersRelations = relations(wiki_folders, ({one, many}) => ({
 		fields: [wiki_folders.created_by],
 		references: [staff_members.id],
 		relationName: "wiki_folders_created_by_staff_members_id"
-	}),
-}));
+	}) }));

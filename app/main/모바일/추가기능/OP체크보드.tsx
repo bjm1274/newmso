@@ -23,8 +23,7 @@ import {
   setOpCardState,
   useOpBoard,
   type OpCheckCard,
-  type OpCheckCardState,
-} from './data-hooks';
+  type OpCheckCardState } from './data-hooks';
 
 type Filter = 'all' | 'inprog' | 'wait' | 'done' | 'hold';
 
@@ -38,8 +37,7 @@ function syncLabel(date: Date): string {
 export default function OP체크보드({
   user,
   onBack,
-  onOpenDetail,
-}: {
+  onOpenDetail }: {
   user: ErpUser;
   onBack: () => void;
   onOpenDetail: (card: OpCheckCard) => void;
@@ -64,8 +62,7 @@ export default function OP체크보드({
       inprog: mergedCards.filter((c) => c.state === '수술중').length,
       wait: mergedCards.filter((c) => c.state === '준비중' || c.state === '준비완료').length,
       done: mergedCards.filter((c) => c.state === '완료').length,
-      hold: mergedCards.filter((c) => c.state === '보류').length,
-    }),
+      hold: mergedCards.filter((c) => c.state === '보류').length }),
     [mergedCards],
   );
 
@@ -87,8 +84,7 @@ export default function OP체크보드({
         await setOpCardState(card, next, {
           id: user.id,
           name: user.name,
-          company: typeof user.company === 'string' ? user.company : null,
-        });
+          company: typeof user.company === 'string' ? user.company : null });
         toast(`${card.patient}: ${prev} → ${next}`, 'success');
         await refresh();
         setOptimistic((m) => {

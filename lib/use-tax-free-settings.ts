@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   TAX_FREE_LEGAL_LIMITS,
   type TaxFreeItemKey,
@@ -24,15 +24,14 @@ const DEFAULT_SETTINGS: TaxFreeSettings = {
   uniform_limit: TAX_FREE_LEGAL_LIMITS.uniform.limit,
   congratulations_limit: TAX_FREE_LEGAL_LIMITS.congratulations.limit,
   housing_limit: TAX_FREE_LEGAL_LIMITS.housing.limit,
-  other_taxfree_limit: 0,
-};
+  other_taxfree_limit: 0 };
 
 export async function fetchTaxFreeSettings(
   companyName: string,
   year: number = new Date().getFullYear()
 ): Promise<TaxFreeSettings> {
   const co = companyName === '전체' ? '전체' : companyName;
-  const { data } = await supabase
+  const { data } = await db
     .from('tax_free_settings')
     .select('meal_limit, vehicle_limit, childcare_limit, research_limit, uniform_limit, congratulations_limit, housing_limit, other_taxfree_limit')
     .eq('company_name', co)
@@ -47,8 +46,7 @@ export async function fetchTaxFreeSettings(
     uniform_limit: data.uniform_limit ?? DEFAULT_SETTINGS.uniform_limit,
     congratulations_limit: data.congratulations_limit ?? DEFAULT_SETTINGS.congratulations_limit,
     housing_limit: data.housing_limit ?? DEFAULT_SETTINGS.housing_limit,
-    other_taxfree_limit: data.other_taxfree_limit ?? 0,
-  };
+    other_taxfree_limit: data.other_taxfree_limit ?? 0 };
 }
 
 export async function saveTaxFreeSettings(
@@ -57,7 +55,7 @@ export async function saveTaxFreeSettings(
   year: number = new Date().getFullYear()
 ) {
   const co = companyName === '전체' ? '전체' : companyName;
-  const { error } = await supabase
+  const { error } = await db
     .from('tax_free_settings')
     .upsert(
       { company_name: co, effective_year: year, ...settings, updated_at: new Date().toISOString() },

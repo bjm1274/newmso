@@ -12,8 +12,7 @@ import {
   getDeletedMessagePreviewText,
   getMessageDisplayText,
   resolveAttachmentKind,
-  type AttachmentPreviewKind,
-} from './메신저첨부';
+  type AttachmentPreviewKind } from './메신저첨부';
 import { renderWithInlineEmoticons } from './메신저메시지렌더';
 import { MessengerAvatar } from './메신저공통';
 import { extractWardMessageMeta, extractPollMetaFromQuestion, WARD_QUICK_REPLY_OPTIONS, toChatDate } from './메신저유틸';
@@ -198,8 +197,7 @@ function MessengerTimelineComponent({
   onMediaLoad,
   onOpenDateJump,
   onOpenStaffProfile,
-  onOpenBoardPost,
-}: MessengerTimelineProps) {
+  onOpenBoardPost }: MessengerTimelineProps) {
   const isMobile = useIsMobile();
 
   useLayoutEffect(() => {
@@ -558,8 +556,7 @@ function MessengerTimelineComponent({
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
-                weekday: 'short',
-              });
+                weekday: 'short' });
               const dateShort = `${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' })} (${created.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', weekday: 'short' })})`;
               const dateKey = formatTimelineDateKey(msg.created_at);
               const showDateDivider = dateLabel !== lastDateLabel;
@@ -711,8 +708,7 @@ function MessengerTimelineComponent({
                                   bubbles: true,
                                   cancelable: true,
                                   clientX: event.clientX,
-                                  clientY: event.clientY,
-                                });
+                                  clientY: event.clientY });
                                 event.currentTarget.dispatchEvent(customEvent);
                               }
                             }}

@@ -4,15 +4,13 @@ import {
   appendApprovalHistory,
   getApprovalRevision,
   isApprovalLocked,
-  lockApprovalMeta,
-} from '@/lib/approval-workflow';
-import { supabase } from '@/lib/supabase';
+  lockApprovalMeta } from '@/lib/approval-workflow';
+import { db } from '@/lib/db-client';
 import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import type { StaffMember } from '@/types';
 import { hasPermission } from '@/lib/access-control';
 import type {
-  TransitionApprovalsOnServer,
-} from './useApprovalBulkActions';
+  TransitionApprovalsOnServer } from './useApprovalBulkActions';
 
 type ApprovalRecord = Record<string, unknown>;
 type ApprovalHistoryEntry = Parameters<typeof appendApprovalHistory>[1];
@@ -52,8 +50,7 @@ export function useApprovalActions({
   setSelectedApprovalId,
   resolveAccessibleView,
   setViewMode,
-  onViewChange,
-}: UseApprovalActionsParams) {
+  onViewChange }: UseApprovalActionsParams) {
   const canUserApproveItem = useCallback((item: ApprovalRecord) => {
     if (item?.status !== '대기' || !user?.id) return false;
     return String(resolveCurrentApproverId(item) || '') === String(user.id);
@@ -87,13 +84,11 @@ export function useApprovalActions({
       let nextMetaData = appendApprovalHistory(baseMetaData, {
         ...buildApprovalHistoryEntry(action, options?.note),
         current_approver_id: options?.currentApproverId ?? null,
-        revision: options?.revision ?? null,
-      });
+        revision: options?.revision ?? null });
       if (options?.lock) {
         nextMetaData = appendApprovalHistory(lockApprovalMeta(nextMetaData, user?.id ? String(user.id) : null), {
           ...buildApprovalHistoryEntry('locked', '결재 문서 잠금'),
-          revision: options?.revision ?? null,
-        });
+          revision: options?.revision ?? null });
       }
       return nextMetaData;
     },
@@ -109,16 +104,14 @@ export function useApprovalActions({
       tone: 'accent',
       inputType: 'textarea',
       placeholder: '승인 코멘트를 입력해 주세요. (선택)',
-      helperText: '비워 두어도 승인 처리됩니다.',
-    });
+      helperText: '비워 두어도 승인 처리됩니다.' });
     if (comment === null) return;
 
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'approve',
         approvalIds: [String(item.id || '')],
-        reason: comment,
-      });
+        reason: comment });
       const result = payload.results[0];
 
       if (result?.ok) {
@@ -191,16 +184,14 @@ export function useApprovalActions({
       tone: 'danger',
       inputType: 'textarea',
       placeholder: '반려 사유를 입력해 주세요.',
-      helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
-    });
+      helperText: '비워 두면 기본 반려 문구로 저장됩니다.' });
     if (reason === null) return;
 
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'reject',
         approvalIds: [String(item.id || '')],
-        reason,
-      });
+        reason });
       const result = payload.results[0];
       if (result?.ok) {
         toast('반려 처리했습니다.', 'success');
@@ -227,9 +218,8 @@ export function useApprovalActions({
       note: reason || '반려',
       lock: true,
       currentApproverId,
-      revision: getApprovalRevision(rejectMetaData),
-    });
-    const rejectResult = await supabase
+      revision: getApprovalRevision(rejectMetaData) });
+    const rejectResult = await db
       .from('approvals')
       .update({ status: '반려', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
       .eq('id', item.id);
@@ -241,7 +231,7 @@ export function useApprovalActions({
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from('approvals')
       .update({ status: '반려', meta_data: { ...(nextRejectedMetaData || {}), reject_reason: reason } })
       .eq('id', item.id);
@@ -275,8 +265,7 @@ export function useApprovalActions({
       description: '회수 후 수정 화면으로 바로 이동합니다.',
       confirmText: '회수',
       cancelText: '취소',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) {
       return;
     }
@@ -284,19 +273,16 @@ export function useApprovalActions({
     const recalledMetaData = {
       ...((item.meta_data as ApprovalRecord | null | undefined) || {}),
       recalled_at: new Date().toISOString(),
-      recalled_by: user?.id,
-    };
+      recalled_by: user?.id };
     const recalledHistoryMetaData = appendApprovalHistory(recalledMetaData, {
       ...buildApprovalHistoryEntry('recalled', '회수 후 수정'),
-      revision: getApprovalRevision(recalledMetaData),
-    });
+      revision: getApprovalRevision(recalledMetaData) });
 
     try {
       const response = await fetch('/api/approval/recall', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvalId: item.id, note: '회수 후 수정' }),
-      });
+        body: JSON.stringify({ approvalId: item.id, note: '회수 후 수정' }) });
       const payload = await response.json().catch(() => null);
 
       if (!response.ok || !payload?.ok) {
@@ -312,8 +298,7 @@ export function useApprovalActions({
       ...item,
       status: '회수',
       current_approver_id: null,
-      meta_data: recalledHistoryMetaData,
-    });
+      meta_data: recalledHistoryMetaData });
     setSelectedApprovalId(null);
     const nextView = resolveAccessibleView('작성하기');
     if (nextView) {
@@ -341,6 +326,5 @@ export function useApprovalActions({
     isApprovalEditLockedItem,
     handleApproveAction,
     handleRejectAction,
-    handleRecallAction,
-  };
+    handleRecallAction };
 }

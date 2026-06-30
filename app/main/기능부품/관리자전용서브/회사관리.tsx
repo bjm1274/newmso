@@ -2,10 +2,10 @@
 
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { Company, CompanyType } from '@/lib/company';
 import { buildSelectClause } from '@/lib/query-columns-utils';
-import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/db-compat';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
@@ -77,8 +77,7 @@ function createEmptyForm(): FormState {
     address: '',
     phone: '',
     payment_day: '7',
-    memo: '',
-  };
+    memo: '' };
 }
 
 function normalizePaymentDay(value: unknown) {
@@ -92,8 +91,7 @@ function PolicyScopeControls({
   selectedCompany,
   onCompanyChange,
   yearMonth,
-  onYearMonthChange,
-}: {
+  onYearMonthChange }: {
   companyOptions: string[];
   selectedCompany: string;
   onCompanyChange: (value: string) => void;
@@ -170,7 +168,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
 
     const { data, error } = await withMissingColumnsFallback(
       (omittedColumns) =>
-        supabase
+        db
           .from('companies')
           .select(buildCompanySelect(omittedColumns))
           .order('type', { ascending: false })
@@ -193,7 +191,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         { name: '서연요양원', type: 'HOSPITAL', is_active: true },
       ];
 
-      const { error: seedError } = await supabase.from('companies').insert(seed);
+      const { error: seedError } = await db.from('companies').insert(seed);
       if (seedError) {
         console.error('companies seed failed:', seedError);
         toast(`기본 회사 등록에 실패했습니다: ${seedError.message}`, 'error');
@@ -203,7 +201,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
 
       const { data: seededData, error: seededError } = await withMissingColumnsFallback(
         (omittedColumns) =>
-          supabase
+          db
             .from('companies')
             .select(buildCompanySelect(omittedColumns))
             .order('type', { ascending: false })
@@ -262,12 +260,11 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       address: form.address || null,
       phone: form.phone || null,
       payment_day: normalizePaymentDay(form.payment_day),
-      memo: form.memo || null,
-    };
+      memo: form.memo || null };
 
     try {
       if (editing) {
-        const { error } = await supabase.from('companies').update(payload).eq('id', editing.id);
+        const { error } = await db.from('companies').update(payload).eq('id', editing.id);
         if (error) {
           if (isMissingColumnError(error, 'payment_day')) {
             toast('급여일 저장 컬럼이 아직 DB에 적용되지 않았습니다. 마이그레이션을 먼저 적용해 주세요.', 'error');
@@ -284,10 +281,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         return;
       }
 
-      const { error } = await supabase.from('companies').insert({
+      const { error } = await db.from('companies').insert({
         ...payload,
-        mso_id: form.type !== 'MSO' ? msoId : null,
-      });
+        mso_id: form.type !== 'MSO' ? msoId : null });
 
       if (error) {
         if (isMissingColumnError(error, 'payment_day')) {
@@ -317,8 +313,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       address: company.address || '',
       phone: company.phone || '',
       payment_day: String(company.payment_day || 7),
-      memo: company.memo || '',
-    });
+      memo: company.memo || '' });
   };
 
   const companyColumns = useMemo((): Column<Company>[] => [
@@ -328,8 +323,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       primary: true,
       render: (company) => (
         <span className="font-bold text-[var(--foreground)]">{company.name}</span>
-      ),
-    },
+      ) },
     {
       key: 'type',
       label: '유형',
@@ -347,8 +341,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
               ? '병원'
               : '클리닉'}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'payment_day',
       label: '급여일',
@@ -356,13 +349,11 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         <span className="text-xs font-bold text-[var(--foreground)]">
           매월 {company.payment_day ?? 7}일
         </span>
-      ),
-    },
+      ) },
     {
       key: 'is_active',
       label: '상태',
-      render: (company) => (company.is_active ? '활성' : '비활성'),
-    },
+      render: (company) => (company.is_active ? '활성' : '비활성') },
     {
       key: 'actions',
       label: '관리',
@@ -379,8 +370,7 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
         >
           수정
         </button>
-      ),
-    },
+      ) },
   ], []);
 
   if (loading) {

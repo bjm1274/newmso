@@ -34,15 +34,13 @@ interface RiskActionDialogProps {
 const toneClasses: Record<NonNullable<RiskActionDialogProps['tone']>, string> = {
   warning: 'border-amber-200 bg-amber-50 text-amber-700',
   danger: 'border-rose-200 bg-rose-50 text-rose-700',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-};
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
 
 const itemToneClasses: Record<NonNullable<RiskActionDialogItem['tone']>, string> = {
   default: 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]',
   warning: 'border-amber-200 bg-amber-50 text-amber-700',
   danger: 'border-rose-200 bg-rose-50 text-rose-700',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-};
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
 
 export default function RiskActionDialog({
   open,
@@ -58,8 +56,7 @@ export default function RiskActionDialog({
   loading = false,
   tone = 'warning',
   onCancel,
-  onConfirm,
-}: RiskActionDialogProps) {
+  onConfirm }: RiskActionDialogProps) {
   if (!open) return null;
 
   return (

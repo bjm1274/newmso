@@ -22,15 +22,13 @@ const TONE_BORDER: Record<DetectionGroup['tone'], string> = {
   warn:   'border-l-[#F59E0B]',
   danger: 'border-l-[#EF4444]',
   muted:  'border-l-[var(--toss-gray-3)]',
-  accent: 'border-l-[var(--accent)]',
-};
+  accent: 'border-l-[var(--accent)]' };
 
 const TONE_VALUE: Record<DetectionGroup['tone'], string> = {
   warn:   'text-[#D97706]',
   danger: 'text-[#DC2626]',
   muted:  'text-[var(--foreground)]',
-  accent: 'text-[var(--accent)]',
-};
+  accent: 'text-[var(--accent)]' };
 
 function AbnormalDetectionCardInner({ group, active, onSelect }: Props) {
   return (

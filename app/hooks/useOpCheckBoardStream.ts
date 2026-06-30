@@ -11,7 +11,7 @@
  * - op_patient_checks → OpPatientCheck (status, checklist 진행도)
  *
  * 실시간:
- * - supabase realtime 두 채널(board_posts, op_patient_checks) 구독
+ * - db realtime 두 채널(board_posts, op_patient_checks) 구독
  * - 변경 감지 시 refresh() 재호출
  * - unmount 시 unsubscribe (JM3 cleanup)
  *
@@ -22,30 +22,26 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   isMissingColumnError,
-  withMissingColumnsFallback,
-} from '@/lib/supabase-compat';
+  withMissingColumnsFallback } from '@/lib/db-compat';
 import type { BoardPost, OpPatientCheck } from '@/types';
 import {
   OP_CHECK_BOARD_POST_OPTIONAL_COLUMNS,
   OP_CHECK_BOARD_POST_REQUIRED_COLUMNS,
   OP_PATIENT_CHECK_OPTIONAL_COLUMNS,
-  OP_PATIENT_CHECK_REQUIRED_COLUMNS,
-} from '../main/기능부품/OP체크/constants';
+  OP_PATIENT_CHECK_REQUIRED_COLUMNS } from '../main/기능부품/OP체크/constants';
 import {
   buildSelectColumns,
   isMissingRelationError,
   isOpCheckSchemaMissing,
-  QueryResult,
-} from '../main/기능부품/op-check-utils';
+  QueryResult } from '../main/기능부품/op-check-utils';
 import {
   compareSchedules,
   mapSchedulePost,
-  type LinkedSchedulePost,
-} from '../main/기능부품/OP체크/schedule-helpers';
+  type LinkedSchedulePost } from '../main/기능부품/OP체크/schedule-helpers';
 
 export type OpCheckBoardFilters = {
   /** YYYY-MM-DD. 빈 문자열이면 전체. */
@@ -85,7 +81,7 @@ export function useOpCheckBoardStream(filters: OpCheckBoardFilters): OpCheckBoar
       const [scheduleRes, patientCheckRes] = await Promise.all([
         withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns): Promise<QueryResult<BoardPost[]>> => {
-            let query = supabase
+            let query = db
               .from('board_posts')
               .select(
                 buildSelectColumns(
@@ -108,7 +104,7 @@ export function useOpCheckBoardStream(filters: OpCheckBoardFilters): OpCheckBoar
         ),
         withMissingColumnsFallback<OpPatientCheck[]>(
           async (omittedColumns): Promise<QueryResult<OpPatientCheck[]>> => {
-            let query = supabase
+            let query = db
               .from('op_patient_checks')
               .select(
                 buildSelectColumns(
@@ -191,8 +187,7 @@ export function useOpCheckBoardStream(filters: OpCheckBoardFilters): OpCheckBoar
     return schedulePosts.map((schedule) => ({
       id: schedule.id,
       schedule,
-      patientCheck: checkByScheduleId.get(schedule.id) || null,
-    }));
+      patientCheck: checkByScheduleId.get(schedule.id) || null }));
   }, [patientChecks, schedulePosts]);
 
   return { items, loading, error, refresh };

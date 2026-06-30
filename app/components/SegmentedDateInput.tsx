@@ -33,8 +33,7 @@ export default function SegmentedDateInput({
   disabled,
   required,
   ariaLabel,
-  className,
-}: Props) {
+  className }: Props) {
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [day, setDay] = useState('');

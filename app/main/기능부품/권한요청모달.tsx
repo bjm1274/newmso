@@ -108,14 +108,12 @@ export default function PermissionPromptModal() {
           await requestCurrentPosition({
             enableHighAccuracy: true,
             timeout: 12000,
-            maximumAge: 0,
-          });
+            maximumAge: 0 });
         } catch {
           await requestCurrentPosition({
             enableHighAccuracy: false,
             timeout: 10000,
-            maximumAge: 60000,
-          });
+            maximumAge: 60000 });
         }
 
         toast('위치 권한을 허용했습니다. 출퇴근 시 GPS 인증을 사용할 수 있습니다.');

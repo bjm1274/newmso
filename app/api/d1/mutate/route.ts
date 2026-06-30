@@ -2,8 +2,8 @@
 // app/api/d1/mutate/route.ts
 // Generic D1 INSERT / UPDATE / DELETE 엔드포인트.
 //
-// /api/d1/query (SELECT 전용)과 짝을 이루어 supabase.from() 호출의
-// write 경로를 D1으로 라우팅. supabase-compatible 클라이언트 헬퍼가
+// /api/d1/query (SELECT 전용)과 짝을 이루어 db.from() 호출의
+// write 경로를 D1으로 라우팅. db-compatible 클라이언트 헬퍼가
 // chained .insert / .update / .delete 호출 시 이 라우트로 fetch.
 //
 // 권한: 로그인 사용자 + POLICY_REGISTRY (Phase 4)로 op별 검증.
@@ -24,8 +24,7 @@ import {
   assertAccess,
   PolicyDenied,
   PolicyMissing,
-  POLICY_REGISTRY,
-} from '@/lib/db';
+  POLICY_REGISTRY } from '@/lib/db';
 import type { ErpClaims } from '@/lib/db/auth/claims';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 import * as schema from '@/lib/db/schema';
@@ -41,16 +40,14 @@ const MAX_ROWS_PER_INSERT = 100;
 // (완전 제거는 마이그레이션 의존이라 위험 → 가드만 적용.)
 let provisioned = false;
 
-// RETURNING 컬럼 — 일반 컬럼명 또는 '*'(전체 컬럼). supabase .select('*') 호환.
+// RETURNING 컬럼 — 일반 컬럼명 또는 '*'(전체 컬럼). db .select('*') 호환.
 const ReturningColSchema = z.string().refine((c) => c === '*' || COLUMN_RE.test(c), {
-  message: 'invalid returning column',
-});
+  message: 'invalid returning column' });
 
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
   op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike', 'contains']),
-  value: z.unknown(),
-});
+  value: z.unknown() });
 
 const InsertSchema = z.object({
   op: z.literal('insert'),
@@ -59,24 +56,20 @@ const InsertSchema = z.object({
   onConflict: z.enum(['ignore', 'replace']).optional(),
   conflict: z.object({
     columns: z.array(z.string().regex(COLUMN_RE)).min(1).max(8),
-    action: z.enum(['update', 'ignore']),
-  }).optional(),
-  returning: z.array(ReturningColSchema).optional(),
-});
+    action: z.enum(['update', 'ignore']) }).optional(),
+  returning: z.array(ReturningColSchema).optional() });
 
 const UpdateSchema = z.object({
   op: z.literal('update'),
   table: z.string(),
   set: z.record(z.string().regex(COLUMN_RE), z.unknown()),
   where: z.array(WhereSchema).min(1).max(20),
-  returning: z.array(ReturningColSchema).optional(),
-});
+  returning: z.array(ReturningColSchema).optional() });
 
 const DeleteSchema = z.object({
   op: z.literal('delete'),
   table: z.string(),
-  where: z.array(WhereSchema).min(1).max(20),
-});
+  where: z.array(WhereSchema).min(1).max(20) });
 
 const PayloadSchema = z.discriminatedUnion('op', [InsertSchema, UpdateSchema, DeleteSchema]);
 
@@ -106,8 +99,7 @@ function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims
     erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_view_all_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),
-    erp_can_manage_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),
-  };
+    erp_can_manage_department_inventory: Boolean(perms.admin || perms.mso || perms.hr) };
 }
 
 /**
@@ -275,22 +267,7 @@ export async function POST(request: Request) {
     // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
     if (!provisioned) {
       try {
-        await d1.exec(`
-        CREATE TABLE IF NOT EXISTS "disciplinary_committees" (
-          "id" text PRIMARY KEY NOT NULL,
-          "company" text,
-          "title" text NOT NULL,
-          "meeting_date" text,
-          "target_staff_id" text NOT NULL,
-          "target_staff_name" text NOT NULL,
-          "status" text DEFAULT '대기',
-          "reason" text NOT NULL,
-          "result_type" text,
-          "result_details" text,
-          "committee_members" text,
-          "created_at" text DEFAULT (CURRENT_TIMESTAMP)
-        );
-      `);
+        await d1.exec('CREATE TABLE IF NOT EXISTS "disciplinary_committees" ("id" text PRIMARY KEY NOT NULL, "company" text, "title" text NOT NULL, "meeting_date" text, "target_staff_id" text NOT NULL, "target_staff_name" text NOT NULL, "status" text DEFAULT \'대기\', "reason" text NOT NULL, "result_type" text, "result_details" text, "committee_members" text, "created_at" text DEFAULT (CURRENT_TIMESTAMP));');
       } catch (err) {
         console.error('Failed to auto-provision disciplinary_committees table:', err);
       }
@@ -419,8 +396,7 @@ export async function POST(request: Request) {
               await updateChatRoomLastMessage(db, {
                 room_id: roomId,
                 created_at: String(row.created_at ?? new Date().toISOString()),
-                content: row.content != null ? String(row.content) : null,
-              });
+                content: row.content != null ? String(row.content) : null });
             }
           } catch (triggerErr) {
             console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
@@ -437,8 +413,7 @@ export async function POST(request: Request) {
                 return enqueueChatPushJob({
                   messageId,
                   roomId,
-                  senderId: (row.sender_id as string | null) ?? null,
-                });
+                  senderId: (row.sender_id as string | null) ?? null });
               }),
             );
           } catch (enqueueErr) {

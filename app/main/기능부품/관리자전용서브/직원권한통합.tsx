@@ -138,8 +138,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ staffId, updates }),
-        });
+          body: JSON.stringify({ staffId, updates }) });
         const body = await response.json().catch(() => null);
         if (!response.ok || !body?.ok) {
           const message = body?.error || '권한 변경 중 오류가 발생했습니다.';
@@ -171,9 +170,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         staffId: selectedStaff.id,
-        clearPassword: true,
-      }),
-    });
+        clearPassword: true }) });
     const payload = await response.json().catch(() => null);
     setPasswordSaving(false);
 
@@ -189,8 +186,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       String(selectedStaff.id),
       {
         staff_name: beforeStaff?.name || selectedStaff.name,
-        ...buildAuditDiff({ password: '[EXISTING]' }, { password: '[CLEARED]' }, ['password']),
-      },
+        ...buildAuditDiff({ password: '[EXISTING]' }, { password: '[CLEARED]' }, ['password']) },
       actor.userId,
       actor.userName
     );
@@ -217,12 +213,10 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
             label: '역할',
             before: String(beforeStaff?.role || 'staff'),
             after: newRole,
-            tone: newRole === 'admin' ? 'critical' : 'warning',
-          },
+            tone: newRole === 'admin' ? 'critical' : 'warning' },
         ],
         affectedGroups: ['조직 / 권한'],
-        riskCount: newRole === 'admin' ? 1 : 0,
-      });
+        riskCount: newRole === 'admin' ? 1 : 0 });
       const { error } = await updateStaffRecord(staffId, { role: newRole });
       if (error) {
         toast('역할 변경 중 오류가 발생했습니다.', 'error');
@@ -235,8 +229,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         String(staffId),
         {
           staff_name: beforeStaff?.name || '-',
-          ...buildAuditDiff({ role: beforeStaff?.role || null }, { role: newRole }, ['role']),
-        },
+          ...buildAuditDiff({ role: beforeStaff?.role || null }, { role: newRole }, ['role']) },
         actor.userId,
         actor.userName,
       );
@@ -265,8 +258,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
             { permissions: beforeStaff?.permissions || {} },
             { permissions: nextPermissions },
             ['permissions']
-          ),
-        },
+          ) },
         actor.userId,
         actor.userName
       );
@@ -298,9 +290,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         ...currentPermissions,
         approval_reference_defaults: {
           ...currentDefaults,
-          [selectedFormType]: updatedFormDefaults,
-        },
-      };
+          [selectedFormType]: updatedFormDefaults } };
 
       await setPermissions(selectedStaff.id as string, nextPermissions);
       setSelectedRecipientId('');
@@ -322,9 +312,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         ...currentPermissions,
         approval_reference_defaults: {
           ...currentDefaults,
-          [selectedFormType]: updatedFormDefaults,
-        },
-      };
+          [selectedFormType]: updatedFormDefaults } };
 
       await setPermissions(selectedStaff.id as string, nextPermissions);
     },
@@ -345,8 +333,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         summary: '단일 권한 변경이 저장됩니다.',
         targetName: String(staff.name || '-'),
         beforePermissions: staff.permissions || {},
-        afterPermissions: nextPermissions,
-      }));
+        afterPermissions: nextPermissions }));
       await setPermissions(staffId, nextPermissions);
     } finally {
       pendingRef.current = false;
@@ -368,8 +355,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         summary: `${keys.length.toLocaleString('ko-KR')}개 권한이 한 번에 변경됩니다.`,
         targetName: String(staff.name || '-'),
         beforePermissions: staff.permissions || {},
-        afterPermissions: nextPermissions,
-      }));
+        afterPermissions: nextPermissions }));
       await setPermissions(staffId, nextPermissions);
     } finally {
       pendingRef.current = false;
@@ -398,8 +384,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       target.permissions as Record<string, unknown> | null,
     );
     const updates: { permissions: Record<string, unknown>; role?: string } = {
-      permissions: mergedPermissions,
-    };
+      permissions: mergedPermissions };
     if (copyRoleToo && source.role) {
       updates.role = source.role;
     }
@@ -409,8 +394,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       summary: `[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}을 [${target.name}]에게 적용합니다.`,
       targetName: String(target.name || '-'),
       beforePermissions: target.permissions || {},
-      afterPermissions: updates.permissions,
-    }));
+      afterPermissions: updates.permissions }));
 
     try {
       const { error } = await updateStaffRecord(target.id, updates);
@@ -438,15 +422,12 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         ...buildAuditDiff(
           {
             role: target.role || null,
-            permissions: target.permissions || {},
-          },
+            permissions: target.permissions || {} },
           {
             role: updates.role ?? target.role ?? null,
-            permissions: updates.permissions,
-          },
+            permissions: updates.permissions },
           ['role', 'permissions']
-        ),
-      },
+        ) },
       actor.userId,
       actor.userName
     );
@@ -480,9 +461,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
           .sort(([teamA], [teamB]) => compareKoreanLabels(teamA, teamB))
           .map(([team, members]) => ({
             team,
-            members: [...members].sort(sortStaffRows),
-          })),
-      }));
+            members: [...members].sort(sortStaffRows) })) }));
   }, [staffs]);
 
   const companies = useMemo(() => {
@@ -495,8 +474,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
       total: group.items.length,
-      active: group.items.filter((item) => selectedPermissions?.[item.key] === true).length,
-    }));
+      active: group.items.filter((item) => selectedPermissions?.[item.key] === true).length }));
   }, [selectedPermissions]);
   const copyPreviewReview = useMemo(() => {
     if (!copySourceId || !selectedStaff?.id || copySourceId === selectedStaff.id) return null;
@@ -515,8 +493,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       summary: `[${source.name}] 권한을 [${target.name}]에게 복사하면 변경되는 항목입니다.`,
       targetName: String(target.name || '-'),
       beforePermissions: target.permissions || {},
-      afterPermissions: previewAfter,
-    });
+      afterPermissions: previewAfter });
 
     if (copyRoleToo && source.role !== target.role) {
       review.changed.unshift({
@@ -524,8 +501,7 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
         label: '역할',
         before: String(target.role || 'staff'),
         after: String(source.role || 'staff'),
-        tone: source.role === 'admin' ? 'critical' : 'warning',
-      });
+        tone: source.role === 'admin' ? 'critical' : 'warning' });
       review.affectedGroups = Array.from(new Set(['조직 / 권한', ...review.affectedGroups]));
       if (source.role === 'admin') review.riskCount += 1;
     }
@@ -814,20 +790,18 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
                           '저장되지 않은 작업이 있다면 손실될 수 있으며, 감사 로그에 계정 보안 조치로 기록됩니다.',
                         ].join('\n'),
                         confirmText: '강제 로그아웃',
-                        tone: 'danger',
-                      });
+                        tone: 'danger' });
                       if (!confirmed) {
                         return;
                       }
                       // 신규 서버 라우트 — force_logout_at 갱신 + 인앱 알림 + 푸시(FCM/WebPush) 일괄.
-                      // 단순 supabase update 만으로는 인앱 알림/푸시가 없어 사용자가 인지하지 못한다.
+                      // 단순 db update 만으로는 인앱 알림/푸시가 없어 사용자가 인지하지 못한다.
                       try {
                         const response = await fetch('/api/admin/force-logout', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           credentials: 'same-origin',
-                          body: JSON.stringify({ staffId: selectedStaff.id }),
-                        });
+                          body: JSON.stringify({ staffId: selectedStaff.id }) });
                         const body = (await response.json().catch(() => null)) as
                           | { ok?: boolean; error?: string }
                           | null;

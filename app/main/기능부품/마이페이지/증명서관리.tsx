@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
@@ -11,8 +11,7 @@ import {
   openApprovalCertificatePrintView,
   openIssuedCertificatePrintView,
   type IssuedCertificate,
-  type IssuedCertificateContext,
-} from './certificate-print-utils';
+  type IssuedCertificateContext } from './certificate-print-utils';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -119,7 +118,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
         const certificateCutoffIso = certificateCutoff.toISOString();
 
         const [approvalRes, certRes, staffRes] = await Promise.all([
-          supabase
+          db
             .from('approvals')
             .select('*')
             .eq('sender_id', effectiveUserId)
@@ -127,14 +126,14 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 조회
             .in('type', ['양식신청', '증명서발급'])
             .order('created_at', { ascending: false }),
-          supabase
+          db
             .from('certificate_issuances')
             .select('*')
             .eq('staff_id', effectiveUserId)
             .gte('issued_at', certificateCutoffIso)
             .order('issued_at', { ascending: false })
             .limit(20),
-          supabase
+          db
             .from('staff_members')
             .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions')
             .eq('id', effectiveUserId)
@@ -156,12 +155,12 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
         if (companyName) {
           try {
             const [sealRes, companyRes] = await Promise.all([
-              supabase
+              db
                 .from('contract_templates')
                 .select('seal_url')
                 .eq('company_name', companyName)
                 .limit(1),
-              supabase
+              db
                 .from('companies')
                 .select('logo_url')
                 .eq('name', companyName)
@@ -226,8 +225,7 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
       employeeNo,
       duty: dutyLabel,
       rank: rankLabel,
-      profilePhotoUrl: getProfilePhotoUrl(staffDetail) || null,
-    };
+      profilePhotoUrl: getProfilePhotoUrl(staffDetail) || null };
   }, [resolvedUser, sealUrl, companyLogoUrl, staffDetail]);
 
   // ── 인쇄/다운로드 핸들러 ──

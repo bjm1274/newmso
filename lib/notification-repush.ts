@@ -8,8 +8,7 @@ import {
   selectLatestFcmToken,
   dedupeWebPushSubscriptions,
   invalidateExpiredFcmTokens,
-  deleteExpiredWebPushSubscriptions,
-} from '@/lib/notification-shared';
+  deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -20,8 +19,7 @@ import {
   inArray,
   isNull,
   lte,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 
 type NotificationRow = {
   id: string;
@@ -112,15 +110,13 @@ function buildRepushPayload(row: NotificationRow) {
     ...metadata,
     id: row.id,
     notification_id: row.id,
-    type,
-  };
+    type };
 
   return {
     title,
     body,
     tag: `erp-notification-repush-${row.id}`,
-    data,
-  };
+    data };
 }
 
 async function patchNotificationMetadata(
@@ -155,8 +151,7 @@ export async function processUnreadNotificationRepushServer(
       skipped: 0,
       pushDisabled: false,
       errors: [],
-      reason: 'quiet-hours',
-    };
+      reason: 'quiet-hours' };
   }
 
   const nowIso = now.toISOString();
@@ -187,8 +182,7 @@ export async function processUnreadNotificationRepushServer(
       title: notificationsTable.title,
       body: notificationsTable.body,
       metadata: notificationsTable.metadata,
-      created_at: notificationsTable.created_at,
-    })
+      created_at: notificationsTable.created_at })
     .from(notificationsTable)
     .where(and(...(conditions as Parameters<typeof and>)))
     .orderBy(asc(notificationsTable.created_at))
@@ -214,8 +208,7 @@ export async function processUnreadNotificationRepushServer(
       title: row.title ?? null,
       body: row.body ?? null,
       metadata: parsedMetadata,
-      created_at: row.created_at ?? null,
-    } satisfies NotificationRow;
+      created_at: row.created_at ?? null } satisfies NotificationRow;
   });
 
   if (notifications.length === 0) {
@@ -231,8 +224,7 @@ export async function processUnreadNotificationRepushServer(
       p256dh: pushSubscriptionsTable.p256dh,
       auth: pushSubscriptionsTable.auth,
       fcm_token: pushSubscriptionsTable.fcm_token,
-      created_at: pushSubscriptionsTable.created_at,
-    })
+      created_at: pushSubscriptionsTable.created_at })
     .from(pushSubscriptionsTable)
     .where(inArray(pushSubscriptionsTable.staff_id, targetUserIds));
 
@@ -306,8 +298,7 @@ export async function processUnreadNotificationRepushServer(
         const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
           title: payload.title,
           body: payload.body,
-          data: payloadData,
-        });
+          data: payloadData });
         rowSent += fcmResult.success.length > 0 ? 1 : 0;
         // error 토큰(5xx·네트워크 실패)은 일시 오류이므로 failed 카운트만 올리고 토큰은 유지.
         // expired 토큰(NOT_FOUND·INVALID_ARGUMENT·400·404)만 DB에서 null 처리.
@@ -356,8 +347,7 @@ export async function processUnreadNotificationRepushServer(
       await patchNotificationMetadata(row, {
         repush_attempt_count: repushAttempts + 1,
         repush_sent_at: nowIso,
-        repush_result: rowSent > 0 ? 'sent' : pushDisabled && webTargets.length > 0 ? 'web-push-disabled' : 'failed',
-      });
+        repush_result: rowSent > 0 ? 'sent' : pushDisabled && webTargets.length > 0 ? 'web-push-disabled' : 'failed' });
     } catch (metadataError) {
       errors.push(`${row.id}: ${String((metadataError as Error)?.message || metadataError)}`);
     }
@@ -377,6 +367,5 @@ export async function processUnreadNotificationRepushServer(
     failed,
     skipped,
     pushDisabled,
-    errors,
-  };
+    errors };
 }

@@ -11,16 +11,14 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import {
   getD1Binding,
   getD1Drizzle,
   approvals as approvalsTable,
   eq,
   and,
-  isNotNull,
-} from '@/lib/db';
+  isNotNull } from '@/lib/db';
 
 type ApprovalRow = {
   id: string;
@@ -42,8 +40,7 @@ export async function checkApprovalQueue(): Promise<CheckJobResult> {
       title: approvalsTable.title,
       sender_name: approvalsTable.sender_name,
       doc_type: approvalsTable.doc_type,
-      type: approvalsTable.type,
-    })
+      type: approvalsTable.type })
     .from(approvalsTable)
     .where(
       and(
@@ -82,10 +79,8 @@ export async function checkApprovalQueue(): Promise<CheckJobResult> {
       metadata: {
         type: 'approval',
         approval_id: row.id,
-        dedupe_key: dedupeKey,
-      },
-      read_at: null,
-    });
+        dedupe_key: dedupeKey },
+      read_at: null });
   }
 
   if (toInsert.length === 0) {

@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 import {
   detectAttendanceAnomalies,
@@ -11,8 +11,7 @@ import {
   type AttendanceAnomalyAttendance,
   type AttendanceAnomalyLeave,
   type AttendanceAnomalyShift,
-  type AttendanceAnomalyStaff,
-} from '@/lib/attendance-anomalies';
+  type AttendanceAnomalyStaff } from '@/lib/attendance-anomalies';
 import { loadLeavePolicySettings, type LeavePolicySettings } from '@/lib/leave-policy-settings';
 import { isActiveStaff } from '@/lib/active-staff';
 
@@ -48,8 +47,7 @@ function normalizeQueryError(error: unknown) {
     return {
       name: error.name,
       message: error.message,
-      stack: error.stack,
-    };
+      stack: error.stack };
   }
 
   if (error && typeof error === 'object') {
@@ -58,8 +56,7 @@ function normalizeQueryError(error: unknown) {
       code: record.code ?? null,
       message: String(record.message ?? ''),
       details: String(record.details ?? ''),
-      hint: String(record.hint ?? ''),
-    };
+      hint: String(record.hint ?? '') };
   }
 
   return { message: String(error ?? 'unknown error') };
@@ -130,7 +127,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
         ] = await Promise.all([
           withMissingColumnsFallback(
             (omittedColumns) =>
-              supabase
+              db
                 .from('attendances')
                 .select(buildSelectColumns(ATTENDANCE_REQUIRED_COLUMNS, ATTENDANCE_OPTIONAL_COLUMNS, omittedColumns))
                 .in('staff_id', staffIds)
@@ -138,13 +135,13 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
                 .lte('work_date', endDate),
             [...ATTENDANCE_OPTIONAL_COLUMNS],
           ),
-          supabase
+          db
             .from('shift_assignments')
             .select('staff_id, work_date, shift_id')
             .in('staff_id', staffIds)
             .gte('work_date', startDate)
             .lte('work_date', endDate),
-          supabase
+          db
             .from('leave_requests')
             .select('staff_id, start_date, end_date, status, leave_type')
             .in('staff_id', staffIds)
@@ -165,8 +162,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
           attendances: normalizedAttendanceRows,
           shiftAssignments: normalizedShiftRows,
           approvedLeaves: normalizedLeaveRows,
-          policy,
-        });
+          policy });
 
         if (active) setAnomalies(detected);
       } catch (error) {
@@ -174,8 +170,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
           month: selectedMonth,
           selectedCo,
           staffCount: filteredStaffs.length,
-          error: normalizeQueryError(error),
-        });
+          error: normalizeQueryError(error) });
         if (active) setAnomalies([]);
       } finally {
         if (active) setLoading(false);
@@ -192,8 +187,7 @@ export default function AttendanceAnomalyPanel({ staffs, selectedCo }: Attendanc
     () => ({
       critical: anomalies.filter((item) => item.severity === 'critical').length,
       warning: anomalies.filter((item) => item.severity === 'warning').length,
-      review: anomalies.filter((item) => item.severity === 'review').length,
-    }),
+      review: anomalies.filter((item) => item.severity === 'review').length }),
     [anomalies]
   );
 

@@ -37,8 +37,7 @@ export default function SuppliesContextBar({
   departmentOptions = DEFAULT_DEPARTMENT_OPTIONS,
   onDepartmentChange,
   draftSavedAt,
-  outOfStockCount,
-}: SuppliesContextBarProps) {
+  outOfStockCount }: SuppliesContextBarProps) {
   const readonly = !onDepartmentChange;
   // 부서 옵션에 현재값이 없으면 추가하여 옵션 불일치로 인한 빈 선택 방지.
   const options = (() => {

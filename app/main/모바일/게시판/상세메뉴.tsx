@@ -30,8 +30,7 @@ export default function PostMenuSheet({
   deleting,
   onEdit,
   onReadStatus,
-  onDelete,
-}: PostMenuSheetProps) {
+  onDelete }: PostMenuSheetProps) {
   return (
     <MSheet open={open} onClose={onClose} title="게시글 메뉴">
       <div style={{ padding: '0 16px 20px', display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -4,8 +4,7 @@ import {
   formatLeaveNoticeMessage,
   getTimeZoneDateKeyOffset,
   LEAVE_NOTICE_ROOM_ID,
-  LEAVE_NOTICE_TIMEZONE,
-} from '@/lib/leave-notice';
+  LEAVE_NOTICE_TIMEZONE } from '@/lib/leave-notice';
 import {
   messages as messagesTable,
   approvals as approvalsTable,
@@ -16,8 +15,7 @@ import {
   eq,
   and,
   inArray,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
 
 type D1Db = ReturnType<typeof getD1Drizzle>;
@@ -95,8 +93,7 @@ async function fetchApprovedLeaveApprovals(db: D1Db): Promise<LeaveApprovalRow[]
         company_id: approvalsTable.company_id,
         title: approvalsTable.title,
         meta_data: approvalsTable.meta_data,
-        created_at: approvalsTable.created_at,
-      })
+        created_at: approvalsTable.created_at })
       .from(approvalsTable)
       .where(
         and(
@@ -126,8 +123,7 @@ async function fetchApprovedLeaveApprovals(db: D1Db): Promise<LeaveApprovalRow[]
         company_id: row.company_id,
         title: row.title,
         meta_data: parseJsonObject(row.meta_data),
-        created_at: row.created_at,
-      });
+        created_at: row.created_at });
     }
 
     if (rows.length < PAGE_SIZE) break;
@@ -152,8 +148,7 @@ async function fetchStaffDirectory(db: D1Db, staffIds: string[]) {
         company_id: staffMembersTable.company_id,
         department: staffMembersTable.department,
         team: staffMembersTable.team,
-        position: staffMembersTable.position,
-      })
+        position: staffMembersTable.position })
       .from(staffMembersTable)
       .where(inArray(staffMembersTable.id, chunk));
     for (const row of rows) {
@@ -239,8 +234,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       department: departmentLabel,
       startDate: leaveMeta.startDate,
       endDate: leaveMeta.endDate,
-      delegateName: leaveMeta.delegateName,
-    });
+      delegateName: leaveMeta.delegateName });
 
     const messageRow = {
       id: messageId,
@@ -248,8 +242,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       sender_id: null,
       sender_name: '공지봇',
       content,
-      created_at: nowIso,
-    };
+      created_at: nowIso };
 
     // 메시지 INSERT — id가 결정적(deterministic)이라 중복은 onConflictDoNothing.
     // returning 결과가 비어 있으면 이미 발송된 공지(중복).
@@ -273,13 +266,11 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
         await updateChatRoomLastMessage(db, {
           room_id: LEAVE_NOTICE_ROOM_ID,
           created_at: nowIso,
-          content,
-        });
+          content });
         await enqueueChatPushJob({
           messageId,
           roomId: LEAVE_NOTICE_ROOM_ID,
-          senderId: null,
-        }).catch((err) => {
+          senderId: null }).catch((err) => {
           console.warn('[leave-notice-cron] Failed to enqueue chat push job', err);
         });
       } catch (err) {
@@ -291,8 +282,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       ...metaData,
       leave_notice_target_date: targetDate,
       leave_notice_announced_at: nowIso,
-      leave_notice_message_id: messageId,
-    };
+      leave_notice_message_id: messageId };
     try {
       await db
         .update(approvalsTable)
@@ -319,8 +309,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
     created,
     skipped,
     failed,
-    errors,
-  };
+    errors };
 }
 
 export async function announceLeaveApprovalIfNeeded(
@@ -355,8 +344,7 @@ export async function announceLeaveApprovalIfNeeded(
         company_id: staffMembersTable.company_id,
         department: staffMembersTable.department,
         team: staffMembersTable.team,
-        position: staffMembersTable.position,
-      })
+        position: staffMembersTable.position })
       .from(staffMembersTable)
       .where(eq(staffMembersTable.id, senderId))
       .limit(1);
@@ -372,8 +360,7 @@ export async function announceLeaveApprovalIfNeeded(
     department: departmentLabel,
     startDate: leaveMeta.startDate,
     endDate: leaveMeta.endDate,
-    delegateName: leaveMeta.delegateName,
-  });
+    delegateName: leaveMeta.delegateName });
 
   const nowIso = now.toISOString();
   const messageRow = {
@@ -382,8 +369,7 @@ export async function announceLeaveApprovalIfNeeded(
     sender_id: null,
     sender_name: '공지봇',
     content,
-    created_at: nowIso,
-  };
+    created_at: nowIso };
 
   let duplicateMessage = false;
   try {
@@ -403,13 +389,11 @@ export async function announceLeaveApprovalIfNeeded(
       await updateChatRoomLastMessage(db, {
         room_id: LEAVE_NOTICE_ROOM_ID,
         created_at: nowIso,
-        content,
-      });
+        content });
       await enqueueChatPushJob({
         messageId,
         roomId: LEAVE_NOTICE_ROOM_ID,
-        senderId: null,
-      }).catch((err) => {
+        senderId: null }).catch((err) => {
         console.warn('[leave-notice-cron] Failed to enqueue chat push job', err);
       });
     } catch (err) {
@@ -421,8 +405,7 @@ export async function announceLeaveApprovalIfNeeded(
     ...metaData,
     leave_notice_target_date: leaveMeta.startDate,
     leave_notice_announced_at: nowIso,
-    leave_notice_message_id: messageId,
-  };
+    leave_notice_message_id: messageId };
 
   try {
     await db

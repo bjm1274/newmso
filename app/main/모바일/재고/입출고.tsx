@@ -32,8 +32,7 @@ import {
   toMTone,
   formatAmount,
   canPlaceOrder,
-  type StockMutateUser,
-} from './data-hooks';
+  type StockMutateUser } from './data-hooks';
 import { IORecordForm } from './입출고-form';
 
 export type IOTab = 'io' | 'order' | 'vendor' | 'doc' | 'history';
@@ -142,8 +141,7 @@ export default function 입출고({ user, onBack, onPlaceOrder }: 입출고Props
 // ─── 빈/에러 안내 ─────────────────────────────────────────────
 function Empty({
   message,
-  tone = 'muted',
-}: {
+  tone = 'muted' }: {
   message: string;
   tone?: 'muted' | 'danger';
 }) {
@@ -153,8 +151,7 @@ function Empty({
         padding: 24,
         textAlign: 'center',
         color: tone === 'danger' ? 'var(--m-danger)' : 'var(--z-500)',
-        fontSize: 13,
-      }}
+        fontSize: 13 }}
     >
       {message}
     </div>
@@ -163,8 +160,7 @@ function Empty({
 
 // ─── 입출고 탭 ────────────────────────────────────────────────
 function IoPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useIOData>;
 }) {
   const inCount = data.moves.filter((m) => m.kind === '입고').length;
@@ -177,8 +173,7 @@ function IoPane({
           padding: '14px 16px 0',
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 8,
-        }}
+          gap: 8 }}
       >
         <MKpi icon="download" label="오늘 입고" value={String(inCount)} unit="건" tone="accent" />
         <MKpi icon="upload" label="오늘 출고" value={String(outCount)} unit="건" tone="success" />
@@ -219,8 +214,7 @@ function IoPane({
 function OrderPane({
   data,
   allowOrder,
-  onPlaceOrder,
-}: {
+  onPlaceOrder }: {
   data: ReturnType<typeof useIOData>;
   allowOrder: boolean;
   onPlaceOrder: () => void;
@@ -233,8 +227,7 @@ function OrderPane({
           padding: '14px 16px',
           marginBottom: 12,
           background: 'var(--m-accent-soft)',
-          borderColor: 'transparent',
-        }}
+          borderColor: 'transparent' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <MIcon name="info" size={18} color="var(--m-accent)" />
@@ -243,8 +236,7 @@ function OrderPane({
               style={{
                 fontSize: 13,
                 fontWeight: 800,
-                color: 'var(--m-accent)',
-              }}
+                color: 'var(--m-accent)' }}
             >
               자동 발주 권장 {data.pendingOrders}건
             </div>
@@ -253,8 +245,7 @@ function OrderPane({
                 fontSize: 11,
                 color: 'var(--z-600)',
                 fontWeight: 600,
-                marginTop: 1,
-              }}
+                marginTop: 1 }}
             >
               안전재고 미달 — 거래처 자동 매칭됨
             </div>
@@ -274,8 +265,7 @@ function OrderPane({
               fontSize: 11,
               color: 'var(--z-500)',
               fontWeight: 600,
-              marginTop: 8,
-            }}
+              marginTop: 8 }}
           >
             발주 권한이 없습니다. 관리자에게 요청하세요.
           </div>
@@ -293,8 +283,7 @@ function OrderPane({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
-                  marginBottom: 6,
-                }}
+                  marginBottom: 6 }}
               >
                 <MChip tone={toMTone(o.tone)}>{o.status}</MChip>
                 <div style={{ flex: 1 }} />
@@ -302,8 +291,7 @@ function OrderPane({
                   style={{
                     fontSize: 11,
                     color: 'var(--z-500)',
-                    fontWeight: 600,
-                  }}
+                    fontWeight: 600 }}
                 >
                   {o.placed} 발주
                 </span>
@@ -319,8 +307,7 @@ function OrderPane({
                   marginTop: 6,
                   fontSize: 12,
                   color: 'var(--z-500)',
-                  fontWeight: 600,
-                }}
+                  fontWeight: 600 }}
               >
                 <span>품목 {o.items}건</span>
                 <span style={{ color: 'var(--z-300)' }}>·</span>
@@ -331,8 +318,7 @@ function OrderPane({
                   style={{
                     fontSize: 13,
                     fontWeight: 800,
-                    color: 'var(--z-900)',
-                  }}
+                    color: 'var(--z-900)' }}
                 >
                   ₩ {formatAmount(o.amt)}
                 </span>
@@ -347,8 +333,7 @@ function OrderPane({
 
 // ─── 거래처 탭 ────────────────────────────────────────────────
 function VendorPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useIOData>;
 }) {
   return (
@@ -374,8 +359,7 @@ function VendorPane({
 
 // ─── 명세서 탭 ────────────────────────────────────────────────
 function DocPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useIOData>;
 }) {
   // 발주 중 '확정/완료' 상태만 명세서로 간주
@@ -408,8 +392,7 @@ function DocPane({
 
 // ─── 이력 탭 (최근 inventory_logs 전체) ───────────────────────
 function HistoryPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useIOData>;
 }) {
   return (

@@ -49,8 +49,7 @@ function formatClockLabel(value: unknown) {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-      timeZone: 'Asia/Seoul',
-    }).format(new Date(parsed));
+      timeZone: 'Asia/Seoul' }).format(new Date(parsed));
   }
   return text.length >= 16 && text[10] === 'T' ? text.slice(11, 16) : text.slice(0, 5);
 }
@@ -74,8 +73,7 @@ export function getPresenceMeta(attendance?: AttendanceSnapshot | null): Presenc
       toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
       dotClass: 'bg-emerald-500',
       checkInLabel,
-      checkOutLabel: null,
-    };
+      checkOutLabel: null };
   }
 
   if (checkInLabel && checkOutLabel) {
@@ -85,8 +83,7 @@ export function getPresenceMeta(attendance?: AttendanceSnapshot | null): Presenc
       toneClass: 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)]',
       dotClass: 'bg-[var(--toss-gray-3)]',
       checkInLabel,
-      checkOutLabel,
-    };
+      checkOutLabel };
   }
 
   return {
@@ -95,8 +92,7 @@ export function getPresenceMeta(attendance?: AttendanceSnapshot | null): Presenc
     toneClass: 'border-amber-200 bg-amber-50 text-amber-700',
     dotClass: 'bg-amber-400',
     checkInLabel: null,
-    checkOutLabel: null,
-  };
+    checkOutLabel: null };
 }
 
 function getCompanyName(staff: StaffMember) {
@@ -110,8 +106,7 @@ function getDepartmentName(staff: StaffMember) {
 function ModalAvatar({
   staff,
   size = 'md',
-  presenceState,
-}: {
+  presenceState }: {
   staff: StaffMember;
   size?: 'sm' | 'md' | 'lg';
   presenceState?: PresenceState;

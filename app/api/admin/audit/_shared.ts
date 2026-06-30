@@ -22,8 +22,7 @@ import {
   payroll_records as payrollRecordsTable,
   staff_members as staffMembersTable,
   desc,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 
 export type D1Db = ReturnType<typeof getD1Drizzle>;
 
@@ -130,8 +129,7 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
       user_id: auditLogsTable.user_id,
       user_name: auditLogsTable.user_name,
       actor_name: auditLogsTable.actor_name,
-      created_at: auditLogsTable.created_at,
-    })
+      created_at: auditLogsTable.created_at })
     .from(auditLogsTable)
     .where(gte(auditLogsTable.created_at, sevenDaysAgo))
     .orderBy(desc(auditLogsTable.created_at))
@@ -195,8 +193,7 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
         when: formatWhen(burst.latest),
         tone: burst.count >= 10 ? 'danger' : 'warn',
         reason: `1시간 내 삭제/초기화 작업 ${burst.count}건이 집중되었습니다.`,
-        recommend: '작업 사유 확인 및 권한 점검',
-      });
+        recommend: '작업 사유 확인 및 권한 점검' });
     }
   }
 
@@ -211,8 +208,7 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
         when: formatWhen(burst.latest),
         tone: burst.count >= 6 ? 'danger' : 'warn',
         reason: `1시간 내 권한/역할 변경 ${burst.count}건이 집중되었습니다.`,
-        recommend: '권한 변경 이력 검토',
-      });
+        recommend: '권한 변경 이력 검토' });
     }
   }
 
@@ -243,8 +239,7 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
         when: formatWhen(entry.latest),
         tone: 'accent',
         reason: `심야(00~05시) 시간대 작업 ${entry.count}건이 확인됩니다.`,
-        recommend: '야간 작업 정당성 확인',
-      });
+        recommend: '야간 작업 정당성 확인' });
     }
   }
 
@@ -279,8 +274,7 @@ export async function detectPayrollOutliers(db: D1Db): Promise<OutlierRow[]> {
       id: payrollRecordsTable.id,
       staff_id: payrollRecordsTable.staff_id,
       year_month: payrollRecordsTable.year_month,
-      net_pay: payrollRecordsTable.net_pay,
-    })
+      net_pay: payrollRecordsTable.net_pay })
     .from(payrollRecordsTable)
     .orderBy(desc(payrollRecordsTable.year_month))
     .limit(20000)) as PayrollRow[];
@@ -333,8 +327,7 @@ export async function detectPayrollOutliers(db: D1Db): Promise<OutlierRow[]> {
         id: c.staffId,
         name,
         changePct: Math.round(c.changePct * 10) / 10,
-        reason: `전월 ${c.prev.toLocaleString('ko-KR')}원 → 당월 ${c.curr.toLocaleString('ko-KR')}원 (${direction})`,
-      } satisfies OutlierRow;
+        reason: `전월 ${c.prev.toLocaleString('ko-KR')}원 → 당월 ${c.curr.toLocaleString('ko-KR')}원 (${direction})` } satisfies OutlierRow;
     })
     .sort((l, r) => Math.abs(r.changePct) - Math.abs(l.changePct));
 }

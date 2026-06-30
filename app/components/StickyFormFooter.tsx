@@ -56,8 +56,7 @@ export default function StickyFormFooter({
   secondary,
   children,
   withSpacer = true,
-  className,
-}: StickyFormFooterProps) {
+  className }: StickyFormFooterProps) {
   const footerClass = ['sticky-form-footer', className].filter(Boolean).join(' ');
 
   // 모바일 키보드(IME) 가 떴을 때, fixed 푸터를 visual viewport 안으로 끌어올린다.

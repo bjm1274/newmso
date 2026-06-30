@@ -58,8 +58,7 @@ export default function OP메시지시트({
   card,
   user,
   onClose,
-  onSent,
-}: {
+  onSent }: {
   open: boolean;
   card: OpCheckCard | null;
   user: ErpUser;
@@ -134,11 +133,9 @@ export default function OP메시지시트({
           room: card.room,
           patient: card.patient,
           sender_id: user.id,
-          sender_name: user.name ?? '',
-        },
+          sender_name: user.name ?? '' },
         read_at: null,
-        created_at: now,
-      }));
+        created_at: now }));
       const { error } = await d1.from('notifications').insert(rows);
       if (error) throw error;
       toast(`${targets.length}명에게 전송했습니다.`, 'success');
@@ -177,8 +174,7 @@ export default function OP메시지시트({
                 borderRadius: 999,
                 border: '1px solid var(--m-border)',
                 background: 'var(--m-card)',
-                color: 'var(--z-700)',
-              }}
+                color: 'var(--z-700)' }}
             >
               {chip}
             </button>
@@ -203,8 +199,7 @@ export default function OP메시지시트({
               background: 'var(--m-card)',
               color: 'var(--z-900)',
               resize: 'vertical',
-              minHeight: 80,
-            }}
+              minHeight: 80 }}
           />
           <span style={{ fontSize: 11, color: 'var(--z-500)', textAlign: 'right' }}>
             {normalized.length}/{MAX_BODY}

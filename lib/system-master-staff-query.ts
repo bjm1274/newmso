@@ -1,4 +1,4 @@
-import { isMissingColumnError } from './supabase-compat';
+import { isMissingColumnError } from './db-compat';
 
 type QueryErrorLike = {
   code?: string | null;
@@ -68,8 +68,7 @@ export async function selectSystemMasterStaffRows<T>(
   while (true) {
     const result = await execute({
       select: buildSystemMasterStaffSelect(omittedColumns),
-      orderColumn: getSystemMasterStaffOrderColumn(omittedColumns),
-    });
+      orderColumn: getSystemMasterStaffOrderColumn(omittedColumns) });
 
     if (!result.error) {
       return result;

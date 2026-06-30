@@ -10,14 +10,12 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import {
   getD1Binding,
   getD1Drizzle,
   attendance as attendanceTable,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 
 type AttendanceRow = {
   id: string;
@@ -40,29 +38,25 @@ function resolveAttendanceEvent(row: AttendanceRow): {
     return {
       statusKey: 'checkout',
       title: '퇴근 기록',
-      body: `${row.date} 퇴근 처리되었습니다.`,
-    };
+      body: `${row.date} 퇴근 처리되었습니다.` };
   }
   if (row.check_in) {
     if (status === '지각') {
       return {
         statusKey: 'late',
         title: '지각 처리',
-        body: `${row.date} 출근이 지각으로 기록되었습니다.`,
-      };
+        body: `${row.date} 출근이 지각으로 기록되었습니다.` };
     }
     return {
       statusKey: 'checkin',
       title: '출근 기록',
-      body: `${row.date} 출근 처리되었습니다.`,
-    };
+      body: `${row.date} 출근 처리되었습니다.` };
   }
   if (status === '결근') {
     return {
       statusKey: 'absent',
       title: '결근 처리',
-      body: `${row.date} 결근으로 기록되었습니다. 관리자에게 문의해 주세요.`,
-    };
+      body: `${row.date} 결근으로 기록되었습니다. 관리자에게 문의해 주세요.` };
   }
   return null;
 }
@@ -79,8 +73,7 @@ export async function checkAttendanceEvents(): Promise<CheckJobResult> {
       date: attendanceTable.date,
       check_in: attendanceTable.check_in,
       check_out: attendanceTable.check_out,
-      status: attendanceTable.status,
-    })
+      status: attendanceTable.status })
     .from(attendanceTable)
     .where(gte(attendanceTable.created_at, cutoff))
     .limit(500);
@@ -114,10 +107,8 @@ export async function checkAttendanceEvents(): Promise<CheckJobResult> {
         type: 'attendance',
         attendance_id: row.id,
         status_key: evt.statusKey,
-        dedupe_key: dedupeKey,
-      },
-      read_at: null,
-    });
+        dedupe_key: dedupeKey },
+      read_at: null });
   }
 
   if (toInsert.length === 0) {

@@ -81,23 +81,20 @@ export function validateInventoryQuantity(
     min = 0,
     max,
     allowEmpty = false,
-    integerOnly = true,
-  }: InventoryQuantityValidationOptions = {},
+    integerOnly = true }: InventoryQuantityValidationOptions = {},
 ): InventoryQuantityValidationResult {
   const quantity = parseInventoryQuantity(value);
 
   if (quantity === null) {
     return {
       quantity: null,
-      error: allowEmpty ? null : `${label}을 입력하세요.`,
-    };
+      error: allowEmpty ? null : `${label}을 입력하세요.` };
   }
 
   if (integerOnly && !Number.isInteger(quantity)) {
     return {
       quantity,
-      error: `${label}은 정수로 입력하세요.`,
-    };
+      error: `${label}은 정수로 입력하세요.` };
   }
 
   if (quantity < min) {
@@ -108,21 +105,18 @@ export function validateInventoryQuantity(
 
     return {
       quantity,
-      error: minMessage,
-    };
+      error: minMessage };
   }
 
   if (typeof max === 'number' && quantity > max) {
     return {
       quantity,
-      error: `${label}은 현재 재고 ${max}개를 초과할 수 없습니다.`,
-    };
+      error: `${label}은 현재 재고 ${max}개를 초과할 수 없습니다.` };
   }
 
   return {
     quantity,
-    error: null,
-  };
+    error: null };
 }
 
 export type InventoryTransferValidationParams = {
@@ -140,8 +134,7 @@ export function validateInventoryTransfer({
   toCompany,
   fromCompany,
   toDept,
-  fromDept,
-}: InventoryTransferValidationParams) {
+  fromDept }: InventoryTransferValidationParams) {
   if (!item) {
     return '물품을 선택하세요.';
   }
@@ -153,8 +146,7 @@ export function validateInventoryTransfer({
   const quantityValidation = validateInventoryQuantity(quantity, {
     label: '이관 수량',
     min: 1,
-    max: getItemQuantity(item),
-  });
+    max: getItemQuantity(item) });
 
   if (quantityValidation.error) {
     return quantityValidation.error;
@@ -185,8 +177,7 @@ export function normalizeInventoryUnit(value: unknown): SupplyRequestItemUnit {
 const CATEGORY_ALIAS_MAP: Record<string, SupplyRequestCategory> = {
   약품: '의약품',
   의료기기: '의료용품',
-  소모품: '사무용품',
-};
+  소모품: '사무용품' };
 
 export function normalizeSupplyRequestCategory(value: unknown): SupplyRequestCategory | '' {
   const normalized = String(value || '').trim();
@@ -204,8 +195,7 @@ export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
       unit: normalizeInventoryUnit(item?.unit || item?.quantity_unit || item?.request_unit),
       category: normalizeSupplyRequestCategory(item?.category || item?.item_category || item?.classification),
       dept: String(item?.dept || item?.department || '').trim(),
-      purpose: String(item?.purpose || item?.reason || '').trim(),
-    }))
+      purpose: String(item?.purpose || item?.reason || '').trim() }))
     .filter((item) => item.name);
 }
 

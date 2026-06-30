@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 import {
   EDUCATION_ITEMS,
@@ -14,8 +14,7 @@ import {
   removeEducationCompletionWithFallback,
   serializeEducationQueryError,
   upsertEducationCompletionWithFallback,
-  type EducationItem,
-} from './education-utils';
+  type EducationItem } from './education-utils';
 
 type StaffRow = Record<string, unknown> & {
   id: string | number;
@@ -36,8 +35,7 @@ export default function EducationList({
   staffs,
   notifications = [],
   completions = {},
-  onStatusChanged,
-}: EducationListProps) {
+  onStatusChanged }: EducationListProps) {
   const filtered = useMemo(
     () => getScopedActiveStaffs(staffs, selectedCo) as unknown as StaffRow[],
     [staffs, selectedCo]
@@ -53,8 +51,7 @@ export default function EducationList({
       if (item.id == null || !item.education) return;
       next.set(getEducationCompletionKey(item.id, item.education), {
         daysLeft: Number(item.daysLeft ?? 0),
-        type: String(item.type ?? ''),
-      });
+        type: String(item.type ?? '') });
     });
     return next;
   }, [notifications]);
@@ -79,8 +76,7 @@ export default function EducationList({
       staffName: staff.name,
       eduName,
       isCompleted: !!completion,
-      certificateUrl: completion?.certificate_url ?? null,
-    });
+      certificateUrl: completion?.certificate_url ?? null });
     setUploadFile(null);
   };
 
@@ -122,8 +118,7 @@ export default function EducationList({
     shortLabel: item.name,
     data: item,
     subLabel:
-      item.category === 'hospital' ? '병원' : item.category === 'company' ? '일반' : '공통',
-  }));
+      item.category === 'hospital' ? '병원' : item.category === 'company' ? '일반' : '공통' }));
 
   const computeRowSummary = (staff: StaffRow) => {
     const applicableItems = getApplicableEducationItems(staff.company);
@@ -150,8 +145,7 @@ export default function EducationList({
         try {
           const uploadRes = await fetch('/api/approvals/upload', {
             method: 'POST',
-            body: uploadForm,
-          });
+            body: uploadForm });
           if (!uploadRes.ok) {
             const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
             console.warn('Storage error, but continuing', errJson.error);
@@ -167,18 +161,17 @@ export default function EducationList({
       }
 
       if (!selectedAction.isCompleted) {
-        const { error: dbError } = await upsertEducationCompletionWithFallback(supabase, {
+        const { error: dbError } = await upsertEducationCompletionWithFallback(db, {
           staff_id: selectedAction.staffId,
           education_name: selectedAction.eduName,
-          certificate_url: url || null,
-        });
+          certificate_url: url || null });
 
         if (dbError) {
           throw dbError;
         }
       } else {
         const { error: deleteError } = await removeEducationCompletionWithFallback(
-          supabase,
+          db,
           selectedAction.staffId,
           selectedAction.eduName,
         );

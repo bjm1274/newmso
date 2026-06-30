@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { canAccessHrSection } from '@/lib/access-control';
@@ -17,8 +17,7 @@ import {
   downloadHtmlFile,
   openIssuedCertificatePrintView,
   type IssuedCertificate,
-  type IssuedCertificateContext,
-} from '../마이페이지/certificate-print-utils';
+  type IssuedCertificateContext } from '../마이페이지/certificate-print-utils';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -82,8 +81,7 @@ function buildContext(staff: StaffRow | null, sealUrl: string): IssuedCertificat
     employeeNo,
     duty,
     rank,
-    profilePhotoUrl: getProfilePhotoUrl(staff) || null,
-  };
+    profilePhotoUrl: getProfilePhotoUrl(staff) || null };
 }
 
 // ─────────────────────────────────────────────
@@ -119,7 +117,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
           return;
         }
 
-        let certQuery = supabase
+        let certQuery = db
           .from('certificate_issuances')
           .select('*')
           .order('issued_at', { ascending: false })
@@ -132,13 +130,13 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
 
         const [certRes, staffRes, sealRes, companyRes] = await Promise.all([
           certQuery,
-          supabase
+          db
             .from('staff_members')
             .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url'),
-          supabase
+          db
             .from('contract_templates')
             .select('company_name, seal_url'),
-          supabase
+          db
             .from('companies')
             .select('name, logo_url'),
         ]);
@@ -166,8 +164,7 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
             ...cert,
             staff_members: matched
               ? { name: matched.name ?? null, company: matched.company ?? null }
-              : null,
-          };
+              : null };
         });
 
         const newSealMap: Record<string, string> = {};

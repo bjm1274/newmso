@@ -16,8 +16,7 @@ function formatOccurredAt(value: string) {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'short',
-    day: 'numeric',
-  });
+    day: 'numeric' });
 }
 
 export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
@@ -50,8 +49,7 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
     () => ({
       appointments: events.filter((event) => event.type === 'appointment').length,
       contracts: events.filter((event) => event.type === 'contract').length,
-      salary: events.filter((event) => event.type === 'salary').length,
-    }),
+      salary: events.filter((event) => event.type === 'salary').length }),
     [events],
   );
 

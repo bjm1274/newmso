@@ -107,8 +107,7 @@ function ChatAlertBanner(props: {
         messageId: messageId || undefined,
         senderName,
         roomName,
-        type,
-      });
+        type });
     };
 
     window.addEventListener('erp-chat-notification', chatHandler);

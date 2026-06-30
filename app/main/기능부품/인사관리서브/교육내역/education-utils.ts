@@ -1,4 +1,4 @@
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 export { getScopedActiveStaffs } from '@/lib/active-staff';
 
@@ -11,13 +11,11 @@ export type {
   EducationCompletionLikeRow,
   EducationAlert,
   EducationSummary,
-  LicenseLikeRow,
-} from './education-types';
+  LicenseLikeRow } from './education-types';
 
 export {
   EDUCATION_ITEMS,
-  EDUCATION_DEADLINES,
-} from './education-types';
+  EDUCATION_DEADLINES } from './education-types';
 
 import type {
   SupabaseLike,
@@ -26,13 +24,11 @@ import type {
   EducationRecordRow,
   LicenseLikeRow,
   StaffLike,
-  StaffMemberLike,
-} from './education-types';
+  StaffMemberLike } from './education-types';
 
 import {
   EDUCATION_ITEMS,
-  EDUCATION_DEADLINES,
-} from './education-types';
+  EDUCATION_DEADLINES } from './education-types';
 
 // ──────────────────────────────────────────────────────────────
 // 회사명 기반 의료기관 판별
@@ -89,8 +85,7 @@ export function buildEducationCompletionMap(
   for (const row of rows) {
     next[getEducationCompletionKey(row.staff_id, row.education_name)] = {
       is_completed: true,
-      certificate_url: row.certificate_url ?? null,
-    };
+      certificate_url: row.certificate_url ?? null };
   }
   return next;
 }
@@ -123,8 +118,7 @@ export function serializeEducationQueryError(error: unknown): SupabaseError | un
     code: err.code ?? null,
     message: err.message ?? null,
     details: err.details ?? null,
-    hint: err.hint ?? null,
-  };
+    hint: err.hint ?? null };
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -145,13 +139,13 @@ function isEducationRecordCompleted(row: EducationRecordRow) {
   );
 }
 
-export async function selectEducationCompletionRowsWithFallback(supabase: SupabaseLike) {
-  let completionQuery = await supabase
+export async function selectEducationCompletionRowsWithFallback(db: SupabaseLike) {
+  let completionQuery = await db
     .from('education_completions')
     .select('staff_id, education_name, certificate_url');
 
   if (isMissingColumnError(completionQuery.error, 'certificate_url')) {
-    completionQuery = await supabase
+    completionQuery = await db
       .from('education_completions')
       .select('staff_id, education_name');
   }
@@ -162,18 +156,16 @@ export async function selectEducationCompletionRowsWithFallback(supabase: Supaba
       rows: rows.map((r) => ({
         staff_id: r.staff_id,
         education_name: r.education_name,
-        certificate_url: r.certificate_url ?? null,
-      })) as EducationCompletionLikeRow[],
+        certificate_url: r.certificate_url ?? null })) as EducationCompletionLikeRow[],
       error: null,
-      source: 'education_completions' as const,
-    };
+      source: 'education_completions' as const };
   }
 
   if (!isEducationCompletionQueryRecoverableError(completionQuery.error)) {
     return { rows: [] as EducationCompletionLikeRow[], error: completionQuery.error, source: null };
   }
 
-  const fallbackQuery = await supabase
+  const fallbackQuery = await db
     .from('education_records')
     .select('staff_id, education_name, status, completed_at');
 
@@ -188,27 +180,24 @@ export async function selectEducationCompletionRowsWithFallback(supabase: Supaba
       .map((r) => ({
         staff_id: r.staff_id,
         education_name: r.education_name,
-        certificate_url: null,
-      })) as EducationCompletionLikeRow[],
+        certificate_url: null })) as EducationCompletionLikeRow[],
     error: null,
-    source: 'education_records' as const,
-  };
+    source: 'education_records' as const };
 }
 
 export async function upsertEducationCompletionWithFallback(
-  supabase: SupabaseLike,
+  db: SupabaseLike,
   payload: EducationCompletionLikeRow,
 ) {
-  let upsertResult = await supabase.from('education_completions').upsert([
+  let upsertResult = await db.from('education_completions').upsert([
     {
       staff_id: payload.staff_id,
       education_name: payload.education_name,
-      certificate_url: payload.certificate_url ?? null,
-    },
+      certificate_url: payload.certificate_url ?? null },
   ]);
 
   if (isMissingColumnError(upsertResult.error, 'certificate_url')) {
-    upsertResult = await supabase.from('education_completions').upsert([
+    upsertResult = await db.from('education_completions').upsert([
       { staff_id: payload.staff_id, education_name: payload.education_name },
     ]);
   }
@@ -219,7 +208,7 @@ export async function upsertEducationCompletionWithFallback(
     return { error: upsertResult.error, source: null };
   }
 
-  const existing = await supabase
+  const existing = await db
     .from('education_records')
     .select('id')
     .eq('staff_id', payload.staff_id)
@@ -235,27 +224,26 @@ export async function upsertEducationCompletionWithFallback(
     staff_id: payload.staff_id,
     education_name: payload.education_name,
     status: '완료',
-    completed_at: getKoreanTodayString(),
-  };
+    completed_at: getKoreanTodayString() };
 
   if (existing.data?.id) {
-    const updateResult = await supabase
+    const updateResult = await db
       .from('education_records')
       .update(completedPayload)
       .eq('id', existing.data.id);
     return { error: updateResult.error, source: 'education_records' as const };
   }
 
-  const insertResult = await supabase.from('education_records').insert([completedPayload]);
+  const insertResult = await db.from('education_records').insert([completedPayload]);
   return { error: insertResult.error, source: 'education_records' as const };
 }
 
 export async function removeEducationCompletionWithFallback(
-  supabase: SupabaseLike,
+  db: SupabaseLike,
   staffId: string,
   educationName: string,
 ) {
-  const deleteResult = await supabase
+  const deleteResult = await db
     .from('education_completions')
     .delete()
     .eq('staff_id', staffId)
@@ -267,7 +255,7 @@ export async function removeEducationCompletionWithFallback(
     return { error: deleteResult.error, source: null };
   }
 
-  const fallbackDelete = await supabase
+  const fallbackDelete = await db
     .from('education_records')
     .delete()
     .eq('staff_id', staffId)
@@ -341,8 +329,7 @@ export function buildFallbackLicenseRows(staffs: StaffMemberLike[] = []): Licens
         expiry_date: expiryDate,
         issuing_body: issuingBody,
         memo,
-        source: 'staff_members' as const,
-      },
+        source: 'staff_members' as const },
     ];
   });
 }

@@ -60,16 +60,13 @@ export function useApprovalBulkActions({
   openConfirm,
   openPrompt,
   fetchApprovals,
-  markApprovalNotificationsAsRead,
-}: UseApprovalBulkActionsParams) {
+  markApprovalNotificationsAsRead }: UseApprovalBulkActionsParams) {
   const processFinalApprovalOnServer = useCallback(async (approvalId: string) => {
     const response = await fetch('/api/approvals/process-final', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ approvalId }),
-    });
+        'Content-Type': 'application/json' },
+      body: JSON.stringify({ approvalId }) });
 
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.ok) {
@@ -87,10 +84,8 @@ export function useApprovalBulkActions({
     const response = await fetch('/api/approvals/transition', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
+        'Content-Type': 'application/json' },
+      body: JSON.stringify(params) });
 
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.ok) {
@@ -113,15 +108,13 @@ export function useApprovalBulkActions({
           tone: 'accent',
           inputType: 'textarea',
           placeholder: '승인 코멘트를 입력해 주세요. (선택)',
-          helperText: '비워 두어도 일괄 승인됩니다.',
-        });
+          helperText: '비워 두어도 일괄 승인됩니다.' });
     if (comment === null) return;
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'approve',
         approvalIds: selectedApprovalIds,
-        reason: comment || null,
-      });
+        reason: comment || null });
 
       setSelectedApprovalIds([]);
       if (payload.summary.failCount > 0) {
@@ -164,15 +157,13 @@ export function useApprovalBulkActions({
           tone: 'danger',
           inputType: 'textarea',
           placeholder: '반려 사유를 입력해 주세요.',
-          helperText: '비워 두면 기본 반려 문구로 저장됩니다.',
-        });
+          helperText: '비워 두면 기본 반려 문구로 저장됩니다.' });
     if (reason === null) return;
     try {
       const payload = await transitionApprovalsOnServer({
         action: 'reject',
         approvalIds: selectedApprovalIds,
-        reason,
-      });
+        reason });
 
       setSelectedApprovalIds([]);
       if (payload.summary.failCount > 0) {
@@ -200,6 +191,5 @@ export function useApprovalBulkActions({
     processFinalApprovalOnServer,
     transitionApprovalsOnServer,
     handleBulkApprove,
-    handleBulkReject,
-  };
+    handleBulkReject };
 }

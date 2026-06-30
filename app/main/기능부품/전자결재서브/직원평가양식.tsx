@@ -53,8 +53,7 @@ export default function EmployeeEvaluationForm({
   staffs,
   formType,
   setExtraData,
-  setFormTitle,
-}: EmployeeEvaluationFormProps) {
+  setFormTitle }: EmployeeEvaluationFormProps) {
   // 공통 선택 직원 ID
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const selectedStaff = useMemo(
@@ -155,8 +154,7 @@ export default function EmployeeEvaluationForm({
         scores: probationScores,
         totalScore: probationTotalScore,
         review: probationReview,
-        decision: probationDecision,
-      }));
+        decision: probationDecision }));
     } else if (formType === '급여인상평가서') {
       setExtraData((prev) => ({
         ...prev,
@@ -169,8 +167,7 @@ export default function EmployeeEvaluationForm({
         raisePercent,
         newSalary,
         effectiveMonth: raiseEffectiveMonth,
-        review: salaryReview,
-      }));
+        review: salaryReview }));
     }
   }, [
     formType,

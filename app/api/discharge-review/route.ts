@@ -7,8 +7,7 @@ import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-acces
 import {
   analyzeDischargeReviewRules,
   formatDischargeRuleAnalysisForPrompt,
-  type DischargeRuleItemInput,
-} from '@/lib/discharge-review-rules';
+  type DischargeRuleItemInput } from '@/lib/discharge-review-rules';
 import type { DischargeCustomRule } from '@/lib/discharge-custom-rules';
 
 interface DischargeReviewRequestBody {
@@ -56,10 +55,8 @@ async function callGemini(prompt: string): Promise<string> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-        }),
-        signal: AbortSignal.timeout(30_000),
-      });
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 } }),
+        signal: AbortSignal.timeout(30_000) });
 
       const data = await res.json();
       if (res.ok) {
@@ -130,8 +127,7 @@ export async function POST(req: Request) {
       allItems,
       chartData,
       templateData,
-      customRules,
-    } = body as DischargeReviewRequestBody;
+      customRules } = body as DischargeReviewRequestBody;
 
     if (!admissionDate || !dischargeDate) {
       return NextResponse.json({ error: '입원일과 퇴원일은 필수입니다.' }, { status: 400 });
@@ -164,8 +160,7 @@ export async function POST(req: Request) {
       templateData,
       allItems,
       checkedItems,
-      customRules: Array.isArray(customRules) ? (customRules as DischargeCustomRule[]) : [],
-    });
+      customRules: Array.isArray(customRules) ? (customRules as DischargeCustomRule[]) : [] });
     const rulePromptContext = formatDischargeRuleAnalysisForPrompt(ruleAnalysis);
 
     let prompt = `당신은 상급종합병원 퇴원심사와 진료비 청구 심사 전문가입니다. 아래 환자의 퇴원심사를 분석해 주세요.
@@ -260,8 +255,7 @@ DRG 위험:
       {
         error: isUserFacingError
           ? message
-          : '퇴원심사 분석 중 오류가 발생했습니다.',
-      },
+          : '퇴원심사 분석 중 오류가 발생했습니다.' },
       { status: 500 }
     );
   }

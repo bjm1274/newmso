@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import { usePayroll, usePayrollData } from '../payroll-context';
 import {
   fetchRecentRetirees,
-  type RetirementComputed,
-} from '../payroll-fetch';
+  type RetirementComputed } from '../payroll-fetch';
 
 // 중간정산.tsx의 export default는 props 타입이 Record<string, unknown>
 const LegacyInterimSettlement = dynamic<Record<string, unknown>>(

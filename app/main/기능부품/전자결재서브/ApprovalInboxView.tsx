@@ -116,8 +116,7 @@ export default function ApprovalInboxView({
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalDelaySnapshot,
-  onCreateDraft,
-}: ApprovalInboxViewProps) {
+  onCreateDraft }: ApprovalInboxViewProps) {
   // 표시용 lookup은 풀(staffs 풀 + 외부 결재자) — 결재선 선택과 분리해 UUID 노출 차단.
   const lookupStaffsForDisplay = approvalLookupStaffs ?? approvalDirectoryStaffs;
   const [bulkReviewAction, setBulkReviewAction] = useState<'approve' | 'reject' | null>(null);
@@ -178,8 +177,7 @@ export default function ApprovalInboxView({
       getRowAriaLabel: (key: string) => {
         const target = listForView.find((item) => String(item.id || '') === key);
         return `${String(target?.title || '결재 문서')} 선택`;
-      },
-    };
+      } };
   }, [viewMode, bulkTargetList, selectedApprovalIds, allBulkSelected, toggleSelectOne, toggleSelectAll, listForView]);
 
   const columns = useMemo(
@@ -195,8 +193,7 @@ export default function ApprovalInboxView({
         handleRecallAction,
         handleApproveAction,
         handleRejectAction,
-        onOpenDetail: (id) => setSelectedApprovalId(id),
-      }),
+        onOpenDetail: (id) => setSelectedApprovalId(id) }),
     [
       lookupStaffsForDisplay,
       resolveApprovalLineIds,

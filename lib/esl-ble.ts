@@ -20,8 +20,7 @@ export const ESL_CHAR = {
   /** 상태 read */
   STATUS: '34323032-4c53-4545-4c42-4b4e494c4f57',
   /** 배터리 read */
-  BATTERY: '35323032-4c53-4545-4c42-4b4e494c4f57',
-} as const;
+  BATTERY: '35323032-4c53-4545-4c42-4b4e494c4f57' } as const;
 
 /** AES-128 ECB 암호화 키 (ESL 보안 인증용) */
 const AES_KEY = new Uint8Array([
@@ -85,8 +84,7 @@ export async function scanEslDevice(): Promise<BleDevice> {
 
   const device = await bt.requestDevice({
     filters: [{ namePrefix: 'WL' }],
-    optionalServices: [ESL_SERVICE_UUID],
-  });
+    optionalServices: [ESL_SERVICE_UUID] });
 
   return device;
 }

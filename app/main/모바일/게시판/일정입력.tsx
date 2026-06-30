@@ -44,8 +44,7 @@ export const EMPTY_SCHEDULE_DRAFT: ScheduleDraft = {
   caregiver: false,
   transfusion: false,
   contrastRequired: false,
-  bodyPartId: 'all',
-};
+  bodyPartId: 'all' };
 
 /** ScheduleDraft → createBoardPost용 ScheduleMetaInput */
 export function toScheduleMetaInput(draft: ScheduleDraft): ScheduleMetaInput {
@@ -61,8 +60,7 @@ export function toScheduleMetaInput(draft: ScheduleDraft): ScheduleMetaInput {
     guardian: draft.guardian,
     caregiver: draft.caregiver,
     transfusion: draft.transfusion,
-    contrastRequired: draft.contrastRequired,
-  };
+    contrastRequired: draft.contrastRequired };
 }
 
 export type ScheduleFormProps = {
@@ -77,8 +75,7 @@ function Toggle({
   id,
   label,
   checked,
-  onChange,
-}: {
+  onChange }: {
   id: string;
   label: string;
   checked: boolean;
@@ -96,8 +93,7 @@ function Toggle({
         border: '1px solid var(--m-border)',
         background: checked ? 'var(--m-accent-soft)' : 'var(--m-bg)',
         fontSize: 13,
-        fontWeight: 700,
-      }}
+        fontWeight: 700 }}
     >
       <input
         id={id}
@@ -121,8 +117,7 @@ export default function ScheduleForm({ isMri, draft, onPickBodyPart, onChange }:
     border: '1px solid var(--m-border)',
     borderRadius: 8,
     background: 'var(--m-bg)',
-    color: 'var(--z-900)',
-  } as const;
+    color: 'var(--z-900)' } as const;
 
   return (
     <div className="m-section">

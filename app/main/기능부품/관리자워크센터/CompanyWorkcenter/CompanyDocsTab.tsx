@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { Card, Chip, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_DOCS } from './fallback-data';
 import type { DocRow } from './types';
@@ -21,7 +21,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 async function loadCompanyDocs(companyName: string): Promise<DBDocRow[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('document_repository')
       .select('id,title,category,content,created_at,company_name')
       .limit(100);
@@ -30,8 +30,7 @@ async function loadCompanyDocs(companyName: string): Promise<DBDocRow[]> {
       // Return filtered fallback docs if no DB records exist
       return FALLBACK_DOCS.map((d, idx) => ({
         id: `fallback-${idx}`,
-        ...d,
-      }));
+        ...d }));
     }
 
     // Filter documents by company_name in client-side or use DB query.
@@ -75,14 +74,12 @@ async function loadCompanyDocs(companyName: string): Promise<DBDocRow[]> {
         category: typeof r.category === 'string' ? r.category : '-',
         date: dateStr,
         size,
-        access,
-      };
+        access };
     });
   } catch {
     return FALLBACK_DOCS.map((d, idx) => ({
       id: `fallback-${idx}`,
-      ...d,
-    }));
+      ...d }));
   }
 }
 
@@ -106,7 +103,7 @@ export default function CompanyDocsTab() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('companies')
           .select('name')
           .limit(50);
@@ -146,10 +143,9 @@ export default function CompanyDocsTab() {
       const contentJson = JSON.stringify({
         textContent: docContent,
         size: docSize || '100KB',
-        access: docAccess,
-      });
+        access: docAccess });
 
-      const { error } = await supabase
+      const { error } = await db
         .from('document_repository')
         .insert({
           id: newId,
@@ -159,8 +155,7 @@ export default function CompanyDocsTab() {
           content: contentJson,
           file_url: '#',
           version: 1,
-          created_by: '관리자',
-        });
+          created_by: '관리자' });
 
       if (error) throw error;
 
@@ -187,7 +182,7 @@ export default function CompanyDocsTab() {
     if (!confirm('정말 이 문서를 삭제하시겠습니까?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('document_repository')
         .delete()
         .eq('id', id);

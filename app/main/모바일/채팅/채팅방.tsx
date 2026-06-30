@@ -20,11 +20,10 @@ import {
   useRef,
   useState,
   useLayoutEffect,
-  type ChangeEvent,
-} from 'react';
+  type ChangeEvent } from 'react';
 import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { pokeChannel } from '@/lib/realtime-bus';
 import { logger } from '@/lib/logger';
 import MIcon from '../공통/MIcon';
@@ -38,8 +37,7 @@ import {
   useMobileChatReadCounts,
   useChatStaffDirectory,
   type MobileChatRoom,
-  type StaffDirectoryEntry,
-} from './data-hooks';
+  type StaffDirectoryEntry } from './data-hooks';
 import {
   normalizeMemberIds,
   isGroupChatRoom,
@@ -47,8 +45,7 @@ import {
   getGroupChatRoomBadgeText,
   NOTICE_ROOM_ID,
   WARD_QUICK_REPLY_OPTIONS,
-  extractWardMessageMeta,
-} from '@/app/main/기능부품/메신저유틸';
+  extractWardMessageMeta } from '@/app/main/기능부품/메신저유틸';
 import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
@@ -57,8 +54,7 @@ import BubbleList from './버블리스트';
 import {
   MOBILE_CHAT_UPLOAD_ACCEPT,
   sendMobileFileMessage,
-  validateMobileUploadTarget,
-} from './업로드';
+  validateMobileUploadTarget } from './업로드';
 import { toggleMobileReaction } from './반응';
 import {
   renameMobileRoom,
@@ -68,8 +64,7 @@ import {
   createMobilePoll,
   voteMobilePoll,
   fetchRoomPolls,
-  type RoomPollsResult,
-} from './메시지액션';
+  type RoomPollsResult } from './메시지액션';
 import { ReactionDetailSheet, ReadStatusSheet } from './상세시트';
 import { ThreadSheet } from './스레드시트';
 import { AddMemberSheet } from './멤버관리시트';
@@ -103,8 +98,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     loadOlder,
     refresh,
     appendOptimistic,
-    replaceOptimistic,
-  } = useChatMessagesForRoom(String(room.id), userId);
+    replaceOptimistic } = useChatMessagesForRoom(String(room.id), userId);
 
   const title = getRoomTitle(room, staffs, userId);
   const headerTone = pickAvatarTone(String(room.id) + title);
@@ -178,8 +172,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const { roomNotifyOn, toggleRoomNotify } = useRoomNotificationSetting({
     selectedRoomId: String(room.id),
     effectiveChatUserId: userId,
-    userId,
-  });
+    userId });
 
   // 공지/나와의채팅은 나갈 수 없음
   const canLeaveRoom = !isNotice && !selfRoom;
@@ -211,8 +204,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         await sendMobileTextMessage({
           roomId: String(room.id),
           senderId: userId,
-          content: `[퇴장] ${userName || '알 수 없음'}님이 채팅방을 나갔습니다.`,
-        });
+          content: `[퇴장] ${userName || '알 수 없음'}님이 채팅방을 나갔습니다.` });
       } catch (noticeError) {
         logger.warn('leave room system message error', noticeError);
       }
@@ -308,8 +300,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       created_at: new Date().toISOString(),
       is_deleted: false,
       reply_to_id: replyTo ? String(replyTo.id) : null,
-      staff: { name: userName, photo_url: null },
-    } as ChatMessage;
+      staff: { name: userName, photo_url: null } } as ChatMessage;
     appendOptimistic(optimisticMsg);
     
     if (composerInputRef.current) {
@@ -324,8 +315,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       roomId: String(room.id),
       senderId: userId,
       content: text,
-      replyToId: savedReplyTo ? String(savedReplyTo.id) : null,
-    });
+      replyToId: savedReplyTo ? String(savedReplyTo.id) : null });
     if (!result.ok) {
       toast(result.error, 'error');
       // 실패 시 임시 메시지는 다음 refresh에서 제거됨
@@ -353,8 +343,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           const result = await sendMobileFileMessage({
             roomId: String(room.id),
             senderId: userId,
-            file,
-          });
+            file });
           if (!result.ok) {
             toast(`${file.name}: ${result.error}`, 'error');
           } else if ('queued' in result && result.queued) {
@@ -409,8 +398,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         messageId,
         userId,
         emoji,
-        roomId: String(room.id),
-      });
+        roomId: String(room.id) });
       if (!result.ok) {
         toast(result.error, 'error');
         return;
@@ -428,8 +416,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         const result = await editMobileMessage({
           messageId: String(message.id),
           content,
-          roomId: String(room.id),
-        });
+          roomId: String(room.id) });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -471,8 +458,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           creatorId: userId,
           question: input.question,
           options: input.options,
-          deadlineAt: input.deadlineAt,
-        });
+          deadlineAt: input.deadlineAt });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -499,8 +485,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           pollId,
           userId,
           optionIndex,
-          roomId: String(room.id),
-        });
+          roomId: String(room.id) });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -528,8 +513,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           roomId: String(room.id),
           senderId: userId,
           content: text,
-          replyToId: String(rootMessage.id),
-        });
+          replyToId: String(rootMessage.id) });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -571,8 +555,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           addIds: selected.map((s) => String(s.id)),
           inviterId: userId,
           inviterName: userName,
-          addedNames: selected.map((s) => s.name),
-        });
+          addedNames: selected.map((s) => s.name) });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -599,8 +582,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           removeId: String(member.id),
           removerId: userId,
           removerName: userName,
-          removedName: member.name,
-        });
+          removedName: member.name });
         if (!result.ok) {
           toast(result.error, 'error');
           return;
@@ -630,14 +612,12 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         created_at: new Date().toISOString(),
         is_deleted: false,
         reply_to_id: null,
-        staff: { name: userName, photo_url: null },
-      } as ChatMessage;
+        staff: { name: userName, photo_url: null } } as ChatMessage;
       appendOptimistic(optimisticMsg);
       const result = await sendMobileTextMessage({
         roomId: String(room.id),
         senderId: userId,
-        content: text,
-      });
+        content: text });
       if (!result.ok) {
         toast(result.error, 'error');
         return;
@@ -650,7 +630,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
   const handleToggleBookmark = useCallback(async (message: ChatMessage) => {
     if (!userId) return;
     try {
-      const { data, error: selectErr } = await supabase
+      const { data, error: selectErr } = await db
         .from('message_bookmarks')
         .select('id')
         .eq('user_id', userId)
@@ -659,7 +639,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       if (selectErr) throw selectErr;
       
       if (data && data.length > 0) {
-        const { error } = await supabase
+        const { error } = await db
           .from('message_bookmarks')
           .delete()
           .eq('user_id', userId)
@@ -667,12 +647,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         if (error) throw error;
         toast('북마크가 해제되었습니다.', 'success');
       } else {
-        const { error } = await supabase.from('message_bookmarks').insert([
+        const { error } = await db.from('message_bookmarks').insert([
           {
             user_id: userId,
             message_id: message.id,
-            room_id: room.id,
-          },
+            room_id: room.id },
         ]);
         if (error) throw error;
         toast('북마크가 추가되었습니다.', 'success');
@@ -686,7 +665,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     if (!userId) return;
     const content = message.content || '첨부 파일 확인';
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('todos')
         .insert([{
           user_id: userId,
@@ -694,8 +673,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           is_complete: false,
           task_date: new Date().toISOString().slice(0, 10),
           source_message_id: message.id,
-          source_room_id: message.room_id,
-        }]);
+          source_room_id: message.room_id }]);
       if (error) throw error;
       toast('할 일(업무)로 등록되었습니다.', 'success');
     } catch (err) {
@@ -707,7 +685,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     try {
       // PC 메신저액션훅과 동일하게 표준 messages 테이블을 사용한다.
       // (기존 'chat_messages'는 읽기 경로(messages)와 다른 비표준 테이블이라 삭제가 반영되지 않던 버그)
-      const { error } = await supabase
+      const { error } = await db
         .from('messages')
         .update({ is_deleted: true, content: '삭제된 메시지입니다.' })
         .eq('id', message.id);
@@ -723,7 +701,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     if (!forwardMessage || !userId) return;
     try {
       // 표준 messages 테이블 + 표준 writer 사용(비표준 chat_messages/message_type 제거).
-      const { data, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(supabase, {
+      const { data, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(db, {
         room_id: String(targetRoom.id),
         sender_id: userId,
         content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
@@ -734,8 +712,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         reply_to_id: null,
         album_id: null,
         album_index: null,
-        album_total: null,
-      }, 'id, room_id');
+        album_total: null }, 'id, room_id');
       if (error) throw error;
       pokeChannel(`mobile-chat-room-${targetRoom.id}`);
       pokeChannel('mobile-chat-rooms-list');
@@ -760,8 +737,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <div
         className="macos-glass"
@@ -776,8 +752,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           zIndex: 99,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}
+          WebkitBackdropFilter: 'blur(20px)' }}
       >
         <button
           type="button"
@@ -792,8 +767,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             borderRadius: 8,
             background: 'rgba(0, 0, 0, 0.03)',
             border: '1px solid rgba(0, 0, 0, 0.05)',
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           <MIcon name="chevL" size={18} color="var(--z-600)" />
         </button>
@@ -808,8 +782,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                borderRadius: 'inherit',
-              }}
+                borderRadius: 'inherit' }}
             />
           ) : isGroup ? (
             <span>{getGroupChatRoomBadgeText(title)}</span>
@@ -826,8 +799,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               letterSpacing: '-0.015em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
+              textOverflow: 'ellipsis' }}
           >
             {title}
           </div>
@@ -837,8 +809,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 width: 6,
                 height: 6,
                 borderRadius: 999,
-                background: 'var(--m-success)',
-              }}
+                background: 'var(--m-success)' }}
               aria-hidden="true"
             />
             {memberCount > 0 ? `${memberCount}명` : '대화방'}
@@ -860,8 +831,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               borderRadius: 8,
               background: 'rgba(0, 0, 0, 0.03)',
               border: '1px solid rgba(0, 0, 0, 0.05)',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="menu" size={18} color="var(--z-600)" />
           </button>
@@ -882,8 +852,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'center',
               color: 'var(--z-500)',
               fontSize: 11,
-              fontWeight: 600,
-            }}
+              fontWeight: 600 }}
           >
             이전 메시지 불러오는 중…
           </div>
@@ -895,8 +864,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'center',
               color: 'var(--z-400)',
               fontSize: 11,
-              fontWeight: 600,
-            }}
+              fontWeight: 600 }}
           >
             처음으로 돌아왔습니다.
           </div>
@@ -908,8 +876,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               textAlign: 'center',
               color: 'var(--z-500)',
               fontSize: 12,
-              fontWeight: 600,
-            }}
+              fontWeight: 600 }}
           >
             메시지 불러오는 중…
           </div>
@@ -922,8 +889,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               color: 'var(--z-500)',
               fontSize: 12,
               fontWeight: 600,
-              lineHeight: 1.6,
-            }}
+              lineHeight: 1.6 }}
           >
             대화를 시작해보세요.
           </div>
@@ -973,8 +939,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(20px)',
           borderTop: '1px solid rgba(0, 0, 0, 0.05)',
-          padding: '8px 12px 12px',
-        }}
+          padding: '8px 12px calc(12px + env(safe-area-inset-bottom))' }}
       >
         {(() => {
           const lastMessage = messages[messages.length - 1];
@@ -993,8 +958,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 gap: 6,
                 marginBottom: 8,
                 overflowX: 'auto',
-                paddingBottom: 2,
-              }}
+                paddingBottom: 2 }}
               className="custom-scrollbar"
             >
               {WARD_QUICK_REPLY_OPTIONS.map((opt) => (
@@ -1014,8 +978,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     fontWeight: 700,
                     border: '1px solid rgba(0, 0, 0, 0.05)',
                     cursor: composerDisabled ? 'not-allowed' : 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
+                    whiteSpace: 'nowrap' }}
                 >
                   {opt.label}
                 </button>
@@ -1033,8 +996,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               marginBottom: 8,
               background: 'rgba(0, 0, 0, 0.04)',
               borderRadius: 8,
-              borderLeft: '3px solid #007AFF',
-            }}
+              borderLeft: '3px solid #007AFF' }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#007AFF', marginBottom: 2 }}>
@@ -1052,8 +1014,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 border: 'none',
                 color: 'var(--z-400)',
                 padding: 4,
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
               aria-label="답장 취소"
             >
               <MIcon name="x" size={16} />
@@ -1068,8 +1029,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
             background: 'rgba(0, 0, 0, 0.04)',
             border: '1px solid rgba(0, 0, 0, 0.05)',
             borderRadius: 22,
-            padding: '4px 6px 4px 12px',
-          }}
+            padding: '4px 6px 4px 12px' }}
         >
           <button
             type="button"
@@ -1082,8 +1042,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               display: 'grid',
               placeItems: 'center',
               color: uploading ? '#007AFF' : 'var(--z-500)',
-              cursor: composerDisabled ? 'not-allowed' : 'pointer',
-            }}
+              cursor: composerDisabled ? 'not-allowed' : 'pointer' }}
           >
             {uploading ? (
               <span
@@ -1094,8 +1053,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                   border: '2px solid #007AFF',
                   borderTopColor: 'transparent',
                   borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }}
+                  animation: 'spin 0.8s linear infinite' }}
               />
             ) : (
               <MIcon name="plus" size={20} />
@@ -1136,8 +1094,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 height: 24,
                 background: 'transparent',
                 border: 'none',
-                outline: 'none',
-              }}
+                outline: 'none' }}
               disabled={composerDisabled}
             />
           </label>
@@ -1154,8 +1111,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               display: 'grid',
               placeItems: 'center',
               color: emojiOpen ? '#007AFF' : 'var(--z-500)',
-              cursor: composerDisabled ? 'not-allowed' : 'pointer',
-            }}
+              cursor: composerDisabled ? 'not-allowed' : 'pointer' }}
           >
             <MIcon name="smile" size={20} />
           </button>
@@ -1179,8 +1135,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               justifyContent: 'center',
               boxShadow: hasText && !composerDisabled ? '0 2px 8px rgba(0, 122, 255, 0.35)' : undefined,
               border: 'none',
-              cursor: hasText && !composerDisabled ? 'pointer' : 'not-allowed',
-            }}
+              cursor: hasText && !composerDisabled ? 'pointer' : 'not-allowed' }}
           >
             <MIcon name="send" size={16} />
           </button>
@@ -1195,8 +1150,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           gap: 12,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(30px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <button
             type="button"
             onClick={() => {
@@ -1242,8 +1196,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           gap: 16,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(30px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
           {/* Section 1: 대화방 개요 */}
           <div style={{ background: 'rgba(0, 0, 0, 0.03)', padding: '14px', borderRadius: 12, border: '1px solid rgba(0, 0, 0, 0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1268,8 +1221,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     fontSize: 11,
                     fontWeight: 800,
                     border: 'none',
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <MIcon name="edit" size={13} />
                   이름 수정
@@ -1299,13 +1251,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               />
               <span style={{
                 position: 'absolute', inset: 0, borderRadius: 24,
-                background: roomNotifyOn ? '#007AFF' : 'rgba(0, 0, 0, 0.15)', transition: '0.2s',
-              }}>
+                background: roomNotifyOn ? '#007AFF' : 'rgba(0, 0, 0, 0.15)', transition: '0.2s' }}>
                 <span style={{
                   position: 'absolute', left: 4, bottom: 4, width: 16, height: 16,
                   borderRadius: '50%', background: '#fff', transition: '0.2s',
-                  transform: roomNotifyOn ? 'translateX(20px)' : 'translateX(0)',
-                }} />
+                  transform: roomNotifyOn ? 'translateX(20px)' : 'translateX(0)' }} />
               </span>
             </label>
           </div>
@@ -1345,8 +1295,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     fontSize: 11,
                     fontWeight: 800,
                     border: 'none',
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <MIcon name="plus" size={13} />
                   추가
@@ -1396,8 +1345,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                           background: 'transparent',
                           color: 'var(--m-danger, #ef4444)',
                           border: 'none',
-                          cursor: memberMutating ? 'not-allowed' : 'pointer',
-                        }}
+                          cursor: memberMutating ? 'not-allowed' : 'pointer' }}
                       >
                         <MIcon name="trash" size={15} />
                       </button>
@@ -1454,8 +1402,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               fontWeight: 800,
               border: 'none',
               cursor: 'pointer',
-              textAlign: 'center',
-            }}
+              textAlign: 'center' }}
           >
             {canLeaveRoom ? '채팅방 나가기' : '목록으로'}
           </button>
@@ -1470,8 +1417,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           gap: 16,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(30px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, lineHeight: 1.6 }}>
             이 채팅방에서 나갑니다.
             <br />
@@ -1491,8 +1437,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 fontSize: 13,
                 fontWeight: 800,
                 border: '1px solid rgba(0, 0, 0, 0.02)',
-                cursor: leaving ? 'not-allowed' : 'pointer',
-              }}
+                cursor: leaving ? 'not-allowed' : 'pointer' }}
             >
               취소
             </button>
@@ -1510,8 +1455,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 fontWeight: 800,
                 border: 'none',
                 cursor: leaving ? 'not-allowed' : 'pointer',
-                opacity: leaving ? 0.7 : 1,
-              }}
+                opacity: leaving ? 0.7 : 1 }}
             >
               {leaving ? '나가는 중…' : '나가기'}
             </button>
@@ -1533,8 +1477,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           overflowY: 'auto',
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(30px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <div style={{ fontSize: 13, color: 'var(--z-600)', fontWeight: 600, marginBottom: 12 }}>
             전달할 채팅방을 선택해 주세요.
           </div>
@@ -1557,8 +1500,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                     color: 'var(--foreground)',
                     display: 'flex',
                     alignItems: 'center',
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <span className="truncate" style={{ flex: 1 }}>{r.name || '이름 없는 채팅방'}</span>
                   <MIcon name="chevR" size={18} color="var(--z-400)" />
@@ -1637,8 +1579,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           gap: 14,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(30px)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-        }}>
+          borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <input
             value={renameDraft}
             onChange={(e) => setRenameDraft(e.target.value)}
@@ -1654,8 +1595,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
               border: '1px solid rgba(0, 0, 0, 0.05)',
               borderRadius: 10,
               outline: 'none',
-              color: 'var(--z-900)',
-            }}
+              color: 'var(--z-900)' }}
           />
           <div style={{ display: 'flex', gap: 10 }}>
             <button
@@ -1671,8 +1611,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 fontSize: 13,
                 fontWeight: 800,
                 border: '1px solid rgba(0, 0, 0, 0.02)',
-                cursor: renameSaving ? 'not-allowed' : 'pointer',
-              }}
+                cursor: renameSaving ? 'not-allowed' : 'pointer' }}
             >
               취소
             </button>
@@ -1692,8 +1631,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
                 fontWeight: 800,
                 border: 'none',
                 cursor: renameSaving || !renameDraft.trim() ? 'not-allowed' : 'pointer',
-                opacity: renameSaving ? 0.7 : 1,
-              }}
+                opacity: renameSaving ? 0.7 : 1 }}
             >
               {renameSaving ? '저장 중…' : '저장'}
             </button>

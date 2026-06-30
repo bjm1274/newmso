@@ -31,8 +31,7 @@ export function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) 
             ? 'var(--warning)'
             : isSuccess
               ? 'var(--success)'
-              : 'var(--foreground)',
-        }}
+              : 'var(--foreground)' }}
       >
         {value}
       </p>
@@ -211,8 +210,7 @@ export function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
                 style={{
                   height: `${Math.max(hours > 0 ? 15 : 4, heightPercent)}%`,
                   background: barBg,
-                  maxHeight: '60px',
-                }}
+                  maxHeight: '60px' }}
               />
               {/* 날짜 라벨 */}
               <span className="text-[8px] text-[var(--toss-gray-3)] mt-0.5">{day}</span>

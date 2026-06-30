@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface Props {
   staffs: any[];
@@ -83,8 +83,7 @@ const HOLIDAYS: Record<string, string> = {
   '2027-10-03': '개천절',
   '2027-10-04': '추석연휴',
   '2027-10-09': '한글날',
-  '2027-12-25': '크리스마스',
-};
+  '2027-12-25': '크리스마스' };
 
 type CompanyHoliday = {
   id: string;
@@ -135,7 +134,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const fetchCustomHolidays = useCallback(async () => {
     setLoadingCustomHolidays(true);
     try {
-      let query = supabase
+      let query = db
         .from('company_holidays')
         .select('id, company_name, holiday_date, name, note, created_by, created_by_name, created_at, updated_at')
         .gte('holiday_date', `${year}-01-01`)
@@ -198,15 +197,13 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
           date,
           name: existing.name.includes(customName) ? existing.name : `${existing.name} / ${customName}`,
           source: 'mixed',
-          companyName: holiday.company_name,
-        });
+          companyName: holiday.company_name });
       } else {
         entries.set(date, {
           date,
           name: String(holiday.name || '지정 공휴일').trim(),
           source: 'custom',
-          companyName: holiday.company_name,
-        });
+          companyName: holiday.company_name });
       }
     });
 
@@ -247,15 +244,14 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
 
     setSavingCustomHoliday(true);
     try {
-      const { error } = await supabase.from('company_holidays').upsert(
+      const { error } = await db.from('company_holidays').upsert(
         {
           company_name: holidayScopeCompany,
           holiday_date: normalizedDate,
           name: normalizedName,
           created_by: user?.id ? String(user.id) : null,
           created_by_name: user?.name ? String(user.name) : null,
-          updated_at: new Date().toISOString(),
-        },
+          updated_at: new Date().toISOString() },
         { onConflict: 'company_name,holiday_date' },
       );
       if (error) throw error;
@@ -281,12 +277,11 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
       title: '지정 공휴일 삭제',
       description: `${holiday.holiday_date} ${holiday.name} 항목을 삭제합니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase.from('company_holidays').delete().eq('id', holiday.id);
+      const { error } = await db.from('company_holidays').delete().eq('id', holiday.id);
       if (error) throw error;
       await fetchCustomHolidays();
       toast('지정 공휴일을 삭제했습니다.', 'success');

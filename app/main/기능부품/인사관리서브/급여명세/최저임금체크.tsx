@@ -6,15 +6,13 @@ import {
   getMinimumWageByYear,
   MINIMUM_WAGE_2025,
   MINIMUM_WAGE_2026,
-  MONTHLY_STANDARD_HOURS,
-} from '@/lib/tax-free-limits';
+  MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 const MIN_WAGE_TABLE: Record<number, number> = {
   2024: 9860,
   2025: MINIMUM_WAGE_2025,
-  2026: MINIMUM_WAGE_2026,
-};
+  2026: MINIMUM_WAGE_2026 };
 
 const MONTHLY_HOURS = MONTHLY_STANDARD_HOURS;
 
@@ -39,8 +37,7 @@ type StaffCheck = {
 
 export default function MinWageChecker({
   staffs = [],
-  selectedCo,
-}: {
+  selectedCo }: {
   staffs: any[];
   selectedCo: string;
   user: any;
@@ -67,8 +64,7 @@ export default function MinWageChecker({
       comparablePay,
       minWage: minWageMonthly,
       diff,
-      isViolation: diff < 0,
-    };
+      isViolation: diff < 0 };
   });
 
   const violations = checks.filter((check) => check.isViolation);
@@ -82,18 +78,15 @@ export default function MinWageChecker({
       primary: true,
       render: (check) => (
         <span className="font-bold text-[var(--foreground)]">{check.name || '—'}</span>
-      ),
-    },
+      ) },
     {
       key: 'position',
       label: '직위',
-      render: (check) => check.position || '—',
-    },
+      render: (check) => check.position || '—' },
     {
       key: 'department',
       label: '부서',
-      render: (check) => check.department || '—',
-    },
+      render: (check) => check.department || '—' },
     {
       key: 'comparablePay',
       label: '비교 급여',
@@ -102,14 +95,12 @@ export default function MinWageChecker({
         <span className="font-bold">
           {check.comparablePay > 0 ? check.comparablePay.toLocaleString() : '미등록'}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'minWage',
       label: '최저임금 기준',
       align: 'right',
-      render: (check) => check.minWage.toLocaleString(),
-    },
+      render: (check) => check.minWage.toLocaleString() },
     {
       key: 'diff',
       label: '차액',
@@ -120,8 +111,7 @@ export default function MinWageChecker({
             ? `${check.diff >= 0 ? '+' : ''}${check.diff.toLocaleString()}`
             : '-'}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'status',
       label: '상태',
@@ -138,8 +128,7 @@ export default function MinWageChecker({
           <span className="rounded-[var(--radius-md)] bg-green-500/20 px-2 py-0.5 text-[9px] font-bold text-green-700">
             준수
           </span>
-        ),
-    },
+        ) },
   ], []);
 
   return (
@@ -183,16 +172,14 @@ export default function MinWageChecker({
           {
             label: '미달 직원',
             value: `${violations.length}명`,
-            color: violations.length > 0 ? 'text-red-600' : 'text-green-600',
-          },
+            color: violations.length > 0 ? 'text-red-600' : 'text-green-600' },
           {
             label: '준수율',
             value:
               checks.length > 0
                 ? `${Math.round(((checks.length - violations.length) / checks.length) * 100)}%`
                 : '100%',
-            color: 'text-green-600',
-          },
+            color: 'text-green-600' },
         ].map((card) => (
           <div
             key={card.label}

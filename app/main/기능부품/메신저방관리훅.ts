@@ -3,7 +3,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { CHAT_ROOM_SELECT } from '@/lib/chat-query-columns';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import type { ChatRoom, StaffMember } from '@/types';
@@ -11,8 +11,7 @@ import {
   NOTICE_ROOM_ID,
   SELF_ROOM_NAME,
   isSelfChatRoom,
-  sortChatRoomsWithNoticeFirst,
-} from './메신저유틸';
+  sortChatRoomsWithNoticeFirst } from './메신저유틸';
 
 type ChatViewMode = 'chat' | 'org';
 
@@ -67,8 +66,7 @@ export function useChatRoomManagement({
   setShowDrawer,
   setViewMode,
   triggerChatPush,
-  user,
-}: UseChatRoomManagementParams) {
+  user }: UseChatRoomManagementParams) {
   const { dialog, openConfirm } = useActionDialog();
   const persistRoomMembers = useCallback(async (roomId: string, members: string[]) => {
     const result = await patchChatRoom(roomId, { members });
@@ -86,14 +84,13 @@ export function useChatRoomManagement({
 
   const insertRoomSystemMessage = useCallback(
     async (roomId: string, content: string) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('messages')
         .insert([
           {
             room_id: roomId,
             sender_id: effectiveChatUserId || user?.id || null,
-            content,
-          },
+            content },
         ])
         .select('id, room_id')
         .single();
@@ -111,8 +108,7 @@ export function useChatRoomManagement({
     async ({
       roomId,
       members,
-      systemContent,
-    }: {
+      systemContent }: {
       roomId: string;
       members: string[];
       systemContent: string;
@@ -139,8 +135,7 @@ export function useChatRoomManagement({
       title: '채팅방 나가기',
       description: '이 채팅방에서 나갑니다.\n대화방 목록에서 사라지고 새 메시지 알림도 받지 않습니다.',
       confirmText: '나가기',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) {
       return;
     }
@@ -209,8 +204,7 @@ export function useChatRoomManagement({
         title: '참여자 제외',
         description: `${removedName}님을 채팅방에서 제외합니다.`,
         confirmText: '제외',
-        tone: 'danger',
-      });
+        tone: 'danger' });
       if (!confirmed) return;
 
       try {
@@ -222,8 +216,7 @@ export function useChatRoomManagement({
         await applyRoomMemberChange({
           roomId: String(selectedRoom.id),
           members: newMembers,
-          systemContent: `[내보내기] ${removerName}님이 ${removedName}님을 채팅방에서 제외했습니다.`,
-        });
+          systemContent: `[내보내기] ${removerName}님이 ${removedName}님을 채팅방에서 제외했습니다.` });
         toast('참여자를 제외했습니다.');
       } catch (error) {
         console.error('remove member error', error);
@@ -290,8 +283,7 @@ export function useChatRoomManagement({
         name: groupName,
         type: 'group',
         created_by: effectiveChatUserId,
-        members: [effectiveChatUserId, ...selectedMembers],
-      });
+        members: [effectiveChatUserId, ...selectedMembers] });
       if (!result.ok || !result.room) throw new Error(result.error || 'Create failed');
       const room = result.room as unknown as ChatRoom;
 
@@ -331,7 +323,7 @@ export function useChatRoomManagement({
       }
 
       try {
-        const { data: rooms, error } = (await supabase
+        const { data: rooms, error } = (await db
           .from('chat_rooms')
           .select(CHAT_ROOM_SELECT)
           .eq('type', 'direct')) as { data: ChatRoom[] | null; error: unknown };
@@ -368,8 +360,7 @@ export function useChatRoomManagement({
                     ...foundRoom,
                     name: SELF_ROOM_NAME,
                     type: 'direct' as const,
-                    members: [effectiveChatUserId],
-                  }
+                    members: [effectiveChatUserId] }
                 : foundRoom,
             ]),
           );
@@ -381,8 +372,7 @@ export function useChatRoomManagement({
         const directResult = await createOrUpsertChatRoom({
           name: isSelfTarget ? SELF_ROOM_NAME : `${staff.name}`,
           type: 'direct',
-          members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId],
-        });
+          members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId] });
         if (!directResult.ok || !directResult.room) {
           throw new Error(directResult.error || 'Direct chat create failed');
         }
@@ -397,8 +387,7 @@ export function useChatRoomManagement({
                     ...room,
                     name: SELF_ROOM_NAME,
                     type: 'direct' as const,
-                    members: [effectiveChatUserId],
-                  }
+                    members: [effectiveChatUserId] }
                 : room,
             ]),
           );
@@ -431,8 +420,7 @@ export function useChatRoomManagement({
       await applyRoomMemberChange({
         roomId: String(selectedRoom.id),
         members: newMembers,
-        systemContent: `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`,
-      });
+        systemContent: `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.` });
 
       closeAddMemberModal();
       setAddMemberSelectingIds([]);
@@ -461,6 +449,5 @@ export function useChatRoomManagement({
     handleCancelEditingRoomName,
     createGroupChat,
     openDirectChat,
-    handleSubmitAddMembers,
-  };
+    handleSubmitAddMembers };
 }

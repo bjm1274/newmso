@@ -6,14 +6,12 @@ import {
   buildApprovalDocNumber,
   buildRevisionDocNumber,
   getApprovalRevision,
-  resolveApprovalDocNumberConfig,
-} from '@/lib/approval-workflow';
+  resolveApprovalDocNumberConfig } from '@/lib/approval-workflow';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import {
-  extractOfficialDocRequest,
-} from '@/lib/official-document-approval';
+  extractOfficialDocRequest } from '@/lib/official-document-approval';
 import { getReportApprovalSummary, getReportApprovalValidationMessage } from '@/lib/approval-report-utils';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import {
@@ -24,17 +22,15 @@ import {
   INVENTORY_SUPPORT_DEPARTMENT,
   normalizeInventoryText,
   normalizeSupplyRequestItems,
-  resolveInventoryDepartment,
-} from '@/app/main/inventory-utils';
-import { supabase, d1 } from '@/lib/supabase';
+  resolveInventoryDepartment } from '@/app/main/inventory-utils';
+import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
   APPROVAL_OPTIONAL_INSERT_COLUMNS,
   BUILTIN_FORM_TYPE_DEFINITIONS,
   type ApprovalCcUser,
   type SupplyInventoryReviewRow,
-  type SupplyInventoryReviewState,
-} from '../전자결재-types';
+  type SupplyInventoryReviewState } from '../전자결재-types';
 import { normalizeApprovalCcUsers } from '../전자결재-utils';
 
 type ApprovalRecord = Record<string, unknown>;
@@ -128,8 +124,7 @@ export function useApprovalSubmit({
   openConfirm,
   resolveEffectiveApproverId,
   resolveApprovalLineIds,
-  surgeryStockDepartmentAliases,
-}: UseApprovalSubmitParams) {
+  surgeryStockDepartmentAliases }: UseApprovalSubmitParams) {
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const confirmApprovalSubmit = openConfirm;
@@ -140,7 +135,7 @@ export function useApprovalSubmit({
     let candidateRow = { ...row };
 
     while (true) {
-      const result = await supabase.from('approvals').insert([candidateRow]).select().single();
+      const result = await db.from('approvals').insert([candidateRow]).select().single();
       const missingColumn = APPROVAL_OPTIONAL_INSERT_COLUMNS.find(
         (columnName) => columnName in candidateRow && isMissingColumnError(result.error, columnName)
       );
@@ -164,8 +159,7 @@ export function useApprovalSubmit({
             if (!record.id) return null;
             return {
               id: String(record.id),
-              name: String(record.name || '이름 없음'),
-            } satisfies ApprovalCcUser;
+              name: String(record.name || '이름 없음') } satisfies ApprovalCcUser;
           })
           .filter(Boolean) as ApprovalCcUser[]
       : [];
@@ -195,9 +189,7 @@ export function useApprovalSubmit({
                 approval_role: 'reference',
                 approval_view: '참조 문서함',
                 sender_name: item.sender_name || null,
-                document_type: item.type || null,
-              },
-            },
+                document_type: item.type || null } },
           ])
       ).values()
     );
@@ -213,10 +205,8 @@ export function useApprovalSubmit({
             await fetch('/rest/v1/notifications', {
               method: 'POST',
               headers: {
-                'content-type': 'application/json',
-              },
-              body: JSON.stringify(notificationRows),
-            });
+                'content-type': 'application/json' },
+              body: JSON.stringify(notificationRows) });
             return;
           } catch {
             return;
@@ -283,8 +273,7 @@ export function useApprovalSubmit({
           supportShortageQty: Math.max(item.qty - supportStock, 0),
           surgeryStock,
           surgeryShortageQty: Math.max(item.qty - surgeryStock, 0),
-          matchedDepartments,
-        } satisfies SupplyInventoryReviewRow;
+          matchedDepartments } satisfies SupplyInventoryReviewRow;
       });
     },
     [surgeryStockDepartmentAliases, user?.company],
@@ -302,7 +291,7 @@ export function useApprovalSubmit({
         fetchSupportInventoryRows(),
         (async () => {
           try {
-            let query = supabase.from('inventory').select('*');
+            let query = db.from('inventory').select('*');
             if (companyName) {
               query = query.eq('company', companyName);
             }
@@ -317,7 +306,7 @@ export function useApprovalSubmit({
         })(),
         (async () => {
           try {
-            const { data, error } = await supabase.from('inventory').select('item_name');
+            const { data, error } = await db.from('inventory').select('item_name');
             if (error) {
               throw error;
             }
@@ -366,8 +355,7 @@ export function useApprovalSubmit({
         notice:
           notices.length > 0
             ? `${notices.join(' ')} 재고 데이터 없이도 최종 신청은 진행할 수 있습니다.`
-            : null,
-      });
+            : null });
     },
     [buildSupplyInventoryReviewRows, setSupplyInventoryReview, user?.company],
   );
@@ -384,8 +372,7 @@ export function useApprovalSubmit({
     if (params.sourceDocNumber) {
       return {
         docNumber: buildRevisionDocNumber(params.sourceDocNumber, revision),
-        revision,
-      };
+        revision };
     }
 
     const dayStart = new Date();
@@ -393,7 +380,7 @@ export function useApprovalSubmit({
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    let countQuery = supabase
+    let countQuery = db
       .from('approvals')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', dayStart.toISOString())
@@ -414,10 +401,8 @@ export function useApprovalSubmit({
         sequence: (count || 0) + 1,
         config: resolveApprovalDocNumberConfig(
           user && typeof user === 'object' ? (user as unknown as ApprovalRecord) : null
-        ),
-      }),
-      revision: 1,
-    };
+        ) }),
+      revision: 1 };
   }, [user]);
 
   const confirmPendingSupplyDuplicate = useCallback(async (trimmedTitle: string) => {
@@ -431,7 +416,7 @@ export function useApprovalSubmit({
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('approvals')
       .select('id, title, created_at, meta_data')
       .eq('sender_id', user.id)
@@ -459,8 +444,7 @@ export function useApprovalSubmit({
           day: '2-digit',
           hour: '2-digit',
           minute: '2-digit',
-          hour12: false,
-        })
+          hour12: false })
       : '';
 
     return confirmApprovalSubmit({
@@ -468,8 +452,7 @@ export function useApprovalSubmit({
       description: `${createdAt ? `${createdAt}에 ` : ''}같은 제목의 대기 물품신청${docNumber ? `(${docNumber})` : ''}이 이미 있습니다. 새 문서로 한 건 더 올릴까요?`,
       confirmText: '새로 신청',
       cancelText: '취소',
-      tone: 'accent',
-    });
+      tone: 'accent' });
   }, [composeSeedApproval?.id, confirmApprovalSubmit, formType, user?.id]);
 
   const submitApproval = useCallback(async (options?: ApprovalSubmitOptions) => {
@@ -572,8 +555,7 @@ export function useApprovalSubmit({
           return {
             ...item,
             inventory_registered: !isUnregistered,
-            unregistered_inventory_item: isUnregistered,
-          };
+            unregistered_inventory_item: isUnregistered };
         }),
         has_unregistered_items: unregisteredItemNames.length > 0,
         unregistered_item_names: unregisteredItemNames,
@@ -582,8 +564,7 @@ export function useApprovalSubmit({
             ? `재고관리에 등록되지 않은 품목이 포함되어 있습니다: ${unregisteredItemNames.join(', ')}`
             : null,
         inventory_source_company: INVENTORY_SUPPORT_COMPANY,
-        inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT,
-      };
+        inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT };
     } else if (formType === '연차/휴가') {
       const leaveMeta = extractLeaveRequestMeta(extraData);
       const leaveTypeValue = leaveMeta?.leaveType || String(extraData.vType || '연차 (1.0)').trim() || '연차 (1.0)';
@@ -598,22 +579,19 @@ export function useApprovalSubmit({
         // 군소집휴가 첨부파일
         ...(leaveTypeValue === '군소집휴가' && Array.isArray(extraData.attachments) && extraData.attachments.length > 0
           ? { attachments: extraData.attachments }
-          : {}),
-      };
+          : {}) };
     } else if (formType === '공문발송' && officialDocumentRequest) {
       nextExtraData = {
         ...extraData,
         official_doc_request: officialDocumentRequest,
-        request_category: 'official_document_dispatch',
-      };
+        request_category: 'official_document_dispatch' };
     } else if (formType === '보고서작성') {
       const reportSummary = getReportApprovalSummary(extraData);
       nextExtraData = {
         ...extraData,
         report_type_label: reportSummary.reportTypeLabel,
         attachments: reportSummary.attachments,
-        request_category: 'report',
-      };
+        request_category: 'report' };
     }
 
     const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
@@ -639,8 +617,7 @@ export function useApprovalSubmit({
       companyName,
       companyId: companyId ? String(companyId) : null,
       sourceMetaData: sourceApprovalMeta,
-      sourceDocNumber,
-    });
+      sourceDocNumber });
     const firstApproverId = String(approverLine[0]?.id || '');
     const initialApproverId = resolveEffectiveApproverId(firstApproverId) || firstApproverId;
 
@@ -666,21 +643,17 @@ export function useApprovalSubmit({
           name: approver.name || '',
           position: approver.position || null,
           department: approver.department || null,
-          company: approver.company || null,
-        })),
+          company: approver.company || null })),
         doc_number: structuredDocNumber,
         revision,
         source_approval_id: composeSeedApproval?.id || null,
-        previous_doc_number: sourceDocNumber,
-      },
+        previous_doc_number: sourceDocNumber },
       doc_number: structuredDocNumber,
-      status: '대기',
-    };
+      status: '대기' };
     row.meta_data = appendApprovalHistory(row.meta_data as ApprovalRecord | null | undefined, {
       ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '회수 후 재상신' : '최초 상신'),
       current_approver_id: initialApproverId || null,
-      revision,
-    });
+      revision });
     if (companyId != null) row.company_id = companyId;
 
     const { error, data: insertedApproval } = await insertApprovalWithLegacyFallback(row);
@@ -719,9 +692,7 @@ export function useApprovalSubmit({
             type: 'approval',
             approval_role: 'approver',
             sender_name: user.name || null,
-            document_type: formType || null,
-          },
-        };
+            document_type: formType || null } };
         const { error: approverNotifError } = await d1.from('notifications')
           .insert([firstApproverNotification]);
         if (approverNotifError) {
@@ -735,9 +706,8 @@ export function useApprovalSubmit({
     if (composeSeedApproval?.id) {
       const supersededMetaData = {
         ...((sourceApprovalMeta || {}) as ApprovalRecord),
-        superseded_by: (insertedApproval as ApprovalRecord | null | undefined)?.id || null,
-      };
-      await supabase.from('approvals').update({ meta_data: supersededMetaData }).eq('id', composeSeedApproval.id);
+        superseded_by: (insertedApproval as ApprovalRecord | null | undefined)?.id || null };
+      await db.from('approvals').update({ meta_data: supersededMetaData }).eq('id', composeSeedApproval.id);
     }
     clearDraftFromStorage();
     setComposeSeedApproval(null);
@@ -801,6 +771,5 @@ export function useApprovalSubmit({
 
   return {
     handleSubmit,
-    isSubmitting,
-  };
+    isSubmitting };
 }

@@ -6,14 +6,13 @@ import type { StaffMember } from '@/types';
 
 import { useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import {
   buildFallbackLicenseRows,
   getScopedActiveStaffs,
   getStaffDepartment,
   getStaffPosition,
-  isLicenseQueryRecoverableError,
-} from './education-utils';
+  isLicenseQueryRecoverableError } from './education-utils';
 
 const COPY_URL_FIELDS = ['file_url', 'attachment_url', 'copy_url', 'document_url', 'document_file_url', 'license_file_url'];
 
@@ -77,7 +76,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
     let isMounted = true;
 
     const loadLicenses = async () => {
-      const { data, error } = await supabase.from('staff_licenses').select('*');
+      const { data, error } = await db.from('staff_licenses').select('*');
       if (!isMounted) return;
 
       if (error) {
@@ -119,8 +118,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
           copyUrl: getCopyUrl(license),
           statusLabel: status.label,
           statusTone: status.tone,
-          daysLeft: status.daysLeft,
-        } as LicenseItem;
+          daysLeft: status.daysLeft } as LicenseItem;
       })
       .filter((item): item is LicenseItem => item !== null)
       .sort((a: LicenseItem, b: LicenseItem) => {
@@ -202,26 +200,22 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
             {getStaffPosition(item.staff) ? ` | ${getStaffPosition(item.staff)}` : ''}
           </p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'license_name',
       label: '자격/면허명',
-      render: (item) => (item.license_name as string) || '—',
-    },
+      render: (item) => (item.license_name as string) || '—' },
     {
       key: 'license_number',
       label: '자격 번호',
       render: (item) => (
         <span className="font-mono text-[11px]">{(item.license_number as string) || '—'}</span>
-      ),
-    },
+      ) },
     {
       key: 'issuing_body',
       label: '발급기관',
       showOnMobile: false,
-      render: (item) => (item.issuing_body as string) || '—',
-    },
+      render: (item) => (item.issuing_body as string) || '—' },
     {
       key: 'expiry_date',
       label: '만료(갱신)',
@@ -237,8 +231,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
             )}
           </span>
         );
-      },
-    },
+      } },
     {
       key: 'statusLabel',
       label: '상태',
@@ -257,8 +250,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
             {(item.statusLabel as string) ?? '—'}
           </span>
         );
-      },
-    },
+      } },
     {
       key: 'actions',
       label: '관리',
@@ -282,8 +274,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
             </button>
           )}
         </div>
-      ),
-    },
+      ) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ], []);
 
@@ -292,8 +283,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
       title: '면허 갱신 알림',
       description: `${item.staff?.name || '대상자'}님에게 ${item.license_name as string} 갱신 알림을 발송합니다.`,
       confirmText: '발송',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     const daysLeft = item.daysLeft ?? null;
@@ -308,8 +298,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
       type: 'license_expiry',
       title: `자격면허 갱신 안내 - ${item.license_name as string}`,
       body: `${item.license_name as string} 자격면허를 확인해 주세요. ${expireMessage} 발급기관: ${(item.issuing_body as string) || '미등록'}`,
-      read_at: null,
-    });
+      read_at: null });
 
     if (error) {
       console.error('자격면허 알림 발송 실패:', error);

@@ -33,8 +33,7 @@ function ChartSkeleton({ height }: { height: number }) {
         className="absolute inset-0 animate-pulse"
         style={{
           background:
-            'linear-gradient(90deg, transparent, color-mix(in srgb, var(--border) 30%, transparent), transparent)',
-        }}
+            'linear-gradient(90deg, transparent, color-mix(in srgb, var(--border) 30%, transparent), transparent)' }}
       />
     </div>
   );
@@ -42,8 +41,7 @@ function ChartSkeleton({ height }: { height: number }) {
 
 function ChartEmpty({
   height,
-  message,
-}: {
+  message }: {
   height: number;
   message: string;
 }) {
@@ -70,8 +68,7 @@ export function MobileChartWrapper({
   isLoading = false,
   className = '',
   actions,
-  ariaLabel,
-}: MobileChartWrapperProps) {
+  ariaLabel }: MobileChartWrapperProps) {
   const isMobile = useIsMobile();
   const effectiveHeight = height ?? (isMobile ? 240 : 320);
 
@@ -110,15 +107,13 @@ export function MobileChartWrapper({
         <div
           className="w-full overflow-x-auto"
           style={{
-            WebkitOverflowScrolling: 'touch',
-          }}
+            WebkitOverflowScrolling: 'touch' }}
         >
           <div
             style={{
               height: effectiveHeight,
               minWidth: minWidth ? `${minWidth}px` : '100%',
-              width: '100%',
-            }}
+              width: '100%' }}
           >
             {children}
           </div>

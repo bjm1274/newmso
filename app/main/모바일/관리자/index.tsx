@@ -109,8 +109,7 @@ export default function 관리자({ user, onBack }: AdminProps) {
 function Hub({
   user,
   onBack,
-  onOpen,
-}: {
+  onOpen }: {
   user: ErpUser;
   onBack: () => void;
   onOpen: (view: Exclude<AdminView, 'hub'>) => void;
@@ -144,7 +143,7 @@ function Hub({
             <div className="lbl">관리자 메뉴</div>
             <div className="cnt">{HUB_ITEMS.length}</div>
           </div>
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {HUB_ITEMS.map((item) => (
               <MListRow
                 key={item.id}
@@ -178,15 +177,14 @@ function AccessDenied({ onBack }: { onBack: () => void }) {
         <div style={{ padding: '24px 16px' }}>
           <div
             role="alert"
-            className="m-card"
+            className="m-card macos-glass macos-squircle-sm"
             style={{
               padding: '20px 16px',
               background: 'var(--m-danger-soft)',
               borderColor: 'transparent',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 12,
-            }}
+              gap: 12 }}
           >
             <MIcon name="alertTri" size={22} color="var(--m-danger)" />
             <div>
@@ -199,8 +197,7 @@ function AccessDenied({ onBack }: { onBack: () => void }) {
                   color: 'var(--z-600)',
                   fontWeight: 600,
                   marginTop: 4,
-                  lineHeight: 1.5,
-                }}
+                  lineHeight: 1.5 }}
               >
                 관리자 또는 매니저 권한이 필요합니다. 관리자에게 권한 부여를 요청하세요.
               </div>

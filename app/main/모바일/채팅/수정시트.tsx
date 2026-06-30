@@ -56,8 +56,7 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
             outline: 'none',
             resize: 'none',
             color: 'var(--z-900)',
-            transition: 'border-color 0.2s',
-          }}
+            transition: 'border-color 0.2s' }}
           onFocus={(e) => {
             e.target.style.borderColor = '#007AFF';
           }}
@@ -80,8 +79,7 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
               fontWeight: 600,
               border: 'none',
               cursor: saving ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s',
-            }}
+              transition: 'background 0.2s' }}
           >
             취소
           </button>
@@ -101,8 +99,7 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
               cursor: saving || !draft.trim() ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1,
               boxShadow: draft.trim() ? '0 4px 12px rgba(0, 122, 255, 0.3)' : 'none',
-              transition: 'all 0.2s',
-            }}
+              transition: 'all 0.2s' }}
           >
             {saving ? '저장 중…' : '저장'}
           </button>

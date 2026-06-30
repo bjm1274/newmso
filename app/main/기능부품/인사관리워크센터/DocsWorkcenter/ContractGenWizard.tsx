@@ -52,8 +52,7 @@ interface ContractGenWizardProps {
 }
 
 export default function ContractGenWizard({
-  currentStep = 1,
-}: ContractGenWizardProps) {
+  currentStep = 1 }: ContractGenWizardProps) {
   return (
     <section
       className="app-card p-3 md:p-4"
@@ -92,8 +91,7 @@ export default function ContractGenWizard({
 function StepItem({
   step,
   status,
-  isLast,
-}: {
+  isLast }: {
   step: WizardStepDef;
   status: StepStatus;
   isLast: boolean;

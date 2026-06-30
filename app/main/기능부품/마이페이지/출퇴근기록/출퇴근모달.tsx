@@ -10,16 +10,14 @@ export const AQI_COLOR_MAP: Record<string, string> = {
   yellow: '#F59E0B',
   orange: '#F97316',
   red:    '#EF4444',
-  gray:   '#9CA3AF',
-};
+  gray:   '#9CA3AF' };
 
 export const AQI_BG_MAP: Record<string, string> = {
   green:  'rgba(16,185,129,0.12)',
   yellow: 'rgba(245,158,11,0.12)',
   orange: 'rgba(249,115,22,0.12)',
   red:    'rgba(239,68,68,0.12)',
-  gray:   'rgba(156,163,175,0.12)',
-};
+  gray:   'rgba(156,163,175,0.12)' };
 
 // ──────────────────────────────────────────────
 // AqiBadge
@@ -136,8 +134,7 @@ export function CheckInSuccessModal({ checkInTime, weather, onClose }: CheckInSu
                     className="flex-1 rounded-[var(--radius-md)] px-3 py-2 flex flex-col items-center justify-center gap-0.5"
                     style={{
                       background: AQI_BG_MAP[weather.aqiColor] ?? 'rgba(156,163,175,0.12)',
-                      border: `1px solid ${AQI_COLOR_MAP[weather.aqiColor] ?? '#9CA3AF'}33`,
-                    }}
+                      border: `1px solid ${AQI_COLOR_MAP[weather.aqiColor] ?? '#9CA3AF'}33` }}
                   >
                     <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">종합</span>
                     <span

@@ -1,6 +1,6 @@
 // ============================================================
 // app/api/d1/rpc/register-staff/route.ts
-// supabase.rpc('register_staff_full', { p_staff, p_licenses, p_job_cats,
+// db.rpc('register_staff_full', { p_staff, p_licenses, p_job_cats,
 //   p_shift_asgns, p_leave_year, p_leave_total }) 대체 라우트.
 //
 // lib/db/functions/staff.ts의 registerStaffFull을 호출.
@@ -66,8 +66,7 @@ const StaffRowSchema = z.object({
   night_work_allowance: z.number().nullable().optional(),
   holiday_work_allowance: z.number().nullable().optional(),
   annual_leave_pay: z.number().nullable().optional(),
-  role: z.string().nullable().optional(),
-});
+  role: z.string().nullable().optional() });
 
 const LicenseRowSchema = z.object({
   license_type: z.string().nullable().optional(),
@@ -77,19 +76,16 @@ const LicenseRowSchema = z.object({
   expiry_date: z.string().nullable().optional(),
   issuing_body: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
-  is_primary: z.boolean().nullable().optional(),
-});
+  is_primary: z.boolean().nullable().optional() });
 
 const JobCategoryRowSchema = z.object({
   job_category_id: z.string().min(1),
-  is_primary: z.boolean().nullable().optional(),
-});
+  is_primary: z.boolean().nullable().optional() });
 
 const ShiftAssignmentRowSchema = z.object({
   shift_id: z.string().min(1),
   is_primary: z.boolean().nullable().optional(),
-  priority: z.number().nullable().optional(),
-});
+  priority: z.number().nullable().optional() });
 
 const BodySchema = z.object({
   p_staff: StaffRowSchema,
@@ -97,8 +93,7 @@ const BodySchema = z.object({
   p_job_cats: z.array(JobCategoryRowSchema).optional(),
   p_shift_asgns: z.array(ShiftAssignmentRowSchema).optional(),
   p_leave_year: z.number().int().min(2000).max(2100),
-  p_leave_total: z.number().min(0).max(365),
-});
+  p_leave_total: z.number().min(0).max(365) });
 
 // ─── 유틸 ───────────────────────────────────────────────────────────────────
 
@@ -162,8 +157,7 @@ export async function POST(request: Request) {
       job_categories: parsed.data.p_job_cats,
       shift_assignments: parsed.data.p_shift_asgns,
       leave_year: parsed.data.p_leave_year,
-      leave_total: parsed.data.p_leave_total,
-    });
+      leave_total: parsed.data.p_leave_total });
 
     return NextResponse.json({ ok: true, data });
   } catch (err) {

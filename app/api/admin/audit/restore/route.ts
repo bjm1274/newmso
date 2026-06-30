@@ -44,8 +44,7 @@ export async function POST(request: NextRequest) {
         ok: false,
         error: '복구 확인 토큰이 필요합니다.',
         requiredConfirmToken: RESTORE_CONFIRM_TOKEN,
-        hint: `본문에 confirm: "${RESTORE_CONFIRM_TOKEN}" 을 포함해야 복구를 시도할 수 있습니다.`,
-      },
+        hint: `본문에 confirm: "${RESTORE_CONFIRM_TOKEN}" 을 포함해야 복구를 시도할 수 있습니다.` },
       { status: 400 },
     );
   }
@@ -59,8 +58,7 @@ export async function POST(request: NextRequest) {
       error: '자동 복구는 지원하지 않습니다.',
       hint:
         '데이터 파괴 위험이 큰 작업입니다. R2 백업 파일을 내려받아 검토 후, ' +
-        '운영자 수동 절차(스테이징 검증 → 점검 모드 → 복원)를 통해 복구하세요.',
-    },
+        '운영자 수동 절차(스테이징 검증 → 점검 모드 → 복원)를 통해 복구하세요.' },
     { status: 501 },
   );
 }

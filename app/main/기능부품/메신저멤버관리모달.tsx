@@ -31,8 +31,7 @@ export function ForwardMessageModal({
   open,
   targetRooms,
   onClose,
-  onForward,
-}: ForwardMessageModalProps) {
+  onForward }: ForwardMessageModalProps) {
   if (!open) return null;
 
   return (
@@ -80,8 +79,7 @@ export function AddMemberModal({
   onSearchChange,
   onToggleMember,
   onClose,
-  onSubmit,
-}: AddMemberModalProps) {
+  onSubmit }: AddMemberModalProps) {
   if (!open || !selectedRoom) return null;
 
   return (

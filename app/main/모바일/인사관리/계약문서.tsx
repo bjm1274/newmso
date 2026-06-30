@@ -26,15 +26,13 @@ import {
   daysUntil,
   useStaffList,
   canMutateTeamAbnormal,
-  type MyDocRow,
-} from './data-hooks';
+  type MyDocRow } from './data-hooks';
 import { issueAndPrintMyCert } from '../내정보/cert-issue';
 import { uploadMyDocument } from '../내정보/doc-submit';
 import {
   DOC_ALLOWED_FORMATS_LABEL,
   DOC_MAX_FILE_SIZE_LABEL,
-  REQUIRED_DOC_CATEGORIES,
-} from '@/lib/document-submission-shared';
+  REQUIRED_DOC_CATEGORIES } from '@/lib/document-submission-shared';
 import 계약문서관리자 from './계약문서관리자';
 import type { ErpUser } from '@/types';
 
@@ -133,7 +131,7 @@ function MineTab({ staffId }: { staffId: string | null }) {
   }
   return (
     <div style={{ padding: '14px 16px 24px' }}>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {docs.map((d) => (
           <button
             key={d.id}
@@ -207,7 +205,7 @@ function CertTab({ staffId }: { staffId: string | null }) {
       <div className="m-section-h" style={{ padding: '0 0 8px' }}>
         <div className="lbl">발급 가능한 증명서</div>
       </div>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {ISSUABLE_CERTS.map((c) => {
           const busy = issuingId === c.id;
           return (
@@ -277,8 +275,7 @@ function ContractTab({ staffId }: { staffId: string | null }) {
               start_date: typeof r.start_date === 'string' ? r.start_date : null,
               end_date: null,
               contract_type: contractType,
-              status: typeof r.status === 'string' ? r.status : null,
-            };
+              status: typeof r.status === 'string' ? r.status : null };
           }),
         );
       } catch (err) {
@@ -303,7 +300,7 @@ function ContractTab({ staffId }: { staffId: string | null }) {
 
   return (
     <div style={{ padding: '14px 16px 24px' }}>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {rows.map((r) => {
           const isCurrent = (r.status ?? '').includes('적용') || r.status === 'active';
           const isPending = r.status === '서명대기';
@@ -360,8 +357,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
   const [uploading, setUploading] = useState(false);
   const [staffMeta, setStaffMeta] = useState<{ name: string | null; company: string | null }>({
     name: null,
-    company: null,
-  });
+    company: null });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 업로드 제목/회사명 구성을 위한 본인 메타 1건 (JM5: staffId 고정).
@@ -379,8 +375,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
         const r = data as { name?: unknown; company?: unknown };
         setStaffMeta({
           name: typeof r.name === 'string' ? r.name : null,
-          company: typeof r.company === 'string' ? r.company : null,
-        });
+          company: typeof r.company === 'string' ? r.company : null });
       } catch {
         // silent — 제목은 '직원'으로 폴백
       }
@@ -415,8 +410,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
               typeof r.title === 'string' && r.title.length > 0 ? r.title : String(r.category ?? '서류'),
             status: '완료',
             due_date: null,
-            submitted_at: typeof r.created_at === 'string' ? r.created_at : null,
-          })),
+            submitted_at: typeof r.created_at === 'string' ? r.created_at : null })),
         );
       } catch (err) {
         if (!cancelled) {
@@ -445,8 +439,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
         staffName: staffMeta.name,
         company: staffMeta.company,
         file,
-        category,
-      });
+        category });
       if (result.ok) setReloadToken((t) => t + 1);
     } finally {
       setUploading(false);
@@ -454,7 +447,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
   };
 
   const uploadCard = (
-    <div className="m-card" style={{ padding: '14px 16px', marginBottom: 12 }}>
+    <div className="m-card macos-glass macos-squircle-sm" style={{ padding: '14px 16px', marginBottom: 12 }}>
       <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>서류 업로드</div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <select
@@ -471,8 +464,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
             background: 'var(--m-card)',
             fontSize: 13,
             fontWeight: 700,
-            color: 'var(--z-800)',
-          }}
+            color: 'var(--z-800)' }}
         >
           {SUBMIT_CATEGORIES.map((c) => (
             <option key={c.id} value={c.id}>
@@ -529,12 +521,11 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
       {uploadCard}
       {pending.length > 0 && (
         <div
-          className="m-card"
+          className="m-card macos-glass macos-squircle-sm"
           style={{
             padding: '14px 16px',
             background: 'var(--m-warning-soft)',
-            borderColor: 'transparent',
-          }}
+            borderColor: 'transparent' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <MIcon name="alertTri" size={18} color="var(--m-warning)" />
@@ -547,8 +538,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
                   fontSize: 11,
                   color: 'var(--z-600)',
                   fontWeight: 600,
-                  marginTop: 1,
-                }}
+                  marginTop: 1 }}
               >
                 {pending
                   .slice(0, 3)
@@ -560,7 +550,7 @@ function SubmitTab({ staffId }: { staffId: string | null }) {
         </div>
       )}
 
-      <div className="m-card flush" style={{ marginTop: 12 }}>
+      <div className="m-card flush macos-glass macos-squircle" style={{ marginTop: 12 }}>
         {rows.map((r) => {
           const submitted = Boolean(r.submitted_at);
           const left = daysUntil(r.due_date);

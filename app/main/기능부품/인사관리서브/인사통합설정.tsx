@@ -6,7 +6,7 @@ import LegalStandardsPanel from './급여명세/법정기준패널';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import ShiftPatternManager from './급여명세/교대제스케줄관리';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 
 type MenuId = 'policy' | 'tax' | 'shift' | 'lock';
@@ -14,8 +14,7 @@ type MenuId = 'policy' | 'tax' | 'shift' | 'lock';
 export default function IntegratedHRSettings({
     companyName,
     showLockMenu = true,
-    enabledMenus,
-}: {
+    enabledMenus }: {
     companyName: string;
     showLockMenu?: boolean;
     enabledMenus?: MenuId[];
@@ -128,7 +127,7 @@ function HRPolicies({ companyName }: { companyName: string }) {
         setLoading(true);
         const loadPolicies = async () => {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await db
                     .from('company_payroll_policies')
                     .select('rule_label, rule_value')
                     .eq('company_name', companyName);
@@ -167,7 +166,7 @@ function HRPolicies({ companyName }: { companyName: string }) {
         setSaving(true);
         try {
             // PK 충돌 방지를 위해 기존 레코드의 id 조회
-            const { data: existing, error: existingError } = await supabase
+            const { data: existing, error: existingError } = await db
                 .from('company_payroll_policies')
                 .select('id, rule_label')
                 .eq('company_name', companyName);
@@ -219,7 +218,7 @@ function HRPolicies({ companyName }: { companyName: string }) {
                 }
             ];
 
-            const { error } = await supabase
+            const { error } = await db
                 .from('company_payroll_policies')
                 .upsert(payload, { onConflict: 'company_name,rule_label' });
 

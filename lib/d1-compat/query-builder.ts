@@ -18,8 +18,7 @@ async function executeQuery<T>(state: QueryState): Promise<QueryResult<T>> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
-      credentials: 'same-origin',
-    });
+      credentials: 'same-origin' });
     const json = (await res.json().catch(() => null)) as
       | { ok: true; data?: T; count?: number }
       | { ok: false; error: string; code?: string; details?: string }
@@ -27,8 +26,7 @@ async function executeQuery<T>(state: QueryState): Promise<QueryResult<T>> {
     if (!res.ok || !json) {
       return {
         data: null,
-        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` },
-      };
+        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` } };
     }
     if (!json.ok) {
       return { data: null, error: { message: json.error, code: json.code, details: json.details } };
@@ -37,8 +35,7 @@ async function executeQuery<T>(state: QueryState): Promise<QueryResult<T>> {
   } catch (err) {
     return {
       data: null,
-      error: { message: err instanceof Error ? err.message : 'Network error' },
-    };
+      error: { message: err instanceof Error ? err.message : 'Network error' } };
   }
 }
 
@@ -117,7 +114,7 @@ export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
   /**
    * .or('a.eq.1,b.eq.2') — PostgREST 스타일 OR 필터.
    * 여러 번 호출하면 서버에서 각 그룹을 AND로 결합.
-   * 파싱 실패 시 await 시점에 에러가 표면화됨 (supabase 동작과 동일).
+   * 파싱 실패 시 await 시점에 에러가 표면화됨 (db 동작과 동일).
    */
   or(filter: string): this {
     if (this.state.parseError) return this; // 이미 실패 상태면 누적하지 않음
@@ -135,8 +132,7 @@ export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
     this.state.order.push({
       field,
       ascending: options?.ascending,
-      nullsFirst: options?.nullsFirst,
-    });
+      nullsFirst: options?.nullsFirst });
     return this;
   }
 
@@ -160,11 +156,11 @@ export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
     return this as QueryBuilder<T>;
   }
 
-  /** supabase의 .returns<T>() — 런타임 no-op, 반환 타입만 재지정. */
+  /** db의 .returns<T>() — 런타임 no-op, 반환 타입만 재지정. */
   returns<U = T>(): QueryBuilder<U> {
     return this as unknown as QueryBuilder<U>;
   }
-  /** supabase의 .overrideTypes<T>() — 런타임 no-op. */
+  /** db의 .overrideTypes<T>() — 런타임 no-op. */
   overrideTypes<U = T>(): QueryBuilder<U> {
     return this as unknown as QueryBuilder<U>;
   }

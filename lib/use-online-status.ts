@@ -31,8 +31,7 @@ function getBrowserOnline(): boolean {
 export function useOnlineStatus(): OnlineStatus {
   const [state, setState] = useState<OnlineStatus>(() => ({
     online: getBrowserOnline(),
-    offlineSinceMs: getBrowserOnline() ? null : Date.now(),
-  }));
+    offlineSinceMs: getBrowserOnline() ? null : Date.now() }));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

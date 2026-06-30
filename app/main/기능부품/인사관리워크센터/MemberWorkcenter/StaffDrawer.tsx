@@ -1,26 +1,22 @@
 'use client';
 
 /**
- * MemberWorkcenter — 직원 프로필 드로어 (우측)
+ * MemberWorkcenter — 직원 프로필 드로어 (우측) - PC 개선 버전
  *
- * - 직원 헤더 (이름·부서·직급·고용)
- * - 인사 이력 타임라인 (`인사이력타임라인.tsx` 재사용)
- * - 빠른 액션 (서류보관함 진입)
- *
- * JM2: 타임라인 컴포넌트는 lazy mount (선택된 직원이 있을 때만 로드)
- * JM6: role="dialog" + aria-labelledby + 닫기 버튼 키보드 접근
+ * - 정보 탭 도입 (인적/면허, 최근 활동/근태, 인사이력)
+ * - PC 공간을 활용한 인적 사항 상세 노출 (연락처, 이메일, 주소, 계좌)
+ * - HSL 그라데이션 아바타 및 세련된 비주얼 테마
  */
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
   formatJoinDate,
   formatTenure,
   pickHireDate,
-  pickToneForStaff,
-} from './data';
+  pickToneForStaff } from './data';
 import { computeLicenseStatus } from '@/lib/license-renewal-policy';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
@@ -35,16 +31,14 @@ const StaffHistoryTimeline = dynamic(
       <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-4 py-6 text-center text-[12px] text-[var(--toss-gray-4)]">
         인사 이력을 불러오는 중…
       </div>
-    ),
-  },
+    ) },
 );
 
 const TONE_BG: Record<string, string> = {
-  success: 'bg-emerald-500/15 text-emerald-700',
-  accent: 'bg-[var(--accent-soft)] text-[var(--accent)]',
-  warn: 'bg-amber-500/15 text-amber-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  success: 'bg-gradient-to-tr from-emerald-500/10 to-teal-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+  accent: 'bg-gradient-to-tr from-[var(--accent-soft)] to-blue-500/10 text-[var(--accent)] border border-[var(--accent)]/10',
+  warn: 'bg-gradient-to-tr from-amber-500/10 to-orange-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+  muted: 'bg-gradient-to-tr from-[var(--muted)] to-zinc-500/10 text-[var(--toss-gray-4)] border border-[var(--border)]' };
 
 interface StaffDrawerProps {
   staff: StaffMember | null;
@@ -61,8 +55,7 @@ export default function StaffDrawer({
   onOpenDocumentRepoForStaff,
   onEditStaff,
   canRegisterNewStaff = false,
-  onRefresh,
-}: StaffDrawerProps) {
+  onRefresh }: StaffDrawerProps) {
   if (!staff) {
     return (
       <aside className="app-card flex h-full items-center justify-center px-4 py-12 text-center text-[12px] text-[var(--toss-gray-4)]">
@@ -88,8 +81,7 @@ function StaffDrawerInner({
   onOpenDocumentRepoForStaff,
   onEditStaff,
   canRegisterNewStaff,
-  onRefresh,
-}: {
+  onRefresh }: {
   staff: StaffMember;
   onClose?: () => void;
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
@@ -97,6 +89,7 @@ function StaffDrawerInner({
   canRegisterNewStaff?: boolean;
   onRefresh?: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'history'>('info');
   const [pendingRetirementStaff, setPendingRetirementStaff] = useState<StaffMember | null>(null);
   const [pendingDeleteStaff, setPendingDeleteStaff] = useState<StaffMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -108,14 +101,12 @@ function StaffDrawerInner({
       const afterStaff = {
         ...직원,
         status: '퇴사',
-        resigned_at: (직원 as any).resigned_at || today,
-      };
-      await supabase
+        resigned_at: (직원 as any).resigned_at || today };
+      await db
         .from('staff_members')
         .update({
           status: '퇴사',
-          resigned_at: (직원 as any).resigned_at || today,
-        })
+          resigned_at: (직원 as any).resigned_at || today })
         .eq('id', 직원.id);
 
       await logAudit(
@@ -125,8 +116,7 @@ function StaffDrawerInner({
         {
           staff_name: 직원.name,
           employee_no: 직원.employee_no || null,
-          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']),
-        },
+          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']) },
         actor.userId,
         actor.userName
       );
@@ -142,7 +132,7 @@ function StaffDrawerInner({
     setIsDeleting(true);
     try {
       const actor = readClientAuditActor();
-      const { error } = await supabase
+      const { error } = await db
         .from('staff_members')
         .delete()
         .eq('id', 직원.id);
@@ -155,8 +145,7 @@ function StaffDrawerInner({
         String(직원.id),
         {
           staff_name: 직원.name,
-          employee_no: 직원.employee_no || null,
-        },
+          employee_no: 직원.employee_no || null },
         actor.userId,
         actor.userName
       );
@@ -198,9 +187,10 @@ function StaffDrawerInner({
       aria-labelledby={labelId}
       className="app-card flex h-full min-h-0 flex-col overflow-hidden"
     >
-      <header className="flex items-start gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3">
+      {/* 헤더 영역 */}
+      <header className="flex items-start gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3.5">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] text-[20px] font-bold ${TONE_BG[tone]}`}
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] text-[20px] font-bold shadow-sm ${TONE_BG[tone]}`}
           aria-hidden="true"
         >
           {initial}
@@ -228,72 +218,144 @@ function StaffDrawerInner({
             type="button"
             onClick={onClose}
             aria-label="프로필 닫기"
-            className="rounded-[var(--radius-md)] p-1 text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--muted)]"
+            className="rounded-[var(--radius-md)] p-1 text-[var(--toss-gray-3)] transition-colors hover:bg-[var(--muted)]"
           >
             <span aria-hidden="true">✕</span>
           </button>
         )}
       </header>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-auto px-3 py-3 md:px-4 md:py-4">
-        <dl className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[var(--page-bg)] px-3 py-2.5">
-          <MetaCell label="입사일" value={formatJoinDate(hire)} />
-          <MetaCell label="근속" value={formatTenure(hire)} />
-          <MetaCell label="소속" value={staff.department || '-'} />
-        </dl>
+      {/* PC형 탭 바 */}
+      <div className="flex border-b border-[var(--border)] bg-[var(--card)] px-3 shrink-0">
+        {[
+          { id: 'info', label: '인적/면허' },
+          { id: 'activity', label: '활동/근태' },
+          { id: 'history', label: '인사이력' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex-1 py-2 text-center text-[12px] font-bold border-b-2 transition-all ${
+              activeTab === tab.id
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        <RecentActivitySection staffId={String(staff.id)} />
+      {/* 탭 콘텐츠 바디 */}
+      <div className="min-h-0 flex-1 overflow-auto px-3 py-3 md:px-4 md:py-4">
+        {activeTab === 'info' && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* 기본 소속 정보 */}
+            <dl className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[var(--page-bg)] px-3 py-2.5">
+              <MetaCell label="입사일" value={formatJoinDate(hire)} />
+              <MetaCell label="근속" value={formatTenure(hire)} />
+              <MetaCell label="소속" value={staff.department || '-'} />
+            </dl>
 
-        <StaffLicensesSection staffId={String(staff.id)} />
+            {/* 인적 사항 상세 노출 (PC 공간 활용) */}
+            <section className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 space-y-2.5">
+              <h4 className="text-[11px] font-extrabold text-[var(--toss-gray-4)] uppercase tracking-wider">상세 인적사항</h4>
+              <div className="grid grid-cols-1 gap-2 text-[12px]">
+                <div className="flex justify-between border-b border-[var(--border-subtle)] pb-1.5">
+                  <span className="text-[var(--toss-gray-3)] font-medium">연락처</span>
+                  <span className="font-semibold text-[var(--foreground)]">{staff.phone || '-'}</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-subtle)] pb-1.5">
+                  <span className="text-[var(--toss-gray-3)] font-medium">이메일</span>
+                  <span className="font-semibold text-[var(--foreground)] truncate max-w-[170px]">{staff.email || '-'}</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-subtle)] pb-1.5">
+                  <span className="text-[var(--toss-gray-3)] font-medium">내선번호</span>
+                  <span className="font-semibold text-[var(--foreground)]">{(staff as any).extension || '-'}</span>
+                </div>
+                <div className="flex justify-between border-b border-[var(--border-subtle)] pb-1.5">
+                  <span className="text-[var(--toss-gray-3)] font-medium">급여계좌</span>
+                  <span className="font-semibold text-[var(--foreground)] truncate max-w-[170px]">
+                    {(staff as any).bank_name ? `${(staff as any).bank_name} ${(staff as any).bank_account}` : '-'}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[var(--toss-gray-3)] font-medium">거주지 주소</span>
+                  <span className="font-semibold text-[var(--foreground)] leading-normal">{staff.address || '-'}</span>
+                </div>
+              </div>
+            </section>
 
-        <section>
-          <div className="section-title mb-2">인사 이력 타임라인</div>
-          <StaffHistoryTimeline staffId={String(staff.id)} staffName={staff.name ?? ''} />
-        </section>
+            {/* 면허 및 자격 정보 */}
+            <StaffLicensesSection staffId={String(staff.id)} />
 
-        {(onOpenDocumentRepoForStaff || (canRegisterNewStaff && onEditStaff)) && (
-          <section>
-            <div className="section-title mb-2">빠른 액션</div>
-            <div className="flex flex-col gap-2">
-              {canRegisterNewStaff && onEditStaff && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onEditStaff(staff)}
-                    className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[12px] font-bold text-white transition-all hover:bg-[var(--accent-hover)] shadow-sm"
-                  >
-                    ✏️ 정보 수정하기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingRetirementStaff(staff)}
-                    className="w-full rounded-[var(--radius-md)] bg-amber-500/10 text-amber-600 px-3 py-2 text-[12px] font-bold transition-all hover:bg-amber-500/20"
-                  >
-                    퇴사 처리
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDeleteStaff(staff)}
-                    className="w-full rounded-[var(--radius-md)] bg-red-500/10 text-red-600 px-3 py-2 text-[12px] font-bold transition-all hover:bg-red-500/20"
-                  >
-                    완전 삭제
-                  </button>
-                </>
-              )}
-              {onOpenDocumentRepoForStaff && (
-                <button
-                  type="button"
-                  onClick={() => onOpenDocumentRepoForStaff(staff)}
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
-                >
-                  서류보관함 열기 →
-                </button>
-              )}
-            </div>
-          </section>
+            {/* 빠른 액션 */}
+            {(onOpenDocumentRepoForStaff || (canRegisterNewStaff && onEditStaff)) && (
+              <section className="pt-2 border-t border-[var(--border)]">
+                <div className="section-title mb-2">빠른 액션</div>
+                <div className="flex flex-col gap-2">
+                  {canRegisterNewStaff && onEditStaff && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onEditStaff(staff)}
+                        className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[12px] font-bold text-white transition-all hover:bg-[var(--accent-hover)] shadow-sm"
+                      >
+                        ✏️ 정보 수정하기
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPendingRetirementStaff(staff)}
+                          className="flex-1 rounded-[var(--radius-md)] bg-amber-500/10 text-amber-600 px-3 py-2 text-[11px] font-bold transition-all hover:bg-amber-500/20"
+                        >
+                          퇴사 처리
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteStaff(staff)}
+                          className="flex-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-600 px-3 py-2 text-[11px] font-bold transition-all hover:bg-red-500/20"
+                        >
+                          완전 삭제
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {onOpenDocumentRepoForStaff && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenDocumentRepoForStaff(staff)}
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+                    >
+                      서류보관함 열기 →
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* 최근 활동 */}
+            <RecentActivitySection staffId={String(staff.id)} />
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* 인사 이력 타임라인 */}
+            <section>
+              <div className="section-title mb-2">인사 이력 타임라인</div>
+              <StaffHistoryTimeline staffId={String(staff.id)} staffName={staff.name ?? ''} />
+            </section>
+          </div>
         )}
       </div>
 
+      {/* 리스크 액션 다이얼로그 모달 */}
       <RiskActionDialog
         open={!!pendingRetirementStaff}
         title="퇴사 처리 확인"
@@ -386,14 +448,12 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
     attend: null,
     leave: null,
     document: null,
-    loading: true,
-  });
+    loading: true });
 
   useEffect(() => {
     let cancelled = false;
     const fetchAll = async () => {
       setState((prev) => ({ ...prev, loading: true }));
-      // JM3: 각 도메인은 독립 try, 한 곳이 실패해도 나머지 표시
       const safeQuery = async (p: any) => {
         try {
           const { data } = await p;
@@ -405,7 +465,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
       const cleanStaffId = String(staffId || '').toLowerCase().trim();
       const [att, lv, doc] = await Promise.all([
         safeQuery(
-          supabase
+          db
             .from('attendances')
             .select('work_date, status, check_in_time')
             .eq('staff_id', cleanStaffId)
@@ -417,7 +477,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
             }>,
         ),
         safeQuery(
-          supabase
+          db
             .from('leave_requests')
             .select('start_date, end_date, leave_type, status, created_at')
             .eq('staff_id', cleanStaffId)
@@ -435,7 +495,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
             }>,
         ),
         safeQuery(
-          supabase
+          db
             .from('document_repository')
             .select('category, file_url, created_at, updated_at')
             .eq('created_by', cleanStaffId)
@@ -460,8 +520,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
             meta:
               `${formatDateShort(att.work_date)} · ${att.status || '기록'}` +
               (att.check_in_time ? ` · ${String(att.check_in_time).slice(0, 5)}` : ''),
-            tone: (att.status === '지각' ? 'warn' : att.status === '결근' ? 'warn' : 'success') as ChipTone,
-          }
+            tone: (att.status === '지각' ? 'warn' : att.status === '결근' ? 'warn' : 'success') as ChipTone }
         : null;
 
       const leaveDisplay = lv
@@ -471,8 +530,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
               `${lv.leave_type || '연차'} · ${formatDateShort(lv.start_date)}` +
               (lv.end_date && lv.end_date !== lv.start_date ? `~${formatDateShort(lv.end_date)}` : '') +
               ` · ${lv.status || '신청'}`,
-            tone: (lv.status === '반려' ? 'warn' : lv.status === '승인' ? 'success' : 'accent') as ChipTone,
-          }
+            tone: (lv.status === '반려' ? 'warn' : lv.status === '승인' ? 'success' : 'accent') as ChipTone }
         : null;
 
       const docDisplay = doc
@@ -481,16 +539,14 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
             meta:
               `${doc.category || '문서'} · ${formatDateShort(doc.updated_at ?? doc.created_at)}` +
               (doc.file_url ? ' · 제출완료' : ' · 미제출'),
-            tone: (doc.file_url ? 'success' : 'muted') as ChipTone,
-          }
+            tone: (doc.file_url ? 'success' : 'muted') as ChipTone }
         : null;
 
       setState({
         attend: attendDisplay,
         leave: leaveDisplay,
         document: docDisplay,
-        loading: false,
-      });
+        loading: false });
     };
 
     void fetchAll();
@@ -549,15 +605,13 @@ const LICENSE_STATUS_COLORS: Record<string, string> = {
   valid: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
   expiring: 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
   expired: 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400',
-  unknown: 'bg-gray-500/15 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400',
-};
+  unknown: 'bg-gray-500/15 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400' };
 
 const LICENSE_STATUS_LABELS: Record<string, string> = {
   valid: '유효',
   expiring: '만료 임박',
   expired: '만료',
-  unknown: '확인 필요',
-};
+  unknown: '확인 필요' };
 
 function StaffLicensesSection({ staffId }: { staffId: string }) {
   const [licenses, setLicenses] = useState<StaffLicense[]>([]);
@@ -569,7 +623,7 @@ function StaffLicensesSection({ staffId }: { staffId: string }) {
       setLoading(true);
       const cleanStaffId = String(staffId || '').toLowerCase().trim();
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_licenses')
           .select('*')
           .eq('staff_id', cleanStaffId)
@@ -615,8 +669,7 @@ function StaffLicensesSection({ staffId }: { staffId: string }) {
               license_type: lic.license_type,
               expiry_date: lic.expiry_date,
               renewed_date: lic.renewed_date,
-              issued_date: lic.issued_date,
-            });
+              issued_date: lic.issued_date });
             const statusLabel = LICENSE_STATUS_LABELS[computed.status] || '확인 필요';
             const statusColor = LICENSE_STATUS_COLORS[computed.status] || 'bg-gray-500/15 text-gray-700';
 
@@ -683,8 +736,7 @@ const CHIP_CLS: Record<ChipTone, string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   warn: 'bg-amber-500/15 text-amber-700',
   accent: 'bg-[var(--accent-soft)] text-[var(--accent)]',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 function Chip({ tone, children }: { tone: ChipTone; children: React.ReactNode }) {
   return (
     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${CHIP_CLS[tone]}`}>

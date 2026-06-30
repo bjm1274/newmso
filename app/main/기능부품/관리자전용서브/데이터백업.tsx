@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { BACKUP_GROUPS, BACKUP_RESTORE_ORDER, resolveBackupTables } from '@/lib/backup-config';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getStaffLikeId, normalizeStaffLike } from '@/lib/staff-identity';
@@ -77,8 +77,7 @@ function normalizeBackupPayload(raw: unknown) {
       ? (record.tables as Record<string, any[]>)
       : Object.fromEntries(
           Object.entries(record).filter(([key, value]) => key !== '__meta' && Array.isArray(value))
-        ),
-  };
+        ) };
 }
 
 function downloadJsonFile(fileName: string, payload: unknown) {
@@ -97,7 +96,7 @@ async function readAllRows(table: string) {
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from(table)
       .select('*')
       .range(offset, offset + PAGE_SIZE - 1);
@@ -116,7 +115,7 @@ async function readAllRows(table: string) {
 }
 
 async function readExactCount(table: string) {
-  const { count, error } = await supabase
+  const { count, error } = await db
     .from(table)
     .select('*', { count: 'exact', head: true });
 
@@ -197,7 +196,7 @@ function DataBackupDesktop({ user }: Props) {
   const loadRestoreRuns = useCallback(async () => {
     try {
       setHistoryLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('backup_restore_runs')
         .select('id,file_name,status,total_tables,total_rows,requested_by_name,started_at,finished_at,result_summary')
         .order('started_at', { ascending: false })
@@ -242,8 +241,7 @@ function DataBackupDesktop({ user }: Props) {
           .filter(([, rows]) => Array.isArray(rows))
           .map(([table, rows]) => ({
             table,
-            rowCount: Array.isArray(rows) ? rows.length : 0,
-          }))
+            rowCount: Array.isArray(rows) ? rows.length : 0 }))
           .sort((a, b) => b.rowCount - a.rowCount || a.table.localeCompare(b.table));
 
         const currentCounts = await Promise.all(
@@ -251,8 +249,7 @@ function DataBackupDesktop({ user }: Props) {
             const result = await readExactCount(entry.table);
             return {
               table: entry.table,
-              currentRowCount: result.error ? null : result.count,
-            };
+              currentRowCount: result.error ? null : result.count };
           })
         );
 
@@ -267,8 +264,7 @@ function DataBackupDesktop({ user }: Props) {
             table: entry.table,
             rowCount: entry.rowCount,
             currentRowCount,
-            delta: currentRowCount === null ? null : entry.rowCount - currentRowCount,
-          };
+            delta: currentRowCount === null ? null : entry.rowCount - currentRowCount };
         });
 
         setRestorePreview({
@@ -278,8 +274,7 @@ function DataBackupDesktop({ user }: Props) {
           currentTotalRows: tables.reduce(
             (sum, entry) => sum + (typeof entry.currentRowCount === 'number' ? entry.currentRowCount : 0),
             0
-          ),
-        });
+          ) });
       } catch (error) {
         console.error('restore preview parse failed:', error);
         if (!cancelled) {
@@ -331,8 +326,7 @@ function DataBackupDesktop({ user }: Props) {
         if (error) {
           skippedTables.push({
             table,
-            reason: String(error.message || error.details || 'table unavailable'),
-          });
+            reason: String(error.message || error.details || 'table unavailable') });
           continue;
         }
         backupTables[table] = rows;
@@ -346,10 +340,8 @@ function DataBackupDesktop({ user }: Props) {
           exported_at: exportedAt,
           selected_groups: selectedGroupIds,
           selected_tables: selectedTables,
-          skipped_tables: skippedTables,
-        },
-        tables: backupTables,
-      };
+          skipped_tables: skippedTables },
+        tables: backupTables };
 
       downloadJsonFile(`mso-backup-${exportedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`, payload);
 
@@ -358,8 +350,7 @@ function DataBackupDesktop({ user }: Props) {
         exportedAt,
         tableCount: Object.keys(backupTables).length,
         rowCount: totalRows,
-        skipped: skippedTables,
-      });
+        skipped: skippedTables });
       toast('백업 파일을 내보냈습니다.', 'success');
     } catch (error) {
       console.error(error);
@@ -379,10 +370,9 @@ function DataBackupDesktop({ user }: Props) {
       status: 'running',
       requested_by: requestedBy,
       requested_by_name: requestedByName,
-      started_at: new Date().toISOString(),
-    };
+      started_at: new Date().toISOString() };
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('backup_restore_runs')
       .insert(payload)
       .select('id')
@@ -400,7 +390,7 @@ function DataBackupDesktop({ user }: Props) {
     payload: Record<string, unknown>
   ) => {
     if (!runId) return;
-    const { error } = await supabase
+    const { error } = await db
       .from('backup_restore_runs')
       .update(payload)
       .eq('id', runId);
@@ -424,8 +414,7 @@ function DataBackupDesktop({ user }: Props) {
       tone: 'danger',
       placeholder: '복원',
       required: true,
-      helperText: '복원 실행 이력과 로그가 관리자 화면에 저장됩니다.',
-    });
+      helperText: '복원 실행 이력과 로그가 관리자 화면에 저장됩니다.' });
 
     if (answer?.trim() !== '복원') {
       return;
@@ -481,10 +470,8 @@ function DataBackupDesktop({ user }: Props) {
           type: 'rollback-before-restore',
           source_restore_file: restoreFile.name,
           total_tables: restoreOrder.length,
-          total_rows: Object.values(rollbackTables).reduce((sum, rows) => sum + rows.length, 0),
-        },
-        tables: rollbackTables,
-      };
+          total_rows: Object.values(rollbackTables).reduce((sum, rows) => sum + rows.length, 0) },
+        tables: rollbackTables };
 
       downloadJsonFile(rollbackFileName, rollbackPayload);
       nextLogs.push(`롤백 스냅샷 다운로드 완료: ${rollbackFileName}`);
@@ -501,7 +488,7 @@ function DataBackupDesktop({ user }: Props) {
 
         let failed = false;
         for (const batch of chunkRows(rows, RESTORE_BATCH_SIZE)) {
-          const { error } = await supabase
+          const { error } = await db
             .from(table)
             .upsert(batch as any[]);
 
@@ -537,9 +524,7 @@ function DataBackupDesktop({ user }: Props) {
           preview_current_rows: restorePreview.currentTotalRows,
           rollback_file_name: rollbackFileName,
           rollback_total_tables: restoreOrder.length,
-          rollback_total_rows: rollbackTotalRows,
-        },
-      });
+          rollback_total_rows: rollbackTotalRows } });
 
       toast(
         failedTables.length > 0
@@ -560,9 +545,7 @@ function DataBackupDesktop({ user }: Props) {
             finished_at: new Date().toISOString(),
             log_lines: latestLogs,
             result_summary: {
-              error: String((error as Error)?.message || error),
-            },
-          });
+              error: String((error as Error)?.message || error) } });
         } catch (updateError) {
           console.error('restore run update failed:', updateError);
         }

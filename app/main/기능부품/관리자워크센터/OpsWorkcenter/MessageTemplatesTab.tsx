@@ -6,17 +6,16 @@
  * JM: 단일 책임(탭 컨테이너 + fetch + 모달), 500줄 이내
  * JM2: 단발 fetch 후 캐시, 컴포넌트 외부의 STATIC 상수로 fallback 즉시 렌더
  * JM3: fetch 실패는 정상 흐름으로 처리 — 콘솔 경고 + fallback 사용 + localStorage 영구 보존
- * JM4: any 금지, supabase row를 안전하게 좁히는 가드 사용
+ * JM4: any 금지, db row를 안전하게 좁히는 가드 사용
  * JM6: 카드 그리드는 role=list, 카드 각각이 listitem
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import MessageTemplateCard, {
   type MessageChannel,
-  type MessageTemplate,
-} from './MessageTemplateCard';
+  type MessageTemplate } from './MessageTemplateCard';
 
 // ─── fallback 12종 (상세 content 본문 추가) ──────────────────────────
 const FALLBACK_TEMPLATES: MessageTemplate[] = [
@@ -27,8 +26,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 1840,
     lastSentLabel: '오늘',
     status: '활성',
-    content: `[newMSO] #{name}님의 #{type} 등록이 완료되었습니다.\n• 일시: #{time}\n• 상태: #{status}\n오늘도 좋은 하루 보내세요!`,
-  },
+    content: `[newMSO] #{name}님의 #{type} 등록이 완료되었습니다.\n• 일시: #{time}\n• 상태: #{status}\n오늘도 좋은 하루 보내세요!` },
   {
     id: 'tmpl-approval-req',
     name: '결재 요청 알림',
@@ -36,8 +34,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 142,
     lastSentLabel: '5/26',
     status: '활성',
-    content: `[newMSO] 📄 신규 결재 요청\n#{name}님이 작성하신 '#{title}' 결재문서가 승인 요청되었습니다.\n결재 대기 목록에서 확인 후 승인해 주시기 바랍니다.`,
-  },
+    content: `[newMSO] 📄 신규 결재 요청\n#{name}님이 작성하신 '#{title}' 결재문서가 승인 요청되었습니다.\n결재 대기 목록에서 확인 후 승인해 주시기 바랍니다.` },
   {
     id: 'tmpl-approval-ok',
     name: '결재 승인 알림',
@@ -45,8 +42,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 98,
     lastSentLabel: '5/26',
     status: '활성',
-    content: `[newMSO] 🎉 결재 최종 승인\n귀하가 요청하신 '#{title}' 결재문서가 승인 완료되었습니다.\n지금 전자결재 보관함에서 확인해 보세요.`,
-  },
+    content: `[newMSO] 🎉 결재 최종 승인\n귀하가 요청하신 '#{title}' 결재문서가 승인 완료되었습니다.\n지금 전자결재 보관함에서 확인해 보세요.` },
   {
     id: 'tmpl-payroll',
     name: '급여 명세서',
@@ -54,8 +50,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 27,
     lastSentLabel: '5/25',
     status: '활성',
-    content: `[newMSO] ✉️ #{month}월 급여명세서 발행\n#{name}님의 #{month}월 급여명세서가 안전하게 발송되었습니다.\n상세 내역 확인 및 전자 서명을 기한 내에 진행해 주세요.`,
-  },
+    content: `[newMSO] ✉️ #{month}월 급여명세서 발행\n#{name}님의 #{month}월 급여명세서가 안전하게 발송되었습니다.\n상세 내역 확인 및 전자 서명을 기한 내에 진행해 주세요.` },
   {
     id: 'tmpl-annual-ok',
     name: '연차 승인',
@@ -63,8 +58,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 64,
     lastSentLabel: '5/24',
     status: '활성',
-    content: `[newMSO] 🌴 연차 승인 안내\n#{name}님의 연차 휴가 신청이 승인되었습니다.\n• 일정: #{date}\n• 잔여연차: #{remain}일`,
-  },
+    content: `[newMSO] 🌴 연차 승인 안내\n#{name}님의 연차 휴가 신청이 승인되었습니다.\n• 일정: #{date}\n• 잔여연차: #{remain}일` },
   {
     id: 'tmpl-annual-notify',
     name: '연차 알림',
@@ -72,8 +66,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 48,
     lastSentLabel: '5/23',
     status: '활성',
-    content: `[newMSO] 📅 연차 사용 촉진 안내\n근로기준법 제61조에 따라 잔여 연차 사용을 촉진합니다.\n• 잔여연차: #{remain}일\n만료 전까지 사용 계획을 등록해 주세요.`,
-  },
+    content: `[newMSO] 📅 연차 사용 촉진 안내\n근로기준법 제61조에 따라 잔여 연차 사용을 촉진합니다.\n• 잔여연차: #{remain}일\n만료 전까지 사용 계획을 등록해 주세요.` },
   {
     id: 'tmpl-dinner',
     name: '회식 안내',
@@ -81,8 +74,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 12,
     lastSentLabel: '5/20',
     status: '활성',
-    content: `[newMSO] 🍺 전사 회식 안내\n이번 달 임직원 친목 도모를 위한 전사 회식을 안내합니다.\n• 일시: #{date} #{time}\n• 장소: #{location}\n참석 여부를 투표해 주세요!`,
-  },
+    content: `[newMSO] 🍺 전사 회식 안내\n이번 달 임직원 친목 도모를 위한 전사 회식을 안내합니다.\n• 일시: #{date} #{time}\n• 장소: #{location}\n참석 여부를 투표해 주세요!` },
   {
     id: 'tmpl-condolence',
     name: '경조사',
@@ -90,8 +82,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 18,
     lastSentLabel: '5/18',
     status: '활성',
-    content: `[newMSO] 🙏 경조사 알림\n임직원 #{name}님의 #{event} 소식을 전해드립니다.\n• 일시: #{date}\n• 장소: #{location}\n따뜻한 위로와 축하를 보내주시기 바랍니다.`,
-  },
+    content: `[newMSO] 🙏 경조사 알림\n임직원 #{name}님의 #{event} 소식을 전해드립니다.\n• 일시: #{date}\n• 장소: #{location}\n따뜻한 위로와 축하를 보내주시기 바랍니다.` },
   {
     id: 'tmpl-emergency',
     name: '비상 호출',
@@ -99,8 +90,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 3,
     lastSentLabel: '5/12',
     status: '활성',
-    content: `🚨 [newMSO 비상호출] 🚨\n현재 #{location} 구역에 응급 상황이 발생하였습니다.\n대기 중인 전 의료진은 즉시 해당 위치로 이동해 주시기 바랍니다.`,
-  },
+    content: `🚨 [newMSO 비상호출] 🚨\n현재 #{location} 구역에 응급 상황이 발생하였습니다.\n대기 중인 전 의료진은 즉시 해당 위치로 이동해 주시기 바랍니다.` },
   {
     id: 'tmpl-patient-arrive',
     name: '환자 도착',
@@ -108,8 +98,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 412,
     lastSentLabel: '오늘',
     status: '활성',
-    content: `[병원 알림] 🏥 대기 환자 접수 완료\n#{name} 환자분이 접수되었습니다.\n• 대기번호: #{number}번\n진료 대기 현황판을 확인해 주세요.`,
-  },
+    content: `[병원 알림] 🏥 대기 환자 접수 완료\n#{name} 환자분이 접수되었습니다.\n• 대기번호: #{number}번\n진료 대기 현황판을 확인해 주세요.` },
   {
     id: 'tmpl-clinic-close',
     name: '진료 마감',
@@ -117,8 +106,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 31,
     lastSentLabel: '5/26',
     status: '활성',
-    content: `[병원 알림] ⏰ 금일 진료 마감 안내\n오늘 진료 일정이 모두 완료되어 접수를 마감합니다.\n인계 기록지 및 일일 보고 작성을 진행해 주시기 바랍니다.`,
-  },
+    content: `[병원 알림] ⏰ 금일 진료 마감 안내\n오늘 진료 일정이 모두 완료되어 접수를 마감합니다.\n인계 기록지 및 일일 보고 작성을 진행해 주시기 바랍니다.` },
   {
     id: 'tmpl-notice',
     name: '일반 공지',
@@ -126,8 +114,7 @@ const FALLBACK_TEMPLATES: MessageTemplate[] = [
     sendCount: 86,
     lastSentLabel: '5/26',
     status: '활성',
-    content: `[공지사항] 📢 전체 임직원 공지\n#{title}\n\n상세 내용은 사내 게시판에서 확인하실 수 있습니다. 관련 부서원들은 숙지 바랍니다.`,
-  },
+    content: `[공지사항] 📢 전체 임직원 공지\n#{title}\n\n상세 내용은 사내 게시판에서 확인하실 수 있습니다. 관련 부서원들은 숙지 바랍니다.` },
 ];
 
 const ALLOWED_CHANNELS: ReadonlySet<MessageChannel> = new Set<MessageChannel>([
@@ -198,7 +185,7 @@ export default function MessageTemplatesTab() {
     let alive = true;
     (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('message_templates')
           .select('id, name, channel, send_count, last_sent_label, status, content')
           .order('name', { ascending: true });
@@ -278,15 +265,14 @@ export default function MessageTemplatesTab() {
       // Supabase 테이블이 활성화되어 있을 때를 대비한 동기화
       (async () => {
         try {
-          await supabase
+          await db
             .from('message_templates')
             .update({
               name: editingTemplate.name,
               channel: editingTemplate.channel,
               status: editingTemplate.status,
               content: editingTemplate.content,
-              updated_at: new Date().toISOString(),
-            })
+              updated_at: new Date().toISOString() })
             .eq('id', editingTemplate.id);
         } catch (err) {
           console.error('Failed to sync updated template to DB:', err);
@@ -311,8 +297,7 @@ export default function MessageTemplatesTab() {
     '#{location}': '2층 컨퍼런스룸 A',
     '#{time_range}': '19:00',
     '#{event}': '빙모상(경조휴가 5일 부여)',
-    '#{number}': '128',
-  };
+    '#{number}': '128' };
 
   const getPreviewText = (text: string) => {
     let result = text;
@@ -399,8 +384,7 @@ export default function MessageTemplatesTab() {
                     onChange={(e) =>
                       setEditingTemplate({
                         ...editingTemplate,
-                        channel: e.target.value as MessageChannel,
-                      })
+                        channel: e.target.value as MessageChannel })
                     }
                     className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--foreground)] focus:outline-none"
                   >
@@ -423,8 +407,7 @@ export default function MessageTemplatesTab() {
                     onChange={(e) =>
                       setEditingTemplate({
                         ...editingTemplate,
-                        status: e.target.value as MessageTemplate['status'],
-                      })
+                        status: e.target.value as MessageTemplate['status'] })
                     }
                     className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-xs text-[var(--foreground)] focus:outline-none"
                   >

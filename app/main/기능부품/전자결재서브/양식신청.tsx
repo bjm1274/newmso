@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useState } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
@@ -26,16 +26,14 @@ function describeError(error: any) {
     message: error?.message ?? String(error),
     code: error?.code ?? null,
     details: error?.details ?? null,
-    hint: error?.hint ?? null,
-  };
+    hint: error?.hint ?? null };
 }
 
 export default function FormRequest({
   user: _user,
   staffs: _staffs,
   approverLine: _approverLine,
-  ccLine: _ccLine,
-}: FormRequestProps) {
+  ccLine: _ccLine }: FormRequestProps) {
   const user = (_user ?? {}) as Record<string, unknown>;
   const staffs = (_staffs ?? []) as Record<string, unknown>[];
   const approverLine = (Array.isArray(_approverLine) ? _approverLine : []) as Record<string, unknown>[];
@@ -80,8 +78,7 @@ export default function FormRequest({
         .map((staff) => ({
           id: String(staff?.id || '').trim(),
           name: String(staff?.name || '').trim(),
-          position: staff?.position ?? null,
-        }))
+          position: staff?.position ?? null }))
         .filter((staff) => staff.id && staff.name);
       const selectedFormData = forms.find((form) => form.id === selectedForm);
       const formLabel = selectedFormData?.label ?? selectedForm;
@@ -104,12 +101,10 @@ export default function FormRequest({
           auto_issue: true,
           approver_line: selectedApproverIds,
           cc_users: referenceUsers,
-          cc_departments: ['행정팀'],
-        },
-        status: '대기',
-      };
+          cc_departments: ['행정팀'] },
+        status: '대기' };
 
-      const { data: insertedApproval, error } = await supabase
+      const { data: insertedApproval, error } = await db
         .from('approvals')
         .insert([payload])
         .select()
@@ -142,9 +137,7 @@ export default function FormRequest({
             approval_role: 'reference',
             approval_view: '참조 문서함',
             sender_name: user.name || null,
-            document_type: payload.type,
-          },
-        }));
+            document_type: payload.type } }));
 
       if (notificationRows.length > 0) {
         const { error: notificationError } = await d1.from('notifications').insert(notificationRows);

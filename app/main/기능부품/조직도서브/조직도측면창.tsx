@@ -12,10 +12,9 @@ import {
   Shield,
   Calendar,
   Landmark,
-  type LucideProps,
-} from 'lucide-react';
+  type LucideProps } from 'lucide-react';
 import { canAccessMainMenu } from '@/lib/access-control';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import type { ChatRoom } from '@/types';
 import { fetchChatUnreadCountsByRoom } from '@/app/main/기능부품/메신저데이터유틸';
@@ -27,8 +26,7 @@ import { prefetchMenuModule } from './조직도본문';
 import {
   getConversationRoomIdSet,
   getRoomPrefsStorageKey,
-  NOTICE_ROOM_ID,
-} from '@/app/main/기능부품/메신저유틸';
+  NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
@@ -84,8 +82,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: 'disbursement', label: '지출결의', icon: 'banknote' },
     { id: 'payroll-link', label: '급여연동', icon: 'transfer' },
     { id: 'tax-reporting', label: '세무신고', icon: 'landmark' },
-  ],
-};
+  ] };
 
 type MainMenuLucideIcon = React.ComponentType<LucideProps>;
 
@@ -544,8 +541,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   ),
   filter: (
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-  ),
-};
+  ) };
 
 export function MenuIcon({ name, className = 'h-5 w-5' }: { name?: string; className?: string }) {
   if (!name || !ICON_PATHS[name]) {
@@ -663,8 +659,7 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   Upload: 'send',
   Video: 'video',
   Wand2: 'wand',
-  X: 'x',
-};
+  X: 'x' };
 
 export function LucideIcon({
   name,
@@ -831,7 +826,7 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
     }
 
     try {
-      const { data: rooms, error: roomsError } = await supabase
+      const { data: rooms, error: roomsError } = await db
         .from('chat_rooms')
         .select('id, members');
 
@@ -855,12 +850,11 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
         typeof window !== 'undefined'
           ? window.sessionStorage.getItem(CHAT_ACTIVE_ROOM_KEY)
           : null;
-      const counts = await fetchChatUnreadCountsByRoom(supabase, {
+      const counts = await fetchChatUnreadCountsByRoom(db, {
         rooms: visibleRooms,
         userId: effectiveUserId,
         activeRoomId,
-        chunkSize: 8,
-      });
+        chunkSize: 8 });
       const totalUnread = Object.values(counts).reduce(
         (sum, count) => sum + (Number(count) || 0),
         0,

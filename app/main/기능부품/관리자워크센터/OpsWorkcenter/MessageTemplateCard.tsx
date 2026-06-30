@@ -24,7 +24,7 @@ export type MessageChannel =
   | '시스템';
 
 export interface MessageTemplate {
-  /** 안정적인 식별자 — supabase row id 또는 fallback key */
+  /** 안정적인 식별자 — db row id 또는 fallback key */
   id: string;
   /** 표시 이름 (예: 결재 요청 알림) */
   name: string;

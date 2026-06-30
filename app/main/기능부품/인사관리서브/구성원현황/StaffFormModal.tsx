@@ -15,14 +15,12 @@ import {
   getStaffExtension,
   getStaffProbationMonths,
   getStaffProbationPercent,
-  toIntegerOrFallback,
-} from '@/lib/staff-meta';
+  toIntegerOrFallback } from '@/lib/staff-meta';
 import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
   resolveWeeklyWorkingHours,
-  resolveWorkingDaysPerWeek,
-} from '@/lib/payroll-working-hours';
+  resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 import { formatWon as libFormatWon } from '@/lib/date-formatter';
 import { getWeeklyRotationShiftIds } from '@/lib/contract-shift-rotation';
@@ -32,9 +30,8 @@ import {
   allowanceWonFromHours,
   getAllowanceMultiplier,
   isHoursBasedAllowance,
-  type AllowanceHoursKey,
-} from '@/lib/payroll-allowance-hours';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+  type AllowanceHoursKey } from '@/lib/payroll-allowance-hours';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { readClientAuditActor, logAudit, buildAuditDiff } from '@/lib/audit';
 import { getDefaultChecklist, getChecklistTargetDate } from '@/lib/hr-checklists';
 
@@ -61,8 +58,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
-    allowance_hours: { ...EMPTY_ALLOWANCE_HOURS },
-  };
+    allowance_hours: { ...EMPTY_ALLOWANCE_HOURS } };
 }
 
 const TAXABLE_SALARY_FIELDS = [
@@ -189,8 +185,7 @@ export default function StaffFormModal({
   licensesByStaff,
   canRegisterNewStaff,
   onClose,
-  onSave,
-}: StaffFormModalProps) {
+  onSave }: StaffFormModalProps) {
   const 편집모드 = !!editingStaff;
   const 선택된직원ID = editingStaff?.id ?? null;
 
@@ -349,8 +344,7 @@ export default function StaffFormModal({
         working_days_per_week: resolveWorkingDaysPerWeek(직원, 5),
         allowance_hours: {
           ...EMPTY_ALLOWANCE_HOURS,
-          ...((직원.permissions?.payroll_allowance_hours as Record<string, number>) || {}),
-        }
+          ...((직원.permissions?.payroll_allowance_hours as Record<string, number>) || {}) }
       });
       프로필사진파일설정(null);
       프로필사진미리보기설정(getProfilePhotoUrl(직원));
@@ -382,8 +376,7 @@ export default function StaffFormModal({
       
       신규직원설정({
         ...createEmptyStaffForm(defaultCompany),
-        팀: defaultTeam,
-      });
+        팀: defaultTeam });
       프로필사진파일설정(null);
       프로필사진미리보기설정(null);
       setLicenses([]);
@@ -499,8 +492,7 @@ export default function StaffFormModal({
           근무형태ID: nextShiftId,
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
     } catch (error) {
       console.error('대표 근무형태 설정 실패:', error);
@@ -531,8 +523,7 @@ export default function StaffFormModal({
           근무형태ID: nextIds[0] || '',
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
       추가근무형태ID설정('');
       새근무형태표시설정(false);
@@ -555,8 +546,7 @@ export default function StaffFormModal({
           근무형태ID: nextIds[0] || '',
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
     } catch (error) {
       console.error('근무형태 제거 실패:', error);
@@ -665,8 +655,7 @@ export default function StaffFormModal({
         weekly_work_days: primaryShift.weekly_work_days || 5,
         is_weekend_work: primaryShift.is_weekend_work || false,
         daily_schedules: null as any,
-        break_plans: null as any,
-      };
+        break_plans: null as any };
     }
     try {
       const metaText = description.slice(markerIndex + marker.length).trim();
@@ -676,16 +665,14 @@ export default function StaffFormModal({
         weekly_work_days: parsed.weekly_work_days ?? primaryShift.weekly_work_days ?? 5,
         is_weekend_work: parsed.is_weekend_work ?? primaryShift.is_weekend_work ?? false,
         daily_schedules: parsed.daily_schedules || null,
-        break_plans: parsed.break_plans || null,
-      };
+        break_plans: parsed.break_plans || null };
     } catch {
       return {
         shift_type: primaryShift.shift_type || null,
         weekly_work_days: primaryShift.weekly_work_days || 5,
         is_weekend_work: primaryShift.is_weekend_work || false,
         daily_schedules: null as any,
-        break_plans: null as any,
-      };
+        break_plans: null as any };
     }
   }, [primaryShift]);
 
@@ -705,8 +692,7 @@ export default function StaffFormModal({
     if (rem <= 0) {
       return {
         isValid: false,
-        message: '고정 수당 합계가 목표 월급보다 큽니다. 고정 수당을 조정하거나 목표 월급을 높여주세요.',
-      };
+        message: '고정 수당 합계가 목표 월급보다 큽니다. 고정 수당을 조정하거나 목표 월급을 높여주세요.' };
     }
 
     const wHours = Number(신규직원.working_hours_per_week || 40);
@@ -741,8 +727,7 @@ export default function StaffFormModal({
         isValid: false,
         derivedHourlyRate,
         minTarget,
-        message: `최저시급 미달 (역산시급: ${derivedHourlyRate.toLocaleString()}원 / 기준: ${previewMinimumWage.toLocaleString()}원). 최소 세전 ${minTarget.toLocaleString()}원 이상 입력하셔야 합니다.`,
-      };
+        message: `최저시급 미달 (역산시급: ${derivedHourlyRate.toLocaleString()}원 / 기준: ${previewMinimumWage.toLocaleString()}원). 최소 세전 ${minTarget.toLocaleString()}원 이상 입력하셔야 합니다.` };
     }
 
     const calculatedBase = Math.floor(derivedHourlyRate * hBase);
@@ -755,8 +740,7 @@ export default function StaffFormModal({
       base_salary: calculatedBase,
       agreed_overtime_allowance: calculatedAgreedOvertime,
       agreed_night_allowance: calculatedAgreedNight,
-      message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)`,
-    };
+      message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)` };
   }, [targetSalaryInput, targetNightHoursInput, 신규직원.meal_allowance, 신규직원.vehicle_allowance, 신규직원.childcare_allowance, 신규직원.research_allowance, 신규직원.other_taxfree, 신규직원.position_allowance, 신규직원.working_hours_per_week, primaryShift, previewMinimumWage]);
 
   const handleApplySplit = () => {
@@ -768,8 +752,7 @@ export default function StaffFormModal({
       ...prev,
       base_salary: reverseCalculateSplit.base_salary || 0,
       agreed_overtime_allowance: reverseCalculateSplit.agreed_overtime_allowance || 0,
-      agreed_night_allowance: reverseCalculateSplit.agreed_night_allowance || 0,
-    }));
+      agreed_night_allowance: reverseCalculateSplit.agreed_night_allowance || 0 }));
     toast('기본급과 약정수당이 최적의 법적 비율로 분할 적용되었습니다.');
   };
 
@@ -825,8 +808,7 @@ export default function StaffFormModal({
         license_number: '',
         issued_date: '',
         expiry_date: '',
-        memo: '',
-      },
+        memo: '' },
     ]);
   };
 
@@ -855,8 +837,7 @@ export default function StaffFormModal({
           license_number: lic.license_number?.trim() || null,
           issued_date: lic.issued_date?.trim() || null,
           expiry_date: lic.expiry_date?.trim() || null,
-          memo: lic.memo?.trim() || null,
-        };
+          memo: lic.memo?.trim() || null };
 
         if (!payload.license_name) continue;
 
@@ -871,8 +852,7 @@ export default function StaffFormModal({
             .from('staff_licenses')
             .insert([{
               ...payload,
-              staff_id: staffId,
-            }]);
+              staff_id: staffId }]);
           if (error) throw error;
         }
       }
@@ -894,8 +874,7 @@ export default function StaffFormModal({
 
     const response = await fetch('/api/staff/profile-photo/upload', {
       method: 'POST',
-      body: formData,
-    });
+      body: formData });
     if (!response.ok) {
       const json = (await response.json().catch(() => ({}))) as { error?: string };
       throw new Error(json.error || '프로필 사진 업로드에 실패했습니다.');
@@ -911,8 +890,7 @@ export default function StaffFormModal({
       ...currentPermissions,
       profile_photo_path: filePath,
       profile_photo_updated_at: uploadedAt,
-      profile_photo_url: photoUrl,
-    };
+      profile_photo_url: photoUrl };
 
     const avatarUpdate = await db
       .from('staff_members')
@@ -1008,8 +986,7 @@ export default function StaffFormModal({
         working_days_per_week: workingDaysPerWeek,
         shift_group_ids: selectedShiftIds,
         weekly_rotation_shift_ids: selectedShiftIds.slice(1),
-        secondary_shift_id: selectedShiftIds[1] || null,
-      };
+        secondary_shift_id: selectedShiftIds[1] || null };
 
       let birthDateStr: string | null = null;
       if (신규직원.주민번호) {
@@ -1080,8 +1057,7 @@ export default function StaffFormModal({
           work_conditions: nextWorkConditions,
           shift_group_ids: selectedShiftIds,
           weekly_rotation_shift_ids: selectedShiftIds.slice(1),
-          secondary_shift_id: selectedShiftIds[1] || null,
-        },
+          secondary_shift_id: selectedShiftIds[1] || null },
         annual_leave_total: 신규직원.연차총개수,
         annual_leave_used: 신규직원.연차사용개수,
         shift_id: primaryShiftId || null,
@@ -1109,14 +1085,12 @@ export default function StaffFormModal({
           ...beforeStaff,
           ...commonData,
           annual_leave_total: 신규직원.연차총개수,
-          annual_leave_used: 신규직원.연차사용개수,
-        };
+          annual_leave_used: 신규직원.연차사용개수 };
 
         const updatePayload: Record<string, unknown> = {
           ...commonData,
           annual_leave_total: afterStaff.annual_leave_total,
-          annual_leave_used: afterStaff.annual_leave_used,
-        };
+          annual_leave_used: afterStaff.annual_leave_used };
 
         const residentDigits = String(신규직원.주민번호 ?? '').replace(/[^0-9]/g, '');
         if (residentDigits.length === 0) {
@@ -1157,8 +1131,7 @@ export default function StaffFormModal({
           {
             staff_name: 신규직원.성명,
             employee_no: beforeStaff?.employee_no || null,
-            ...buildAuditDiff(beforeStaff, afterStaff, Object.keys(afterStaff)),
-          },
+            ...buildAuditDiff(beforeStaff, afterStaff, Object.keys(afterStaff)) },
           actor.userId,
           actor.userName
         );
@@ -1212,8 +1185,7 @@ export default function StaffFormModal({
           role: 'staff',
           password: '',
           join_date: dateOrNull(신규직원.입사일),
-          password_reset_required: 1,
-        };
+          password_reset_required: 1 };
         const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
@@ -1252,8 +1224,7 @@ export default function StaffFormModal({
                     (insertedStaff.join_date as string) ||
                     dateOrNull(신규직원.입사일),
                 ),
-                completed_at: null,
-              },
+                completed_at: null },
               { onConflict: 'staff_id,checklist_type' },
             );
 
@@ -1270,8 +1241,7 @@ export default function StaffFormModal({
           {
             staff_name: 신규직원.성명,
             employee_no: newEmployeeNo,
-            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after,
-          },
+            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after },
           actor.userId,
           actor.userName
         );
@@ -1980,8 +1950,7 @@ export default function StaffFormModal({
                                   신규직원설정(prev => ({
                                     ...prev,
                                     allowance_hours: { ...prev.allowance_hours, [hoursKey]: h },
-                                    [hoursKey]: won,
-                                  }));
+                                    [hoursKey]: won }));
                                 }}
                                 placeholder="시간 입력"
                                 className="flex-1 min-w-0 p-1.5 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"

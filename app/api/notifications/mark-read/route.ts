@@ -6,8 +6,7 @@ import {
   getD1Drizzle,
   notifications as notificationsTable,
   eq,
-  and,
-} from '@/lib/db';
+  and } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 

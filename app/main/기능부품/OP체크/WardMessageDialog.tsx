@@ -78,8 +78,7 @@ export function OpCheckWardMessageDialog({
   onToggleRecipientPicker,
   onRecipientSearchChange,
   onMessageTextChange,
-  onSend,
-}: OpCheckWardMessageDialogProps) {
+  onSend }: OpCheckWardMessageDialogProps) {
   return (
     <div
       className="fixed inset-0 z-[360] flex items-center justify-center bg-black/50 p-4"

@@ -44,8 +44,7 @@ function liveFormsKpi(d: ReturnType<typeof useFormsOverview>): AdminKpi[] {
       label: '이번 달 사용',
       value: d.loading ? '…' : String(d.monthlyUsage),
       unit: '회',
-      sub: `${d.yearMonth} 결재 기준`,
-    },
+      sub: `${d.yearMonth} 결재 기준` },
   ];
 }
 

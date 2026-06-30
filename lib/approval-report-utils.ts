@@ -48,8 +48,7 @@ export function normalizeApprovalAttachments(value: unknown): ApprovalAttachment
         provider: cleanString(record.provider) || null,
         bucket: cleanString(record.bucket) || null,
         path: cleanString(record.path) || null,
-        uploadedAt: cleanString(record.uploadedAt || record.uploaded_at) || null,
-      } satisfies ApprovalAttachmentMeta;
+        uploadedAt: cleanString(record.uploadedAt || record.uploaded_at) || null } satisfies ApprovalAttachmentMeta;
     })
     .filter(Boolean) as ApprovalAttachmentMeta[];
 
@@ -82,8 +81,7 @@ export function getReportApprovalSummary(metaData: unknown) {
     tripDateLabel: buildDateRangeLabel(meta.trip_start_date || meta.tripStartDate, meta.trip_end_date || meta.tripEndDate),
     tripDestination: cleanString(meta.trip_destination || meta.tripDestination),
     tripPurpose: cleanString(meta.trip_purpose || meta.tripPurpose),
-    attachments,
-  };
+    attachments };
 }
 
 export function buildReportApprovalTitle(metaData: unknown) {

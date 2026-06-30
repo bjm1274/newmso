@@ -1,17 +1,15 @@
 import { db } from '@/lib/db-client';
-import { d1Client } from '@/lib/d1-supabase-compat';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { d1Client } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   callAtomicStockUpdate,
-  callAtomicStockTransfer,
-} from '@/lib/inventory-stock-client';
+  callAtomicStockTransfer } from '@/lib/inventory-stock-client';
 import {
   getD1Binding,
   getD1Drizzle,
   inventory as inventoryTable,
   and,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import {
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
@@ -24,8 +22,7 @@ import {
   type LooseRecord,
   type InventoryLike,
   type InventoryUserLike,
-  type SupabaseCompatResult,
-} from './inventory-validation';
+  type SupabaseCompatResult } from './inventory-validation';
 
 // For destination insert selecting
 const INVENTORY_SELECT_COLUMNS = [
@@ -74,8 +71,7 @@ export async function fetchSupportInventoryRows(): Promise<{
         );
       return {
         data: normalizeSupportInventoryRows(toLooseRecordArray(rows) as InventoryLike[]),
-        error: null,
-      };
+        error: null };
     }
 
     // 브라우저 — d1Client가 /api/d1/query로 D1을 읽는다
@@ -89,8 +85,7 @@ export async function fetchSupportInventoryRows(): Promise<{
     }
     return {
       data: normalizeSupportInventoryRows(toLooseRecordArray(data) as InventoryLike[]),
-      error: null,
-    };
+      error: null };
   } catch (error) {
     return { data: [], error };
   }
@@ -115,8 +110,7 @@ export async function processInventoryIssue({
   toDept,
   reason,
   user,
-  destinationCompanyId,
-}: ProcessInventoryIssueParams) {
+  destinationCompanyId }: ProcessInventoryIssueParams) {
   const transferQuantity = Math.max(1, Number(quantity) || 0);
   const sourceCompany = String(sourceItem?.company || INVENTORY_SUPPORT_COMPANY).trim();
   const sourceDept = String(sourceItem?.department || INVENTORY_SUPPORT_DEPARTMENT).trim();
@@ -163,8 +157,7 @@ export async function processInventoryIssue({
       const transferResp = await callAtomicStockTransfer({
         sourceId: String(sourceItem.id ?? ''),
         destId: String(destinationItem.id ?? ''),
-        quantity: transferQuantity,
-      });
+        quantity: transferQuantity });
       const transferResult = transferResp.ok ? transferResp.data : null;
       const transferRpcError = transferResp.ok ? null : { message: transferResp.error };
 
@@ -239,8 +232,7 @@ export async function processInventoryIssue({
       const srcResp = await callAtomicStockUpdate({
         itemId: String(sourceItem.id ?? ''),
         delta: -transferQuantity,
-        minAllowed: 0,
-      });
+        minAllowed: 0 });
       const srcResult = srcResp.ok ? srcResp.data : null;
       const srcRpcError = srcResp.ok ? null : { message: srcResp.error };
       if (srcRpcError) {
@@ -278,8 +270,7 @@ export async function processInventoryIssue({
         is_udi: Boolean(sourceItem?.is_udi),
         company: destinationCompany,
         department: destinationDept || '',
-        location: sourceItem?.location || null,
-      };
+        location: sourceItem?.location || null };
 
       if (sourceItem?.spec) baseDestinationPayload.spec = sourceItem.spec;
       if (sourceItem?.insurance_code) baseDestinationPayload.insurance_code = sourceItem.insurance_code;
@@ -322,8 +313,7 @@ export async function processInventoryIssue({
     const srcOnlyResp = await callAtomicStockUpdate({
       itemId: String(sourceItem.id ?? ''),
       delta: -transferQuantity,
-      minAllowed: 0,
-    });
+      minAllowed: 0 });
     const srcOnlyResult = srcOnlyResp.ok ? srcOnlyResp.data : null;
     const srcOnlyError = srcOnlyResp.ok ? null : { message: srcOnlyResp.error };
     if (srcOnlyError) {
@@ -363,8 +353,7 @@ export async function processInventoryIssue({
         reason: reason || '',
         transferred_by: user?.name,
         transferred_by_id: user?.id,
-        status: '완료',
-      },
+        status: '완료' },
     ]);
 
     if (transferError) {
@@ -383,8 +372,7 @@ export async function processInventoryIssue({
       next_quantity: sourceNextQty,
       actor_name: user?.name,
       company: sourceCompany,
-      notes: sourceNotes,
-    },
+      notes: sourceNotes },
   ];
 
   if (destinationInventoryId && !isSameLocation) {
@@ -398,8 +386,7 @@ export async function processInventoryIssue({
       next_quantity: destinationNextQty,
       actor_name: user?.name,
       company: destinationCompany,
-      notes: destinationNotes,
-    });
+      notes: destinationNotes });
   }
 
   const { error: logError } = await db.from('inventory_logs').insert(logRows);
@@ -411,8 +398,7 @@ export async function processInventoryIssue({
     sourceNextQty,
     destinationInventoryId,
     destinationNextQty,
-    isSameLocation,
-  };
+    isSameLocation };
 }
 
 type ReverseInventoryIssueParams = {
@@ -435,16 +421,14 @@ export async function reverseInventoryIssue({
   itemName,
   quantity,
   reason,
-  user,
-}: ReverseInventoryIssueParams) {
+  user }: ReverseInventoryIssueParams) {
   const reverseQty = Math.max(1, Number(quantity) || 0);
 
   // 1) SY INC. 재고 복원 (증가)
   const reverseResp = await callAtomicStockUpdate({
     itemId: sourceItemId,
     delta: reverseQty,
-    minAllowed: 0,
-  });
+    minAllowed: 0 });
   const srcErr = reverseResp.ok ? null : { message: reverseResp.error };
   if (srcErr) {
     // RPC 미등록 fallback
@@ -489,8 +473,7 @@ export async function reverseInventoryIssue({
       quantity: reverseQty,
       actor_name: user?.name,
       company: INVENTORY_SUPPORT_COMPANY,
-      notes: `불출 취소: ${destinationCompany} ${destinationDept} → ${INVENTORY_SUPPORT_COMPANY} ${INVENTORY_SUPPORT_DEPARTMENT} (${reason || '운영자 취소'})`,
-    },
+      notes: `불출 취소: ${destinationCompany} ${destinationDept} → ${INVENTORY_SUPPORT_COMPANY} ${INVENTORY_SUPPORT_DEPARTMENT} (${reason || '운영자 취소'})` },
   ];
   await db.from('inventory_logs').insert(logRows);
 }
@@ -516,8 +499,7 @@ export async function createSupportInventoryItem(
     min_quantity: safeQty,
     min_stock: safeQty,
     company: INVENTORY_SUPPORT_COMPANY,
-    department: INVENTORY_SUPPORT_DEPARTMENT,
-  };
+    department: INVENTORY_SUPPORT_DEPARTMENT };
 
   try {
     const { data, error } = await withMissingColumnsFallback<LooseRecord>(

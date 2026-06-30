@@ -40,8 +40,7 @@ import {
   eq,
   lt,
   inArray,
-  notInArray,
-} from '@/lib/db';
+  notInArray } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -160,8 +159,7 @@ export async function POST(req: Request) {
         .values({ key: 'min_auth_time', value: now, description: '전체 로그아웃 시점' })
         .onConflictDoUpdate({
           target: systemConfigsTable.key,
-          set: { value: now, description: '전체 로그아웃 시점' },
-        });
+          set: { value: now, description: '전체 로그아웃 시점' } });
       return NextResponse.json({ ok: true });
     }
 

@@ -58,8 +58,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <MobileHeader
         title="근무현황"
@@ -82,8 +81,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
               textAlign: 'center',
               background: 'rgba(255, 255, 255, 0.65)',
               border: '1px solid rgba(0, 0, 0, 0.06)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-            }}
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)' }}
           >
             <div className="m-tnum" style={{ fontSize: 22, fontWeight: 800, color: k.color }}>
               {k.v}
@@ -101,8 +99,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
           marginTop: 12,
           padding: '10px 16px',
           background: 'rgba(255, 255, 255, 0.35)',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        }}
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}
       >
         <button
           type="button"
@@ -120,8 +117,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
         >
           전체 <span style={{ opacity: 0.6, fontSize: 10 }}>{members.length}</span>
         </button>
@@ -141,8 +137,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
         >
           근무중 <span style={{ opacity: 0.6, fontSize: 10 }}>{kpi.working}</span>
         </button>
@@ -162,8 +157,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
         >
           휴게/외근 <span style={{ opacity: 0.6, fontSize: 10 }}>{kpi.breakCount + kpi.outside}</span>
         </button>
@@ -183,8 +177,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
         >
           휴가 <span style={{ opacity: 0.6, fontSize: 10 }}>{kpi.off}</span>
         </button>
@@ -198,8 +191,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
               overflow: 'hidden',
               padding: '4px 0',
               border: '1px solid rgba(0, 0, 0, 0.06)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-            }}
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)' }}
           >
             {loading && (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
@@ -214,8 +206,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
                   className="m-list-row"
                   style={{
                     background: 'transparent',
-                    borderBottom: isLast ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
-                  }}
+                    borderBottom: isLast ? 'none' : '1px solid rgba(0, 0, 0, 0.04)' }}
                 >
                   <div style={{ position: 'relative' }}>
                     <MAvatar tone={pickTone(p.id)} size="sm">{p.name.charAt(0)}</MAvatar>
@@ -230,8 +221,7 @@ export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: 
                           height: 11,
                           borderRadius: 999,
                           background: 'var(--m-success)',
-                          border: '2px solid rgba(255, 255, 255, 0.8)',
-                        }}
+                          border: '2px solid rgba(255, 255, 255, 0.8)' }}
                       />
                     )}
                   </div>

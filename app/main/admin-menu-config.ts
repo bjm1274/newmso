@@ -106,22 +106,19 @@ export const ADMIN_OUTER_TABS: AdminOuterTabId[] = ADMIN_SIDEBAR_ITEMS.filter((i
 export const ADMIN_TAB_ALIASES: Record<string, AdminOuterTabId> = {
   양식빌더: '문서양식',
   문서서식: '문서양식',
-  연차수동부여: '시스템마스터센터',
-};
+  연차수동부여: '시스템마스터센터' };
 
 export const ADMIN_PARENT_SUBVIEW_MAP: Record<string, AdminOuterTabId> = {
   ...Object.fromEntries(ADMIN_ANALYSIS_TABS.map((tab) => [tab.id, '경영분석' as const])),
   ...Object.fromEntries(ADMIN_OPERATIONS_TABS.map((tab) => [tab.id, '운영설정' as const])),
   ...Object.fromEntries(ADMIN_AUDIT_TABS.map((tab) => [tab.id, '감사센터' as const])),
-  ...ADMIN_TAB_ALIASES,
-};
+  ...ADMIN_TAB_ALIASES };
 
 const DEFAULT_ADMIN_ENTRY: AdminEntryState = {
   activeTab: '경영분석',
   analysisTab: '경영대시보드',
   operationsTab: '알림자동화',
-  auditTab: '접근감사로그',
-};
+  auditTab: '접근감사로그' };
 
 const ADMIN_ANALYSIS_TAB_ID_SET = new Set<string>(ADMIN_ANALYSIS_TABS.map((tab) => tab.id));
 const ADMIN_OPERATIONS_TAB_ID_SET = new Set<string>(ADMIN_OPERATIONS_TABS.map((tab) => tab.id));
@@ -156,39 +153,34 @@ export function normalizeAdminEntry(tabId?: string | null): AdminEntryState {
     return {
       ...DEFAULT_ADMIN_ENTRY,
       activeTab: '경영분석',
-      analysisTab: aliasedTabId,
-    };
+      analysisTab: aliasedTabId };
   }
 
   if (isAdminAuditTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
       activeTab: '감사센터',
-      auditTab: aliasedTabId,
-    };
+      auditTab: aliasedTabId };
   }
 
   if (isAdminOperationsTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
       activeTab: '운영설정',
-      operationsTab: aliasedTabId,
-    };
+      operationsTab: aliasedTabId };
   }
 
   if (isAdminOuterTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
-      activeTab: aliasedTabId,
-    };
+      activeTab: aliasedTabId };
   }
 
   const parentTabId = aliasedTabId ? ADMIN_PARENT_SUBVIEW_MAP[aliasedTabId] : null;
   if (parentTabId) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
-      activeTab: parentTabId,
-    };
+      activeTab: parentTabId };
   }
 
   return DEFAULT_ADMIN_ENTRY;

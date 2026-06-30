@@ -27,8 +27,7 @@ export function BottomSheet({
   title,
   mode = 'auto',
   children,
-  footer,
-}: BottomSheetProps) {
+  footer }: BottomSheetProps) {
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);

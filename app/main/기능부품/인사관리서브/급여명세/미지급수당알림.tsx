@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { calculateHourlyRateFromMonthlySalary, resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 
 interface Props {
@@ -65,9 +65,9 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
         const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
 
         const [payrollRes, attendRes, holidayRes] = await Promise.all([
-          supabase.from('payroll_records').select('*').in('year_month', months).in('staff_id', staffIds),
-          supabase.from('attendances').select('*').in('staff_id', staffIds).gte('work_date', months[0] + '-01'),
-          supabase.from('company_holidays').select('*').gte('holiday_date', months[0] + '-01'),
+          db.from('payroll_records').select('*').in('year_month', months).in('staff_id', staffIds),
+          db.from('attendances').select('*').in('staff_id', staffIds).gte('work_date', months[0] + '-01'),
+          db.from('company_holidays').select('*').gte('holiday_date', months[0] + '-01'),
         ]);
 
         const payrolls = payrollRes.data || [];
@@ -135,8 +135,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
                 type: 'OT 수당',
                 hours: roundedOT,
                 estimatedPay: pay,
-                severity: roundedOT >= 20 ? '높음' : roundedOT >= 10 ? '중간' : '낮음',
-              });
+                severity: roundedOT >= 20 ? '높음' : roundedOT >= 10 ? '중간' : '낮음' });
             }
           }
 
@@ -149,8 +148,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
                 type: '야간 수당',
                 hours: roundedNight,
                 estimatedPay: pay,
-                severity: roundedNight >= 20 ? '높음' : '낮음',
-              });
+                severity: roundedNight >= 20 ? '높음' : '낮음' });
             }
           }
 
@@ -164,8 +162,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
                 type: '휴일 수당',
                 hours: roundedHoliday,
                 estimatedPay: pay,
-                severity: roundedHoliday >= 10 ? '중간' : '낮음',
-              });
+                severity: roundedHoliday >= 10 ? '중간' : '낮음' });
             }
           }
         }
@@ -185,20 +182,18 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
       title: '미지급 수당 결재 상신',
       description: `${item.staff.name}의 ${item.type} 미지급 건을 결재 상신합니다.\n추정 금액 ${item.estimatedPay.toLocaleString('ko-KR')}원이 포함됩니다.`,
       confirmText: '상신',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
     setSubmitting(`${item.staff.id}_${item.type}`);
     try {
-      await supabase.from('approvals').insert({
+      await db.from('approvals').insert({
         type: '수당지급신청',
         title: `[미지급수당] ${item.staff.name} - ${item.type} ${item.hours}시간`,
         content: `미지급 ${item.type}: ${item.hours}시간, 추정 금액: ${item.estimatedPay.toLocaleString('ko-KR')}원`,
         sender_id: user?.id,
         sender_name: user?.name || user?.email,
         status: '대기',
-        company: item.staff.company,
-      });
+        company: item.staff.company });
       toast('결재 상신이 완료되었습니다.', 'success');
     } catch {
       toast('결재 상신에 실패했습니다.', 'error');

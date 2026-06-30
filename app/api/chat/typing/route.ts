@@ -71,8 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .values({ room_id: roomId, user_id: userId, user_name: userName, updated_at: now })
       .onConflictDoUpdate({
         target: [chat_typing_status.room_id, chat_typing_status.user_id],
-        set: { user_name: userName, updated_at: now },
-      });
+        set: { user_name: userName, updated_at: now } });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('[chat/typing POST] upsert failed', err);
@@ -161,8 +160,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const rows = await db
       .select({
         user_id: chat_typing_status.user_id,
-        user_name: chat_typing_status.user_name,
-      })
+        user_name: chat_typing_status.user_name })
       .from(chat_typing_status)
       .where(
         and(

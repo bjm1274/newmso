@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type MutableRefObject } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
@@ -60,8 +60,7 @@ function parseGlobalSearchQuery(rawQuery: string): ParsedGlobalSearchQuery {
     attachment,
     after,
     before,
-    hasStructuredFilters: Boolean(fromQuery || roomQuery || attachment !== 'all' || after || before),
-  };
+    hasStructuredFilters: Boolean(fromQuery || roomQuery || attachment !== 'all' || after || before) };
 }
 
 function getGlobalSearchHighlightQuery(rawQuery: string) {
@@ -74,8 +73,7 @@ import {
   getRoomPreviewText,
   normalizeMemberIds,
   NOTICE_ROOM_ID,
-  type RoomPreference,
-} from './메신저유틸';
+  type RoomPreference } from './메신저유틸';
 
 type GlobalSearchCounts = {
   all: number;
@@ -150,7 +148,7 @@ async function fetchAllGlobalSearchMessages(params: {
 
   for (const searchColumn of targetSearchColumns) {
     for (let offset = 0; ; offset += CHAT_GLOBAL_SEARCH_PAGE_SIZE) {
-      let searchQuery = supabase
+      let searchQuery = db
         .from('messages')
         .select(selectClause)
         .in('room_id', roomIds)
@@ -210,8 +208,7 @@ async function fetchAllGlobalSearchMessages(params: {
       (left, right) =>
         new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()
     ),
-    error: null,
-  };
+    error: null };
 }
 
 async function loadGlobalSearchRoomMap(roomIds: string[]) {
@@ -220,7 +217,7 @@ async function loadGlobalSearchRoomMap(roomIds: string[]) {
 
   for (let index = 0; index < uniqueRoomIds.length; index += CHAT_GLOBAL_SEARCH_ROOM_CHUNK_SIZE) {
     const chunk = uniqueRoomIds.slice(index, index + CHAT_GLOBAL_SEARCH_ROOM_CHUNK_SIZE);
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('chat_rooms')
       .select('id, name, type, members')
       .in('id', chunk);
@@ -270,8 +267,7 @@ export function useChatGlobalSearch({
   visibleRoomIds,
   roomLabelMap,
   roomPrefs,
-  roomPrefsUserId,
-}: UseChatGlobalSearchParams) {
+  roomPrefsUserId }: UseChatGlobalSearchParams) {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchTab, setGlobalSearchTab] = useState<MessengerGlobalSearchTab>('all');
@@ -302,8 +298,7 @@ export function useChatGlobalSearch({
                 id: String((entry as Record<string, unknown>).id || '').trim(),
                 label: String((entry as Record<string, unknown>).label || '').trim(),
                 query: String((entry as Record<string, unknown>).query || '').trim(),
-                createdAt: String((entry as Record<string, unknown>).createdAt || '').trim(),
-              }))
+                createdAt: String((entry as Record<string, unknown>).createdAt || '').trim() }))
               .filter((entry) => entry.id && entry.query)
               .slice(0, 8)
           : [],
@@ -394,8 +389,7 @@ export function useChatGlobalSearch({
           : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       label: nextQuery.length > 24 ? `${nextQuery.slice(0, 24)}...` : nextQuery,
       query: nextQuery,
-      createdAt,
-    };
+      createdAt };
 
     persistSavedSearches([nextEntry, ...savedSearches].slice(0, 8));
   }, [globalSearchQuery, persistSavedSearches, savedSearches]);
@@ -462,8 +456,7 @@ export function useChatGlobalSearch({
           memberCount: memberIds.length,
           isHidden: roomPrefs[room.id]?.hidden === true,
           isNoticeChannel: room.id === NOTICE_ROOM_ID,
-          memberSearchText,
-        };
+          memberSearchText };
       })
       .filter(({ label, preview, memberSearchText }) => {
         const haystack = `${String(label || '').toLowerCase()} ${String(preview || '').toLowerCase()} ${memberSearchText}`;
@@ -492,8 +485,7 @@ export function useChatGlobalSearch({
       member: globalSearchMemberResults.length,
       room: globalSearchRoomResults.length,
       message: globalSearchMessageResults.length,
-      file: globalSearchFileResults.length,
-    }),
+      file: globalSearchFileResults.length }),
     [
       globalSearchFileResults.length,
       globalSearchMemberResults.length,
@@ -550,8 +542,7 @@ export function useChatGlobalSearch({
             omittedColumns,
             selectClause,
             parsedQuery,
-            roomIds: scopedVisibleRoomIds,
-          }),
+            roomIds: scopedVisibleRoomIds }),
       );
 
       if (error) throw error;
@@ -572,8 +563,7 @@ export function useChatGlobalSearch({
       const enrichedRows = messageRows.map((message: ChatMessage) => ({
         ...message,
         staff: resolveStaffProfile(message.sender_id, message.sender_name),
-        chat_rooms: roomMap.get(String(message.room_id)) || null,
-      }));
+        chat_rooms: roomMap.get(String(message.room_id)) || null }));
 
       const filteredRows = enrichedRows.filter((message: ChatMessage) => {
         const senderName = String(
@@ -673,6 +663,5 @@ export function useChatGlobalSearch({
     handleGlobalSearch,
     saveCurrentSearch,
     removeSavedSearch,
-    applySavedSearch,
-  };
+    applySavedSearch };
 }

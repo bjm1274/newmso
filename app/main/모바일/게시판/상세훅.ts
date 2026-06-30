@@ -42,8 +42,7 @@ export function useIncrementPostView(
         await fetch(ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ p_post_id: postId }),
-        }).catch(() => null);
+          body: JSON.stringify({ p_post_id: postId }) }).catch(() => null);
         callbackRef.current?.();
       } catch {
         // 조회수 실패는 무시 (통계 목적)

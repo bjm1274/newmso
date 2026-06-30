@@ -1,8 +1,7 @@
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type {
   SystemMasterOverviewPayload,
-  SystemMasterSensitiveStaff,
-} from './types';
+  SystemMasterSensitiveStaff } from './types';
 import { formatCurrency, formatDateTime } from './utils';
 
 type SummaryCard = { id: string; label: string; value: number | undefined };
@@ -20,8 +19,7 @@ export function OverviewPanel({
   summaryCards,
   showSensitiveRaw,
   setShowSensitiveRaw,
-  sensitiveStaffColumns,
-}: OverviewPanelProps) {
+  sensitiveStaffColumns }: OverviewPanelProps) {
   return (
     <>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

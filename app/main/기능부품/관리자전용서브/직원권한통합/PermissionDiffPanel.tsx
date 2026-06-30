@@ -5,8 +5,7 @@ import type { PermissionReview, PermissionReviewItem } from './types';
 function PermissionDiffList({
   title,
   items,
-  tone,
-}: {
+  tone }: {
   title: string;
   items: PermissionReviewItem[];
   tone: 'added' | 'removed' | 'changed';

@@ -14,8 +14,7 @@ import {
   FEATURE_CARDS,
   FontFamilyControl,
   FontSizeControl,
-  type FeatureCard,
-} from './추가기능공통';
+  type FeatureCard } from './추가기능공통';
 import { LucideIcon } from './조직도서브/조직도측면창';
 
 const prefetchedExtraFeatureModules = new Set<string>();
@@ -38,8 +37,7 @@ export default function ExtraFeatures({
   posts = [],
   selectedCo,
   selectedCompanyId,
-  onSearchSelect,
-}: ExtraFeaturesProps) {
+  onSearchSelect }: ExtraFeaturesProps) {
   const [subView, setSubView] = useState<string | null>(null);
   const [orgChartCompany, setOrgChartCompany] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);

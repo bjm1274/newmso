@@ -11,24 +11,21 @@ import { InsertBuilder, UpdateBuilder, DeleteBuilder } from './d1-compat/mutatio
 // RPC 라우트 매핑 — 알려진 함수만 신규 라우트로 디스패치
 const RPC_ROUTES: Readonly<Record<string, string>> = {
   increment_post_views: '/api/d1/rpc/increment-post-views',
-  register_staff_full: '/api/d1/rpc/register-staff',
-};
+  register_staff_full: '/api/d1/rpc/register-staff' };
 
 async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<QueryResult<T>> {
   const path = RPC_ROUTES[name];
   if (!path) {
     return {
       data: null,
-      error: { message: `rpc() not supported by Cloudflare D1 client: ${name}. Use direct API route.` },
-    } as QueryResult<T>;
+      error: { message: `rpc() not supported by Cloudflare D1 client: ${name}. Use direct API route.` } } as QueryResult<T>;
   }
   try {
     const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(args),
-      credentials: 'same-origin',
-    });
+      credentials: 'same-origin' });
     const json = (await res.json().catch(() => null)) as
       | { ok: true; data?: T }
       | { ok: false; error: string; code?: string; details?: string }
@@ -36,8 +33,7 @@ async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<
     if (!res.ok || !json) {
       return {
         data: null,
-        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` },
-      } as QueryResult<T>;
+        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` } } as QueryResult<T>;
     }
     if (!json.ok) {
       return { data: null, error: { message: json.error, code: json.code, details: json.details } } as QueryResult<T>;
@@ -46,8 +42,7 @@ async function callRpc<T>(name: string, args: Record<string, unknown>): Promise<
   } catch (err) {
     return {
       data: null,
-      error: { message: err instanceof Error ? err.message : 'Network error' },
-    } as QueryResult<T>;
+      error: { message: err instanceof Error ? err.message : 'Network error' } } as QueryResult<T>;
   }
 }
 
@@ -70,8 +65,7 @@ class FromBuilder {
       columns,
       where: [],
       order: [],
-      count: options?.head ? true : undefined,
-    });
+      count: options?.head ? true : undefined });
   }
 
   insert<T = any>(
@@ -82,8 +76,7 @@ class FromBuilder {
     return new InsertBuilder<T>({
       table: this.table,
       values: arr,
-      onConflict: options?.onConflict,
-    } satisfies InsertState);
+      onConflict: options?.onConflict } satisfies InsertState);
   }
 
   upsert<T = any>(
@@ -99,8 +92,7 @@ class FromBuilder {
           .filter(Boolean);
       state.conflict = {
         columns,
-        action: options.ignoreDuplicates ? 'ignore' : 'update',
-      };
+        action: options.ignoreDuplicates ? 'ignore' : 'update' };
     } else {
       state.onConflict = 'replace';
     }
@@ -111,15 +103,13 @@ class FromBuilder {
     return new UpdateBuilder<T>({
       table: this.table,
       set,
-      where: [],
-    } satisfies UpdateState);
+      where: [] } satisfies UpdateState);
   }
 
   delete<T = any>(): DeleteBuilder<T> {
     return new DeleteBuilder<T>({
       table: this.table,
-      where: [],
-    } satisfies DeleteState);
+      where: [] } satisfies DeleteState);
   }
 }
 
@@ -135,8 +125,7 @@ class D1ClientImpl {
   channel(_name: string): { on: () => unknown; subscribe: () => void } {
     return {
       on: () => ({ on: () => ({}), subscribe: () => {} }),
-      subscribe: () => {},
-    };
+      subscribe: () => {} };
   }
 
   removeChannel(_channel: unknown): void {
@@ -147,4 +136,3 @@ class D1ClientImpl {
 export const d1Client = new D1ClientImpl();
 export const db = d1Client;
 export const d1 = d1Client;
-export const supabase = d1Client;

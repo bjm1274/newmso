@@ -35,8 +35,7 @@ export const ALLOWANCE_MULTIPLIERS = {
   /** 야간근로수당 — 실제 야간근로(22:00–06:00) 가산분 (근로기준법 제56조 제3항) */
   night_work_allowance: 0.5,
   /** 연차휴가수당 — 미사용 연차 보상, 가산 없음 (근로기준법 제60조 제5항) */
-  annual_leave_pay: 1.0,
-} as const;
+  annual_leave_pay: 1.0 } as const;
 
 /** Union of all hours-based allowance field keys. */
 export type AllowanceHoursKey = keyof typeof ALLOWANCE_MULTIPLIERS;
@@ -62,33 +61,27 @@ export const HOURS_BASED_ALLOWANCE_FIELDS: ReadonlyArray<{
   {
     key: 'agreed_overtime_allowance',
     label: '약정연장수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.agreed_overtime_allowance,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.agreed_overtime_allowance },
   {
     key: 'agreed_night_allowance',
     label: '약정야간수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.agreed_night_allowance,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.agreed_night_allowance },
   {
     key: 'overtime_allowance',
     label: '연장근로수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.overtime_allowance,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.overtime_allowance },
   {
     key: 'night_work_allowance',
     label: '야간근로수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.night_work_allowance,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.night_work_allowance },
   {
     key: 'holiday_work_allowance',
     label: '휴일근로수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.holiday_work_allowance,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.holiday_work_allowance },
   {
     key: 'annual_leave_pay',
     label: '연차휴가수당',
-    multiplier: ALLOWANCE_MULTIPLIERS.annual_leave_pay,
-  },
+    multiplier: ALLOWANCE_MULTIPLIERS.annual_leave_pay },
 ] as const;
 
 // ---------------------------------------------------------------------------

@@ -4,8 +4,7 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import {
   isAdminSession,
   isSystemMasterSession,
-  readSessionFromRequest,
-} from '@/lib/server-session';
+  readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,8 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: err instanceof Error ? err.message : '연차 자동발생 실행 중 오류가 발생했습니다.',
-      },
+        error: err instanceof Error ? err.message : '연차 자동발생 실행 중 오류가 발생했습니다.' },
       { status: 500 },
     );
   }

@@ -19,8 +19,7 @@ import { useMyLeave, type MyLeaveHistory } from './data-hooks';
 const STATUS_STYLE: Record<MyLeaveHistory['status'], { bg: string; color: string }> = {
   '승인': { bg: 'var(--m-success-soft)', color: 'var(--m-success)' },
   '대기': { bg: 'var(--m-warning-soft)', color: 'var(--m-warning)' },
-  '반려': { bg: 'var(--m-danger-soft)', color: 'var(--m-danger)' },
-};
+  '반려': { bg: 'var(--m-danger-soft)', color: 'var(--m-danger)' } };
 
 export type 연차Props = {
   user: ErpUser;
@@ -45,8 +44,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
             background: 'var(--page-bg)',
             border: '1px solid var(--border)',
             color: 'var(--foreground)',
-            textAlign: 'center',
-          }}
+            textAlign: 'center' }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-500)' }}>
             {currentYear}년 잔여 연차
@@ -58,8 +56,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
               letterSpacing: '-0.04em',
               marginTop: 8,
               fontFeatureSettings: '"tnum"',
-              color: 'var(--m-accent)',
-            }}
+              color: 'var(--m-accent)' }}
           >
             {loading ? '—' : remaining}{' '}
             <span style={{ fontSize: 20, color: 'var(--z-500)', fontWeight: 600 }}>/ {total}일</span>
@@ -87,8 +84,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
-            }}
+              gap: 8 }}
           >
             <MIcon name="plus" size={18} />
             연차 신청
@@ -118,8 +114,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
                     alignItems: 'center',
                     gap: 12,
                     padding: '14px 16px',
-                    borderBottom: '1px solid var(--border)',
-                  }}
+                    borderBottom: '1px solid var(--border)' }}
                 >
                   <div
                     style={{
@@ -127,8 +122,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
                       height: 36,
                       color: 'var(--m-accent)',
                       display: 'grid',
-                      placeItems: 'center',
-                    }}
+                      placeItems: 'center' }}
                   >
                     <MIcon name="calendar" size={18} />
                   </div>
@@ -147,8 +141,7 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
                       padding: '3px 10px',
                       borderRadius: 999,
                       background: st.bg,
-                      color: st.color,
-                    }}
+                      color: st.color }}
                   >
                     {h.status}
                   </span>

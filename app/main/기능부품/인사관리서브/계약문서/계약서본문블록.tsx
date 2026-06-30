@@ -13,8 +13,7 @@ export default function ContractBodyBlock({
     templateText,
     privacyConsent,
     onPrivacyConsentChange,
-    isInteractive = false,
-}: Props) {
+    isInteractive = false }: Props) {
     const stripped = stripContractClosingLines(templateText || '');
     let raw = stripped.mainText || templateText || '';
 
@@ -274,7 +273,7 @@ export default function ContractBodyBlock({
                                     );
                                 }
                                 if (/^(기본급|식대|직책수당|자가운전보조금|보육수당|연구활동비|기타수당|기타\s*비과세|연장근로수당|야간근로수당|야간당직수당|합계)/.test(t)) {
-                                    const parts = t.split(/\s{2,}/);
+                                    const parts = t.split(/\s{2 }/);
                                     return (
                                         <div
                                             key={li}

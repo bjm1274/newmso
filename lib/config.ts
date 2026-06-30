@@ -30,32 +30,27 @@ function optionalEnvWithDefault(key: string, defaultValue: string): string {
 export const config = {
   /** 세션 */
   session: {
-    secret: requireEnv('SESSION_SECRET'),
-  },
+    secret: requireEnv('SESSION_SECRET') },
 
   /** Cron 인증 */
   cron: {
-    secret: optionalEnvWithDefault('CRON_SECRET', ''),
-  },
+    secret: optionalEnvWithDefault('CRON_SECRET', '') },
 
   /** AI 서비스 */
   ai: {
     geminiKey: optionalEnv('GEMINI_API_KEY'),
-    googleApiKey: optionalEnv('GOOGLE_API_KEY'),
-  },
+    googleApiKey: optionalEnv('GOOGLE_API_KEY') },
 
   /** Web Push / VAPID */
   push: {
     vapidPublicKey: optionalEnv('NEXT_PUBLIC_VAPID_PUBLIC_KEY'),
     vapidPublicKeyAlt: optionalEnv('VAPID_PUBLIC_KEY'),
     vapidPrivateKey: optionalEnv('VAPID_PRIVATE_KEY'),
-    vapidSubject: optionalEnv('VAPID_SUBJECT'),
-  },
+    vapidSubject: optionalEnv('VAPID_SUBJECT') },
 
   /** Firebase / FCM */
   firebase: {
-    serviceAccount: optionalEnv('FIREBASE_SERVICE_ACCOUNT'),
-  },
+    serviceAccount: optionalEnv('FIREBASE_SERVICE_ACCOUNT') },
 
   /** Cloudflare R2 오브젝트 스토리지 */
   r2: {
@@ -63,33 +58,26 @@ export const config = {
     accessKeyId: optionalEnv('R2_ACCESS_KEY_ID'),
     secretAccessKey: optionalEnv('R2_SECRET_ACCESS_KEY'),
     chatBucket: optionalEnv('R2_CHAT_BUCKET'),
-    publicBaseUrl: optionalEnv('R2_PUBLIC_BASE_URL'),
-  },
+    publicBaseUrl: optionalEnv('R2_PUBLIC_BASE_URL') },
 
   /** 결제 (가상계좌) */
   payment: {
-    virtualAccountWebhookToken: optionalEnv('VIRTUAL_ACCOUNT_WEBHOOK_TOKEN'),
-  },
+    virtualAccountWebhookToken: optionalEnv('VIRTUAL_ACCOUNT_WEBHOOK_TOKEN') },
 
   /** 관리자 비밀번호 해시 */
   admin: {
-    resetSecretHash: optionalEnv('RESET_SECRET_HASH'),
-  },
+    resetSecretHash: optionalEnv('RESET_SECRET_HASH') },
 
   /** 앱 URL */
   app: {
-    url: optionalEnv('NEXT_PUBLIC_APP_URL') ?? optionalEnv('APP_URL') ?? optionalEnv('NEXT_PUBLIC_SITE_URL') ?? '',
-  },
+    url: optionalEnv('NEXT_PUBLIC_APP_URL') ?? optionalEnv('APP_URL') ?? optionalEnv('NEXT_PUBLIC_SITE_URL') ?? '' },
 
   /** 모니터링 */
   monitoring: {
-    erpPushQuietHoursTimezone: optionalEnvWithDefault('ERP_PUSH_QUIET_HOURS_TIMEZONE', 'Asia/Seoul'),
-  },
+    erpPushQuietHoursTimezone: optionalEnvWithDefault('ERP_PUSH_QUIET_HOURS_TIMEZONE', 'Asia/Seoul') },
 
   /** Node 환경 */
   env: {
     nodeEnv: optionalEnvWithDefault('NODE_ENV', 'development'),
     isDev: process.env.NODE_ENV === 'development',
-    isProd: process.env.NODE_ENV === 'production',
-  },
-} as const;
+    isProd: process.env.NODE_ENV === 'production' } } as const;

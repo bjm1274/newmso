@@ -3,8 +3,7 @@ import { toast } from '@/lib/toast';
 import {
   buildStorageDownloadUrl,
   shouldUseManagedBrowserDownload,
-  triggerManagedBrowserDownload,
-} from '@/lib/object-storage-url';
+  triggerManagedBrowserDownload } from '@/lib/object-storage-url';
 
 type ManagedDownloadOptions = {
   logLabel?: string;

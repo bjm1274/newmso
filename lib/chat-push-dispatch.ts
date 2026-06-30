@@ -20,8 +20,7 @@ import {
   isNull,
   lte,
   or,
-  lt,
-} from '@/lib/db';
+  lt } from '@/lib/db';
 
 type MessageRow = {
   id: string;
@@ -110,8 +109,7 @@ function buildQueueFailurePatch(attemptCount: number, error: unknown, supportsRe
   if (!supportsRetryColumns) {
     return {
       processing_started_at: null,
-      last_error: message,
-    };
+      last_error: message };
   }
 
   const now = new Date();
@@ -124,8 +122,7 @@ function buildQueueFailurePatch(attemptCount: number, error: unknown, supportsRe
     processing_started_at: null,
     last_error: message,
     next_attempt_at: retryAt.toISOString(),
-    dead_lettered_at: exhausted ? now.toISOString() : null,
-  };
+    dead_lettered_at: exhausted ? now.toISOString() : null };
 }
 
 function buildQuietHoursDeferredPatch(job: QueueJobRow, supportsRetryColumns: boolean) {
@@ -142,8 +139,7 @@ function buildQuietHoursDeferredPatch(job: QueueJobRow, supportsRetryColumns: bo
     processing_started_at: null,
     last_error: 'quiet-hours-deferred',
     next_attempt_at: quietHoursDecision.resumeAt.toISOString(),
-    dead_lettered_at: null,
-  };
+    dead_lettered_at: null };
 }
 
 function parseBoardMessageMetaType(content: string | null | undefined) {
@@ -200,8 +196,7 @@ async function selectPendingChatPushJobsD1(limit: number) {
       created_at: chatPushJobsTable.created_at,
       attempt_count: chatPushJobsTable.attempt_count,
       next_attempt_at: chatPushJobsTable.next_attempt_at,
-      dead_lettered_at: chatPushJobsTable.dead_lettered_at,
-    })
+      dead_lettered_at: chatPushJobsTable.dead_lettered_at })
     .from(chatPushJobsTable)
     .where(
       and(
@@ -219,8 +214,7 @@ async function selectPendingChatPushJobsD1(limit: number) {
   return {
     jobs: rows as QueueJobRow[],
     supportsRetryColumns: true,
-    missingQueueTable: false,
-  };
+    missingQueueTable: false };
 }
 
 function toFiniteNumber(value: unknown) {
@@ -246,8 +240,7 @@ function getAlbumPushContext(message: MessageRow) {
     albumTotal,
     isAlbumBatch,
     isLastAlbumItem,
-    notificationTag: isAlbumBatch ? `chat-album-${albumId}` : `chat-msg-${message.id}`,
-  };
+    notificationTag: isAlbumBatch ? `chat-album-${albumId}` : `chat-msg-${message.id}` };
 }
 
 const STATIC_WORKER_LABELS = [
@@ -387,8 +380,7 @@ function choosePreferredChatNotification(rows: ExistingChatNotificationRow[]) {
 
   return {
     keep: sorted[0]!,
-    staleIds: sorted.slice(1).map((row) => String(row.id)),
-  };
+    staleIds: sorted.slice(1).map((row) => String(row.id)) };
 }
 
 async function getMutedUserIds(roomId: string) {
@@ -457,8 +449,7 @@ async function fetchMessageAndRoom(
         file_kind: messagesTable.file_kind,
         album_id: messagesTable.album_id,
         album_index: messagesTable.album_index,
-        album_total: messagesTable.album_total,
-      })
+        album_total: messagesTable.album_total })
       .from(messagesTable)
       .where(eq(messagesTable.id, messageId))
       .limit(1),
@@ -467,8 +458,7 @@ async function fetchMessageAndRoom(
         id: chatRoomsTable.id,
         name: chatRoomsTable.name,
         type: chatRoomsTable.type,
-        members: chatRoomsTable.members,
-      })
+        members: chatRoomsTable.members })
       .from(chatRoomsTable)
       .where(eq(chatRoomsTable.id, roomId))
       .limit(1),
@@ -492,8 +482,7 @@ async function fetchMessageAndRoom(
 
   return {
     message: rawMsg as MessageRow,
-    room: { ...rawRoom, members: parsedMembers } as ChatRoomRow,
-  };
+    room: { ...rawRoom, members: parsedMembers } as ChatRoomRow };
 }
 
 export async function dispatchChatPushForMessage(params: {
@@ -504,8 +493,7 @@ export async function dispatchChatPushForMessage(params: {
   // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
   const [, fetchResult, mutedIdsEarly] = await Promise.all([
     updateChatPushJobByMessageId(params.messageId, {
-      processing_started_at: new Date().toISOString(),
-    }),
+      processing_started_at: new Date().toISOString() }),
     fetchMessageAndRoom(params.messageId, params.roomId),
     getMutedUserIds(params.roomId),
   ]);
@@ -514,16 +502,14 @@ export async function dispatchChatPushForMessage(params: {
     await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
-      last_error: 'message-or-room-not-found',
-    });
+      last_error: 'message-or-room-not-found' });
     return {
       sent: 0,
       failed: 0,
       targets: 0,
       notificationsCreated: 0,
       pushDisabled: false,
-      reason: 'message-or-room-not-found',
-    } satisfies ChatPushDispatchResult;
+      reason: 'message-or-room-not-found' } satisfies ChatPushDispatchResult;
   }
 
   const message = fetchResult.message;
@@ -539,32 +525,28 @@ export async function dispatchChatPushForMessage(params: {
     await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
-      last_error: 'album-batch-intermediate-suppressed',
-    });
+      last_error: 'album-batch-intermediate-suppressed' });
     return {
       sent: 0,
       failed: 0,
       targets: 0,
       notificationsCreated: 0,
       pushDisabled: false,
-      reason: 'album-batch-intermediate',
-    } satisfies ChatPushDispatchResult;
+      reason: 'album-batch-intermediate' } satisfies ChatPushDispatchResult;
   }
 
   if (shouldSuppressBoardAutoAnnouncementPush(message, room)) {
     await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
-      last_error: 'board-auto-announcement-suppressed',
-    });
+      last_error: 'board-auto-announcement-suppressed' });
     return {
       sent: 0,
       failed: 0,
       targets: 0,
       notificationsCreated: 0,
       pushDisabled: false,
-      reason: 'board-auto-announcement',
-    } satisfies ChatPushDispatchResult;
+      reason: 'board-auto-announcement' } satisfies ChatPushDispatchResult;
   }
 
   let members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
@@ -583,16 +565,14 @@ export async function dispatchChatPushForMessage(params: {
     await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
-      last_error: null,
-    });
+      last_error: null });
     return {
       sent: 0,
       failed: 0,
       targets: 0,
       notificationsCreated: 0,
       pushDisabled: false,
-      reason: 'no-room-members',
-    } satisfies ChatPushDispatchResult;
+      reason: 'no-room-members' } satisfies ChatPushDispatchResult;
   }
 
   // 수정 K: 멘션된 사용자는 뮤트 여부와 무관하게 발송 대상에 포함
@@ -614,16 +594,14 @@ export async function dispatchChatPushForMessage(params: {
     await updateChatPushJobByMessageId(params.messageId, {
       processed_at: new Date().toISOString(),
       processing_started_at: null,
-      last_error: null,
-    });
+      last_error: null });
     return {
       sent: 0,
       failed: 0,
       targets: 0,
       notificationsCreated: 0,
       pushDisabled: false,
-      reason: 'no-targets',
-    } satisfies ChatPushDispatchResult;
+      reason: 'no-targets' } satisfies ChatPushDispatchResult;
   }
 
   let subscriptions: PushSubscriptionRow[] = [];
@@ -642,8 +620,7 @@ export async function dispatchChatPushForMessage(params: {
           p256dh: pushSubscriptionsTable.p256dh,
           auth: pushSubscriptionsTable.auth,
           fcm_token: pushSubscriptionsTable.fcm_token,
-          created_at: pushSubscriptionsTable.created_at,
-        })
+          created_at: pushSubscriptionsTable.created_at })
         .from(pushSubscriptionsTable)
         .where(inArray(pushSubscriptionsTable.staff_id, targetIds)),
       db
@@ -679,8 +656,7 @@ export async function dispatchChatPushForMessage(params: {
           user_id: notificationsTable.user_id,
           type: notificationsTable.type,
           metadata: notificationsTable.metadata,
-          created_at: notificationsTable.created_at,
-        })
+          created_at: notificationsTable.created_at })
         .from(notificationsTable)
         .where(
           and(
@@ -705,8 +681,7 @@ export async function dispatchChatPushForMessage(params: {
           user_id: String(row.user_id ?? ''),
           type: row.type ?? null,
           metadata: parsedMeta,
-          created_at: row.created_at ?? null,
-        };
+          created_at: row.created_at ?? null };
         const uid = String(notifRow.user_id || '').trim();
         if (!uid) continue;
         existingNotificationsByUser.set(uid, [
@@ -749,12 +724,9 @@ export async function dispatchChatPushForMessage(params: {
           created_at: message.created_at,
           is_thread_reply: Boolean(message.reply_to_id),
           reply_to_id: message.reply_to_id || null,
-          thread_root_id: threadRootId,
-        },
-      }),
+          thread_root_id: threadRootId } }),
       read_at: null,
-      created_at: message.created_at || new Date().toISOString(),
-    };
+      created_at: message.created_at || new Date().toISOString() };
   });
 
   // 알림 DB 저장은 백그라운드로 — push 전송과 병렬 실행
@@ -772,16 +744,13 @@ export async function dispatchChatPushForMessage(params: {
                   .insert(notificationsTable)
                   .values({
                     ...row,
-                    metadata: JSON.stringify(row.metadata),
-                  })
+                    metadata: JSON.stringify(row.metadata) })
                   .onConflictDoUpdate({
                     target: notificationsTable.id,
                     set: {
                       title: row.title,
                       body: row.body,
-                      metadata: JSON.stringify(row.metadata),
-                    },
-                  })
+                      metadata: JSON.stringify(row.metadata) } })
               ),
             );
           } catch (err) {
@@ -837,8 +806,7 @@ export async function dispatchChatPushForMessage(params: {
     if (!prev || (Number.isFinite(createdAt) ? createdAt : 0) > prev.createdAt) {
       latestFcmTokenByStaffId.set(row.staff_id, {
         token,
-        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
-      });
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0 });
     }
   }
   const uniqueFcmTokens = Array.from(
@@ -851,8 +819,7 @@ export async function dispatchChatPushForMessage(params: {
       updateChatPushJobByMessageId(params.messageId, {
         processed_at: new Date().toISOString(),
         processing_started_at: null,
-        last_error: 'no-active-subscriptions',
-      }),
+        last_error: 'no-active-subscriptions' }),
     ]);
 
     return {
@@ -861,8 +828,7 @@ export async function dispatchChatPushForMessage(params: {
       targets: targetIds.length,
       notificationsCreated: notificationRows.length,
       pushDisabled: false,
-      reason: 'no-active-subscriptions',
-    } satisfies ChatPushDispatchResult;
+      reason: 'no-active-subscriptions' } satisfies ChatPushDispatchResult;
   }
 
   // staff_id 기준으로 FCM 토큰이 있는 사용자 집합 구성 — Web Push + FCM 이중 발송 방지
@@ -900,16 +866,13 @@ export async function dispatchChatPushForMessage(params: {
       thread_root_id: threadRootId,
       ...(albumContext.albumId ? { album_id: albumContext.albumId } : {}),
       ...(albumContext.albumIndex !== null ? { album_index: String(albumContext.albumIndex) } : {}),
-      ...(albumContext.albumTotal !== null ? { album_total: String(albumContext.albumTotal) } : {}),
-    },
-  });
+      ...(albumContext.albumTotal !== null ? { album_total: String(albumContext.albumTotal) } : {}) } });
   const webPushPayload = JSON.stringify({
     title,
     body: previewBody,
     tag: notificationTag,
     data: payloadData,
-    ...(stickerImageUrl ? { image: stickerImageUrl } : {}),
-  });
+    ...(stickerImageUrl ? { image: stickerImageUrl } : {}) });
   const fcmPayloadData = Object.entries(payloadData).reduce<Record<string, string>>(
     (acc, [key, value]) => {
       if (value === null || value === undefined) return acc;
@@ -928,8 +891,7 @@ export async function dispatchChatPushForMessage(params: {
         title,
         body: previewBody,
         data: fcmPayloadData,
-        ...(stickerImageUrl ? { image: stickerImageUrl } : {}),
-      });
+        ...(stickerImageUrl ? { image: stickerImageUrl } : {}) });
       sent += fcmResult.success.length;
       // error 토큰(400 페이로드·5xx·네트워크·OAuth 실패)은 유효할 수 있으므로 무효화하지 않는다.
       // expired 토큰(UNREGISTERED·NOT_FOUND·404·410)만 DB에서 null 처리.
@@ -988,8 +950,7 @@ export async function dispatchChatPushForMessage(params: {
       targets.map((subscription) =>
         sendWebPushNotification(subscription, payload).then(() => ({
           ok: true as const,
-          id: subscription.id,
-        }))
+          id: subscription.id }))
       )
     );
     for (let i = 0; i < results.length; i++) {
@@ -1023,8 +984,7 @@ export async function dispatchChatPushForMessage(params: {
   if (pushDisabled && hasUndeliveredWebPushTargets) {
     await updateChatPushJobByMessageId(params.messageId, {
       processing_started_at: null,
-      last_error: 'web-push-disabled',
-    });
+      last_error: 'web-push-disabled' });
 
     return {
       sent,
@@ -1032,23 +992,20 @@ export async function dispatchChatPushForMessage(params: {
       targets: targetIds.length,
       notificationsCreated: notificationRows.length,
       pushDisabled: true,
-      reason: 'web-push-disabled',
-    } satisfies ChatPushDispatchResult;
+      reason: 'web-push-disabled' } satisfies ChatPushDispatchResult;
   }
 
   await updateChatPushJobByMessageId(params.messageId, {
     processed_at: new Date().toISOString(),
     processing_started_at: null,
-    last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null,
-  });
+    last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null });
 
   return {
     sent,
     failed,
     targets: targetIds.length,
     notificationsCreated: notificationRows.length,
-    pushDisabled,
-  } satisfies ChatPushDispatchResult;
+    pushDisabled } satisfies ChatPushDispatchResult;
 }
 
 export async function processPendingChatPushJobs(limit = 25) {
@@ -1076,14 +1033,12 @@ export async function processPendingChatPushJobs(limit = 25) {
     await updateChatPushJobById(job.id, {
       processing_started_at: new Date().toISOString(),
       attempt_count: nextAttemptCount,
-      last_error: null,
-    });
+      last_error: null });
 
     try {
       const result = await dispatchChatPushForMessage({
         roomId: String(job.room_id),
-        messageId: String(job.message_id),
-      });
+        messageId: String(job.message_id) });
       processed += 1;
       sent += result.sent;
       failed += result.failed;
@@ -1098,8 +1053,7 @@ export async function processPendingChatPushJobs(limit = 25) {
           await updateChatPushJobById(job.id, {
             processed_at: new Date().toISOString(),
             processing_started_at: null,
-            last_error: result.reason,
-          });
+            last_error: result.reason });
         }
         continue;
       }
@@ -1117,6 +1071,5 @@ export async function processPendingChatPushJobs(limit = 25) {
     processed,
     sent,
     failed,
-    skipped,
-  };
+    skipped };
 }

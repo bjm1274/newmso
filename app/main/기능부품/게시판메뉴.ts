@@ -24,5 +24,4 @@ export const BOARD_META_MAP: Record<string, { title: string; description: string
   수술일정: { title: '수술일정', description: '' },
   MRI일정: { title: 'MRI일정', description: '' },
   직원제안함: { title: '직원 제안함', description: '' },
-  업무가이드: { title: '업무공유', description: '회사별 / 팀별 메뉴에서 업무자료, 인수인계, 팀 할일을 함께 관리합니다.' },
-};
+  업무가이드: { title: '업무공유', description: '회사별 / 팀별 메뉴에서 업무자료, 인수인계, 팀 할일을 함께 관리합니다.' } };

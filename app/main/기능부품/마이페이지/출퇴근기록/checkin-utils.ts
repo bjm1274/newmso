@@ -18,11 +18,10 @@ import {
   buildShiftLookup,
   resolveAssignedShift,
   type ShiftAssignmentReference,
-  type ShiftLookupRecord,
-} from '@/lib/shift-resolution';
+  type ShiftLookupRecord } from '@/lib/shift-resolution';
 import { getStaffShifts } from '@/lib/staff-shift-resolver';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnFallback } from '@/lib/db-compat';
 import type { CommuteLog, ShiftBoundary } from './commute-types';
 import { decideCheckInStatus } from './late-status';
 
@@ -30,8 +29,7 @@ const COMMUTE_STATUS_TO_ATTENDANCES: Record<string, string> = {
   정상: 'present',
   지각: 'late',
   조퇴: 'early_leave',
-  결근: 'absent',
-};
+  결근: 'absent' };
 
 // ---------------------------------------------------------------------------
 // 순수 함수
@@ -54,8 +52,7 @@ export function buildFallbackShiftBoundary(department?: string): ShiftBoundary {
     label: isMedicalStaff ? '08:30' : '09:10',
     endHour: null,
     endMinute: null,
-    shiftKnown: false,
-  };
+    shiftKnown: false };
 }
 
 export function buildShiftBoundary(
@@ -74,8 +71,7 @@ export function buildShiftBoundary(
     label: `${String(start.hour).padStart(2, '0')}:${String(start.minute).padStart(2, '0')}`,
     endHour: end?.hour ?? null,
     endMinute: end?.minute ?? null,
-    shiftKnown: true,
-  };
+    shiftKnown: true };
 }
 
 export function buildDateWithTime(dateStr: string, hour: number, minute: number): Date {
@@ -137,7 +133,7 @@ export async function fetchLatestStaffShiftContext(
   try {
     const [shifts, staffRow] = await Promise.all([
       getStaffShifts(staffId),
-      supabase
+      db
         .from('staff_members')
         .select('shift_id, department, company')
         .eq('id', staffId)
@@ -156,8 +152,7 @@ export async function fetchLatestStaffShiftContext(
       department:
         String(staffRow?.department || '').trim() || fallback.department || undefined,
       company:
-        String(staffRow?.company || '').trim() || fallback.company || undefined,
-    };
+        String(staffRow?.company || '').trim() || fallback.company || undefined };
   } catch (error) {
     logger.warn('최신 근무유형 조회 실패:', error);
     return fallback;
@@ -180,14 +175,14 @@ export async function resolveLateThreshold(
       fetchLatestStaffShiftContext(staffId, fallback),
       withMissingColumnFallback(
         () =>
-          supabase
+          db
             .from('shift_assignments')
             .select('shift_id, shift_name')
             .eq('staff_id', staffId)
             .eq('work_date', workDate)
             .maybeSingle(),
         () =>
-          supabase
+          db
             .from('shift_assignments')
             .select('shift_id')
             .eq('staff_id', staffId)
@@ -221,7 +216,7 @@ export async function resolveLateThreshold(
 
     const [idsRes, namesRes] = await Promise.all([
       shiftIds.length > 0
-        ? supabase
+        ? db
             .from('work_shifts')
             .select(
               'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work, shift_type',
@@ -229,7 +224,7 @@ export async function resolveLateThreshold(
             .in('id', shiftIds)
         : Promise.resolve({ data: [], error: null }),
       shiftNames.length > 0
-        ? supabase
+        ? db
             .from('work_shifts')
             .select(
               'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work, shift_type',
@@ -250,8 +245,7 @@ export async function resolveLateThreshold(
       fallbackShiftIds: ctx.shiftIds,
       preferredCompany: ctx.company || undefined,
       workDate,
-      checkInIso: options?.checkInIso,
-    });
+      checkInIso: options?.checkInIso });
     if (!shiftRow) return buildFallbackShiftBoundary(effectiveDepartment);
 
     const startTime = String(shiftRow.start_time || '').trim();
@@ -260,8 +254,7 @@ export async function resolveLateThreshold(
     return {
       ...boundary,
       shiftType: String(shiftRow.shift_type || '') || null,
-      rosterAssigned: !!String(assignment?.shift_id || '').trim(),
-    };
+      rosterAssigned: !!String(assignment?.shift_id || '').trim() };
   } catch (error) {
     logger.warn('지각 기준 시간 조회 실패:', error);
     return buildFallbackShiftBoundary(fallback.department ?? undefined);
@@ -307,19 +300,18 @@ export async function syncToAttendances(
       check_in_time: checkIn,
       check_out_time: checkOut,
       status: attStatus,
-      work_hours_minutes: mins ?? undefined,
-    };
+      work_hours_minutes: mins ?? undefined };
 
     const earlyLeaveMinutes =
       attStatus === 'early_leave' ? Math.max(0, Number(options?.earlyLeaveMinutes || 0)) : 0;
 
     const result = await withMissingColumnFallback(
       () =>
-        supabase.from('attendances').upsert(
+        db.from('attendances').upsert(
           { ...basePayload, early_leave_minutes: earlyLeaveMinutes },
           { onConflict: 'staff_id,work_date' },
         ),
-      () => supabase.from('attendances').upsert(basePayload, { onConflict: 'staff_id,work_date' }),
+      () => db.from('attendances').upsert(basePayload, { onConflict: 'staff_id,work_date' }),
       'early_leave_minutes',
     );
 

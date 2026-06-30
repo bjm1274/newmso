@@ -6,7 +6,7 @@
  *  2. 오프라인 or 네트워크 실패 → Blob을 offline-blob-storage에 저장 후 큐 적재
  *     → queued: true, fileUrl: null
  *  3. 온라인 복귀 / 진입 시 자동 flush: 새 presigned URL 발급 후 R2 PUT
- *  4. onSuccessAction 있으면 성공 후 enqueueSupabaseMutation 체이닝
+ *  4. onSuccessAction 있으면 성공 후 enqueueD1Mutation 체이닝
  *  5. MAX_RETRY=3 초과 시 failed 상태 보관 (blob은 14일 후 cleanup)
  *
  * 플래너 requester:
@@ -22,7 +22,7 @@
  */
 
 import { storeBlob, getBlob, deleteBlob, cleanupOldBlobs } from './offline-blob-storage';
-import { enqueueSupabaseMutation } from './offline-queue-supabase';
+import { enqueueD1Mutation } from './offline-queue-d1';
 
 // ─────────────────────────────────────────────────────────────
 // 상수
@@ -103,8 +103,7 @@ function serializableItem(item: UploadQueueItem): Record<string, unknown> {
     retryCount: item.retryCount,
     lastAttemptAt: item.lastAttemptAt,
     createdAt: item.createdAt,
-    status: item.status,
-  };
+    status: item.status };
 }
 
 function lsReadQueue(): UploadQueueItem[] {
@@ -160,16 +159,14 @@ async function requestPlan(
     chat: '/api/chat/upload',
     board: '/api/board/upload',
     approval: '/api/approval/upload',
-    submission: '/api/submission/upload',
-  };
+    submission: '/api/submission/upload' };
   const endpoint = endpointMap[requester];
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ fileName: filename, mimeType, fileSize: sizeBytes, ...params }),
-    });
+      body: JSON.stringify({ fileName: filename, mimeType, fileSize: sizeBytes, ...params }) });
     const payload = (await res.json().catch(() => null)) as PlanResponse | null;
     if (!res.ok || !payload?.signedUrl || !payload?.url) {
       return { ok: false, error: payload?.error ?? `presigned 발급 실패 (HTTP ${res.status})` };
@@ -178,8 +175,7 @@ async function requestPlan(
       ok: true,
       signedUrl: payload.signedUrl,
       publicUrl: payload.url,
-      headers: payload.headers ?? { 'content-type': mimeType },
-    };
+      headers: payload.headers ?? { 'content-type': mimeType } };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'presigned 요청 실패' };
   }
@@ -289,7 +285,7 @@ async function flushOne(item: UploadQueueItem): Promise<void> {
         v === '{fileUrl}' ? plan.publicUrl : v,
       ]),
     );
-    await enqueueSupabaseMutation({ kind, table, payload, match });
+    await enqueueD1Mutation({ kind, table, payload, match });
   }
 }
 
@@ -365,12 +361,11 @@ export async function enqueueUpload(opts: EnqueueUploadOpts): Promise<EnqueueUpl
                 v === '{fileUrl}' ? plan.publicUrl : v,
               ]),
             );
-            await enqueueSupabaseMutation({
+            await enqueueD1Mutation({
               kind: onSuccessAction.kind,
               table: onSuccessAction.table,
               payload,
-              match: onSuccessAction.match,
-            });
+              match: onSuccessAction.match });
           }
           return { uploaded: true, queued: false, fileUrl: plan.publicUrl, error: null };
         }
@@ -407,8 +402,7 @@ export async function enqueueUpload(opts: EnqueueUploadOpts): Promise<EnqueueUpl
     retryCount: 0,
     lastAttemptAt: 0,
     createdAt: Date.now(),
-    status: 'pending',
-  };
+    status: 'pending' };
 
   uploadQueue = [...uploadQueue, queueItem];
   lsSaveQueue();

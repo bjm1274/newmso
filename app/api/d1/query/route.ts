@@ -2,7 +2,7 @@
 // app/api/d1/query/route.ts
 // Generic D1 SELECT 엔드포인트.
 //
-// 클라이언트가 supabase-like API로 호출하면 이 라우트가 D1 SQL을 생성·실행.
+// 클라이언트가 db-like API로 호출하면 이 라우트가 D1 SQL을 생성·실행.
 // SQL injection 방지를 위해 모든 입력은 zod로 검증 + ALLOWED_TABLES whitelist.
 //
 // 권한: 로그인 사용자 + POLICY_REGISTRY (Phase 4)로 SELECT 검증.
@@ -18,7 +18,7 @@
 //   { ok: true, data: T[] | T | null, count?: number }
 //   { ok: false, error: string, code?: string }
 //
-// Phase 6-A — supabase.from() 직접 호출을 D1으로 점진 이전.
+// Phase 6-A — db.from() 직접 호출을 D1으로 점진 이전.
 // ============================================================
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -28,14 +28,12 @@ import {
   getD1Binding,
   getD1Drizzle,
   filterByPolicy,
-  POLICY_REGISTRY,
-} from '@/lib/db';
+  POLICY_REGISTRY } from '@/lib/db';
 import type { ErpClaims } from '@/lib/db/auth/claims';
 import {
   FilterNodeSchema,
   assertFilterTreeValid,
-  type FilterNode,
-} from '@/lib/d1-compat/filter';
+  type FilterNode } from '@/lib/d1-compat/filter';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 
 export const dynamic = 'force-dynamic';
@@ -57,14 +55,12 @@ let provisioned = false;
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
   op: z.enum(['eq', 'neq', 'in', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike', 'contains']),
-  value: z.unknown(),
-});
+  value: z.unknown() });
 
 const OrderSchema = z.object({
   field: z.string().regex(COLUMN_RE),
   ascending: z.boolean().optional(),
-  nullsFirst: z.boolean().optional(),
-});
+  nullsFirst: z.boolean().optional() });
 
 const PayloadSchema = z.object({
   table: z.string(),
@@ -76,8 +72,7 @@ const PayloadSchema = z.object({
   range: z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }).optional(),
   single: z.boolean().optional(),
   maybeSingle: z.boolean().optional(),
-  count: z.boolean().optional(),
-});
+  count: z.boolean().optional() });
 
 type Payload = z.infer<typeof PayloadSchema>;
 
@@ -105,8 +100,7 @@ function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims
     erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_view_all_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),
-    erp_can_manage_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),
-  };
+    erp_can_manage_department_inventory: Boolean(perms.admin || perms.mso || perms.hr) };
 }
 
 /**
@@ -336,22 +330,7 @@ export async function POST(request: Request) {
     // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
     if (!provisioned) {
       try {
-        await d1.exec(`
-        CREATE TABLE IF NOT EXISTS "disciplinary_committees" (
-          "id" text PRIMARY KEY NOT NULL,
-          "company" text,
-          "title" text NOT NULL,
-          "meeting_date" text,
-          "target_staff_id" text NOT NULL,
-          "target_staff_name" text NOT NULL,
-          "status" text DEFAULT '대기',
-          "reason" text NOT NULL,
-          "result_type" text,
-          "result_details" text,
-          "committee_members" text,
-          "created_at" text DEFAULT (CURRENT_TIMESTAMP)
-        );
-      `);
+        await d1.exec('CREATE TABLE IF NOT EXISTS "disciplinary_committees" ("id" text PRIMARY KEY NOT NULL, "company" text, "title" text NOT NULL, "meeting_date" text, "target_staff_id" text NOT NULL, "target_staff_name" text NOT NULL, "status" text DEFAULT \'대기\', "reason" text NOT NULL, "result_type" text, "result_details" text, "committee_members" text, "created_at" text DEFAULT (CURRENT_TIMESTAMP));');
       } catch (err) {
         console.error('Failed to auto-provision disciplinary_committees table:', err);
       }
@@ -394,8 +373,7 @@ export async function POST(request: Request) {
         ...payload,
         columns: undefined,
         limit: MAX_LIMIT,
-        range: undefined,
-      };
+        range: undefined };
       const countResult = await db.run(buildSelectSql(countPayload));
       const rawRows = ((countResult as { results?: unknown[] }).results ?? []) as Array<Record<string, unknown>>;
       const filtered = await filterByPolicy(db, claims, payload.table, rawRows);

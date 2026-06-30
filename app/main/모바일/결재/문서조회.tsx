@@ -53,15 +53,13 @@ export default function SApprovalDocs({
   completed,
   loading,
   onOpen,
-  onBack,
-}: SApprovalDocsProps) {
+  onBack }: SApprovalDocsProps) {
   // 조회 조건: pending(선택중) → 조회 버튼으로 applied 반영 (PC 문서조회 흐름 재현)
   const [typeSel, setTypeSel] = useState('전체');
   const [periodSel, setPeriodSel] = useState<DocPeriod>('90d');
   const [applied, setApplied] = useState<{ type: string; period: DocPeriod }>({
     type: '전체',
-    period: '90d',
-  });
+    period: '90d' });
 
   // 문서 종류 옵션 — 본인 관여 문서에 실제 존재하는 type만
   const typeOptions = useMemo(() => {
@@ -105,8 +103,7 @@ export default function SApprovalDocs({
           margin: '16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
-        }}
+          gap: 12 }}
       >
         <div>
           <label
@@ -132,8 +129,7 @@ export default function SApprovalDocs({
                 fontWeight: 900,
                 color: 'var(--z-900)',
                 fontFamily: 'inherit',
-                outline: 'none',
-              }}
+                outline: 'none' }}
             >
               {typeOptions.map((t) => (
                 <option key={t} value={t}>
@@ -159,8 +155,7 @@ export default function SApprovalDocs({
               padding: 3,
               borderRadius: 16,
               gap: 2,
-              border: '1px solid rgba(0, 0, 0, 0.03)',
-            }}
+              border: '1px solid rgba(0, 0, 0, 0.03)' }}
           >
             {PERIOD_CHIPS.map((p) => {
               const on = periodSel === p.id;
@@ -183,8 +178,7 @@ export default function SApprovalDocs({
                     background: on ? '#fff' : 'transparent',
                     color: on ? 'var(--z-900)' : 'var(--z-600)',
                     boxShadow: on ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   {p.label}
                 </button>
@@ -211,8 +205,7 @@ export default function SApprovalDocs({
             gap: 6,
             border: 'none',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0, 122, 255, 0.25)',
-          }}
+            boxShadow: '0 2px 8px rgba(0, 122, 255, 0.25)' }}
         >
           <span style={{ display: 'inline-flex' }}><MIcon name="search" size={15} /></span>
           조회
@@ -260,8 +253,7 @@ function DocSection({
   rows,
   staffId,
   onOpen,
-  emptyMsg,
-}: {
+  emptyMsg }: {
   title: string;
   count: number;
   rows: ApprovalRow[];

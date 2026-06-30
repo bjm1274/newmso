@@ -39,8 +39,7 @@ export async function POST(request: NextRequest) {
     const result = await dispatchChatPushForMessage({
       roomId,
       messageId,
-      expectedSenderId: String(session.user.id),
-    });
+      expectedSenderId: String(session.user.id) });
 
     return NextResponse.json(result);
   } catch (error: any) {

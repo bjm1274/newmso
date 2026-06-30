@@ -9,20 +9,17 @@ import WebVitalsInit from "@/app/components/dev/WebVitalsInit";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+  subsets: ["latin"] });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  subsets: ["latin"] });
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: "#2563eb",
-  viewportFit: "cover",
-};
+  viewportFit: "cover" };
 
 export const metadata: Metadata = {
   title: "AllERP",
@@ -31,17 +28,13 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "MSO",
-  },
+    title: "MSO" },
   icons: {
     icon: "/icon-512x512.png",
-    apple: "/apple-touch-icon.png",
-  },
-};
+    apple: "/apple-touch-icon.png" } };
 
 export default function RootLayout({
-  children,
-}: Readonly<{
+  children }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
@@ -61,8 +54,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('erp-font-size');if(s){document.documentElement.style.fontSize=s+'px';}}catch(e){}})();`,
-          }}
+            __html: `(function(){try{var s=localStorage.getItem('erp-font-size');if(s){document.documentElement.style.fontSize=s+'px';}}catch(e){}})();` }}
         />
       </head>
       <body

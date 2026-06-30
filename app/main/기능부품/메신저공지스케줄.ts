@@ -63,8 +63,7 @@ function normalizeJob(raw: unknown): NoticeScheduleJob | null {
           return {
             offsetMinutes: Math.floor(offsetMinutes),
             unreadCount: Math.max(0, Math.floor(unreadCount)),
-            sentAt,
-          } satisfies NoticeReminderLogEntry;
+            sentAt } satisfies NoticeReminderLogEntry;
         })
         .filter((entry): entry is NoticeReminderLogEntry => Boolean(entry))
     : [];
@@ -92,8 +91,7 @@ function normalizeJob(raw: unknown): NoticeScheduleJob | null {
         ? record.sentAt.trim()
         : null,
     reminderMinutes: normalizeReminderMinutes(record.reminderMinutes),
-    reminderLog,
-  };
+    reminderLog };
 }
 
 function readJobs(actorId: string | null | undefined) {
@@ -161,8 +159,7 @@ export function saveScheduledNoticeJob(
     sentMessageId: existing?.sentMessageId || null,
     sentAt: existing?.sentAt || null,
     reminderMinutes: normalizeReminderMinutes(job.reminderMinutes ?? existing?.reminderMinutes),
-    reminderLog: existing?.reminderLog || [],
-  };
+    reminderLog: existing?.reminderLog || [] };
 
   const nextJobs = [
     ...existingJobs.filter((entry) => entry.id !== normalizedId),
@@ -194,8 +191,7 @@ export function cancelScheduledNoticeJob(
         ? {
             ...job,
             status: 'cancelled',
-            updatedAt: new Date().toISOString(),
-          }
+            updatedAt: new Date().toISOString() }
         : job,
     ),
   );
@@ -222,8 +218,7 @@ export function markScheduledNoticeSent(
             status: 'sent',
             sentMessageId: messageId,
             sentAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
+            updatedAt: new Date().toISOString() }
         : job,
     ),
   );
@@ -247,10 +242,8 @@ export function recordScheduledNoticeReminder(
           {
             offsetMinutes,
             unreadCount: Math.max(0, Math.floor(unreadCount)),
-            sentAt: new Date().toISOString(),
-          },
-        ].sort((left, right) => left.offsetMinutes - right.offsetMinutes),
-      };
+            sentAt: new Date().toISOString() },
+        ].sort((left, right) => left.offsetMinutes - right.offsetMinutes) };
     }),
   );
 }
@@ -280,8 +273,7 @@ export function getDueScheduledNoticeReminderStages(
       .filter((offsetMinutes) => sentAt + offsetMinutes * 60 * 1000 <= now)
       .map((offsetMinutes) => ({
         job,
-        offsetMinutes,
-      }));
+        offsetMinutes }));
   });
 }
 

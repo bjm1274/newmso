@@ -75,8 +75,7 @@ export function getBoardPostAuthorSignal(post: Partial<BoardPost>) {
     name,
     initials,
     meta: company,
-    isAnonymous,
-  };
+    isAnonymous };
 }
 
 export function getBoardPostPreview(post: Partial<BoardPost>, maxLength = 120) {
@@ -124,8 +123,7 @@ export function extractAttachmentMetaFromContent(value: unknown) {
     return {
       displayContent: raw.trim(),
       attachments: [] as AttachmentItem[],
-      hasEmbeddedAttachments: false,
-    };
+      hasEmbeddedAttachments: false };
   }
 
   const displayContent = `${raw.slice(0, start)}${raw.slice(end + ATTACHMENTS_META_SUFFIX.length)}`.trim();
@@ -141,22 +139,19 @@ export function extractAttachmentMetaFromContent(value: unknown) {
             type: inferAttachmentType(
               String((item as AttachmentItem)?.name ?? (item as AttachmentItem)?.url ?? ''),
               String((item as AttachmentItem)?.type ?? '')
-            ),
-          }))
+            ) }))
           .filter((item) => item.name && item.url)
       : [];
 
     return {
       displayContent,
       attachments,
-      hasEmbeddedAttachments: attachments.length > 0,
-    };
+      hasEmbeddedAttachments: attachments.length > 0 };
   } catch {
     return {
       displayContent,
       attachments: [] as AttachmentItem[],
-      hasEmbeddedAttachments: true,
-    };
+      hasEmbeddedAttachments: true };
   }
 }
 
@@ -166,8 +161,7 @@ export function buildAttachmentMetaContent(visibleContent: string, attachments: 
   const attachmentPayload = attachments.map((item) => ({
     name: String(item.name || '').trim(),
     url: String(item.url || '').trim(),
-    type: inferAttachmentType(String(item.name || item.url || ''), String(item.type || '')),
-  }));
+    type: inferAttachmentType(String(item.name || item.url || ''), String(item.type || '')) }));
 
   return `${normalizedVisibleContent}${normalizedVisibleContent ? '\n' : ''}${ATTACHMENTS_META_PREFIX}${JSON.stringify(attachmentPayload)}${ATTACHMENTS_META_SUFFIX}`;
 }
@@ -254,8 +248,7 @@ export function extractScheduleMetaFromContent(value: unknown) {
     return {
       displayContent: raw.trim(),
       meta: null as ScheduleMetaPayload | null,
-      hasEmbeddedMeta: false,
-    };
+      hasEmbeddedMeta: false };
   }
 
   const displayContent = `${raw.slice(0, start)}${raw.slice(end + SCHEDULE_META_SUFFIX.length)}`.trim();
@@ -285,8 +278,7 @@ export function extractBoardMetaFromContent(value: unknown) {
     return {
       displayContent: raw.trim(),
       meta: null as BoardMetaPayload | null,
-      hasEmbeddedMeta: false,
-    };
+      hasEmbeddedMeta: false };
   }
 
   const displayContent = `${raw.slice(0, start)}${raw.slice(end + BOARD_META_SUFFIX.length)}`.trim();
@@ -310,24 +302,20 @@ export function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   if (!post) return post;
   const {
     displayContent: attachmentStrippedContent,
-    attachments: embeddedAttachments,
-  } = extractAttachmentMetaFromContent(post.content ?? '');
+    attachments: embeddedAttachments } = extractAttachmentMetaFromContent(post.content ?? '');
   const {
     displayContent: scheduleStrippedContent,
     meta: scheduleMeta,
-    hasEmbeddedMeta,
-  } = extractScheduleMetaFromContent(attachmentStrippedContent);
+    hasEmbeddedMeta } = extractScheduleMetaFromContent(attachmentStrippedContent);
   const {
     displayContent,
-    meta: boardMeta,
-  } = extractBoardMetaFromContent(scheduleStrippedContent);
+    meta: boardMeta } = extractBoardMetaFromContent(scheduleStrippedContent);
   const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? scheduleMeta?.date ?? '');
   const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? scheduleMeta?.time ?? '');
   const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
   const normalizedAttachments = (Array.isArray(post.attachments) && post.attachments.length > 0 ? post.attachments : embeddedAttachments).map((item) => ({
     ...item,
-    type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')),
-  }));
+    type: inferAttachmentType(String(item?.name || item?.url || ''), String(item?.type || '')) }));
 
   return {
     ...post,
@@ -349,8 +337,7 @@ export function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
         ? post.mri_contrast_required
         : Boolean(scheduleMeta?.contrast),
     schedule_meta_embedded: hasEmbeddedMeta,
-    schedule_meta_legacy_missing: scheduleMetaLegacyMissing,
-  };
+    schedule_meta_legacy_missing: scheduleMetaLegacyMissing };
 }
 
 export function isScheduledNoticePending(post: Partial<BoardPost>, nowMs: number) {

@@ -94,8 +94,7 @@ function getLocalD1Mock(): D1Database | undefined {
         return {
           results,
           success: true,
-          meta: { duration: 0, changes: 0, rows_read: results.length, rows_written: 0 },
-        };
+          meta: { duration: 0, changes: 0, rows_read: results.length, rows_written: 0 } };
       }
 
       async run() {
@@ -103,8 +102,7 @@ function getLocalD1Mock(): D1Database | undefined {
         const info = stmt.run(...this.params);
         return {
           success: true,
-          meta: { duration: 0, changes: info.changes, rows_read: 0, rows_written: info.changes },
-        };
+          meta: { duration: 0, changes: info.changes, rows_read: 0, rows_written: info.changes } };
       }
 
       async first() {

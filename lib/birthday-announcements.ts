@@ -11,8 +11,7 @@ import {
   eq,
   and,
   ne,
-  sql,
-} from '@/lib/db';
+  sql } from '@/lib/db';
 import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
 
 type D1Db = ReturnType<typeof getD1Drizzle>;
@@ -48,8 +47,7 @@ export async function processBirthdayAnnouncements(now = new Date()): Promise<Bi
       department: staffMembersTable.department,
       position: staffMembersTable.position,
       resident_no: staffMembersTable.resident_no,
-      birth_date: staffMembersTable.birth_date,
-    })
+      birth_date: staffMembersTable.birth_date })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.status, '재직'));
 
@@ -129,8 +127,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
       sender_id: null,
       sender_name: '공지봇',
       content,
-      created_at: nowIso,
-    };
+      created_at: nowIso };
 
     try {
       const inserted = await db
@@ -145,13 +142,11 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         await updateChatRoomLastMessage(db, {
           room_id: NOTICE_ROOM_ID,
           created_at: nowIso,
-          content,
-        });
+          content });
         await enqueueChatPushJob({
           messageId,
           roomId: NOTICE_ROOM_ID,
-          senderId: null,
-        }).catch((err) => {
+          senderId: null }).catch((err) => {
           console.warn('[birthday-announcements] Failed to enqueue chat push job', err);
         });
         postedToChat += 1;
@@ -174,8 +169,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         event_date: welfareTable.event_date,
         relation: welfareTable.relation,
         recipient: welfareTable.recipient,
-        memo: welfareTable.memo,
-      })
+        memo: welfareTable.memo })
       .from(welfareTable)
       .where(
         and(
@@ -195,8 +189,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         relation: event.relation || '본인',
         recipient: event.recipient || '',
         eventDate: event.event_date || kstDateStr,
-        memo: event.memo || '',
-      });
+        memo: event.memo || '' });
 
       const eventMessageRow = {
         id: eventMessageId,
@@ -204,8 +197,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         sender_id: null,
         sender_name: '공지봇',
         content: eventContent,
-        created_at: nowIso,
-      };
+        created_at: nowIso };
 
       try {
         const inserted = await db
@@ -220,13 +212,11 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
           await updateChatRoomLastMessage(db, {
             room_id: NOTICE_ROOM_ID,
             created_at: nowIso,
-            content: eventContent,
-          });
+            content: eventContent });
           await enqueueChatPushJob({
             messageId: eventMessageId,
             roomId: NOTICE_ROOM_ID,
-            senderId: null,
-          }).catch((err) => {
+            senderId: null }).catch((err) => {
             console.warn('[birthday-announcements] Failed to enqueue welfare chat push job', err);
           });
           postedWelfareEvents += 1;
@@ -246,8 +236,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
     addedToWelfare,
     postedToChat,
     postedWelfareEvents,
-    errors,
-  };
+    errors };
 }
 
 function buildDeterministicId(namespace: string, staffId: string, year: string) {

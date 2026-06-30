@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff, isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import MSheet from '../공통/MSheet';
@@ -36,8 +36,7 @@ export function toApproverPick(s: StaffMember): ApproverPick {
     name: String(s.name || ''),
     position: s.position ?? null,
     department: s.department ?? null,
-    company: s.company ?? null,
-  };
+    company: s.company ?? null };
 }
 
 export type SApprovalApproverPickerProps = {
@@ -57,8 +56,7 @@ export default function SApprovalApproverPicker({
   company,
   current,
   defaultLine,
-  onApply,
-}: SApprovalApproverPickerProps) {
+  onApply }: SApprovalApproverPickerProps) {
   const [line, setLine] = useState<ApproverPick[]>(current);
   const [query, setQuery] = useState('');
   const [staffRows, setStaffRows] = useState<StaffMember[] | null>(null);
@@ -82,7 +80,7 @@ export default function SApprovalApproverPicker({
     setLoading(true);
     (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select(
             'id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions'
@@ -181,8 +179,7 @@ export default function SApprovalApproverPicker({
                 color: 'var(--z-600)',
                 background: 'rgba(255, 159, 10, 0.08)',
                 border: '1px solid rgba(255, 159, 10, 0.2)',
-                fontWeight: 800,
-              }}
+                fontWeight: 800 }}
             >
               결재자를 한 명 이상 추가해 주세요.
             </div>
@@ -204,8 +201,7 @@ export default function SApprovalApproverPicker({
                       gridTemplateColumns: '32px 1fr auto',
                       gap: 10,
                       alignItems: 'center',
-                      padding: '8px 10px',
-                    }}
+                      padding: '8px 10px' }}
                   >
                     <MAvatar tone="violet" size="sm">
                       {(a.name || '?').charAt(0)}
@@ -261,8 +257,7 @@ export default function SApprovalApproverPicker({
                 padding: 6,
                 background: 'transparent',
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
               aria-label="결재선을 기본값으로 되돌리기"
             >
               기본값으로
@@ -283,8 +278,7 @@ export default function SApprovalApproverPicker({
               alignItems: 'center',
               gap: 8,
               padding: '8px 12px',
-              borderRadius: 10,
-            }}
+              borderRadius: 10 }}
           >
             <MIcon name="search" size={14} color="var(--z-500)" />
             <input
@@ -300,8 +294,7 @@ export default function SApprovalApproverPicker({
                 background: 'transparent',
                 fontSize: 13,
                 fontWeight: 700,
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             />
           </div>
 
@@ -322,8 +315,7 @@ export default function SApprovalApproverPicker({
                     fontWeight: 900,
                     color: 'var(--z-500)',
                     padding: '6px 4px 4px',
-                    letterSpacing: '0.04em',
-                  }}
+                    letterSpacing: '0.04em' }}
                 >
                   {dept}
                 </div>
@@ -363,8 +355,7 @@ export default function SApprovalApproverPicker({
           display: 'flex',
           gap: 8,
           padding: '10px 16px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.4)',
-        }}
+          borderTop: '1px solid rgba(255,255,255,0.4)' }}
       >
         <button
           type="button"
@@ -383,8 +374,7 @@ export default function SApprovalApproverPicker({
           style={{
             ...actionStyle('primary'),
             opacity: line.length === 0 ? 0.5 : 1,
-            cursor: line.length === 0 ? 'not-allowed' : 'pointer',
-          }}
+            cursor: line.length === 0 ? 'not-allowed' : 'pointer' }}
           aria-label="결재선 적용"
         >
           적용
@@ -407,8 +397,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         color: 'var(--z-500)',
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
-        margin: '4px 0 6px',
-      }}
+        margin: '4px 0 6px' }}
     >
       {children}
     </div>
@@ -444,8 +433,7 @@ function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: I
         border: '1px solid rgba(0, 0, 0, 0.05)',
         color,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-      }}
+        opacity: disabled ? 0.5 : 1 }}
     >
       {children}
     </button>
@@ -460,16 +448,14 @@ const memberRowStyle: CSSProperties = {
   background: 'transparent',
   border: 'none',
   borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
-  cursor: 'pointer',
-};
+  cursor: 'pointer' };
 
 const emptyStyle: CSSProperties = {
   textAlign: 'center',
   padding: '20px 0',
   fontSize: 12,
   color: 'var(--z-500)',
-  fontWeight: 800,
-};
+  fontWeight: 800 };
 
 function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
   const base: CSSProperties = {
@@ -478,8 +464,7 @@ function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
     fontSize: 14,
     fontWeight: 900,
     cursor: 'pointer',
-    border: '1px solid rgba(0, 0, 0, 0.06)',
-  };
+    border: '1px solid rgba(0, 0, 0, 0.06)' };
   if (kind === 'primary') {
     return { ...base, background: '#007AFF', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)' };
   }

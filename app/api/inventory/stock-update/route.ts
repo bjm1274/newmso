@@ -13,16 +13,14 @@ import {
   atomicStockUpdate,
   StockError,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 const PayloadSchema = z.object({
   itemId: z.string().min(1),
   delta: z.number().int(),
-  minAllowed: z.number().int().optional(),
-});
+  minAllowed: z.number().int().optional() });
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
@@ -58,8 +56,7 @@ export async function POST(request: Request) {
         INSUFFICIENT_STOCK: 409,
         ITEM_NOT_FOUND: 404,
         SOURCE_NOT_FOUND: 404,
-        DEST_NOT_FOUND: 404,
-      };
+        DEST_NOT_FOUND: 404 };
       const status = statusMap[err.code] ?? 500;
       return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });
     }

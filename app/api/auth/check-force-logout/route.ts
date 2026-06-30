@@ -14,8 +14,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,8 +72,7 @@ export async function GET(request: Request) {
         company_id: staffMembersTable.company_id,
         department: staffMembersTable.department,
         position: staffMembersTable.position,
-        team: staffMembersTable.team,
-      })
+        team: staffMembersTable.team })
       .from(staffMembersTable)
       .where(eq(staffMembersTable.id, id))
       .limit(1);

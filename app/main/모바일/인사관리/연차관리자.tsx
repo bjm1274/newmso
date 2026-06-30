@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
@@ -63,7 +63,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
   const fetchLeaveData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('leave_requests')
         .select('*')
         .order('start_date', { ascending: false });
@@ -90,8 +90,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
         staff: s,
         total,
         used,
-        remaining,
-      };
+        remaining };
     });
   }, [activeStaffs]);
 
@@ -113,8 +112,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
     return {
       totalRemaining,
       pendingCount,
-      expiringCount: expiryItems.length,
-    };
+      expiringCount: expiryItems.length };
   }, [staffLedger, requests, expiryItems]);
 
   // 수동 연차 부여 처리
@@ -141,17 +139,16 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
         days: finalDays,
         status: '승인',
         reason: reason.trim() || '관리자 수동 처리',
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { error: insErr } = await supabase.from('leave_requests').insert([payload]);
+      const { error: insErr } = await db.from('leave_requests').insert([payload]);
       if (insErr) throw insErr;
 
       // 직원 연차 총량 즉시 갱신
       if (leaveType === '연차(부여)') {
         const staff = staffs.find((s) => String(s.id) === selectedStaffId);
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_total: currentTotal + finalDays })
           .eq('id', selectedStaffId);
@@ -161,8 +158,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       await fetch('/api/admin/annual-leave/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId: selectedStaffId }),
-      }).catch((e) => console.error('동기화 API 실패:', e));
+        body: JSON.stringify({ staffId: selectedStaffId }) }).catch((e) => console.error('동기화 API 실패:', e));
 
       toast('수동 연차가 부여되었습니다.', 'success');
       setSelectedStaffId('');
@@ -181,12 +177,11 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
   // 연차 승인/반려 결재 처리
   const handleStatusUpdate = async (req: LeaveRequestRow, status: '승인' | '반려') => {
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('leave_requests')
         .update({
           status,
-          approved_at: status === '승인' ? new Date().toISOString() : null,
-        })
+          approved_at: status === '승인' ? new Date().toISOString() : null })
         .eq('id', req.id);
 
       if (error) throw error;
@@ -196,7 +191,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
         const daysVal = req.days || calculateLeaveDays(req.start_date, req.end_date);
         const staff = staffs.find((s) => String(s.id) === String(req.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_total: currentTotal + daysVal })
           .eq('id', req.staff_id);
@@ -205,8 +200,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       await fetch('/api/admin/annual-leave/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId: req.staff_id }),
-      }).catch((e) => console.error(e));
+        body: JSON.stringify({ staffId: req.staff_id }) }).catch((e) => console.error(e));
 
       // 감사 로그
       const actor = readClientAuditActor();
@@ -234,8 +228,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
         style={{
           padding: '10px 16px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="연차 관리 탭">
           <button
@@ -271,7 +264,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       {subTab === 'ledger' && (
         <div style={{ padding: '14px 16px 0' }}>
           {/* 수동 연차 부여 폼 */}
-          <div className="m-card" style={{ padding: 14, marginBottom: 12 }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>수동 연차 부여 및 차감</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <select
@@ -283,8 +276,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
                   fontSize: 13,
-                  background: 'white',
-                }}
+                  background: 'white' }}
               >
                 <option value="">대상 직원을 선택하세요</option>
                 {activeStaffs.map((s) => (
@@ -304,8 +296,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    background: 'white',
-                  }}
+                    background: 'white' }}
                 >
                   <option value="연차(부여)">연차 부여 (+)</option>
                   <option value="연차(과거사용)">연차 차감 (-)</option>
@@ -324,8 +315,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                       padding: 10,
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
-                      fontSize: 13,
-                    }}
+                      fontSize: 13 }}
                   />
                 ) : (
                   <input
@@ -337,8 +327,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                       padding: 10,
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
-                      fontSize: 13,
-                    }}
+                      fontSize: 13 }}
                   />
                 )}
               </div>
@@ -352,8 +341,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                   padding: 10,
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
-                  fontSize: 13,
-                }}
+                  fontSize: 13 }}
               />
 
               <input
@@ -366,8 +354,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                   padding: 10,
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
-                  fontSize: 13,
-                }}
+                  fontSize: 13 }}
               />
 
               <MBtn variant="primary" block disabled={submitting} onClick={handleQuickSubmit}>
@@ -380,7 +367,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
           <div className="m-section-h" style={{ padding: '8px 0 6px' }}>
             <div className="lbl">임직원 연차 목록</div>
           </div>
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {staffLedger.map((row) => (
               <div key={row.staff.id} className="m-list-row">
                 <MAvatar tone={pickAvatarTone(row.staff.name)}>{row.staff.name.charAt(0)}</MAvatar>
@@ -424,7 +411,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
               결재 대기 중인 연차/휴가 요청이 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {requests
                 .filter((r) => r.status === '대기')
                 .map((req) => {
@@ -469,8 +456,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                             background: 'white',
                             color: 'var(--m-danger)',
                             fontSize: 11,
-                            fontWeight: 700,
-                          }}
+                            fontWeight: 700 }}
                         >
                           반려
                         </button>
@@ -484,8 +470,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                             background: 'var(--m-accent)',
                             color: 'white',
                             fontSize: 11,
-                            fontWeight: 700,
-                          }}
+                            fontWeight: 700 }}
                         >
                           승인
                         </button>
@@ -500,7 +485,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
 
       {subTab === 'expiry' && (
         <div style={{ padding: '14px 16px 0' }}>
-          <div className="m-card" style={{ padding: 14, marginBottom: 12, background: 'var(--m-warning-soft)', borderColor: 'transparent' }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12, background: 'var(--m-warning-soft)', borderColor: 'transparent' }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-warning)', marginBottom: 4 }}>
               연간 소멸 대상자 안내
             </div>
@@ -509,7 +494,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
             </p>
           </div>
 
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {expiryItems.map((item) => (
               <div key={item.staff.id} className="m-list-row">
                 <MAvatar tone={pickAvatarTone(item.staff.name)}>{item.staff.name.charAt(0)}</MAvatar>
@@ -535,8 +520,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                       background: 'var(--m-accent-soft)',
                       color: 'var(--m-accent)',
                       fontSize: 11,
-                      fontWeight: 700,
-                    }}
+                      fontWeight: 700 }}
                   >
                     권고 발송
                   </button>

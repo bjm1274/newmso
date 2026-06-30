@@ -14,8 +14,7 @@ const CompanyContext = createContext<CompanyState | null>(null);
 
 export function CompanyProvider({
   value,
-  children,
-}: {
+  children }: {
   value: CompanyState;
   children: React.ReactNode;
 }) {

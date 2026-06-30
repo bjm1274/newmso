@@ -78,8 +78,7 @@ export function calcStatutoryDeductions(
   if (applyTax && hasExactWithholdingTable) {
     const exactIncomeTax = calculateMonthlyIncomeTax(taxableIncome, rates, dependentCount, {
       withholdingRatePercent,
-      qualifyingChildCount,
-    });
+      qualifyingChildCount });
     income_tax = Math.max(0, exactIncomeTax);
     local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10% 이내 10원 단위 절사 (국고금관리법 제47조)
   }
@@ -91,6 +90,5 @@ export function calcStatutoryDeductions(
     employment_insurance,
     income_tax,
     local_tax,
-    total_insurance_deductions: national_pension + health_insurance + long_term_care + employment_insurance,
-  };
+    total_insurance_deductions: national_pension + health_insurance + long_term_care + employment_insurance };
 }

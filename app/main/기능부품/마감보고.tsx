@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { canAccessExtraFeature, isAdminUser } from '@/lib/access-control';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import SmartDatePicker from './공통/SmartDatePicker';
 import ClosureItemsGrid from './마감보고Grid';
 
@@ -42,8 +42,7 @@ interface DailyClosure {
 export default function DailyClosurePage({
     user,
     staffs = [],
-    selectedCompanyId = null,
-}: {
+    selectedCompanyId = null }: {
     user: any;
     staffs?: any[];
     selectedCompanyId?: string | null;
@@ -116,7 +115,7 @@ export default function DailyClosurePage({
             return;
         }
         setLoading(true);
-        let query = supabase
+        let query = db
             .from('daily_closures')
             .select('*')
             .order('date', { ascending: false });
@@ -133,8 +132,8 @@ export default function DailyClosurePage({
 
     const loadClosureDetails = useCallback(async (closure: DailyClosure) => {
         const [{ data: detailItems, error: itemError }, { data: detailChecks, error: checkError }] = await Promise.all([
-            supabase.from('daily_closure_items').select('*').eq('closure_id', closure.id).order('created_at', { ascending: true }),
-            supabase.from('daily_checks').select('*').eq('closure_id', closure.id).order('created_at', { ascending: true }),
+            db.from('daily_closure_items').select('*').eq('closure_id', closure.id).order('created_at', { ascending: true }),
+            db.from('daily_checks').select('*').eq('closure_id', closure.id).order('created_at', { ascending: true }),
         ]);
 
         if (itemError) {
@@ -153,14 +152,12 @@ export default function DailyClosurePage({
             amount: Number(item.amount) || 0,
             payment_method: String(item.payment_method || '카드'),
             receipt_type: String(item.receipt_type || '진료비'),
-            memo: String(item.memo || ''),
-        })));
+            memo: String(item.memo || '') })));
         setChecks((detailChecks || []).map((check: any) => ({
             id: check.id,
             check_number: String(check.check_number || ''),
             amount: Number(check.amount) || 0,
-            bank_name: String(check.bank_name || ''),
-        })));
+            bank_name: String(check.bank_name || '') })));
     }, []);
 
     const loadSelectedDateClosure = useCallback(async () => {
@@ -176,7 +173,7 @@ export default function DailyClosurePage({
             return;
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('daily_closures')
             .select('*')
             .eq('company_id', detailCompanyId)
@@ -294,7 +291,7 @@ export default function DailyClosurePage({
             };
 
             const upsertClosure = async (payload: Record<string, unknown>) =>
-                await supabase
+                await db
                     .from('daily_closures')
                     .upsert(payload, { onConflict: 'company_id, date' })
                     .select()
@@ -310,21 +307,21 @@ export default function DailyClosurePage({
             if (cError) throw cError;
 
             // Delete existing items if any (for update)
-            const { error: delErr1 } = await supabase.from('daily_closure_items').delete().eq('closure_id', closure.id);
+            const { error: delErr1 } = await db.from('daily_closure_items').delete().eq('closure_id', closure.id);
             if (delErr1) throw delErr1;
-            const { error: delErr2 } = await supabase.from('daily_checks').delete().eq('closure_id', closure.id);
+            const { error: delErr2 } = await db.from('daily_checks').delete().eq('closure_id', closure.id);
             if (delErr2) throw delErr2;
 
             // Insert new items
             if (items.length > 0) {
-                const { error: insErr1 } = await supabase.from('daily_closure_items').insert(
+                const { error: insErr1 } = await db.from('daily_closure_items').insert(
                     items.map(({ id: _itemId, ...item }) => ({ ...item, closure_id: closure.id }))
                 );
                 if (insErr1) throw insErr1;
             }
 
             if (checks.length > 0) {
-                const { error: insErr2 } = await supabase.from('daily_checks').insert(
+                const { error: insErr2 } = await db.from('daily_checks').insert(
                     checks.map(({ id: _checkId, ...check }) => ({ ...check, closure_id: closure.id }))
                 );
                 if (insErr2) throw insErr2;
@@ -354,25 +351,24 @@ export default function DailyClosurePage({
             title: '마감보고 삭제',
             description: `${closure.date} 마감보고를 삭제합니다.\n작성자: ${authorName}\n삭제 후에는 복구할 수 없습니다.`,
             confirmText: '삭제',
-            tone: 'danger',
-        });
+            tone: 'danger' });
         if (!confirmed) return;
 
         setLoading(true);
         try {
-            const { error: deleteItemsError } = await supabase
+            const { error: deleteItemsError } = await db
                 .from('daily_closure_items')
                 .delete()
                 .eq('closure_id', closure.id);
             if (deleteItemsError) throw deleteItemsError;
 
-            const { error: deleteChecksError } = await supabase
+            const { error: deleteChecksError } = await db
                 .from('daily_checks')
                 .delete()
                 .eq('closure_id', closure.id);
             if (deleteChecksError) throw deleteChecksError;
 
-            const { error: deleteClosureError } = await supabase
+            const { error: deleteClosureError } = await db
                 .from('daily_closures')
                 .delete()
                 .eq('id', closure.id);

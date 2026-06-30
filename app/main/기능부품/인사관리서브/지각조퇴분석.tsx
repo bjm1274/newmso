@@ -6,7 +6,7 @@ import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { useEffect, useMemo, useState } from 'react';
 import { db, d1 } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 
 interface Props {
   staffs: any[];
@@ -32,8 +32,7 @@ function gradeColor(grade: '정상' | '주의' | '경고') {
 const PERIOD_MONTHS: Record<'1개월' | '3개월' | '6개월', number> = {
   '1개월': 1,
   '3개월': 3,
-  '6개월': 6,
-};
+  '6개월': 6 };
 
 export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
   const { dialog, openConfirm } = useActionDialog();
@@ -79,8 +78,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
           return {
             ...record,
             late_minutes: Number(record.late_minutes ?? 0),
-            early_leave_minutes: Number(record.early_leave_minutes ?? 0),
-          };
+            early_leave_minutes: Number(record.early_leave_minutes ?? 0) };
         });
         const result = filteredStaffs.map((staff: any) => {
           const staffRecords = records.filter((record: any) => String(record.staff_id) === String(staff.id));
@@ -100,8 +98,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
             lateCount,
             earlyLeaveCount: earlyLeaveRecords.length,
             avgLateMin,
-            grade,
-          };
+            grade };
         });
 
         setStats(result.sort((a, b) => b.lateCount - a.lateCount));
@@ -143,27 +140,23 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       primary: true,
       render: (item) => (
         <span className="font-bold text-[var(--foreground)]">{item.staff.name}</span>
-      ),
-    },
+      ) },
     {
       key: 'lateCount',
       label: '지각 횟수',
       align: 'center',
-      render: (item) => <span className="font-bold">{item.lateCount}</span>,
-    },
+      render: (item) => <span className="font-bold">{item.lateCount}</span> },
     {
       key: 'earlyLeaveCount',
       label: '조퇴 횟수',
       align: 'center',
-      render: (item) => <span>{item.earlyLeaveCount}</span>,
-    },
+      render: (item) => <span>{item.earlyLeaveCount}</span> },
     {
       key: 'avgLateMin',
       label: '평균 지각분',
       align: 'center',
       render: (item) => <span>{item.avgLateMin}분</span>,
-      showOnMobile: false,
-    },
+      showOnMobile: false },
     {
       key: 'lateRatio',
       label: '지각 비중',
@@ -176,8 +169,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
           />
         </div>
       ),
-      showOnMobile: false,
-    },
+      showOnMobile: false },
     {
       key: 'grade',
       label: '등급',
@@ -186,8 +178,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
         <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${gradeColor(item.grade)}`}>
           {item.grade}
         </span>
-      ),
-    },
+      ) },
   ], [maxLateCount]);
 
   const handleSendAlert = async () => {
@@ -201,8 +192,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       title: '지각 경고 알림 발송',
       description: `${targets.length}명에게 지각 경고 알림을 발송합니다.\n최근 근태 패턴 기준 대상자에게만 전송됩니다.`,
       confirmText: '발송',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
     setSending(true);
 
@@ -214,8 +204,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
           body: `최근 ${period} 동안 ${target.lateCount}회 지각이 확인되었습니다. 근태 기록을 확인해 주세요.`,
           type: 'attendance',
           read_at: null,
-          created_at: new Date().toISOString(),
-        })),
+          created_at: new Date().toISOString() })),
       );
 
       toast('알림을 발송했습니다.', 'success');

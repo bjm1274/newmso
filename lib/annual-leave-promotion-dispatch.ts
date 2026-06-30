@@ -23,8 +23,7 @@ import {
   eq,
   and,
   inArray,
-  ne,
-} from '@/lib/db';
+  ne } from '@/lib/db';
 
 export type PromotionDispatchResult = {
   scanned: number;
@@ -74,8 +73,7 @@ export async function dispatchAnnualLeavePromotions(now: Date = new Date()): Pro
       annual_leave_used: staffMembersTable.annual_leave_used,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
-      hire_date: staffMembersTable.hire_date,
-    })
+      hire_date: staffMembersTable.hire_date })
     .from(staffMembersTable)) as StaffRow[];
 
   // 이미 발송된 (staff_id|stage|expiry_date) 셋
@@ -145,10 +143,8 @@ export async function dispatchAnnualLeavePromotions(now: Date = new Date()): Pro
           stage,
           remaining,
           expiry_date: expiryKey,
-          link: '/main/전자결재?view=작성하기&type=연차계획서',
-        },
-        read_at: null,
-      };
+          link: '/main/전자결재?view=작성하기&type=연차계획서' },
+        read_at: null };
       await mirrorNotificationsToD1([notif]);
 
       await db
@@ -166,8 +162,7 @@ export async function dispatchAnnualLeavePromotions(now: Date = new Date()): Pro
           remain_days: remaining,
           remaining_days_at_notice: remaining,
           meta: JSON.stringify({ action: 'promote', stage, auto: true }),
-          created_at: nowIso,
-        })
+          created_at: nowIso })
         .onConflictDoNothing();
 
       sentSet.add(`${s.id}|${stage}|${expiryKey}`);

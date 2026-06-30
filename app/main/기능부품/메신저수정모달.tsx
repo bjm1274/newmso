@@ -25,8 +25,7 @@ export function MessageEditModal({
   draft,
   onDraftChange,
   onClose,
-  onSave,
-}: MessageEditModalProps) {
+  onSave }: MessageEditModalProps) {
   if (!open) return null;
 
   return (
@@ -62,8 +61,7 @@ export function MessageEditHistoryModal({
   message,
   loading,
   entries,
-  onClose,
-}: MessageEditHistoryModalProps) {
+  onClose }: MessageEditHistoryModalProps) {
   if (!open || !message) return null;
 
   return (

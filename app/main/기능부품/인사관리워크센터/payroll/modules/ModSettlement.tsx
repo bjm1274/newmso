@@ -6,7 +6,7 @@ import { usePayroll, usePayrollData } from '../payroll-context';
 import { calculateKpis } from '../payroll-kpi';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 type SalarySettlementProps = {
   staffs: StaffMember[];
@@ -70,40 +70,35 @@ export default function ModSettlement() {
       body: `${y}년 ${m}월 근로시간 확정 · 지각·조퇴 반영. 총 ${kpis.headcount}명 대상.`,
       state: hasRecord ? 'done' : 'on',
       actionLabel: '근태 워크센터 열기',
-      date: `${m}/3`,
-    },
+      date: `${m}/3` },
     {
       id: 2,
       label: '수당·공제 산정',
       body: `초과·야간·휴일 수당 + 4대보험·소득세 자동 산정. 수당 합계 ${kpis.allowanceSum.toLocaleString()}원.`,
       state: hasRecord ? 'done' : 'pending',
       actionLabel: '시뮬레이션',
-      date: `${m}/7`,
-    },
+      date: `${m}/7` },
     {
       id: 3,
       label: '결재 상신',
       body: `정산 ${data.records.length}건을 결재 상신합니다. 검토자/전결자 지정 필요.`,
       state: allConfirmed ? 'done' : hasRecord ? 'on' : 'pending',
       actionLabel: '결재 상신',
-      date: `${m}/10`,
-    },
+      date: `${m}/10` },
     {
       id: 4,
       label: '지급 처리',
       body: `은행 이체 파일(.xlsx) 생성 · 총 ${kpis.netPaySum.toLocaleString()}원 지급.`,
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '이체 파일 다운로드',
-      date: `예정 ${m}/${payrollDay}`,
-    },
+      date: `예정 ${m}/${payrollDay}` },
     {
       id: 5,
       label: '원천징수 신고',
       body: '국세청 제출 파일 생성 · 지방세 포함 · 간이세액 적용.',
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '신고 파일 생성',
-      date: `예정 ${m}/20`,
-    },
+      date: `예정 ${m}/20` },
   ];
 
   const doneCount = steps.filter((s) => s.state === 'done').length;
@@ -119,7 +114,7 @@ export default function ModSettlement() {
       const XLSX = await import('xlsx');
       const staffIds = Array.from(new Set(confirmedRecords.map(r => String(r.staff_id))));
 
-      const { data: dbStaffs, error: dbError } = await supabase
+      const { data: dbStaffs, error: dbError } = await db
         .from('staff_members')
         .select('id, name, bank_name, bank_account, permissions')
         .in('id', staffIds);

@@ -52,8 +52,7 @@ async function createSignedJwt(
     scope: 'https://www.googleapis.com/auth/firebase.messaging',
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
-    exp: now + 3600,
-  };
+    exp: now + 3600 };
 
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
@@ -81,8 +80,7 @@ async function getAccessToken(): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-  });
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}` });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -92,8 +90,7 @@ async function getAccessToken(): Promise<string> {
   const data = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = {
     token: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
+    expiresAt: Date.now() + data.expires_in * 1000 };
 
   return data.access_token;
 }
@@ -136,8 +133,7 @@ export async function sendFcmNotification(
       ...(payload.data || {}),
       title: payload.title,
       body: payload.body,
-      ...(payload.image ? { image: payload.image } : {}),
-    };
+      ...(payload.image ? { image: payload.image } : {}) };
 
     const messageId = payload.data?.message_id || '';
     const collapseKey = payload.data?.tag || (messageId ? `chat-msg-${messageId}` : undefined);
@@ -149,8 +145,7 @@ export async function sendFcmNotification(
       data: messageData,
       webpush: {
         headers: { Urgency: 'high' },
-        ...(webpushLink ? { fcm_options: { link: webpushLink } } : {}),
-      },
+        ...(webpushLink ? { fcm_options: { link: webpushLink } } : {}) },
       android: {
         priority: 'high',
         ...(collapseKey ? { collapse_key: collapseKey } : {}),
@@ -160,19 +155,13 @@ export async function sendFcmNotification(
         headers: {
           'apns-priority': '10',
           'apns-push-type': 'alert',
-          ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}),
-        },
+          ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}) },
         payload: {
           aps: {
             'content-available': 1,
             alert: {
               title: payload.title,
-              body: payload.body,
-            },
-          },
-        },
-      },
-    };
+              body: payload.body } } } } };
 
     const res = await fetch(
       `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
@@ -180,10 +169,8 @@ export async function sendFcmNotification(
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message }),
-      },
+          'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }) },
     );
 
     if (!res.ok) {

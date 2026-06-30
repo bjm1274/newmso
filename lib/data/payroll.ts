@@ -6,7 +6,7 @@
  */
 
 import { fetcher } from '@/lib/fetcher';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 const PAYROLL_TTL = 300_000; // 5분
 
@@ -24,7 +24,7 @@ export async function fetchPayrollRecordsByMonth(yearMonth: string): Promise<Pay
   return fetcher(
     `payroll:records:by-month:${yearMonth}`,
     async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('payroll_records')
         .select('staff_id, net_pay')
         .eq('year_month', yearMonth);

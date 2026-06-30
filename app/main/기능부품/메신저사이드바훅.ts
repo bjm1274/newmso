@@ -17,8 +17,7 @@ import {
   isSelfChatRoom,
   normalizeMemberIds,
   sortRoomsForSidebar,
-  type RoomPreference,
-} from './메신저유틸';
+  type RoomPreference } from './메신저유틸';
 
 type UseChatSidebarStateParams = {
   chatRooms: ChatRoom[];
@@ -57,8 +56,7 @@ export function useChatSidebarState({
   pinnedRoomOrder,
   setPinnedRoomOrder,
   roomPrefsUserId,
-  roomUnreadCounts,
-}: UseChatSidebarStateParams) {
+  roomUnreadCounts }: UseChatSidebarStateParams) {
   const visibleRooms = useMemo(() => {
     const dedupedRooms = new Map<string, ChatRoom>();
     chatRooms.forEach((room) => {
@@ -186,8 +184,7 @@ export function useChatSidebarState({
           return {
             room,
             unreadCount: getConversationUnreadCountForRoom(room, roomUnreadCounts, chatRooms),
-            displayName: peer?.name || roomLabelMap.get(String(room.id)),
-          };
+            displayName: peer?.name || roomLabelMap.get(String(room.id)) };
         }),
     [
       chatRooms,
@@ -238,8 +235,7 @@ export function useChatSidebarState({
         isPinned: roomPrefs[room.id]?.pinned === true,
         isHidden: roomPrefs[room.id]?.hidden === true,
         pinnedIndex: pinnedOrderIndex.get(roomId) ?? -1,
-        pinnedCount,
-      };
+        pinnedCount };
     });
   }, [
     allKnownStaffMap,
@@ -265,6 +261,5 @@ export function useChatSidebarState({
     roomLabelMap,
     sidebarRoomItems,
     visibleRoomIds,
-    forwardTargetRoomItems,
-  };
+    forwardTargetRoomItems };
 }

@@ -4,8 +4,7 @@ import {
   buildR2AccessUrl,
   createChatAttachmentUploadPlan,
   isR2ChatStorageEnabled,
-  uploadToR2,
-} from '@/lib/object-storage';
+  uploadToR2 } from '@/lib/object-storage';
 
 const R2_BUCKET = 'pchos-files';
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
@@ -92,8 +91,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         signedUrl: plan.signedUrl,
         headers: plan.headers,
         url: buildR2AccessUrl(R2_BUCKET, objectKey),
-        maxFileBytes: getMaxFileBytes(contentType),
-      });
+        maxFileBytes: getMaxFileBytes(contentType) });
     }
 
     // multipart/form-data: 서버에서 직접 업로드 (이미지)
@@ -125,8 +123,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       success: true,
       provider: 'r2',
       path: uploaded.path,
-      url: buildR2AccessUrl(R2_BUCKET, objectKey),
-    });
+      url: buildR2AccessUrl(R2_BUCKET, objectKey) });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '팝업 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

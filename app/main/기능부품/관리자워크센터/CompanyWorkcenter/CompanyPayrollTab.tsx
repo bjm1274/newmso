@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_PAY_RULES } from './fallback-data';
 import type { RuleRow } from './types';
@@ -24,7 +24,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 async function loadCompanyPayRules(companyName: string): Promise<DBPayrollRule[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('company_payroll_policies')
       .select('id,rule_label,rule_value')
       .eq('company_name', companyName)
@@ -33,7 +33,7 @@ async function loadCompanyPayRules(companyName: string): Promise<DBPayrollRule[]
     if (error || !Array.isArray(data) || data.length === 0) {
       // If specific company has no payroll rules, try to load '전체'
       if (companyName !== '전체') {
-        const { data: allData } = await supabase
+        const { data: allData } = await db
           .from('company_payroll_policies')
           .select('id,rule_label,rule_value')
           .eq('company_name', '전체')
@@ -42,8 +42,7 @@ async function loadCompanyPayRules(companyName: string): Promise<DBPayrollRule[]
           return allData.filter(isRecord).map((r): DBPayrollRule => ({
             id: typeof r.id === 'string' ? r.id : undefined,
             label: typeof r.rule_label === 'string' ? r.rule_label : '-',
-            value: typeof r.rule_value === 'string' ? r.rule_value : '-',
-          }));
+            value: typeof r.rule_value === 'string' ? r.rule_value : '-' }));
         }
       }
       return FALLBACK_PAY_RULES.map(r => ({ label: r.label, value: r.value }));
@@ -52,8 +51,7 @@ async function loadCompanyPayRules(companyName: string): Promise<DBPayrollRule[]
     return data.filter(isRecord).map((r): DBPayrollRule => ({
       id: typeof r.id === 'string' ? r.id : undefined,
       label: typeof r.rule_label === 'string' ? r.rule_label : '-',
-      value: typeof r.rule_value === 'string' ? r.rule_value : '-',
-    }));
+      value: typeof r.rule_value === 'string' ? r.rule_value : '-' }));
   } catch {
     return FALLBACK_PAY_RULES.map(r => ({ label: r.label, value: r.value }));
   }
@@ -82,7 +80,7 @@ export default function CompanyPayrollTab() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('companies')
           .select('name')
           .limit(50);
@@ -134,7 +132,7 @@ export default function CompanyPayrollTab() {
     try {
       // 기존 행의 id를 라벨 기준으로 재사용한다. onConflict가 D1 경로에서 무시되더라도
       // 동일 PK 업서트로 안정적으로 갱신되어, 저장이 새로고침 후 리셋되는 문제(#1)를 막는다.
-      const { data: existing, error: existingError } = await supabase
+      const { data: existing, error: existingError } = await db
         .from('company_payroll_policies')
         .select('id, rule_label')
         .eq('company_name', selectedCompany);
@@ -162,10 +160,9 @@ export default function CompanyPayrollTab() {
         id: idByLabel.get(r.label) || safeUUID(),
         company_name: selectedCompany,
         rule_label: r.label,
-        rule_value: r.value,
-      }));
+        rule_value: r.value }));
 
-      const { error } = await supabase
+      const { error } = await db
         .from('company_payroll_policies')
         .upsert(payload, { onConflict: 'company_name,rule_label' });
       if (error) throw error;

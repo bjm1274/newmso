@@ -11,8 +11,7 @@ import {
   push_subscriptions as pushSubscriptionsTable,
   inArray,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 const ROSTER_CREATOR_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uAC04\uD638\uBD80\uC7A5', '\uC2E4\uC7A5'];
 const ROSTER_APPROVER_POSITIONS = ['\uAC04\uD638\uACFC\uC7A5', '\uBCD1\uC6D0\uC7A5'];
@@ -107,8 +106,7 @@ function normalizeAssignments(assignments: ApprovalAssignment[] = []) {
         work_date: workDate,
         shift_id: shiftId,
         staff_name: staffName || undefined,
-        shift_name: shiftName || undefined,
-      };
+        shift_name: shiftName || undefined };
     })
     .filter((item): item is NormalizedAssignment => item !== null);
 
@@ -215,9 +213,7 @@ function buildApprovalNotificationRows(params: {
         team_name: teamName,
         year_month: yearMonth,
         requested_by: requestedBy,
-        requested_by_name: requestedByName,
-      },
-    });
+        requested_by_name: requestedByName } });
   });
 
   return rows;
@@ -230,9 +226,7 @@ function buildImmediatePushPayload(row: NotificationInsertRow) {
     tag: `erp-roster-approval-${String(row.metadata.approval_id || row.metadata.roster_request_id || 'request')}`,
     data: {
       ...row.metadata,
-      notification_type: row.type,
-    },
-  };
+      notification_type: row.type } };
 }
 
 async function dispatchImmediateApprovalPush(
@@ -259,8 +253,7 @@ async function dispatchImmediateApprovalPush(
           p256dh: pushSubscriptionsTable.p256dh,
           auth: pushSubscriptionsTable.auth,
           fcm_token: pushSubscriptionsTable.fcm_token,
-          created_at: pushSubscriptionsTable.created_at,
-        })
+          created_at: pushSubscriptionsTable.created_at })
         .from(pushSubscriptionsTable)
         .where(inArray(pushSubscriptionsTable.staff_id, targetUserIds));
       subscriptions = rows.map((r) => ({
@@ -270,8 +263,7 @@ async function dispatchImmediateApprovalPush(
         p256dh: r.p256dh ?? null,
         auth: r.auth ?? null,
         fcm_token: r.fcm_token ?? null,
-        created_at: r.created_at ?? null,
-      }));
+        created_at: r.created_at ?? null }));
     }
   }
   const sampleNotification = notificationRows[0];
@@ -302,8 +294,7 @@ async function dispatchImmediateApprovalPush(
       const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
         title: payload.title,
         body: payload.body,
-        data: toStringRecord(payload.data),
-      });
+        data: toStringRecord(payload.data) });
       pushSentCount += fcmResult.success.length;
     } catch (error) {
       console.error('roster approval FCM push failed:', error);
@@ -366,8 +357,7 @@ async function dispatchImmediateApprovalPush(
 
   return {
     pushTargetCount: targetUserIds.length,
-    pushSentCount,
-  };
+    pushSentCount };
 }
 
 async function insertLegacyApprovalRequest(params: {
@@ -400,8 +390,7 @@ async function insertLegacyApprovalRequest(params: {
     form_slug: 'roster',
     form_name: '\uADFC\uBB34\uD45C', // '근무표'
     doc_number: docNumber,
-    revision: 1,
-  };
+    revision: 1 };
 
   await db.insert(approvalsTable).values({
     id: newId,
@@ -416,8 +405,7 @@ async function insertLegacyApprovalRequest(params: {
     meta_data: JSON.stringify(metaDataObj),
     approver_line: JSON.stringify(approverIds),
     doc_number: docNumber,
-    created_at: new Date().toISOString(),
-  });
+    created_at: new Date().toISOString() });
   return newId;
 }
 
@@ -474,8 +462,7 @@ export async function POST(request: Request) {
           name: staffMembersTable.name,
           position: staffMembersTable.position,
           company: staffMembersTable.company,
-          role: staffMembersTable.role,
-        })
+          role: staffMembersTable.role })
         .from(staffMembersTable)
         .where(
           drizzleOr(
@@ -489,8 +476,7 @@ export async function POST(request: Request) {
         name: r.name ?? null,
         position: r.position ?? null,
         company: r.company ?? null,
-        role: r.role ?? null,
-      }));
+        role: r.role ?? null }));
     }
 
     const approvers = resolveApprovers(staffRows, requestedBy, companyName);
@@ -516,8 +502,7 @@ export async function POST(request: Request) {
         assignments,
         requestedBy,
         requestedByName,
-        approverIds,
-      });
+        approverIds });
     } catch (legacyInsertError) {
       const message =
         legacyInsertError instanceof Error
@@ -535,8 +520,7 @@ export async function POST(request: Request) {
       teamName,
       yearMonth,
       requestedBy,
-      requestedByName,
-    });
+      requestedByName });
 
     let notifiedApproverCount = 0;
     let pushSentCount = 0;
@@ -559,8 +543,7 @@ export async function POST(request: Request) {
       requestId,
       storage,
       notifiedApproverCount,
-      pushSentCount,
-    });
+      pushSentCount });
   } catch (error) {
     const message =
       error instanceof Error

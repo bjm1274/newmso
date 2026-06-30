@@ -54,8 +54,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
     border: '1px solid rgba(120, 120, 128, 0.15)',
     outline: 'none',
     color: 'var(--z-900)',
-    transition: 'all 0.2s',
-  };
+    transition: 'all 0.2s' };
 
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
@@ -63,8 +62,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
     color: 'var(--z-600)',
     letterSpacing: '-0.01em',
     marginBottom: 6,
-    display: 'block',
-  };
+    display: 'block' };
 
   return (
     <MSheet open={open} onClose={handleClose} title="새 투표 만들기">
@@ -150,8 +148,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
                       display: 'grid',
                       placeItems: 'center',
                       cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
+                      transition: 'all 0.2s' }}
                   >
                     <MIcon name="x" size={16} />
                   </button>
@@ -174,8 +171,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
+                  transition: 'all 0.2s' }}
               >
                 + 항목 추가
               </button>
@@ -198,8 +194,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
               fontWeight: 600,
               border: 'none',
               cursor: submitting ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s',
-            }}
+              transition: 'background 0.2s' }}
           >
             취소
           </button>
@@ -225,8 +220,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
               boxShadow: (question.trim() && options.filter(o => o.trim()).length >= 2)
                 ? '0 4px 12px rgba(0, 122, 255, 0.3)'
                 : 'none',
-              transition: 'all 0.2s',
-            }}
+              transition: 'all 0.2s' }}
           >
             {submitting ? '생성 중…' : '투표 생성'}
           </button>
@@ -261,8 +255,7 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
         padding: '16px',
         margin: '12px 0',
         border: '1px solid rgba(255, 255, 255, 0.4)',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.03)',
-      }}
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.03)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
         <MIcon name="list" size={15} color="#007AFF" />
@@ -302,8 +295,7 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
                 cursor: voting || deadlinePassed ? 'not-allowed' : 'pointer',
                 textAlign: 'left',
                 transition: 'all 0.2s',
-                boxShadow: mine ? '0 2px 8px rgba(0, 122, 255, 0.08)' : 'none',
-              }}
+                boxShadow: mine ? '0 2px 8px rgba(0, 122, 255, 0.08)' : 'none' }}
             >
               <span
                 aria-hidden="true"
@@ -314,8 +306,7 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
                   bottom: 0,
                   width: `${pct}%`,
                   background: mine ? 'rgba(0, 122, 255, 0.12)' : 'rgba(120, 120, 128, 0.06)',
-                  transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
+                  transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
               />
               <span style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-900)', display: 'flex', alignItems: 'center', gap: 4 }}>

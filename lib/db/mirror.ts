@@ -85,8 +85,7 @@ export async function mirrorRowsToD1<T extends SQLiteTable>(
       }
       query = base.onConflictDoUpdate({
         target: options.target as never,
-        set: options.set as never,
-      });
+        set: options.set as never });
     } else {
       query = base;
     }

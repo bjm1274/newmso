@@ -50,8 +50,7 @@ export default function PwaBootstrap() {
           if ('periodicSync' in registration) {
             try {
               const status = await navigator.permissions.query({
-                name: 'periodic-background-sync' as any,
-              });
+                name: 'periodic-background-sync' as any });
               if (status.state === 'granted') {
                 await (registration as any).periodicSync.register('erp-periodic-sync', {
                   minInterval: 12 * 60 * 60 * 1000, // 12시간
@@ -122,8 +121,7 @@ export default function PwaBootstrap() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: action.type, payload: action.payload }),
-      });
+        body: JSON.stringify({ type: action.type, payload: action.payload }) });
       if (!response.ok) {
         throw new Error(`offline queue flush failed (${response.status})`);
       }

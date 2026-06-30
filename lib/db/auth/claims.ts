@@ -204,8 +204,7 @@ export async function erpIsRosterApprover(
     .select({
       role: staff_members.role,
       position: staff_members.position,
-      company: staff_members.company,
-    })
+      company: staff_members.company })
     .from(staff_members)
     .where(eq(staff_members.id, me))
     .limit(1);

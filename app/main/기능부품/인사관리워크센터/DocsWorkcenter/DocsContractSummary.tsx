@@ -10,8 +10,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 
 interface ContractRow {
   id: string;
@@ -31,8 +31,7 @@ const TONE_CLS: Record<'success' | 'accent' | 'warn' | 'danger' | 'muted', strin
   accent: 'bg-[var(--accent)]/15 text-[var(--accent)]',
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 function formatDate(value: unknown): string {
   if (!value) return '-';
@@ -86,7 +85,7 @@ export default function DocsContractSummary() {
             const cols = ['id', 'status', 'contract_type', 'effective_date', 'probation_months', 'staff_id', 'created_at']
               .filter((c) => !omittedColumns.has(c))
               .join(', ');
-            return supabase
+            return db
               .from('employment_contracts')
               .select(cols)
               .order('created_at', { ascending: false })
@@ -112,7 +111,7 @@ export default function DocsContractSummary() {
         // 3. 해당 직원들의 인적 사항 및 권한 조회
         const staffMap: Record<string, any> = {};
         if (staffIds.length > 0) {
-          const { data: staffs, error: staffErr } = await supabase
+          const { data: staffs, error: staffErr } = await db
             .from('staff_members')
             .select('id, name, joined_at, join_date, permissions')
             .in('id', staffIds);
@@ -155,8 +154,7 @@ export default function DocsContractSummary() {
             auto: autoRenew ? '자동 연장' : '-',
             status,
             employTone: pickEmployTone(employ),
-            statusTone,
-          };
+            statusTone };
         });
         items.sort((a, b) => {
           const order = { danger: 0, warn: 1, success: 2, muted: 3 } as const;

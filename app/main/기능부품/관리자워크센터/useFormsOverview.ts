@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 
 export interface FormUsageRow {
@@ -50,8 +50,7 @@ export function useFormsOverview(): FormsOverviewData {
     inactiveForms: 0,
     monthlyUsage: 0,
     usageByType: [],
-    yearMonth: getKoreanMonthString(),
-  });
+    yearMonth: getKoreanMonthString() });
 
   useEffect(() => {
     let cancelled = false;
@@ -62,9 +61,9 @@ export function useFormsOverview(): FormsOverviewData {
     const run = async () => {
       try {
         const [formTypesRes, approvalsRes] = await Promise.all([
-          supabase.from('approval_form_types').select('is_active'),
+          db.from('approval_form_types').select('is_active'),
           // 이번 달 결재 사용 집계 (전사 — MSO 설계상 필터 없음)
-          supabase.from('approvals').select('type, doc_type').gte('created_at', monthStart),
+          db.from('approvals').select('type, doc_type').gte('created_at', monthStart),
         ]);
 
         const formRows = (formTypesRes.data ?? []) as FormTypeRow[];
@@ -92,8 +91,7 @@ export function useFormsOverview(): FormsOverviewData {
             inactiveForms,
             monthlyUsage,
             usageByType,
-            yearMonth,
-          });
+            yearMonth });
         }
       } catch (err) {
         console.error('결재 양식 개요 데이터 로드 실패:', err);

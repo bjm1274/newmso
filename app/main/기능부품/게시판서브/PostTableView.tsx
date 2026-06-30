@@ -19,8 +19,7 @@ import {
   getBoardPostAuthorSignal,
   getBoardPostPreview,
   isScheduledNoticePending,
-  normalizeBoardPostStatus,
-} from '../게시판-view-utils';
+  normalizeBoardPostStatus } from '../게시판-view-utils';
 import type { BoardPost } from '@/types';
 import {
   READ_FILTER_LABELS,
@@ -32,8 +31,7 @@ import {
   readFavoritesFromStorage,
   writeFavoritesToStorage,
   type ReadFilter,
-  type SortKey,
-} from './post-table-helpers';
+  type SortKey } from './post-table-helpers';
 import PostMoreMenu from './PostMoreMenu';
 
 export type { SortKey, ReadFilter } from './post-table-helpers';
@@ -79,8 +77,7 @@ export default function PostTableView({
   onShareToChat,
   canEditPost,
   canDeletePost,
-  emptyDescription,
-}: PostTableViewProps) {
+  emptyDescription }: PostTableViewProps) {
   // ── 상태: 검색, 정렬, 태그, 안읽음/즐겨찾기, 즐겨찾기 ──
   const [searchKeyword, setSearchKeyword] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('recent');

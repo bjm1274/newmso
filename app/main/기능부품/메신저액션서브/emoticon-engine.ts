@@ -123,8 +123,7 @@ const C = {
   steam: "#ff9a9a",
   spark: "#ffd166",
   moon: "#ffe39a",
-  money: "#7fd59a",
-};
+  money: "#7fd59a" };
 
 const ST = C.line;
 const HAIRC: Record<string, string> = { dark: "#3c3540", brown: "#6b4f3a", lbrown: "#8a6648", auburn: "#79483a", gray: "#9b9099", soft: "#5a4636" };

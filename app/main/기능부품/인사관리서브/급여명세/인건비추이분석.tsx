@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface Props {
   selectedCo: string;
@@ -24,7 +24,7 @@ export default function LaborCostTrend({ selectedCo }: Props) {
         }
 
         // 12개월 데이터를 단일 쿼리로 가져옴 (N+1 waterfall 방지)
-        const { data: records, error } = await supabase
+        const { data: records, error } = await db
           .from('payroll_records')
           .select('staff_id, net_pay, record_type, year_month')
           .in('year_month', monthStrings);
@@ -37,7 +37,7 @@ export default function LaborCostTrend({ selectedCo }: Props) {
         if (selectedCo && selectedCo !== '전체') {
           const staffIds = [...new Set(filteredRecords.map((r: any) => r.staff_id))];
           if (staffIds.length > 0) {
-            const { data: staffData } = await supabase
+            const { data: staffData } = await db
               .from('staff_members')
               .select('id, company')
               .in('id', staffIds);
@@ -57,8 +57,7 @@ export default function LaborCostTrend({ selectedCo }: Props) {
           return {
             ym,
             total: monthRows.reduce((sum, r) => sum + (r.net_pay || 0), 0),
-            count: monthRows.length,
-          };
+            count: monthRows.length };
         });
 
         setMonths(list);

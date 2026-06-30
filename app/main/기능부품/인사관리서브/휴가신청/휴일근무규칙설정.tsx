@@ -6,8 +6,7 @@ import {
   DEFAULT_LEAVE_POLICY_SETTINGS,
   loadLeavePolicySettings,
   saveLeavePolicySettings,
-  type LeavePolicySettings,
-} from '@/lib/leave-policy-settings';
+  type LeavePolicySettings } from '@/lib/leave-policy-settings';
 
 type HolidayWorkPolicySettingsProps = {
   selectedCo: string;
@@ -16,8 +15,7 @@ type HolidayWorkPolicySettingsProps = {
 function FieldRow({
   label,
   description,
-  children,
-}: {
+  children }: {
   label: string;
   description: string;
   children: React.ReactNode;
@@ -173,8 +171,7 @@ export default function HolidayWorkPolicySettings({ selectedCo }: HolidayWorkPol
             onChange={(event) =>
               setSettings((prev) => ({
                 ...prev,
-                earlyLeaveAnomalyMinutes: Math.max(5, Number(event.target.value) || 5),
-              }))
+                earlyLeaveAnomalyMinutes: Math.max(5, Number(event.target.value) || 5) }))
             }
             className="w-28 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
           />
@@ -192,8 +189,7 @@ export default function HolidayWorkPolicySettings({ selectedCo }: HolidayWorkPol
             onChange={(event) =>
               setSettings((prev) => ({
                 ...prev,
-                missingCheckoutGraceHours: Math.max(1, Number(event.target.value) || 1),
-              }))
+                missingCheckoutGraceHours: Math.max(1, Number(event.target.value) || 1) }))
             }
             className="w-28 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
           />

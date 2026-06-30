@@ -64,15 +64,13 @@ const toneBorderClass: Record<MatrixCellTone, string> = {
   normal: 'border-[var(--border)]',
   ok: 'border-green-500/30',
   warn: 'border-yellow-500/30',
-  danger: 'border-red-500/30',
-};
+  danger: 'border-red-500/30' };
 
 const toneChipClass: Record<MatrixCellTone, string> = {
   normal: 'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]',
   ok: 'bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-300',
   warn: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-300',
-  danger: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-300',
-};
+  danger: 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-300' };
 
 // ---------------------------------------------------------------------------
 // 컴포넌트
@@ -90,8 +88,7 @@ export function MatrixTable<R, C>({
   emptyMessage = '표시할 데이터가 없습니다.',
   minWidth = 600,
   className = '',
-  ariaLabel,
-}: MatrixTableProps<R, C>) {
+  ariaLabel }: MatrixTableProps<R, C>) {
   if (rows.length === 0 || columns.length === 0) {
     return (
       <div className={className}>

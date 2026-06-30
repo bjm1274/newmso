@@ -1,6 +1,6 @@
 import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
 import { isApprovalLocked } from '@/lib/approval-workflow';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
@@ -8,13 +8,11 @@ import { useCallback,useEffect,useRef,type Dispatch,type MutableRefObject,type S
 import {
 ALL_DOCUMENT_FILTER,
 APPROVAL_DRAFT_STORAGE_KEY,
-type ApprovalCcUser,
-} from '../전자결재-types';
+type ApprovalCcUser } from '../전자결재-types';
 import {
 normalizeApprovalCcUsers,
 normalizeComposeFormType,
-resolveApprovalStaffLine,
-} from '../전자결재-utils';
+resolveApprovalStaffLine } from '../전자결재-utils';
 
 type ApprovalRecord = Record<string, unknown>;
 
@@ -121,8 +119,7 @@ export function useApprovalComposeDraft({
   autoSaveTimer,
   autoSaveMsgTimer,
   isHydratingComposeRef,
-  resolveDefaultReferenceUsersForForm,
-}: UseApprovalComposeDraftParams) {
+  resolveDefaultReferenceUsersForForm }: UseApprovalComposeDraftParams) {
   const hydratedComposeSeedIdRef = useRef<string | null>(null);
   const approverLineRef = useRef(approverLine);
   const ccLineRef = useRef(ccLine);
@@ -325,7 +322,7 @@ export function useApprovalComposeDraft({
     let cancelled = false;
 
     const loadSelectedApproval = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('approvals')
         .select('*')
         .eq('id', selectedApprovalId)
@@ -349,7 +346,7 @@ export function useApprovalComposeDraft({
 
   const fetchMyLastApproval = useCallback(async (type: string) => {
     if (!user?.id) return null;
-    const { data } = await supabase
+    const { data } = await db
       .from('approvals')
       .select('*')
       .eq('sender_id', user.id)
@@ -529,11 +526,9 @@ export function useApprovalComposeDraft({
           approverLine: approverLine.map((approver) => ({
             id: approver.id,
             name: approver.name,
-            position: approver.position ?? null,
-          })),
+            position: approver.position ?? null })),
           ccLine,
-          savedAt: hhmm,
-        })
+          savedAt: hhmm })
       );
       setAutoSaveMsg(`임시저장됨 ${hhmm}`);
       if (autoSaveMsgTimer.current) clearTimeout(autoSaveMsgTimer.current);
@@ -597,6 +592,5 @@ export function useApprovalComposeDraft({
     loadLastDraft,
     loadDraftFromStorage,
     clearDraftFromStorage,
-    saveDraftNow,
-  };
+    saveDraftNow };
 }

@@ -37,8 +37,7 @@ export type UsePullToRefreshResult = {
 export function usePullToRefresh({
   onRefresh,
   enabled = true,
-  threshold = 60,
-}: UsePullToRefreshOptions): UsePullToRefreshResult {
+  threshold = 60 }: UsePullToRefreshOptions): UsePullToRefreshResult {
   const containerRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);

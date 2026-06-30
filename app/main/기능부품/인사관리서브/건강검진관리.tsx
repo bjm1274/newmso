@@ -2,7 +2,7 @@
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
 import { ExpandableTable, type ExpandableColumn } from '@/app/components/ExpandableTable';
@@ -50,8 +50,7 @@ const emptyForm: CheckupForm = {
     status: '완료',
     hospital: '',
     result: '',
-    memo: '',
-};
+    memo: '' };
 
 const statusBadgeClass = (s?: string) =>
     s === '완료' ? 'bg-emerald-100 text-emerald-700'
@@ -82,7 +81,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
 
     useEffect(() => { fetchRecords(); }, []);
     const fetchRecords = async () => {
-        const { data } = await supabase.from('health_checkups').select('*').order('completed_date', { ascending: false });
+        const { data } = await db.from('health_checkups').select('*').order('completed_date', { ascending: false });
         if (data) setRecords(data);
     };
 
@@ -143,8 +142,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                     completed_date: null,
                     hospital: '-',
                     status: '미수검',
-                    isVirtual: true,
-                }));
+                    isVirtual: true }));
             rows = [...dbMissed, ...virtuals];
         } else if (colFilter.status) {
             rows = rows.filter((r: any) => r.status === colFilter.status);
@@ -172,8 +170,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         let groups: Group[] = Array.from(map.entries()).map(([sid, rows]) => ({
             sid,
             latest: rows[0],
-            history: rows.slice(1),
-        }));
+            history: rows.slice(1) }));
         if (colSort.key === 'staff_name') {
             const dir = colSort.dir === 'asc' ? 1 : -1;
             groups = groups.sort((a, b) =>
@@ -195,7 +192,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('이 검진 기록을 삭제하시겠습니까?')) return;
-        const { error } = await supabase.from('health_checkups').delete().eq('id', id);
+        const { error } = await db.from('health_checkups').delete().eq('id', id);
         if (error) {
             console.error('health_checkups delete failed:', error);
             toast('삭제에 실패했습니다.', 'error');
@@ -226,8 +223,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
             status: String(rec.status ?? '예정'),
             hospital: String(rec.hospital ?? ''),
             result: String(rec.result ?? ''),
-            memo: String(rec.memo ?? ''),
-        });
+            memo: String(rec.memo ?? '') });
         setShowForm(true);
     };
 
@@ -245,10 +241,9 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
             status: form.status,
             hospital: form.hospital,
             result: form.result,
-            memo: form.memo,
-        };
+            memo: form.memo };
         if (editId) {
-            const { data, error } = await supabase.from('health_checkups').update(payload).eq('id', editId).select();
+            const { data, error } = await db.from('health_checkups').update(payload).eq('id', editId).select();
             if (error) {
                 console.error('health_checkups update failed:', error);
                 toast('건강검진 정보 수정에 실패했습니다.', 'error');
@@ -256,7 +251,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
             }
             if (data?.[0]) setRecords(records.map((r: any) => r.id === editId ? data[0] : r));
         } else {
-            const { data, error } = await supabase.from('health_checkups').insert([payload]).select();
+            const { data, error } = await db.from('health_checkups').insert([payload]).select();
             if (error) {
                 console.error('health_checkups insert failed:', error);
                 toast('건강검진 일정 저장에 실패했습니다.', 'error');
@@ -269,7 +264,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
 
     const markComplete = async (id: string) => {
         const now = getKoreanTodayString();
-        const { error } = await supabase.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
+        const { error } = await db.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
         if (error) {
             console.error('health_checkups update failed:', error);
             toast('건강검진 완료 처리에 실패했습니다.', 'error');
@@ -310,8 +305,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
                         <br /><span className="text-[9px] font-medium text-[var(--toss-gray-3)]">{r.department}</span>
                     </span>
                 );
-            },
-        },
+            } },
         { key: 'checkup_type', label: '종류', render: (g) => normalizeCheckupType(g.latest.checkup_type) },
         { key: 'completed_date', label: '완료일', render: (g) => g.latest.completed_date || '-' },
         { key: 'hospital', label: '기관', render: (g) => g.latest.hospital || '-' },
@@ -321,8 +315,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
             align: 'center',
             render: (g) => (
                 <span className={`inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold ${statusBadgeClass(g.latest.status)}`}>{g.latest.status}</span>
-            ),
-        },
+            ) },
         { key: 'actions', label: '액션', align: 'center', render: (g) => renderActions(g.latest) },
     ], []);
 

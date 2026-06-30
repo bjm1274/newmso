@@ -15,8 +15,7 @@ export function WorkcenterHeader({
   subtitle,
   mergedCount: _mergedCount,
   mergedTitles: _mergedTitles,
-  actions,
-}: {
+  actions }: {
   title: string;
   subtitle?: string;
   mergedCount: number;
@@ -74,8 +73,7 @@ export function Card({
   title,
   action,
   children,
-  className = '',
-}: {
+  className = '' }: {
   title?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
@@ -98,8 +96,7 @@ export function Card({
 export function TabBar<T extends string>({
   tabs,
   active,
-  onChange,
-}: {
+  onChange }: {
   tabs: { id: T; label: string; count?: number }[];
   active: T;
   onChange: (id: T) => void;
@@ -142,8 +139,7 @@ export function TabBar<T extends string>({
 export function Toggle({
   checked,
   onChange,
-  label,
-}: {
+  label }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label?: string;
@@ -190,8 +186,7 @@ export function SmBtn({
   primary,
   children,
   onClick,
-  ariaLabel,
-}: {
+  ariaLabel }: {
   primary?: boolean;
   children: React.ReactNode;
   onClick?: () => void;

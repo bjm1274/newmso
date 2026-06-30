@@ -6,8 +6,7 @@ import {
   isApprovedLeaveStatus,
   isAnnualLeaveType,
   getLeaveUnit,
-  calculateLeaveDays,
-} from '@/lib/annual-leave-ledger';
+  calculateLeaveDays } from '@/lib/annual-leave-ledger';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import {
   getD1Binding,
@@ -18,8 +17,7 @@ import {
   leave_balances as leaveBalancesTable,
   eq,
   and,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -91,8 +89,7 @@ function normalizeUpdates(payload: ManualGrantPayload | null) {
           total: payload.total,
           used: payload.used,
           expired: payload.expired,
-          compensated: payload.compensated,
-        }]
+          compensated: payload.compensated }]
       : [];
 
   const normalized = rawUpdates
@@ -152,8 +149,7 @@ export async function POST(request: Request) {
     if (invalid) {
       return NextResponse.json(
         {
-          error: `사용(${invalid.used}) + 소멸(${invalid.expired}) + 수당지급(${invalid.compensated}) 합계가 총 연차(${invalid.total})를 초과합니다. (staffId: ${invalid.staffId})`,
-        },
+          error: `사용(${invalid.used}) + 소멸(${invalid.expired}) + 수당지급(${invalid.compensated}) 합계가 총 연차(${invalid.total})를 초과합니다. (staffId: ${invalid.staffId})` },
         { status: 400 },
       );
     }
@@ -175,8 +171,7 @@ export async function POST(request: Request) {
         join_date: staffMembersTable.join_date,
         joined_at: staffMembersTable.joined_at,
         hire_date: staffMembersTable.hire_date,
-        company_id: staffMembersTable.company_id,
-      })
+        company_id: staffMembersTable.company_id })
       .from(staffMembersTable)
       .where(inArray(staffMembersTable.id, staffIds));
 
@@ -200,16 +195,14 @@ export async function POST(request: Request) {
         .select({
           id: companiesTable.id,
           leave_policy: companiesTable.leave_policy,
-          fiscal_year_start_month: companiesTable.fiscal_year_start_month,
-        })
+          fiscal_year_start_month: companiesTable.fiscal_year_start_month })
         .from(companiesTable)
         .where(inArray(companiesTable.id, companyIds));
       companyDataRows.forEach((c) =>
         companyMap.set(c.id, {
           id: c.id,
           leave_policy: c.leave_policy ?? null,
-          fiscal_year_start_month: c.fiscal_year_start_month ?? null,
-        }),
+          fiscal_year_start_month: c.fiscal_year_start_month ?? null }),
       );
     }
 
@@ -220,8 +213,7 @@ export async function POST(request: Request) {
         leave_type: leaveRequestsTable.leave_type,
         start_date: leaveRequestsTable.start_date,
         end_date: leaveRequestsTable.end_date,
-        status: leaveRequestsTable.status,
-      })
+        status: leaveRequestsTable.status })
       .from(leaveRequestsTable)
       .where(inArray(leaveRequestsTable.staff_id, staffIds));
 
@@ -234,8 +226,7 @@ export async function POST(request: Request) {
         leave_type: row.leave_type ?? null,
         start_date: row.start_date ?? null,
         end_date: row.end_date ?? null,
-        status: row.status ?? null,
-      };
+        status: row.status ?? null };
       const list = leaveByStaff.get(staffId);
       if (list) list.push(leaveRow);
       else leaveByStaff.set(staffId, [leaveRow]);
@@ -246,8 +237,7 @@ export async function POST(request: Request) {
       .select({
         id: leaveBalancesTable.id,
         staff_id: leaveBalancesTable.staff_id,
-        year: leaveBalancesTable.year,
-      })
+        year: leaveBalancesTable.year })
       .from(leaveBalancesTable)
       .where(
         and(
@@ -283,8 +273,7 @@ export async function POST(request: Request) {
         .update(staffMembersTable)
         .set({
           annual_leave_total: totalDays,
-          annual_leave_used: usedDays,
-        })
+          annual_leave_used: usedDays })
         .where(eq(staffMembersTable.id, update.staffId));
 
       // leave_balances upsert (SELECT 후 UPDATE or INSERT)
@@ -299,8 +288,7 @@ export async function POST(request: Request) {
             expiry_date: expiryDateStr,
             expired_days: update.expired,
             compensated_days: update.compensated,
-            updated_at: new Date().toISOString(),
-          })
+            updated_at: new Date().toISOString() })
           .where(eq(leaveBalancesTable.id, existingBalance.id));
       } else {
         await db.insert(leaveBalancesTable).values({
@@ -314,8 +302,7 @@ export async function POST(request: Request) {
           expired_days: update.expired,
           compensated_days: update.compensated,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+          updated_at: new Date().toISOString() });
       }
     }
 
@@ -325,8 +312,7 @@ export async function POST(request: Request) {
       message:
         updates.length === 1
           ? '연차 수동 부여 내역이 저장되었습니다.'
-          : `${updates.length}명의 연차 수동 부여 내역이 저장되었습니다.`,
-    });
+          : `${updates.length}명의 연차 수동 부여 내역이 저장되었습니다.` });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : '연차 수동 부여 저장 중 오류가 발생했습니다.';

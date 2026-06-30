@@ -35,8 +35,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
         borderTop: '1px solid rgba(0, 0, 0, 0.05)',
-        padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 12px))',
-      }}
+        padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 12px))' }}
     >
       {replyTo && (
         <div
@@ -50,8 +49,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             color: '#007AFF',
             borderRadius: 10,
             fontSize: 12,
-            fontWeight: 800,
-          }}
+            fontWeight: 800 }}
         >
           <span aria-hidden>↳</span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -70,8 +68,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
               display: 'grid',
               placeItems: 'center',
               border: 'none',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="x" size={10} />
           </button>
@@ -85,8 +82,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
           gap: 6,
           background: 'rgba(0, 0, 0, 0.04)',
           borderRadius: 22,
-          padding: '4px 6px 4px 12px',
-        }}
+          padding: '4px 6px 4px 12px' }}
       >
         <label htmlFor="board-comment-input" style={{ position: 'absolute', left: -9999 }}>
           댓글 입력
@@ -128,8 +124,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             opacity: sending ? 0.5 : 1,
             border: 'none',
             cursor: 'pointer',
-            boxShadow: draft.trim() ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
-          }}
+            boxShadow: draft.trim() ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
         >
           <MIcon name="send" size={14} />
         </button>

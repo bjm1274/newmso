@@ -19,8 +19,7 @@ import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
 import {
   formatBubbleTimestamp,
-  type StaffDirectoryEntry,
-} from './data-hooks';
+  type StaffDirectoryEntry } from './data-hooks';
 
 export type ThreadSheetProps = {
   rootMessage: ChatMessage | null;
@@ -44,8 +43,7 @@ function ThreadRow({
   message,
   staffs,
   mine,
-  isRoot = false,
-}: {
+  isRoot = false }: {
   message: ChatMessage;
   staffs: StaffDirectoryEntry[];
   mine: boolean;
@@ -93,8 +91,7 @@ function ThreadRow({
         alignItems: mine ? 'flex-end' : 'flex-start',
         gap: 4,
         padding: '6px 0',
-        width: '100%',
-      }}
+        width: '100%' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexDirection: mine ? 'row-reverse' : 'row' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)' }}>
@@ -119,8 +116,7 @@ function ThreadRow({
           borderRadius: mine ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
           border: mine ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
           color: mine ? '#fff' : 'var(--z-900)',
-          boxShadow: mine ? '0 4px 12px rgba(0, 122, 255, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.02)',
-        }}
+          boxShadow: mine ? '0 4px 12px rgba(0, 122, 255, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.02)' }}
       >
         {message.file_url ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: mine ? '#fff' : 'var(--m-accent)', fontWeight: 600 }}>
@@ -144,8 +140,7 @@ export function ThreadSheet({
   userId,
   sending,
   onClose,
-  onSendReply,
-}: ThreadSheetProps) {
+  onSendReply }: ThreadSheetProps) {
   const [draft, setDraft] = useState('');
 
   const replies = useMemo(() => {
@@ -186,8 +181,7 @@ export function ThreadSheet({
                 borderTop: 'none',
                 borderRight: 'none',
                 borderBottom: 'none',
-                marginBottom: 16,
-              }}
+                marginBottom: 16 }}
             >
               <div style={{ fontSize: 11, fontWeight: 800, color: '#007AFF', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
                 원문 메시지
@@ -237,8 +231,7 @@ export function ThreadSheet({
               gap: 10,
               background: 'rgba(255, 255, 255, 0.35)',
               backdropFilter: 'blur(5px)',
-              WebkitBackdropFilter: 'blur(5px)',
-            }}
+              WebkitBackdropFilter: 'blur(5px)' }}
           >
             <input
               value={draft}
@@ -262,8 +255,7 @@ export function ThreadSheet({
                 borderRadius: 22,
                 outline: 'none',
                 color: 'var(--z-900)',
-                transition: 'all 0.2s',
-              }}
+                transition: 'all 0.2s' }}
               onFocus={(e) => {
                 e.target.style.borderColor = '#007AFF';
                 e.target.style.background = 'rgba(255, 255, 255, 0.85)';
@@ -293,8 +285,7 @@ export function ThreadSheet({
                 flexShrink: 0,
                 cursor: draft.trim() && !sending ? 'pointer' : 'not-allowed',
                 boxShadow: draft.trim() && !sending ? '0 4px 10px rgba(0, 122, 255, 0.25)' : 'none',
-                transition: 'all 0.2s',
-              }}
+                transition: 'all 0.2s' }}
             >
               <MIcon name="send" size={15} color={draft.trim() && !sending ? '#fff' : 'rgba(120, 120, 128, 0.4)'} />
             </button>

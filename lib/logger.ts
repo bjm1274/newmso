@@ -42,5 +42,4 @@ export const logger = {
 
       console.debug(...args);
     }
-  },
-};
+  } };

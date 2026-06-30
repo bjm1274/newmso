@@ -24,8 +24,7 @@ import {
   BOARD_CATS,
   boardTypeToCat,
   useBoardDetail,
-  useBoardPosts,
-} from './data-hooks';
+  useBoardPosts } from './data-hooks';
 import { useMyLikes } from './좋아요훅';
 
 export type 게시판Props = {
@@ -250,8 +249,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
-      }}
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)' }}
     >
       {contentElement}
     </div>

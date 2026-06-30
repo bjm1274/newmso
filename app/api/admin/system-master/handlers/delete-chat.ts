@@ -12,8 +12,7 @@ import {
   room_read_cursors as roomReadCursorsTable,
   room_notification_settings as roomNotificationSettingsTable,
   eq,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 
 async function deleteChatRoomCascade(
   roomId: string,
@@ -94,8 +93,7 @@ export async function handleDelete(request: NextRequest) {
       ok: true,
       deletedRoomId: roomId,
       deletedMessageCount: result.deletedMessageCount,
-      deletedPollCount: result.deletedPollCount,
-    });
+      deletedPollCount: result.deletedPollCount });
   }
 
   // 일괄 삭제 — 안전을 위해 한 번에 최대 500개로 제한
@@ -116,6 +114,5 @@ export async function handleDelete(request: NextRequest) {
     deletedRoomIds,
     failureCount: failures.length,
     failures,
-    requestedCount: targets.length,
-  });
+    requestedCount: targets.length });
 }

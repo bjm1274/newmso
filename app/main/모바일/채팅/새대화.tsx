@@ -55,8 +55,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
           [m.name, m.position, m.department]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(query)),
-        ),
-      }))
+        ) }))
       .filter((g) => g.members.length > 0);
   }, [groups, q]);
 
@@ -111,8 +110,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         name,
         type: isDirect ? 'direct' : 'group',
         members: memberIds,
-        created_by: userId,
-      });
+        created_by: userId });
       if (!result.ok || !result.room) {
         toast(result.error || '대화방 생성에 실패했어요.', 'error');
         return;
@@ -139,8 +137,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         className="macos-glass"
         style={{
           padding: '10px 16px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-        }}
+          borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
       >
         <div
           className="m-seg macos-glass macos-squircle-sm"
@@ -150,8 +147,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
             background: 'rgba(0, 0, 0, 0.04)',
             border: 'none',
             padding: '2px',
-            display: 'flex',
-          }}
+            display: 'flex' }}
         >
           <SegBtn label="구성원" active={tab === 'member'} onClick={() => setTab('member')} />
           <SegBtn label="조직도" active={tab === 'org'} onClick={() => setTab('org')} />
@@ -172,8 +168,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
           className="macos-glass"
           style={{
             padding: '10px 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-          }}
+            borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
         >
           <label
             className="macos-squircle-sm"
@@ -182,8 +177,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
               alignItems: 'center',
               gap: 8,
               background: 'rgba(0, 0, 0, 0.04)',
-              padding: '6px 12px',
-            }}
+              padding: '6px 12px' }}
           >
             <MIcon name="search" size={16} color="var(--z-500)" />
             <span style={{ position: 'absolute', left: -9999 }}>이름·부서·직급 검색</span>
@@ -200,8 +194,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
                 border: 'none',
                 outline: 'none',
                 width: '100%',
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             />
           </label>
         </div>
@@ -256,8 +249,7 @@ function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHe
         padding: '16px 16px 12px',
         display: 'flex',
         alignItems: 'center',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-      }}
+        borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
     >
       <button
         type="button"
@@ -271,8 +263,7 @@ function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHe
           padding: '6px 12px',
           background: 'rgba(0, 0, 0, 0.04)',
           border: 'none',
-          cursor: 'pointer',
-        }}
+          cursor: 'pointer' }}
       >
         취소
       </button>
@@ -295,8 +286,7 @@ function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHe
           background: saveDisabled ? 'rgba(0, 0, 0, 0.04)' : 'linear-gradient(135deg, #007AFF, #0A55E1)',
           border: 'none',
           cursor: saveDisabled ? 'default' : 'pointer',
-          transition: 'all 0.2s ease',
-        }}
+          transition: 'all 0.2s ease' }}
       >
         {saveLabel}
       </button>
@@ -321,8 +311,7 @@ function SegBtn({ label, active, onClick }: SegBtnProps) {
         color: active ? 'var(--z-900)' : 'var(--z-600)',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
-        background: 'transparent',
-      }}
+        background: 'transparent' }}
       onClick={onClick}
     >
       {label}
@@ -347,8 +336,7 @@ function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
         borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
         display: 'flex',
         gap: 8,
-        overflowX: 'auto',
-      }}
+        overflowX: 'auto' }}
       role="list"
       aria-label="선택된 구성원"
     >
@@ -368,8 +356,7 @@ function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
               fontSize: 12,
               fontWeight: 700,
               color: '#007AFF',
-              flex: '0 0 auto',
-            }}
+              flex: '0 0 auto' }}
           >
             {name}
             <button
@@ -385,8 +372,7 @@ function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
                 display: 'grid',
                 placeItems: 'center',
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               <MIcon name="x" size={9} />
             </button>
@@ -438,8 +424,7 @@ function MemberTab({ groups, picked, onToggle, empty }: MemberTabProps) {
                 fontWeight: 800,
                 color: 'var(--z-500)',
                 letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
+                textTransform: 'uppercase' }}
             >
               {group.department}
             </span>
@@ -492,8 +477,7 @@ function MemberRow({ member, department, checked, onToggle }: MemberRowProps) {
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          border: 'none',
-        }}
+          border: 'none' }}
       >
         <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
         <div style={{ flex: 1 }}>
@@ -511,8 +495,7 @@ function MemberRow({ member, department, checked, onToggle }: MemberRowProps) {
             display: 'grid',
             placeItems: 'center',
             boxShadow: checked ? '0 2px 5px rgba(0, 122, 255, 0.3)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
+            transition: 'all 0.15s ease' }}
           aria-hidden="true"
         >
           {checked && <MIcon name="check" size={12} color="#ffffff" />}

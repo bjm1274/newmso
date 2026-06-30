@@ -22,16 +22,15 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ErpUser } from '@/types';
 import MIcon from '../공통/MIcon';
 import {
   MFormHeader,
   MField,
   MInput,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 
 const ASSET_CATS = ['의료기기', '영상장비', 'IT 장비', '가구', '사무'] as const;
 type AssetCat = (typeof ASSET_CATS)[number];
@@ -42,8 +41,7 @@ const CAT_TO_DB: Record<AssetCat, string> = {
   영상장비: '의료기기',
   'IT 장비': '기타',
   가구: '기타',
-  사무: '사무용품',
-};
+  사무: '사무용품' };
 
 type FormState = {
   scan: boolean;
@@ -64,14 +62,12 @@ const INITIAL: FormState = {
   loc: '',
   buy: '',
   vendor: '',
-  warranty: '',
-};
+  warranty: '' };
 
 const MOCK_SCAN = {
   name: 'C-Arm OEC 9900 Elite',
   tag: 'AST-0049',
-  udi: '(01)08806525301229(17)271231',
-};
+  udi: '(01)08806525301229(17)271231' };
 
 // YYYY.MM.DD → ISO date(YYYY-MM-DD) 변환. 빈 값/형식 불일치 시 null.
 function toISODate(raw: string): string | null {
@@ -123,8 +119,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
       ...prev,
       scan: true,
       name: prev.name || MOCK_SCAN.name,
-      tag: prev.tag || MOCK_SCAN.tag,
-    }));
+      tag: prev.tag || MOCK_SCAN.tag }));
   };
 
   const handleSave = async () => {
@@ -172,8 +167,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
           purchase_date: purchaseDate,
           expiry_date: warrantyDate, // 자산은 만료=보증 만료로 보관
           company,
-          department: typeof user.department === 'string' ? user.department : '',
-        };
+          department: typeof user.department === 'string' ? user.department : '' };
         const out: Record<string, unknown> = { ...payload };
         if (omittedColumns.has('department')) delete out.department;
         if (omittedColumns.has('unit')) delete out.unit;
@@ -186,7 +180,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
 
       const { error, data } = await withMissingColumnsFallback(
         (omittedColumns) =>
-          supabase.from('inventory').insert([buildPayload(omittedColumns)]).select('id'),
+          db.from('inventory').insert([buildPayload(omittedColumns)]).select('id'),
         ['department', 'unit', 'serial_number', 'udi_code', 'purchase_date', 'location'],
       );
 
@@ -221,8 +215,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
           style={{
             padding: '18px 16px',
             background: 'var(--m-card)',
-            borderBottom: '1px solid var(--m-border)',
-          }}
+            borderBottom: '1px solid var(--m-border)' }}
         >
           {!v.scan ? (
             <button
@@ -240,8 +233,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 10,
-              }}
+                gap: 10 }}
             >
               <MIcon name="qr" size={42} strokeWidth={1.4} />
               <div style={{ fontSize: 16, fontWeight: 800 }}>자산 라벨 스캔하기</div>
@@ -255,8 +247,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
                 padding: '14px 14px',
                 borderRadius: 'var(--m-radius-lg)',
                 background: 'var(--m-success-soft)',
-                border: '1px solid transparent',
-              }}
+                border: '1px solid transparent' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <MIcon name="checkCircle" size={22} color="var(--m-success)" />
@@ -270,8 +261,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
                       color: 'var(--z-600)',
                       fontWeight: 600,
                       marginTop: 1,
-                      fontFamily: 'var(--m-mono)',
-                    }}
+                      fontFamily: 'var(--m-mono)' }}
                   >
                     {scannedUdi ?? MOCK_SCAN.udi}
                   </div>
@@ -329,8 +319,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
                     fontSize: 12,
                     fontWeight: 700,
                     background: v.cat === c ? 'var(--m-accent)' : 'var(--m-bg)',
-                    color: v.cat === c ? '#fff' : 'var(--z-700)',
-                  }}
+                    color: v.cat === c ? '#fff' : 'var(--z-700)' }}
                 >
                   {c}
                 </button>

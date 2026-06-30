@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MBtn from '../공통/MBtn';
@@ -59,14 +59,13 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
           amount: Number(amount) || 0,
           relation,
           status,
-          company: selectedStaff?.company || '전체',
-        };
+          company: selectedStaff?.company || '전체' };
 
         if (initialData?.id) {
-          const { error } = await supabase.from('congratulations_condolences').update(payload).eq('id', initialData.id);
+          const { error } = await db.from('congratulations_condolences').update(payload).eq('id', initialData.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('congratulations_condolences').insert([payload]);
+          const { error } = await db.from('congratulations_condolences').insert([payload]);
           if (error) throw error;
         }
         toast('경조사 정보가 저장되었습니다.', 'success');
@@ -82,14 +81,13 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
           checkup_date: chkDate || null,
           vendor: chkVendor.trim(),
           status: chkStatus,
-          company: selectedStaff?.company || '전체',
-        };
+          company: selectedStaff?.company || '전체' };
 
         if (initialData?.id) {
-          const { error } = await supabase.from('health_checkups').update(payload).eq('id', initialData.id);
+          const { error } = await db.from('health_checkups').update(payload).eq('id', initialData.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('health_checkups').insert([payload]);
+          const { error } = await db.from('health_checkups').insert([payload]);
           if (error) throw error;
         }
         toast('건강검진 일정이 저장되었습니다.', 'success');
@@ -102,14 +100,13 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
         const payload = {
           staff_id: staffId,
           license_name: licName.trim(),
-          expiry_date: licExpiry || null,
-        };
+          expiry_date: licExpiry || null };
 
         if (initialData?.id) {
-          const { error } = await supabase.from('staff_licenses').update(payload).eq('id', initialData.id);
+          const { error } = await db.from('staff_licenses').update(payload).eq('id', initialData.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('staff_licenses').insert([payload]);
+          const { error } = await db.from('staff_licenses').insert([payload]);
           if (error) throw error;
         }
         toast('면허/자격증 정보가 저장되었습니다.', 'success');
@@ -123,14 +120,13 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
           name: devName.trim(),
           model: devModel.trim(),
           cycle: Number(devCycle) || 12,
-          next_inspection_date: devNextDate || null,
-        };
+          next_inspection_date: devNextDate || null };
 
         if (initialData?.id) {
-          const { error } = await supabase.from('medical_devices').update(payload).eq('id', initialData.id);
+          const { error } = await db.from('medical_devices').update(payload).eq('id', initialData.id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('medical_devices').insert([payload]);
+          const { error } = await db.from('medical_devices').insert([payload]);
           if (error) throw error;
         }
         toast('의료기기 점검 정보가 저장되었습니다.', 'success');
@@ -161,7 +157,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
               ? 'staff_licenses'
               : 'medical_devices';
 
-      const { error } = await supabase.from(table).delete().eq('id', initialData.id);
+      const { error } = await db.from(table).delete().eq('id', initialData.id);
       if (error) throw error;
 
       toast('삭제되었습니다.', 'success');
@@ -179,8 +175,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
     family: '경조사 관리',
     health: '건강검진 관리',
     cert: '면허·자격증 관리',
-    dev: '의료기기 등록',
-  };
+    dev: '의료기기 등록' };
 
   return (
     <div
@@ -195,8 +190,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
           padding: '20px 16px 24px',
           maxHeight: '85vh',
           display: 'flex',
-          flexDirection: 'column',
-        }}
+          flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: 16 }}>
@@ -225,8 +219,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                   borderRadius: 8,
                   fontSize: 13,
                   marginTop: 4,
-                  background: initialData?.id ? 'var(--m-bg)' : 'white',
-                }}
+                  background: initialData?.id ? 'var(--m-bg)' : 'white' }}
               >
                 <option value="">직원을 선택하세요</option>
                 {staffs.map((s) => (
@@ -253,8 +246,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                       borderRadius: 8,
                       fontSize: 13,
                       marginTop: 4,
-                      background: 'white',
-                    }}
+                      background: 'white' }}
                   >
                     <option value="결혼">결혼</option>
                     <option value="조사">조사 (사망)</option>
@@ -276,8 +268,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
                       fontSize: 13,
-                      marginTop: 4,
-                    }}
+                      marginTop: 4 }}
                   />
                 </div>
               </div>
@@ -294,8 +285,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -312,8 +302,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -329,8 +318,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    background: 'white',
-                  }}
+                    background: 'white' }}
                 >
                   <option value="접수">접수</option>
                   <option value="지급대기">지급대기</option>
@@ -355,8 +343,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -373,8 +360,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -390,8 +376,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    background: 'white',
-                  }}
+                    background: 'white' }}
                 >
                   <option value="예정">예정</option>
                   <option value="진행중">진행중</option>
@@ -417,8 +402,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -434,8 +418,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
             </>
@@ -456,8 +439,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -474,8 +456,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -493,8 +474,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
                       fontSize: 13,
-                      marginTop: 4,
-                    }}
+                      marginTop: 4 }}
                   />
                 </div>
                 <div>
@@ -509,8 +489,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
                       fontSize: 13,
-                      marginTop: 4,
-                    }}
+                      marginTop: 4 }}
                   />
                 </div>
               </div>
@@ -532,8 +511,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
                 background: 'white',
                 color: 'var(--m-danger)',
                 fontWeight: 700,
-                fontSize: 13,
-              }}
+                fontSize: 13 }}
             >
               삭제
             </button>

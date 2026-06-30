@@ -30,9 +30,8 @@ import {
   WorkcenterKpiRow,
   WorkcenterSection,
   WorkcenterShell,
-  type WorkcenterKpi,
-} from './workcenter-common';
-import { supabase } from '@/lib/supabase';
+  type WorkcenterKpi } from './workcenter-common';
+import { db } from '@/lib/db-client';
 import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { LeaveBalanceTable } from './LeaveWorkcenter/LeaveBalanceTable';
@@ -43,8 +42,7 @@ import {
   fetchLeaveData,
   type LeaveDataResult,
   type LeaveExpiryItem,
-  type LeaveStaffRow,
-} from './LeaveWorkcenter/data';
+  type LeaveStaffRow } from './LeaveWorkcenter/data';
 
 interface LeaveWorkcenterProps {
   staffs?: StaffMember[];
@@ -62,15 +60,13 @@ const EMPTY_RESULT: LeaveDataResult = {
   rows: [],
   requests: [],
   expiryItems: [],
-  totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 },
-};
+  totals: { remaining: 0, total: 0, used: 0, pending: 0, expiringStaff: 0 } };
 
 export default function LeaveWorkcenter({
   staffs = [],
   selectedCo,
   user = null,
-  onRefresh,
-}: LeaveWorkcenterProps) {
+  onRefresh }: LeaveWorkcenterProps) {
   const [data, setData] = useState<LeaveDataResult>(EMPTY_RESULT);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -141,12 +137,11 @@ export default function LeaveWorkcenter({
       if (!targetLeave) return;
       const previousStatus = targetLeave.status;
 
-      const { error } = await supabase
+      const { error } = await db
         .from('leave_requests')
         .update({
           status,
-          approved_at: status === '승인' ? new Date().toISOString() : null,
-        })
+          approved_at: status === '승인' ? new Date().toISOString() : null })
         .eq('id', id);
 
       if (error) throw error;
@@ -169,7 +164,7 @@ export default function LeaveWorkcenter({
         }
 
         if (newTotal !== currentTotal) {
-          await supabase
+          await db
             .from('staff_members')
             .update({ annual_leave_total: newTotal })
             .eq('id', targetLeave.staff_id);
@@ -180,8 +175,7 @@ export default function LeaveWorkcenter({
         const syncRes = await fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: targetLeave.staff_id }),
-        });
+          body: JSON.stringify({ staffId: targetLeave.staff_id }) });
         if (!syncRes.ok) {
           console.error('연차 동기화 서버 실패:', await syncRes.text());
         }
@@ -198,8 +192,7 @@ export default function LeaveWorkcenter({
           staff_id: targetLeave.staff_id,
           leave_type: targetLeave.leave_type,
           before_status: previousStatus,
-          after_status: status,
-        },
+          after_status: status },
         actor.userId,
         actor.userName
       );
@@ -220,7 +213,7 @@ export default function LeaveWorkcenter({
     const confirmed = confirm('이 결재 내역을 완전히 삭제하시겠습니까?');
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('leave_requests').delete().eq('id', id);
+      const { error } = await db.from('leave_requests').delete().eq('id', id);
       if (error) throw error;
 
       if (target.status === '승인' && target.leave_type === '연차(부여)') {
@@ -230,7 +223,7 @@ export default function LeaveWorkcenter({
         const staff = staffs.find((s) => String(s.id) === String(target.staff_id));
         const currentTotal = Number(staff?.annual_leave_total ?? 0);
         const newTotal = Math.max(0, currentTotal - days);
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_total: newTotal })
           .eq('id', target.staff_id);
@@ -240,8 +233,7 @@ export default function LeaveWorkcenter({
         const syncRes = await fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: target.staff_id }),
-        });
+          body: JSON.stringify({ staffId: target.staff_id }) });
         if (!syncRes.ok) {
           console.error('연차 동기화 서버 실패:', await syncRes.text());
         }
@@ -275,8 +267,7 @@ export default function LeaveWorkcenter({
     fetchLeaveData({
       staffs,
       selectedCo: selectedCo || '전체',
-      signal: controller.signal,
-    })
+      signal: controller.signal })
       .then((result) => {
         if (!alive) return;
         setData(result);
@@ -310,32 +301,28 @@ export default function LeaveWorkcenter({
         label: '전체 잔여 연차',
         value: totals.remaining.toString(),
         unit: '일',
-        sub: totalCount > 0 ? `재직 ${totalCount}명 합산` : '데이터 없음',
-      },
+        sub: totalCount > 0 ? `재직 ${totalCount}명 합산` : '데이터 없음' },
       {
         key: 'usage',
         label: '사용률',
         value: usageRate.toString(),
         unit: '%',
         sub: totals.total > 0 ? `${totals.used} / ${totals.total}일` : '연간 누적',
-        tone: 'success',
-      },
+        tone: 'success' },
       {
         key: 'expire',
         label: '소멸 예정',
         value: totals.expiringStaff.toString(),
         unit: '명',
         sub: '30일 이내 사용 권고',
-        tone: 'warn',
-      },
+        tone: 'warn' },
       {
         key: 'pending',
         label: '신청 대기',
         value: totals.pending.toString(),
         unit: '건',
         sub: '결재 필요',
-        tone: 'accent',
-      },
+        tone: 'accent' },
     ];
   }, [data]);
 
@@ -419,8 +406,7 @@ export default function LeaveWorkcenter({
           date: iso,
           status,
           staffName: staffMap.get(String(req.staff_id)) || null,
-          leaveType: req.leave_type || null,
-        });
+          leaveType: req.leave_type || null });
       }
     }
     return list;
@@ -855,8 +841,7 @@ export default function LeaveWorkcenter({
               top: `${popupPosition.y}px`,
               width: '675px',
               height: '525px',
-              maxHeight: '525px',
-            }}
+              maxHeight: '525px' }}
             className="z-[140] flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)]/95 p-6 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
           >
             {/* Header */}

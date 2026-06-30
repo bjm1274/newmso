@@ -248,8 +248,7 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
   try {
     const tables = entry.tables.map((t) => t.table).join(',');
     const res = await fetch(`/api/realtime/tail?tables=${encodeURIComponent(tables)}`, {
-      credentials: 'same-origin',
-    });
+      credentials: 'same-origin' });
     if (!res.ok) return;
     const data = (await res.json()) as { ok: boolean; tail?: Record<string, string | null> };
     if (!data.ok || !data.tail) return;
@@ -470,8 +469,7 @@ function getOrCreateEntry(
     pollIntervalMs,
     timer: null,
     lastSeen: {},
-    inFlight: false,
-  };
+    inFlight: false };
 
   channelRegistry.set(channelKey, entry);
 

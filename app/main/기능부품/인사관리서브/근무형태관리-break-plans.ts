@@ -28,8 +28,7 @@ export function createBreakPlan(index: number, start = '12:00', end = '13:00'): 
   return {
     id: indexToBreakPlanLabel(index),
     start_time: normalizeTime(start, '12:00'),
-    end_time: normalizeTime(end, '13:00'),
-  };
+    end_time: normalizeTime(end, '13:00') };
 }
 
 // 저장된 배열을 정규화. id 는 위치 기반으로 재부여해 항상 결정적이게 만든다.

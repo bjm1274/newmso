@@ -4,8 +4,7 @@ import {
     CONFIDENTIALITY_PLEDGE_AFFIRMATION,
     CONFIDENTIALITY_PLEDGE_CLAUSES,
     CONFIDENTIALITY_PLEDGE_INTRO_PREFIX,
-    CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX,
-} from '@/lib/contract-confidentiality-pledge';
+    CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX } from '@/lib/contract-confidentiality-pledge';
 
 /**
  * 근로계약서에 첨부되는 비밀유지 서약서.
@@ -23,8 +22,7 @@ export default function ConfidentialityPledge({
     companyName,
     employeeName,
     contractDate,
-    signatureDataUrl,
-}: Props) {
+    signatureDataUrl }: Props) {
     return (
         <section
             className="contract-pledge mt-10 print:mt-0 print:pt-0 print:break-before-page"

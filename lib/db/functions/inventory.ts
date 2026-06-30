@@ -138,14 +138,12 @@ export async function atomicStockConsumeWithLog(
     .update(inventory)
     .set({
       quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
-      stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
-    })
+      stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}` })
     .where(
       sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${consumeAmount}`,
     )
     .returning({
-      next_qty: inventory.quantity,
-    });
+      next_qty: inventory.quantity });
 
   if (updated.length === 0) {
     const found = await db
@@ -179,8 +177,7 @@ export async function atomicStockConsumeWithLog(
       company: logRow.company,
       company_id: logRow.company_id ?? null,
       department: logRow.department,
-      notes: logRow.notes,
-    });
+      notes: logRow.notes });
 
   return { prev_qty: prev, next_qty: next };
 }

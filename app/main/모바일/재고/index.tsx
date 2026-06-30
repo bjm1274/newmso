@@ -130,8 +130,7 @@ export default function 재고관리({ user, onBack }: 재고관리Props) {
 function Hub({
   company,
   onExit,
-  onOpen,
-}: {
+  onOpen }: {
   company?: string;
   onExit: () => void;
   onOpen: (view: StockMenuId) => void;
@@ -168,8 +167,7 @@ function Hub({
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 8,
-            padding: '12px 16px',
-          }}
+            padding: '12px 16px' }}
         >
           <MKpi
             icon="box"

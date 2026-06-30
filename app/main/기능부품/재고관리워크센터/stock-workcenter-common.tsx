@@ -22,16 +22,14 @@ const TONE_BG: Record<Tone, string> = {
   warn: 'var(--warning-light)',
   danger: 'var(--danger-light)',
   accent: 'var(--accent-selected-subtle)',
-  muted: 'var(--muted)',
-};
+  muted: 'var(--muted)' };
 
 const TONE_FG: Record<Tone, string> = {
   success: 'var(--success)',
   warn: 'var(--warning)',
   danger: 'var(--danger)',
   accent: 'var(--accent)',
-  muted: 'var(--muted-foreground)',
-};
+  muted: 'var(--muted-foreground)' };
 
 // ─────────────────────────────────────────────────
 // 톤 배지 (Chip)
@@ -39,8 +37,7 @@ const TONE_FG: Record<Tone, string> = {
 
 export function StockChip({
   tone = 'muted',
-  children,
-}: {
+  children }: {
   tone?: Tone;
   children: ReactNode;
 }) {
@@ -88,8 +85,7 @@ function KpiCard({ item }: { item: KpiItem }) {
       className="app-card flex flex-col gap-1 px-4 py-3"
       style={{
         boxShadow: 'var(--shadow-xs)',
-        borderLeft: tone ? `3px solid ${TONE_FG[tone]}` : undefined,
-      }}
+        borderLeft: tone ? `3px solid ${TONE_FG[tone]}` : undefined }}
     >
       <div className="text-[11px] font-bold tracking-tight text-[var(--toss-gray-3)]">
         {item.label}
@@ -131,8 +127,7 @@ export function StockTabs<T extends string>({
   tabs,
   active,
   onChange,
-  ariaLabel,
-}: {
+  ariaLabel }: {
   tabs: TabItem<T>[];
   active: T;
   onChange: (id: T) => void;
@@ -163,8 +158,7 @@ export function StockTabs<T extends string>({
               isActive
                 ? {
                     borderBottom: '2px solid var(--accent)',
-                    background: 'var(--accent-selected-subtle)',
-                  }
+                    background: 'var(--accent-selected-subtle)' }
                 : undefined
             }
           >
@@ -174,8 +168,7 @@ export function StockTabs<T extends string>({
                 className="rounded-[var(--radius-sm)] px-1.5 py-[1px] text-[10px] font-bold tabular-nums"
                 style={{
                   background: isActive ? 'var(--accent)' : 'var(--muted)',
-                  color: isActive ? '#fff' : 'var(--toss-gray-4)',
-                }}
+                  color: isActive ? '#fff' : 'var(--toss-gray-4)' }}
               >
                 {t.count}
               </span>
@@ -202,8 +195,7 @@ export function FilterChips<T extends string>({
   chips,
   active,
   onChange,
-  ariaLabel,
-}: {
+  ariaLabel }: {
   chips: FilterChip<T>[];
   active: T;
   onChange: (id: T) => void;
@@ -230,13 +222,11 @@ export function FilterChips<T extends string>({
                 ? {
                     background: c.tone ? toneColor : 'var(--accent)',
                     color: '#fff',
-                    borderColor: c.tone ? toneColor : 'var(--accent)',
-                  }
+                    borderColor: c.tone ? toneColor : 'var(--accent)' }
                 : {
                     background: toneBg,
                     color: toneColor,
-                    borderColor: 'transparent',
-                  }
+                    borderColor: 'transparent' }
             }
           >
             {c.label}
@@ -256,8 +246,7 @@ export function FilterChips<T extends string>({
 
 export function WorkcenterBack({
   label = '워크센터 대시보드',
-  onBack,
-}: {
+  onBack }: {
   label?: string;
   onBack: () => void;
 }) {
@@ -282,8 +271,7 @@ export function StockDarkBanner({
   title,
   desc,
   children,
-  style,
-}: {
+  style }: {
   kicker?: string;
   title: string;
   desc?: string;
@@ -296,8 +284,7 @@ export function StockDarkBanner({
       style={{
         background: 'var(--zinc-900)',
         color: '#fff',
-        ...style,
-      }}
+        ...style }}
     >
       <div className="flex flex-col gap-0.5 min-w-0">
         {kicker && (
@@ -321,10 +308,11 @@ export function WorkcenterNotes({
   kicker,
   title,
   points,
-}: {
+  children }: {
   kicker: string;
   title: string;
   points: string[];
+  children?: React.ReactNode;
 }) {
   return (
     <aside className="app-card flex flex-col gap-2 p-4" aria-label="워크센터 노트">
@@ -344,6 +332,7 @@ export function WorkcenterNotes({
           </li>
         ))}
       </ul>
+      {children}
     </aside>
   );
 }

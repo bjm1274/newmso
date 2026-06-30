@@ -59,8 +59,7 @@ export default function AbnormalDailyCard({
   status,
   onClarify,
   onResolve,
-  isLast,
-}: AbnormalDailyCardProps) {
+  isLast }: AbnormalDailyCardProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const busy = status === 'clarifying' || status === 'resolving';
   const resolved = status === 'resolved';
@@ -72,8 +71,7 @@ export default function AbnormalDailyCard({
         padding: '12px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--m-border)',
         background: resolved ? 'var(--m-success-soft)' : 'transparent',
-        transition: 'background .2s',
-      }}
+        transition: 'background .2s' }}
       aria-busy={busy || undefined}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -86,8 +84,7 @@ export default function AbnormalDailyCard({
               gap: 6,
               fontSize: 13,
               fontWeight: 700,
-              color: 'var(--z-900)',
-            }}
+              color: 'var(--z-900)' }}
           >
             <span className="m-tnum">{formatHeaderDate(row.date)}</span>
             <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
@@ -99,8 +96,7 @@ export default function AbnormalDailyCard({
               marginTop: 2,
               fontSize: 12,
               color: 'var(--z-700)',
-              fontWeight: 700,
-            }}
+              fontWeight: 700 }}
           >
             {buildDailyBodyLine(row)}
           </div>
@@ -128,8 +124,7 @@ export default function AbnormalDailyCard({
             marginTop: 10,
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: 8,
-          }}
+            gap: 8 }}
         >
           <ActionButton
             variant="ghost"
@@ -168,8 +163,7 @@ function ActionButton({
   busy,
   ariaLabel,
   tooltip,
-  children,
-}: {
+  children }: {
   variant: 'primary' | 'ghost';
   onClick: () => void;
   disabled?: boolean;
@@ -201,8 +195,7 @@ function ActionButton({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-      }}
+        gap: 6 }}
     >
       {busy ? '처리 중...' : children}
     </button>
@@ -213,8 +206,7 @@ function ConfirmBar({
   text,
   onCancel,
   onConfirm,
-  busy,
-}: {
+  busy }: {
   text: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -231,8 +223,7 @@ function ConfirmBar({
         border: '1px solid var(--m-warning)',
         borderRadius: 8,
         display: 'grid',
-        gap: 8,
-      }}
+        gap: 8 }}
     >
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-900)' }}>{text}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

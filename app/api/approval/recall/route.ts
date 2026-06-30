@@ -21,8 +21,7 @@ import {
   eq,
   and,
   isNull,
-  sql,
-} from '@/lib/db';
+  sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,8 +57,7 @@ export async function POST(request: NextRequest) {
         id: approvalsTable.id,
         status: approvalsTable.status,
         sender_id: approvalsTable.sender_id,
-        meta_data: approvalsTable.meta_data,
-      })
+        meta_data: approvalsTable.meta_data })
       .from(approvalsTable)
       .where(eq(approvalsTable.id, approvalId))
       .limit(1);
@@ -107,8 +105,7 @@ export async function POST(request: NextRequest) {
         status: '회수',
         current_approver_id: null,
         meta_data: JSON.stringify(nextMeta),
-        updated_at: new Date().toISOString(),
-      })
+        updated_at: new Date().toISOString() })
       .where(and(eq(approvalsTable.id, approvalId), eq(approvalsTable.sender_id, rowSenderId)))
       .run();
 

@@ -18,8 +18,7 @@ const SmartMonthPicker: React.FC<SmartMonthPickerProps> = ({
     className = "",
     inputClassName = "",
     disabled = false,
-    'data-testid': dataTestId,
-}) => {
+    'data-testid': dataTestId }) => {
     const dateInputRef = useRef<HTMLInputElement>(null);
 
     const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {

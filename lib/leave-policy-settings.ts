@@ -1,10 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { supabase } from './supabase';
+import { db } from './db-client';
 import {
   getD1Binding,
   getD1Drizzle,
-  system_settings as systemSettingsTable,
-} from './db';
+  system_settings as systemSettingsTable } from './db';
 
 export const LEAVE_POLICY_SETTINGS_KEY = 'leave_policy_rules_v1';
 
@@ -28,16 +27,13 @@ export const DEFAULT_LEAVE_POLICY_SETTINGS: LeavePolicySettings = {
   grantCompDayForHolidayWork: false,
   lateAnomalyMinutes: 30,
   earlyLeaveAnomalyMinutes: 30,
-  missingCheckoutGraceHours: 8,
-};
+  missingCheckoutGraceHours: 8 };
 
 function getDefaultStore(): LeavePolicyStore {
   return {
     version: 1,
     companies: {
-      전체: { ...DEFAULT_LEAVE_POLICY_SETTINGS },
-    },
-  };
+      전체: { ...DEFAULT_LEAVE_POLICY_SETTINGS } } };
 }
 
 function sanitizeSettings(raw: unknown): LeavePolicySettings {
@@ -59,8 +55,7 @@ function sanitizeSettings(raw: unknown): LeavePolicySettings {
     missingCheckoutGraceHours: Math.max(
       1,
       Number(source.missingCheckoutGraceHours ?? DEFAULT_LEAVE_POLICY_SETTINGS.missingCheckoutGraceHours) || 8
-    ),
-  };
+    ) };
 }
 
 function sanitizeStore(raw: unknown): LeavePolicyStore {
@@ -75,9 +70,7 @@ function sanitizeStore(raw: unknown): LeavePolicyStore {
     version: 1,
     companies: {
       ...base.companies,
-      ...companies,
-    },
-  };
+      ...companies } };
 }
 
 function readLocalFallbackStore(): LeavePolicyStore {
@@ -105,8 +98,7 @@ function writeLocalFallbackStore(store: LeavePolicyStore) {
 
 export async function loadLeavePolicyStore(): Promise<LeavePolicyStore> {
   try {
-    const { data, error } = await supabase
-      .from('system_settings')
+    const { data, error } = await db.from('system_settings')
       .select('value')
       .eq('key', LEAVE_POLICY_SETTINGS_KEY)
       .maybeSingle();
@@ -132,20 +124,16 @@ export async function saveLeavePolicySettings(selectedCompany: string, settings:
     version: 1,
     companies: {
       ...current.companies,
-      [selectedCompany || '전체']: sanitizeSettings(settings),
-    },
-  };
+      [selectedCompany || '전체']: sanitizeSettings(settings) } };
 
   const payload = {
     key: LEAVE_POLICY_SETTINGS_KEY,
     value: nextStore,
-    updated_at: new Date().toISOString(),
-  };
+    updated_at: new Date().toISOString() };
 
-  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
   if (typeof window !== 'undefined') {
-    const { error } = await supabase
-      .from('system_settings')
+    const { error } = await db.from('system_settings')
       .upsert(
         { key: payload.key, value: payload.value, updated_at: payload.updated_at },
         { onConflict: 'key' },
@@ -162,23 +150,19 @@ export async function saveLeavePolicySettings(selectedCompany: string, settings:
   if (!d1) {
     throw new Error('[leave-policy-settings] D1 binding not available');
   }
-  const db = getD1Drizzle(d1);
+  const drizzleDb = getD1Drizzle(d1);
 
   // value는 D1 스키마에서 text — jsonb → JSON.stringify
-  await db
-    .insert(systemSettingsTable)
+  await drizzleDb.insert(systemSettingsTable)
     .values({
       key: payload.key,
       value: JSON.stringify(payload.value),
-      updated_at: payload.updated_at,
-    })
+      updated_at: payload.updated_at })
     .onConflictDoUpdate({
       target: systemSettingsTable.key,
       set: {
         value: sql`excluded.value`,
-        updated_at: sql`excluded.updated_at`,
-      },
-    });
+        updated_at: sql`excluded.updated_at` } });
 
   writeLocalFallbackStore(nextStore);
   return nextStore;

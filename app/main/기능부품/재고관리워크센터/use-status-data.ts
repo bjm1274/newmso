@@ -6,7 +6,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StockStatusRow, Tone } from './stock-types';
 import { pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
@@ -67,8 +67,7 @@ const EMPTY: StatusWorkcenterData = {
   myCount: 0,
   deptUsageTop5: [],
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useStatusData(
   userCompany?: string,
@@ -82,12 +81,12 @@ export function useStatusData(
 
     const load = async () => {
       try {
-        const invQuery = supabase.from('inventory').select('*').limit(500);
+        const invQuery = db.from('inventory').select('*').limit(500);
         const [inv, logs] = await Promise.all([
           userCompany && userCompany !== '전체'
             ? invQuery.eq('company', userCompany)
             : invQuery,
-          supabase
+          db
             .from('inventory_logs')
             .select('actor_name,department,quantity,change_type,created_at')
             .in('change_type', ['사용', '소모', '출고'])
@@ -126,8 +125,7 @@ export function useStatusData(
           myCount,
           deptUsageTop5,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '재고 데이터를 불러오지 못했습니다.';

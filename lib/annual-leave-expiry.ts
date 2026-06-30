@@ -18,8 +18,7 @@ import {
   and,
   isNull,
   lte,
-  gt,
-} from './db';
+  gt } from './db';
 
 export type ExpiryResult = {
   staffId: string;
@@ -52,8 +51,7 @@ export async function processStaffLeaveExpiry(
     .update(leaveBalancesTable)
     .set({
       expired_days: remainingDays,
-      expired_at: now.toISOString(),
-    })
+      expired_at: now.toISOString() })
     .where(
       and(
         eq(leaveBalancesTable.staff_id, staffId),
@@ -65,8 +63,7 @@ export async function processStaffLeaveExpiry(
   const promotionMeta = {
     action: 'expired',
     expiry_date: expiryDateStr,
-    processed_at: now.toISOString(),
-  };
+    processed_at: now.toISOString() };
   await db.insert(annualLeavePromotionLogsTable).values({
     id: crypto.randomUUID(),
     staff_id: staffId,
@@ -74,8 +71,7 @@ export async function processStaffLeaveExpiry(
     step: 3,
     remain_days: remainingDays,
     meta: JSON.stringify(promotionMeta),
-    created_at: now.toISOString(),
-  });
+    created_at: now.toISOString() });
 
   // 소멸 알림 발송 (D1 직접 insert — mirrorNotificationsToD1 내부에서 처리)
   const expiryNotificationRow: NotificationRow = {
@@ -83,16 +79,14 @@ export async function processStaffLeaveExpiry(
     type: '연차소멸',
     title: '미사용 연차 소멸 안내',
     body: `${remainingDays}일의 미사용 연차가 소멸 처리되었습니다. (만료일: ${expiryDateStr})`,
-    read_at: null,
-  };
+    read_at: null };
   await mirrorNotificationsToD1([expiryNotificationRow]);
 
   return {
     staffId,
     staffName,
     expiredDays: remainingDays,
-    expiryDate: expiryDateStr,
-  };
+    expiryDate: expiryDateStr };
 }
 
 /**
@@ -164,8 +158,7 @@ export async function batchProcessExpiredLeaves(): Promise<{
       staff_id: leaveBalancesTable.staff_id,
       remaining_days: leaveBalancesTable.remaining_days,
       expiry_date: leaveBalancesTable.expiry_date,
-      staff_name: staffMembersTable.name,
-    })
+      staff_name: staffMembersTable.name })
     .from(leaveBalancesTable)
     .innerJoin(staffMembersTable, eq(leaveBalancesTable.staff_id, staffMembersTable.id))
     .where(

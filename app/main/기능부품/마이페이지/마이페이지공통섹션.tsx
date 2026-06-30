@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import SalarySlipContainer from './급여명세서';
 import MyCertificates from './증명서관리';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { LucideIcon } from '../조직도서브/조직도측면창';
@@ -25,16 +25,14 @@ export function buildProfileSummary(source: Record<string, unknown> | null | und
     position: typeof source?.position === 'string' ? source.position : '',
     department: typeof source?.department === 'string' ? source.department : '',
     avatarUrl: getProfilePhotoUrl(source),
-    employeeNo: typeof source?.employee_no === 'string' ? source.employee_no : '',
-  };
+    employeeNo: typeof source?.employee_no === 'string' ? source.employee_no : '' };
 }
 
 export function PayrollAndCertificatesHub({
   user,
   activeView,
   onBack,
-  onChangeView,
-}: {
+  onChangeView }: {
   user: Record<string, unknown> | null | undefined;
   activeView: 'salary' | 'certificates';
   onBack?: () => void;
@@ -52,7 +50,7 @@ export function PayrollAndCertificatesHub({
       try {
         const [salaryRecordsRes, salaryNotiRes, certRes, approvedDocsRes] = await Promise.all([
           // 명세서 뷰어와 동일 기준으로 집계하도록 레코드와 발송 알림을 함께 조회한다.
-          supabase
+          db
             .from('payroll_records')
             .select('record_type, status, year_month')
             .eq('staff_id', user.id),
@@ -60,11 +58,11 @@ export function PayrollAndCertificatesHub({
             .select('title, body')
             .eq('user_id', user.id)
             .eq('type', '급여명세'),
-          supabase
+          db
             .from('certificate_issuances')
             .select('id', { count: 'exact', head: true })
             .eq('staff_id', user.id),
-          supabase
+          db
             .from('approvals')
             .select('id', { count: 'exact', head: true })
             .eq('sender_id', user.id)
@@ -80,8 +78,7 @@ export function PayrollAndCertificatesHub({
 
         setSummary({
           salaryCount: issuedSalaryRecords.length,
-          certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0),
-        });
+          certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0) });
       } catch (error) {
         console.error('[마이페이지공통섹션] 급여·증명서 요약 조회 실패:', error);
         setSummary({ salaryCount: 0, certificateCount: 0 });
@@ -173,8 +170,7 @@ export function TabButton({
   onClick,
   label,
   icon,
-  ariaLabel,
-}: {
+  ariaLabel }: {
   isActive: boolean;
   onClick: () => void;
   label: string;
@@ -201,8 +197,7 @@ export function QuickFavoriteButton({
   icon,
   onClick,
   active,
-  onRemove,
-}: {
+  onRemove }: {
   label: string;
   icon: string;
   onClick: () => void;

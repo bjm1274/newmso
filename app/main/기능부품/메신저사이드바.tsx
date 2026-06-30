@@ -129,8 +129,7 @@ export function MessengerSidebar({
   onMovePinnedRoom,
   onToggleRoomHidden,
   onToggleDept,
-  onOpenDirectChat,
-}: MessengerSidebarProps) {
+  onOpenDirectChat }: MessengerSidebarProps) {
   const [actionRoomId, setActionRoomId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   // 현재 사용하지 않는 props: suppress unused-var lint
@@ -343,8 +342,7 @@ const RoomRow = memo(function RoomRow({
   onRoomClick,
   onToggleRoomPinned,
   onToggleRoomHidden,
-  setActionRoomId,
-}: RoomRowProps) {
+  setActionRoomId }: RoomRowProps) {
   const {
     room,
     roomId,
@@ -359,8 +357,7 @@ const RoomRow = memo(function RoomRow({
     peerPhotoUrl,
     isPeerOnline,
     isPinned,
-    isHidden,
-  } = item;
+    isHidden } = item;
 
   const tone = hashRoomTone(room.id || room.name || '');
   const rawTime = typeof room.last_message_at === 'string' ? room.last_message_at : null;
@@ -375,8 +372,7 @@ const RoomRow = memo(function RoomRow({
           label: isPinned ? '고정 해제' : '고정',
           icon: isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />,
           tone: 'normal',
-          onTrigger: () => onToggleRoomPinned(room.id, !isPinned),
-        },
+          onTrigger: () => onToggleRoomPinned(room.id, !isPinned) },
       ]
     : [];
   const swipeRightActions: SwipeAction[] = enableSwipe
@@ -386,8 +382,7 @@ const RoomRow = memo(function RoomRow({
           label: isHidden ? '표시' : '숨김',
           icon: isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />,
           tone: 'normal',
-          onTrigger: () => onToggleRoomHidden(room.id, !isHidden),
-        },
+          onTrigger: () => onToggleRoomHidden(room.id, !isHidden) },
       ]
     : [];
 

@@ -41,8 +41,7 @@ function parseRow(r: ApiBackupRow): BackupItem | null {
     size,
     kind,
     duration: typeof r.duration === 'string' ? r.duration : undefined,
-    tone,
-  };
+    tone };
 }
 
 export default function AuditBackupTab() {
@@ -84,8 +83,7 @@ export default function AuditBackupTab() {
       const res = await fetch('/api/admin/audit/backups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: '수동' }),
-      });
+        body: JSON.stringify({ kind: '수동' }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       // 성공 시 목록 새로고침
       const refreshed = await fetch('/api/admin/audit/backups', { cache: 'no-store' });
@@ -113,8 +111,7 @@ export default function AuditBackupTab() {
       const res = await fetch('/api/admin/audit/backups/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: item.file }),
-      });
+        body: JSON.stringify({ file: item.file }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (err) {
       console.warn('[backup] 복구 요청 실패', err);

@@ -40,8 +40,7 @@ export function recordNotificationDelivery(
     title: entry.title,
     stage: entry.stage,
     at: entry.at || new Date().toISOString(),
-    detail: normalizePushDebugDetail(entry.detail),
-  };
+    detail: normalizePushDebugDetail(entry.detail) };
 
   try {
     const nextLog = [nextEntry, ...readNotificationDeliveryLog()].slice(0, 40);
@@ -52,8 +51,7 @@ export function recordNotificationDelivery(
 
   try {
     window.dispatchEvent(new CustomEvent(NOTIFICATION_DELIVERY_EVENT, {
-      detail: nextEntry,
-    }));
+      detail: nextEntry }));
   } catch {
     // ignore event failures
   }

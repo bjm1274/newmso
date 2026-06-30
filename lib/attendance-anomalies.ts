@@ -137,8 +137,7 @@ export function detectAttendanceAnomalies(params: {
         staffName: staff?.name || '미지정 직원',
         department: staff?.department,
         summary: '배정 근무일인데 출근 기록이 없습니다.',
-        detail: `${staff?.name || '직원'} 님은 ${date} 근무표에 배정되어 있지만 출근/휴가 기록이 없습니다.`,
-      });
+        detail: `${staff?.name || '직원'} 님은 ${date} 근무표에 배정되어 있지만 출근/휴가 기록이 없습니다.` });
     }
 
     if (attendance && onLeave) {
@@ -151,8 +150,7 @@ export function detectAttendanceAnomalies(params: {
         staffName: staff?.name || '미지정 직원',
         department: staff?.department,
         summary: '승인 휴가와 실제 출근 기록이 동시에 존재합니다.',
-        detail: `${date} 승인 휴가와 출근 기록이 함께 존재합니다. 승인 취소 또는 근태 정정이 필요한지 확인하세요.`,
-      });
+        detail: `${date} 승인 휴가와 출근 기록이 함께 존재합니다. 승인 취소 또는 근태 정정이 필요한지 확인하세요.` });
     }
   });
 
@@ -177,8 +175,7 @@ export function detectAttendanceAnomalies(params: {
             staffName: staff?.name || '미지정 직원',
             department: staff?.department,
             summary: '출근 기록은 있지만 퇴근 기록이 없습니다.',
-            detail: `${staff?.name || '직원'} 님의 ${date} 퇴근 기록이 ${policy.missingCheckoutGraceHours}시간 이상 비어 있습니다.`,
-          });
+            detail: `${staff?.name || '직원'} 님의 ${date} 퇴근 기록이 ${policy.missingCheckoutGraceHours}시간 이상 비어 있습니다.` });
         }
       }
     }
@@ -193,8 +190,7 @@ export function detectAttendanceAnomalies(params: {
         staffName: staff?.name || '미지정 직원',
         department: staff?.department,
         summary: `지각 ${lateMinutes}분`,
-        detail: `${staff?.name || '직원'} 님의 지각 시간이 기준 ${policy.lateAnomalyMinutes}분을 넘었습니다.`,
-      });
+        detail: `${staff?.name || '직원'} 님의 지각 시간이 기준 ${policy.lateAnomalyMinutes}분을 넘었습니다.` });
     }
 
     if (earlyLeaveMinutes >= policy.earlyLeaveAnomalyMinutes) {
@@ -207,8 +203,7 @@ export function detectAttendanceAnomalies(params: {
         staffName: staff?.name || '미지정 직원',
         department: staff?.department,
         summary: `조퇴 ${earlyLeaveMinutes}분`,
-        detail: `${staff?.name || '직원'} 님의 조퇴 시간이 기준 ${policy.earlyLeaveAnomalyMinutes}분을 넘었습니다.`,
-      });
+        detail: `${staff?.name || '직원'} 님의 조퇴 시간이 기준 ${policy.earlyLeaveAnomalyMinutes}분을 넘었습니다.` });
     }
 
     if (policy.grantCompDayForHolidayWork && isHoliday(date, policy) && attendance.check_in_time) {
@@ -221,8 +216,7 @@ export function detectAttendanceAnomalies(params: {
         staffName: staff?.name || '미지정 직원',
         department: staff?.department,
         summary: '휴일/공휴일 근무가 감지되었습니다.',
-        detail: `${date} 근무는 대체휴무 또는 보상휴가 대상인지 확인하세요.`,
-      });
+        detail: `${date} 근무는 대체휴무 또는 보상휴가 대상인지 확인하세요.` });
     }
   });
 
@@ -230,8 +224,7 @@ export function detectAttendanceAnomalies(params: {
     const severityOrder: Record<AttendanceAnomalySeverity, number> = {
       critical: 0,
       warning: 1,
-      review: 2,
-    };
+      review: 2 };
     if (severityOrder[a.severity] !== severityOrder[b.severity]) {
       return severityOrder[a.severity] - severityOrder[b.severity];
     }

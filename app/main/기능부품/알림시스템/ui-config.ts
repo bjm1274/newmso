@@ -9,8 +9,7 @@ export const TYPE_CFG: Record<string, { icon: string; bg: string; progress: stri
   인사: { icon: '👥', bg: 'bg-cyan-600', progress: 'bg-cyan-400', accent: 'border-cyan-400' },
   education: { icon: '📚', bg: 'bg-purple-500/100', progress: 'bg-purple-400', accent: 'border-purple-400' },
   todo: { icon: '🗓️', bg: 'bg-sky-600', progress: 'bg-sky-400', accent: 'border-sky-400' },
-  notification: { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' },
-};
+  notification: { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' } };
 
 export const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
 

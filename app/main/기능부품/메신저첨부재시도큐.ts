@@ -92,8 +92,7 @@ const buildQueueId = buildRetryQueueId;
 function toFile(record: AttachmentRetryRecord) {
   return new File([record.fileBlob], record.fileName, {
     type: record.fileType || 'application/octet-stream',
-    lastModified: new Date(record.updatedAt || record.createdAt || Date.now()).getTime(),
-  });
+    lastModified: new Date(record.updatedAt || record.createdAt || Date.now()).getTime() });
 }
 
 function normalizeRecord(raw: unknown): AttachmentRetryRecord | null {
@@ -118,8 +117,7 @@ function normalizeRecord(raw: unknown): AttachmentRetryRecord | null {
     createdAt: String(record.createdAt || '') || new Date().toISOString(),
     updatedAt: String(record.updatedAt || '') || new Date().toISOString(),
     attemptCount: Math.max(1, Math.floor(Number(record.attemptCount) || 1)),
-    error: typeof record.error === 'string' ? record.error : null,
-  };
+    error: typeof record.error === 'string' ? record.error : null };
 }
 
 async function getAllRecords(store: IDBObjectStore) {
@@ -145,8 +143,7 @@ export async function readFailedAttachmentRetryQueue(actorId: string | null | un
     return sortByCreatedAt(all.filter((entry) => entry.actorId === normalizedActorId))
       .map((entry) => ({
         ...entry,
-        file: toFile(entry),
-      }));
+        file: toFile(entry) }));
   });
 }
 
@@ -188,8 +185,7 @@ export async function queueFailedAttachmentRetryEntry(
       createdAt: now,
       updatedAt: now,
       attemptCount: 1,
-      error: params.error || null,
-    };
+      error: params.error || null };
     store.put(record);
     return undefined;
   });

@@ -19,27 +19,22 @@ const TONE_STYLE: Record<StatTone, { bg: string; border: string; label: string; 
     bg: 'var(--warning-light)',
     border: 'var(--warning)',
     label: 'var(--warning)',
-    value: 'var(--foreground)',
-  },
+    value: 'var(--foreground)' },
   success: {
     bg: 'var(--success-light)',
     border: 'var(--success)',
     label: 'var(--success)',
-    value: 'var(--foreground)',
-  },
+    value: 'var(--foreground)' },
   danger: {
     bg: 'var(--danger-light)',
     border: 'var(--danger)',
     label: 'var(--danger)',
-    value: 'var(--foreground)',
-  },
+    value: 'var(--foreground)' },
   accent: {
     bg: 'var(--accent-selected-subtle)',
     border: 'var(--accent)',
     label: 'var(--accent)',
-    value: 'var(--foreground)',
-  },
-};
+    value: 'var(--foreground)' } };
 
 function startOfMonth(): Date {
   const now = new Date();
@@ -78,8 +73,7 @@ export default function ApprovalWorkflowKpi({
   documents,
   myStaffId,
   resolveCurrentApproverId,
-  averageHoursOverride,
-}: ApprovalWorkflowKpiProps) {
+  averageHoursOverride }: ApprovalWorkflowKpiProps) {
   const stats = useMemo(() => {
     const monthStart = startOfMonth();
     let myTurn = 0;

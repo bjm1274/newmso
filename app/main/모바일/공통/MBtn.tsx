@@ -9,7 +9,7 @@
  * JM6: button 시맨틱 + aria-label 지원 + 비활성 처리
  */
 
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode, type CSSProperties } from 'react';
 import MIcon from './MIcon';
 
 export type MBtnVariant = 'default' | 'primary' | 'danger' | 'warning' | 'ghost';
@@ -27,6 +27,7 @@ export type MBtnProps = {
   children?: ReactNode;
   className?: string;
   title?: string;
+  style?: CSSProperties;
 };
 
 function MBtnBase({
@@ -42,7 +43,7 @@ function MBtnBase({
   children,
   className,
   title,
-}: MBtnProps) {
+  style }: MBtnProps) {
   const classes = [
     'm-btn',
     variant === 'default' ? '' : variant,
@@ -60,6 +61,7 @@ function MBtnBase({
       onClick={onClick}
       aria-label={ariaLabel}
       title={title}
+      style={style}
     >
       {icon && <MIcon name={icon} size={lg ? 18 : 16} />}
       {children}

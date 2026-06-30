@@ -92,8 +92,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
       filename,
       patientName: name.trim() || '미지정',
       chartNumber: chartNo.trim() || '미지정',
-      result: res,
-    };
+      result: res };
     setRecords((prev) => {
       const next = [rec, ...prev].slice(0, 30);
       try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
@@ -244,8 +243,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
           'X-Goog-Upload-Command': 'start',
           'X-Goog-Upload-Header-Content-Length': String(blob.size),
           'X-Goog-Upload-Header-Content-Type': mimeType,
-          'Content-Type': 'application/json',
-        },
+          'Content-Type': 'application/json' },
         body: JSON.stringify({
           file: {
             display_name: `consultation_${Date.now()}`
@@ -430,8 +428,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
               {patientGroups.map((group) => {
                 const isActive = selectedPatientKey === group.key;
                 const latestDate = new Date(group.latestAt).toLocaleDateString('ko-KR', {
-                  timeZone: 'Asia/Seoul', month: 'short', day: 'numeric',
-                });
+                  timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' });
                 return (
                   <button
                     key={group.key}
@@ -574,8 +571,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                             title: '수술상담 기록 삭제',
                             description: '선택한 수술상담 기록을 삭제합니다.\n녹취 요약과 분석 결과가 함께 제거됩니다.',
                             confirmText: '삭제',
-                            tone: 'danger',
-                          });
+                            tone: 'danger' });
                           if (confirmed) deleteRecord(rec.id);
                         }}
                         className="p-1.5 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-red-500/10 hover:text-red-500 transition-colors text-sm"
@@ -702,8 +698,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
                             style={{
                               height: `${Math.random() * 24 + 8}px`,
                               animationDelay: `${i * 0.08}s`,
-                              animationDuration: '0.6s',
-                            }}
+                              animationDuration: '0.6s' }}
                           />
                         ))}
                       </div>

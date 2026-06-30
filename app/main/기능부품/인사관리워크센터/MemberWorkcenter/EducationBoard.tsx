@@ -17,15 +17,14 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { WorkcenterBackButton } from '../workcenter-common';
 import {
   buildEducationCompletionMap,
   getApplicableEducationItems,
   getEducationCompletionKey,
-  selectEducationCompletionRowsWithFallback,
-} from '../../인사관리서브/교육내역/education-utils';
+  selectEducationCompletionRowsWithFallback } from '../../인사관리서브/교육내역/education-utils';
 import { computeEducationTone, isActive, type EducationProgress } from './data';
 
 const EducationMain = dynamic(() => import('../../인사관리서브/교육관리'), {
@@ -34,8 +33,7 @@ const EducationMain = dynamic(() => import('../../인사관리서브/교육관�
     <div className="flex items-center justify-center py-16">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
     </div>
-  ),
-});
+  ) });
 
 interface EducationBoardProps {
   staffs: StaffMember[];
@@ -60,14 +58,12 @@ interface LicenseAlertView {
 const PROGRESS_TONE_BG: Record<EducationProgress['tone'], string> = {
   success: 'bg-emerald-500',
   warn: 'bg-amber-500',
-  danger: 'bg-red-500',
-};
+  danger: 'bg-red-500' };
 
 const PROGRESS_TONE_TEXT: Record<EducationProgress['tone'], string> = {
   success: 'text-emerald-700',
   warn: 'text-amber-700',
-  danger: 'text-red-700',
-};
+  danger: 'text-red-700' };
 
 export default function EducationBoard({ staffs, selectedCo }: EducationBoardProps) {
   const [progress, setProgress] = useState<EducationProgress[]>([]);
@@ -103,8 +99,8 @@ export default function EducationBoard({ staffs, selectedCo }: EducationBoardPro
         { rows: completions, error: completionsError },
         licensesResult,
       ] = await Promise.all([
-        selectEducationCompletionRowsWithFallback(supabase),
-        supabase
+        selectEducationCompletionRowsWithFallback(db),
+        db
           .from('staff_licenses')
           .select('id, staff_id, license_name, expiry_date'),
       ]);
@@ -143,8 +139,7 @@ export default function EducationBoard({ staffs, selectedCo }: EducationBoardPro
           due: null,
           completed,
           total,
-          tone: computeEducationTone(completed, total),
-        });
+          tone: computeEducationTone(completed, total) });
       }
       nextProgress.sort((a, b) => a.completed / Math.max(1, a.total) - b.completed / Math.max(1, b.total));
       setProgress(nextProgress);
@@ -167,8 +162,7 @@ export default function EducationBoard({ staffs, selectedCo }: EducationBoardPro
           staffName: staff.name ?? '직원',
           licenseName: row.license_name,
           expiryDate: row.expiry_date,
-          daysLeft,
-        });
+          daysLeft });
       }
       alerts.sort((a, b) => a.daysLeft - b.daysLeft);
       setLicenseAlerts(alerts.slice(0, 12));

@@ -25,8 +25,7 @@ export type PullRefreshIndicatorProps = {
 
 export default function PullRefreshIndicator({
   refreshing,
-  pullProgress,
-}: PullRefreshIndicatorProps) {
+  pullProgress }: PullRefreshIndicatorProps) {
   const [liveMsg, setLiveMsg] = useState('');
   const prevRefreshing = usePrevious(refreshing);
 
@@ -85,8 +84,7 @@ export default function PullRefreshIndicator({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          pointerEvents: 'none',
-        }}
+          pointerEvents: 'none' }}
       >
         {/* 진행 바 */}
         <div
@@ -94,16 +92,14 @@ export default function PullRefreshIndicator({
             width: '100%',
             height: 2,
             background: 'var(--m-border)',
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           <div
             style={{
               height: '100%',
               background: 'var(--m-accent)',
               width: `${opacity * 100}%`,
-              transition: refreshing ? 'none' : 'width 0.1s ease',
-            }}
+              transition: refreshing ? 'none' : 'width 0.1s ease' }}
           />
         </div>
 
@@ -116,8 +112,7 @@ export default function PullRefreshIndicator({
             display: 'grid',
             placeItems: 'center',
             opacity,
-            transition: refreshing ? 'opacity 0.15s ease' : 'opacity 0.1s ease',
-          }}
+            transition: refreshing ? 'opacity 0.15s ease' : 'opacity 0.1s ease' }}
         >
           <svg
             viewBox="0 0 24 24"
@@ -129,8 +124,7 @@ export default function PullRefreshIndicator({
             strokeLinecap="round"
             style={{
               transform: rotation ? `rotate(${rotation})` : undefined,
-              animation: refreshing ? 'spin 0.7s linear infinite' : undefined,
-            }}
+              animation: refreshing ? 'spin 0.7s linear infinite' : undefined }}
           >
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>

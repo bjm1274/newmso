@@ -7,8 +7,7 @@ export const NOTIFICATION_MENU_LABELS = {
   inventory: '\uC7AC\uACE0\uAD00\uB9AC',
   myPage: '\uB0B4\uC815\uBCF4',
   notifications: '\uC54C\uB9BC',
-  admin: '\uAD00\uB9AC\uC790',
-} as const;
+  admin: '\uAD00\uB9AC\uC790' } as const;
 
 export const DEFAULT_APPROVAL_VIEW = '\uACB0\uC7AC\uD568';
 export const DEFAULT_BOARD_TYPE = '\uACF5\uC9C0\uC0AC\uD56D';
@@ -190,8 +189,7 @@ export function buildChatNotificationMetadata(params: {
   const metadata: Record<string, unknown> = {
     ...(params.extra || {}),
     room_id: params.roomId,
-    type: cleanNotificationValue(params.notificationType) || 'message',
-  };
+    type: cleanNotificationValue(params.notificationType) || 'message' };
   const messageId = cleanNotificationValue(params.messageId);
   if (messageId) {
     metadata.id = messageId;
@@ -212,8 +210,7 @@ export function buildApprovalNotificationMetadata(params: {
 }) {
   const metadata: Record<string, unknown> = {
     ...(params.extra || {}),
-    type: 'approval',
-  };
+    type: 'approval' };
   const approvalId = cleanNotificationValue(params.approvalId);
   const approvalView = cleanNotificationValue(params.approvalView);
   const dedupeKey = cleanNotificationValue(params.dedupeKey);
@@ -239,8 +236,7 @@ export function buildInventoryNotificationMetadata(params: {
 }) {
   const metadata: Record<string, unknown> = {
     ...(params.extra || {}),
-    type: 'inventory',
-  };
+    type: 'inventory' };
   const approvalId = cleanNotificationValue(params.approvalId);
   const inventoryView = cleanNotificationValue(params.inventoryView);
   const dedupeKey = cleanNotificationValue(params.dedupeKey);
@@ -265,8 +261,7 @@ export function buildBoardNotificationMetadata(params: {
 }) {
   const metadata: Record<string, unknown> = {
     ...(params.extra || {}),
-    type: 'board',
-  };
+    type: 'board' };
   const boardType = cleanNotificationValue(params.boardType);
   const postId = cleanNotificationValue(params.postId);
   const dedupeKey = cleanNotificationValue(params.dedupeKey);
@@ -291,8 +286,7 @@ export function buildMenuNotificationMetadata(params: {
 }) {
   const metadata: Record<string, unknown> = {
     ...(params.extra || {}),
-    open_menu: params.menu,
-  };
+    open_menu: params.menu };
   const subView = cleanNotificationValue(params.subView);
   const dedupeKey = cleanNotificationValue(params.dedupeKey);
 
@@ -389,8 +383,7 @@ export function resolveNotificationTarget(
       kind: 'chat',
       href: buildChatNotificationHref(resolvedRecord),
       roomId,
-      messageId: resolveChatNotificationMessageId(resolvedRecord) || null,
-    };
+      messageId: resolveChatNotificationMessageId(resolvedRecord) || null };
   }
 
   const explicitInventoryApprovalId = resolveExplicitInventoryApprovalId(resolvedRecord);
@@ -405,8 +398,7 @@ export function resolveNotificationTarget(
       approvalId: inventoryApprovalId || null,
       inventoryView:
         inventoryView ||
-        (normalizedType === 'inventory' || inventoryApprovalId ? DEFAULT_INVENTORY_VIEW : null),
-    };
+        (normalizedType === 'inventory' || inventoryApprovalId ? DEFAULT_INVENTORY_VIEW : null) };
   }
 
   const approvalId = resolveApprovalNotificationId(resolvedRecord);
@@ -416,8 +408,7 @@ export function resolveNotificationTarget(
       kind: 'approval',
       href: buildApprovalNotificationHref(resolvedRecord),
       approvalId: approvalId || null,
-      approvalView: approvalView || DEFAULT_APPROVAL_VIEW,
-    };
+      approvalView: approvalView || DEFAULT_APPROVAL_VIEW };
   }
 
   const postId = resolveBoardNotificationPostId(resolvedRecord);
@@ -432,8 +423,7 @@ export function resolveNotificationTarget(
       kind: 'board',
       href: buildBoardNotificationHref(resolvedRecord),
       boardType: boardType || DEFAULT_BOARD_TYPE,
-      postId: postId || null,
-    };
+      postId: postId || null };
   }
 
   const openMenu = resolveNotificationOpenMenu(resolvedRecord);
@@ -442,8 +432,7 @@ export function resolveNotificationTarget(
       kind: 'menu',
       href: buildMenuNotificationHref(resolvedRecord, openMenu),
       menu: openMenu,
-      subView: resolveNotificationOpenSubView(resolvedRecord) || null,
-    };
+      subView: resolveNotificationOpenSubView(resolvedRecord) || null };
   }
 
   if (
@@ -457,16 +446,14 @@ export function resolveNotificationTarget(
       kind: 'my_page',
       href: createMainHref([
         ['open_menu', NOTIFICATION_MENU_LABELS.myPage],
-      ]),
-    };
+      ]) };
   }
 
   return {
     kind: 'notifications',
     href: createMainHref([
       ['open_menu', NOTIFICATION_MENU_LABELS.notifications],
-    ]),
-  };
+    ]) };
 }
 
 export function buildNotificationHref(

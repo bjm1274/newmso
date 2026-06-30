@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -64,26 +64,33 @@ function PopupManagerDesktop() {
     media_url: '',
     media_type: 'image',
     width: 400,
-    height: 500,
-  });
+    height: 500 });
+  const [titleError, setTitleError] = useState(false);
+  const [fileKey, setFileKey] = useState(0);
 
-  const previewUrl = useMemo(() => {
-    if (selectedFile) {
-      return URL.createObjectURL(selectedFile);
-    }
-    return newPopup.media_url;
-  }, [newPopup.media_url, selectedFile]);
+  const [previewDataUrl, setPreviewDataUrl] = useState<string>('');
 
   useEffect(() => {
-    return () => {
-      if (previewUrl && selectedFile) {
-        URL.revokeObjectURL(previewUrl);
+    if (!selectedFile) {
+      setPreviewDataUrl(newPopup.media_url);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setPreviewDataUrl(reader.result);
       }
     };
-  }, [previewUrl, selectedFile]);
+    reader.readAsDataURL(selectedFile);
+
+    return () => {
+      reader.abort();
+    };
+  }, [selectedFile, newPopup.media_url]);
 
   const loadPopups = async () => {
-    const { data } = await supabase
+    const { data } = await db
       .from('popups')
       .select('*')
       .order('created_at', { ascending: false });
@@ -105,13 +112,10 @@ function PopupManagerDesktop() {
     const signResponse = await fetch('/api/admin/popups/upload', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-      },
+        'Content-Type': 'application/json' },
       body: JSON.stringify({
         fileName: selectedFile.name,
-        contentType: selectedFile.type,
-      }),
-    });
+        contentType: selectedFile.type }) });
 
     const signPayload = (await signResponse.json().catch(() => null)) as SignedUploadResponse | null;
     if (!signResponse.ok || !signPayload?.signedUrl || !signPayload?.url) {
@@ -124,10 +128,8 @@ function PopupManagerDesktop() {
       headers: {
         'content-type': selectedFile.type,
         'cache-control': '3600',
-        ...(signPayload.headers ?? {}),
-      },
-      body: selectedFile,
-    });
+        ...(signPayload.headers ?? {}) },
+      body: selectedFile });
 
     if (!r2Response.ok) {
       throw new Error(`파일 업로드에 실패했습니다. (status: ${r2Response.status})`);
@@ -138,6 +140,8 @@ function PopupManagerDesktop() {
 
   const handleAddPopup = async () => {
     if (!newPopup.title.trim()) {
+      setTitleError(true);
+      document.getElementById('popup-title-input')?.focus();
       return toast('팝업 제목을 입력해주세요.', 'warning');
     }
 
@@ -149,7 +153,7 @@ function PopupManagerDesktop() {
 
     try {
       const finalUrl = await uploadSelectedFile();
-      const { error } = await supabase
+      const { error } = await db
         .from('popups')
         .insert([{ ...newPopup, title: newPopup.title.trim(), media_url: finalUrl, is_active: true }]);
 
@@ -159,6 +163,7 @@ function PopupManagerDesktop() {
 
       toast('새 팝업이 생성되었습니다.');
       setSelectedFile(null);
+      setFileKey(prev => prev + 1);
       setNewPopup({ title: '', media_url: '', media_type: 'image', width: 400, height: 500 });
       await loadPopups();
     } catch (error) {
@@ -176,8 +181,7 @@ function PopupManagerDesktop() {
       title: '팝업 삭제',
       description: `"${popup.title || '제목 없음'}" 팝업을 삭제합니다.\n홈 화면 노출 설정에서도 함께 제거됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     setDeletingPopupId(popup.id);
@@ -185,10 +189,8 @@ function PopupManagerDesktop() {
       const response = await fetch('/api/admin/popups/delete', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ popupId: popup.id }),
-      });
+          'Content-Type': 'application/json' },
+        body: JSON.stringify({ popupId: popup.id }) });
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -221,16 +223,28 @@ function PopupManagerDesktop() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label htmlFor="popup-title-input" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-              팝업 제목 <span className="text-red-500" aria-hidden>*</span>
+            <label htmlFor="popup-title-input" className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest flex items-center justify-between">
+              <span>팝업 제목 <span className="text-red-500" aria-hidden>*</span></span>
+              {titleError && (
+                <span className="text-[10px] text-red-500 font-normal normal-case">
+                  제목을 필수 입력해 주세요.
+                </span>
+              )}
             </label>
             <input
               id="popup-title-input"
               aria-required="true"
-              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
+              className={`w-full p-2 bg-[var(--muted)] border text-xs font-bold outline-none transition-colors ${
+                titleError
+                  ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500'
+                  : 'border-[var(--border)] focus:border-[var(--foreground)]'
+              }`}
               placeholder="예: 박철홍정형외과 설날 진료 안내"
               value={newPopup.title}
-              onChange={(e) => setNewPopup({ ...newPopup, title: e.target.value })}
+              onChange={(e) => {
+                setTitleError(false);
+                setNewPopup({ ...newPopup, title: e.target.value });
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -245,8 +259,7 @@ function PopupManagerDesktop() {
                 setSelectedFile(null);
                 setNewPopup({
                   ...newPopup,
-                  media_type: e.target.value as PopupDraft['media_type'],
-                });
+                  media_type: e.target.value as PopupDraft['media_type'] });
               }}
             >
               <option value="image">이미지 (JPG, PNG)</option>
@@ -263,6 +276,7 @@ function PopupManagerDesktop() {
           </label>
           <input
             id="popup-media-file-input"
+            key={fileKey}
             aria-required="true"
             type="file"
             accept={newPopup.media_type === 'video' ? 'video/mp4' : 'image/png,image/jpeg,image/jpg'}
@@ -407,7 +421,7 @@ function PopupManagerDesktop() {
               >
                 {newPopup.media_type === 'video' ? (
                   <video
-                    src={previewUrl}
+                    src={previewDataUrl}
                     className="w-full h-full object-cover"
                     muted
                     loop
@@ -415,7 +429,7 @@ function PopupManagerDesktop() {
                     playsInline
                   />
                 ) : (
-                  <img src={previewUrl} alt="Popup" className="w-full h-full object-fill" />
+                  <img src={previewDataUrl} alt="Popup" className="w-full h-full object-fill" />
                 )}
                 <div className="absolute bottom-0 w-full h-8 bg-black text-white flex justify-between items-center px-3 text-[11px] font-semibold">
                   <span>오늘 하루 열지 않기</span>

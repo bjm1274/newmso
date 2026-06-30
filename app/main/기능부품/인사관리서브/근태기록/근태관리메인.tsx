@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db, d1 } from '@/lib/db-client';
 import { getKoreanMonthString, getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { filterRosterShiftsForDepartment } from '@/lib/roster-shift-team-filter';
 import { isActiveStaff } from '@/lib/active-staff';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
@@ -40,8 +40,7 @@ import {
   isWorkedShiftAssignment,
   buildWeekDates,
   buildMonthCalendarCells,
-  isShiftBasedShift,
-} from './근태관리메인-내부유틸';
+  isShiftBasedShift } from './근태관리메인-내부유틸';
 
 type AttendanceMainProps = {
   staffs: StaffMember[];
@@ -157,8 +156,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           annualLeave: 0,
           sickLeave: 0,
           halfLeave: 0,
-          totalRecords: 0,
-        });
+          totalRecords: 0 });
       }
 
       const current = summary.get(workDate)!;
@@ -492,8 +490,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       const { error } = await db.from('roster_swap_requests').update({
         status: 'approved',
         approved_by: user?.id,
-        approved_at: new Date().toISOString(),
-      }).eq('id', req.id);
+        approved_at: new Date().toISOString() }).eq('id', req.id);
       if (error) throw error;
       setPendingSwaps(p => p.filter(x => x.id !== req.id));
       toast('교환 요청을 승인했습니다.');
@@ -507,8 +504,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
       status: 'rejected',
       reject_reason: reason,
       rejected_by: user?.id,
-      rejected_at: new Date().toISOString(),
-    }).eq('id', req.id);
+      rejected_at: new Date().toISOString() }).eq('id', req.id);
     setPendingSwaps(p => p.filter(x => x.id !== req.id));
     toast('교환 요청을 반려했습니다.');
   };
@@ -639,8 +635,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           staff_name: staffObj?.name || staff_id,
           work_date,
           shift_id: v,
-          shift_name: shiftObj?.name || v,
-        };
+          shift_name: shiftObj?.name || v };
       })
       .filter(a => allowedStaffIds.has(String(a.staff_id)));
     if (assignments.length === 0) return toast('근무표에 배정된 근무가 없습니다.', 'warning');
@@ -654,9 +649,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           companyName: selectedCo === '전체' ? (userCompany || '') : selectedCo,
           teamName: rosterTeam,
           yearMonth: selectedMonth,
-          assignments,
-        }),
-      });
+          assignments }) });
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
@@ -696,17 +689,14 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             ...metaData,
             roster_approval_status: 'approved',
             roster_approved_by: user?.id || null,
-            roster_approved_at: nowIso,
-          },
-        }).eq('id', request.id);
+            roster_approved_at: nowIso } }).eq('id', request.id);
         if (approvalError) throw approvalError;
       } else {
         const { error: approvalError } = await db.from('roster_approval_requests').update({
           status: 'approved',
           approved_by: user?.id,
           approved_at: nowIso,
-          updated_at: nowIso,
-        }).eq('id', request.id);
+          updated_at: nowIso }).eq('id', request.id);
         if (approvalError) throw approvalError;
       }
 
@@ -732,8 +722,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
         content: `승인일: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}\n승인자: ${user?.name || ''}\n요청자: ${request.requested_by_name || ''}\n\n직원명\t근무일\t근무형태\n${docContent}`,
         company_name: companyName || '전체',
         created_by: user?.id,
-        version: 1,
-      });
+        version: 1 });
 
       if (request.requested_by) {
         await d1.from('notifications').insert({
@@ -750,9 +739,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             approval_source: legacyRequest ? 'approvals' : 'roster_approval_requests',
             approval_status: 'approved',
             team_name: request.team_name || '전체',
-            year_month: request.year_month || selectedMonth,
-          },
-        });
+            year_month: request.year_month || selectedMonth } });
       }
 
       if (false && request.requested_by) {
@@ -771,9 +758,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             approval_status: 'rejected',
             reject_reason: null,
             team_name: request.team_name || '전체',
-            year_month: request.year_month || selectedMonth,
-          },
-        });
+            year_month: request.year_month || selectedMonth } });
       }
 
       setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
@@ -802,9 +787,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             roster_approval_status: 'rejected',
             roster_rejected_by: user?.id || null,
             roster_rejected_at: nowIso,
-            roster_reject_reason: reason,
-          },
-        }).eq('id', request.id);
+            roster_reject_reason: reason } }).eq('id', request.id);
         if (error) throw error;
       } else {
         const { error } = await db.from('roster_approval_requests').update({
@@ -812,8 +795,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           rejected_by: user?.id,
           rejected_at: nowIso,
           reject_reason: reason,
-          updated_at: nowIso,
-        }).eq('id', request.id);
+          updated_at: nowIso }).eq('id', request.id);
         if (error) throw error;
       }
 
@@ -833,9 +815,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             approval_status: 'rejected',
             reject_reason: reason,
             team_name: request.team_name || '전체',
-            year_month: request.year_month || selectedMonth,
-          },
-        });
+            year_month: request.year_month || selectedMonth } });
       }
 
       setPendingApprovals(prev => prev.filter(p => p.id !== request.id));
@@ -1073,8 +1053,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
             name: s.name,
             position: s.position,
             department: s.department,
-            company: s.company,
-          }))}
+            company: s.company }))}
           initialDate={selectedDate}
           attendances={attendanceData}
           approvedLeaves={approvedLeaves}

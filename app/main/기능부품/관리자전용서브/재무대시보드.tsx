@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export default function FinancialDashboard() {
@@ -17,7 +17,7 @@ export default function FinancialDashboard() {
     useEffect(() => {
         const fetchFinancials = async () => {
             const today = getKoreanTodayString();
-            const { data } = await supabase
+            const { data } = await db
                 .from('daily_closures')
                 .select('*')
                 .eq('date', today)

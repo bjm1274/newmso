@@ -14,8 +14,7 @@ export function buildPermissionReview({
   summary,
   targetName,
   beforePermissions,
-  afterPermissions,
-}: {
+  afterPermissions }: {
   title: string;
   summary: string;
   targetName: string;
@@ -49,8 +48,7 @@ export function buildPermissionReview({
       label: item?.label || key,
       before: formatPermissionValue(before),
       after: formatPermissionValue(after),
-      tone: item?.tone,
-    };
+      tone: item?.tone };
     const groupLabel = groupMap.get(key);
     if (groupLabel) affectedGroups.add(groupLabel);
     if (item?.tone === 'critical') riskCount += 1;
@@ -72,8 +70,7 @@ export function buildPermissionReview({
     removed,
     changed,
     affectedGroups: Array.from(affectedGroups),
-    riskCount,
-  };
+    riskCount };
 }
 
 export function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): ApprovalReferenceSettingUser | null {
@@ -87,8 +84,7 @@ export function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): 
       name: String(matched.name || '이름 없음'),
       position: matched.position ?? null,
       department: matched.department ?? null,
-      company: matched.company ?? null,
-    };
+      company: matched.company ?? null };
   }
 
   if (typeof entry === 'object') {
@@ -100,8 +96,7 @@ export function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): 
       name: String(entry.name || matched?.name || '이름 없음'),
       position: typeof entry.position === 'string' ? entry.position : matched?.position ?? null,
       department: typeof entry.department === 'string' ? entry.department : matched?.department ?? null,
-      company: typeof entry.company === 'string' ? entry.company : matched?.company ?? null,
-    };
+      company: typeof entry.company === 'string' ? entry.company : matched?.company ?? null };
   }
 
   return null;

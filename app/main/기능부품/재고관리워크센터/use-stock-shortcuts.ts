@@ -113,8 +113,7 @@ export function useGridShortcuts({
   onSelectRow,
   onNew,
   onEscape,
-  enabled = true,
-}: UseGridShortcutsOptions) {
+  enabled = true }: UseGridShortcutsOptions) {
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   useEffect(() => {

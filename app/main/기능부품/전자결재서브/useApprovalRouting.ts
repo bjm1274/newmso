@@ -7,15 +7,13 @@ import {
   isApprovalOverdue,
   markDelayNotification,
   resolveApprovalDelayConfig,
-  shouldSendDelayNotification,
-} from '@/lib/approval-workflow';
-import { supabase } from '@/lib/supabase';
+  shouldSendDelayNotification } from '@/lib/approval-workflow';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import {
   normalizeApprovalLineIds as normalizeApprovalLineIdsCore,
   resolveApprovalLineIds as resolveApprovalLineIdsCore,
-  resolveStoredCurrentApproverId as resolveStoredCurrentApproverIdCore,
-} from '@/lib/approval-shared';
+  resolveStoredCurrentApproverId as resolveStoredCurrentApproverIdCore } from '@/lib/approval-shared';
 import type { StaffMember } from '@/types';
 import { APPROVER_POSITIONS } from './approval-constants';
 import { useApprovalDelegation } from './useApprovalDelegation';
@@ -33,8 +31,7 @@ type UseApprovalRoutingParams = {
 export function useApprovalRouting({
   user,
   approvalDirectoryStaffs,
-  setApprovals,
-}: UseApprovalRoutingParams) {
+  setApprovals }: UseApprovalRoutingParams) {
   const approverCandidates = useMemo(() => {
     const source = approvalDirectoryStaffs;
     if (!Array.isArray(source)) return [];
@@ -76,15 +73,13 @@ export function useApprovalRouting({
     resolveEffectiveApproverId,
     resolveApprovalDelegateSnapshot,
     syncDelegatedApprovalDelayNotifications,
-    syncDelegatedApprovalRouting,
-  } = useApprovalDelegation({
+    syncDelegatedApprovalRouting } = useApprovalDelegation({
     approvalStaffMap,
     normalizeApprovalLineIds,
     resolveStoredCurrentApproverId,
     resolveApprovalDelayConfigForStaff,
     buildApprovalHistoryEntry,
-    setApprovals,
-  });
+    setApprovals });
 
   const resolveCurrentApproverId = useCallback((item: ApprovalRecord): string | null => {
     return resolveEffectiveApproverId(resolveStoredCurrentApproverId(item));
@@ -112,8 +107,7 @@ export function useApprovalRouting({
       elapsedHours,
       overdue: String(item?.status || '').trim() === '대기' && isApprovalOverdue(item, thresholdHours),
       lastNotifiedAt: String(tracker?.last_notified_at || ''),
-      notificationCount: Math.max(0, Number(tracker?.count) || 0),
-    };
+      notificationCount: Math.max(0, Number(tracker?.count) || 0) };
   }, [resolveApprovalDelayConfigForStaff, resolveStoredCurrentApproverId]);
 
   const resolveApprovalLockSnapshot = useCallback((item: ApprovalRecord) => {
@@ -123,8 +117,7 @@ export function useApprovalRouting({
         lockedAt: '',
         lockedById: '',
         lockedByName: '',
-        revision: 1,
-      };
+        revision: 1 };
     }
     const lockedById = String(metaData?.edit_locked_by || '');
     const lockedByStaff = lockedById ? approvalStaffMap.get(lockedById) : null;
@@ -132,8 +125,7 @@ export function useApprovalRouting({
       lockedAt: String(metaData?.edit_locked_at || ''),
       lockedById,
       lockedByName: lockedByStaff?.name || lockedById || '시스템',
-      revision: getApprovalRevision(metaData),
-    };
+      revision: getApprovalRevision(metaData) };
   }, [approvalStaffMap]);
 
   const syncApprovalDelayNotifications = useCallback(async (items: ApprovalRecord[]) => {
@@ -177,8 +169,7 @@ export function useApprovalRouting({
         {
           ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
           current_approver_id: currentApproverId,
-          revision: getApprovalRevision(metaData),
-        }
+          revision: getApprovalRevision(metaData) }
       );
 
       try {
@@ -197,11 +188,9 @@ export function useApprovalRouting({
             delay_hours: delayConfig.thresholdHours,
             delay_repeat_hours: delayConfig.repeatHours,
             delay_max_notifications: delayConfig.maxNotifications,
-            delay_count: nextCount,
-          },
-          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}`,
-        });
-        await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
+            delay_count: nextCount },
+          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` });
+        await db.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
       } catch (delayError) {
         console.error('approval delay notification failed:', delayError);
       }
@@ -223,6 +212,5 @@ export function useApprovalRouting({
     resolveApprovalLockSnapshot,
     syncApprovalDelayNotifications,
     syncDelegatedApprovalDelayNotifications,
-    syncDelegatedApprovalRouting,
-  };
+    syncDelegatedApprovalRouting };
 }

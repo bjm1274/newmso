@@ -1,15 +1,26 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useMemo } from 'react';
+import { db } from '@/lib/db-client';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import { AffectedItemSummary } from './InventoryComponents';
 
 export default function UDIManagement({ user, inventory, fetchInventory }: Record<string, unknown>) {
   const [loading, setLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // UDI 대상 품목 필터링 (is_udi 필드 사용)
-  const udiItems = (inventory as any[]).filter((item: any) => item.is_udi);
+  const udiItems = useMemo(() => (Array.isArray(inventory) ? (inventory as any[]) : []).filter((item: any) => item.is_udi), [inventory]);
+
+  const selectedSummaryItems = useMemo(() => {
+    return udiItems
+      .filter((item: any) => selectedItems.includes(item.id))
+      .map((item: any) => ({
+        name: String(item.item_name || item.name || ''),
+        qty: Number(item.quantity || 0),
+        extra: String(item.company || '')
+      }));
+  }, [selectedItems, udiItems]);
 
   const toggleItemSelection = (itemId: string) => {
     setSelectedItems(prev => 
@@ -97,6 +108,12 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
           </div>
         </div>
 
+        {selectedItems.length > 0 && (
+          <div className="mb-4">
+            <AffectedItemSummary items={selectedSummaryItems} title="보고 예정 UDI 대상 품목" />
+          </div>
+        )}
+
         {udiItems.length === 0 ? (
           <div className="text-center py-20 bg-[var(--muted)] rounded-[var(--radius-lg)] border border-dashed border-[var(--border)]">
             <p className="text-sm font-semibold text-[var(--toss-gray-3)]">UDI 보고 대상 품목이 없습니다.</p>
@@ -122,7 +139,12 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="col-span-2 md:col-span-1">
                         <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
-                        <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
+                        <p className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-1.5 flex-wrap">
+                          {item.item_name}
+                          <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[9px] font-black uppercase tracking-wider">
+                            UDI 대상
+                          </span>
+                        </p>
                         <p className="text-[11px] font-bold text-purple-500 mt-1">{item.company}</p>
                       </div>
                       <div>

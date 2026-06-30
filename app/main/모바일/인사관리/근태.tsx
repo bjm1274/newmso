@@ -24,8 +24,7 @@ import {
   formatDateShort,
   useStaffList,
   canMutateTeamAbnormal,
-  type AttendanceDailyRow,
-} from './data-hooks';
+  type AttendanceDailyRow } from './data-hooks';
 import 근태조정신청 from './근태조정신청';
 import { CalTab } from './근태달력탭';
 import 근태관리자 from './근태관리자';
@@ -119,8 +118,7 @@ export default function 근태({ staffId, company, user, onBack }: SHrAttendProp
             style={{
               padding: '10px 16px 0',
               background: 'var(--m-card)',
-              borderBottom: '1px solid var(--m-border)',
-            }}
+              borderBottom: '1px solid var(--m-border)' }}
           >
             <div className="m-seg" role="tablist" aria-label="근태 탭">
               <button
@@ -207,8 +205,7 @@ function deriveMonthSummary(rows: AttendanceDailyRow[]): MonthSummary {
 function DashTab({
   rows,
   summary,
-  onAdjust,
-}: {
+  onAdjust }: {
   rows: AttendanceDailyRow[];
   summary: MonthSummary;
   onAdjust: (date: string) => void;
@@ -232,26 +229,22 @@ function DashTab({
       label: '출근',
       value: String(summary.presentDays),
       sub: '이번 달 일수',
-      tone: 'success',
-    },
+      tone: 'success' },
     {
       label: '지각',
       value: String(summary.lateCnt),
       sub: summary.lateCnt > 0 ? '사유 입력 권장' : '-',
-      tone: summary.lateCnt > 0 ? 'warning' : '',
-    },
+      tone: summary.lateCnt > 0 ? 'warning' : '' },
     {
       label: '조퇴',
       value: String(summary.earlyCnt),
       sub: '-',
-      tone: summary.earlyCnt > 0 ? 'warning' : '',
-    },
+      tone: summary.earlyCnt > 0 ? 'warning' : '' },
     {
       label: '휴가',
       value: String(summary.leaveCnt),
       sub: '연차·반차·병가',
-      tone: 'accent',
-    },
+      tone: 'accent' },
   ];
 
   return (
@@ -261,8 +254,7 @@ function DashTab({
           padding: '14px 16px 0',
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 8,
-        }}
+          gap: 8 }}
       >
         {kpis.map((k) => (
           <MKpi
@@ -289,11 +281,11 @@ function DashTab({
           <div className="lbl">최근 기록</div>
         </div>
         {recent.length === 0 ? (
-          <div className="m-card" style={{ padding: 16, color: 'var(--z-500)', fontSize: 13 }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 16, color: 'var(--z-500)', fontSize: 13 }}>
             이번 달 기록이 없습니다.
           </div>
         ) : (
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {recent.map((r) => {
               const tone = statusTone(r.status);
               const adjustable =
@@ -321,8 +313,7 @@ function DashTab({
                         padding: '4px 8px',
                         borderRadius: 6,
                         background: 'var(--m-accent-soft, rgba(37,99,235,.08))',
-                        whiteSpace: 'nowrap',
-                      }}
+                        whiteSpace: 'nowrap' }}
                     >
                       조정 신청
                     </button>
@@ -393,8 +384,7 @@ function fmtHm(iso: string | null): string {
     timeZone: 'Asia/Seoul',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-  });
+    hour12: false });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -423,15 +413,14 @@ function ScheduleTab({ rows, cursor }: { rows: AttendanceDailyRow[]; cursor: Dat
 
   return (
     <div style={{ padding: '14px 16px 24px' }}>
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         <div
           style={{
             padding: '12px 16px',
             borderBottom: '1px solid var(--m-border)',
             fontSize: 13,
             fontWeight: 800,
-            textAlign: 'center',
-          }}
+            textAlign: 'center' }}
         >
           {cursor.getFullYear()}년 {cursor.getMonth() + 1}월 근무표
         </div>
@@ -446,8 +435,7 @@ function ScheduleTab({ rows, cursor }: { rows: AttendanceDailyRow[]; cursor: Dat
               className="m-list-row"
               style={{
                 borderBottom: isLast ? 'none' : '1px solid var(--m-border)',
-                gridTemplateColumns: '52px 1fr auto',
-              }}
+                gridTemplateColumns: '52px 1fr auto' }}
             >
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)' }}>
                 {dow} {d.date.getDate()}

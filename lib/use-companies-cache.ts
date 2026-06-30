@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 type Company = { id: string; name: string; type: string };
 
@@ -8,7 +8,7 @@ let cachedCompanies: Company[] | null = null;
 let fetchPromise: Promise<Company[]> | null = null;
 
 async function fetchCompanies(): Promise<Company[]> {
-  const { data } = await supabase
+  const { data } = await db
     .from('companies')
     .select('id, name, type')
     .order('name');

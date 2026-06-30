@@ -52,8 +52,7 @@ function SuppliesStatPickerImpl({
   summaryText,
   suggestions,
   stockByName,
-  onPick,
-}: SuppliesStatPickerProps) {
+  onPick }: SuppliesStatPickerProps) {
   return (
     <div className="border-b border-[var(--border)] bg-[var(--background)]/35 px-3 py-3">
       <button

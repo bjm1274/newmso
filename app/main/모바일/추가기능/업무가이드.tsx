@@ -117,8 +117,7 @@ function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }
           gap: 8,
           padding: '10px 16px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <label htmlFor="co-filter" style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-500)' }}>회사</label>
@@ -135,8 +134,7 @@ function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }
               fontWeight: 700,
               color: 'var(--z-800)',
               outline: 'none',
-              width: '100%',
-            }}
+              width: '100%' }}
           >
             {companies.map((co) => (
               <option key={co} value={co}>{co}</option>
@@ -158,8 +156,7 @@ function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }
               fontWeight: 700,
               color: 'var(--z-800)',
               outline: 'none',
-              width: '100%',
-            }}
+              width: '100%' }}
           >
             {departments.map((dept) => (
               <option key={dept} value={dept}>{dept}</option>
@@ -199,8 +196,7 @@ function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }
                 background: 'linear-gradient(135deg, var(--m-accent), #1D4ED8)',
                 borderColor: 'transparent',
                 color: '#fff',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
               aria-label={`${filtered[0].title} 상세 보기`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -287,8 +283,7 @@ function MobileTaskGuide({ user, onBack }: { user: ErpUser; onBack: () => void }
                 background: 'var(--m-bg)',
                 padding: '14px 16px',
                 borderRadius: 'var(--m-radius-md)',
-                border: '1px solid var(--m-border)',
-              }}
+                border: '1px solid var(--m-border)' }}
             >
               {selectedGuide.body}
             </div>

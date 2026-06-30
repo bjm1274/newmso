@@ -25,8 +25,7 @@ import {
   gte,
   lt,
   inArray,
-  isNotNull,
-} from '@/lib/db';
+  isNotNull } from '@/lib/db';
 
 const ABSENT_STATUSES = ['absent', '결근'] as const;
 
@@ -164,8 +163,7 @@ async function tryInsertAccrual(
       year: row.year,
       source_date: row.sourceDate,
       note: row.note,
-      created_at: new Date().toISOString(),
-    })
+      created_at: new Date().toISOString() })
     .onConflictDoNothing()
     .returning({ id: leaveAccrualsTable.id });
   return inserted.length > 0;
@@ -209,8 +207,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
       annual_leave_total: staffMembersTable.annual_leave_total,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
-      hire_date: staffMembersTable.hire_date,
-    })
+      hire_date: staffMembersTable.hire_date })
     .from(staffMembersTable)
     .where(isNotNull(staffMembersTable.id))) as StaffRow[];
 
@@ -256,8 +253,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
               days,
               year: targetYear,
               sourceDate: todayKey,
-              note: `만 ${n}년차 연차 ${days}일 자동부여`,
-            });
+              note: `만 ${n}년차 연차 ${days}일 자동부여` });
             if (ok) {
               if (n === maxYears) {
                 // 신규 연차연도 또는 가장 최근의 연도만 셋팅
@@ -273,8 +269,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
                 kind: 'annual',
                 days,
                 periodKey,
-                note: `만 ${n}년차 ${days}일`,
-              });
+                note: `만 ${n}년차 ${days}일` });
               hasGranted = true;
             }
           }
@@ -326,8 +321,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           days: 1,
           year: targetYear,
           sourceDate: todayKey,
-          note: `${k}개월차 만근 +1일`,
-        });
+          note: `${k}개월차 만근 +1일` });
         if (!ok) continue;
         monthlyGranted += 1;
         result.granted.push({
@@ -336,8 +330,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           kind: 'monthly',
           days: 1,
           periodKey,
-          note: `${k}개월차 만근`,
-        });
+          note: `${k}개월차 만근` });
       }
 
       if (monthlyGranted > 0) {

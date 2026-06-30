@@ -1,14 +1,12 @@
 import {
   getReportApprovalSummary,
-  normalizeApprovalAttachments,
-} from './approval-report-utils';
+  normalizeApprovalAttachments } from './approval-report-utils';
 import {
   getD1Binding,
   getD1Drizzle,
   document_repository as documentRepositoryTable,
   eq,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 
 type ApprovalArchiveSource = Record<string, unknown>;
 
@@ -53,8 +51,7 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   correctionDate: '정정일자',
   correctionType: '정정유형',
   originalTime: '원래시간',
-  correctedTime: '정정시간',
-};
+  correctedTime: '정정시간' };
 
 /** 단일 값을 plain text로 직렬화 */
 function serializeFieldValue(value: unknown): string {
@@ -317,8 +314,7 @@ export function mapApprovalToDocumentRepositoryEntry(item: ApprovalArchiveSource
     source_type: 'approval',
     read_only: true,
     approval_id: item.id || null,
-    approval_type: item.type || null,
-  };
+    approval_type: item.type || null };
 }
 
 export async function syncApprovalToDocumentRepository(
@@ -337,8 +333,7 @@ export async function syncApprovalToDocumentRepository(
     file_url: null as string | null,
     version: 1,
     company_name: String(item.sender_company || '').trim() || '전체',
-    created_by: (item.sender_id as string | null) || null,
-  };
+    created_by: (item.sender_id as string | null) || null };
 
   const docNumber = resolveApprovalDocNumber(item);
   const companyName = nextRow.company_name;
@@ -374,8 +369,7 @@ export async function syncApprovalToDocumentRepository(
         ...nextRow,
         updated_at: now,
         version: currentVersion,
-        file_url: (matchedDoc.file_url as string | null) || null,
-      })
+        file_url: (matchedDoc.file_url as string | null) || null })
       .where(eq(documentRepositoryTable.id, String(matchedDoc.id)));
     return matchedDoc.id;
   }
@@ -385,7 +379,6 @@ export async function syncApprovalToDocumentRepository(
     id: newId,
     ...nextRow,
     created_at: now,
-    updated_at: now,
-  });
+    updated_at: now });
   return newId;
 }

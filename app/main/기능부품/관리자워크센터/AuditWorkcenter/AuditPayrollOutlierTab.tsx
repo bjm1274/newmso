@@ -31,8 +31,7 @@ function parseRow(r: ApiOutlierRow): PayrollOutlier | null {
     id: typeof r.id === 'string' ? r.id : undefined,
     name,
     changePct,
-    reason,
-  };
+    reason };
 }
 
 function pctTone(pct: number): 'danger' | 'warn' | 'accent' {

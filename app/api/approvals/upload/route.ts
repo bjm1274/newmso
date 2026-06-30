@@ -105,8 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       fileName: normalizedFileName,
       mimeType,
       size: file.size,
-      url: uploaded.url,
-    });
+      url: uploaded.url });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '결재 첨부 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

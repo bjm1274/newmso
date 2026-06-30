@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface TemplateData {
   id: string;
@@ -24,8 +24,7 @@ interface TemplateData {
 const TONE_CLS: Record<TemplateData['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   accent: 'bg-[var(--accent)]/15 text-[var(--accent)]',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 const FALLBACK_TEMPLATES: TemplateData[] = [
   { id: 'tpl-1', name: '근로계약서 (정규직)', kind: '근로', used: 22, tone: 'success' },
@@ -58,7 +57,7 @@ export default function DocsGenSummary() {
     let cancelled = false;
     const fetchData = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('contract_templates')
           .select('id, name, kind, used_count')
           .order('used_count', { ascending: false })
@@ -73,8 +72,7 @@ export default function DocsGenSummary() {
               name: String(r.name ?? '계약서'),
               kind: String(r.kind ?? '기타'),
               used: Number(r.used_count ?? 0),
-              tone: inferTone(String(r.kind ?? '')),
-            })),
+              tone: inferTone(String(r.kind ?? '')) })),
           );
         }
       } catch (error) {

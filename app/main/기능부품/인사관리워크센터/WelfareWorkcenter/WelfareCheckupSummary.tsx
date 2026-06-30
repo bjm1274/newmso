@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface CheckupRow {
   id: string;
@@ -30,15 +30,13 @@ interface CheckupCounts {
 const STATUS_TONE: Record<string, CheckupRow['tone']> = {
   완료: 'success',
   예약: 'warn',
-  미수검: 'danger',
-};
+  미수검: 'danger' };
 
 const TONE_CLS: Record<CheckupRow['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 function formatDateCompact(value: unknown): string {
   if (!value) return '';
@@ -62,7 +60,7 @@ export default function WelfareCheckupSummary() {
         const year = new Date().getFullYear();
         const yearStart = `${year}-01-01`;
         const yearEnd = `${year}-12-31`;
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('health_checkups')
           .select('id, staff_name, place, scheduled_date, status')
           .gte('scheduled_date', yearStart)
@@ -88,8 +86,7 @@ export default function WelfareCheckupSummary() {
           place: String(r.place ?? '-'),
           when: formatDateCompact(r.scheduled_date),
           status: String(r.status ?? '미수검'),
-          tone: STATUS_TONE[String(r.status ?? '')] ?? 'muted',
-        }));
+          tone: STATUS_TONE[String(r.status ?? '')] ?? 'muted' }));
         setRows(display);
       } catch (error) {
         if (cancelled) return;

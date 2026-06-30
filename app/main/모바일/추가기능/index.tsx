@@ -80,8 +80,7 @@ const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
   webfax: { kind: 'webfax' },
   mri: { kind: 'mri' },
   share: { kind: 'share-list' },
-  guide: { kind: 'guide' },
-};
+  guide: { kind: 'guide' } };
 
 export type 추가기능Props = {
   user: ErpUser;

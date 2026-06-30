@@ -26,8 +26,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
         zIndex: 99,
         background: 'rgba(255, 255, 255, 0.65)',
         backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-      }}
+        WebkitBackdropFilter: 'blur(20px)' }}
     >
 
 
@@ -46,8 +45,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
             background: 'rgba(0, 0, 0, 0.03)',
             border: '1px solid rgba(0, 0, 0, 0.05)',
             cursor: 'pointer',
-            flexShrink: 0,
-          }}
+            flexShrink: 0 }}
         >
           <MIcon name={backIcon || 'chevL'} size={18} color="var(--z-600)" />
         </button>
@@ -63,8 +61,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
               color: 'var(--z-500)',
               letterSpacing: 0.5,
               textTransform: 'uppercase',
-              marginBottom: 1,
-            }}
+              marginBottom: 1 }}
           >
             {eyebrow}
           </div>
@@ -76,8 +73,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
             fontWeight: 800,
             color: 'var(--foreground)',
             letterSpacing: '-0.02em',
-            lineHeight: 1.25,
-          }}
+            lineHeight: 1.25 }}
         >
           {title}
         </div>
@@ -88,8 +84,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
               fontSize: 11,
               fontWeight: 600,
               color: 'var(--z-500)',
-              marginTop: 2,
-            }}
+              marginTop: 2 }}
           >
             {sub}
           </div>
@@ -103,8 +98,7 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            flexShrink: 0,
-          }}
+            flexShrink: 0 }}
         >
           {actions}
         </div>

@@ -10,8 +10,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
-} from 'react';
+  type WheelEvent as ReactWheelEvent } from 'react';
 import {
   buildDownloadUrl,
   getAttachmentDisplayName,
@@ -19,8 +18,7 @@ import {
   resolveAttachmentKind,
   type AttachmentPreview as AttachmentPreviewState,
   type AttachmentPreviewItem,
-  type AttachmentPreviewKind,
-} from './메신저첨부';
+  type AttachmentPreviewKind } from './메신저첨부';
 
 type AttachmentDragState = {
   pointerId: number;
@@ -69,8 +67,7 @@ export function useChatAttachmentPreview() {
       return {
         url: resolvedUrl,
         name: getAttachmentDisplayName(fileName, resolvedUrl),
-        kind: forcedKind || resolveAttachmentKind(resolvedUrl, null),
-      };
+        kind: forcedKind || resolveAttachmentKind(resolvedUrl, null) };
     },
     []
   );
@@ -139,8 +136,7 @@ export function useChatAttachmentPreview() {
         pinchRef.current = {
           pointers: new Map([[event.pointerId, { x: event.clientX, y: event.clientY }]]),
           startDistance: 0,
-          startZoom: zoomRef.current,
-        };
+          startZoom: zoomRef.current };
       } else {
         pinch.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (pinch.pointers.size === 2) {
@@ -166,8 +162,7 @@ export function useChatAttachmentPreview() {
       startX: event.clientX,
       startY: event.clientY,
       originX: offsetRef.current.x,
-      originY: offsetRef.current.y,
-    };
+      originY: offsetRef.current.y };
     setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }, []);
@@ -260,8 +255,7 @@ export function useChatAttachmentPreview() {
     buildPreviewItem, openPreviewGallery, openPreview,
     closePreview, movePreview, jumpToIndex, rotateImage, resetTransform, nudgeZoom,
     handleImageWheel, handleImagePointerDown, handleImagePointerMove,
-    handleImagePointerUp, handleImageDoubleClick,
-  };
+    handleImagePointerUp, handleImageDoubleClick };
 }
 
 export type ChatAttachmentPreviewController = ReturnType<typeof useChatAttachmentPreview>;
@@ -279,8 +273,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
     zoom, offset, isDragging, rotation,
     closePreview, movePreview, jumpToIndex, rotateImage, nudgeZoom,
     handleImageWheel, handleImagePointerDown, handleImagePointerMove,
-    handleImagePointerUp, handleImageDoubleClick,
-  } = controller;
+    handleImagePointerUp, handleImageDoubleClick } = controller;
 
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
@@ -479,8 +472,7 @@ export function ChatAttachmentPreviewModal({ controller }: ChatAttachmentPreview
                   maxHeight: '100%',
                   transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom}) rotate(${rotation}deg)`,
                   transformOrigin: 'center center',
-                  transition: isDragging ? 'none' : 'transform 160ms ease',
-                }}
+                  transition: isDragging ? 'none' : 'transform 160ms ease' }}
                 draggable={false}
                 onClick={(e) => e.stopPropagation()}
                 onError={() => setImageLoadFailed(true)}

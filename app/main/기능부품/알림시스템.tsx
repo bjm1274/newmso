@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { canAccessAdminSection } from '@/lib/access-control';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -10,8 +10,7 @@ import {
   DEFAULT_ADMIN_SUBVIEW,
   DEFAULT_BOARD_TYPE,
   NOTIFICATION_MENU_LABELS,
-  resolveNotificationTarget,
-} from '@/lib/notification-metadata';
+  resolveNotificationTarget } from '@/lib/notification-metadata';
 import { detectPayrollAnomalies } from './관리자전용서브/급여이상치감지';
 import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
 import { toNotificationText, getInitials, timeAgo } from '@/lib/notification-utils';
@@ -25,16 +24,14 @@ export {
   NOTIFICATION_DELIVERY_LOG_KEY,
   NOTIFICATION_DELIVERY_EVENT,
   readNotificationDeliveryLog,
-  recordNotificationDelivery,
-} from './알림시스템/delivery-log';
+  recordNotificationDelivery } from './알림시스템/delivery-log';
 
 export type { PushDebugEntry } from './알림시스템/push-debug';
 export {
   PUSH_DEBUG_STORAGE_KEY,
   normalizePushDebugDetail,
   readPushDebugLog,
-  recordPushDebug,
-} from './알림시스템/push-debug';
+  recordPushDebug } from './알림시스템/push-debug';
 
 // ─── 서브모듈 imports (본체 내부 사용) ───
 import { loadNotifSettings } from './알림시스템/settings';
@@ -44,21 +41,18 @@ import {
   isWeekendQuiet,
   matchesNotificationKeywords,
   resolveChatRoomSurfaceSuppression,
-  isFollowedThreadNotification,
-} from './알림시스템/filter-helpers';
+  isFollowedThreadNotification } from './알림시스템/filter-helpers';
 import { recordPushDebug } from './알림시스템/push-debug';
 import {
   urlBase64ToUint8Array,
   uint8ArrayToBase64Url,
   getPushVapidStorageKey,
-  getPushSubscriptionActiveKey,
-} from './알림시스템/push-utils';
+  getPushSubscriptionActiveKey } from './알림시스템/push-utils';
 import { getTypeCfg } from './알림시스템/ui-config';
 import {
   isMissingTodoReminderSchema,
   setAppBadge,
-  playIncomingNotificationFeedback,
-} from './알림시스템/device-feedback';
+  playIncomingNotificationFeedback } from './알림시스템/device-feedback';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -85,9 +79,7 @@ function dispatchPushStatusChanged(staffId: string | undefined, active: boolean)
     window.dispatchEvent(new CustomEvent(PUSH_STATUS_CHANGED_EVENT, {
       detail: {
         staffId: staffId || null,
-        active,
-      },
-    }));
+        active } }));
   } catch {
     // ignore
   }
@@ -143,8 +135,7 @@ export async function flushPushRetryQueue() {
       registration.installing;
     if (!worker || typeof worker.postMessage !== 'function') return false;
     worker.postMessage({
-      type: 'erp-push-flush-retry-queue',
-    });
+      type: 'erp-push-flush-retry-queue' });
     return true;
   } catch {
     return false;
@@ -162,8 +153,7 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
       requiresGesture: false,
       standalone: false,
       platform: 'unknown',
-      appleMobile: false,
-    };
+      appleMobile: false };
   }
 
   const hasNotificationApi = typeof Notification !== 'undefined';
@@ -196,8 +186,7 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
     requiresGesture: supported && requiresUserGestureForPushPermission(),
     standalone: isStandaloneWebApp(),
     platform,
-    appleMobile,
-  };
+    appleMobile };
 }
 
 function getOrCreatePushDeviceId(staffId?: string) {
@@ -339,8 +328,7 @@ function buildNotificationRowFromPushPreview(payload: {
     title: toNotificationText(payload?.title, '알림'),
     body: toNotificationText(payload?.body, ''),
     metadata,
-    created_at: new Date().toISOString(),
-  } satisfies Record<string, unknown>;
+    created_at: new Date().toISOString() } satisfies Record<string, unknown>;
 }
 
 function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
@@ -357,8 +345,7 @@ function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
 
     const nextClaim = JSON.stringify({
       ownerId,
-      expiresAt: now + ttlMs,
-    });
+      expiresAt: now + ttlMs });
     window.localStorage.setItem(key, nextClaim);
     const confirmedRaw = window.localStorage.getItem(key);
     if (!confirmedRaw) return false;
@@ -432,9 +419,7 @@ async function syncPushSubscriptionOnServer(
       fcm_token: subscription.fcm_token ?? null,
       device_id: deviceId,
       platform: getPushClientPlatform(),
-      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-    }),
-  });
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null }) });
 
   if (!response.ok) {
     throw new Error(`push subscription sync failed (${response.status})`);
@@ -447,8 +432,7 @@ async function deletePushSubscriptionOnServer(endpoint?: string | null) {
   await fetch('/api/notifications/push-subscription', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint }),
-  });
+    body: JSON.stringify({ endpoint }) });
 }
 
 type InitNotificationServiceOptions =
@@ -464,8 +448,7 @@ function normalizeInitNotificationServiceOptions(options?: InitNotificationServi
   }
   return {
     staffId: options?.staffId,
-    requestPermission: Boolean(options?.requestPermission),
-  };
+    requestPermission: Boolean(options?.requestPermission) };
 }
 
 export async function initNotificationService(options?: InitNotificationServiceOptions) {
@@ -488,9 +471,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
     detail: {
       permission: Notification.permission,
       requestPermission,
-      platform: getPushClientPlatform(),
-    },
-  });
+      platform: getPushClientPlatform() } });
   try {
     await cleanupLegacyMessagingServiceWorkers();
     const reg = await navigator.serviceWorker.register('/sw.js');
@@ -502,17 +483,14 @@ export async function initNotificationService(options?: InitNotificationServiceO
       stage: 'sw-registered',
       message: '서비스워커 등록을 확인했습니다.',
       detail: {
-        scope: reg.scope,
-      },
-    });
+        scope: reg.scope } });
     if (Notification.permission === 'default') {
       if (requiresUserGestureForPushPermission() && !requestPermission) {
         setPushSubscriptionActiveState(staffId, false);
         recordPushDebug({
           source: 'app',
           stage: 'permission-wait-gesture',
-          message: '알림 권한 요청은 첫 사용자 동작을 기다립니다.',
-        });
+          message: '알림 권한 요청은 첫 사용자 동작을 기다립니다.' });
         return;
       }
       const permission = await Notification.requestPermission();
@@ -520,8 +498,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
         source: 'app',
         stage: 'permission-result',
         message: `알림 권한 결과: ${permission}`,
-        detail: { permission },
-      });
+        detail: { permission } });
     }
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
     if (Notification.permission === 'granted' && vapidKey) {
@@ -559,8 +536,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
             source: 'app',
             stage: 'subscribe-failed-attempt-1',
             message: '푸시 구독 1차 시도 실패. 기존 구독 조회 후 재시도합니다.',
-            detail: { error: String((subscribeErr as { message?: string } | null)?.message || subscribeErr || '') },
-          });
+            detail: { error: String((subscribeErr as { message?: string } | null)?.message || subscribeErr || '') } });
           // 1. 실패 직전에 브라우저가 이미 보유한 구독이 있으면 재사용
           try {
             const existing = await reg.pushManager.getSubscription();
@@ -570,8 +546,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
                 source: 'app',
                 stage: 'subscribe-reuse-existing',
                 message: '기존 브라우저 구독을 재사용합니다.',
-                detail: { endpoint: existing.endpoint },
-              });
+                detail: { endpoint: existing.endpoint } });
             }
           } catch {
             // 기존 구독 조회 실패는 무시하고 재시도로 진행
@@ -584,15 +559,13 @@ export async function initNotificationService(options?: InitNotificationServiceO
               recordPushDebug({
                 source: 'app',
                 stage: 'subscribe-retry-success',
-                message: '푸시 구독 재시도 성공.',
-              });
+                message: '푸시 구독 재시도 성공.' });
             } catch (retryErr) {
               recordPushDebug({
                 source: 'app',
                 stage: 'subscribe-retry-failed',
                 message: '푸시 구독 재시도도 실패했습니다. 다음 상호작용 시 재시도됩니다.',
-                detail: { error: String((retryErr as { message?: string } | null)?.message || retryErr || '') },
-              });
+                detail: { error: String((retryErr as { message?: string } | null)?.message || retryErr || '') } });
               // 다음 focus/visibilitychange 이벤트에서 재시도될 수 있도록 active 상태를 false 유지
               // (setPushSubscriptionActiveState는 아래 else 분기에서 처리)
             }
@@ -615,14 +588,12 @@ export async function initNotificationService(options?: InitNotificationServiceO
                 projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
                 storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
                 messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-                appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-              };
+                appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID };
               const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
               const messaging = getMessaging(app);
               fcmToken = await getToken(messaging, {
                 vapidKey: fcmVapidKey,
-                serviceWorkerRegistration: reg,
-              });
+                serviceWorkerRegistration: reg });
             }
           } catch (fcmErr) {
             console.warn('[FCM] 토큰 발급 실패 (Web Push는 계속 사용):', fcmErr);
@@ -631,9 +602,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
               stage: 'fcm-token-failed',
               message: 'FCM 토큰 발급에 실패해 Web Push만 사용합니다.',
               detail: {
-                error: String((fcmErr as { message?: string } | null)?.message || fcmErr || ''),
-              },
-            });
+                error: String((fcmErr as { message?: string } | null)?.message || fcmErr || '') } });
           }
           // 서버 저장 실패가 init 전체를 throw로 중단시키지 않도록 격리(JM3).
           // 실패 시: 브라우저 구독은 살아있으나 서버 push_subscriptions 미저장 → active=false 로 두고
@@ -648,9 +617,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
               message: '푸시 구독이 활성화되었습니다.',
               detail: {
                 endpoint: j.endpoint,
-                hasFcmToken: Boolean(fcmToken),
-              },
-            });
+                hasFcmToken: Boolean(fcmToken) } });
           } catch (syncErr) {
             setPushSubscriptionActiveState(staffId, false);
             recordPushDebug({
@@ -658,9 +625,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
               stage: 'subscription-sync-failed',
               message: '구독 서버 저장에 실패해 재시도를 예약했습니다.',
               detail: {
-                error: String((syncErr as { message?: string } | null)?.message || syncErr || ''),
-              },
-            });
+                error: String((syncErr as { message?: string } | null)?.message || syncErr || '') } });
             const retrySubscription = sub;
             window.setTimeout(() => {
               const retryJson = retrySubscription?.toJSON() as
@@ -683,8 +648,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
         recordPushDebug({
           source: 'app',
           stage: 'subscription-missing',
-          message: '브라우저 푸시 구독을 확보하지 못했습니다.',
-        });
+          message: '브라우저 푸시 구독을 확보하지 못했습니다.' });
       }
     } else {
       setPushSubscriptionActiveState(staffId, false);
@@ -693,9 +657,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
         stage: 'permission-not-granted',
         message: `알림 권한 상태가 ${Notification.permission} 입니다.`,
         detail: {
-          permission: Notification.permission,
-        },
-      });
+          permission: Notification.permission } });
     }
   } catch (e) {
     setPushSubscriptionActiveState(staffId, false);
@@ -705,9 +667,7 @@ export async function initNotificationService(options?: InitNotificationServiceO
       stage: 'init-error',
       message: '푸시 초기화 중 오류가 발생했습니다.',
       detail: {
-        error: String((e as { message?: string } | null)?.message || e || ''),
-      },
-    });
+        error: String((e as { message?: string } | null)?.message || e || '') } });
   }
   };
 
@@ -727,9 +687,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
       message: '알림 권한이 없어 시스템 팝업을 띄우지 못했습니다.',
       detail: {
         permission: Notification.permission,
-        title,
-      },
-    });
+        title } });
     return;
   }
 
@@ -742,8 +700,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
           badge: '/badge-72x72.png',
           tag: 'erp-noti',
           requireInteraction: false,
-          ...options,
-        })
+          ...options })
       )
       .then(() => {
         recordPushDebug({
@@ -752,9 +709,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
           message: '앱에서 시스템 팝업 표시를 요청했습니다.',
           detail: {
             title,
-            tag: String(options?.tag || 'erp-noti'),
-          },
-        });
+            tag: String(options?.tag || 'erp-noti') } });
       })
       .catch((error) => {
         recordPushDebug({
@@ -763,9 +718,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
           message: '앱에서 시스템 팝업 표시 요청이 실패했습니다.',
           detail: {
             title,
-            error: String((error as { message?: string } | null)?.message || error || ''),
-          },
-        });
+            error: String((error as { message?: string } | null)?.message || error || '') } });
       });
     return;
   }
@@ -778,9 +731,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
       message: 'Notification API로 시스템 팝업 표시를 요청했습니다.',
       detail: {
         title,
-        tag: String(options?.tag || 'erp-noti'),
-      },
-    });
+        tag: String(options?.tag || 'erp-noti') } });
   } catch (error) {
     recordPushDebug({
       source: 'app',
@@ -788,9 +739,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
       message: 'Notification API 호출이 실패했습니다.',
       detail: {
         title,
-        error: String((error as { message?: string } | null)?.message || error || ''),
-      },
-    });
+        error: String((error as { message?: string } | null)?.message || error || '') } });
   }
 }
 
@@ -860,8 +809,7 @@ interface UserLike {
 
 // ─── 메인 컴포넌트 ───
 export default function NotificationSystem({
-  user: rawUser, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost, onOpenAdmin,
-}: {
+  user: rawUser, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost, onOpenAdmin }: {
   user: UserLike | null | undefined;
   onOpenChatRoom?: (roomId: string) => void;
   onOpenMessage?: (roomId: string, messageId: string) => void;
@@ -882,8 +830,7 @@ export default function NotificationSystem({
   const chatPushFlushInFlightRef = useRef(false);
   const todoReminderDispatchRef = useRef<{ lastAt: number; inFlight: Promise<void> | null }>({
     lastAt: 0,
-    inFlight: null,
-  });
+    inFlight: null });
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
   const tabIdRef = useRef(
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -1013,8 +960,7 @@ export default function NotificationSystem({
         kind: 'candidate',
         claimKey,
         ownerId: tabIdRef.current,
-        ttlMs,
-      });
+        ttlMs });
     } catch {
       return true;
     }
@@ -1065,16 +1011,13 @@ export default function NotificationSystem({
       title,
       stage: 'received',
       detail: {
-        displayKey,
-      },
-    });
+        displayKey } });
     if (settings.types[type] === false) {
       recordNotificationDelivery({
         notificationId: rowId,
         type,
         title,
-        stage: 'skipped-type-disabled',
-      });
+        stage: 'skipped-type-disabled' });
       return;
     }
     if (!matchesNotificationKeywords(settings, type, title, body, rowMetadata)) {
@@ -1082,8 +1025,7 @@ export default function NotificationSystem({
         notificationId: rowId,
         type,
         title,
-        stage: 'skipped-keyword-filtered',
-      });
+        stage: 'skipped-keyword-filtered' });
       return;
     }
 
@@ -1097,13 +1039,11 @@ export default function NotificationSystem({
             type,
             title,
             body,
-            metadata: rowMetadata,
-          })
+            metadata: rowMetadata })
         : {
             suppressLiveSurface: false,
             mode: 'all',
-            keyword: '',
-          };
+            keyword: '' };
     const isThreadReplyNotification =
       rowMetadata.is_thread_reply === true || String(rowMetadata.is_thread_reply || '').toLowerCase() === 'true';
     const isFollowedThreadAlert = Boolean(
@@ -1135,14 +1075,12 @@ export default function NotificationSystem({
         body,
         type,
         senderName: rowMetadata.sender_name as string | undefined,
-        data: rowMetadata,
-      });
+        data: rowMetadata });
       recordNotificationDelivery({
         notificationId: rowId,
         type,
         title,
-        stage: 'toast-shown',
-      });
+        stage: 'toast-shown' });
     }
 
     if (typeof window !== 'undefined') {
@@ -1155,9 +1093,7 @@ export default function NotificationSystem({
             room_id: rowMetadata.room_id,
             message_id: rowMetadata.message_id || rowMetadata.id || row.id,
             data: rowMetadata,
-            suppress_mobile_banner: suppressLiveDisplay || suppressByRoomPreference,
-          },
-        }));
+            suppress_mobile_banner: suppressLiveDisplay || suppressByRoomPreference } }));
       } else if (!suppressLiveDisplay && !suppressByRoomPreference) {
         window.dispatchEvent(new CustomEvent('erp-alert', {
           detail: {
@@ -1167,9 +1103,7 @@ export default function NotificationSystem({
             room_id: rowMetadata.room_id,
             message_id: rowMetadata.message_id || rowMetadata.id || row.id,
             data: rowMetadata,
-            suppress_mobile_banner: shouldPreferMobileNativePopup,
-          },
-        }));
+            suppress_mobile_banner: shouldPreferMobileNativePopup } }));
       }
       window.dispatchEvent(new CustomEvent('erp-new-notification', { detail: row }));
     }
@@ -1188,14 +1122,12 @@ export default function NotificationSystem({
       playIncomingNotificationFeedback({
         type,
         allowSound: Boolean(settings.sound && shouldPlayLocalSound),
-        allowVibration: Boolean(settings.vibration),
-      });
+        allowVibration: Boolean(settings.vibration) });
       recordNotificationDelivery({
         notificationId: rowId,
         type,
         title,
-        stage: 'feedback-played',
-      });
+        stage: 'feedback-played' });
     }
 
     if (suppressLiveDisplay) {
@@ -1205,9 +1137,7 @@ export default function NotificationSystem({
         title,
         stage: 'suppressed-active-room',
         detail: {
-          room_id: incomingRoomId,
-        },
-      });
+          room_id: incomingRoomId } });
       void syncBadge();
       return;
     }
@@ -1222,9 +1152,7 @@ export default function NotificationSystem({
           room_id: incomingRoomId,
           mode: roomSurfaceDecision.mode,
           keyword: roomSurfaceDecision.keyword || null,
-          thread_follow_override: isFollowedThreadAlert,
-        },
-      });
+          thread_follow_override: isFollowedThreadAlert } });
       void syncBadge();
       return;
     }
@@ -1255,13 +1183,11 @@ export default function NotificationSystem({
           notificationId: rowId,
           type,
           title,
-          stage: 'system-popup-requested',
-        });
+          stage: 'system-popup-requested' });
         sendNotification(title, {
           body,
           tag: displayKey || type,
-          data: rowMetadata,
-        });
+          data: rowMetadata });
       }
     })();
     void syncBadge();
@@ -1278,8 +1204,7 @@ export default function NotificationSystem({
       void flushPushRetryQueue();
       void initNotificationService({
         staffId: effectiveUserId,
-        requestPermission: false,
-      });
+        requestPermission: false });
     };
 
     window.addEventListener('focus', resyncPushSubscription);
@@ -1309,16 +1234,14 @@ export default function NotificationSystem({
       if (target.kind === 'approval' && onOpenApproval) {
         onOpenApproval({
           ...(target.approvalView ? { viewMode: target.approvalView } : {}),
-          ...(target.approvalId ? { approvalId: target.approvalId } : {}),
-        });
+          ...(target.approvalId ? { approvalId: target.approvalId } : {}) });
         return;
       }
 
       if (target.kind === 'inventory' && onOpenInventory) {
         onOpenInventory({
           view: target.inventoryView,
-          approvalId: target.approvalId,
-        });
+          approvalId: target.approvalId });
         return;
       }
 
@@ -1351,8 +1274,7 @@ export default function NotificationSystem({
     if (!effectiveUserId) return;
     void initNotificationService({
       staffId: effectiveUserId,
-      requestPermission: !requiresUserGestureForPushPermission(),
-    });
+      requestPermission: !requiresUserGestureForPushPermission() });
     const uid = effectiveUserId;
     const mountedAt = mountedAtRef.current;
     void syncBadge();
@@ -1381,15 +1303,13 @@ export default function NotificationSystem({
         title: n.title,
         body: n.body,
         metadata,
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
       try {
         const res = await fetch('/api/notifications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(insertPayload),
-        });
+          body: JSON.stringify(insertPayload) });
         if (!res.ok) throw new Error('Insert failed');
         const json = await res.json();
         return {
@@ -1400,8 +1320,7 @@ export default function NotificationSystem({
           body: n.body,
           metadata,
           read_at: null,
-          created_at: insertPayload.created_at,
-        };
+          created_at: insertPayload.created_at };
       } catch (error) {
         throw error;
       }
@@ -1443,8 +1362,7 @@ export default function NotificationSystem({
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent(NOTIFICATION_LIST_UPDATED_EVENT, {
-              detail: { notifications: rows || [] },
-            }),
+              detail: { notifications: rows || [] } }),
           );
         }
       } catch {
@@ -1458,8 +1376,7 @@ export default function NotificationSystem({
       try {
         const response = await fetch('/api/todos/reminders/dispatch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
+          headers: { 'Content-Type': 'application/json' } });
 
         if (response.ok) {
           return;
@@ -1478,7 +1395,7 @@ export default function NotificationSystem({
 
       try {
         const nowIso = new Date().toISOString();
-        const { data: dueRows, error: dueError } = await supabase
+        const { data: dueRows, error: dueError } = await db
           .from('todos')
           .select('id,content,task_date,reminder_at')
           .eq('user_id', uid)
@@ -1497,7 +1414,7 @@ export default function NotificationSystem({
           .map((row) => String(row.id || '').trim())
           .filter(Boolean);
 
-        const { data: logRows, error: logError } = await supabase
+        const { data: logRows, error: logError } = await db
           .from('todo_reminder_logs')
           .select('todo_id,reminder_at')
           .eq('user_id', uid)
@@ -1528,14 +1445,12 @@ export default function NotificationSystem({
                 type: 'todo',
                 todo_id: todoId,
                 task_date: row.task_date || null,
-                reminder_at: reminderAt,
-              },
-            },
+                reminder_at: reminderAt } },
             `todo-reminder:${uid}:${todoId}:${reminderAt}`,
             60_000
           );
 
-          const { error: writeLogError } = await supabase
+          const { error: writeLogError } = await db
             .from('todo_reminder_logs')
             .upsert(
               [
@@ -1546,8 +1461,7 @@ export default function NotificationSystem({
                   notification_id: notification?.id || null,
                   status: notification?.id ? 'sent' : 'duplicate',
                   title: '할일 리마인더',
-                  body: String(row.content || '할일'),
-                },
+                  body: String(row.content || '할일') },
               ],
               { onConflict: 'user_id,todo_id,reminder_at' }
             );
@@ -1607,9 +1521,7 @@ export default function NotificationSystem({
               current_month: analysis.currentMonth,
               anomaly_count: analysis.visibleAnomalies.length,
               critical_count: analysis.criticalCount,
-              warning_count: analysis.warningCount,
-            },
-          },
+              warning_count: analysis.warningCount } },
           dedupeKey,
           60_000
         );
@@ -1620,7 +1532,7 @@ export default function NotificationSystem({
 
     let notificationRealtimeReady = false;
 
-    // Phase 5-C-4 — 8개 supabase.channel 호출을 notifications polling 1개로 통합.
+    // Phase 5-C-4 — 8개 db.channel 호출을 notifications polling 1개로 통합.
     // 비활성화된 7개 트리거 채널 (approvals/inventory/payroll/education/messages/
     // attendance/word-filter)은 payload 기반 즉시 알림 생성에 의존했음. 서버
     // cron이 notifications insert로 동일 효과를 줄 수 있는 경우만 동작.
@@ -1651,7 +1563,7 @@ export default function NotificationSystem({
     void processDueTodoReminders();
     void queuePayrollAnomalyAlert();
 
-    // 비활성화된 7개 supabase.channel (approvals/inventory/payroll/education/
+    // 비활성화된 7개 db.channel (approvals/inventory/payroll/education/
     // messages/attendance/word-filter trigger). 인앱 알림은 nTableChannel
     // polling 1개로 통합 — notifications row가 도착하면 emitIncomingNotification.
     // payload 기반 즉시 분석(예: 결재 차례 / 재고 부족 / 단어 필터)은 사라짐.
@@ -1799,8 +1711,7 @@ export default function NotificationSystem({
           detail:
             message.payload && typeof message.payload === 'object'
               ? (message.payload as Record<string, unknown>)
-              : null,
-        });
+              : null });
         return;
       }
 
@@ -1828,8 +1739,7 @@ export default function NotificationSystem({
       window.removeEventListener('keydown', handleUserGesture, true);
       void initNotificationService({
         staffId: effectiveUserId,
-        requestPermission: true,
-      });
+        requestPermission: true });
     };
 
     window.addEventListener('pointerdown', handleUserGesture, true);
@@ -1913,8 +1823,7 @@ export default function NotificationSystem({
         await fetch('/api/notifications/chat-push-flush', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ limit: 12 }),
-        });
+          body: JSON.stringify({ limit: 12 }) });
       } catch {
         // ignore queue recovery failures
       } finally {

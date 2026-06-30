@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
 import ManualGrantGrid, {
   type CompanyPolicy,
-  type EditState,
-} from './연차수동부여Grid';
+  type EditState } from './연차수동부여Grid';
 
 type ManualGrantUpdate = {
   staffId: string;
@@ -32,10 +31,8 @@ async function saveManualGrant(updates: ManualGrantUpdate[]) {
   const response = await fetch('/api/admin/annual-leave/manual-grant', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ updates }),
-  });
+      'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates }) });
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
@@ -53,8 +50,7 @@ function clampNumber(value: number) {
 export default function AnnualLeaveManualGrant({
   user,
   staffs = [],
-  onRefresh,
-}: {
+  onRefresh }: {
   user?: any;
   staffs?: any[];
   onRefresh?: () => void;
@@ -87,7 +83,7 @@ export default function AnnualLeaveManualGrant({
       return;
     }
 
-    void supabase
+    void db
       .from('companies')
       .select('name, leave_policy, fiscal_year_start_month')
       .in('name', companyNames)
@@ -103,8 +99,7 @@ export default function AnnualLeaveManualGrant({
           if (!row.name) return;
           next[row.name] = {
             basis: row.leave_policy === '회계연도' ? 'fiscal' : 'hire',
-            fiscalStartMonth: row.fiscal_year_start_month ?? 1,
-          };
+            fiscalStartMonth: row.fiscal_year_start_month ?? 1 };
         });
         setCompanyPolicies(next);
       });
@@ -124,7 +119,7 @@ export default function AnnualLeaveManualGrant({
     }
 
     const year = new Date().getFullYear();
-    void supabase
+    void db
       .from('leave_balances')
       .select('staff_id, expired_days, compensated_days')
       .eq('year', year)
@@ -140,8 +135,7 @@ export default function AnnualLeaveManualGrant({
         ((data || []) as LeaveBalanceRow[]).forEach((row) => {
           next[String(row.staff_id)] = {
             expired: Number(row.expired_days) || 0,
-            compensated: Number(row.compensated_days) || 0,
-          };
+            compensated: Number(row.compensated_days) || 0 };
         });
         setBalances(next);
       });
@@ -195,15 +189,13 @@ export default function AnnualLeaveManualGrant({
           total: getTotal(staff),
           used: getUsed(staff),
           expired: getExpired(staff),
-          compensated: getCompensated(staff),
-        },
+          compensated: getCompensated(staff) },
       ]);
 
       // 로컬 balances 동기화 (재조회 없이 즉시 반영)
       setBalances((prev) => ({
         ...prev,
-        [staff.id]: { expired: getExpired(staff), compensated: getCompensated(staff) },
-      }));
+        [staff.id]: { expired: getExpired(staff), compensated: getCompensated(staff) } }));
       setMessage(payload.message || `${staff.name} 연차 저장 완료`);
     } catch (error: unknown) {
       setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
@@ -233,8 +225,7 @@ export default function AnnualLeaveManualGrant({
           total: getTotal(staff),
           used: getUsed(staff),
           expired: getExpired(staff),
-          compensated: getCompensated(staff),
-        })),
+          compensated: getCompensated(staff) })),
       );
 
       setBalances((prev) => {

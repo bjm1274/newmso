@@ -57,8 +57,7 @@ export function buildApprovalWorkflowSummary(params: {
     totalSteps,
     isFinalStep: totalSteps > 0 && currentStep === totalSteps,
     currentApproverName: resolveStaffLabel(params.staffs, currentApproverId),
-    rejectReason: resolveRejectReason(params.item),
-  };
+    rejectReason: resolveRejectReason(params.item) };
 }
 
 export function ApprovalProgressSummary({
@@ -67,8 +66,7 @@ export function ApprovalProgressSummary({
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalDelaySnapshot,
-  compact = false,
-}: {
+  compact = false }: {
   item: ApprovalRecord;
   staffs: StaffMember[];
   resolveApprovalLineIds: (item: ApprovalRecord) => string[];
@@ -80,8 +78,7 @@ export function ApprovalProgressSummary({
     item,
     staffs,
     resolveApprovalLineIds,
-    resolveCurrentApproverId,
-  });
+    resolveCurrentApproverId });
   const delay = resolveApprovalDelaySnapshot?.(item);
   const status = String(item.status || '대기');
 
@@ -137,8 +134,7 @@ export function ApprovalRiskReviewDialog({
   reason,
   setReason,
   onClose,
-  onConfirm,
-}: {
+  onConfirm }: {
   action: 'approve' | 'reject';
   items: ApprovalRecord[];
   staffs: StaffMember[];

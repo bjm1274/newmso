@@ -31,8 +31,7 @@ function SuppliesMobileCardImpl({
   onSearch,
   onSelect,
   onChangeField,
-  onRemove,
-}: SuppliesMobileCardProps) {
+  onRemove }: SuppliesMobileCardProps) {
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-3">

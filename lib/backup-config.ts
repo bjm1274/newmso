@@ -29,8 +29,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'annual_leave_promotions',
       'approval_form_types',
       'approval_templates',
-    ],
-  },
+    ] },
   {
     id: 'approval',
     label: '전자결재',
@@ -40,8 +39,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'approval_history',
       'certificate_issuances',
       'document_repository',
-    ],
-  },
+    ] },
   {
     id: 'attendance',
     label: '근태/급여',
@@ -55,8 +53,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'leave_requests',
       'payroll_records',
       'payroll_locks',
-    ],
-  },
+    ] },
   {
     id: 'chat',
     label: '채팅/알림',
@@ -74,8 +71,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'notifications',
       'push_subscriptions',
       'chat_push_jobs',
-    ],
-  },
+    ] },
   {
     id: 'board',
     label: '게시판/업무가이드',
@@ -88,8 +84,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'wiki_folders',
       'wiki_documents',
       'wiki_document_versions',
-    ],
-  },
+    ] },
   {
     id: 'inventory',
     label: '재고/구매',
@@ -101,8 +96,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'purchase_orders',
       'corporate_cards',
       'corporate_card_transactions',
-    ],
-  },
+    ] },
   {
     id: 'work',
     label: '업무/운영',
@@ -114,8 +108,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'tasks',
       'popups',
       'audit_logs',
-    ],
-  },
+    ] },
 ];
 
 export const FULL_BACKUP_TABLES = Array.from(

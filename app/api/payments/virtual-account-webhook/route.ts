@@ -5,8 +5,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   virtual_account_deposits as virtualAccountDepositsTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
@@ -29,8 +28,7 @@ async function authorizeWebhookRequest(request: NextRequest) {
     return {
       allowed: true,
       userCompanyId: null as string | null,
-      response: null as NextResponse<unknown> | null,
-    };
+      response: null as NextResponse<unknown> | null };
   }
 
   const access = await readAuthorizedDepositUser(request);
@@ -38,8 +36,7 @@ async function authorizeWebhookRequest(request: NextRequest) {
     return {
       allowed: true,
       userCompanyId: String(access.user.company_id || '').trim() || null,
-      response: null as NextResponse<unknown> | null,
-    };
+      response: null as NextResponse<unknown> | null };
   }
 
   if (!expectedToken) {
@@ -53,8 +50,7 @@ async function authorizeWebhookRequest(request: NextRequest) {
     return {
       allowed: false,
       userCompanyId: null as string | null,
-      response,
-    };
+      response };
   }
 
   const response = NextResponse.json(
@@ -64,8 +60,7 @@ async function authorizeWebhookRequest(request: NextRequest) {
   return {
     allowed: false,
     userCompanyId: null as string | null,
-    response,
-  };
+    response };
 }
 
 export async function POST(request: NextRequest) {
@@ -87,8 +82,7 @@ export async function POST(request: NextRequest) {
     const url = new URL(request.url);
     const normalized = normalizeVirtualAccountWebhook(payload, {
       companyId: url.searchParams.get('companyId') || authorization.userCompanyId,
-      provider: url.searchParams.get('provider'),
-    });
+      provider: url.searchParams.get('provider') });
 
     if (!normalized) {
       return NextResponse.json({ error: 'Unsupported webhook payload.' }, { status: 400 });
@@ -150,8 +144,7 @@ export async function POST(request: NextRequest) {
       matched_target_type: normalized.matched_target_type,
       matched_target_id: normalized.matched_target_id,
       matched_note: normalized.matched_note,
-      raw_payload: rawPayloadStr,
-    };
+      raw_payload: rawPayloadStr };
 
     let depositId: string;
     if (existing.length > 0 && existing[0].id) {
@@ -166,16 +159,14 @@ export async function POST(request: NextRequest) {
         id: depositId,
         ...d1Fields,
         created_at: now,
-        updated_at: now,
-      });
+        updated_at: now });
     }
 
     return NextResponse.json({
       ok: true,
       depositId,
       dedupeKey: normalized.dedupe_key,
-      depositStatus: normalized.deposit_status,
-    });
+      depositStatus: normalized.deposit_status });
   } catch (error) {
     return NextResponse.json({ error: '웹훅 처리 중 오류가 발생했습니다.' }, { status: 500 });
   }

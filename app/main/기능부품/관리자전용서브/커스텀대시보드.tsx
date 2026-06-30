@@ -8,8 +8,7 @@ import {
   fetchInventoryItems,
   fetchPendingApprovalCount,
   fetchRecentNotifications,
-  fetchTodayCheckedInCount,
-} from '@/lib/data/dashboard-widgets';
+  fetchTodayCheckedInCount } from '@/lib/data/dashboard-widgets';
 
 type Props = { user: Record<string, unknown>; selectedCo?: string };
 
@@ -100,8 +99,7 @@ export default function CustomDashboard({ user, selectedCo }: Props) {
       type,
       title: def.label,
       size: def.defaultSize,
-      position: widgets.length,
-    };
+      position: widgets.length };
     setWidgets((prev) => [...prev, newWidget]);
     setShowAddWidget(false);
   };
@@ -113,8 +111,7 @@ export default function CustomDashboard({ user, selectedCo }: Props) {
   const SIZE_CLASS: Record<string, string> = {
     sm: 'col-span-1',
     md: 'col-span-1 md:col-span-2',
-    lg: 'col-span-1 md:col-span-2 lg:col-span-3',
-  };
+    lg: 'col-span-1 md:col-span-2 lg:col-span-3' };
 
   return (
     <div className="space-y-4">

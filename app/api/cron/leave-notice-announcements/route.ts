@@ -23,8 +23,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : 'Failed to dispatch leave notices',
-      },
+        error: error instanceof Error ? error.message : 'Failed to dispatch leave notices' },
       { status: 500 },
     );
   }

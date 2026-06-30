@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 const PENSION_TYPES = ['DC (확정기여형)', 'DB (확정급여형)', '미가입'];
 const DC_RATE = 0.0833; // 월 임금의 1/12 (연 8.33%)
@@ -30,7 +30,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
   const filteredStaffs = staffs.filter(s => selectedCo === '전체' || s.company === selectedCo);
 
   const fetchPensions = useCallback(async () => {
-    const { data } = await supabase.from('retirement_pensions').select('*');
+    const { data } = await db.from('retirement_pensions').select('*');
     setPensions(data || []);
   }, []);
 
@@ -74,9 +74,9 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
       const staff = filteredStaffs.find(s => String(s.id) === String(form.staff_id));
       const payload = { ...form, staff_name: staff?.name || '' };
       if (editId) {
-        await supabase.from('retirement_pensions').update(payload).eq('id', editId);
+        await db.from('retirement_pensions').update(payload).eq('id', editId);
       } else {
-        await supabase.from('retirement_pensions').insert([payload]);
+        await db.from('retirement_pensions').insert([payload]);
       }
       setShowModal(false);
       fetchPensions();

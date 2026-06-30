@@ -68,8 +68,7 @@ const WMO_MAP: Record<number, [string, string]> = {
   86: ['눈 소나기',     '🌨️'],
   95: ['천둥번개',      '⛈️'],
   96: ['우박 동반 뇌우','⛈️'],
-  99: ['우박 동반 뇌우','⛈️'],
-};
+  99: ['우박 동반 뇌우','⛈️'] };
 
 function getWeatherInfo(code: number): { label: string; emoji: string } {
   const entry = WMO_MAP[code];
@@ -98,8 +97,7 @@ function getPm10Grade(value: number): GradeResult {
 }
 
 const GRADE_ORDER: Record<string, number> = {
-  '좋음': 0, '보통': 1, '나쁨': 2, '매우나쁨': 3,
-};
+  '좋음': 0, '보통': 1, '나쁨': 2, '매우나쁨': 3 };
 
 function worstGrade(a: GradeResult, b: GradeResult): GradeResult {
   return GRADE_ORDER[a.grade] >= GRADE_ORDER[b.grade] ? a : b;
@@ -197,10 +195,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     pm10Grade:      pm10GradeResult.grade,
     pm10GradeColor: pm10GradeResult.color,
     aqi:      aqiResult.grade,
-    aqiColor: aqiResult.color,
-  };
+    aqiColor: aqiResult.color };
 
   return NextResponse.json(data, {
-    headers: { 'Cache-Control': 'no-store' },
-  });
+    headers: { 'Cache-Control': 'no-store' } });
 }

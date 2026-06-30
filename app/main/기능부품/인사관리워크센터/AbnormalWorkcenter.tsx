@@ -27,12 +27,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   WorkcenterKpiRow,
   WorkcenterShell,
-  type WorkcenterKpi,
-} from './workcenter-common';
+  type WorkcenterKpi } from './workcenter-common';
 import { AbnormalDetectionCard } from './AbnormalWorkcenter/AbnormalDetectionCard';
 import { AbnormalRuleConfig } from './AbnormalWorkcenter/AbnormalRuleConfig';
 import { AbnormalActionLog } from './AbnormalWorkcenter/AbnormalActionLog';
@@ -45,8 +44,7 @@ import {
   type AbnormalKind,
   type AbnormalPattern,
   type AbnormalRule,
-  type DetectionGroup,
-} from './AbnormalWorkcenter/data';
+  type DetectionGroup } from './AbnormalWorkcenter/data';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 
 interface AbnormalWorkcenterProps {
@@ -61,8 +59,7 @@ const EMPTY_RESULT: AbnormalDataResult = {
   unresolved: 0,
   resolved: 0,
   ruleActiveCount: DEFAULT_RULES.filter((r) => r.active).length,
-  actionLog: [],
-};
+  actionLog: [] };
 
 function nowIso(): string {
   return getKoreanTodayString();
@@ -71,8 +68,7 @@ function nowIso(): string {
 export default function AbnormalWorkcenter({
   staffs = [],
   selectedCo,
-  user = null,
-}: AbnormalWorkcenterProps) {
+  user = null }: AbnormalWorkcenterProps) {
   const [data, setData] = useState<AbnormalDataResult>(EMPTY_RESULT);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -86,7 +82,7 @@ export default function AbnormalWorkcenter({
     let alive = true;
     const fetchEarlyLeave = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('early_leave_records')
           .select('*')
           .order('work_date', { ascending: false });
@@ -119,8 +115,7 @@ export default function AbnormalWorkcenter({
       staffs,
       selectedCo: selectedCo || '전체',
       signal: controller.signal,
-      rules,
-    })
+      rules })
       .then((result) => {
         if (!alive) return;
         setData(result);
@@ -150,8 +145,7 @@ export default function AbnormalWorkcenter({
       earlyLeave: '조기퇴근',
       missing: '미기록',
       consecutive: '연속결근',
-      pattern: '패턴',
-    };
+      pattern: '패턴' };
     const groupParts = data.groups
       .filter((g) => g.count > 0)
       .slice(0, 4)
@@ -165,32 +159,28 @@ export default function AbnormalWorkcenter({
         value: data.todayDetected.toString(),
         unit: '건',
         sub: detectedSub,
-        tone: 'warn',
-      },
+        tone: 'warn' },
       {
         key: 'unresolved',
         label: '미처리',
         value: data.unresolved.toString(),
         unit: '건',
         sub: '확인 후 조치 필요',
-        tone: 'danger',
-      },
+        tone: 'danger' },
       {
         key: 'resolved',
         label: '처리 완료',
         value: resolvedLog.length.toString(),
         unit: '건',
         sub: '이번 달 누적',
-        tone: 'success',
-      },
+        tone: 'success' },
       {
         key: 'rules',
         label: '규칙 활성화',
         value: data.ruleActiveCount.toString(),
         unit: '개',
         sub: `전체 ${rules.length}개 중`,
-        tone: 'accent',
-      },
+        tone: 'accent' },
     ];
   }, [data.todayDetected, data.unresolved, data.ruleActiveCount, data.groups, resolvedLog.length, rules.length]);
 
@@ -220,8 +210,7 @@ export default function AbnormalWorkcenter({
           id: `${pattern.kind}-${pattern.staffId}-${Date.now()}`,
           date: nowIso(),
           severity: pattern.severity,
-          text: `${pattern.staffName} (${pattern.department}) · ${pattern.description} — 정상 처리 (${result.updatedDates.length}일 보정)`,
-        },
+          text: `${pattern.staffName} (${pattern.department}) · ${pattern.description} — 정상 처리 (${result.updatedDates.length}일 보정)` },
         ...prev,
       ]);
       setReloadKey((k) => k + 1); // 워크센터 자체 데이터 즉시 갱신
@@ -232,9 +221,7 @@ export default function AbnormalWorkcenter({
             detail: {
               staffId: pattern.staffId,
               dates: result.updatedDates,
-              source: 'abnormal-workcenter',
-            },
-          }),
+              source: 'abnormal-workcenter' } }),
         );
       }
 
@@ -255,8 +242,7 @@ export default function AbnormalWorkcenter({
         id: `reason-${pattern.kind}-${pattern.staffId}-${Date.now()}`,
         date: nowIso(),
         severity: pattern.severity,
-        text: `${pattern.staffName} — ${pattern.suggestion} (사유 확인 요청)`,
-      },
+        text: `${pattern.staffName} — ${pattern.suggestion} (사유 확인 요청)` },
       ...prev,
     ]);
     toast(`${pattern.staffName} 사유 확인 요청을 기록했습니다.`, 'success');

@@ -61,8 +61,7 @@ function toChecklistItem(raw: unknown): ChecklistItem | null {
         ? record.doneAt
         : typeof record.done_at === 'string'
           ? record.done_at
-          : null,
-  };
+          : null };
 }
 
 export function getDefaultChecklist(type: ChecklistType): ChecklistItem[] {
@@ -102,8 +101,7 @@ export function normalizeChecklistItems(rawItems: unknown, type: ChecklistType):
       ? {
           ...item,
           done: matched.done,
-          doneAt: matched.done ? matched.doneAt ?? null : null,
-        }
+          doneAt: matched.done ? matched.doneAt ?? null : null }
       : item;
   });
 
@@ -134,8 +132,7 @@ export function syncChecklistWithContract(
     return {
       ...item,
       done: true,
-      doneAt: contract.signedAt ?? contract.requestedAt ?? item.doneAt ?? new Date().toISOString(),
-    };
+      doneAt: contract.signedAt ?? contract.requestedAt ?? item.doneAt ?? new Date().toISOString() };
   });
 
   return changed ? nextItems : items;
@@ -147,8 +144,7 @@ export function toggleChecklistItem(items: ChecklistItem[], key: string): Checkl
       ? {
           ...item,
           done: !item.done,
-          doneAt: item.done ? null : new Date().toISOString(),
-        }
+          doneAt: item.done ? null : new Date().toISOString() }
       : item,
   );
 }

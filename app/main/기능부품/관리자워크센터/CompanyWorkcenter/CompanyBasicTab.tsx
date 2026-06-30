@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { Card, Chip, SmBtn } from '../admin-workcenter-common';
 import TeamManager from '../../관리자전용서브/팀관리';
 
@@ -56,7 +56,7 @@ export default function CompanyBasicTab() {
   const loadCompanies = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('companies')
         .select('*')
         .order('name');
@@ -76,8 +76,7 @@ export default function CompanyBasicTab() {
           phone: typeof r.phone === 'string' ? r.phone : null,
           memo: typeof r.memo === 'string' ? r.memo : null,
           payment_day: typeof r.payment_day === 'number' ? r.payment_day : 7,
-          leave_policy: typeof r.leave_policy === 'string' ? r.leave_policy : '입사일',
-        }));
+          leave_policy: typeof r.leave_policy === 'string' ? r.leave_policy : '입사일' }));
         setCompanies(list);
         
         // Keep selected company or set default
@@ -126,7 +125,7 @@ export default function CompanyBasicTab() {
     setSaving(true);
     setSavedAt(null);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('companies')
         .update({
           name: info.name,
@@ -136,8 +135,7 @@ export default function CompanyBasicTab() {
           business_number: info.business_no,
           address: info.address,
           phone: info.phone,
-          memo: info.memo,
-        })
+          memo: info.memo })
         .eq('id', info.id);
         
       if (error) throw error;
@@ -158,7 +156,7 @@ export default function CompanyBasicTab() {
     if (!confirm(`"${name}" 회사를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('companies')
         .delete()
         .eq('id', id);
@@ -199,10 +197,9 @@ export default function CompanyBasicTab() {
         business_no: newBizNo || null,
         address: newAddress || null,
         phone: newPhone || null,
-        memo: newMemo || null,
-      };
+        memo: newMemo || null };
       
-      const { error } = await supabase
+      const { error } = await db
         .from('companies')
         .insert({
           id: newId,
@@ -214,8 +211,7 @@ export default function CompanyBasicTab() {
           address: newAddress,
           phone: newPhone,
           memo: newMemo,
-          is_active: 1,
-        });
+          is_active: 1 });
         
       if (error) throw error;
       
@@ -241,8 +237,7 @@ export default function CompanyBasicTab() {
         business_no: newBizNo || null,
         address: newAddress || null,
         phone: newPhone || null,
-        memo: newMemo || null,
-      };
+        memo: newMemo || null };
       setCompanies(prev => [...prev, newCo]);
       setSelectedId(newCo.id);
       setInfo(newCo);
@@ -472,8 +467,7 @@ function Field({
   id,
   label,
   value,
-  onChange,
-}: {
+  onChange }: {
   id: string;
   label: string;
   value: string;
@@ -503,8 +497,7 @@ function SelectField({
   label,
   value,
   onChange,
-  options,
-}: {
+  options }: {
   id: string;
   label: string;
   value: string;

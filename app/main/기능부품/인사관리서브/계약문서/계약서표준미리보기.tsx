@@ -15,8 +15,7 @@ export default function ContractStandardPreview({
     templateText,
     closingData,
     showTitle = true,
-    privacyConsent,
-}: Props) {
+    privacyConsent }: Props) {
     return (
         <div className="text-[var(--foreground)]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
             {showTitle && (

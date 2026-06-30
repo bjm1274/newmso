@@ -27,8 +27,7 @@ const TAX_FREE_COLUMN_MAP: Record<string, keyof typeof TAX_FREE_LEGAL_LIMITS> = 
   meal_allowance: 'meal',
   vehicle_allowance: 'vehicle',
   childcare_allowance: 'childcare',
-  research_allowance: 'research',
-};
+  research_allowance: 'research' };
 
 export default function ModTaxFree() {
   const data = usePayrollData();
@@ -52,8 +51,7 @@ export default function ModTaxFree() {
         basis: limit.basis,
         avgApplied: avg,
         staffCount: applied.length,
-        exceededCount: exceeded,
-      });
+        exceededCount: exceeded });
     }
     // 추가 표시용 (법정 한도만 노출)
     (['uniform', 'congratulations', 'housing'] as const).forEach((k) => {
@@ -65,8 +63,7 @@ export default function ModTaxFree() {
         basis: l.basis,
         avgApplied: 0,
         staffCount: 0,
-        exceededCount: 0,
-      });
+        exceededCount: 0 });
     });
     return out;
   }, [data.records]);

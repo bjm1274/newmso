@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -26,10 +26,10 @@ import {
   useStaffList,
   daysUntil,
   expiryTone,
-  type LicenseRow,
-} from './data-hooks';
+  type LicenseRow } from './data-hooks';
 import 발령탭 from './발령탭';
 import 징계탭 from './징계탭';
+import 교육자격탭 from './교육자격탭';
 import 사고보고서탭 from './사고보고서탭';
 import type { ErpUser } from '@/types';
 
@@ -81,8 +81,7 @@ export default function 구성원({ company, user, onBack, onOpenForm, onEditSta
         style={{
           padding: '10px 16px 0',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="구성원 탭">
           <button
@@ -143,9 +142,9 @@ export default function 구성원({ company, user, onBack, onOpenForm, onEditSta
             onRowClick={onEditStaff}
           />
         )}
-        {tab === 'transfer' && <발령탭 company={company} />}
+        {tab === 'transfer' && <발령탭 staffs={staffs} company={company} user={user} />}
         {tab === 'disciplinary' && <징계탭 staffs={staffs} company={company} user={user} />}
-        {tab === 'edu' && <EduTab company={company} />}
+        {tab === 'edu' && <교육자격탭 staffs={staffs} company={company} user={user} />}
         {tab === 'accident' && <사고보고서탭 staffs={staffs} company={company} user={user} />}
       </div>
     </div>
@@ -163,8 +162,7 @@ function ListTab({
   search,
   onSearch,
   loading,
-  onRowClick,
-}: {
+  onRowClick }: {
   grouped: ListGroup[];
   search: string;
   onSearch: (v: string) => void;
@@ -178,8 +176,7 @@ function ListTab({
         style={{
           padding: '10px 16px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <label
           htmlFor="hr-member-search"
@@ -189,8 +186,7 @@ function ListTab({
             gap: 8,
             background: 'var(--m-bg)',
             borderRadius: 10,
-            padding: '8px 12px',
-          }}
+            padding: '8px 12px' }}
         >
           <MIcon name="search" size={16} color="var(--z-500)" />
           <input
@@ -223,8 +219,7 @@ function ListTab({
               padding: '14px 16px 6px',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-            }}
+              gap: 6 }}
           >
             <span
               style={{
@@ -232,8 +227,7 @@ function ListTab({
                 fontWeight: 800,
                 color: 'var(--z-500)',
                 letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
+                textTransform: 'uppercase' }}
             >
               {dept}
             </span>
@@ -241,7 +235,7 @@ function ListTab({
               {members.length}명
             </span>
           </div>
-          <div className="m-card flush" style={{ margin: '0 16px' }}>
+          <div className="m-card flush macos-glass macos-squircle" style={{ margin: '0 16px' }}>
             {members.map((m) => {
               const status = (m.status ?? '근무중').trim() || '근무중';
               const tone =
@@ -257,8 +251,7 @@ function ListTab({
                     textAlign: 'left',
                     background: 'none',
                     border: 'none',
-                    cursor: onRowClick ? 'pointer' : 'default',
-                  }}
+                    cursor: onRowClick ? 'pointer' : 'default' }}
                 >
                   <MAvatar tone={pickAvatarTone(m.name)}>
                     {(m.name ?? '?').charAt(0)}
@@ -284,111 +277,4 @@ function ListTab({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 교육·자격 탭 (간이 — licenses 만료 임박 위주)
-// ─────────────────────────────────────────────────────────────
 
-function EduTab({ company }: { company?: string }) {
-  const [rows, setRows] = useState<LicenseRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoading(true);
-      try {
-        // 정본 테이블은 staff_licenses 이며 staff_name/status/company 컬럼이 없다.
-        const q = supabase
-          .from('staff_licenses')
-          .select('id, staff_id, license_name, expiry_date')
-          .order('expiry_date', { ascending: true })
-          .limit(30);
-        const { data, error } = await q;
-        if (error) throw error;
-        if (cancelled) return;
-        setRows(
-          ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-            id: String(r.id ?? ''),
-            staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,
-            staff_name: typeof r.staff_name === 'string' ? r.staff_name : null,
-            license_name: typeof r.license_name === 'string' ? r.license_name : null,
-            expiry_date: typeof r.expiry_date === 'string' ? r.expiry_date : null,
-            status: typeof r.status === 'string' ? r.status : null,
-          })),
-        );
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] licenses load failed', err);
-          setRows([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [company]);
-
-  if (loading) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
-        불러오는 중...
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
-        등록된 면허·자격이 없습니다.
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: '12px 16px 0' }}>
-      <div className="m-card flush">
-        {rows.map((r) => {
-          const left = daysUntil(r.expiry_date);
-          const tone = expiryTone(left);
-          const label =
-            left === null
-              ? '정보 부족'
-              : left < 0
-                ? `${-left}일 지남`
-                : left <= 30
-                  ? `D-${left} 만료 임박`
-                  : left <= 90
-                    ? '3개월 내 만료'
-                    : '정상';
-          return (
-            <div key={r.id} className="m-list-row">
-              <div className={'ico-tile tone-' + (tone || '')}>
-                <MIcon name="badge" size={18} />
-              </div>
-              <div>
-                <div className="lbl">
-                  {r.staff_name ?? '직원'}{' '}
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--z-500)',
-                      fontWeight: 600,
-                    }}
-                  >
-                    · {r.license_name ?? '면허'}
-                  </span>
-                </div>
-                <div className="sub">만료일 {r.expiry_date ?? '-'}</div>
-              </div>
-              <MChip tone={tone}>{label}</MChip>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{ height: 24 }} />
-    </div>
-  );
-}

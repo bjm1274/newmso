@@ -3,20 +3,18 @@ import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import {
   alphaColor,
   fetchDocumentDesignStore,
-  resolveDocumentDesign,
-} from '@/lib/document-designs';
+  resolveDocumentDesign } from '@/lib/document-designs';
 import {
   openIssuedCertificatePrintView,
   type IssuedCertificate,
-  type IssuedCertificateContext,
-} from '../마이페이지/certificate-print-utils';
+  type IssuedCertificateContext } from '../마이페이지/certificate-print-utils';
 
 function formatDateLabel(value?: string | null) {
   if (!value) return '현재';
@@ -48,8 +46,7 @@ function getClosingText(certType: string) {
     소득금액증명원: '위와 같이 소득 금액을 확인합니다.',
     소득금액증명서: '위와 같이 소득 금액을 확인합니다.',
     근로소득원천징수필증: '위와 같이 근로소득 원천징수 사실을 확인합니다.',
-    '근로소득 원천징수확인': '위와 같이 근로소득 원천징수 사실을 확인합니다.',
-  };
+    '근로소득 원천징수확인': '위와 같이 근로소득 원천징수 사실을 확인합니다.' };
 
   return map[certType] || '위와 같이 증명합니다.';
 }
@@ -135,8 +132,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       // JS에서 staff_members 병합
       const merged = rawRows.map((row) => ({
         ...row,
-        staff_members: staffLookup.get(String(row.staff_id || '')) ?? null,
-      }));
+        staff_members: staffLookup.get(String(row.staff_id || '')) ?? null }));
 
       const filtered = merged.filter((row) => {
         if (selectedCo === '전체') return true;
@@ -256,8 +252,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         cert_type: certType,
         serial_no: nextSerial,
         purpose,
-        issued_by: currentUser?.id || null,
-      });
+        issued_by: currentUser?.id || null });
     } catch (error) {
       console.error('증명서 발급 이력 저장 실패:', error);
     }
@@ -279,8 +274,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       serial_no: nextSerial,
       purpose,
       issued_at: new Date().toISOString(),
-      staff_members: { name: (selectedStaff.name as string) || null },
-    };
+      staff_members: { name: (selectedStaff.name as string) || null } };
     const printContext: IssuedCertificateContext = {
       companyLabel,
       staffName: (selectedStaff.name as string) || null,
@@ -300,8 +294,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         : null,
       resignedAt: (resignedAt as string | undefined) || null,
       resignationReason: (selectedStaff.resigned_reason || selectedStaff.resign_reason || '일신상의 사정') as string,
-      isResigned,
-    };
+      isResigned };
 
     try {
       openIssuedCertificatePrintView(cert, printContext);
@@ -324,8 +317,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
         style={{
           border: `1px solid ${borderColor}`,
           minHeight: '980px',
-          background: 'linear-gradient(180deg, #ffffff 0%, #fdfefe 78%, #f5f8fa 100%)',
-        }}
+          background: 'linear-gradient(180deg, #ffffff 0%, #fdfefe 78%, #f5f8fa 100%)' }}
       >
         <div className="pointer-events-none absolute inset-0">
           <img
@@ -395,8 +387,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
             className="mt-5 overflow-hidden bg-[var(--card)]"
             style={{
               borderTop: `2px solid ${primaryColor}`,
-              borderBottom: `2px solid ${primaryColor}`,
-            }}
+              borderBottom: `2px solid ${primaryColor}` }}
           >
             {certificateRows.map(([label, value], index) => (
               <div
@@ -568,8 +559,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-2xl p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:p-5"
               style={{
                 border: `1px solid ${borderColor}`,
-                background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.035)} 100%)`,
-              }}
+                background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.035)} 100%)` }}
             >
               <div className="pointer-events-none absolute inset-0">
                 <div
@@ -596,8 +586,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 className="rounded-[var(--radius-xl)] border px-4 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
                 style={{
                   background: `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.82)})`,
-                  borderColor: alphaColor(primaryColor, 0.22),
-                }}
+                  borderColor: alphaColor(primaryColor, 0.22) }}
               >
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--card)]/95 shadow-sm">
@@ -618,8 +607,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 className="mt-4 flex items-center justify-between rounded-[var(--radius-xl)] border px-5 py-4 shadow-sm"
                 style={{
                   backgroundColor: alphaColor(primaryColor, 0.075),
-                  borderColor: alphaColor(primaryColor, 0.15),
-                }}
+                  borderColor: alphaColor(primaryColor, 0.15) }}
               >
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">발급번호</p>
@@ -670,8 +658,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 className="mt-5 rounded-[var(--radius-xl)] border p-4 text-center"
                 style={{
                   background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.12)}, rgba(255,255,255,0.88))`,
-                  borderColor: alphaColor(primaryColor, 0.18),
-                }}
+                  borderColor: alphaColor(primaryColor, 0.18) }}
               >
                 <p className="text-[16px] font-black leading-relaxed text-[var(--foreground)]">
                   {getClosingText(selectedCertificate?.id || certType)}

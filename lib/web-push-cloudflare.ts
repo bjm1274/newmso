@@ -79,8 +79,7 @@ async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKe
     crv: 'P-256',
     d: bytesToB64url(privateKeyBytes),
     x: bytesToB64url(publicKeyBytes.slice(1, 33)),
-    y: bytesToB64url(publicKeyBytes.slice(33, 65)),
-  };
+    y: bytesToB64url(publicKeyBytes.slice(33, 65)) };
 
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
 
@@ -89,8 +88,7 @@ async function createVapidJwt(audience: string): Promise<{ jwt: string; publicKe
   const payload = bytesToB64url(new TextEncoder().encode(JSON.stringify({
     aud: audience,
     exp: now + 3600,
-    sub: getVapidConfig().subject,
-  })));
+    sub: getVapidConfig().subject })));
 
   const signingInput = new TextEncoder().encode(`${header}.${payload}`);
   const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, buf(signingInput)));
@@ -208,10 +206,8 @@ export async function sendWebPushNotification(
       // Content-Length 는 fetch forbidden header — 런타임이 본문 길이로 자동 설정하므로 명시 불필요.
       Authorization: `vapid t=${jwt}, k=${bytesToB64url(publicKeyBytes)}`,
       TTL: '60',
-      Urgency: 'high',
-    },
-    body: buf(body),
-  });
+      Urgency: 'high' },
+    body: buf(body) });
 
   if (!response.ok) {
     const err = new Error(`Web Push failed: HTTP ${response.status}`) as Error & { statusCode: number };

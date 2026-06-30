@@ -49,8 +49,7 @@ export const DEPT_STYLES: Record<string, { gradient: string; color: string }> = 
   간호부: { gradient: 'from-rose-500 to-pink-500', color: '#F43F5E' },
   총무부: { gradient: 'from-emerald-600 to-green-500', color: '#10B981' },
   운영본부: { gradient: 'from-violet-600 to-purple-500', color: '#8B5CF6' },
-  전략기획본부: { gradient: 'from-sky-600 to-blue-400', color: '#0EA5E9' },
-};
+  전략기획본부: { gradient: 'from-sky-600 to-blue-400', color: '#0EA5E9' } };
 
 export const DEFAULT_DEPT_STYLE = { gradient: 'from-slate-700 to-slate-600', color: '#64748B' };
 

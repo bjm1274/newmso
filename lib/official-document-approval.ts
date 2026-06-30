@@ -4,8 +4,7 @@ import {
   getD1Drizzle,
   official_doc_log as officialDocLogTable,
   like,
-  count,
-} from '@/lib/db';
+  count } from '@/lib/db';
 
 export type OfficialDocRequest = {
   sent_date: string;
@@ -44,8 +43,7 @@ export function extractOfficialDocRequest(metaData: unknown): OfficialDocRequest
     manager: String(request.manager || '').trim(),
     is_received: request.is_received === true,
     note: String(request.note || '').trim(),
-    company: String(request.company || '').trim(),
-  };
+    company: String(request.company || '').trim() };
 }
 
 export function buildOfficialDocumentApprovalContent(request: OfficialDocRequest) {
@@ -113,8 +111,7 @@ export async function syncOfficialDocumentLogFromApproval(
     manager: request.manager || String(approval.sender_name || '').trim(),
     is_received: false,
     note: buildOfficialDocNote(request.note, approval),
-    company: request.company || String(approval.sender_company || '').trim(),
-  };
+    company: request.company || String(approval.sender_company || '').trim() };
 
   // D1 직접 INSERT — is_received boolean → 0|1, id는 INTEGER PK rowid 자동
   const d1 = await getD1Binding();
@@ -131,8 +128,7 @@ export async function syncOfficialDocumentLogFromApproval(
     is_received: payload.is_received ? 1 : 0,
     note: payload.note,
     company: payload.company,
-    created_at: new Date().toISOString(),
-  });
+    created_at: new Date().toISOString() });
 
   return payload;
 }

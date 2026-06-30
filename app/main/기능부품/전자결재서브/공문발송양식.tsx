@@ -6,8 +6,7 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import {
   buildOfficialDocumentApprovalContent,
-  type OfficialDocRequest,
-} from '@/lib/official-document-approval';
+  type OfficialDocRequest } from '@/lib/official-document-approval';
 
 type OfficialDocumentDraft = Partial<OfficialDocRequest>;
 
@@ -37,8 +36,7 @@ function readDraft(extraData?: Record<string, unknown> | null): OfficialDocument
     manager: String(raw.manager || '').trim(),
     is_received: raw.is_received === true,
     note: String(raw.note || '').trim(),
-    company: String(raw.company || '').trim(),
-  };
+    company: String(raw.company || '').trim() };
 }
 
 function normalizeRequest(
@@ -53,8 +51,7 @@ function normalizeRequest(
     manager: String(draft.manager || user?.name || '').trim(),
     is_received: false,
     note: String(draft.note || '').trim(),
-    company: String(draft.company || user?.company || '').trim(),
-  };
+    company: String(draft.company || user?.company || '').trim() };
 }
 
 function buildApprovalTitle(request: OfficialDocRequest) {
@@ -67,8 +64,7 @@ export default function OfficialDocumentDispatchForm({
   extraData,
   setExtraData,
   setFormTitle,
-  setFormContent,
-}: OfficialDocumentFormProps) {
+  setFormContent }: OfficialDocumentFormProps) {
   const draft = useMemo(() => readDraft(extraData), [extraData]);
   const request = useMemo(() => normalizeRequest(draft, user), [draft, user]);
 
@@ -78,8 +74,7 @@ export default function OfficialDocumentDispatchForm({
     setExtraData((previous) => ({
       ...previous,
       official_doc_request: request,
-      request_category: 'official_document_dispatch',
-    }));
+      request_category: 'official_document_dispatch' }));
   }, [extraData?.official_doc_request, request, setExtraData]);
 
   useEffect(() => {
@@ -92,14 +87,12 @@ export default function OfficialDocumentDispatchForm({
       const previousDraft = readDraft(previous);
       const nextDraft = {
         ...previousDraft,
-        [key]: value,
-      };
+        [key]: value };
 
       return {
         ...previous,
         official_doc_request: normalizeRequest(nextDraft, user),
-        request_category: 'official_document_dispatch',
-      };
+        request_category: 'official_document_dispatch' };
     });
   };
 

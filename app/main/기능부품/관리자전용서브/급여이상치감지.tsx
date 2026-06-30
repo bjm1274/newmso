@@ -116,8 +116,7 @@ function buildStaffLookup(staffs: StaffLike[]) {
 export async function detectPayrollAnomalies({
   currentMonth = toMonthValue(new Date()),
   threshold = DEFAULT_THRESHOLD,
-  staffs = [],
-}: {
+  staffs = [] }: {
   currentMonth?: string;
   threshold?: number;
   staffs?: StaffLike[];
@@ -140,8 +139,7 @@ export async function detectPayrollAnomalies({
       visibleAnomalies: [],
       newPayments: [],
       criticalCount: 0,
-      warningCount: 0,
-    };
+      warningCount: 0 };
   }
 
   const currentMap = new Map<string, PayrollRow>();
@@ -199,8 +197,7 @@ export async function detectPayrollAnomalies({
       previous: previousAmount,
       diff,
       pct,
-      severity,
-    });
+      severity });
   }
 
   allData.sort((a, b) => {
@@ -223,8 +220,7 @@ export async function detectPayrollAnomalies({
     visibleAnomalies,
     newPayments,
     criticalCount,
-    warningCount,
-  };
+    warningCount };
 }
 
 export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
@@ -304,8 +300,7 @@ export default function SalaryAnomalyDetector({ staffs = [] as StaffLike[] }) {
       const result = await detectPayrollAnomalies({
         currentMonth,
         threshold,
-        staffs,
-      });
+        staffs });
 
       setAllData(result.allData);
     } catch (error) {

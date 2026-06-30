@@ -7,16 +7,14 @@ import {
   and,
   desc,
   eq,
-  sql,
-} from '@/lib/db';
+  sql } from '@/lib/db';
 import {
   matchSearch,
   normalizeChatRoom,
   normalizeMessage,
   type ChatMessageRow,
   type ChatRoomRow,
-  type StaffRow,
-} from '../_shared';
+  type StaffRow } from '../_shared';
 
 export async function handleChats(
   request: NextRequest,
@@ -49,8 +47,7 @@ export async function handleChats(
     file_url: messagesTable.file_url,
     is_deleted: messagesTable.is_deleted,
     created_at: messagesTable.created_at,
-    edited_at: messagesTable.edited_at,
-  } as const;
+    edited_at: messagesTable.edited_at } as const;
 
   let msgQuery = db.select(msgBaseSelect).from(messagesTable).$dynamic();
   const msgConditions: ReturnType<typeof and>[] = [];
@@ -85,8 +82,7 @@ export async function handleChats(
     type: chatRoomsTable.type,
     members: chatRoomsTable.members,
     created_at: chatRoomsTable.created_at,
-    last_message_at: chatRoomsTable.last_message_at,
-  }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(roomLimit);
+    last_message_at: chatRoomsTable.last_message_at }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(roomLimit);
 
   const [msgRows] = await Promise.all([msgQuery]);
 
@@ -123,6 +119,5 @@ export async function handleChats(
   return NextResponse.json({
     rooms: normalizedRooms,
     messages: filteredMessages,
-    flaggedRoomIds: bannedWords.length > 0 ? Array.from(bannedRoomIds) : undefined,
-  });
+    flaggedRoomIds: bannedWords.length > 0 ? Array.from(bannedRoomIds) : undefined });
 }

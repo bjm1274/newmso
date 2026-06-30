@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { logger } from '@/lib/logger';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { compareStaffMembers, isMessageReadByCursor } from './메신저유틸';
@@ -77,8 +77,7 @@ export function useChatMessageEditing({
   fetchData,
   syncRoomSummaryFromMessages,
   setMessages,
-  setPersistedPinnedMessages,
-}: UseChatMessageEditingParams) {
+  setPersistedPinnedMessages }: UseChatMessageEditingParams) {
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [editingMessageDraft, setEditingMessageDraft] = useState('');
   const [editHistoryTarget, setEditHistoryTarget] = useState<ChatMessage | null>(null);
@@ -114,12 +113,11 @@ export function useChatMessageEditing({
           previousContent: null,
           nextContent: message.content || null,
           editedAt: message.edited_at || message.created_at || null,
-          isFallback: true,
-        }]
+          isFallback: true }]
       : [];
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('audit_logs')
         .select('id, user_id, user_name, details, created_at')
         .eq('action', 'message_edit')
@@ -146,8 +144,7 @@ export function useChatMessageEditing({
           editedAt:
             typeof details.edited_at === 'string' && details.edited_at.trim()
               ? details.edited_at
-              : (typeof row.created_at === 'string' ? row.created_at : null),
-        } satisfies MessageEditHistoryEntry;
+              : (typeof row.created_at === 'string' ? row.created_at : null) } satisfies MessageEditHistoryEntry;
       });
 
       setEditHistoryEntries(parsedEntries.length > 0 ? parsedEntries : fallbackEntries);
@@ -197,7 +194,7 @@ export function useChatMessageEditing({
     );
     syncRoomSummaryFromMessages(targetMessage.room_id || selectedRoomId, nextMessagesSnapshot);
 
-    const { error } = await supabase
+    const { error } = await db
       .from('messages')
       .update({ content: nextContent, edited_at: editedAt })
       .eq('id', targetMessage.id);
@@ -209,7 +206,7 @@ export function useChatMessageEditing({
     }
 
     try {
-      await supabase.from('audit_logs').insert([{
+      await db.from('audit_logs').insert([{
         user_id: auditUserId || currentUserId || fallbackUserId || null,
         user_name: auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null,
         action: 'message_edit',
@@ -221,9 +218,7 @@ export function useChatMessageEditing({
           next_content: nextContent,
           edited_at: editedAt,
           editor_name:
-            auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null,
-        }),
-      }]);
+            auditUserName || (targetMessage.staff as { name?: string } | null | undefined)?.name || null }) }]);
     } catch (auditError) {
       logger.warn('message edit audit log insert failed', auditError);
     }
@@ -240,16 +235,14 @@ export function useChatMessageEditing({
     closeEditingMessage,
     openEditHistory,
     closeEditHistory,
-    saveEditedMessage,
-  };
+    saveEditedMessage };
 }
 
 export function useReadStatusModal({
   selectedRoom,
   allKnownStaffs,
   roomReadCursorMap,
-  getEffectiveRoomMemberIds,
-}: UseReadStatusParams) {
+  getEffectiveRoomMemberIds }: UseReadStatusParams) {
   const [unreadModalMsg, setUnreadModalMsg] = useState<ChatMessage | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [readUsers, setReadUsers] = useState<StaffMember[]>([]);
@@ -298,8 +291,7 @@ export function useReadStatusModal({
     unreadLoading,
     setUnreadModalMsg,
     closeReadStatusModal,
-    loadReadStatusForMessage,
-  };
+    loadReadStatusForMessage };
 }
 
 export function useChatMobileBackLayer<TReactionDetail>({
@@ -329,8 +321,7 @@ export function useChatMobileBackLayer<TReactionDetail>({
   showGlobalSearch,
   closeGlobalSearch,
   showGroupModal,
-  closeGroupModal,
-}: UseChatMobileBackLayerParams<TReactionDetail>) {
+  closeGroupModal }: UseChatMobileBackLayerParams<TReactionDetail>) {
   return useCallback(() => {
     if (attachmentPreviewOpen) {
       closeAttachmentPreview();

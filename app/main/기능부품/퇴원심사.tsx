@@ -4,17 +4,15 @@ import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import SmartDatePicker from './공통/SmartDatePicker';
 import {
     analyzeDischargeReviewRules,
-    type DischargeRuleAnalysis,
-} from '@/lib/discharge-review-rules';
+    type DischargeRuleAnalysis } from '@/lib/discharge-review-rules';
 import {
     loadDischargeCustomRules,
     saveDischargeCustomRules,
-    type DischargeCustomRule,
-} from '@/lib/discharge-custom-rules';
+    type DischargeCustomRule } from '@/lib/discharge-custom-rules';
 import DischargeRuleAnalysisPanel from './퇴원심사규정패널';
 import DischargeRuleBuilder from './퇴원심사규정빌더';
 import { useIsMobile } from '@/app/components/useIsMobile';
@@ -160,8 +158,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             templateData: selectedReviewTemplate?.data || '',
             allItems: selectedReview.items,
             checkedItems: selectedReview.items.filter(i => i.checked),
-            customRules,
-        });
+            customRules });
     }, [customRules, selectedReview, selectedReviewTemplate]);
 
     useEffect(() => { loadData(); }, []);
@@ -194,16 +191,15 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         setLoading(true);
         try {
             const [{ data: tmpls }, { data: revs }, { data: surgTmpls }] = await Promise.all([
-                supabase.from('discharge_templates').select('*').order('id'),
-                supabase.from('discharge_reviews').select('*').order('created_at', { ascending: false }).limit(100),
-                supabase.from('surgery_templates').select('id, name').eq('is_active', true).order('sort_order'),
+                db.from('discharge_templates').select('*').order('id'),
+                db.from('discharge_reviews').select('*').order('created_at', { ascending: false }).limit(100),
+                db.from('surgery_templates').select('id, name').eq('is_active', true).order('sort_order'),
             ]);
             if (tmpls && tmpls.length > 0) {
                 setTemplates(tmpls.map((t: any) => ({
                     id: t.id,
                     title: t.title || t.id,
-                    data: typeof t.items === 'string' ? t.items : (Array.isArray(t.items) ? t.items.join('\n') : ''),
-                })));
+                    data: typeof t.items === 'string' ? t.items : (Array.isArray(t.items) ? t.items.join('\n') : '') })));
             }
             setReviews((revs || []) as DischargeReview[]);
             setSurgeryOptions((surgTmpls || []).map((s: any) => ({ id: s.id, name: s.name })));
@@ -220,7 +216,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             setTemplates(templates.map(t => t.id === tmpl.id ? tmpl : t));
         }
         try {
-            await supabase.from('discharge_templates').upsert({
+            await db.from('discharge_templates').upsert({
                 id: tmpl.id, title: tmpl.title, items: tmpl.data, updated_at: new Date().toISOString()
             }, { onConflict: 'id' });
         } catch (err) { console.error(err); }
@@ -232,12 +228,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             title: '퇴원심사 템플릿 삭제',
             description: `${target?.title || '선택한 템플릿'}을 삭제합니다.\n새 심사 생성 시 더 이상 선택할 수 없습니다.`,
             confirmText: '삭제',
-            tone: 'danger',
-        });
+            tone: 'danger' });
         if (!confirmed) return;
         setTemplates(templates.filter(t => t.id !== id));
         if (editTmplId === id) { setEditTmplId(null); setEditTmplTitle(''); setEditTmplData(''); }
-        try { await supabase.from('discharge_templates').delete().eq('id', id); } catch (err) { console.error(err); }
+        try { await db.from('discharge_templates').delete().eq('id', id); } catch (err) { console.error(err); }
     };
 
     const startNewTemplate = () => {
@@ -280,11 +275,10 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             items, chart_data: newChartData,
             status: DISCHARGE_STATUS.pending,
             reviewer_name: user?.name || '알 수 없음', reviewer_id: user?.id || 'unknown',
-            ai_analysis: '', created_at: new Date().toISOString(),
-        };
+            ai_analysis: '', created_at: new Date().toISOString() };
 
         try {
-            const { data, error } = await supabase.from('discharge_reviews').insert([review]).select();
+            const { data, error } = await db.from('discharge_reviews').insert([review]).select();
             if (error) {
                 // 저장 실패 시 가짜 id 로 로컬에만 추가하면 새로고침 시 소실되어
                 // 사용자가 저장 성공으로 오인한다. 에러를 알리고 폼을 유지한다.
@@ -343,7 +337,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         });
         setSelectedReview({ ...review, items: updatedItems });
         setReviews(prev => prev.map(r => r.id === review.id ? { ...r, items: updatedItems } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updatedItems }).eq('id', review.id); }
+        try { await db.from('discharge_reviews').update({ items: updatedItems }).eq('id', review.id); }
         catch (e) { toast(`자동비교 결과 저장 실패: ${String((e as Error)?.message || e)}`, 'error'); }
     };
 
@@ -360,7 +354,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         const updated = selectedReview.items.map(i => i.id === itemId ? { ...i, checked: !i.checked } : i);
         setSelectedReview({ ...selectedReview, items: updated });
         setReviews(reviews.map(r => r.id === reviewId ? { ...r, items: updated } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', reviewId); }
+        try { await db.from('discharge_reviews').update({ items: updated }).eq('id', reviewId); }
         catch (e) {
             toast(`체크 상태 저장 실패: ${String((e as Error)?.message || e)}`, 'error');
             setSelectedReview(selectedReview);
@@ -373,7 +367,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         const updated = selectedReview.items.map(i => ({ ...i, checked: check }));
         setSelectedReview({ ...selectedReview, items: updated });
         setReviews(reviews.map(r => r.id === selectedReview.id ? { ...r, items: updated } : r));
-        try { await supabase.from('discharge_reviews').update({ items: updated }).eq('id', selectedReview.id); }
+        try { await db.from('discharge_reviews').update({ items: updated }).eq('id', selectedReview.id); }
         catch (e) {
             toast(`전체 체크 저장 실패: ${String((e as Error)?.message || e)}`, 'error');
             setSelectedReview(selectedReview);
@@ -389,8 +383,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 title: '미체크 항목 승인',
                 description: `${u.length}개 미체크 항목이 있습니다.\n그래도 퇴원심사를 승인하시겠습니까?`,
                 confirmText: '승인',
-                tone: 'danger',
-            });
+                tone: 'danger' });
             if (!confirmedUnchecked) return;
         }
         if (selectedRuleAnalysis && selectedRuleAnalysis.summary.critical > 0) {
@@ -398,14 +391,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 title: 'Critical 규정 점검 승인',
                 description: `규정 기반 점검에서 Critical ${selectedRuleAnalysis.summary.critical}건이 감지되었습니다.\n그래도 퇴원 승인하시겠습니까?`,
                 confirmText: '승인',
-                tone: 'danger',
-            });
+                tone: 'danger' });
             if (!allowCriticalApproval) return;
         }
         setSelectedReview({ ...selectedReview, status: DISCHARGE_STATUS.approved });
         setReviews(reviews.map(r => r.id === id ? { ...r, status: DISCHARGE_STATUS.approved } : r));
         try {
-            await supabase.from('discharge_reviews').update({ status: DISCHARGE_STATUS.approved }).eq('id', id);
+            await db.from('discharge_reviews').update({ status: DISCHARGE_STATUS.approved }).eq('id', id);
         } catch (e) {
             toast(`승인 처리 실패: ${String((e as Error)?.message || e)}`, 'error');
             setSelectedReview(selectedReview);
@@ -419,13 +411,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             title: '퇴원심사 삭제',
             description: `${target?.patient_name || '선택한 퇴원심사'} 기록을 삭제합니다.\n삭제 후에는 목록에서 복구할 수 없습니다.`,
             confirmText: '삭제',
-            tone: 'danger',
-        });
+            tone: 'danger' });
         if (!confirmed) return;
         setReviews(reviews.filter(r => r.id !== id));
         if (selectedReview?.id === id) setSelectedReview(null);
         try {
-            await supabase.from('discharge_reviews').delete().eq('id', id);
+            await db.from('discharge_reviews').delete().eq('id', id);
         } catch (e) {
             toast(`삭제 실패: ${String((e as Error)?.message || e)}`, 'error');
             setReviews(reviews);
@@ -453,8 +444,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 title: '체크리스트 재생성',
                 description: '차트 데이터가 변경되었습니다.\n체크리스트 항목을 다시 생성하면 기본 체크가 해제됩니다.',
                 confirmText: '재생성',
-                tone: 'accent',
-            });
+                tone: 'accent' });
             if (shouldRegenerate) {
                 const newLines = parseChartData(editForm.chart_data || '');
                 updatedItems = chartLinesToCheckItems(newLines);
@@ -464,7 +454,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         const updatedReview = { ...selectedReview, ...editForm, items: updatedItems } as DischargeReview;
 
         try {
-            const { error } = await supabase.from('discharge_reviews').update({
+            const { error } = await db.from('discharge_reviews').update({
                 patient_name: updatedReview.patient_name,
                 birth_date: updatedReview.birth_date,
                 gender: updatedReview.gender,
@@ -484,8 +474,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 discharge_type: updatedReview.discharge_type,
                 drg_code: updatedReview.drg_code,
                 chart_data: updatedReview.chart_data,
-                items: updatedReview.items,
-            }).eq('id', selectedReview.id);
+                items: updatedReview.items }).eq('id', selectedReview.id);
 
             if (error) throw error;
 
@@ -527,15 +516,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                     allItems: selectedReview.items,
                     chartData: selectedReview.chart_data || '',
                     templateData: tmpl?.data || '',
-                    customRules,
-                }),
-            });
+                    customRules }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
             setAiResult(data.analysis);
             setSelectedReview({ ...selectedReview, ai_analysis: data.analysis });
             setReviews(reviews.map(r => r.id === selectedReview.id ? { ...r, ai_analysis: data.analysis } : r));
-            await supabase.from('discharge_reviews').update({ ai_analysis: data.analysis }).eq('id', selectedReview.id);
+            await db.from('discharge_reviews').update({ ai_analysis: data.analysis }).eq('id', selectedReview.id);
         } catch (err) {
             setAiResult('AI 분석 실패: ' + (err instanceof Error ? err.message : String(err)));
         } finally { setAiLoading(false); }

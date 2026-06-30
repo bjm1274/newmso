@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { bindPageRefresh } from '@/lib/realtime-maintenance';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime, subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom } from '@/types';
@@ -15,8 +15,7 @@ export type ChatRealtimeState = 'idle' | 'connecting' | 'connected' | 'reconnect
 export function useRoomNotificationSetting({
   selectedRoomId,
   effectiveChatUserId,
-  userId,
-}: {
+  userId }: {
   selectedRoomId: string | null;
   effectiveChatUserId: string | null | undefined;
   userId: string | null | undefined;
@@ -34,7 +33,7 @@ export function useRoomNotificationSetting({
         setRoomNotifyOn(true);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('room_notification_settings')
         .select('notifications_enabled')
         .eq('user_id', effectiveChatUserId || userId)
@@ -53,7 +52,7 @@ export function useRoomNotificationSetting({
     setRoomNotifyOn(nextValue);
     roomNotifyRef.current = nextValue;
     try {
-      const { error } = await supabase.from('room_notification_settings').upsert(
+      const { error } = await db.from('room_notification_settings').upsert(
         { user_id: effectiveChatUserId || userId, room_id: selectedRoomId, notifications_enabled: nextValue },
         { onConflict: 'user_id,room_id' },
       );
@@ -98,7 +97,7 @@ type UseChatRealtimeSubscriptionsParams = {
   selectedRoomId: string | null;
   globalRealtimeRetryToken: number;
   roomRealtimeRetryToken: number;
-  presenceChannelRef: MutableRefObject<ReturnType<typeof supabase.channel> | null>;
+  presenceChannelRef: MutableRefObject<ReturnType<typeof db.channel> | null>;
   syncChannelRef: MutableRefObject<BroadcastChannel | null>;
   chatRoomsRef: MutableRefObject<ChatRoom[]>;
   visibleMessageIdsRef?: MutableRefObject<Set<string>>;
@@ -157,8 +156,7 @@ export function useChatRealtimeSubscriptions({
   scheduleRealtimeReconnect,
   isRoomInSelectedConversation,
   fetchMessageByIdWithRetry,
-  sortChatRoomsWithNoticeFirst,
-}: UseChatRealtimeSubscriptionsParams) {
+  sortChatRoomsWithNoticeFirst }: UseChatRealtimeSubscriptionsParams) {
   const fetchDataLatestRef = useRef(fetchData);
   const handleIncomingRealtimeMessageRef = useRef(handleIncomingRealtimeMessage);
   const isRoomInSelectedConversationRef = useRef(isRoomInSelectedConversation);
@@ -427,8 +425,7 @@ export function useChatRealtimeSubscriptions({
                     ...room,
                     last_message: previewText || room.last_message,
                     last_message_preview: previewText || room.last_message_preview,
-                    last_message_at: new Date().toISOString(),
-                  }
+                    last_message_at: new Date().toISOString() }
                 : room
             )
           );

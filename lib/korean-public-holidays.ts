@@ -120,8 +120,7 @@ const KOREAN_PUBLIC_HOLIDAY_LABELS: Record<string, string> = {
   '2026-10-03': '개천절',
   '2026-10-05': '개천절 대체',
   '2026-10-09': '한글날',
-  '2026-12-25': '성탄절',
-};
+  '2026-12-25': '성탄절' };
 
 export function isKoreanPublicHoliday(dateKey: string) {
   return holidayDateSet.has(String(dateKey || '').slice(0, 10));

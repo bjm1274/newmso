@@ -20,15 +20,14 @@
 import { useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import MIcon from '../공통/MIcon';
 import {
   MFormHeader,
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from './form-helpers';
+  useFieldIdPrefix } from './form-helpers';
 import { useMyLeaveBalance } from './data-hooks';
 import { useApproverLine } from '../결재/useApproverLine';
 import ApproverLineSection from '../결재/ApproverLineSection';
@@ -55,8 +54,7 @@ export default function 연차신청({
   staffId,
   staffName,
   user,
-  onBack,
-}: SFormLeaveProps) {
+  onBack }: SFormLeaveProps) {
   const { data, reload } = useMyLeaveBalance(staffId);
   const fieldId = useFieldIdPrefix('form-leave');
   const company = typeof user.company === 'string' ? user.company.trim() : '';
@@ -100,7 +98,7 @@ export default function 연차신청({
     let leaveRequestInserted = false;
     let leaveQueued = false;
     try {
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'leave_requests',
         payload: {
@@ -110,9 +108,7 @@ export default function 연차신청({
           end_date: end,
           days,
           reason: reason || null,
-          status: '대기',
-        },
-      });
+          status: '대기' } });
       if (error) throw new Error(error);
       leaveRequestInserted = true;
       leaveQueued = queued;
@@ -147,9 +143,7 @@ export default function 연차신청({
           startDate: start,
           endDate: end,
           reason: reason || '',
-          leave_request_synced: leaveRequestInserted,
-        },
-      });
+          leave_request_synced: leaveRequestInserted } });
 
       if (leaveQueued || apprQueued) {
         toast('오프라인 — 연차 신청이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
@@ -187,16 +181,14 @@ export default function 연차신청({
             padding: '18px 16px 8px',
             background: 'var(--m-card)',
             borderBottom: '1px solid var(--m-border)',
-            textAlign: 'center',
-          }}
+            textAlign: 'center' }}
         >
           <div
             style={{
               fontSize: 11,
               color: 'var(--z-500)',
               fontWeight: 800,
-              letterSpacing: '0.04em',
-            }}
+              letterSpacing: '0.04em' }}
           >
             잔여 연차
           </div>
@@ -207,8 +199,7 @@ export default function 연차신청({
               fontWeight: 800,
               color: 'var(--m-accent)',
               letterSpacing: '-0.03em',
-              marginTop: 4,
-            }}
+              marginTop: 4 }}
           >
             {data.remaining}
             <span
@@ -216,8 +207,7 @@ export default function 연차신청({
                 fontSize: 14,
                 color: 'var(--z-500)',
                 fontWeight: 700,
-                marginLeft: 3,
-              }}
+                marginLeft: 3 }}
             >
               일
             </span>
@@ -228,7 +218,7 @@ export default function 연차신청({
           </div>
         </div>
 
-        <div className="m-card flush" style={{ borderRadius: 0, border: 'none' }}>
+        <div className="m-card flush macos-glass macos-squircle" style={{ borderRadius: 0, border: 'none' }}>
           <MField label="휴가 종류">
             <MSegRow
               value={kind}
@@ -279,8 +269,7 @@ export default function 연차신청({
                 fontSize: 14,
                 fontFamily: 'inherit',
                 resize: 'none',
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             />
           </MField>
         </div>
@@ -290,15 +279,14 @@ export default function 연차신청({
         {staffName && data.remaining < days && (
           <div style={{ padding: '14px 16px 24px' }}>
             <div
-              className="m-card"
+              className="m-card macos-glass macos-squircle-sm"
               style={{
                 padding: '12px 14px',
                 background: 'var(--m-warning-soft)',
                 borderColor: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
-              }}
+                gap: 10 }}
             >
               <MIcon name="alertTri" size={18} color="var(--m-warning)" />
               <div
@@ -306,8 +294,7 @@ export default function 연차신청({
                   flex: 1,
                   fontSize: 12,
                   fontWeight: 700,
-                  color: 'var(--m-warning)',
-                }}
+                  color: 'var(--m-warning)' }}
               >
                 잔여 연차 {data.remaining}일을 초과합니다. 결재자 확인이 필요합니다.
               </div>

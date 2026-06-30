@@ -16,7 +16,7 @@
  */
 
 import { getOfflineQueue } from './offline-queue';
-import { supabase } from './supabase';
+import { db } from './db-client';
 
 // ─────────────────────────────────────────────────────────────
 // 타입
@@ -77,16 +77,16 @@ async function executeStep(
 
   switch (kind) {
     case 'insert':
-      q = supabase.from(table).insert(arr).select();
+      q = db.from(table).insert(arr).select();
       break;
     case 'upsert':
-      q = supabase.from(table).upsert(arr).select();
+      q = db.from(table).upsert(arr).select();
       break;
     case 'update': {
       if (!match || Object.keys(match).length === 0) {
         throw new Error(`[tx-queue] update requires match: table=${table}`);
       }
-      q = supabase.from(table).update(arr[0]).select();
+      q = db.from(table).update(arr[0]).select();
       for (const [col, val] of Object.entries(match)) q = q.eq(col, val);
       break;
     }
@@ -94,7 +94,7 @@ async function executeStep(
       if (!match || Object.keys(match).length === 0) {
         throw new Error(`[tx-queue] delete requires match: table=${table}`);
       }
-      q = supabase.from(table).delete();
+      q = db.from(table).delete();
       for (const [col, val] of Object.entries(match)) q = q.eq(col, val);
       break;
     }
@@ -163,8 +163,7 @@ export async function enqueueSupabaseTransaction(
       return {
         data: results,
         queued: false,
-        error: `[tx-queue] step[${i}] requires payload or inject`,
-      };
+        error: `[tx-queue] step[${i}] requires payload or inject` };
     }
 
     try {
@@ -308,11 +307,9 @@ function enqueueRemainingSteps(
         kind: step.kind,
         table: step.table,
         data: dataPayload,
-        match: step.match,
-      },
+        match: step.match },
       groupId,
-      groupIndex: startIndex + i,
-    });
+      groupIndex: startIndex + i });
 
     allResults.push(createMockObjectProxy(`$prev[${startIndex + i}]`));
   }

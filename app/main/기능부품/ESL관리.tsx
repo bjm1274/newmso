@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   type HandoverRoomConfig,
   type HandoverNoteRow,
   normalizeHandoverNote,
-  parseRoomConfigsFromNote,
-} from '@/lib/handover-notes';
+  parseRoomConfigsFromNote } from '@/lib/handover-notes';
 import {
   type EslBinding,
   type EslTransferProgress,
@@ -21,8 +20,7 @@ import {
   saveBindings,
   updateBinding,
   renderPatientBitmap,
-  renderPatientPreview,
-} from '@/lib/esl-ble';
+  renderPatientPreview } from '@/lib/esl-ble';
 
 // ─── 타입 ───
 
@@ -79,7 +77,7 @@ export default function EslManager({ user }: { user?: any }) {
   async function loadRoomConfigs() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
@@ -103,8 +101,7 @@ export default function EslManager({ user }: { user?: any }) {
           latestByDate.set(note.handover_date, {
             date: note.handover_date,
             createdAt: note.created_at,
-            rooms: parsed,
-          });
+            rooms: parsed });
         }
       }
 
@@ -132,8 +129,7 @@ export default function EslManager({ user }: { user?: any }) {
         age: '',
         gender: '',
         doctor: editDoctor[`${room.roomNumber}-${bed.bedNumber}`] || '',
-        admissionDate: bed.admissionDate || '',
-      }));
+        admissionDate: bed.admissionDate || '' }));
   }, [editDoctor]);
 
   // ESL 기기 스캔 + 바인딩
@@ -145,8 +141,7 @@ export default function EslManager({ user }: { user?: any }) {
         title: 'Web Bluetooth 미지원',
         description: '이 브라우저에서 Web Bluetooth를 사용할 수 없습니다.\n\nChrome 주소창에 chrome://flags/#enable-web-bluetooth 를 입력하고 Enabled로 변경한 뒤 브라우저를 재시작해 주세요.',
         confirmText: '확인',
-        tone: 'danger',
-      });
+        tone: 'danger' });
       return;
     }
 
@@ -156,8 +151,7 @@ export default function EslManager({ user }: { user?: any }) {
 
       const nextBindings = updateBinding(bindings, roomNumber, {
         deviceId: device.id || device.name || '',
-        deviceName: device.name || '알 수 없는 기기',
-      });
+        deviceName: device.name || '알 수 없는 기기' });
       setBindings(nextBindings);
       saveBindings(nextBindings);
     } catch (err: any) {
@@ -169,22 +163,19 @@ export default function EslManager({ user }: { user?: any }) {
           title: 'Web Bluetooth 차단',
           description: 'Web Bluetooth가 차단되었습니다.\nHTTPS 또는 localhost에서만 사용 가능합니다.',
           confirmText: '확인',
-          tone: 'danger',
-        });
+          tone: 'danger' });
       } else if (err.name === 'NotSupportedError') {
         await openConfirm({
           title: '블루투스 어댑터 확인 필요',
           description: '이 PC에 블루투스 어댑터가 없거나 비활성화되어 있습니다.\n\n1. PC에 블루투스가 있는지 확인\n2. Windows 설정 → 블루투스 켜기\n3. Chrome 재시작',
           confirmText: '확인',
-          tone: 'danger',
-        });
+          tone: 'danger' });
       } else {
         await openConfirm({
           title: 'ESL 스캔 실패',
           description: `스캔 실패: ${err.name}\n${err.message}`,
           confirmText: '확인',
-          tone: 'danger',
-        });
+          tone: 'danger' });
       }
     }
   }
@@ -205,8 +196,7 @@ export default function EslManager({ user }: { user?: any }) {
         title: 'ESL 기기 연결 필요',
         description: '먼저 ESL 기기를 연결해 주세요.',
         confirmText: '확인',
-        tone: 'default',
-      });
+        tone: 'default' });
       return;
     }
 
@@ -224,8 +214,7 @@ export default function EslManager({ user }: { user?: any }) {
             title: 'ESL 기기 연결 실패',
             description: `기기 연결 실패: ${err.message}`,
             confirmText: '확인',
-            tone: 'danger',
-          });
+            tone: 'danger' });
         }
         return;
       }
@@ -240,8 +229,7 @@ export default function EslManager({ user }: { user?: any }) {
 
       // 전송 완료 후 바인딩 업데이트
       const nextBindings = updateBinding(bindings, room.roomNumber, {
-        lastUpdated: new Date().toISOString(),
-      });
+        lastUpdated: new Date().toISOString() });
       setBindings(nextBindings);
       saveBindings(nextBindings);
 
@@ -256,8 +244,7 @@ export default function EslManager({ user }: { user?: any }) {
     } catch (err: any) {
       setProgressMap((prev) => ({
         ...prev,
-        [room.roomNumber]: { stage: 'error', percent: 0, message: `오류: ${err.message}` },
-      }));
+        [room.roomNumber]: { stage: 'error', percent: 0, message: `오류: ${err.message}` } }));
     }
   }
 
@@ -274,8 +261,7 @@ export default function EslManager({ user }: { user?: any }) {
             title: 'ESL 기기 연결 실패',
             description: `기기 연결 실패: ${err.message}`,
             confirmText: '확인',
-            tone: 'danger',
-          });
+            tone: 'danger' });
         }
         return;
       }
@@ -296,8 +282,7 @@ export default function EslManager({ user }: { user?: any }) {
     } catch (err: any) {
       setProgressMap((prev) => ({
         ...prev,
-        [room.roomNumber]: { stage: 'error', percent: 0, message: `오류: ${err.message}` },
-      }));
+        [room.roomNumber]: { stage: 'error', percent: 0, message: `오류: ${err.message}` } }));
     }
   }
 
@@ -471,8 +456,7 @@ export default function EslManager({ user }: { user?: any }) {
                         onChange={(e) =>
                           setEditDoctor((prev) => ({
                             ...prev,
-                            [`${room.roomNumber}-${bed.bedNumber}`]: e.target.value,
-                          }))
+                            [`${room.roomNumber}-${bed.bedNumber}`]: e.target.value }))
                         }
                         className="w-16 rounded border border-[var(--border)] bg-transparent px-1 py-0.5 text-[10px] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)]"
                       />

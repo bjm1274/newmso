@@ -45,8 +45,7 @@ const NewDestSchema = z.object({
   insurance_code: z.string().nullable().optional(),
   udi_code: z.string().nullable().optional(),
   supplier_name: z.string().nullable().optional(),
-  supplier: z.string().nullable().optional(),
-});
+  supplier: z.string().nullable().optional() });
 
 // 이력/로그용 메타.
 const MetaSchema = z.object({
@@ -58,8 +57,7 @@ const MetaSchema = z.object({
   reason: z.string().nullable().optional(),
   serial_number: z.string().nullable().optional(),
   source_notes: z.string().nullable().optional(),
-  dest_notes: z.string().nullable().optional(),
-});
+  dest_notes: z.string().nullable().optional() });
 
 const PayloadSchema = z
   .object({
@@ -68,11 +66,9 @@ const PayloadSchema = z
     destId: z.string().min(1).nullable().optional(),
     newDest: NewDestSchema.nullable().optional(),
     quantity: z.number().int().positive(),
-    meta: MetaSchema.optional(),
-  })
+    meta: MetaSchema.optional() })
   .refine((v) => Boolean(v.destId) !== Boolean(v.newDest), {
-    message: 'destId 또는 newDest 중 정확히 하나만 지정해야 합니다.',
-  });
+    message: 'destId 또는 newDest 중 정확히 하나만 지정해야 합니다.' });
 
 type Payload = z.infer<typeof PayloadSchema>;
 
@@ -117,8 +113,7 @@ export async function POST(request: Request) {
         INSUFFICIENT_STOCK: 409,
         SOURCE_NOT_FOUND: 404,
         DEST_NOT_FOUND: 404,
-        ITEM_NOT_FOUND: 404,
-      };
+        ITEM_NOT_FOUND: 404 };
       const status = statusMap[err.code] ?? 500;
       return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });
     }
@@ -213,8 +208,7 @@ async function executeTransfer(
         insurance_code: nd.insurance_code ?? null,
         udi_code: nd.udi_code ?? null,
         supplier_name: nd.supplier_name ?? null,
-        supplier: nd.supplier ?? null,
-      }),
+        supplier: nd.supplier ?? null }),
     );
   }
 
@@ -235,8 +229,7 @@ async function executeTransfer(
       serial_number: meta?.serial_number ?? null,
       transferred_by: user?.name ?? null,
       transferred_by_id: userId(user),
-      status: '완료',
-    }),
+      status: '완료' }),
   );
 
   // 이관출고 로그(출발지).
@@ -253,8 +246,7 @@ async function executeTransfer(
       serial_number: meta?.serial_number ?? null,
       actor_name: actorName(user),
       company: meta?.from_company ?? null,
-      notes: meta?.source_notes ?? null,
-    }),
+      notes: meta?.source_notes ?? null }),
   );
 
   // 이관입고 로그(목적지).
@@ -271,8 +263,7 @@ async function executeTransfer(
       serial_number: meta?.serial_number ?? null,
       actor_name: actorName(user),
       company: meta?.to_company ?? newDest?.company ?? null,
-      notes: meta?.dest_notes ?? null,
-    }),
+      notes: meta?.dest_notes ?? null }),
   );
 
   await db.batch(ops as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
@@ -283,6 +274,5 @@ async function executeTransfer(
     dst_prev: dstPrev,
     dst_next: dstNext,
     destId: resolvedDestId,
-    destCreated,
-  };
+    destCreated };
 }

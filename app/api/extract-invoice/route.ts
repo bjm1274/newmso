@@ -27,9 +27,7 @@ async function extractWithGemini(prompt: string, base64Data: string, mimeType: s
                     {
                         inlineData: {
                             data: base64Data,
-                            mimeType,
-                        },
-                    },
+                            mimeType } },
                 ]),
                 30_000,
                 `Gemini[${modelName}]`,

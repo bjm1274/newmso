@@ -24,8 +24,7 @@ import { EmptyState } from '@/app/components/StatePanel';
 import {
   type CalendarCellInfo,
   type CalendarRow,
-  type CalendarTableProps,
-} from './CalendarTable.types';
+  type CalendarTableProps } from './CalendarTable.types';
 import { MonthGridView, StaffByDayView } from './CalendarTable.internal';
 
 export type {
@@ -36,8 +35,7 @@ export type {
   CalendarSortKey,
   CalendarSortState,
   CalendarTableMode,
-  CalendarTableProps,
-} from './CalendarTable.types';
+  CalendarTableProps } from './CalendarTable.types';
 
 // ---------------------------------------------------------------------------
 // 날짜 유틸 (모듈 로컬)
@@ -73,8 +71,7 @@ function makeBuildInfo(monthRef: Date, today: Date, holidaySet: Set<number>) {
       isCurrentMonth: date.getMonth() === monthRef.getMonth(),
       isToday: sameDay(date, today),
       isWeekend: dow === 0 || dow === 6,
-      isHoliday: holidaySet.has(startOfDay(date).getTime()),
-    };
+      isHoliday: holidaySet.has(startOfDay(date).getTime()) };
   };
 }
 
@@ -99,8 +96,7 @@ export function CalendarTable<R>({
   onCellPointerUp,
   sortableRowHeader,
   sort,
-  onSortChange,
-}: CalendarTableProps<R>) {
+  onSortChange }: CalendarTableProps<R>) {
   const today = startOfDay(new Date());
   const holidaySet = new Set((holidays ?? []).map((d) => startOfDay(d).getTime()));
   const dates = buildDateRange(startDate, endDate);

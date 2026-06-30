@@ -27,8 +27,7 @@ export function OpCheckPrintModal({
   checkForm,
   chartNo,
   scheduleRoom,
-  onClose,
-}: OpCheckPrintModalProps) {
+  onClose }: OpCheckPrintModalProps) {
   if (!open || !checkForm) return null;
 
   return (

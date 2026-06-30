@@ -1,12 +1,11 @@
 'use client';
 
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   getPinnedRoomOrderStorageKey,
   getRoomPrefsStorageKey,
-  type RoomPreference,
-} from './메신저유틸';
+  type RoomPreference } from './메신저유틸';
 
 type UseChatRoomPreferencesParams = {
   roomPrefsUserId: string | null | undefined;
@@ -19,8 +18,7 @@ export function useChatRoomPreferences({
   roomPrefsUserId,
   pinnedRoomOrder,
   setRoomPrefs,
-  setPinnedRoomOrder,
-}: UseChatRoomPreferencesParams) {
+  setPinnedRoomOrder }: UseChatRoomPreferencesParams) {
   const updateRoomPreference = useCallback(
     (roomId: string, patch: RoomPreference) => {
       setRoomPrefs((prev) => {
@@ -28,9 +26,7 @@ export function useChatRoomPreferences({
           ...prev,
           [roomId]: {
             ...(prev[roomId] || {}),
-            ...patch,
-          },
-        };
+            ...patch } };
 
         if (typeof window !== 'undefined') {
           try {
@@ -45,7 +41,7 @@ export function useChatRoomPreferences({
 
         if (roomPrefsUserId) {
           const merged = next[roomId] || {};
-          void supabase
+          void db
             .from('chat_room_prefs')
             .upsert(
               {
@@ -53,8 +49,7 @@ export function useChatRoomPreferences({
                 room_id: roomId,
                 pinned: merged.pinned ?? false,
                 hidden: merged.hidden ?? false,
-                updated_at: new Date().toISOString(),
-              },
+                updated_at: new Date().toISOString() },
               { onConflict: 'user_id,room_id' },
             )
             .then(({ error }) => {
@@ -129,6 +124,5 @@ export function useChatRoomPreferences({
     persistPinnedRoomOrder,
     toggleRoomPinned,
     movePinnedRoom,
-    toggleRoomHidden,
-  };
+    toggleRoomHidden };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import type { InventoryItem } from '@/types';
 
 const WARD_MESSAGE_FAVORITES_STORAGE_PREFIX = 'erp_op_check_ward_message_favorites';
@@ -96,7 +96,7 @@ export function stripHiddenMetaBlocks(value: unknown) {
     .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
     .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
     .replace(/\[\[(?:SCHEDULE_META|BOARD_META|WARD_MESSAGE_META)\]\][\s\S]*$/g, '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/\s{2 }/g, ' ')
     .trim();
 }
 
@@ -129,8 +129,7 @@ export function normalizeWardStaffList<
       department: stripHiddenMetaBlocks(staff.department),
       position: stripHiddenMetaBlocks(staff.position),
       company: stripHiddenMetaBlocks(staff.company),
-      company_id: String(staff.company_id || '').trim() || null,
-    };
+      company_id: String(staff.company_id || '').trim() || null };
 
     if (!normalized.id || !normalized.name || normalized.id === senderId) return;
     deduped.set(normalized.id, normalized);
@@ -202,8 +201,7 @@ export function normalizeInventoryRows(rows: unknown) {
         quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity || 0),
         company: String(item.company || '').trim() || null,
         company_id: String(item.company_id || '').trim() || null,
-        department: String(item.department || '').trim() || null,
-      } as InventoryItem;
+        department: String(item.department || '').trim() || null } as InventoryItem;
     })
     .filter((item): item is InventoryItem => Boolean(item));
 }
@@ -257,11 +255,9 @@ export async function withOptionalQueryFallback<T>(
   console.warn('OP체크 선택 데이터 조회를 건너뜁니다.', {
     relationNames,
     columnNames,
-    error: result.error,
-  });
+    error: result.error });
 
   return {
     data: options.fallbackData,
-    error: null,
-  };
+    error: null };
 }

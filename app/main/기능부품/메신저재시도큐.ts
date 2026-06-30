@@ -65,8 +65,7 @@ function normalizeRetryEntry(raw: unknown): PersistedChatRetryEntry | null {
         : null,
       albumTotal: Number.isFinite(Number(payloadRecord?.albumTotal))
         ? Number(payloadRecord?.albumTotal)
-        : null,
-    },
+        : null },
     createdAt: String(record.createdAt || '') || new Date().toISOString(),
     updatedAt: String(record.updatedAt || '') || new Date().toISOString(),
     error: typeof record.error === 'string' ? record.error : null,
@@ -74,8 +73,7 @@ function normalizeRetryEntry(raw: unknown): PersistedChatRetryEntry | null {
     nextAutoRetryAt:
       typeof record.nextAutoRetryAt === 'string' && record.nextAutoRetryAt.trim()
         ? record.nextAutoRetryAt.trim()
-        : null,
-  };
+        : null };
 }
 
 function readQueueEntries(actorId: string | null | undefined): PersistedChatRetryEntry[] {
@@ -138,8 +136,7 @@ export function upsertFailedChatRetryEntry(
     updatedAt: now,
     error: params.error || null,
     attemptCount,
-    nextAutoRetryAt: buildNextAutoRetryAt(attemptCount),
-  };
+    nextAutoRetryAt: buildNextAutoRetryAt(attemptCount) };
 
   const nextEntries = sortByCreatedAt([
     ...existingEntries.filter((entry) => entry.id !== normalizedId),
@@ -205,7 +202,5 @@ export function buildRetryQueueMessage(
     staff: {
       name: user?.name || null,
       position: user?.position || null,
-      photo_url: user?.photo_url || user?.avatar_url || null,
-    },
-  } as ChatMessage;
+      photo_url: user?.photo_url || user?.avatar_url || null } } as ChatMessage;
 }

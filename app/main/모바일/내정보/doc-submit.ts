@@ -16,7 +16,7 @@
  * JM5: created_by 고정 — 본인 외 데이터 접근 금지.
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { validateDocUpload } from '@/lib/document-submission-shared';
 
@@ -61,8 +61,7 @@ export async function uploadMyDocument(params: {
 
     const uploadRes = await fetch('/api/approvals/upload', {
       method: 'POST',
-      body: uploadForm,
-    });
+      body: uploadForm });
     if (!uploadRes.ok) {
       const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
       const message = errJson.error || '파일 업로드에 실패했습니다.';
@@ -79,15 +78,14 @@ export async function uploadMyDocument(params: {
 
     // 3) document_repository insert (서류제출.tsx handleUploadSuccess 와 동일 컬럼셋).
     const title = `${str(staffName) ?? '직원'} - ${category}`;
-    const { error: dbError } = await supabase.from('document_repository').insert({
+    const { error: dbError } = await db.from('document_repository').insert({
       created_by: staffId,
       category,
       title,
       company_name: str(company) ?? '전체',
       file_url: fileUrl,
       version: 1,
-      content: null,
-    });
+      content: null });
     if (dbError) throw dbError;
 
     toast(`${category} 업로드가 완료되었습니다.`, 'success');

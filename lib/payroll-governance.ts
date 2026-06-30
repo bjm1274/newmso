@@ -120,8 +120,7 @@ export function buildPayrollVerificationReport(
         level: 'error',
         message: `${row.staffName}의 기본급이 0원입니다.`,
         staffId: row.staffId,
-        staffName: row.staffName,
-      });
+        staffName: row.staffName });
     }
 
     if (requireExactTaxTable && row.applyTax && row.exactTaxConfigured === false) {
@@ -130,8 +129,7 @@ export function buildPayrollVerificationReport(
         level: 'error',
         message: `${row.staffName}의 소득세 계산에 공식 월 원천징수표가 필요합니다.`,
         staffId: row.staffId,
-        staffName: row.staffName,
-      });
+        staffName: row.staffName });
     }
 
     if (!String(row.bankName || '').trim() || !String(row.bankAccount || '').trim()) {
@@ -140,8 +138,7 @@ export function buildPayrollVerificationReport(
         level: 'warning',
         message: `${row.staffName}의 급여 계좌 정보가 비어 있습니다.`,
         staffId: row.staffId,
-        staffName: row.staffName,
-      });
+        staffName: row.staffName });
     }
 
     if (row.deductionTotal > row.grossPay && row.grossPay > 0) {
@@ -150,8 +147,7 @@ export function buildPayrollVerificationReport(
         level: 'warning',
         message: `${row.staffName}의 공제액이 총지급액보다 큽니다.`,
         staffId: row.staffId,
-        staffName: row.staffName,
-      });
+        staffName: row.staffName });
     }
 
     if (toNumber(row.advancePay) > 0) {
@@ -160,8 +156,7 @@ export function buildPayrollVerificationReport(
         level: 'info',
         message: `${row.staffName}는 선지급 차감이 적용됩니다.`,
         staffId: row.staffId,
-        staffName: row.staffName,
-      });
+        staffName: row.staffName });
     }
   });
 
@@ -181,8 +176,7 @@ export function buildPayrollVerificationReport(
     issues,
     errorCount: issues.filter((issue) => issue.level === 'error').length,
     warningCount: issues.filter((issue) => issue.level === 'warning').length,
-    infoCount: issues.filter((issue) => issue.level === 'info').length,
-  };
+    infoCount: issues.filter((issue) => issue.level === 'info').length };
 }
 
 export function buildPayrollPolicySnapshot(params: {
@@ -203,9 +197,7 @@ export function buildPayrollPolicySnapshot(params: {
       health_insurance_rate: params.taxInsuranceRates.health_insurance_rate,
       long_term_care_rate: params.taxInsuranceRates.long_term_care_rate,
       employment_insurance_rate: params.taxInsuranceRates.employment_insurance_rate,
-      income_tax_bracket: params.taxInsuranceRates.income_tax_bracket,
-    },
-  };
+      income_tax_bracket: params.taxInsuranceRates.income_tax_bracket } };
 }
 
 export function buildMonthlyPayrollComparison(params: {
@@ -229,8 +221,7 @@ export function buildMonthlyPayrollComparison(params: {
       companyName: staff?.company || '미분류',
       taxable: toNumber(record.total_taxable),
       deduction: toNumber(record.total_deduction),
-      net: toNumber(record.net_pay),
-    };
+      net: toNumber(record.net_pay) };
   };
 
   const current = params.currentRecords.map(normalizeRecord).filter((row) => !selectedCompany || row.companyName === selectedCompany);
@@ -250,8 +241,7 @@ export function buildMonthlyPayrollComparison(params: {
       companyName: staff?.company || currentRow?.companyName || previousRow?.companyName || '미분류',
       taxableDelta: toNumber(currentRow?.taxable) - toNumber(previousRow?.taxable),
       deductionDelta: toNumber(currentRow?.deduction) - toNumber(previousRow?.deduction),
-      netDelta: toNumber(currentRow?.net) - toNumber(previousRow?.net),
-    };
+      netDelta: toNumber(currentRow?.net) - toNumber(previousRow?.net) };
   }).sort((left, right) => Math.abs(right.netDelta) - Math.abs(left.netDelta));
 
   const companyBuckets = new Map<string, PayrollComparisonCompanyDelta>();
@@ -263,8 +253,7 @@ export function buildMonthlyPayrollComparison(params: {
         previousCount: 0,
         taxableDelta: 0,
         deductionDelta: 0,
-        netDelta: 0,
-      };
+        netDelta: 0 };
       currentBucket[field] += 1;
       currentBucket.taxableDelta += row.taxable * sign;
       currentBucket.deductionDelta += row.deduction * sign;
@@ -284,6 +273,5 @@ export function buildMonthlyPayrollComparison(params: {
     deductionDelta: current.reduce((sum, row) => sum + row.deduction, 0) - previous.reduce((sum, row) => sum + row.deduction, 0),
     netDelta: current.reduce((sum, row) => sum + row.net, 0) - previous.reduce((sum, row) => sum + row.net, 0),
     companyDeltas: Array.from(companyBuckets.values()).sort((left, right) => Math.abs(right.netDelta) - Math.abs(left.netDelta)),
-    employeeDeltas: employeeDeltas.slice(0, 10),
-  };
+    employeeDeltas: employeeDeltas.slice(0, 10) };
 }

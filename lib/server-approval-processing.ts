@@ -4,8 +4,7 @@ import {
   fetchSupportInventoryRows,
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
-  summarizeSupplyRequestWorkflow,
-} from '@/app/main/inventory-utils';
+  summarizeSupplyRequestWorkflow } from '@/app/main/inventory-utils';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
@@ -22,8 +21,7 @@ import {
   staff_members as staffMembersTable,
   eq,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
@@ -68,8 +66,7 @@ function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {
   const statusMap: Record<string, { att: string; atts: string }> = {
     정상반영: { att: '정상', atts: 'present' },
     지각처리: { att: '지각', atts: 'late' },
-    결근처리: { att: '결근', atts: 'absent' },
-  };
+    결근처리: { att: '결근', atts: 'absent' } };
 
   return statusMap[correctionTypeValue] || statusMap['정상반영'];
 }
@@ -79,7 +76,7 @@ async function upsertAttendanceCorrectionRows(
 ) {
   if (correctionRows.length === 0) return;
 
-  // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+  // Phase 8-C: D1 직접 upsert — db + mirror 2단 처리 대체.
   // attendance_corrections D1 스키마는 attendance_date 보유 → 항상 onConflictDoUpdate 사용.
   // (Supabase 측 'approval_status'/'approved_by'/'approved_at' 컬럼은 D1엔 없으므로 row 매핑에서 자동 제외)
   const db = await requireD1ForApprovalProcessing('attendance_corrections.upsert');
@@ -92,8 +89,7 @@ async function upsertAttendanceCorrectionRows(
     reason: (r.reason ?? null) as string | null,
     status: (r.status ?? '대기') as string,
     requested_at: (r.requested_at ?? new Date().toISOString()) as string,
-    created_at: new Date().toISOString(),
-  }));
+    created_at: new Date().toISOString() }));
 
   await db
     .insert(attendanceCorrectionsTable)
@@ -104,9 +100,7 @@ async function upsertAttendanceCorrectionRows(
         correction_type: sql`excluded.correction_type`,
         reason: sql`excluded.reason`,
         status: sql`excluded.status`,
-        requested_at: sql`excluded.requested_at`,
-      },
-    });
+        requested_at: sql`excluded.requested_at` } });
 }
 
 async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
@@ -134,13 +128,11 @@ async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
     created_at: inventoryWorkflow?.created_at || now,
     updated_at: now,
     items: workflowItems,
-    summary,
-  };
+    summary };
 
   const nextMetaData = {
     ...(metaData || {}),
-    inventory_workflow: workflow,
-  };
+    inventory_workflow: workflow };
 
   {
     const d1 = await getD1Binding();
@@ -185,9 +177,7 @@ async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
           workflow_type: 'supply_request_fulfillment',
           source_company: INVENTORY_SUPPORT_COMPANY,
           source_department: INVENTORY_SUPPORT_DEPARTMENT,
-          summary,
-        },
-      }))
+          summary } }))
       .filter((notification) => notification.user_id);
 
     const senderNotification = item?.sender_id
@@ -199,14 +189,12 @@ async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
           metadata: {
             approval_id: item.id,
             workflow_type: 'supply_request_fulfillment',
-            summary,
-          },
-        }]
+            summary } }]
       : [];
 
     const notificationRows = [...managerNotifications, ...senderNotification];
     if (notificationRows.length > 0) {
-      // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+      // Phase 8-C: D1 직접 INSERT — db + mirror 2단 처리 대체.
       await insertNotificationsOrThrow(notificationRows as NotificationRow[]);
     }
   } catch {
@@ -232,8 +220,7 @@ export async function processFinalApprovalEffects(
       processedAt: String(lifecycle.processed_at),
       steps: [],
       warnings: [],
-      supplySummary: null,
-    };
+      supplySummary: null };
   }
 
   const startedAt = new Date().toISOString();
@@ -244,9 +231,7 @@ export async function processFinalApprovalEffects(
       started_at: startedAt,
       started_by: actorId || null,
       processed_at: null,
-      errors: [],
-    },
-  };
+      errors: [] } };
 
   {
     const d1 = await getD1Binding();
@@ -329,9 +314,8 @@ export async function processFinalApprovalEffects(
           before_value: orderCategory === '부서이동(전보)' ? currentStaffDept : currentStaffPosition,
           after_value: orderCategory === '부서이동(전보)' ? targetDept : newPosition,
           effective_date: getKoreanTodayString(),
-          approval_id: item.id,
-        };
-        // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+          approval_id: item.id };
+        // Phase 8-C: D1 직접 INSERT — db + mirror 2단 처리 대체.
         const transferDb = await requireD1ForApprovalProcessing('staff_transfer_history.insert');
         await transferDb.insert(staffTransferHistoryTable).values({
           id: crypto.randomUUID(),
@@ -341,8 +325,7 @@ export async function processFinalApprovalEffects(
           after_value: (transferRow.after_value ?? null) as string | null,
           effective_date: transferRow.effective_date,
           approval_id: (item.id ?? null) as string | null,
-          created_at: new Date().toISOString(),
-        });
+          created_at: new Date().toISOString() });
       }
 
       steps.push('personnel_order');
@@ -378,10 +361,9 @@ export async function processFinalApprovalEffects(
           delegateId: leaveSummary?.delegateId || null,
           delegateName: leaveSummary?.delegateName || null,
           delegateDepartment: leaveSummary?.delegateDepartment || null,
-          delegatePosition: leaveSummary?.delegatePosition || null,
-        });
+          delegatePosition: leaveSummary?.delegatePosition || null });
 
-        // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+        // Phase 8-C: D1 직접 upsert — db + mirror 2단 처리 대체.
         const leaveDb = await requireD1ForApprovalProcessing('leave_attendance.upsert');
 
         // 연차 신규 부여(+)인 경우, 승인 시 직원의 연차 총량(annual_leave_total) 가산 처리
@@ -414,12 +396,10 @@ export async function processFinalApprovalEffects(
                 staff_id: senderId,
                 date: dateStr,
                 status: leaveStatus.legacy,
-                created_at: new Date().toISOString(),
-              })
+                created_at: new Date().toISOString() })
               .onConflictDoUpdate({
                 target: [attendanceTable.staff_id, attendanceTable.date],
-                set: { status: sql`excluded.status` },
-              });
+                set: { status: sql`excluded.status` } });
 
             await leaveDb
               .insert(attendancesTable)
@@ -431,17 +411,14 @@ export async function processFinalApprovalEffects(
                 check_in_time: null,
                 check_out_time: null,
                 work_hours_minutes: 0,
-                created_at: new Date().toISOString(),
-              })
+                created_at: new Date().toISOString() })
               .onConflictDoUpdate({
                 target: [attendancesTable.staff_id, attendancesTable.work_date],
                 set: {
                   status: sql`excluded.status`,
                   check_in_time: sql`excluded.check_in_time`,
                   check_out_time: sql`excluded.check_out_time`,
-                  work_hours_minutes: sql`excluded.work_hours_minutes`,
-                },
-              });
+                  work_hours_minutes: sql`excluded.work_hours_minutes` } });
           }
         }
 
@@ -470,8 +447,7 @@ export async function processFinalApprovalEffects(
             company_id: item.company_id as string | null,
             title: item.title as string | null,
             meta_data: itemMetaData, // Use the latest itemMetaData
-            created_at: item.created_at as string | null,
-          };
+            created_at: item.created_at as string | null };
           const announced = await announceLeaveApprovalIfNeeded(leaveDb, approvalRow);
           if (announced) {
             steps.push('leave_immediate_announcement');
@@ -500,13 +476,12 @@ export async function processFinalApprovalEffects(
         reason: String(itemMetaData?.correction_reason || item.content || ''),
         correction_type: correctionType,
         requested_at: approvedAt,
-        status: '승인',
-      }));
+        status: '승인' }));
 
       await upsertAttendanceCorrectionRows(correctionRows);
 
       const { att, atts } = resolveAttendanceCorrectionStatusPair(correctionType);
-      // Phase 8-C: D1 직접 upsert — supabase + mirror 2단 처리 대체.
+      // Phase 8-C: D1 직접 upsert — db + mirror 2단 처리 대체.
       const fixDb = await requireD1ForApprovalProcessing('attendance_fix.upsert');
       for (const dateStr of itemMetaData.correction_dates as string[]) {
         await fixDb
@@ -516,12 +491,10 @@ export async function processFinalApprovalEffects(
             staff_id: item.sender_id as string | null,
             date: dateStr,
             status: att,
-            created_at: new Date().toISOString(),
-          })
+            created_at: new Date().toISOString() })
           .onConflictDoUpdate({
             target: [attendanceTable.staff_id, attendanceTable.date],
-            set: { status: sql`excluded.status` },
-          });
+            set: { status: sql`excluded.status` } });
 
         await fixDb
           .insert(attendancesTable)
@@ -530,12 +503,10 @@ export async function processFinalApprovalEffects(
             staff_id: item.sender_id as string,
             work_date: dateStr,
             status: atts,
-            created_at: new Date().toISOString(),
-          })
+            created_at: new Date().toISOString() })
           .onConflictDoUpdate({
             target: [attendancesTable.staff_id, attendancesTable.work_date],
-            set: { status: sql`excluded.status` },
-          });
+            set: { status: sql`excluded.status` } });
       }
 
       steps.push('attendance_fix');
@@ -554,9 +525,8 @@ export async function processFinalApprovalEffects(
         cert_type: itemMetaData.form_type as string,
         serial_no: serialNo,
         purpose: (itemMetaData.purpose as string) || '제출용',
-        issued_by: actorId || null,
-      };
-      // Phase 8-C: D1 직접 INSERT — supabase + mirror 2단 처리 대체.
+        issued_by: actorId || null };
+      // Phase 8-C: D1 직접 INSERT — db + mirror 2단 처리 대체.
       const certDb = await requireD1ForApprovalProcessing('certificate_issuances.insert');
       await certDb.insert(certificateIssuancesTable).values({
         id: crypto.randomUUID(),
@@ -565,8 +535,7 @@ export async function processFinalApprovalEffects(
         serial_no: certRow.serial_no,
         purpose: certRow.purpose,
         issued_by: certRow.issued_by,
-        issued_at: new Date().toISOString(),
-      });
+        issued_at: new Date().toISOString() });
       steps.push('certificate_issue');
     } catch (error) {
       warnings.push(`증명서 발급 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
@@ -606,8 +575,7 @@ export async function processFinalApprovalEffects(
               staff_id: staffId,
               work_date: workDate,
               shift_id: shiftId,
-              company_name: companyName || null,
-            });
+              company_name: companyName || null });
         }
         steps.push('shift_assignments_sync');
       }
@@ -639,9 +607,7 @@ export async function processFinalApprovalEffects(
           body: `${approvalTitle} 문서가 최종 승인되었습니다.`,
           metadata: {
             approval_id: String(item.id || ''),
-            approval_type: item.type ?? null,
-          },
-        } as NotificationRow]);
+            approval_type: item.type ?? null } } as NotificationRow]);
         steps.push('sender_approval_notification');
       }
     } catch {
@@ -688,9 +654,7 @@ export async function processFinalApprovalEffects(
       started_by: actorId || null,
       processed_at: processedAt,
       errors: warnings,
-      steps,
-    },
-  };
+      steps } };
 
   {
     const d1 = await getD1Binding();
@@ -709,6 +673,5 @@ export async function processFinalApprovalEffects(
     processedAt,
     steps,
     warnings,
-    supplySummary,
-  };
+    supplySummary };
 }

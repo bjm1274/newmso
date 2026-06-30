@@ -32,8 +32,7 @@ export function BannedWordModal({ onClose }: { onClose: () => void }) {
       title: '금지어 기본값 초기화',
       description: '현재 금지어 목록을 기본 금지어 목록으로 되돌립니다.',
       confirmText: '초기화',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setWords(DEFAULT_BANNED);
     saveBannedWords(DEFAULT_BANNED);

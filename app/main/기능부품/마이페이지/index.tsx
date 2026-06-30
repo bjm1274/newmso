@@ -7,8 +7,7 @@ import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import {
   calculateMonthlyAttendance,
-  type MonthlyAttendance,
-} from './출퇴근기록/attendance-utils';
+  type MonthlyAttendance } from './출퇴근기록/attendance-utils';
 
 // 기능 컴포넌트 불러오기
 import MyTodoList from './나의할일';
@@ -19,13 +18,12 @@ import {
   buildProfileSummary,
   PayrollAndCertificatesHub,
   QuickFavoriteButton,
-  TabButton,
-} from './마이페이지공통섹션';
+  TabButton } from './마이페이지공통섹션';
 import AnnualLeaveUsagePanel from './연차휴가내역';
 import HomeTabHeader, { type HomeKpiCard } from './홈탭헤더';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { sendAdminNotifications } from '@/lib/notification-utils';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -49,8 +47,7 @@ import {
   migrateStoredFavorites,
   type FavoriteEntry,
   type MainMenuId,
-  type MypageTabId,
-} from './즐겨찾기설정';
+  type MypageTabId } from './즐겨찾기설정';
 
 const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
 
@@ -122,8 +119,7 @@ function MyPageMain({
   onOpenApproval,
   setMainMenu,
   setSubView,
-  onOpenChatMessage,
-}: MyPageMainProps) {
+  onOpenChatMessage }: MyPageMainProps) {
   // 2026-05-27: chunk가 isMobile 변수 참조하는 stale 잔재 — 안전 정의
   // (현재 본문에서 사용 안 해도 컴파일된 코드의 미정의 참조 회귀 방지)
   const isMobile = useIsMobile();
@@ -177,7 +173,7 @@ function MyPageMain({
     const checkPendingContracts = async () => {
       try {
         const [{ data: nextPending }, { data: nextLatest }] = await Promise.all([
-          supabase
+          db
             .from('employment_contracts')
             .select('*')
             .eq('staff_id', user.id as string)
@@ -185,7 +181,7 @@ function MyPageMain({
             .order('requested_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
-          supabase
+          db
             .from('employment_contracts')
             .select('*')
             .eq('staff_id', user.id as string)
@@ -227,7 +223,7 @@ function MyPageMain({
     // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
     const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendance')
         .select('check_in, check_out, status, date')
         .eq('staff_id', userId as string)
@@ -248,7 +244,7 @@ function MyPageMain({
     if (!user?.id) return;
     const loadBalance = async () => {
       try {
-        const { data } = await supabase
+        const { data } = await db
           .from('leave_balances')
           .select('expired_days, compensated_days')
           .eq('staff_id', user.id)
@@ -257,8 +253,7 @@ function MyPageMain({
         if (data) {
           setLeaveBalance({
             expired: Number(data.expired_days) || 0,
-            compensated: Number(data.compensated_days) || 0,
-          });
+            compensated: Number(data.compensated_days) || 0 });
         }
       } catch {
         // ignore
@@ -296,7 +291,7 @@ function MyPageMain({
     const currentUserId = typeof user?.id === 'string' ? user.id : null;
     if (!pendingContract || !currentUserId) return;
     try {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('employment_contracts')
         .update({
           status: '서명완료',
@@ -311,7 +306,7 @@ function MyPageMain({
         throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);
       }
 
-      const { data: checklistRows } = await supabase
+      const { data: checklistRows } = await db
         .from('onboarding_checklists')
         .select('id, checklist_type, items, target_date')
         .eq('staff_id', currentUserId);
@@ -327,17 +322,15 @@ function MyPageMain({
         {
           status: '서명완료',
           requestedAt: (pendingContract.requested_at as string) || null,
-          signedAt,
-        },
+          signedAt },
       );
-      const { error: checklistError } = await supabase.from('onboarding_checklists').upsert(
+      const { error: checklistError } = await db.from('onboarding_checklists').upsert(
         {
           staff_id: currentUserId,
           checklist_type: '입사',
           items: syncedItems,
           target_date: entryChecklistRow?.target_date ?? null,
-          completed_at: isChecklistComplete(syncedItems) ? signedAt : null,
-        },
+          completed_at: isChecklistComplete(syncedItems) ? signedAt : null },
         { onConflict: 'staff_id,checklist_type' },
       );
 
@@ -349,7 +342,7 @@ function MyPageMain({
       // 서명 이미지·주소·연락처 PII 가 포함되므로 저장 직전 암호화(키 미설정 시 평문 폴백)
       const { encryptContract } = await import('@/lib/contract-crypto');
       const encryptedContractText = await encryptContract(contractText);
-      const { error: insertDocError } = await supabase.from('document_repository').insert({
+      const { error: insertDocError } = await db.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
         category: '계약서',
         content: encryptedContractText,
@@ -368,8 +361,7 @@ function MyPageMain({
         type: 'SUCCESS',
         title: '계약서 서명 완료',
         body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
-        dedupeKey: `contract-signed:${pendingContract.id}`,
-      }]);
+        dedupeKey: `contract-signed:${pendingContract.id}` }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
@@ -378,8 +370,7 @@ function MyPageMain({
         ...pendingContract,
         status: '서명완료',
         signed_at: signedAt,
-        signature_data: signatureDataUrl,
-      });
+        signature_data: signatureDataUrl });
       setShowSignaturePad(false);
     } catch (e) {
       console.error('[마이페이지] 근로계약서 서명 저장 실패:', e);
@@ -485,8 +476,7 @@ function MyPageMain({
       employee_no: (user as Record<string, unknown> | undefined)?.employee_no,
       photo_url: (user as Record<string, unknown> | undefined)?.photo_url,
       avatar_url: (user as Record<string, unknown> | undefined)?.avatar_url,
-      profile_photo_updated_at: (user as Record<string, unknown> | undefined)?.profile_photo_updated_at,
-    }),
+      profile_photo_updated_at: (user as Record<string, unknown> | undefined)?.profile_photo_updated_at }),
     [
       (user as Record<string, unknown> | undefined)?.id,
       (user as Record<string, unknown> | undefined)?.name,
@@ -663,17 +653,14 @@ function MyPageMain({
         cancelText: '취소',
         inputType: 'password',
         required: true,
-        placeholder: '현재 비밀번호',
-      });
+        placeholder: '현재 비밀번호' });
       if (!input) return false;
 
       const response = await fetch('/api/auth/verify-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          password: input,
-        }),
-      });
+          password: input }) });
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
@@ -718,8 +705,7 @@ function MyPageMain({
       cancelText: '취소',
       inputType: 'password',
       required: true,
-      placeholder: '현재 비밀번호',
-    });
+      placeholder: '현재 비밀번호' });
     if (!currentPassword) return;
 
     const nextPassword = await openPrompt({
@@ -730,8 +716,7 @@ function MyPageMain({
       inputType: 'password',
       required: true,
       placeholder: '새 비밀번호',
-      helperText: '4자 이상 입력해 주세요.',
-    });
+      helperText: '4자 이상 입력해 주세요.' });
     if (!nextPassword) return;
     if (nextPassword.trim().length < 4) {
       toast('새 비밀번호는 4자 이상 입력해 주세요.', 'warning');
@@ -745,8 +730,7 @@ function MyPageMain({
       cancelText: '취소',
       inputType: 'password',
       required: true,
-      placeholder: '새 비밀번호 확인',
-    });
+      placeholder: '새 비밀번호 확인' });
     if (!nextPasswordConfirm) return;
 
     if (nextPassword !== nextPasswordConfirm) {
@@ -758,8 +742,7 @@ function MyPageMain({
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword: nextPassword }),
-      });
+        body: JSON.stringify({ currentPassword, newPassword: nextPassword }) });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
         toast(payload?.error || '비밀번호 변경에 실패했습니다.', 'error');
@@ -777,8 +760,7 @@ function MyPageMain({
       description: '현재 계정에서 로그아웃합니다. 계속할까요?',
       confirmText: '로그아웃',
       cancelText: '취소',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!shouldLogout) return;
 
     await performClientLogout();
@@ -825,11 +807,9 @@ function MyPageMain({
       value: monthlyAttendance
         ? {
             main: String(monthlyAttendance.present),
-            fraction: `/${monthlyAttendance.total}`,
-          }
+            fraction: `/${monthlyAttendance.total}` }
         : null,
-      onClick: isRetired ? undefined : () => setActiveTab('commute'),
-    },
+      onClick: isRetired ? undefined : () => setActiveTab('commute') },
     {
       key: 'leave',
       label: '연차휴가',
@@ -837,8 +817,7 @@ function MyPageMain({
       icon: 'CalendarDays',
       tone: 'success',
       value: { main: String(leaveRemaining), unit: '일' },
-      onClick: isRetired ? undefined : () => setActiveTab('leave'),
-    },
+      onClick: isRetired ? undefined : () => setActiveTab('leave') },
     {
       key: 'salary',
       label: '급여명세서',
@@ -849,8 +828,7 @@ function MyPageMain({
       onClick: () => {
         setRecordsView('salary');
         setActiveTab('records');
-      },
-    },
+      } },
     {
       key: 'certificates',
       label: '증명서',
@@ -861,16 +839,14 @@ function MyPageMain({
       onClick: () => {
         setRecordsView('certificates');
         setActiveTab('records');
-      },
-    },
+      } },
     {
       key: 'approvals',
       label: '미결재',
       sub: '결재 대기중',
       icon: 'FileWarning',
       tone: 'warn',
-      value: { main: String(pendingApprovalCount), unit: '건' },
-    },
+      value: { main: String(pendingApprovalCount), unit: '건' } },
   ];
 
   return (
@@ -1178,8 +1154,7 @@ function MyPageMain({
                 onOpenApproval?.({
                   type: '출결정정',
                   viewMode: '작성하기',
-                  dates: [log.date || log.work_date].filter(Boolean),
-                })
+                  dates: [log.date || log.work_date].filter(Boolean) })
               }
               />
             </div>

@@ -10,35 +10,41 @@ import {
   STOCK_WORKCENTER_IDS,
   STOCK_WORKCENTER_META,
   resolveWorkcenterId,
-  type StockWorkcenterId,
-} from './stock-types';
+  type StockWorkcenterId } from './stock-types';
 
 // dynamic import로 워크센터당 별도 번들 분리 (JM2 — 초기 페이로드 최소화)
 const Loading = () => null;
 
 const StatusWorkcenter = dynamic(() => import('./StatusWorkcenter'), {
   ssr: false,
-  loading: Loading,
-});
-const IOWorkcenter = dynamic(() => import('./IOWorkcenter'), {
+  loading: Loading });
+const InoutWorkcenter = dynamic(() => import('./InoutWorkcenter'), {
   ssr: false,
-  loading: Loading,
-});
-const ItemWorkcenter = dynamic(() => import('./ItemWorkcenter'), {
+  loading: Loading });
+const OrderWorkcenter = dynamic(() => import('./OrderWorkcenter'), {
   ssr: false,
-  loading: Loading,
-});
+  loading: Loading });
+const AuditWorkcenter = dynamic(() => import('./AuditWorkcenter'), {
+  ssr: false,
+  loading: Loading });
+const UdiWorkcenter = dynamic(() => import('./UdiWorkcenter'), {
+  ssr: false,
+  loading: Loading });
+const MasterWorkcenter = dynamic(() => import('./MasterWorkcenter'), {
+  ssr: false,
+  loading: Loading });
 const AnalyzeWorkcenter = dynamic(() => import('./AnalyzeWorkcenter'), {
   ssr: false,
-  loading: Loading,
-});
+  loading: Loading });
 
 export const STOCK_WORKCENTER_MAP: Record<StockWorkcenterId, ComponentType> = {
   status: StatusWorkcenter,
-  io: IOWorkcenter,
-  item: ItemWorkcenter,
-  analyze: AnalyzeWorkcenter,
-};
+  inout: InoutWorkcenter,
+  order: OrderWorkcenter,
+  audit: AuditWorkcenter,
+  udi: UdiWorkcenter,
+  master: MasterWorkcenter,
+  analyze: AnalyzeWorkcenter };
 
 /**
  * 사이드바2 id(정식 또는 기존 한글) → 워크센터 컴포넌트
@@ -54,9 +60,11 @@ export {
   STOCK_WORKCENTER_META,
   resolveWorkcenterId,
   StatusWorkcenter,
-  IOWorkcenter,
-  ItemWorkcenter,
-  AnalyzeWorkcenter,
-};
+  InoutWorkcenter,
+  OrderWorkcenter,
+  AuditWorkcenter,
+  UdiWorkcenter,
+  MasterWorkcenter,
+  AnalyzeWorkcenter };
 
 export type { StockWorkcenterId } from './stock-types';

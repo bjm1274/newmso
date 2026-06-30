@@ -8,8 +8,7 @@ import {
   staff_members as staffMembersTable,
   eq,
   and,
-  inArray,
-} from './db';
+  inArray } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 /**
@@ -77,8 +76,7 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
         ? null
         : JSON.stringify(row.metadata),
     read_at: row.read_at ?? null,
-    created_at: row.created_at ?? new Date().toISOString(),
-  };
+    created_at: row.created_at ?? new Date().toISOString() };
 }
 
 async function requireD1ForContractJobs(label: string) {
@@ -171,8 +169,7 @@ function extractCandidatesForStaff(row: StaffRow, today: Date): ExpiryCandidate[
           staffDepartment,
           staffPosition,
           kind: 'probation',
-          expiryDate: probationEnd,
-        });
+          expiryDate: probationEnd });
       }
     }
   }
@@ -191,8 +188,7 @@ function extractCandidatesForStaff(row: StaffRow, today: Date): ExpiryCandidate[
           staffDepartment,
           staffPosition,
           kind: 'contract',
-          expiryDate: contractEndRaw.slice(0, 10),
-        });
+          expiryDate: contractEndRaw.slice(0, 10) });
       }
     }
   }
@@ -244,10 +240,8 @@ function buildNotification(
       staff_name: candidate.staffName,
       expiry_date: candidate.expiryDate,
       dedup_key: dedupKey,
-      days_left: LEAD_DAYS,
-    },
-    read_at: null,
-  };
+      days_left: LEAD_DAYS },
+    read_at: null };
 }
 
 /** 메인 잡. */
@@ -278,8 +272,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
         join_date: staffMembersTable.join_date,
         status: staffMembersTable.status,
         role: staffMembersTable.role,
-        permissions: staffMembersTable.permissions,
-      })
+        permissions: staffMembersTable.permissions })
       .from(staffMembersTable);
     // permissions는 D1에서 TEXT(JSON) → 파싱
     rows = staffRows.map((r) => {
@@ -302,8 +295,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
         join_date: r.join_date ?? null,
         status: r.status ?? null,
         role: r.role ?? null,
-        permissions,
-      };
+        permissions };
     });
   }
 
@@ -329,8 +321,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
       scanned: rows.length,
       sent: 0,
       skipped: candidates.length,
-      errors: ['no_admin_recipients'],
-    };
+      errors: ['no_admin_recipients'] };
   }
 
   // 중복 방지: 이미 발송된 (수신자|staff|kind|expiryDate) 조합 조회.
@@ -400,8 +391,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
       scanned: rows.length,
       sent: 0,
       skipped: candidates.length * adminIds.length,
-      errors: [],
-    };
+      errors: [] };
   }
 
   const errors: string[] = [];
@@ -424,8 +414,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
     scanned: rows.length,
     sent,
     skipped: candidates.length * adminIds.length - sent,
-    errors,
-  };
+    errors };
 }
 
 export async function runContractExpiryJobs(): Promise<ContractExpiryJobResult> {

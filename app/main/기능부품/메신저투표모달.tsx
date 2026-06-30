@@ -66,8 +66,7 @@ export function PollComposerModal({
   kickTargetId,
   onKickTargetIdChange,
   onClose,
-  onSubmit,
-}: PollComposerModalProps) {
+  onSubmit }: PollComposerModalProps) {
   if (!open) return null;
 
   return (
@@ -232,8 +231,7 @@ export function SlashCommandModal({
   onFieldChange,
   onClose,
   onSubmitAnnualLeave,
-  onSubmitPurchase,
-}: SlashCommandModalProps) {
+  onSubmitPurchase }: SlashCommandModalProps) {
   if (!open || !command) return null;
 
   return (

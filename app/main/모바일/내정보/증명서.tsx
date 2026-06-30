@@ -86,8 +86,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                     padding: '14px 16px',
                     borderBottom: '1px solid var(--border)',
                     opacity: issuingId && !busy ? 0.5 : 1,
-                    cursor: issuingId ? 'default' : 'pointer',
-                  }}
+                    cursor: issuingId ? 'default' : 'pointer' }}
                 >
                   <div
                     style={{
@@ -95,8 +94,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                       height: 36,
                       color: 'var(--m-accent)',
                       display: 'grid',
-                      placeItems: 'center',
-                    }}
+                      placeItems: 'center' }}
                   >
                     <MIcon name={doc.icon} size={18} />
                   </div>
@@ -116,8 +114,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                       borderRadius: 999,
                       background: 'rgba(29, 78, 216, 0.05)',
                       color: 'var(--m-accent)',
-                      border: '1px solid rgba(29, 78, 216, 0.1)',
-                    }}
+                      border: '1px solid rgba(29, 78, 216, 0.1)' }}
                   >
                     {busy ? '발급 중…' : '발급'}
                   </span>
@@ -148,8 +145,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                   alignItems: 'center',
                   gap: 12,
                   padding: '14px 16px',
-                  borderBottom: '1px solid var(--border)',
-                }}
+                  borderBottom: '1px solid var(--border)' }}
               >
                 <div
                   style={{
@@ -157,8 +153,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                     height: 36,
                     color: 'var(--m-accent)',
                     display: 'grid',
-                    placeItems: 'center',
-                  }}
+                    placeItems: 'center' }}
                 >
                   <MIcon name="fileText" size={18} />
                 </div>
@@ -177,8 +172,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
                     padding: '4px 12px',
                     borderRadius: 999,
                     background: 'var(--m-success-soft)',
-                    color: 'var(--m-success)',
-                  }}
+                    color: 'var(--m-success)' }}
                 >
                   완료
                 </span>

@@ -26,8 +26,7 @@ export default function PostMoreMenu({
   onBookmark,
   onEdit,
   onShareToChat,
-  onDelete,
-}: PostMoreMenuProps) {
+  onDelete }: PostMoreMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

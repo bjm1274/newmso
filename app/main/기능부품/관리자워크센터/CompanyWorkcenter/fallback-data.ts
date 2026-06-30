@@ -11,8 +11,7 @@ import type {
   TemplateItem,
   HolidayItem,
   RuleRow,
-  DocRow,
-} from './types';
+  DocRow } from './types';
 
 export const FALLBACK_COMPANY: CompanyInfo = {
   bizNo: '123-45-67890',
@@ -21,8 +20,7 @@ export const FALLBACK_COMPANY: CompanyInfo = {
   address: '서울특별시 강남구 테헤란로 213',
   phone: '02-1234-5678',
   fax: '02-1234-5679',
-  hospitalCode: '11135-001',
-};
+  hospitalCode: '11135-001' };
 
 export const FALLBACK_CORPS: CorpItem[] = [
   { name: '박철홍정형외과', kind: '본사·진료', emp: 18, primary: true },

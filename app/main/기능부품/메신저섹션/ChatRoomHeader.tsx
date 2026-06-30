@@ -41,8 +41,7 @@ export function ChatRoomHeader({
   onOpenPollModal,
   onOpenApprovalDraft,
   onOpenMediaArchive,
-  onOpenDrawer,
-}: ChatRoomHeaderProps) {
+  onOpenDrawer }: ChatRoomHeaderProps) {
   return (
     <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
       <div className="flex items-center gap-3 min-w-0">

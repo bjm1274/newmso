@@ -5,17 +5,16 @@
  *
  * JM: 단일 책임(탭 컨테이너 + fetch), 250줄 이내
  * JM3: fetch 실패는 정상 흐름 — fallback 유지, 사용자에게 "샘플 표시" 노출
- * JM4: any 금지, supabase row 검증
+ * JM4: any 금지, db row 검증
  * JM6: 카드 그리드 role=list / listitem
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import IntegrationCard, {
   type Integration,
   type IntegrationStatus,
-  type IntegrationVendor,
-} from './IntegrationCard';
+  type IntegrationVendor } from './IntegrationCard';
 
 // ─── fallback 6개 (사용자 명세) ───────────────────────────────────
 const FALLBACK_INTEGRATIONS: Integration[] = [
@@ -25,48 +24,42 @@ const FALLBACK_INTEGRATIONS: Integration[] = [
     name: '카카오 알림톡',
     sub: '발송 12,840건/월 · 발신 프로필 sy_inc',
     status: 'connected',
-    lastSyncedLabel: '5분 전',
-  },
+    lastSyncedLabel: '5분 전' },
   {
     id: 'int-naver-works',
     vendor: 'naver-works',
     name: '네이버웍스',
     sub: '메시지 4,210건/월 · OAuth 활성',
     status: 'connected',
-    lastSyncedLabel: '12분 전',
-  },
+    lastSyncedLabel: '12분 전' },
   {
     id: 'int-slack',
     vendor: 'slack',
     name: '슬랙',
     sub: '채널 6개 연결 · #mso-알림 외 5',
     status: 'connected',
-    lastSyncedLabel: '1분 전',
-  },
+    lastSyncedLabel: '1분 전' },
   {
     id: 'int-hometax',
     vendor: 'hometax',
     name: '홈택스',
     sub: '세금계산서 발송 · 원천징수 자동화',
     status: 'connected',
-    lastSyncedLabel: '오늘 09:00',
-  },
+    lastSyncedLabel: '오늘 09:00' },
   {
     id: 'int-edi',
     vendor: 'edi',
     name: 'EDI 4대보험',
     sub: 'EDI 신고 자동화 · 국민·건강·고용·산재',
     status: 'connected',
-    lastSyncedLabel: '오늘 08:30',
-  },
+    lastSyncedLabel: '오늘 08:30' },
   {
     id: 'int-bank',
     vendor: 'bank',
     name: '시중은행',
     sub: '자동 이체 · 펌뱅킹 — 설정 필요',
     status: 'disconnected',
-    lastSyncedLabel: '연결 안됨',
-  },
+    lastSyncedLabel: '연결 안됨' },
 ];
 
 // ─── 검증 헬퍼 (JM4) ──────────────────────────────────────────────
@@ -105,7 +98,7 @@ function toIntegration(row: unknown): Integration | null {
   return { id, vendor, name, sub, status, lastSyncedLabel };
 }
 
-// ─── fetch hook: supabase 우선, 실패·빈 결과 시 fallback ─────────
+// ─── fetch hook: db 우선, 실패·빈 결과 시 fallback ─────────
 function useIntegrations(): {
   integrations: Integration[];
   loading: boolean;
@@ -119,7 +112,7 @@ function useIntegrations(): {
     let alive = true;
     (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('external_integrations')
           .select('id, vendor, name, sub, status, last_synced_label')
           .order('vendor', { ascending: true });
@@ -156,8 +149,7 @@ interface IntegrationsTabProps {
 export default function IntegrationsTab({
   onConfigure,
   onConnect,
-  onDisconnect,
-}: IntegrationsTabProps) {
+  onDisconnect }: IntegrationsTabProps) {
   const { integrations, loading, source } = useIntegrations();
   const connectedCount = integrations.filter((i) => i.status === 'connected').length;
 

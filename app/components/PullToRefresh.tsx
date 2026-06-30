@@ -47,8 +47,7 @@ export function PullToRefresh({
   children,
   className,
   disabled = false,
-  contentClassName,
-}: PullToRefreshProps) {
+  contentClassName }: PullToRefreshProps) {
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startYRef = useRef<number | null>(null);
@@ -147,8 +146,7 @@ export function PullToRefresh({
         style={{
           height: threshold,
           transform: `translateY(${indicatorOffset}px)`,
-          transition: startYRef.current === null ? 'transform 200ms ease-out' : 'none',
-        }}
+          transition: startYRef.current === null ? 'transform 200ms ease-out' : 'none' }}
       >
         <span
           className={[
@@ -178,8 +176,7 @@ export function PullToRefresh({
         style={{
           transform: `translateY(${pullDistance}px)`,
           transition: startYRef.current === null ? 'transform 200ms ease-out' : 'none',
-          willChange: 'transform',
-        }}
+          willChange: 'transform' }}
       >
         {children}
       </div>

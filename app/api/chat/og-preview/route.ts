@@ -91,11 +91,9 @@ export async function GET(request: NextRequest) {
     let response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ERPBot/1.0)',
-        Accept: 'text/html',
-      },
+        Accept: 'text/html' },
       signal: AbortSignal.timeout(5000),
-      redirect: 'manual',
-    });
+      redirect: 'manual' });
 
     // 리다이렉트 응답(3xx)이면 Location을 isPublicHttpUrl로 재검증 후 1회만 재요청
     if (response.status >= 300 && response.status < 400) {
@@ -115,11 +113,9 @@ export async function GET(request: NextRequest) {
       response = await fetch(redirectUrl.href, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; ERPBot/1.0)',
-          Accept: 'text/html',
-        },
+          Accept: 'text/html' },
         signal: AbortSignal.timeout(5000),
-        redirect: 'manual',
-      });
+        redirect: 'manual' });
       // 재요청에서도 3xx이면 루프 방지를 위해 빈 OG 반환
       if (response.status >= 300 && response.status < 400) {
         return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
@@ -159,8 +155,7 @@ export async function GET(request: NextRequest) {
       title: extractMeta(html, 'og:title') || extractTitle(html),
       description: extractMeta(html, 'og:description') || extractMeta(html, 'description'),
       image: extractMeta(html, 'og:image'),
-      siteName: extractMeta(html, 'og:site_name'),
-    };
+      siteName: extractMeta(html, 'og:site_name') };
 
     // 상대 경로 이미지를 절대 경로로 변환
     if (ogData.image && !ogData.image.startsWith('http')) {
@@ -183,8 +178,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(ogData, {
-      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
-    });
+      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' } });
   } catch {
     return NextResponse.json({ url, title: null, description: null, image: null, siteName: null });
   }

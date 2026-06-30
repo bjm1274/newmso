@@ -193,8 +193,7 @@ export function normalizeProfileUser<T>(source: T): T {
     avatar_url: photoUrl,
     photo_url: photoUrl,
     employ_type: employType,
-    employment_type: employType,
-  } as Record<string, any>;
+    employment_type: employType } as Record<string, any>;
 
   for (const key of STAFF_SALARY_KEYS) {
     const topLevelValue = cleanFiniteNumber(base[key]);
@@ -228,9 +227,7 @@ export function withProfilePhotoMetadata<T>(
     permissions: {
       ...permissions,
       profile_photo_path: photoPath,
-      profile_photo_updated_at: photoUpdatedAt,
-    },
+      profile_photo_updated_at: photoUpdatedAt },
     profile_photo_path: photoPath,
-    profile_photo_updated_at: photoUpdatedAt,
-  } as T);
+    profile_photo_updated_at: photoUpdatedAt } as T);
 }

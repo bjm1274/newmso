@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActive } from '../MemberWorkcenter/data';
 import {
@@ -20,8 +20,7 @@ import {
   aggregateHourlyInOut,
   getTodayIso,
   resolveAttendanceStatus,
-  type AttendanceRow,
-} from './data';
+  type AttendanceRow } from './data';
 import AttendHourlyChart from './AttendHourlyChart';
 
 interface AttendDashboardProps {
@@ -59,7 +58,7 @@ export default function AttendDashboard({ staffs, selectedCo, rowsOverride }: At
         setRows([]);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendances')
         .select('staff_id, work_date, status, check_in_time, check_out_time')
         .in('staff_id', staffIds)
@@ -103,8 +102,7 @@ export default function AttendDashboard({ staffs, selectedCo, rowsOverride }: At
         id: String(row.staff_id),
         name: staff.name ?? '직원',
         status,
-        checkIn: row.check_in_time,
-      });
+        checkIn: row.check_in_time });
     }
     return list;
   }, [scopedStaffs, effectiveRows]);

@@ -23,8 +23,7 @@ export default function ReadStatusModal({
   readers,
   pending,
   loading,
-  onClose,
-}: ReadStatusModalProps) {
+  onClose }: ReadStatusModalProps) {
   if (isAnonymousReadStatusPost(post)) return null;
 
   return (

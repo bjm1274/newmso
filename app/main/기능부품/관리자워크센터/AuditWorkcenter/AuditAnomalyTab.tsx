@@ -42,8 +42,7 @@ function parseRow(r: ApiAnomalyRow): AnomalyCard | null {
     when: typeof r.when === 'string' ? r.when : '',
     tone: toneStr,
     reason,
-    recommend,
-  };
+    recommend };
 }
 
 export default function AuditAnomalyTab() {

@@ -3,8 +3,7 @@ import { createChatAttachmentUploadPlan } from '@/lib/object-storage';
 import {
   normalizeSessionUser,
   readSessionFromRequest,
-  resolveLatestSessionUser,
-} from '@/lib/server-session';
+  resolveLatestSessionUser } from '@/lib/server-session';
 
 /**
  * POST /api/submission/upload
@@ -112,8 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       url: plan.url,
       headers: plan.headers,
       path: plan.path,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    });
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() });
   } catch (err) {
     const message = err instanceof Error ? err.message : '서류 제출 업로드 오류';
     return NextResponse.json({ error: message }, { status: 500 });

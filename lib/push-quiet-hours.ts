@@ -54,8 +54,7 @@ function getTimeZoneDateTimeParts(
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hourCycle: 'h23',
-  });
+    hourCycle: 'h23' });
   const parts = formatter.formatToParts(date);
 
   return {
@@ -64,8 +63,7 @@ function getTimeZoneDateTimeParts(
     day: Number(parts.find((part) => part.type === 'day')?.value || '0'),
     hour: Number(parts.find((part) => part.type === 'hour')?.value || '0'),
     minute: Number(parts.find((part) => part.type === 'minute')?.value || '0'),
-    second: Number(parts.find((part) => part.type === 'second')?.value || '0'),
-  };
+    second: Number(parts.find((part) => part.type === 'second')?.value || '0') };
 }
 
 function toUtcComparableValue(parts: TimeZoneDateTimeParts) {
@@ -125,8 +123,7 @@ export function getNextPushQuietHoursEnd(now = new Date()) {
     day: targetDay.getUTCDate(),
     hour: PUSH_QUIET_HOURS_END_HOUR,
     minute: 0,
-    second: 0,
-  });
+    second: 0 });
 }
 
 export function shouldDeferStaleChatPush(messageCreatedAt: string | Date, now = new Date()) {
@@ -136,27 +133,23 @@ export function shouldDeferStaleChatPush(messageCreatedAt: string | Date, now = 
   if (Number.isNaN(createdAt.getTime())) {
     return {
       defer: false as const,
-      resumeAt: null,
-    };
+      resumeAt: null };
   }
 
   if (!isWithinPushQuietHours(now)) {
     return {
       defer: false as const,
-      resumeAt: null,
-    };
+      resumeAt: null };
   }
 
   const ageMinutes = (now.getTime() - createdAt.getTime()) / (60 * 1000);
   if (ageMinutes < STALE_CHAT_PUSH_DEFER_MINUTES) {
     return {
       defer: false as const,
-      resumeAt: null,
-    };
+      resumeAt: null };
   }
 
   return {
     defer: true as const,
-    resumeAt: getNextPushQuietHoursEnd(now),
-  };
+    resumeAt: getNextPushQuietHoursEnd(now) };
 }

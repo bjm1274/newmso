@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -64,8 +64,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <MobileHeader title="직원평가" sub="상반기 평가 기간" back={onBack} />
 
@@ -73,8 +72,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
         className="macos-glass"
         style={{
           padding: '12px 16px',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        }}
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}
       >
         <div
           style={{
@@ -82,8 +80,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
             background: 'rgba(0, 0, 0, 0.04)',
             borderRadius: '999px',
             padding: 2,
-            position: 'relative',
-          }}
+            position: 'relative' }}
         >
           <button
             type="button"
@@ -100,8 +97,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
               color: tab === 'target' ? 'var(--foreground)' : 'var(--z-600)',
               boxShadow: tab === 'target' ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
+              transition: 'all 0.2s ease' }}
           >
             평가 대상 {targetCount}
           </button>
@@ -120,8 +116,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
               color: tab === 'result' ? 'var(--foreground)' : 'var(--z-600)',
               boxShadow: tab === 'result' ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
+              transition: 'all 0.2s ease' }}
           >
             결과
           </button>
@@ -148,8 +143,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
                   border: '1px solid rgba(0, 0, 0, 0.07)',
                   borderRadius: '14px',
                   padding: '8px 12px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                }}
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)' }}
               >
                 <select
                   id="dept-select"
@@ -163,8 +157,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
                     fontWeight: 800,
                     color: 'var(--foreground)',
                     outline: 'none',
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <option value="all">전체 팀</option>
                   {groups.map((g) => (
@@ -194,8 +187,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
                     background: 'rgba(255, 255, 255, 0.65)',
                     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
                     transition: 'all 0.2s ease',
-                    borderRadius: '16px',
-                  }}
+                    borderRadius: '16px' }}
                 >
                   <MAvatar tone={pickTone(m.id)} size="sm">{m.name.charAt(0)}</MAvatar>
                   <div style={{ minWidth: 0, flex: 1 }}>
@@ -232,8 +224,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
                 borderLeft: '4px solid var(--m-accent)',
                 border: '1px solid rgba(0, 122, 255, 0.15)',
                 background: 'rgba(0, 122, 255, 0.04)',
-                borderRadius: '12px',
-              }}
+                borderRadius: '12px' }}
             >
               <MIcon name="info" size={18} />
               <span>상세 분석 · HR DB 반영은 데스크톱에서 확인하세요.</span>
@@ -248,8 +239,7 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
 function EvalWriteForm({
   user,
   target,
-  onClose,
-}: {
+  onClose }: {
   user: ErpUser;
   target: OrgMember;
   onClose: () => void;
@@ -275,15 +265,13 @@ function EvalWriteForm({
         category: v.category,
         content: v.comment.trim(),
         score,
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'staff_evaluations',
         payload,
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
       if (queued) { toast('오프라인 — 평가 대기 중', 'info'); onClose(); return; }
@@ -300,8 +288,7 @@ function EvalWriteForm({
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <div
         className="macos-glass"
@@ -313,8 +300,7 @@ function EvalWriteForm({
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           position: 'sticky',
           top: 0,
-          zIndex: 99,
-        }}
+          zIndex: 99 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
@@ -330,8 +316,7 @@ function EvalWriteForm({
               borderRadius: 8,
               background: 'rgba(0, 0, 0, 0.03)',
               border: '1px solid rgba(0, 0, 0, 0.05)',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="chevL" size={18} color="var(--z-600)" />
           </button>
@@ -354,8 +339,7 @@ function EvalWriteForm({
             gap: 20,
             border: '1px solid rgba(0, 0, 0, 0.06)',
             background: 'rgba(255, 255, 255, 0.65)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.04)',
-          }}
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.04)' }}
         >
           <div>
             <label style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '0.02em', display: 'block', marginBottom: 8 }}>
@@ -369,8 +353,7 @@ function EvalWriteForm({
                 padding: 2.5,
                 gap: 2,
                 overflowX: 'auto',
-                scrollbarWidth: 'none',
-              }}
+                scrollbarWidth: 'none' }}
             >
               {CATEGORIES.map((cat) => {
                 const active = v.category === cat;
@@ -392,8 +375,7 @@ function EvalWriteForm({
                       boxShadow: active ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap',
-                    }}
+                      whiteSpace: 'nowrap' }}
                   >
                     {cat}
                   </button>
@@ -412,8 +394,7 @@ function EvalWriteForm({
                 background: 'rgba(0, 0, 0, 0.04)',
                 borderRadius: '999px',
                 padding: 2.5,
-                gap: 2,
-              }}
+                gap: 2 }}
             >
               {SCORES.map((sc) => {
                 const active = v.score === sc;
@@ -434,8 +415,7 @@ function EvalWriteForm({
                       color: active ? 'var(--foreground)' : 'var(--z-600)',
                       boxShadow: active ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
+                      transition: 'all 0.15s ease' }}
                   >
                     {sc}점
                   </button>
@@ -456,8 +436,7 @@ function EvalWriteForm({
                 borderRadius: '16px',
                 padding: '12px 14px',
                 boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.02)',
-                transition: 'border-color 0.2s ease',
-              }}
+                transition: 'border-color 0.2s ease' }}
             >
               <textarea
                 value={v.comment}
@@ -473,8 +452,7 @@ function EvalWriteForm({
                   color: 'var(--foreground)',
                   outline: 'none',
                   resize: 'none',
-                  lineHeight: 1.5,
-                }}
+                  lineHeight: 1.5 }}
               />
             </div>
           </div>
@@ -497,8 +475,7 @@ function EvalWriteForm({
               cursor: saving ? 'default' : 'pointer',
               opacity: saving ? 0.7 : 1,
               transition: 'all 0.2s ease',
-              marginTop: 6,
-            }}
+              marginTop: 6 }}
           >
             {saving ? '저장 중…' : '실시간 기록 저장'}
           </button>

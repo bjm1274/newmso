@@ -56,8 +56,7 @@ export default function AdminForms({ user, staffs, formType, extraData, setExtra
       ...p,
       resignDate,
       handoverTarget,
-      resignReason: finalReason,
-    }));
+      resignReason: finalReason }));
 
     if (setFormTitle) {
       setFormTitle(`사직서 (${formUser?.name || ''})`);

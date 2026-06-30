@@ -4,16 +4,14 @@ export const EMPLOYEE_INSURANCE_RATES_2026 = {
   nationalPension: 0.0475,
   healthInsurance: 0.03595,
   longTermCare: 0.004724,
-  employmentInsurance: 0.009,
-} as const;
+  employmentInsurance: 0.009 } as const;
 
 export const EMPLOYER_INSURANCE_RATES_2026 = {
   nationalPension: 0.0475,
   healthInsurance: 0.03595,
   longTermCare: 0.004724,
   employmentInsuranceMin: 0.0115,
-  employmentInsuranceMax: 0.0175,
-} as const;
+  employmentInsuranceMax: 0.0175 } as const;
 
 export const LONG_TERM_CARE_HEALTH_RATIO_2026 = 0.1314;
 export const COMMUTE_ACCIDENT_RATE_2026 = 0.0006;
@@ -50,8 +48,7 @@ export function getIndustrialAccidentInsuranceInfo(companyName?: unknown): Indus
       businessRate: 0.008,
       commuteRate: COMMUTE_ACCIDENT_RATE_2026,
       employerRate: 0.0086,
-      employeeRate: 0,
-    };
+      employeeRate: 0 };
   }
 
   if (
@@ -66,8 +63,7 @@ export function getIndustrialAccidentInsuranceInfo(companyName?: unknown): Indus
       businessRate: 0.006,
       commuteRate: COMMUTE_ACCIDENT_RATE_2026,
       employerRate: 0.0066,
-      employeeRate: 0,
-    };
+      employeeRate: 0 };
   }
 
   return {
@@ -75,8 +71,7 @@ export function getIndustrialAccidentInsuranceInfo(companyName?: unknown): Indus
     businessRate: AVERAGE_INDUSTRIAL_ACCIDENT_RATE_2026 - COMMUTE_ACCIDENT_RATE_2026,
     commuteRate: COMMUTE_ACCIDENT_RATE_2026,
     employerRate: AVERAGE_INDUSTRIAL_ACCIDENT_RATE_2026,
-    employeeRate: 0,
-  };
+    employeeRate: 0 };
 }
 
 export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age: number = 30, _yearMonth?: string) {
@@ -93,8 +88,7 @@ export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age:
     healthInsurance,
     longTermCare,
     employmentInsurance,
-    total: nationalPension + healthInsurance + longTermCare + employmentInsurance,
-  };
+    total: nationalPension + healthInsurance + longTermCare + employmentInsurance };
 }
 
 export function calculateIndustrialAccidentInsurance(baseAmount: number, companyName?: unknown) {
@@ -104,6 +98,5 @@ export function calculateIndustrialAccidentInsurance(baseAmount: number, company
 
   return {
     ...info,
-    employerAmount,
-  };
+    employerAmount };
 }

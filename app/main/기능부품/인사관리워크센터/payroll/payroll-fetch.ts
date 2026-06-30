@@ -12,16 +12,15 @@
  * JM5: 금액은 Math.floor로 정수 보장
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   getPayrollPolicy,
   calculateTenureYears,
-  type PayrollPolicy,
-} from './payroll-policy';
+  type PayrollPolicy } from './payroll-policy';
 import { calculateDcRetirementBenefitFromMonthlyWage } from '@/lib/severance-pay';
 
 // ─── 정규화된 payroll record ─────────────────────────
@@ -110,8 +109,7 @@ function normalizeRecord(row: Record<string, unknown>): PayrollRecordNormalized 
     employment_insurance: num(row.employment_insurance),
     income_tax: num(row.income_tax),
     local_tax: num(row.local_tax),
-    net_pay: num(row.net_pay),
-  };
+    net_pay: num(row.net_pay) };
 }
 
 // ─── 통합 출력 ───────────────────────────────────────
@@ -144,8 +142,7 @@ export interface FetchPayrollOptions {
 export async function fetchPayrollWorkcenterData({
   yearMonth,
   selectedCo,
-  signal,
-}: FetchPayrollOptions): Promise<PayrollWorkcenterData> {
+  signal }: FetchPayrollOptions): Promise<PayrollWorkcenterData> {
   const policy = getPayrollPolicy();
   const errors: { source: string; message: string }[] = [];
   const yearMonthPrev = shiftYearMonth(yearMonth, -1);
@@ -153,7 +150,7 @@ export async function fetchPayrollWorkcenterData({
   // Check lock status
   let isLocked = false;
   try {
-    const { data: lockRows } = await supabase
+    const { data: lockRows } = await db
       .from('payroll_locks')
       .select('company_name')
       .eq('year_month', yearMonth);
@@ -170,7 +167,7 @@ export async function fetchPayrollWorkcenterData({
 
   let payrollDay = 15;
   try {
-    const { data: coRows } = await supabase
+    const { data: coRows } = await db
       .from('companies')
       .select('name, payment_day')
       .neq('name', '전체');
@@ -189,7 +186,7 @@ export async function fetchPayrollWorkcenterData({
       }
     } else {
       const scope = selectedCo && selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
-      const { data: policyRows } = await supabase
+      const { data: policyRows } = await db
         .from('company_payroll_policies')
         .select('company_name, rule_value')
         .eq('rule_label', '급여일')
@@ -214,7 +211,7 @@ export async function fetchPayrollWorkcenterData({
 
   let staffs: StaffMember[] = [];
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_members')
       .select(
         'id, name, company, department, position, status, hire_date, resign_date, join_date, joined_at, resigned_at, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, agreed_overtime_allowance, agreed_night_allowance, working_hours_per_week, working_days_per_week, shift_id',
@@ -271,8 +268,7 @@ export async function fetchPayrollWorkcenterData({
           agreed_night_allowance: num(row.agreed_night_allowance || allowances.agreed_night_allowance),
           working_hours_per_week: row.working_hours_per_week == null ? 40 : Number(row.working_hours_per_week),
           working_days_per_week: row.working_days_per_week == null ? 5 : Number(row.working_days_per_week),
-          shift_id: row.shift_id == null ? null : str(row.shift_id),
-        };
+          shift_id: row.shift_id == null ? null : str(row.shift_id) };
       })
       .filter((s) => {
         if (selectedCo && selectedCo !== '전체' && s.company !== selectedCo) return false;
@@ -295,7 +291,7 @@ export async function fetchPayrollWorkcenterData({
   const [curRes, prevRes] = await Promise.allSettled([
     withMissingColumnsFallback(
       (omitted) =>
-        supabase
+        db
           .from('payroll_records')
           .select(
             [
@@ -310,7 +306,7 @@ export async function fetchPayrollWorkcenterData({
     ),
     withMissingColumnsFallback(
       (omitted) =>
-        supabase
+        db
           .from('payroll_records')
           .select(
             [
@@ -340,8 +336,7 @@ export async function fetchPayrollWorkcenterData({
     selectedCo,
     errors,
     isLocked,
-    payrollDay,
-  };
+    payrollDay };
 }
 
 function extractRecords(
@@ -384,7 +379,7 @@ export async function fetchRecentRetirees(
   signal?: AbortSignal,
 ): Promise<RetirementComputed[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_members')
       .select('id, name, company, department, hire_date, resign_date, join_date, joined_at, resigned_at, salary, base_salary, meal_allowance, status');
     if (error) throw new Error(error.message);
@@ -425,8 +420,7 @@ export async function fetchRecentRetirees(
           name: str(row.name),
           resignDate: resign,
           tenureLabel,
-          estimatedPay,
-        };
+          estimatedPay };
       })
       .sort((a, b) => (b.resignDate ?? '').localeCompare(a.resignDate ?? ''))
       .slice(0, 20);

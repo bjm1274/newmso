@@ -1,7 +1,6 @@
 import {
   readAuthorizedExtraFeatureUser,
-  type SessionReadableRequest,
-} from './server-extra-feature-access';
+  type SessionReadableRequest } from './server-extra-feature-access';
 import { type SessionUser } from './server-session';
 
 export async function readAuthorizedDepositUser(request: SessionReadableRequest): Promise<{
@@ -22,6 +21,5 @@ export function getDepositCompanyScope(user: SessionUser) {
 
   return {
     companyId: companyId || null,
-    isSystemMaster,
-  };
+    isSystemMaster };
 }

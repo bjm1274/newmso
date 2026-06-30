@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface LicenseCardData {
   id: string;
@@ -28,8 +28,7 @@ const TONE_CLS: Record<LicenseCardData['tone'], string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -69,7 +68,7 @@ export default function WelfareLicenseSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_licenses')
           .select('id, staff_id, staff_name, license_name, sub_category, expiry_date')
           .order('expiry_date', { ascending: true, nullsFirst: false })
@@ -89,8 +88,7 @@ export default function WelfareLicenseSummary() {
             sub: String(r.sub_category ?? ''),
             exp: formatExp(expDateStr, days),
             days,
-            tone: pickTone(days),
-          };
+            tone: pickTone(days) };
         });
         // 만료 임박(warn/danger) 우선 정렬, 그 다음 success/muted
         items.sort((a, b) => {

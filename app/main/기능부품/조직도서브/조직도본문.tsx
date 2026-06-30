@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { normalizeMainMenuForUser } from '@/lib/access-control';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 const prefetchedMainMenuModules = new Set<string>();
@@ -37,8 +37,7 @@ const MENU_LOADER_MAP: Record<string, () => Promise<unknown>> = {
   관리자: loadAdminView,
   추가기능: loadExtraFeaturesView,
   공유캘린더: loadSharedCalendarView,
-  재무회계: loadFinanceView,
-};
+  재무회계: loadFinanceView };
 
 export function prefetchMenuModule(menuId: string) {
   if (prefetchedMainMenuModules.has(menuId)) return;
@@ -50,52 +49,40 @@ export function prefetchMenuModule(menuId: string) {
 
 const OrgChart = dynamic(loadOrgChartView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="조직도" />,
-});
+  loading: () => <MenuViewLoading label="조직도" /> });
 const MyPage = dynamic(loadMyPageView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="내정보" />,
-});
+  loading: () => <MenuViewLoading label="내정보" /> });
 const NotificationInbox = dynamic(loadNotificationInboxView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="알림" />,
-});
+  loading: () => <MenuViewLoading label="알림" /> });
 const ChatView = dynamic(loadChatView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="채팅" />,
-});
+  loading: () => <MenuViewLoading label="채팅" /> });
 const BoardView = dynamic(loadBoardView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="게시판" />,
-});
+  loading: () => <MenuViewLoading label="게시판" /> });
 const ApprovalView = dynamic(loadApprovalView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="전자결재" />,
-});
+  loading: () => <MenuViewLoading label="전자결재" /> });
 const HRView = dynamic(loadHRView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="인사관리" />,
-});
+  loading: () => <MenuViewLoading label="인사관리" /> });
 const InventoryView = dynamic(loadInventoryView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="재고관리" />,
-});
+  loading: () => <MenuViewLoading label="재고관리" /> });
 const AdminView = dynamic(loadAdminView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="관리자" />,
-});
+  loading: () => <MenuViewLoading label="관리자" /> });
 const ExtraFeatures = dynamic(loadExtraFeaturesView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="추가기능" />,
-});
+  loading: () => <MenuViewLoading label="추가기능" /> });
 const SharedCalendar = dynamic(loadSharedCalendarView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="공유캘린더" />,
-});
+  loading: () => <MenuViewLoading label="공유캘린더" /> });
 const FinanceView = dynamic(loadFinanceView, {
   ssr: false,
-  loading: () => <MenuViewLoading label="재무·회계·세무" />,
-});
+  loading: () => <MenuViewLoading label="재무·회계·세무" /> });
 
 interface MainContentProps {
   user: ErpUser | null;
@@ -175,8 +162,7 @@ export default function MainContent({
   onOpenChatMessage,
   onOpenBoardPost,
   shareTarget,
-  onConsumeShareTarget,
-}: MainContentProps) {
+  onConsumeShareTarget }: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -242,7 +228,7 @@ export default function MainContent({
     const checkNotifications = async () => {
       if (!user?.id) return;
 
-      const { data: staff } = await supabase
+      const { data: staff } = await db
         .from('staff_members')
         .select('annual_leave_total, annual_leave_used')
         .eq('id', user.id)

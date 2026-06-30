@@ -19,8 +19,7 @@ import {
   STATIC_HOSPITAL_LABELS,
   STATIC_CAT_LABELS,
   type EmojiEntry,
-  type CategoryId,
-} from '@/app/main/기능부품/메신저액션서브/emoji-data';
+  type CategoryId } from '@/app/main/기능부품/메신저액션서브/emoji-data';
 
 // Re-export for backward compatibility — other modules import this from here
 export { COMPOSER_EMOJI_PALETTE } from '@/app/main/기능부품/메신저액션서브/emoji-data';
@@ -37,8 +36,7 @@ export default function EmojiPicker({
   open,
   onClose,
   onSelect,
-  bottomOffset = 78,
-}: EmojiPickerProps) {
+  bottomOffset = 78 }: EmojiPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryId>('stickers');
@@ -142,8 +140,7 @@ export default function EmojiPicker({
         padding: 10,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 385,
-      }}
+        maxHeight: 385 }}
     >
       {/* 🔍 검색 바 */}
       <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -155,8 +152,7 @@ export default function EmojiPicker({
             transform: 'translateY(-50%)',
             fontSize: 13,
             opacity: 0.6,
-            pointerEvents: 'none',
-          }}
+            pointerEvents: 'none' }}
         >
           🔍
         </span>
@@ -178,8 +174,7 @@ export default function EmojiPicker({
             fontSize: 12.5,
             fontWeight: 600,
             outline: 'none',
-            boxSizing: 'border-box',
-          }}
+            boxSizing: 'border-box' }}
         />
       </div>
 
@@ -197,8 +192,7 @@ export default function EmojiPicker({
             background: 'rgba(0, 0, 0, 0.05)',
             borderRadius: 10,
             whiteSpace: 'nowrap',
-            scrollbarWidth: 'none',
-          }}
+            scrollbarWidth: 'none' }}
         >
           {CATEGORIES.map((cat) => {
             const active = cat.id === category;
@@ -228,8 +222,7 @@ export default function EmojiPicker({
                   border: 0,
                   cursor: 'pointer',
                   flexShrink: 0,
-                  transition: 'all 0.15s ease-in-out',
-                }}
+                  transition: 'all 0.15s ease-in-out' }}
                 title={cat.label}
               >
                 {cat.icon}
@@ -248,15 +241,13 @@ export default function EmojiPicker({
           overflowY: 'auto',
           minHeight: 140,
           maxHeight: 200,
-          paddingRight: 2,
-        }}
+          paddingRight: 2 }}
       >
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: isEmoticonCat ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)',
-            gap: isEmoticonCat ? 6 : 4,
-          }}
+            gap: isEmoticonCat ? 6 : 4 }}
         >
           {items.map((entry, idx) => {
             const isCustomEmo = entry.e.startsWith('[emo:');
@@ -283,8 +274,7 @@ export default function EmojiPicker({
                   cursor: 'pointer',
                   padding: isEmoticonCat ? 5 : 2,
                   boxSizing: 'border-box',
-                  overflow: 'hidden',
-                }}
+                  overflow: 'hidden' }}
               >
                 {isCustomEmo ? (
                   (() => {
@@ -312,8 +302,7 @@ export default function EmojiPicker({
                           style={{
                             width: isEmoticonCat ? 48 : 24,
                             height: isEmoticonCat ? 48 : 24,
-                            objectFit: 'contain',
-                          }}
+                            objectFit: 'contain' }}
                           loading="lazy"
                         />
                       );
@@ -334,8 +323,7 @@ export default function EmojiPicker({
                 padding: '36px 0',
                 color: 'var(--z-400)',
                 fontSize: 12.5,
-                fontWeight: 600,
-              }}
+                fontWeight: 600 }}
             >
               결과가 없습니다.
             </div>
@@ -353,8 +341,7 @@ export default function EmojiPicker({
           paddingTop: 8,
           marginTop: 6,
           minHeight: 38,
-          boxSizing: 'border-box',
-        }}
+          boxSizing: 'border-box' }}
       >
         {activeEntry ? (
           <>
@@ -369,8 +356,7 @@ export default function EmojiPicker({
                 borderRadius: 6,
                 overflow: 'hidden',
                 flexShrink: 0,
-                border: '1px solid rgba(0,0,0,0.05)',
-              }}
+                border: '1px solid rgba(0,0,0,0.05)' }}
             >
               {activeEntry.e.startsWith('[emo:') ? (
                 (() => {
@@ -413,8 +399,7 @@ export default function EmojiPicker({
                   color: 'var(--z-900)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
+                  textOverflow: 'ellipsis' }}
               >
                 {activeEntry.e.startsWith('[emo:') ? (
                   (() => {
@@ -447,8 +432,7 @@ export default function EmojiPicker({
                   fontSize: 9.5,
                   color: 'var(--z-400)',
                   fontWeight: 600,
-                  fontFamily: 'monospace',
-                }}
+                  fontFamily: 'monospace' }}
               >
                 {activeEntry.name}
               </div>
@@ -473,8 +457,7 @@ export default function EmojiPicker({
             border: 'none',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          }}
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
         >
           닫기
         </button>

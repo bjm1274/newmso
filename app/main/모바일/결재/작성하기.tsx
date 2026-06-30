@@ -31,15 +31,13 @@ const FORM_CATEGORIES: FormCategory[] = [
       { slug: 'overtime', name: '연장근무 신청' },
       { slug: 'attendance_fix', name: '출결정정 신청' },
       { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
-    ],
-  },
+    ] },
   {
     g: '재무/물품',
     items: [
       { slug: 'purchase', name: '물품구매 신청' },
       { slug: 'repair_request', name: '수리요청서' },
-    ],
-  },
+    ] },
   {
     g: '인사/징계',
     items: [
@@ -51,8 +49,7 @@ const FORM_CATEGORIES: FormCategory[] = [
       { slug: 'contract_end_notice', name: '계약종료 통보' },
       { slug: 'dismissal_notice', name: '해고통보' },
       { slug: 'disciplinary_attendance_request', name: '징계위원회 출석요구서' },
-    ],
-  },
+    ] },
   {
     g: '문서',
     items: [
@@ -61,8 +58,7 @@ const FORM_CATEGORIES: FormCategory[] = [
       { slug: 'official_document_dispatch', name: '공문발송' },
       { slug: 'report', name: '보고서작성' },
       { slug: 'generic', name: '증명서발급' },
-    ],
-  },
+    ] },
 ];
 
 // PC와 누락된 슬러그 없는지 점검용 디버그 (런타임 무영향)
@@ -93,8 +89,7 @@ export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) 
               width: 30,
               height: 30,
               border: 'none',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="search" size={15} color="var(--z-600)" />
           </button>
@@ -112,8 +107,7 @@ export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) 
               style={{
                 overflow: 'hidden',
                 padding: 0,
-                margin: '0 16px',
-              }}
+                margin: '0 16px' }}
             >
               {cat.items.map((item, index) => (
                 <button
@@ -132,8 +126,7 @@ export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) 
                     alignItems: 'center',
                     borderLeft: 'none',
                     borderRight: 'none',
-                    borderTop: 'none',
-                  }}
+                    borderTop: 'none' }}
                   onClick={() => onPick(item.slug, item.name)}
                   aria-label={`${item.name} 양식 선택`}
                 >

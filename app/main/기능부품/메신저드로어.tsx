@@ -12,8 +12,7 @@ import {
   extractFirstLinkUrl,
   getAttachmentDisplayName,
   getMessageDisplayText,
-  resolveAttachmentKind,
-} from './메신저첨부';
+  resolveAttachmentKind } from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { isSelfChatRoom, NOTICE_ROOM_ID, toChatDate } from './메신저유틸';
@@ -71,15 +70,13 @@ const COLLAPSED_LIMITS: Record<DrawerSectionKey, number> = {
   media: 3,
   files: 3,
   links: 2,
-  bookmarks: 3,
-};
+  bookmarks: 3 };
 
 const DEFAULT_EXPANDED_SECTIONS: Record<DrawerSectionKey, boolean> = {
   media: false,
   files: false,
   links: false,
-  bookmarks: false,
-};
+  bookmarks: false };
 
 function sortMessagesByRecent(messages: ChatMessage[] | null | undefined) {
   const safeMessages = Array.isArray(messages) ? messages : [];
@@ -109,8 +106,7 @@ function DrawerSectionHeader({
   canExpand,
   onToggle,
   archiveTestId,
-  onArchive,
-}: {
+  onArchive }: {
   title: string;
   count: number;
   expanded: boolean;
@@ -196,8 +192,7 @@ function MessengerDrawerImpl({
   onCancelEditingRoomName,
   onStartEditingRoomName,
   onLeaveRoom,
-  onOpenStaffProfile,
-}: MessengerDrawerProps) {
+  onOpenStaffProfile }: MessengerDrawerProps) {
   const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
 
   useEffect(() => {
@@ -503,8 +498,7 @@ function MessengerDrawerImpl({
                       month: 'numeric',
                       day: 'numeric',
                       hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                      minute: '2-digit' })
                   : '-';
 
                 return (

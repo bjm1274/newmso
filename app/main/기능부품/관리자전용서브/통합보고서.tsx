@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 // recharts(차트)와 XLSX는 모두 dynamic import로 분리 — 번들 사이즈 최적화
 
 const ChartLoader = ({ height }: { height: number }) => (
@@ -60,7 +60,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
   useEffect(() => {
     const fetchInventory = async () => {
       setLoadingInventory(true);
-      const { data } = await supabase.from('inventory').select('*');
+      const { data } = await db.from('inventory').select('*');
       if (data) setInventory(data);
       setLoadingInventory(false);
     };
@@ -84,8 +84,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
     name: dept,
     value: v.total,
     regular: v.regular,
-    contract: v.contract,
-  }));
+    contract: v.contract }));
 
   const totalRegular = staffs.filter((s: StaffMember) => s.employment_type !== '계약직' && s.contract_type !== '계약직').length;
   const totalContract = staffs.length - totalRegular;
@@ -105,8 +104,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
 
   const salaryChartData = Object.entries(salaryByDept).map(([dept, total]) => ({
     dept,
-    total,
-  }));
+    total }));
 
   // ── 재고 현황 데이터 ──
   const categoryMap: Record<string, { count: number; totalAmount: number }> = {};
@@ -120,8 +118,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
   const inventoryChartData = Object.entries(categoryMap).map(([category, v]) => ({
     category,
     count: v.count,
-    totalAmount: v.totalAmount,
-  }));
+    totalAmount: v.totalAmount }));
 
   // ── Excel 다운로드 ──
   const handleExcelDownload = async () => {

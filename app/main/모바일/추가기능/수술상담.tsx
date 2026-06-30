@@ -16,7 +16,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MBtn from '../공통/MBtn';
@@ -26,8 +26,7 @@ import {
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 
 // 데스크톱 풀기능(음성 녹음 + AI 분석) 컴포넌트를 모바일에 그대로 노출.
 const VoiceLoading = () => (
@@ -56,8 +55,7 @@ const CONSULT_INITIAL: ConsultFormState = {
   patientName: '',
   surgeryKind: '',
   state: '검토',
-  note: '',
-};
+  note: '' };
 
 export default function 수술상담({ user, onBack }: { user: ErpUser; onBack: () => void }) {
   const [showForm, setShowForm] = useState(false);
@@ -119,8 +117,7 @@ export default function 수술상담({ user, onBack }: { user: ErpUser; onBack: 
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
-                }}
+                  gap: 8 }}
               >
                 <MIcon name="info" size={16} />
                 환자명·수술 종류만 빠르게 기록합니다. 음성 녹음·AI 분석은 &ldquo;정밀 분석&rdquo; 탭에서 진행하세요.
@@ -142,8 +139,7 @@ export default function 수술상담({ user, onBack }: { user: ErpUser; onBack: 
 // ─── 상담 기록 등록 폼 ────────────────────────────────────────
 function ConsultForm({
   user,
-  onClose,
-}: {
+  onClose }: {
   user: ErpUser;
   onClose: () => void;
 }) {
@@ -175,15 +171,13 @@ function ConsultForm({
         staff_id: user.id,
         staff_name: staffName,
         company: typeof user.company === 'string' ? user.company : null,
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'op_consultations',
         payload,
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
       if (queued) { toast('오프라인 — 상담 기록 대기 중', 'info'); onClose(); return; }

@@ -12,8 +12,7 @@ import {
   asc,
   isNotNull,
   lte,
-  inArray,
-} from './db';
+  inArray } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 // Phase 8-G — notifications/todo_reminder_logs D1 직접 사용 헬퍼
@@ -30,8 +29,7 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
         ? null
         : JSON.stringify(row.metadata),
     read_at: row.read_at ?? null,
-    created_at: row.created_at ?? new Date().toISOString(),
-  };
+    created_at: row.created_at ?? new Date().toISOString() };
 }
 
 async function requireD1ForTodoReminder(label: string) {
@@ -102,8 +100,7 @@ export async function processDueTodoRemindersServer(
       user_id: todosTable.user_id,
       content: todosTable.content,
       task_date: todosTable.task_date,
-      reminder_at: todosTable.reminder_at,
-    })
+      reminder_at: todosTable.reminder_at })
     .from(todosTable)
     .where(and(...dueConditions))
     .orderBy(asc(todosTable.reminder_at))
@@ -117,8 +114,7 @@ export async function processDueTodoRemindersServer(
       created: 0,
       skipped: 0,
       failed: 0,
-      errors: [],
-    };
+      errors: [] };
   }
 
   const todoIds = todos.map((row) => String(row.id || '')).filter(Boolean);
@@ -130,8 +126,7 @@ export async function processDueTodoRemindersServer(
     const logRows = await db
       .select({
         todo_id: todoReminderLogsTable.todo_id,
-        reminder_at: todoReminderLogsTable.reminder_at,
-      })
+        reminder_at: todoReminderLogsTable.reminder_at })
       .from(todoReminderLogsTable)
       .where(inArray(todoReminderLogsTable.todo_id, chunk));
     for (const row of logRows) {
@@ -175,11 +170,9 @@ export async function processDueTodoRemindersServer(
         todo_id: todoId,
         task_date: todo.task_date || null,
         reminder_at: reminderAt,
-        dedupe_key: dedupeKey,
-      },
+        dedupe_key: dedupeKey },
       read_at: null,
-      created_at: nowIso,
-    };
+      created_at: nowIso };
 
     // Phase 8-G — D1 직접 INSERT. notification id가 결정적이므로
     // onConflictDoNothing 결과(returning) 길이로 중복 여부 판정.
@@ -210,8 +203,7 @@ export async function processDueTodoRemindersServer(
         notification_id: null,
         status: 'failed',
         title: '할 일 리마인더',
-        body: String(todo.content || '할 일'),
-      };
+        body: String(todo.content || '할 일') };
       try {
         const db = await requireD1ForTodoReminder('todo_reminder_logs:failed-upsert');
         await db
@@ -222,8 +214,7 @@ export async function processDueTodoRemindersServer(
               todoReminderLogsTable.user_id,
               todoReminderLogsTable.todo_id,
               todoReminderLogsTable.reminder_at,
-            ],
-          });
+            ] });
       } catch (logErr) {
         errors.push(`${todoId}: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
       }
@@ -238,8 +229,7 @@ export async function processDueTodoRemindersServer(
       notification_id: notificationId,
       status: duplicateNotification ? 'duplicate' : 'sent',
       title: '할 일 리마인더',
-      body: String(todo.content || '할 일'),
-    };
+      body: String(todo.content || '할 일') };
     try {
       const db = await requireD1ForTodoReminder('todo_reminder_logs:sent-upsert');
       await db
@@ -250,8 +240,7 @@ export async function processDueTodoRemindersServer(
             todoReminderLogsTable.user_id,
             todoReminderLogsTable.todo_id,
             todoReminderLogsTable.reminder_at,
-          ],
-        });
+          ] });
     } catch (logErr) {
       errors.push(`${todoId}: ${logErr instanceof Error ? logErr.message : String(logErr)}`);
     }
@@ -270,6 +259,5 @@ export async function processDueTodoRemindersServer(
     created,
     skipped,
     failed,
-    errors,
-  };
+    errors };
 }

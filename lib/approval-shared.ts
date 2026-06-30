@@ -105,6 +105,5 @@ export function buildApprovalHistoryEntryCore<A extends string>(
     action,
     actor_id: actorId,
     actor_name: actorName,
-    note: note ?? null,
-  };
+    note: note ?? null };
 }

@@ -65,7 +65,6 @@ export function logD1BindingMissing(context: Pick<MirrorFailureContext, 'label' 
     ts: new Date().toISOString(),
     label: normalizeLabel(context.label),
     backend: context.backend ?? 'unknown',
-    reason: 'D1 binding unavailable',
-  };
+    reason: 'D1 binding unavailable' };
   console.warn(JSON.stringify(payload));
 }

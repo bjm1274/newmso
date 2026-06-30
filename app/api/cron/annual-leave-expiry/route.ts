@@ -42,12 +42,10 @@ export async function GET(request: Request) {
         staffId: r.staffId,
         staffName: r.staffName,
         expiredDays: r.expiredDays,
-        expiryDate: r.expiryDate,
-      })),
+        expiryDate: r.expiryDate })),
       balanceErrors: balanceErrors.length > 0 ? balanceErrors : undefined,
       // 촉진 미이행으로 소멸 보류된 건 (보상의무 유지 — 관리자 확인 필요)
-      skippedNoPromotion: skippedNoPromotion.length > 0 ? skippedNoPromotion : undefined,
-    });
+      skippedNoPromotion: skippedNoPromotion.length > 0 ? skippedNoPromotion : undefined });
   } catch (err) {
     console.error('연차 소멸 크론 실패:', err);
     return NextResponse.json(

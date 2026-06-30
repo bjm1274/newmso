@@ -23,9 +23,7 @@ export const DEFAULT_SETTINGS: NotifSettings = {
   types: {
     message: true, mention: true, approval: true, payroll: true,
     inventory: true, attendance: true, board: true, 인사: true,
-    education: true, notification: true, todo: true,
-  },
-};
+    education: true, notification: true, todo: true } };
 
 export function saveNotifSettings(next: NotifSettings) {
   if (typeof window === 'undefined') return;
@@ -46,7 +44,6 @@ export function loadNotifSettings(): NotifSettings {
       ...DEFAULT_SETTINGS,
       ...p,
       keywords: normalizeKeywordList(p.keywords),
-      types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) },
-    };
+      types: { ...DEFAULT_SETTINGS.types, ...(p.types || {}) } };
   } catch { return DEFAULT_SETTINGS; }
 }

@@ -47,8 +47,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
           'linear-gradient(135deg, rgba(235, 244, 255, 0.7) 0%, rgba(243, 231, 255, 0.7) 50%, rgba(255, 230, 240, 0.7) 100%)',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100%',
-      }}
+        minHeight: '100%' }}
     >
       <MobileHeader title="주차관제" sub="외부 시스템 연동" back={onBack} />
       <div className="m-scroll" style={{ background: 'transparent' }}>
@@ -62,8 +61,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
               backdropFilter: 'blur(30px)',
               WebkitBackdropFilter: 'blur(30px)',
               border: '1px solid rgba(255, 255, 255, 0.4)',
-              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
-            }}
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)' }}
           >
             <div
               aria-hidden="true"
@@ -76,8 +74,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
                 display: 'grid',
                 placeItems: 'center',
                 margin: '0 auto 18px',
-                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.1)',
-              }}
+                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.1)' }}
             >
               <MIcon name="box" size={32} strokeWidth={1.4} />
             </div>
@@ -91,8 +88,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
                 fontWeight: 500,
                 marginTop: 8,
                 lineHeight: 1.6,
-                padding: '0 12px',
-              }}
+                padding: '0 12px' }}
             >
               주차장 입출차·차량 인식은 외부 시스템(Hi-Park)에서 운영됩니다.
               <br />
@@ -119,8 +115,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
                     boxShadow: '0 4px 12px rgba(0, 122, 255, 0.3)',
                     color: '#fff',
                     fontWeight: 600,
-                    fontSize: '14px',
-                  }}
+                    fontSize: '14px' }}
                 >
                   <MIcon name="send" size={16} />
                   외부 시스템 열기
@@ -147,8 +142,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
                   fontSize: 12.5,
                   lineHeight: 1.6,
                   color: '#d32f2f',
-                  textAlign: 'left',
-                }}
+                  textAlign: 'left' }}
                 role="status"
                 aria-live="polite"
               >
@@ -188,8 +182,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
               color: 'var(--z-500)',
               fontSize: 12.5,
-              fontWeight: 500,
-            }}
+              fontWeight: 500 }}
           >
             외부 시스템 연동 후 표시됩니다.
           </div>

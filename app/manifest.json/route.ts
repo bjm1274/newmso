@@ -22,22 +22,18 @@ const MANIFEST_BASE = {
       name: '채팅',
       short_name: '채팅',
       url: '/main?open_menu=채팅',
-      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
-    },
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }] },
     {
       name: '게시판',
       short_name: '게시판',
       url: '/main?open_menu=게시판',
-      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
-    },
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }] },
     {
       name: '전자결재',
       short_name: '결재',
       url: '/main?open_menu=전자결재',
-      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }],
-    },
-  ],
-} as const;
+      icons: [{ src: '/pwa-icon-192.png', sizes: '192x192', type: 'image/png' }] },
+  ] } as const;
 
 const SHARE_TARGET = {
   action: '/share-target',
@@ -62,11 +58,8 @@ const SHARE_TARGET = {
           '.pptx',
           '.txt',
           '.zip',
-        ],
-      },
-    ],
-  },
-} as const;
+        ] },
+    ] } } as const;
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -82,8 +75,7 @@ function buildManifest(userAgent: string) {
 
   return {
     ...MANIFEST_BASE,
-    share_target: SHARE_TARGET,
-  };
+    share_target: SHARE_TARGET };
 }
 
 export function GET(request: NextRequest) {
@@ -93,7 +85,5 @@ export function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'application/manifest+json; charset=utf-8',
       'Cache-Control': 'no-store, max-age=0, must-revalidate',
-      Vary: 'User-Agent',
-    },
-  });
+      Vary: 'User-Agent' } });
 }

@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 // ---------------------------------------------------------------------------
 // 스키마
@@ -25,8 +25,7 @@ const StaffShiftAssignmentSchema = z.object({
   priority: z.number().int().optional().nullable(),
   effective_from: z.string().optional().nullable(),
   effective_to: z.string().optional().nullable(),
-  created_at: z.string().optional().nullable(),
-});
+  created_at: z.string().optional().nullable() });
 
 export type StaffShiftAssignment = z.infer<typeof StaffShiftAssignmentSchema>;
 
@@ -34,13 +33,11 @@ const AttendanceShiftRowSchema = z.object({
   staff_id: z.string(),
   work_date: z.string().optional().nullable(),
   date: z.string().optional().nullable(),
-  shift_id: z.string().optional().nullable(),
-});
+  shift_id: z.string().optional().nullable() });
 
 const StaffLegacyRowSchema = z.object({
   id: z.string(),
-  shift_id: z.string().optional().nullable(),
-});
+  shift_id: z.string().optional().nullable() });
 
 // ---------------------------------------------------------------------------
 // 반환 타입
@@ -67,7 +64,7 @@ export type StaffShiftEntry = {
 export async function getStaffShifts(staffId: string): Promise<StaffShiftEntry[]> {
   const safeId = z.string().min(1).parse(staffId);
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('staff_shift_assignments')
     .select('shift_id, is_primary, priority')
     .eq('staff_id', safeId)
@@ -88,8 +85,7 @@ export async function getStaffShifts(staffId: string): Promise<StaffShiftEntry[]
     .map((row) => ({
       shiftId: row.shift_id as string,
       isPrimary: row.is_primary === true,
-      priority: typeof row.priority === 'number' ? row.priority : 999,
-    }));
+      priority: typeof row.priority === 'number' ? row.priority : 999 }));
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +96,7 @@ export async function getPrimaryShift(staffId: string): Promise<string | null> {
   const safeId = z.string().min(1).parse(staffId);
 
   // 1. staff_shift_assignments에서 is_primary=TRUE 조회
-  const { data: primaryData } = await supabase
+  const { data: primaryData } = await db
     .from('staff_shift_assignments')
     .select('shift_id')
     .eq('staff_id', safeId)
@@ -111,7 +107,7 @@ export async function getPrimaryShift(staffId: string): Promise<string | null> {
   if (primaryShiftId) return primaryShiftId;
 
   // 2. legacy — staff_members.shift_id
-  const { data: staffData } = await supabase
+  const { data: staffData } = await db
     .from('staff_members')
     .select('id, shift_id')
     .eq('id', safeId)
@@ -135,7 +131,7 @@ export async function getStaffShiftsBatch(
 
   const safeIds = z.array(z.string().min(1)).parse(staffIds);
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('staff_shift_assignments')
     .select('staff_id, shift_id, is_primary, priority')
     .in('staff_id', safeIds)
@@ -149,8 +145,7 @@ export async function getStaffShiftsBatch(
         const entry: StaffShiftEntry = {
           shiftId: row.shift_id,
           isPrimary: row.is_primary === true,
-          priority: typeof row.priority === 'number' ? row.priority : 999,
-        };
+          priority: typeof row.priority === 'number' ? row.priority : 999 };
         const existing = result.get(row.staff_id) ?? [];
         existing.push(entry);
         result.set(row.staff_id, existing);
@@ -161,7 +156,7 @@ export async function getStaffShiftsBatch(
   // legacy 폴백: staff_shift_assignments에 데이터 없는 직원은 staff_members.shift_id로 채움
   const missingIds = safeIds.filter((id) => !result.has(id) || result.get(id)!.length === 0);
   if (missingIds.length > 0) {
-    const { data: legacyData } = await supabase
+    const { data: legacyData } = await db
       .from('staff_members')
       .select('id, shift_id')
       .in('id', missingIds);
@@ -174,8 +169,7 @@ export async function getStaffShiftsBatch(
           {
             shiftId: row.shift_id,
             isPrimary: true,
-            priority: 0,
-          },
+            priority: 0 },
         ]);
       }
     }
@@ -219,7 +213,7 @@ export async function resolveShiftForDate(
   const safeDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(date);
 
   // 1. 근태기록(attendances 테이블) shift_id
-  const { data: attData } = await supabase
+  const { data: attData } = await db
     .from('attendances')
     .select('staff_id, work_date, shift_id')
     .eq('staff_id', safeId)
@@ -232,7 +226,7 @@ export async function resolveShiftForDate(
   }
 
   // attendance 테이블도 확인 (일부 환경에서 혼용)
-  const { data: attLegacyData } = await supabase
+  const { data: attLegacyData } = await db
     .from('attendance')
     .select('staff_id, date, shift_id')
     .eq('staff_id', safeId)

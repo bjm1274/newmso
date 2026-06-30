@@ -3,8 +3,7 @@ import {
   audit_logs as auditLogsTable,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
-} from './db';
+  resolveDataBackend } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 export type AuditAction = string;
@@ -110,8 +109,7 @@ export function buildAuditDiff(
   return {
     changed_fields,
     before: before_values,
-    after: after_values,
-  };
+    after: after_values };
 }
 
 export function readClientAuditActor() {
@@ -124,8 +122,7 @@ export function readClientAuditActor() {
     const parsed = raw ? JSON.parse(raw) : null;
     return {
       userId: parsed?.id,
-      userName: parsed?.name,
-    };
+      userName: parsed?.name };
   } catch {
     return { userId: undefined, userName: undefined };
   }
@@ -152,10 +149,10 @@ export async function logAudit(
 ) {
   const createdAt = new Date().toISOString();
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
     if (typeof window !== 'undefined') {
-      const { supabase } = await import('./supabase');
-      const { error } = await supabase.from('audit_logs').insert({
+      const { db: db } = await import('./db-client');
+      const { error } = await db.from('audit_logs').insert({
         id: crypto.randomUUID(),
         user_id: userId || null,
         user_name: userName || null,
@@ -163,8 +160,7 @@ export async function logAudit(
         target_type: targetType,
         target_id: targetId,
         details,
-        created_at: createdAt,
-      });
+        created_at: createdAt });
       if (error) {
         console.warn('[audit_logs] logAudit (client):', error.message);
       }
@@ -180,8 +176,7 @@ export async function logAudit(
       target_type: targetType,
       target_id: targetId,
       details: JSON.stringify(details),
-      created_at: createdAt,
-    });
+      created_at: createdAt });
   } catch (e) {
     console.error('Audit log failed:', e);
   }

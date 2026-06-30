@@ -43,8 +43,7 @@ export default function NewChatChannelTab({
   user,
   staffs,
   selectedMemberIds,
-  onCreated,
-}: NewChatChannelTabProps) {
+  onCreated }: NewChatChannelTabProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const allowed = useMemo(() => canCreateChannel(user), [user]);
 
@@ -98,8 +97,7 @@ export default function NewChatChannelTab({
         type: channelType,
         members: memberIds,
         created_by: userId,
-        is_announcement: channelType === 'notice',
-      });
+        is_announcement: channelType === 'notice' });
       if (!result.ok || !result.room) {
         toast(result.error || '채널 생성에 실패했어요.', 'error');
         return;
@@ -242,8 +240,7 @@ const CARD: React.CSSProperties = {
   padding: '16px 14px',
   display: 'flex',
   flexDirection: 'column',
-  gap: 6,
-};
+  gap: 6 };
 
 const LABEL: React.CSSProperties = {
   fontSize: 11,
@@ -251,8 +248,7 @@ const LABEL: React.CSSProperties = {
   color: 'var(--z-500)',
   letterSpacing: '0.02em',
   textTransform: 'uppercase',
-  marginTop: 6,
-};
+  marginTop: 6 };
 
 const INPUT: React.CSSProperties = {
   width: '100%',
@@ -263,16 +259,14 @@ const INPUT: React.CSSProperties = {
   fontSize: 14,
   fontFamily: 'inherit',
   color: 'var(--z-900)',
-  outline: 'none',
-};
+  outline: 'none' };
 
 const NOTICE_CARD: React.CSSProperties = {
   background: 'var(--m-card)',
   border: '1px solid var(--m-border)',
   borderRadius: 14,
   padding: '32px 24px',
-  textAlign: 'center',
-};
+  textAlign: 'center' };
 
 const MEMBER_HINT: React.CSSProperties = {
   marginTop: 10,
@@ -284,5 +278,4 @@ const MEMBER_HINT: React.CSSProperties = {
   borderRadius: 8,
   fontSize: 12,
   color: 'var(--z-600)',
-  fontWeight: 600,
-};
+  fontWeight: 600 };

@@ -7,14 +7,13 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import {
   MFormHeader,
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 import type { StockMutateUser } from './data-hooks';
 
 type IOKind = '입고' | '출고';
@@ -30,8 +29,7 @@ const IO_FORM_INITIAL: IOFormState = { kind: '입고', item: '', qty: '', reason
 
 export function IORecordForm({
   user,
-  onClose,
-}: {
+  onClose }: {
   user: StockMutateUser | null;
   onClose: () => void;
 }) {
@@ -72,15 +70,13 @@ export function IORecordForm({
         actor_id: typeof u?.id === 'string' ? u.id : null,
         company: typeof u?.company === 'string' ? u.company : null,
         notes: reason ? `${item} / ${reason}` : item,
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'inventory_logs',
         payload,
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
       if (queued) { toast('오프라인 — 입출고 기록 대기 중', 'info'); onClose(); return; }
@@ -149,8 +145,7 @@ export function KpiCard({
   label,
   value,
   unit,
-  tone,
-}: {
+  tone }: {
   label: string;
   value: number;
   unit: string;
@@ -174,8 +169,7 @@ export function KpiCard({
           fontWeight: 800,
           letterSpacing: '-0.025em',
           marginTop: 4,
-          color,
-        }}
+          color }}
       >
         {value}
         <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700, marginLeft: 3 }}>

@@ -83,8 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       success: true,
       path: objectKey,
       url,
-      uploadedAt,
-    });
+      uploadedAt });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : '프로필 사진 업로드 중 오류가 발생했습니다.';

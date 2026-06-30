@@ -6,21 +6,18 @@ import {
   pickStoredPassword,
   updateStaffPasswordWithFallback,
   verifyStoredPassword,
-  type StaffCredentialRow,
-} from '@/lib/staff-password';
+  type StaffCredentialRow } from '@/lib/staff-password';
 import {
   clearSessionCookie,
   createSessionToken,
   getSessionCookieOptions,
   normalizeSessionUser,
-  SESSION_COOKIE_NAME,
-} from '@/lib/server-session';
+  SESSION_COOKIE_NAME } from '@/lib/server-session';
 import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 async function successResponse(user: any, notice?: string) {
   const safeUser = normalizeSessionUser(user);
@@ -30,8 +27,7 @@ async function successResponse(user: any, notice?: string) {
     success: true,
     user: safeUser,
     issuedAt,
-    ...(notice ? { notice } : {}),
-  });
+    ...(notice ? { notice } : {}) });
 
   response.cookies.set(SESSION_COOKIE_NAME, token, getSessionCookieOptions());
   return response;
@@ -97,8 +93,7 @@ function normalizeD1LoginRow(row: Record<string, unknown>): StaffLoginRow {
     is_system_master: row.is_system_master === 1 || row.is_system_master === true,
     password_reset_required: row.password_reset_required === 1 || row.password_reset_required === true,
     password: typeof row.password === 'string' ? row.password : null,
-    passwd: typeof row.passwd === 'string' ? row.passwd : null,
-  };
+    passwd: typeof row.passwd === 'string' ? row.passwd : null };
 }
 
 async function fetchStaffLoginRowByEmployeeNoD1(loginId: string): Promise<StaffLoginRow | null> {
@@ -177,9 +172,7 @@ async function privilegedFallbackResponse(loginId: string, password: string) {
         approval: true,
         admin: true,
         mso: true,
-        hr_교대근무: true,
-      },
-    });
+        hr_교대근무: true } });
   }
 
   return successResponse({
@@ -199,9 +192,7 @@ async function privilegedFallbackResponse(loginId: string, password: string) {
       admin: true,
       mso: true,
       system_master: true,
-      hr_교대근무: true,
-    },
-  });
+      hr_교대근무: true } });
 }
 
 export async function POST(request: NextRequest) {
@@ -285,9 +276,7 @@ export async function POST(request: NextRequest) {
                 approval: true,
                 admin: true,
                 mso: true,
-                hr_교대근무: true,
-              },
-            }
+                hr_교대근무: true } }
           : {
               id: null,
               employee_no: '1',
@@ -302,9 +291,7 @@ export async function POST(request: NextRequest) {
                 approval: true,
                 admin: true,
                 mso: true,
-                hr_교대근무: true,
-              },
-            };
+                hr_교대근무: true } };
 
         return successResponse(user);
       }
@@ -327,9 +314,7 @@ export async function POST(request: NextRequest) {
             admin: true,
             mso: true,
             system_master: true,
-            hr_교대근무: true,
-          },
-        });
+            hr_교대근무: true } });
       }
 
       return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
@@ -404,9 +389,7 @@ export async function POST(request: NextRequest) {
                 approval: true,
                 admin: true,
                 mso: true,
-                hr_교대근무: true,
-              },
-            };
+                hr_교대근무: true } };
 
             return successResponse(user);
           }
@@ -429,9 +412,7 @@ export async function POST(request: NextRequest) {
                 admin: true,
                 mso: true,
                 system_master: true,
-                hr_교대근무: true,
-              },
-            });
+                hr_교대근무: true } });
           }
         }
 

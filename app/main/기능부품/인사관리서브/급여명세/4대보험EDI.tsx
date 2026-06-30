@@ -7,10 +7,9 @@ import {
   calculateEmployeeInsuranceDeductions,
   calculateIndustrialAccidentInsurance,
   EMPLOYEE_INSURANCE_RATES_2026,
-  getIndustrialAccidentInsuranceInfo,
-} from '@/lib/payroll-insurance-rates';
+  getIndustrialAccidentInsuranceInfo } from '@/lib/payroll-insurance-rates';
 import { getPayrollStaffAge } from '@/lib/payroll-insurance-settings';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Row = {
@@ -50,8 +49,7 @@ function formatPercent(value: number) {
 export default function InsuranceEDI({
   staffs = [],
   selectedCo,
-  user,
-}: {
+  user }: {
   staffs: any[];
   selectedCo: string;
   user: any;
@@ -84,7 +82,7 @@ export default function InsuranceEDI({
       setLoading(true);
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('payroll_records')
           .select('staff_id, year_month, record_type, status, total_taxable, total_taxfree, base_salary')
           .eq('year_month', yearMonth);
@@ -127,8 +125,7 @@ export default function InsuranceEDI({
               ei: employeeInsurance.employmentInsurance,
               wc: industrialAccident.employerAmount,
               employeeTotal: employeeInsurance.total,
-              employerOnlyTotal: industrialAccident.employerAmount,
-            },
+              employerOnlyTotal: industrialAccident.employerAmount },
           ];
         });
 
@@ -156,8 +153,7 @@ export default function InsuranceEDI({
       ei: accumulator.ei + row.ei,
       wc: accumulator.wc + row.wc,
       employeeTotal: accumulator.employeeTotal + row.employeeTotal,
-      employerOnlyTotal: accumulator.employerOnlyTotal + row.employerOnlyTotal,
-    }),
+      employerOnlyTotal: accumulator.employerOnlyTotal + row.employerOnlyTotal }),
     { nps: 0, hi: 0, lci: 0, ei: 0, wc: 0, employeeTotal: 0, employerOnlyTotal: 0 }
   );
 
@@ -211,59 +207,50 @@ export default function InsuranceEDI({
       key: 'name',
       label: '성명',
       primary: true,
-      render: (row) => <span className="font-semibold">{row.name}</span>,
-    },
+      render: (row) => <span className="font-semibold">{row.name}</span> },
     {
       key: 'position',
       label: '직위',
       showOnMobile: false,
-      render: (row) => row.position || '—',
-    },
+      render: (row) => row.position || '—' },
     {
       key: 'base',
       label: '보험기준금액',
       align: 'right',
-      render: (row) => row.base.toLocaleString(),
-    },
+      render: (row) => row.base.toLocaleString() },
     {
       key: 'nps',
       label: '국민연금',
       align: 'right',
-      render: (row) => row.nps.toLocaleString(),
-    },
+      render: (row) => row.nps.toLocaleString() },
     {
       key: 'hi',
       label: '건강보험',
       align: 'right',
-      render: (row) => row.hi.toLocaleString(),
-    },
+      render: (row) => row.hi.toLocaleString() },
     {
       key: 'lci',
       label: '장기요양',
       align: 'right',
       showOnMobile: false,
-      render: (row) => row.lci.toLocaleString(),
-    },
+      render: (row) => row.lci.toLocaleString() },
     {
       key: 'ei',
       label: '고용보험',
       align: 'right',
-      render: (row) => row.ei.toLocaleString(),
-    },
+      render: (row) => row.ei.toLocaleString() },
     {
       key: 'wc',
       label: '산재보험(사업주)',
       align: 'right',
-      render: (row) => <span className="text-rose-600">{row.wc.toLocaleString()}</span>,
-    },
+      render: (row) => <span className="text-rose-600">{row.wc.toLocaleString()}</span> },
     {
       key: 'employeeTotal',
       label: '근로자 부담',
       align: 'right',
       render: (row) => (
         <span className="font-bold text-[var(--accent)]">{row.employeeTotal.toLocaleString()}</span>
-      ),
-    },
+      ) },
     {
       key: 'employerOnlyTotal',
       label: '사업주 부담',
@@ -271,8 +258,7 @@ export default function InsuranceEDI({
       showOnMobile: false,
       render: (row) => (
         <span className="font-bold text-rose-600">{row.employerOnlyTotal.toLocaleString()}</span>
-      ),
-    },
+      ) },
   ], []);
 
   const rateCards = [
@@ -280,32 +266,27 @@ export default function InsuranceEDI({
       id: 'NPS',
       label: '국민연금',
       rate: EMPLOYEE_INSURANCE_RATES_2026.nationalPension,
-      desc: '근로자 부담 4.75%',
-    },
+      desc: '근로자 부담 4.75%' },
     {
       id: 'HI',
       label: '건강보험',
       rate: EMPLOYEE_INSURANCE_RATES_2026.healthInsurance,
-      desc: '근로자 부담 3.595%',
-    },
+      desc: '근로자 부담 3.595%' },
     {
       id: 'LCI',
       label: '장기요양보험',
       rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
-      desc: '근로자 부담 0.4724%',
-    },
+      desc: '근로자 부담 0.4724%' },
     {
       id: 'EI',
       label: '고용보험',
       rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
-      desc: '근로자 부담 0.9%',
-    },
+      desc: '근로자 부담 0.9%' },
     {
       id: 'WCI',
       label: '산재보험',
       rate: industrialAccidentInfo.employerRate,
-      desc: `${industrialAccidentInfo.industryLabel} · 사업주 부담`,
-    },
+      desc: `${industrialAccidentInfo.industryLabel} · 사업주 부담` },
   ] as const;
 
   return (

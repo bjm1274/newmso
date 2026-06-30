@@ -23,7 +23,7 @@ import ModAbsence     from './modules/ModAbsence';
 /**
  * 급여 워크센터 — 메인 엔트리.
  *
- * - Provider가 supabase 데이터를 1회 fetch (yearMonth/selectedCo 변경 시 재호출).
+ * - Provider가 db 데이터를 1회 fetch (yearMonth/selectedCo 변경 시 재호출).
  * - 13 모듈은 useContext로 데이터 공유 — 모듈 전환에 fetch 안 일어남 (JM2).
  *
  * JM: 200줄 이내 메인 라우터.
@@ -43,8 +43,7 @@ const MODULE_COMPONENTS: Record<PayrollModuleId, (props: { user?: any }) => Reac
   taxFree:     ModTaxFree,
   ordinary:    ModOrdinary,
   unpaid:      ModUnpaid,
-  absence:     ModAbsence,
-};
+  absence:     ModAbsence };
 
 function moduleTone(meta: PayrollModuleMeta | undefined): string {
   if (!meta?.tone) return 'bg-[var(--accent-light)] text-[var(--accent)]';
@@ -56,8 +55,7 @@ function moduleTone(meta: PayrollModuleMeta | undefined): string {
 export default function PayrollWorkcenter({
   selectedCo,
   user,
-  initialModule,
-}: {
+  initialModule }: {
   selectedCo?: string;
   user?: any;
   initialModule?: string | null;

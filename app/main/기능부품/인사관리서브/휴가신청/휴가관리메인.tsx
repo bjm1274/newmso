@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
@@ -65,8 +65,7 @@ export default function LeaveManagement({
   initialTab,
   allowLeaveTabs = true,
   allowHolidayTab = true,
-  tabMode = 'all',
-}: Record<string, unknown>) {
+  tabMode = 'all' }: Record<string, unknown>) {
   const { dialog, openConfirm } = useActionDialog();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,7 +95,7 @@ export default function LeaveManagement({
   const fetchLeaves = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('leave_requests')
         .select('*')
         .order('created_at', { ascending: false });
@@ -128,7 +127,7 @@ export default function LeaveManagement({
     if (!coName || coName === '전체') return;
     setLeaveConfigLoading(true);
     void Promise.resolve(
-      supabase
+      db
         .from('companies')
         .select('leave_policy')
         .eq('name', coName)
@@ -175,12 +174,11 @@ export default function LeaveManagement({
     try {
       const targetLeave = leaves.find((leave) => leave.id === id);
       const previousStatus = targetLeave?.status;
-      const { error } = await supabase
+      const { error } = await db
         .from('leave_requests')
         .update({
           status,
-          approved_at: status === '승인' ? new Date().toISOString() : null,
-        })
+          approved_at: status === '승인' ? new Date().toISOString() : null })
         .eq('id', id);
 
       if (error) throw error;
@@ -195,7 +193,7 @@ export default function LeaveManagement({
 
         recalculatedUsedDays = calculateApprovedAnnualLeaveUsage(staffLeaves as Record<string, unknown>[]);
 
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_used: recalculatedUsedDays })
           .eq('id', targetLeave.staff_id);
@@ -204,8 +202,7 @@ export default function LeaveManagement({
         fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: targetLeave.staff_id }),
-        }).catch((err) => {
+          body: JSON.stringify({ staffId: targetLeave.staff_id }) }).catch((err) => {
           console.error('[handleStatusUpdate] 연차 동기화 API 실패:', err);
         });
       }
@@ -221,8 +218,7 @@ export default function LeaveManagement({
           before_status: previousStatus ?? null,
           after_status: status,
           rollback_applied: previousStatus === '승인' && status !== '승인',
-          annual_leave_used_recalculated: recalculatedUsedDays,
-        },
+          annual_leave_used_recalculated: recalculatedUsedDays },
         actor.userId,
         actor.userName
       );
@@ -243,7 +239,7 @@ export default function LeaveManagement({
     try {
       const target = leaves.find((l) => l.id === id);
       const nextStatus = patch.status ?? target?.status;
-      const { error } = await supabase
+      const { error } = await db
         .from('leave_requests')
         .update({
           leave_type: patch.leave_type,
@@ -251,8 +247,7 @@ export default function LeaveManagement({
           end_date: patch.end_date,
           reason: patch.reason,
           status: nextStatus,
-          approved_at: nextStatus === '승인' ? new Date().toISOString() : null,
-        })
+          approved_at: nextStatus === '승인' ? new Date().toISOString() : null })
         .eq('id', id);
       if (error) throw error;
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
@@ -265,7 +260,7 @@ export default function LeaveManagement({
           staffLeaves as Record<string, unknown>[],
         );
 
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_used: approvedAnnualLeaveDays })
           .eq('id', target.staff_id);
@@ -273,8 +268,7 @@ export default function LeaveManagement({
         fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: target.staff_id }),
-        }).catch((err) => {
+          body: JSON.stringify({ staffId: target.staff_id }) }).catch((err) => {
           console.error('[handleEditLeave] 연차 동기화 API 실패:', err);
         });
       }
@@ -292,11 +286,9 @@ export default function LeaveManagement({
                 start_date: target.start_date,
                 end_date: target.end_date,
                 reason: target.reason,
-                status: target.status,
-              }
+                status: target.status }
             : null,
-          after: patch,
-        },
+          after: patch },
         actor.userId,
         actor.userName
       );
@@ -320,11 +312,10 @@ export default function LeaveManagement({
       title: '휴가 신청내역 삭제',
       description: `${staffName}의 ${target?.leave_type ?? '휴가'} 신청(${target?.start_date})을 삭제합니다.\n삭제 후 연차 사용일수가 재계산됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('leave_requests').delete().eq('id', id);
+      const { error } = await db.from('leave_requests').delete().eq('id', id);
       if (error) throw error;
       setLeaves((prev) => prev.filter((l) => l.id !== id));
 
@@ -336,7 +327,7 @@ export default function LeaveManagement({
           staffLeaves as Record<string, unknown>[],
         );
 
-        await supabase
+        await db
           .from('staff_members')
           .update({ annual_leave_used: approvedAnnualLeaveDays })
           .eq('id', target.staff_id);
@@ -344,8 +335,7 @@ export default function LeaveManagement({
         fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: target.staff_id }),
-        }).catch((err) => {
+          body: JSON.stringify({ staffId: target.staff_id }) }).catch((err) => {
           console.error('[handleDeleteLeave] 연차 동기화 API 실패:', err);
         });
       }
@@ -360,8 +350,7 @@ export default function LeaveManagement({
           leave_type: target?.leave_type ?? null,
           start_date: target?.start_date ?? null,
           end_date: target?.end_date ?? null,
-          status: target?.status ?? null,
-        },
+          status: target?.status ?? null },
         actor.userId,
         actor.userName
       );
@@ -389,8 +378,7 @@ export default function LeaveManagement({
       title: '전 직원 연차 재계산',
       description: `전 직원의 연차를 ${policyLabel} 기준으로 재계산합니다.\n기존 연차 총량이 갱신될 수 있습니다.`,
       confirmText: '재계산',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setLoading(true);
     try {
@@ -413,12 +401,11 @@ export default function LeaveManagement({
           else total = Math.min(11, Math.floor((now.getTime() - join.getTime()) / (30 * 24 * 60 * 60 * 1000)));
         }
 
-        await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', (s as Record<string, unknown>).id);
+        await db.from('staff_members').update({ annual_leave_total: total }).eq('id', (s as Record<string, unknown>).id);
         fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: String((s as Record<string, unknown>).id) }),
-        }).catch((err) => {
+          body: JSON.stringify({ staffId: String((s as Record<string, unknown>).id) }) }).catch((err) => {
           console.error('[runAnnualLeaveAutoGrant] 연차 동기화 API 실패:', err);
         });
       }

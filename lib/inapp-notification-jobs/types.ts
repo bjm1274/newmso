@@ -9,8 +9,7 @@ import {
   eq,
   and,
   inArray,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 
 export type CheckJobResult = {
   detected: number;
@@ -119,8 +118,7 @@ export async function insertNotificationsChunked(
         ? JSON.stringify(row.metadata)
         : null,
       read_at: row.read_at ?? null,
-      created_at: new Date().toISOString(),
-    }));
+      created_at: new Date().toISOString() }));
     try {
       await db.insert(notificationsTable).values(d1Rows).onConflictDoNothing();
       created += chunk.length;
@@ -142,8 +140,7 @@ export async function insertNotificationsChunked(
         type: row.type,
         title: row.title,
         body: row.body,
-        metadata: row.metadata ?? null,
-      }));
+        metadata: row.metadata ?? null }));
       const pushResult = await dispatchPushForNotificationRows(pushRows);
       if (pushResult.errors.length > 0) {
         console.warn(

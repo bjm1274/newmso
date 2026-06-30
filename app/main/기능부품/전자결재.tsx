@@ -4,9 +4,9 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/db-compat';
 import { APPROVAL_OPTIONAL_COLUMNS, buildApprovalSelect } from '@/lib/approval-query-columns';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import type { StaffMember } from '@/types';
@@ -39,8 +39,7 @@ import {
   type ApprovalCcUser,
   type ApproverTemplate,
   type SupplyInventoryReviewState,
-  type ApprovalViewProps,
-} from './전자결재-types';
+  type ApprovalViewProps } from './전자결재-types';
 
 import {
   normalizeApprovalCcUsers,
@@ -55,8 +54,7 @@ import {
   matchesCreatedDateRange,
   normalizeComposeFormType,
   matchesInventorySupportCompanyName,
-  sanitizeCustomFormTypes,
-} from './전자결재-utils';
+  sanitizeCustomFormTypes } from './전자결재-utils';
 
 function normalizeApprovalCompanyName(value?: unknown, fallback = '') {
   const text = String(value || '').trim();
@@ -199,8 +197,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
     return {
       slug: customForm?.slug || builtInForm?.slug || normalizedFormType,
-      name: customForm?.name || builtInForm?.name || normalizedFormType,
-    };
+      name: customForm?.name || builtInForm?.name || normalizedFormType };
   }, [customFormTypes, formType]);
   const scopedStaffs = useMemo(
     () =>
@@ -233,8 +230,8 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     const loadSupportApprovers = async () => {
       try {
         const [{ data: companyRows, error: companyError }, { data: staffRows, error: staffError }] = await Promise.all([
-          supabase.from('companies').select('id, name, type'),
-          supabase
+          db.from('companies').select('id, name, type'),
+          db
             .from('staff_members')
             .select('id, name, position, department, company, company_id, employee_no, role, status, permissions')
             .order('employee_no', { ascending: true }),
@@ -329,8 +326,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
           })
           .map((staff) => ({
             id: staff.id,
-            name: staff.name,
-          }));
+            name: staff.name }));
 
         return mergeApprovalCcUsers(dbCcUsers, supportCcUsers);
       }
@@ -369,8 +365,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       id: Date.now().toString(),
       name: templateNameInput.trim(),
       line: approverLine,
-      ccLine,
-    };
+      ccLine };
     const next = [...approverTemplates, newTpl];
     setApproverTemplates(next);
     persistApproverTemplates(next);
@@ -382,8 +377,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     if (extractOfficialDocRequest(metaData)) {
       return {
         slug: 'official_document_dispatch',
-        name: '공문발송',
-      };
+        name: '공문발송' };
     }
     const rawSlug = String(metaData?.form_slug || '').trim();
     const rawType = String(item?.type || '').trim();
@@ -403,8 +397,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
     return {
       slug: rawSlug || rawType || 'generic',
-      name: rawName || rawType || '증명서발급',
-    };
+      name: rawName || rawType || '증명서발급' };
   }, [customFormTypes]);
 
   useEffect(() => {
@@ -432,8 +425,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       companyLabel,
       sealLabel: storedDesign.sealLabel || `${companyLabel} 직인`,
       templateName: template.name || (item?.type as string) || '결재 문서',
-      templateSlug: template.slug || ((item?.meta_data as Record<string, unknown> | null | undefined)?.form_slug as string) || (item?.type as string) || 'generic',
-    };
+      templateSlug: template.slug || ((item?.meta_data as Record<string, unknown> | null | undefined)?.form_slug as string) || (item?.type as string) || 'generic' };
   }, [formTemplateDesigns, resolveApprovalTemplateMeta, targetCompanyName, user?.company]);
 
 
@@ -495,15 +487,13 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       approvalDirectoryStaffs,
       resolveApprovalTemplateDesign,
       resolveApprovalTemplateMeta,
-      options,
-    });
+      options });
   }, [approvalDirectoryStaffs, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
 
   const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     openApprovalPrintViewDocument({
       item,
-      buildHtml: buildApprovalPrintHtml,
-    });
+      buildHtml: buildApprovalPrintHtml });
   }, [buildApprovalPrintHtml]);
 
   const allCompaniesApproverCandidates = useMemo(() => {
@@ -543,12 +533,10 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     resolveApprovalDelaySnapshot,
     resolveApprovalLockSnapshot,
     syncDelegatedApprovalDelayNotifications,
-    syncDelegatedApprovalRouting,
-  } = useApprovalRouting({
+    syncDelegatedApprovalRouting } = useApprovalRouting({
     user,
     approvalDirectoryStaffs,
-    setApprovals,
-  });
+    setApprovals });
 
   useEffect(() => {
     const normalizedFallbackTypes = [
@@ -585,7 +573,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('approval_form_types')
           .select('name, slug, company_name, is_active')
           .eq('is_active', true)
@@ -594,7 +582,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
         if (!error && Array.isArray(data)) {
           normalizeRows(data as Record<string, unknown>[]).forEach((row) => merged.set(row.slug, row));
         } else if (error && isMissingColumnError(error, 'company_name')) {
-          const legacyResult = await supabase
+          const legacyResult = await db
             .from('approval_form_types')
             .select('name, slug, is_active')
             .eq('is_active', true)
@@ -643,7 +631,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('system_settings')
           .select('value')
           .eq('key', 'form_template_designs')
@@ -690,7 +678,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const fetchApprovals = useCallback(async () => {
     const { data, error } = await withMissingColumnsFallback(
       (omittedColumns) =>
-        supabase
+        db
           .from('approvals')
           .select(buildApprovalSelect(omittedColumns))
           .order('created_at', { ascending: false }),
@@ -723,8 +711,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     loadLastDraft,
     loadDraftFromStorage,
     clearDraftFromStorage,
-    saveDraftNow,
-  } = useApprovalComposeDraft({
+    saveDraftNow } = useApprovalComposeDraft({
     user,
     viewMode,
     setViewMode,
@@ -774,21 +761,18 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     autoSaveTimer,
     autoSaveMsgTimer,
     isHydratingComposeRef,
-    resolveDefaultReferenceUsersForForm,
-  });
+    resolveDefaultReferenceUsersForForm });
 
   const {
     transitionApprovalsOnServer,
     handleBulkApprove,
-    handleBulkReject,
-  } = useApprovalBulkActions({
+    handleBulkReject } = useApprovalBulkActions({
     selectedApprovalIds,
     setSelectedApprovalIds,
     openConfirm,
     openPrompt,
     fetchApprovals,
-    markApprovalNotificationsAsRead,
-  });
+    markApprovalNotificationsAsRead });
 
   useEffect(() => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -815,8 +799,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     isApprovalEditLockedItem,
     handleApproveAction,
     handleRejectAction,
-    handleRecallAction,
-  } = useApprovalActions({
+    handleRecallAction } = useApprovalActions({
     user,
     openConfirm,
     openPrompt,
@@ -833,8 +816,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     setSelectedApprovalId,
     resolveAccessibleView,
     setViewMode,
-    onViewChange,
-  });
+    onViewChange });
   const hasApproverSelection = approverLine.length > 0;
 
   const { handleSubmit } = useApprovalSubmit({
@@ -864,8 +846,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     openConfirm,
     resolveEffectiveApproverId,
     resolveApprovalLineIds,
-    surgeryStockDepartmentAliases,
-  });
+    surgeryStockDepartmentAliases });
 
   const visibleApprovals = useMemo(() => approvals, [approvals]);
 

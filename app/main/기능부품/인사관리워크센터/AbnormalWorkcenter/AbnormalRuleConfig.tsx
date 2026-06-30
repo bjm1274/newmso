@@ -23,8 +23,7 @@ interface Props {
 const SEVERITY_BADGE: Record<Severity, string> = {
   관찰: 'badge badge-blue',
   주의: 'badge badge-yellow',
-  경고: 'badge badge-red',
-};
+  경고: 'badge badge-red' };
 
 function AbnormalRuleConfigInner({ rules, canEdit, onSave }: Props) {
   const [local, setLocal] = useState<AbnormalRule[]>(rules);

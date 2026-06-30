@@ -19,8 +19,7 @@ export function pollDraftToInput(poll: PollDraft): BoardPollInput | null {
     question: poll.question.trim(),
     options,
     anonymous: poll.anonymous,
-    multiple: poll.multiple,
-  };
+    multiple: poll.multiple };
   if (poll.prizeEnabled && poll.prizeName.trim() && poll.prizeWinnerCount >= 1) {
     out.prize = { winnerCount: poll.prizeWinnerCount, name: poll.prizeName.trim() };
   }
@@ -44,8 +43,7 @@ export function pollDraftFromPost(post: BoardListPost | null): PollDraft {
     anonymous: Boolean(obj.anonymous),
     prizeEnabled: Boolean(prize && String(prize.name ?? '').trim()),
     prizeName: prize ? String(prize.name ?? '') : '',
-    prizeWinnerCount: prize && Number(prize.winnerCount) >= 1 ? Number(prize.winnerCount) : 1,
-  };
+    prizeWinnerCount: prize && Number(prize.winnerCount) >= 1 ? Number(prize.winnerCount) : 1 };
 }
 
 /** EDIT prefill — 일정 메타 → ScheduleDraft (좌/우는 title 접두사로 파싱) */
@@ -71,7 +69,5 @@ export function scheduleDraftFromPost(post: BoardListPost | null): { draft: Sche
       caregiver: Boolean(post.surgery_caregiver),
       transfusion: Boolean(post.surgery_transfusion),
       contrastRequired: Boolean(post.mri_contrast_required),
-      bodyPartId: 'all',
-    },
-  };
+      bodyPartId: 'all' } };
 }

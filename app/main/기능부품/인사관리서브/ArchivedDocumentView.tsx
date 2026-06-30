@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { parseArchivedContent, extractApprovalDocNumberFromDocument } from '@/lib/approval-document-archive';
 import { buildApprovalPrintHtml } from '../전자결재서브/approval-print-utils';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from '../전자결재서브/approval-constants';
@@ -37,8 +37,7 @@ function resolveApprovalLookup(doc: Record<string, unknown>) {
     docNumber,
     title: String(doc.title || '').trim(),
     senderCompany: String(doc.company_name || '').trim(),
-    senderId: String(doc.created_by || '').trim(),
-  };
+    senderId: String(doc.created_by || '').trim() };
 }
 
 /**
@@ -54,8 +53,7 @@ function buildResolvers(originalApproval: Record<string, unknown>) {
 
   const resolveApprovalTemplateMeta = () => ({
     slug: 'generic',
-    name: formName,
-  });
+    name: formName });
 
   const genericPreset = BUILTIN_TEMPLATE_DEFAULTS.generic || {};
   const resolveApprovalTemplateDesign = () => ({
@@ -65,8 +63,7 @@ function buildResolvers(originalApproval: Record<string, unknown>) {
     companyLabel,
     sealLabel: `${companyLabel} 직인`,
     templateName: formName,
-    templateSlug: 'generic',
-  });
+    templateSlug: 'generic' });
 
   return { resolveApprovalTemplateDesign, resolveApprovalTemplateMeta };
 }
@@ -92,7 +89,7 @@ export default function ArchivedDocumentView({ doc, companyName }: ArchivedDocum
 
         // 1차: doc_number 정확 매칭
         if (lookup.docNumber) {
-          const { data, error } = await supabase
+          const { data, error } = await db
             .from('approvals')
             .select('*')
             .eq('doc_number', lookup.docNumber)
@@ -104,7 +101,7 @@ export default function ArchivedDocumentView({ doc, companyName }: ArchivedDocum
 
         // 2차 폴백: title + 발신회사 + 발신자(있을 때)로 매칭
         if (!row && lookup.title) {
-          let query = supabase
+          let query = db
             .from('approvals')
             .select('*')
             .eq('title', lookup.title)
@@ -149,8 +146,7 @@ export default function ArchivedDocumentView({ doc, companyName }: ArchivedDocum
         approvalDirectoryStaffs: [],
         resolveApprovalTemplateDesign,
         resolveApprovalTemplateMeta,
-        options: { autoPrint: false },
-      });
+        options: { autoPrint: false } });
     } catch {
       return null;
     }

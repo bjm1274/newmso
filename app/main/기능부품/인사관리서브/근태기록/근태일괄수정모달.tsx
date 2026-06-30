@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
@@ -24,8 +24,7 @@ import {
   isProblemAttendanceStatus,
   isWeekendDate,
   resolveAttendanceStatusWithLeave,
-  resolveLeaveStatusForDate,
-} from './근태유틸';
+  resolveLeaveStatusForDate } from './근태유틸';
 
 type StaffLite = {
   id: string;
@@ -69,8 +68,7 @@ const STATUS_LABEL_MAP: Record<BulkStatus, string> = {
   half_leave: '반차',
   annual_leave: '연차',
   sick_leave: '병가',
-  holiday: '휴일',
-};
+  holiday: '휴일' };
 
 type BulkEditAttendanceRow = {
   staff_id: string;
@@ -120,14 +118,12 @@ function computeDateRange(rangeType: BulkRangeType, startDate: string, endDate: 
     const monthLast = new Date(y, m, 0).getDate();
     return {
       start: `${y}-${String(m).padStart(2, '0')}-01`,
-      end: `${y}-${String(m).padStart(2, '0')}-${String(monthLast).padStart(2, '0')}`,
-    };
+      end: `${y}-${String(m).padStart(2, '0')}-${String(monthLast).padStart(2, '0')}` };
   }
   if (rangeType === 'custom') {
     return {
       start: startDate <= endDate ? startDate : endDate,
-      end: startDate <= endDate ? endDate : startDate,
-    };
+      end: startDate <= endDate ? endDate : startDate };
   }
   return { start: startDate, end: startDate };
 }
@@ -151,8 +147,7 @@ export default function AttendanceBulkEditModal({
   initialSelectedIds,
   initialDate,
   attendances = [],
-  approvedLeaves = [],
-}: AttendanceBulkEditModalProps) {
+  approvedLeaves = [] }: AttendanceBulkEditModalProps) {
   const [rangeType, setRangeType] = useState<BulkRangeType>('day');
   const today = useMemo(() => getKoreanTodayString(), []);
   const [startDate, setStartDate] = useState(initialDate || today);
@@ -294,13 +289,11 @@ export default function AttendanceBulkEditModal({
           ...(isPresent
             ? {
                 check_in_time: `${work_date}T09:00:00+09:00`,
-                check_out_time: `${work_date}T18:00:00+09:00`,
-              }
-            : {}),
-        }));
+                check_out_time: `${work_date}T18:00:00+09:00` }
+            : {}) }));
         try {
           for (const row of rows) {
-            const { error } = await supabase
+            const { error } = await db
               .from('attendances')
               .upsert(row, { onConflict: 'staff_id,work_date' });
             if (error) throw error;

@@ -23,8 +23,7 @@ const FILTER_LABEL: Record<SentFilter, string> = {
   all: '전체',
   pending: '대기',
   approved: '승인',
-  rejected: '반려',
-};
+  rejected: '반려' };
 
 function statusInfo(row: ApprovalRow, staffId: string | null): { label: string; tone: MChipTone } {
   const status = String(row.status || '');
@@ -40,8 +39,7 @@ function statusInfo(row: ApprovalRow, staffId: string | null): { label: string; 
   const isMine = staffId != null && line.includes(staffId);
   return {
     label: total > 1 ? `${step}/${total} 결재중` : isMine ? '결재중' : '대기',
-    tone: 'warning',
-  };
+    tone: 'warning' };
 }
 
 function formatTs(iso?: string | null): string {
@@ -84,8 +82,7 @@ export default function SApprovalSent({
   loading,
   onBack,
   onOpen,
-  onWrite,
-}: SApprovalSentProps) {
+  onWrite }: SApprovalSentProps) {
   const [filter, setFilter] = useState<SentFilter>('all');
 
   const filtered = useMemo(() => {
@@ -103,8 +100,7 @@ export default function SApprovalSent({
       all: rows.length,
       pending: rows.filter((r) => String(r.status) === '대기').length,
       approved: rows.filter((r) => String(r.status) === '승인').length,
-      rejected: rows.filter((r) => String(r.status) === '반려').length,
-    }),
+      rejected: rows.filter((r) => String(r.status) === '반려').length }),
     [rows]
   );
 
@@ -127,8 +123,7 @@ export default function SApprovalSent({
               width: 30,
               height: 30,
               border: 'none',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="edit" size={15} color="var(--z-600)" />
           </button>
@@ -143,8 +138,7 @@ export default function SApprovalSent({
           display: 'flex',
           gap: 6,
           overflowX: 'auto',
-          scrollbarWidth: 'none',
-        }}
+          scrollbarWidth: 'none' }}
       >
         {(['all', 'pending', 'approved', 'rejected'] as SentFilter[]).map((f) => {
           const on = filter === f;
@@ -164,8 +158,7 @@ export default function SApprovalSent({
                 border: on ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
-              }}
+                boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
             >
               {FILTER_LABEL[f]}
               <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{counts[f]}</span>
@@ -180,8 +173,7 @@ export default function SApprovalSent({
             padding: '14px 16px 16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-          }}
+            gap: 10 }}
         >
           {loading && filtered.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
@@ -214,8 +206,7 @@ export default function SApprovalSent({
                   display: 'block',
                   outline: 'none',
                   cursor: 'pointer',
-                  border: 'none',
-                }}
+                  border: 'none' }}
                 onClick={() => onOpen(row.id)}
                 aria-label={`${title} 상세 열기`}
               >

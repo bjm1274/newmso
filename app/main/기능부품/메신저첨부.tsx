@@ -4,8 +4,7 @@ import { logger } from '@/lib/logger';
 import {
   useEffect,
   useState,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
+  type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from '@/lib/toast';
 import {
   buildStorageInlineUrl,
@@ -13,8 +12,7 @@ import {
   extractStorageUrlExtension,
   triggerManagedBrowserDownload,
   isInternalStorageObjectUrl,
-  rewritePublicR2UrlToInternal,
-} from '@/lib/object-storage-url';
+  rewritePublicR2UrlToInternal } from '@/lib/object-storage-url';
 import type { ChatMessage } from '@/types';
 import { Paperclip, Video } from './lucide-shim';
 
@@ -38,8 +36,7 @@ export function DeferredAttachmentImage({
   placeholderClassName = '',
   fallbackClassName = '',
   className = '',
-  onLoad,
-}: {
+  onLoad }: {
   src: string;
   alt: string;
   wrapperClassName?: string;
@@ -237,8 +234,7 @@ function guessFileExtension(file: File): string {
     'video/quicktime': 'mov',
     'application/pdf': 'pdf',
     'text/plain': 'txt',
-    'application/zip': 'zip',
-  };
+    'application/zip': 'zip' };
   return mimeMap[mime] || 'bin';
 }
 
@@ -338,8 +334,7 @@ export function AttachmentQuickActions({
   replyTestId,
   variant = 'pill',
   className = '',
-  kind,
-}: AttachmentQuickActionsProps) {
+  kind }: AttachmentQuickActionsProps) {
   const handleShare = async (event: { preventDefault?: () => void; stopPropagation?: () => void }) => {
     event.preventDefault?.();
     event.stopPropagation?.();
@@ -367,38 +362,32 @@ export function AttachmentQuickActions({
   const actionClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: 'px-2 py-1 rounded-md text-[10px] font-bold',
     subtle: 'text-[10px] font-bold hover:underline underline-offset-2',
-    overlay: 'pointer-events-auto px-2 py-1 rounded-[var(--radius-md)] bg-black/40 hover:bg-black/60 text-white text-[10px] font-bold',
-  };
+    overlay: 'pointer-events-auto px-2 py-1 rounded-[var(--radius-md)] bg-black/40 hover:bg-black/60 text-white text-[10px] font-bold' };
 
   const previewClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-blue-500/10 dark:bg-blue-900/30 text-[var(--accent)] hover:text-blue-600`,
     subtle: `${actionClassByVariant.subtle} text-[var(--accent)] hover:text-blue-600`,
-    overlay: actionClassByVariant.overlay,
-  };
+    overlay: actionClassByVariant.overlay };
 
   const replyClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-amber-50 dark:bg-amber-900/30 text-amber-700 hover:text-amber-800`,
     subtle: `${actionClassByVariant.subtle} text-amber-700 hover:text-amber-800`,
-    overlay: actionClassByVariant.overlay,
-  };
+    overlay: actionClassByVariant.overlay };
 
   const shareClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
     subtle: `${actionClassByVariant.subtle} text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)]`,
-    overlay: actionClassByVariant.overlay,
-  };
+    overlay: actionClassByVariant.overlay };
 
   const copyClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-purple-50 dark:bg-purple-900/30 text-purple-600 hover:text-purple-700`,
     subtle: `${actionClassByVariant.subtle} text-purple-600 hover:text-purple-700`,
-    overlay: actionClassByVariant.overlay,
-  };
+    overlay: actionClassByVariant.overlay };
 
   const downloadClassByVariant: Record<AttachmentQuickActionsVariant, string> = {
     pill: `${actionClassByVariant.pill} bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 hover:text-emerald-700`,
     subtle: `${actionClassByVariant.subtle} text-emerald-600 hover:text-emerald-700`,
-    overlay: actionClassByVariant.overlay,
-  };
+    overlay: actionClassByVariant.overlay };
 
   return (
     <div className={`flex items-center gap-1.5 flex-wrap ${className}`}>
@@ -467,8 +456,7 @@ export function AttachmentListCard({
   layout = 'list',
   tone = 'default',
   className = '',
-  onMediaLoad,
-}: AttachmentListCardProps) {
+  onMediaLoad }: AttachmentListCardProps) {
   const isClickable = typeof onActivate === 'function';
   const bubbleAlignmentClass = tone === 'accent' ? 'items-end text-right' : 'items-start text-left';
   const mediaUrl = kind === 'image' || kind === 'video' ? buildStorageInlineUrl(url, name) || url : url;

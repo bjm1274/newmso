@@ -147,8 +147,7 @@ export function formatPatientBedLabel(input: {
 function compareRoomNumbers(left: string, right: string) {
   return left.localeCompare(right, 'ko-KR', {
     numeric: true,
-    sensitivity: 'base',
-  });
+    sensitivity: 'base' });
 }
 
 function normalizeBeds(value: unknown, capacity: number): HandoverBedConfig[] {
@@ -173,8 +172,7 @@ function normalizeBeds(value: unknown, capacity: number): HandoverBedConfig[] {
     return {
       bedNumber,
       patientName: patientNames.get(bedNumber) || '',
-      admissionDate: admissionDates.get(bedNumber) || null,
-    };
+      admissionDate: admissionDates.get(bedNumber) || null };
   });
 }
 
@@ -199,8 +197,7 @@ export function normalizeHandoverRoomConfigs(value: unknown): HandoverRoomConfig
         id: dedupeKey,
         roomNumber,
         capacity,
-        beds: normalizeBeds(item.beds, capacity),
-      } satisfies HandoverRoomConfig;
+        beds: normalizeBeds(item.beds, capacity) } satisfies HandoverRoomConfig;
     })
     .filter((item): item is HandoverRoomConfig => !!item);
 
@@ -219,8 +216,7 @@ function decodeHandoverMetadata(content?: string | null): DecodedHandoverMetadat
     bedNumber: null,
     handoverKind: 'note',
     templateName: null,
-    templateVersion: null,
-  };
+    templateVersion: null };
 
   while (true) {
     const match = remaining.match(HANDOVER_MARKER_REGEX);
@@ -327,8 +323,7 @@ export function normalizeHandoverNote(row: HandoverNoteRow): HandoverNote {
     bed_key: row.bed_key || buildBedKey(roomNumber, bedNumber),
     handover_kind: handoverKind,
     template_name: templateName,
-    template_version: templateVersion,
-  };
+    template_version: templateVersion };
 }
 
 export function parseRoomConfigsFromNote(note: Pick<HandoverNoteRow, 'content'> | null | undefined) {
@@ -343,8 +338,7 @@ export function parseRoomConfigsFromNote(note: Pick<HandoverNoteRow, 'content'> 
 export function buildRoomConfigNoteContent(rooms: HandoverRoomConfig[], handoverDate?: string | null) {
   return encodeHandoverContent(JSON.stringify(normalizeHandoverRoomConfigs(rooms)), {
     handoverKind: 'room_config',
-    handoverDate,
-  });
+    handoverDate });
 }
 
 export function buildHandoverSearchText(

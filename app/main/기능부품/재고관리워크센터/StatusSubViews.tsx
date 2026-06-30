@@ -8,7 +8,7 @@
 import dynamic from 'next/dynamic';
 import { useState, useCallback, useEffect } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { StockChip } from './stock-workcenter-common';
 import type { StockStatusRow } from './stock-types';
 
@@ -24,8 +24,7 @@ const PurchaseOrderManagement = dynamic(
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
       </div>
     ),
-    ssr: false,
-  },
+    ssr: false },
 );
 
 /** 발주관리 모달 래퍼 */
@@ -35,7 +34,7 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
   const [suppliers, setSuppliers] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    const { data: inv } = await supabase
+    const { data: inv } = await db
       .from('inventory')
       .select('*')
       .order('created_at', { ascending: false });
@@ -43,7 +42,7 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
-    const { data: sups } = await supabase
+    const { data: sups } = await db
       .from('suppliers')
       .select('*')
       .order('name');
@@ -92,14 +91,27 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
 // 표
 // ─────────────────────────────────────────────────
 
+import { InventoryRecordCard } from '../재고관리서브/InventoryComponents';
+
 export function StockStatusTable({
   rows,
-  emptyMessage,
-}: {
+  emptyMessage }: {
   rows: StockStatusRow[];
   emptyMessage?: string | null;
 }) {
   const [showPurchase, setShowPurchase] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   if (emptyMessage) {
     return (
@@ -118,61 +130,73 @@ export function StockStatusTable({
   return (
     <>
       {showPurchase && <PurchaseOrderOverlay onClose={() => setShowPurchase(false)} />}
-      <div className="overflow-x-auto">
-        <table className="data-table compact w-full text-[12px]">
-          <thead>
-            <tr>
-              <th scope="col" className="text-left">품목</th>
-              <th scope="col" className="text-left">카테고리</th>
-              <th scope="col" className="text-left">위치</th>
-              <th scope="col" className="text-center">재고</th>
-              <th scope="col" className="text-center">최소</th>
-              <th scope="col" className="text-left">유효기간</th>
-              <th scope="col" className="text-left">상태</th>
-              <th scope="col" className="w-20" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={`${r.name}-${r.loc}-${i}`}>
-                <td className="font-bold">{r.name}</td>
-                <td className="text-[var(--toss-gray-4)]">{r.cat}</td>
-                <td className="text-[var(--toss-gray-4)]">{r.loc}</td>
-                <td
-                  className="text-center font-extrabold tabular-nums"
-                  style={{
-                    color:
-                      r.stock === 0
-                        ? 'var(--danger)'
-                        : r.stock < r.min
-                          ? 'var(--warning)'
-                          : 'var(--foreground)',
-                  }}
-                >
-                  {r.stock}
-                  <span className="ml-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
-                    {r.unit}
-                  </span>
-                </td>
-                <td className="text-center text-[var(--toss-gray-4)] tabular-nums">{r.min}</td>
-                <td className="text-[var(--toss-gray-4)] tabular-nums">{r.expire}</td>
-                <td>
-                  <StockChip tone={r.tone}>{r.status}</StockChip>
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="rounded-[var(--radius-sm)] border border-[var(--accent)] bg-transparent px-2 py-0.5 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-selected-subtle)]"
-                    onClick={() => setShowPurchase(true)}
-                  >
-                    발주
-                  </button>
-                </td>
+      
+      {isMobile ? (
+        <div className="flex flex-col gap-3.5 px-1 py-2">
+          {rows.map((r, i) => (
+            <InventoryRecordCard
+              key={`${r.name}-${r.loc}-${i}`}
+              row={r}
+              onAction={() => setShowPurchase(true)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data-table compact w-full text-[12px]">
+            <thead>
+              <tr>
+                <th scope="col" className="text-left">품목</th>
+                <th scope="col" className="text-left">카테고리</th>
+                <th scope="col" className="text-left">위치</th>
+                <th scope="col" className="text-center">재고</th>
+                <th scope="col" className="text-center">최소</th>
+                <th scope="col" className="text-left">유효기간</th>
+                <th scope="col" className="text-left">상태</th>
+                <th scope="col" className="w-20" />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.name}-${r.loc}-${i}`}>
+                  <td className="font-bold">{r.name}</td>
+                  <td className="text-[var(--toss-gray-4)]">{r.cat}</td>
+                  <td className="text-[var(--toss-gray-4)]">{r.loc}</td>
+                  <td
+                    className="text-center font-extrabold tabular-nums"
+                    style={{
+                      color:
+                        r.stock === 0
+                          ? 'var(--danger)'
+                          : r.stock < r.min
+                            ? 'var(--warning)'
+                            : 'var(--foreground)' }}
+                  >
+                    {r.stock}
+                    <span className="ml-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
+                      {r.unit}
+                    </span>
+                  </td>
+                  <td className="text-center text-[var(--toss-gray-4)] tabular-nums">{r.min}</td>
+                  <td className="text-[var(--toss-gray-4)] tabular-nums">{r.expire}</td>
+                  <td>
+                    <StockChip tone={r.tone}>{r.status}</StockChip>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="rounded-[var(--radius-sm)] border border-[var(--accent)] bg-transparent px-2 py-0.5 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-selected-subtle)]"
+                      onClick={() => setShowPurchase(true)}
+                    >
+                      발주
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }
@@ -192,8 +216,7 @@ export function UrgentAlertList({ rows }: { rows: StockStatusRow[] }) {
         '재고 0': 0,
         '유효기간': 1,
         '부족': 2,
-        '정상': 3,
-      };
+        '정상': 3 };
       return order[a.status] - order[b.status];
     })
     .slice(0, 5);
@@ -225,8 +248,7 @@ export function UrgentAlertList({ rows }: { rows: StockStatusRow[] }) {
                 className="flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5"
                 style={{
                   background:
-                    a.tone === 'danger' ? 'var(--danger-light)' : 'var(--warning-light)',
-                }}
+                    a.tone === 'danger' ? 'var(--danger-light)' : 'var(--warning-light)' }}
               >
                 <StockChip tone={a.tone}>{a.status}</StockChip>
                 <div className="flex-1 min-w-0">
@@ -291,8 +313,7 @@ export function DeptUsageTop5({ items }: { items: Array<{ dept: string; value: n
                     className="h-full rounded-full"
                     style={{
                       width: `${pct}%`,
-                      background: 'linear-gradient(90deg, #3B82F6, #2563EB)',
-                    }}
+                      background: 'linear-gradient(90deg, #3B82F6, #2563EB)' }}
                   />
                 </div>
                 <span className="text-right text-[11px] font-extrabold tabular-nums">

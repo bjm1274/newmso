@@ -25,8 +25,7 @@ export function dotColorForStatus(status: string | null): string | null {
 export function CalTab({
   rows,
   cursor,
-  onChange,
-}: {
+  onChange }: {
   rows: AttendanceDailyRow[];
   cursor: Date;
   onChange: (next: Date) => void;
@@ -45,7 +44,7 @@ export function CalTab({
 
   return (
     <div style={{ padding: '14px 16px 0' }}>
-      <div className="m-card">
+      <div className="m-card macos-glass macos-squircle-sm">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <button
             type="button"
@@ -74,16 +73,14 @@ export function CalTab({
             gap: 4,
             fontSize: 11,
             fontWeight: 700,
-            marginBottom: 6,
-          }}
+            marginBottom: 6 }}
         >
           {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
             <div
               key={d}
               style={{
                 textAlign: 'center',
-                color: i === 0 ? 'var(--m-danger)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)',
-              }}
+                color: i === 0 ? 'var(--m-danger)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)' }}
             >
               {d}
             </div>
@@ -111,8 +108,7 @@ export function CalTab({
                   display: 'grid',
                   placeItems: 'center',
                   fontSize: 13,
-                  fontWeight: isToday ? 800 : 600,
-                }}
+                  fontWeight: isToday ? 800 : 600 }}
               >
                 {day}
                 {dot && !isToday && (
@@ -123,8 +119,7 @@ export function CalTab({
                       width: 4,
                       height: 4,
                       borderRadius: 999,
-                      background: dot,
-                    }}
+                      background: dot }}
                   />
                 )}
               </div>

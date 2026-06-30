@@ -84,8 +84,7 @@ export function sanitizeDischargeCustomRule(raw: unknown): DischargeCustomRule |
     keywords,
     detail,
     basis: String(candidate.basis ?? '').trim() || '사용자 정의 규정',
-    enabled: candidate.enabled !== false,
-  };
+    enabled: candidate.enabled !== false };
 }
 
 export function sanitizeDischargeCustomRules(raw: unknown): DischargeCustomRule[] {
@@ -121,7 +120,6 @@ export function saveDischargeCustomRules(rules: DischargeCustomRule[], scope?: s
   window.localStorage.setItem(getStorageKey(scope), JSON.stringify(payload));
   window.dispatchEvent(
     new CustomEvent('erp-discharge-custom-rules-updated', {
-      detail: { scope: String(scope || '').trim() || 'global' },
-    }),
+      detail: { scope: String(scope || '').trim() || 'global' } }),
   );
 }

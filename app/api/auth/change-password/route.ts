@@ -7,14 +7,12 @@ import {
   selectStaffCredentialsByNameD1,
   type StaffCredentialRow,
   updateStaffPasswordWithFallback,
-  verifyStoredPassword,
-} from '@/lib/staff-password';
+  verifyStoredPassword } from '@/lib/staff-password';
 import { isUuidLike } from '@/lib/staff-identity';
 import {
   getD1Binding,
   getD1Drizzle,
-  audit_logs as auditLogsTable,
-} from '@/lib/db';
+  audit_logs as auditLogsTable } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -116,8 +114,7 @@ export async function POST(request: Request) {
           user_id: targetStaff.id,
           user_name: sessionUserName || targetStaff.name || '',
           details: JSON.stringify({ updatedColumn }),
-          created_at: new Date().toISOString(),
-        });
+          created_at: new Date().toISOString() });
       }
     } catch {
       // 감사 로그 실패가 본 흐름을 막지 않음

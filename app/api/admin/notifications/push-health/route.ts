@@ -2,16 +2,14 @@ import { NextResponse } from 'next/server';
 import {
   isAdminSession,
   isSystemMasterSession,
-  readSessionFromRequest,
-} from '@/lib/server-session';
+  readSessionFromRequest } from '@/lib/server-session';
 import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
 import {
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
   push_subscriptions as pushSubscriptionsTable,
-  staff_members as staffMembersTable,
-} from '@/lib/db';
+  staff_members as staffMembersTable } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
@@ -68,8 +66,7 @@ export async function GET(request: Request) {
         .select({
           id: pushSubscriptionsTable.id,
           staff_id: pushSubscriptionsTable.staff_id,
-          endpoint: pushSubscriptionsTable.endpoint,
-        })
+          endpoint: pushSubscriptionsTable.endpoint })
         .from(pushSubscriptionsTable),
       db.select({ id: staffMembersTable.id }).from(staffMembersTable),
     ]);
@@ -77,8 +74,7 @@ export async function GET(request: Request) {
     const subscriptionRows: PushSubscriptionRow[] = subscriptionData.map((row) => ({
       id: String(row.id || ''),
       staff_id: row.staff_id ?? null,
-      endpoint: row.endpoint ?? null,
-    }));
+      endpoint: row.endpoint ?? null }));
     const validStaffIds = new Set(
       staffData.map((row) => String(row.id || '')),
     );
@@ -102,16 +98,13 @@ export async function GET(request: Request) {
         retrying: queueSummary.retrying,
         deadLettered: queueSummary.deadLettered,
         inFlight: queueSummary.inFlight,
-        oldestPendingAt: queueSummary.oldestPendingAt || null,
-      },
+        oldestPendingAt: queueSummary.oldestPendingAt || null },
       subscriptions: {
         total: subscriptionRows.length,
         nullStaff: nullStaffSubscriptions,
         orphan: orphanSubscriptions,
         duplicateEndpointGroups: duplicateEndpointInfo.duplicateGroups,
-        duplicateRows: duplicateEndpointInfo.duplicateRows,
-      },
-    });
+        duplicateRows: duplicateEndpointInfo.duplicateRows } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Push health check failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

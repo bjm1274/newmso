@@ -1,9 +1,8 @@
-import { withMissingColumnsFallback } from './supabase-compat';
+import { withMissingColumnsFallback } from './db-compat';
 import {
   getD1Binding,
   getD1Drizzle,
-  chat_push_jobs as chatPushJobsTable,
-} from '@/lib/db';
+  chat_push_jobs as chatPushJobsTable } from '@/lib/db';
 
 // ============================================================
 // chat-upload-constants
@@ -82,8 +81,7 @@ export async function enqueueChatPushJob(params: {
       sender_id: params.senderId ? String(params.senderId).trim() || null : null,
       created_at: nowIso,
       next_attempt_at: nowIso,
-      attempt_count: 0,
-    })
+      attempt_count: 0 })
     .onConflictDoNothing({ target: chatPushJobsTable.message_id });
 }
 
@@ -136,8 +134,7 @@ export async function createOrUpsertChatRoom(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{ ok?: boolean; room?: ChatRoomRow; error?: string }>(res);
   if (!res.ok || !data?.ok) {
     return { ok: false, error: data?.error || `HTTP ${res.status}` };
@@ -153,8 +150,7 @@ export async function patchChatRoom(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{ ok?: boolean; error?: string }>(res);
   if (!res.ok || !data?.ok) {
     return { ok: false, error: data?.error || `HTTP ${res.status}` };

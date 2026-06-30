@@ -7,12 +7,11 @@ import {
 buildShiftLookup,
 resolveAssignedShift,
 type ShiftAssignmentReference,
-type ShiftLookupRecord,
-} from '@/lib/shift-resolution';
+type ShiftLookupRecord } from '@/lib/shift-resolution';
 import { getStaffShifts, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
 import { getStaffLikeId,normalizeStaffLike,resolveStaffLike } from '@/lib/staff-identity';
-import { supabase } from '@/lib/supabase';
-import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { isMissingColumnError, withMissingColumnFallback } from '@/lib/db-compat';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
@@ -23,16 +22,14 @@ import {
   calculateEarlyLeaveMinutes,
   resolveLateThreshold as resolveLateThresholdHelper,
   resolveStaleOpenLog,
-  syncToAttendances as syncToAttendancesHelper,
-} from './checkin-utils';
+  syncToAttendances as syncToAttendancesHelper } from './checkin-utils';
 import {
 COMMUTE_STATUS_LABELS,
 NON_ABSENT_DISPLAY_STATUSES,
 type CommuteLog,
 type MonthlyShiftAssignmentRow,
 type ShiftBoundary,
-type WeatherData,
-} from './commute-types';
+type WeatherData } from './commute-types';
 import { CheckInSuccessModal,CheckOutSuccessModal,GpsWarningModal } from './출퇴근모달';
 import { AttendanceCalendar,StatItem,WorkHoursChart } from './출퇴근차트';
 
@@ -46,8 +43,7 @@ const WORK_STATUS_LABEL_TO_CODE: Record<WorkStatusLabel, WorkStatusCode> = {
   근무중: null,
   휴게: 'break',
   점심: 'lunch',
-  외근: 'field',
-};
+  외근: 'field' };
 
 const WORK_STATUS_LABELS: WorkStatusLabel[] = ['근무중', '휴게', '점심', '외근'];
 
@@ -202,15 +198,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         shiftId: fallbackShiftId,
         shiftIds: [],
         department: fallbackDepartment,
-        company: fallbackCompany,
-      };
+        company: fallbackCompany };
     }
 
     try {
       // 1. staff_shift_assignments에서 다중 근무유형 조회 (is_primary 우선)
       const [shifts, staffRow] = await Promise.all([
         getStaffShifts(userId),
-        supabase
+        db
           .from('staff_members')
           .select('shift_id, department, company')
           .eq('id', userId)
@@ -223,7 +218,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         setStaffShifts(shifts);
         const shiftIds = shifts.map((e) => e.shiftId);
         void Promise.resolve(
-          supabase
+          db
             .from('work_shifts')
             .select('id, company_id, name')
             .in('id', shiftIds)
@@ -250,16 +245,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         department:
           String(staffRow?.department || '').trim() || fallbackDepartment,
         company:
-          String(staffRow?.company || '').trim() || fallbackCompany,
-      };
+          String(staffRow?.company || '').trim() || fallbackCompany };
     } catch (error) {
       logger.warn('최신 근무유형 조회 실패:', error);
       return {
         shiftId: fallbackShiftId,
         shiftIds: [],
         department: fallbackDepartment,
-        company: fallbackCompany,
-      };
+        company: fallbackCompany };
     }
   }, [effectiveUserId, resolvedUser]);
 
@@ -378,7 +371,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const fetchTodayLog = async (targetDate = formatLocalDateKey(new Date())) => {
     const userId = effectiveUserId;
     if (!userId) return;
-    const { data } = await supabase
+    const { data } = await db
       .from('attendance')
       .select('*')
       .eq('staff_id', userId)
@@ -394,7 +387,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     const userId = effectiveUserId;
     if (!userId) return;
 
-    const { data } = await supabase
+    const { data } = await db
       .from('attendance')
       .select('*')
       .eq('staff_id', userId)
@@ -407,14 +400,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       fetchLatestStaffShiftContext(),
       withMissingColumnFallback(
         () =>
-          supabase
+          db
             .from('shift_assignments')
             .select('work_date, shift_id, shift_name')
             .eq('staff_id', userId)
             .gte('work_date', startOfMonth)
             .lte('work_date', endOfMonth),
         () =>
-          supabase
+          db
             .from('shift_assignments')
             .select('work_date, shift_id')
             .eq('staff_id', userId)
@@ -435,8 +428,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           String(item.work_date).slice(0, 10),
           {
             shift_id: item.shift_id,
-            shift_name: item.shift_name,
-          },
+            shift_name: item.shift_name },
         ])
     );
 
@@ -465,10 +457,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     if (shiftIds.length > 0 || shiftNames.length > 0) {
       const [shiftIdsResult, shiftNamesResult] = await Promise.all([
         shiftIds.length > 0
-          ? supabase.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
+          ? db.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
           : Promise.resolve({ data: [], error: null }),
         shiftNames.length > 0
-          ? supabase.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
+          ? db.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -494,8 +486,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         fallbackShiftIds: shiftIds,
         preferredCompany: effectiveCompany,
         workDate: dateStr,
-        checkInIso: checkInIso,
-      });
+        checkInIso: checkInIso });
       const boundary = shiftRow
         ? buildShiftBoundary(
             String(shiftRow.start_time || ''),
@@ -527,8 +518,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         ...log,
         status: normalizedStatus || String(log.status || ''),
         displayStatus,
-        displayEarlyLeaveMinutes: displayStatus === '조퇴' ? earlyLeaveMinutes : null,
-      };
+        displayEarlyLeaveMinutes: displayStatus === '조퇴' ? earlyLeaveMinutes : null };
     });
 
     const logsByDate = new Map<string, CommuteLog>();
@@ -549,8 +539,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         status: '결근',
         displayStatus: '결근',
         displayEarlyLeaveMinutes: null,
-        isVirtual: true,
-      });
+        isVirtual: true });
     }
 
     const finalLogs = Array.from(logsByDate.values()).sort((a, b) =>
@@ -580,7 +569,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             return;
           }
 
-          await supabase
+          await db
             .from('attendance')
             .update({ status: '조퇴' })
             .eq('staff_id', userId)
@@ -614,15 +603,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       latitude,
       longitude,
       distance: roundedDistance,
-      capturedAt: Date.now(),
-    };
+      capturedAt: Date.now() };
     return dist;
   };
 
   const resolveCurrentLocation = async ({
     showErrors = true,
-    preferCached = true,
-  }: {
+    preferCached = true }: {
     showErrors?: boolean;
     preferCached?: boolean;
   } = {}): Promise<boolean> => {
@@ -680,14 +667,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         position = await requestCurrentPosition({
           enableHighAccuracy: true,
           timeout: 12000,
-          maximumAge: 0,
-        });
+          maximumAge: 0 });
       } catch {
         position = await requestCurrentPosition({
           enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 60000,
-        });
+          maximumAge: 60000 });
       }
 
       const { latitude, longitude } = position.coords;
@@ -767,12 +752,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         // 근무상태 복원은 fetchTodayLog 가 읽는 `attendance` 테이블(date 컬럼)의
         // current_status 를 기준으로 하므로, 쓰기도 동일 테이블로 일치시킨다.
         // (이전에는 `attendances`/work_date 에 써서 새로고침 시 항상 '근무중'으로 리셋됐음)
-        const { error } = await supabase
+        const { error } = await db
           .from('attendance')
           .update({
             current_status: newCode,
-            current_status_at: now,
-          })
+            current_status_at: now })
           .eq('staff_id', userId)
           .eq('date', workDate);
 
@@ -815,8 +799,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         {
           department: fallbackDepartment,
           company: fallbackCompany,
-          shiftId: fallbackShiftId,
-        },
+          shiftId: fallbackShiftId },
         { checkInIso }
       );
     },
@@ -850,7 +833,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     try {
       if (type === 'in') {
         // 이미 출근 기록이 있으면 중복 처리 방지
-        const { data: existingLog } = await supabase
+        const { data: existingLog } = await db
           .from('attendance')
           .select('id, staff_id, check_in, check_out')
           .eq('staff_id', userId)
@@ -900,7 +883,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           ? `지각 처리되었습니다. (기준: ${lateThreshold.label})`
           : '정상 출근되었습니다. 오늘도 화이팅!';
 
-        const { data, error } = await supabase.from('attendance').upsert([{
+        const { data, error } = await db.from('attendance').upsert([{
           staff_id: userId,
           date: today,
           check_in: timeString,
@@ -931,7 +914,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         const lateThreshold = await resolveLateThreshold(workDate, userDepartment);
         const earlyLeaveMinutes = calculateEarlyLeaveMinutes(workDate, timeString, lateThreshold);
         const finalStatus = earlyLeaveMinutes > 0 ? '조퇴' : ((targetLog.status as string) || '정상');
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('attendance')
           .update({ check_out: timeString, status: finalStatus })
           .eq('staff_id', userId)
@@ -957,8 +940,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         setCheckOutSummary({
           checkInTime: formatTime(checkInIso || ''),
           checkOutTime: formatTime(timeString),
-          workedMinutes,
-        });
+          workedMinutes });
         setShowCheckOutSuccess(true);
         if (checkOutSuccessTimerRef.current) clearTimeout(checkOutSuccessTimerRef.current);
         checkOutSuccessTimerRef.current = setTimeout(() => setShowCheckOutSuccess(false), 10000);

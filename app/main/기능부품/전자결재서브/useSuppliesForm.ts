@@ -15,14 +15,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   buildSupplyRequestMonthlySuggestions,
   normalizeInventoryUnit,
   normalizeSupplyRequestCategory,
   normalizeSupplyRequestItems,
-  type SupplyRequestMonthlySuggestion,
-} from '@/app/main/inventory-utils';
+  type SupplyRequestMonthlySuggestion } from '@/app/main/inventory-utils';
 import { normalizeApprovalAttachments } from '@/lib/approval-report-utils';
 import {
   buildInventoryLabel,
@@ -43,8 +42,7 @@ import {
   sanitizeQuantity,
   type DropdownPosition,
   type InventoryCatalogItem,
-  type SupplyRow,
-} from './supplies-helpers';
+  type SupplyRow } from './supplies-helpers';
 
 type UseSuppliesFormArgs = {
   setExtraData: (value: Record<string, unknown>) => void;
@@ -115,8 +113,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
         min_stock: 0,
         unit: rowUnit,
         spec: rowSpec,
-        category: rowCategory,
-      };
+        category: rowCategory };
       current.stock += getInventoryStock(row);
       current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
       if (!current.spec && rowSpec) current.spec = rowSpec;
@@ -156,7 +153,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
     let cancelled = false;
     const run = async () => {
       try {
-        const { data } = await supabase.from('inventory').select('*');
+        const { data } = await db.from('inventory').select('*');
         if (cancelled) return;
         if (data) setInventory(data as unknown[]);
       } catch {
@@ -174,7 +171,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
     const run = async () => {
       setStatsLoading(true);
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      let query = supabase
+      let query = db
         .from('approvals')
         .select('id, created_at, status, sender_company, meta_data')
         .eq('type', '물품신청')
@@ -216,8 +213,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
           ...item,
           currentStock:
             matched || departmentStockByName.has(itemKey) ? departmentStock ?? 0 : null,
-          unit: matched ? matched.unit : item.unit,
-        };
+          unit: matched ? matched.unit : item.unit };
       }),
     );
   }, [departmentStockByName, inventoryCatalog]);
@@ -233,8 +229,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
       inventory_source_department: requesterDepartment || null,
       note: note.trim() || null,
       attachment_count: attachments.length,
-      attachments: attachments,
-    });
+      attachments: attachments });
     setDraftSavedAt(formatDraftTime(new Date()));
   }, [items, note, attachments, requesterCompany, requesterDepartment, setExtraData]);
 
@@ -264,8 +259,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
     setDropdownPos({
       top: showAbove ? rect.top - dropdownHeight : rect.bottom + 4,
       left: rect.left,
-      width: rect.width,
-    });
+      width: rect.width });
     setActiveDropdownIndex(index);
   }, []);
 
@@ -314,11 +308,9 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
                   })
                   .map((e) => ({
                     ...e,
-                    stock: departmentStockByName.get(normalizeInventoryKey(e.name)) ?? e.stock,
-                  }))
+                    stock: departmentStockByName.get(normalizeInventoryKey(e.name)) ?? e.stock }))
                   .slice(0, 8)
-              : [],
-          };
+              : [] };
         }),
       );
     },
@@ -338,8 +330,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
                 currentStock: departmentStockByName.get(itemKey) ?? 0,
                 unit: selected.unit,
                 category: selected.category || item.category,
-                suggestions: [],
-              }
+                suggestions: [] }
             : item,
         ),
       );
@@ -361,8 +352,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
                       ? normalizeSupplyRequestCategory(value)
                       : key === 'unit'
                         ? normalizeInventoryUnit(value)
-                        : value,
-              }
+                        : value }
             : item,
         ),
       );
@@ -413,8 +403,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
           currentStock:
             matched || departmentStockByName.has(normalizeInventoryKey(suggestion.name))
               ? departmentStock
-              : null,
-        });
+              : null });
         const existingIndex = prev.findIndex(
           (row) =>
             normalizeInventoryKey(row.name) === normalizeInventoryKey(suggestion.name) &&
@@ -430,8 +419,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
               matched || departmentStockByName.has(normalizeInventoryKey(suggestion.name))
                 ? departmentStock
                 : next[existingIndex].currentStock,
-            unit: matched ? matched.unit : next[existingIndex].unit,
-          };
+            unit: matched ? matched.unit : next[existingIndex].unit };
           return next;
         }
         const last = prev[prev.length - 1];
@@ -495,6 +483,5 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
     addItemRow,
     removeLastItemRow,
     removeItemAt,
-    insertSuggestionRow,
-  };
+    insertSuggestionRow };
 }

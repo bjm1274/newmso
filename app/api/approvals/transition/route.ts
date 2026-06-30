@@ -35,18 +35,15 @@ export async function POST(request: Request) {
         id: String(session.user.id || '').trim() || null,
         name: String(session.user.name || '').trim() || null,
         company: String(session.user.company || '').trim() || null,
-        isAdmin: isAdminSession(session.user),
-      },
+        isAdmin: isAdminSession(session.user) },
       action,
       rejectReason: action === 'reject' ? reason : null,
-      approveComment: action === 'approve' ? reason : null,
-    });
+      approveComment: action === 'approve' ? reason : null });
 
     return NextResponse.json({
       ok: true,
       action,
-      ...result,
-    });
+      ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to transition approvals';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

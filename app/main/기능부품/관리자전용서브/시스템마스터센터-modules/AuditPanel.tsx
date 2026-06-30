@@ -18,8 +18,7 @@ export function AuditPanel({
   setAuditKeyword,
   onSearch,
   auditLogs,
-  loading,
-}: AuditPanelProps) {
+  loading }: AuditPanelProps) {
   return (
     <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
       <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">

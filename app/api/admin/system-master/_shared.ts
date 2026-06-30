@@ -9,8 +9,7 @@ import {
   chat_push_jobs as chatPushJobsTable,
   desc,
   isNotNull,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 
@@ -191,8 +190,7 @@ export function normalizeAuditLog(log: AuditLogRow, staffMap: Map<string, StaffR
     actor_label: log.user_name || getStaffLabel(log.user_id ? staffMap.get(String(log.user_id)) : undefined),
     target_label: targetStaff ? getStaffLabel(targetStaff) : log.target_id || '-',
     changed_fields: changedFields,
-    details,
-  };
+    details };
 }
 
 export function normalizeChatRoom(room: ChatRoomRow, staffMap: Map<string, StaffRow>) {
@@ -210,8 +208,7 @@ export function normalizeChatRoom(room: ChatRoomRow, staffMap: Map<string, Staff
     member_labels: memberNames,
     created_at: room.created_at,
     last_message_at: room.last_message_at || null,
-    last_activity_at: room.last_message_at || room.created_at || null,
-  };
+    last_activity_at: room.last_message_at || room.created_at || null };
 }
 
 export function normalizeMessage(
@@ -232,8 +229,7 @@ export function normalizeMessage(
     file_url: message.file_url || null,
     is_deleted: message.is_deleted === true,
     created_at: message.created_at,
-    edited_at: message.edited_at || null,
-  };
+    edited_at: message.edited_at || null };
 }
 
 export async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> {
@@ -245,16 +241,14 @@ export async function listRecentBackups(limit = 8): Promise<BackupSummaryRow[]> 
       .select({
         id: backupRestoreRunsTable.id,
         file_name: backupRestoreRunsTable.file_name,
-        started_at: backupRestoreRunsTable.started_at,
-      })
+        started_at: backupRestoreRunsTable.started_at })
       .from(backupRestoreRunsTable)
       .orderBy(desc(backupRestoreRunsTable.started_at))
       .limit(limit);
     return rows.map((row) => ({
       name: row.file_name || row.id,
       created_at: row.started_at || new Date().toISOString(),
-      source: 'db' as const,
-    }));
+      source: 'db' as const }));
   } catch {
     return [];
   }
@@ -280,8 +274,7 @@ export function buildUsageSummary(logs: AuditLogRow[]) {
       count: 0,
       latestAt: '',
       topAction: '-',
-      actionCounts: new Map<string, number>(),
-    };
+      actionCounts: new Map<string, number>() };
 
     existing.count += 1;
     if (!existing.latestAt || String(log.created_at || '') > existing.latestAt) {
@@ -308,8 +301,7 @@ export function buildUsageSummary(logs: AuditLogRow[]) {
         label: entry.label,
         count: entry.count,
         latestAt: entry.latestAt || null,
-        topAction,
-      };
+        topAction };
     })
     .sort((left, right) => right.count - left.count);
 }
@@ -346,8 +338,7 @@ export async function loadPushSubscriptionDiagnostics() {
       user_agent: pushSubscriptionsTable.user_agent,
       device_id: pushSubscriptionsTable.device_id,
       fcm_token: pushSubscriptionsTable.fcm_token,
-      created_at: pushSubscriptionsTable.created_at,
-    })
+      created_at: pushSubscriptionsTable.created_at })
     .from(pushSubscriptionsTable);
   return rows as PushSubscriptionRow[];
 }
@@ -366,8 +357,7 @@ export async function loadRecentPushFailures() {
       created_at: chatPushJobsTable.created_at,
       processing_started_at: chatPushJobsTable.processing_started_at,
       next_attempt_at: chatPushJobsTable.next_attempt_at,
-      dead_lettered_at: chatPushJobsTable.dead_lettered_at,
-    })
+      dead_lettered_at: chatPushJobsTable.dead_lettered_at })
     .from(chatPushJobsTable)
     .where(isNotNull(chatPushJobsTable.last_error))
     .orderBy(desc(chatPushJobsTable.processing_started_at))
@@ -416,8 +406,7 @@ export async function cleanupPushSubscriptionsInternal() {
     db.select({
       id: pushSubscriptionsTable.id,
       staff_id: pushSubscriptionsTable.staff_id,
-      endpoint: pushSubscriptionsTable.endpoint,
-    }).from(pushSubscriptionsTable),
+      endpoint: pushSubscriptionsTable.endpoint }).from(pushSubscriptionsTable),
     db.select({ id: staffMembersTable.id }).from(staffMembersTable),
   ]);
   const rows = subRows as PushSubscriptionRow[];
@@ -491,8 +480,7 @@ export async function cleanupPushSubscriptionsInternal() {
     orphanStaff,
     duplicateGroups,
     duplicateRowsDeleted,
-    totalAfter: rows.length - ids.length,
-  };
+    totalAfter: rows.length - ids.length };
 }
 
 export function buildPermissionChangeSummary(details: LooseRecord) {
@@ -516,8 +504,7 @@ export function buildPermissionChangeSummary(details: LooseRecord) {
     enabled,
     disabled,
     beforeRole: String(before.role || '').trim() || null,
-    afterRole: String(after.role || '').trim() || null,
-  };
+    afterRole: String(after.role || '').trim() || null };
 }
 
 export function buildIntegrityChecks(params: {
@@ -565,8 +552,7 @@ export function buildIntegrityChecks(params: {
       title: '직원 마스터와 연결되지 않은 급여 레코드',
       description: '급여 레코드가 현재 직원 마스터와 끊어져 있어 정산/보정이 어려운 상태입니다.',
       count: orphanPayrollRows.length,
-      samples: orphanPayrollRows.slice(0, 5).map((row) => `${row.year_month || '-'} · ${row.id}`),
-    });
+      samples: orphanPayrollRows.slice(0, 5).map((row) => `${row.year_month || '-'} · ${row.id}`) });
   }
   if (invalidSubscriptions.length > 0) {
     issues.push({
@@ -575,8 +561,7 @@ export function buildIntegrityChecks(params: {
       title: '유효하지 않은 푸시 구독',
       description: 'staff_id가 없거나 현재 직원과 연결되지 않은 푸시 구독이 남아 있습니다.',
       count: invalidSubscriptions.length,
-      samples: invalidSubscriptions.slice(0, 5).map((row) => `${row.id} · ${row.staff_id || 'staff 없음'}`),
-    });
+      samples: invalidSubscriptions.slice(0, 5).map((row) => `${row.id} · ${row.staff_id || 'staff 없음'}`) });
   }
   if (roomsWithMissingMembers.length > 0) {
     issues.push({
@@ -585,8 +570,7 @@ export function buildIntegrityChecks(params: {
       title: '삭제된 직원을 포함한 채팅방',
       description: '채팅방 멤버 목록에 현재 직원 마스터에 없는 사용자가 포함돼 있습니다.',
       count: roomsWithMissingMembers.length,
-      samples: roomsWithMissingMembers.slice(0, 5).map((entry) => `${entry.room.name || entry.room.id} · ${entry.missingMembers.join(', ')}`),
-    });
+      samples: roomsWithMissingMembers.slice(0, 5).map((entry) => `${entry.room.name || entry.room.id} · ${entry.missingMembers.join(', ')}`) });
   }
   if (approvalsWithMissingApprover.length > 0) {
     issues.push({
@@ -595,8 +579,7 @@ export function buildIntegrityChecks(params: {
       title: '현재 결재자가 존재하지 않는 대기 문서',
       description: '대기 문서인데 현재 결재자가 직원 마스터에 없어 결재가 멈춘 상태일 수 있습니다.',
       count: approvalsWithMissingApprover.length,
-      samples: approvalsWithMissingApprover.slice(0, 5).map((row) => `${row.title || row.id} · ${row.current_approver_id}`),
-    });
+      samples: approvalsWithMissingApprover.slice(0, 5).map((row) => `${row.title || row.id} · ${row.current_approver_id}`) });
   }
   if (duplicateEmployeeNoRows.length > 0) {
     issues.push({
@@ -605,8 +588,7 @@ export function buildIntegrityChecks(params: {
       title: '중복 사번',
       description: '직원 마스터에 동일한 사번이 여러 건 존재합니다.',
       count: duplicateEmployeeNoRows.length,
-      samples: duplicateEmployeeNoRows.slice(0, 5).map(([employeeNo, count]) => `${employeeNo} (${count}건)`),
-    });
+      samples: duplicateEmployeeNoRows.slice(0, 5).map(([employeeNo, count]) => `${employeeNo} (${count}건)`) });
   }
   if (issues.length === 0) {
     issues.push({
@@ -615,8 +597,7 @@ export function buildIntegrityChecks(params: {
       title: '정합성 이상 없음',
       description: '현재 기준으로 주요 원장/구독/채팅방/결재 데이터 정합성 이슈가 발견되지 않았습니다.',
       count: 0,
-      samples: [],
-    });
+      samples: [] });
   }
 
   return issues;

@@ -12,13 +12,11 @@
 
 import {
   calculateHourlyRateFromMonthlySalary,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import { calculateAge } from './payroll-policy';
 import type {
   PayrollRecordNormalized,
-  PayrollWorkcenterData,
-} from './payroll-fetch';
+  PayrollWorkcenterData } from './payroll-fetch';
 
 // ─── KPI ────────────────────────────────────────────
 export interface PayrollKpiCalculated {
@@ -81,8 +79,7 @@ export function calculateKpis(data: PayrollWorkcenterData): PayrollKpiCalculated
     insurancePayDate,
     withholdingPayDate,
     prevBaseSalarySum,
-    prevNetPaySum,
-  };
+    prevNetPaySum };
 }
 
 // ─── 5건 점검 자동 감지 ───────────────────────────────
@@ -123,8 +120,7 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
       actionLabel: '반영 처리',
       tone: 'danger',
       targetModule: 'unpaid',
-      count: unpaidStaffIds.length,
-    });
+      count: unpaidStaffIds.length });
   }
 
   // 2) 최저임금
@@ -144,8 +140,7 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
       actionLabel: '시뮬레이션',
       tone: 'warn',
       targetModule: 'minWage',
-      count: minWageBelow,
-    });
+      count: minWageBelow });
   }
 
   // 3) 통상임금
@@ -157,8 +152,7 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
       actionLabel: '계산기',
       tone: 'warn',
       targetModule: 'ordinary',
-      count: bonusStaff,
-    });
+      count: bonusStaff });
   }
 
   // 4) 무급결근
@@ -176,8 +170,7 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
       actionLabel: '상세',
       tone: 'info',
       targetModule: 'absence',
-      count: absenceCnt,
-    });
+      count: absenceCnt });
   }
 
   // 5) 임금피크
@@ -195,8 +188,7 @@ export function detectAlerts(data: PayrollWorkcenterData): DetectedAlert[] {
       actionLabel: '설정',
       tone: 'info',
       targetModule: 'wagePeak',
-      count: peakCnt,
-    });
+      count: peakCnt });
   }
 
   return alerts;

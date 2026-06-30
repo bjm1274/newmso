@@ -35,33 +35,27 @@ const COLUMN_TONE_STYLE: Record<ColumnTone, { border: string; chipBg: string; ch
     border: 'var(--toss-gray-2)',
     chipBg: 'var(--muted)',
     chipColor: 'var(--muted-foreground)',
-    headColor: 'var(--foreground)',
-  },
+    headColor: 'var(--foreground)' },
   warn: {
     border: 'var(--warning)',
     chipBg: 'var(--warning-light)',
     chipColor: 'var(--warning)',
-    headColor: 'var(--warning)',
-  },
+    headColor: 'var(--warning)' },
   accent: {
     border: 'var(--accent)',
     chipBg: 'var(--accent-selected-subtle)',
     chipColor: 'var(--accent)',
-    headColor: 'var(--accent)',
-  },
+    headColor: 'var(--accent)' },
   success: {
     border: 'var(--success)',
     chipBg: 'var(--success-light)',
     chipColor: 'var(--success)',
-    headColor: 'var(--success)',
-  },
+    headColor: 'var(--success)' },
   danger: {
     border: 'var(--danger)',
     chipBg: 'var(--danger-light)',
     chipColor: 'var(--danger)',
-    headColor: 'var(--danger)',
-  },
-};
+    headColor: 'var(--danger)' } };
 
 function formatBoardDate(value: unknown) {
   const raw = String(value || '').trim();
@@ -107,8 +101,7 @@ function classifyStage(
 function StageDots({
   total,
   currentIndex,
-  rejected,
-}: {
+  rejected }: {
   total: number;
   currentIndex: number;
   rejected: boolean;
@@ -156,8 +149,7 @@ function BoardCard({
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalTemplateMeta,
-  onSelect,
-}: {
+  onSelect }: {
   item: ApprovalRecord;
   staffs: StaffMember[];
   resolveApprovalLineIds: (item: ApprovalRecord) => string[];
@@ -173,8 +165,7 @@ function BoardCard({
     item,
     staffs,
     resolveApprovalLineIds,
-    resolveCurrentApproverId,
-  });
+    resolveCurrentApproverId });
   const status = String(item.status || '대기');
   const rejected = status.includes('반려');
   const approved = status.includes('승인') || status.includes('완료');
@@ -235,16 +226,14 @@ export default function WorkflowBoard({
   resolveApprovalLineIds,
   resolveCurrentApproverId,
   resolveApprovalTemplateMeta,
-  onSelectDocument,
-}: WorkflowBoardProps) {
+  onSelectDocument }: WorkflowBoardProps) {
   const columns = useMemo<WorkflowColumn[]>(() => {
     const buckets: Record<WorkflowStage, ApprovalRecord[]> = {
       draft: [],
       pending: [],
       review: [],
       approved: [],
-      rejected: [],
-    };
+      rejected: [] };
     for (const item of documents) {
       const currentApproverId = resolveCurrentApproverId(item);
       const stage = classifyStage(item, myStaffId, currentApproverId);
@@ -268,8 +257,7 @@ export default function WorkflowBoard({
       {columns.map((column) => {
         const tone = COLUMN_TONE_STYLE[column.tone];
         const headStyle: CSSProperties = {
-          borderLeft: `3px solid ${tone.border}`,
-        };
+          borderLeft: `3px solid ${tone.border}` };
         return (
           <div
             key={column.id}

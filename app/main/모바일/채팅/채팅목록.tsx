@@ -23,8 +23,7 @@ import {
   useChatMessageSearch,
   type MobileChatRoom,
   type ChatMessageSearchHit,
-  type StaffDirectoryEntry,
-} from './data-hooks';
+  type StaffDirectoryEntry } from './data-hooks';
 import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
@@ -80,8 +79,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
         name: peerName,
         type: 'direct',
         members: memberIds,
-        created_by: userId,
-      });
+        created_by: userId });
       if (result.ok && result.room) {
         await onRefresh().catch(() => undefined);
         onOpen(String(result.room.id));
@@ -113,8 +111,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
 
   const { containerRef: scrollContainerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh,
-    enabled: !!userId,
-  });
+    enabled: !!userId });
 
   // debounce 150ms — 칩 변경/탭 전환 시는 즉시 반영, 입력만 지연
   useEffect(() => {
@@ -179,8 +176,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
             borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-          }}
+            gap: 8 }}
         >
           <label
             className="macos-squircle-sm"
@@ -190,8 +186,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
               alignItems: 'center',
               gap: 8,
               background: 'rgba(0, 0, 0, 0.04)',
-              padding: '6px 12px',
-            }}
+              padding: '6px 12px' }}
           >
             <MIcon name="search" size={16} color="var(--z-500)" />
             <span style={{ position: 'absolute', left: -9999 }}>채팅방 검색</span>
@@ -209,8 +204,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                 border: 'none',
                 outline: 'none',
                 width: '100%',
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             />
             {searchInput.length > 0 && (
               <button
@@ -227,8 +221,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                   placeItems: 'center',
                   flexShrink: 0,
                   border: 'none',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
               >
                 <MIcon name="x" size={11} />
               </button>
@@ -242,8 +235,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
           display: 'flex',
           alignItems: 'center',
           borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-          padding: '8px 12px 8px 16px',
-        }}
+          padding: '8px 12px 8px 16px' }}
       >
         <div
           className="m-seg macos-glass macos-squircle-sm"
@@ -255,8 +247,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
             border: 'none',
             padding: '2px',
             display: 'flex',
-            marginRight: 8,
-          }}
+            marginRight: 8 }}
         >
           <ChipBtn label="채팅" active={tab === 'chat'} onClick={() => setTab('chat')} />
           <ChipBtn label="조직도" active={tab === 'org'} onClick={() => setTab('org')} />
@@ -281,8 +272,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
             placeItems: 'center',
             background: searchOpen ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
             border: 'none',
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           <MIcon name="search" size={20} />
         </button>
@@ -313,8 +303,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                             alignItems: 'center',
                             gap: 12,
                             padding: '12px 16px',
-                            border: 'none',
-                          }}
+                            border: 'none' }}
                         >
                           <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
                           <div style={{ flex: 1 }}>
@@ -438,8 +427,7 @@ function renderSnippet(content: string, query: string): React.ReactNode {
           color: 'var(--m-accent, inherit)',
           padding: '0 2px',
           borderRadius: 3,
-          fontWeight: 800,
-        }}
+          fontWeight: 800 }}
       >
         {match}
       </mark>
@@ -483,8 +471,7 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
           padding: '12px 16px',
           width: '100%',
           textAlign: 'left',
-          border: 'none',
-        }}
+          border: 'none' }}
       >
         <MAvatar tone={tone}>
           <span>{roomTitle.charAt(0) || '방'}</span>
@@ -499,8 +486,7 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 flex: '0 1 auto',
-                minWidth: 0,
-              }}
+                minWidth: 0 }}
             >
               {roomTitle}
             </span>
@@ -515,8 +501,7 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
-              wordBreak: 'break-word',
-            }}
+              wordBreak: 'break-word' }}
           >
             {renderSnippet(hit.content, query)}
           </div>
@@ -544,8 +529,7 @@ function ChipBtn({ label, active, onClick }: ChipBtnProps) {
         color: active ? 'var(--z-900)' : 'var(--z-600)',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
-        background: 'transparent',
-      }}
+        background: 'transparent' }}
       onClick={onClick}
     >
       {label}
@@ -605,8 +589,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
           width: '100%',
           textAlign: 'left',
           border: 'none',
-          transition: 'transform 0.15s ease, background-color 0.15s ease',
-        }}
+          transition: 'transform 0.15s ease, background-color 0.15s ease' }}
       >
         <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
           {isNotice ? (
@@ -619,8 +602,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                borderRadius: 'inherit',
-              }}
+                borderRadius: 'inherit' }}
             />
           ) : isGroup ? (
             <span>{getGroupChatRoomBadgeText(title)}</span>
@@ -640,8 +622,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
                 textOverflow: 'ellipsis',
                 flex: '0 1 auto',
                 minWidth: 0,
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             >
               {title}
             </span>
@@ -662,8 +643,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                maxWidth: 220,
-              }}
+                maxWidth: 220 }}
             >
               {lastMsg || <span style={{ color: 'var(--z-400)' }}>대화 시작 전</span>}
             </span>
@@ -684,8 +664,7 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
 
 function OrgBrowseTab({
   groups,
-  onStartChat,
-}: {
+  onStartChat }: {
   groups: { department: string; members: StaffDirectoryEntry[] }[];
   onStartChat: (peerId: string, peerName: string) => void;
 }) {
@@ -721,8 +700,7 @@ function OrgBrowseTab({
                 padding: '12px 16px',
                 border: 'none',
                 cursor: 'pointer',
-                textAlign: 'left',
-              }}
+                textAlign: 'left' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-800)' }}>
@@ -754,8 +732,7 @@ function OrgBrowseTab({
                         alignItems: 'center',
                         gap: 12,
                         padding: '10px 16px',
-                        border: 'none',
-                      }}
+                        border: 'none' }}
                     >
                       <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
                       <div style={{ flex: 1 }}>
@@ -805,8 +782,7 @@ function OrgPlaceholder() {
         color: 'var(--z-500)',
         fontSize: 13,
         fontWeight: 600,
-        lineHeight: 1.6,
-      }}
+        lineHeight: 1.6 }}
     >
       조직도 탐색은 곧 추가됩니다.
     </div>
@@ -821,8 +797,7 @@ function EmptyState({ label }: { label: string }) {
         textAlign: 'center',
         color: 'var(--z-500)',
         fontSize: 13,
-        fontWeight: 600,
-      }}
+        fontWeight: 600 }}
     >
       {label}
     </div>

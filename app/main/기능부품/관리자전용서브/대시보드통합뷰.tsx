@@ -13,8 +13,7 @@ import {
   fetchActiveStaffLeaves,
   fetchInventoryItems,
   fetchRecentNotifications,
-  fetchTodayCheckedInCount,
-} from '@/lib/data/dashboard-widgets';
+  fetchTodayCheckedInCount } from '@/lib/data/dashboard-widgets';
 import { SwipeableKpiCards, type KpiCard } from '@/app/components/SwipeableKpiCards';
 import { MobileChartWrapper } from '@/app/components/MobileChartWrapper';
 
@@ -24,8 +23,7 @@ import { MobileChartWrapper } from '@/app/components/MobileChartWrapper';
 export function BusinessDashboard({
   staffs = [],
   inventory = [],
-  onNavigate,
-}: Record<string, any>) {
+  onNavigate }: Record<string, any>) {
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
   const [monthlyDeposit, setMonthlyDeposit] = useState<number | null>(null);
@@ -72,29 +70,25 @@ export function BusinessDashboard({
           : `₩${Math.round(monthlyDeposit).toLocaleString('ko-KR')}`,
       detail: '가상계좌 입금 합계',
       icon: 'analytics',
-      tone: 'text-[var(--success)] bg-[var(--success-light)]',
-    },
+      tone: 'text-[var(--success)] bg-[var(--success-light)]' },
     {
       label: '총 직원',
       value: `${activeStaffs.length}명`,
       detail: '재직 기준',
       icon: 'users',
-      tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
-    },
+      tone: 'text-[var(--accent)] bg-[var(--accent-light)]' },
     {
       label: '미결재 건수',
       value: `${pendingApprovalCount}건`,
       detail: pendingApprovalCount > 0 ? '검토 필요' : '정상',
       icon: 'history',
-      tone: 'text-[var(--warning)] bg-[var(--warning-light)]',
-    },
+      tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
     {
       label: '재고 이상',
       value: `${lowStockCount}개`,
       detail: lowStockCount > 0 ? '확인 필요' : '정상',
       icon: 'alert',
-      tone: 'text-[var(--danger)] bg-[var(--danger-light)]',
-    },
+      tone: 'text-[var(--danger)] bg-[var(--danger-light)]' },
   ];
 
   const notices = [
@@ -198,8 +192,7 @@ function BusinessMobileDashboard({
   notices,
   quickLinks,
   leaveUsageRate,
-  onNavigate,
-}: BusinessMobileDashboardProps) {
+  onNavigate }: BusinessMobileDashboardProps) {
   const kpiCards = useMemo<KpiCard[]>(
     () =>
       stats.map((s, idx) => ({
@@ -207,8 +200,7 @@ function BusinessMobileDashboard({
         label: s.label,
         value: s.value,
         description: s.detail,
-        icon: <MenuIcon name={s.icon} className="h-4 w-4" />,
-      })),
+        icon: <MenuIcon name={s.icon} className="h-4 w-4" /> })),
     [stats],
   );
 
@@ -314,8 +306,7 @@ export function FinancialDashboard() {
         setCashFlow({
           in: Number(data.total_amount) || 0,
           out: 0,
-          balance: Number(data.total_amount) || 0,
-        });
+          balance: Number(data.total_amount) || 0 });
       }
     };
     fetchFinancials();
@@ -512,8 +503,7 @@ export function CustomDashboard({ user, selectedCo }: CustomDashboardProps) {
       type,
       title: def.label,
       size: def.defaultSize,
-      position: widgets.length,
-    };
+      position: widgets.length };
     setWidgets((prev) => [...prev, newWidget]);
     setShowAddWidget(false);
   };
@@ -525,8 +515,7 @@ export function CustomDashboard({ user, selectedCo }: CustomDashboardProps) {
   const SIZE_CLASS: Record<string, string> = {
     sm: 'col-span-1',
     md: 'col-span-1 md:col-span-2',
-    lg: 'col-span-1 md:col-span-2 lg:col-span-3',
-  };
+    lg: 'col-span-1 md:col-span-2 lg:col-span-3' };
 
   return (
     <div className="space-y-4">

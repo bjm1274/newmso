@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActive } from '../MemberWorkcenter/data';
 import {
@@ -22,22 +22,19 @@ import {
   resolveShiftBand,
   type ShiftBand,
   type ShiftAssignmentRow,
-  type WorkShiftRow,
-} from './data';
+  type WorkShiftRow } from './data';
 
 const BAND_CLS: Record<ShiftBand, string> = {
   day: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   evening: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
   night: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  off: 'bg-[var(--muted)] text-[var(--toss-gray-3)]',
-};
+  off: 'bg-[var(--muted)] text-[var(--toss-gray-3)]' };
 
 const BAND_LABEL: Record<ShiftBand, string> = {
   day: 'D',
   evening: 'E',
   night: 'N',
-  off: 'OFF',
-};
+  off: 'OFF' };
 
 interface RosterGridProps {
   staffs: StaffMember[];
@@ -80,7 +77,7 @@ export default function RosterGrid({ staffs, selectedCo, onOpenLegacyPlanner }: 
 
   const fetchShifts = useCallback(async () => {
     try {
-      let q = supabase.from('work_shifts').select('id, name, start_time, end_time, shift_type, description').eq('is_active', true);
+      let q = db.from('work_shifts').select('id, name, start_time, end_time, shift_type, description').eq('is_active', true);
       if (selectedCo && selectedCo !== '전체') {
         q = q.eq('company_name', selectedCo);
       }
@@ -107,7 +104,7 @@ export default function RosterGrid({ staffs, selectedCo, onOpenLegacyPlanner }: 
       }
       const start = dates[0]!.iso;
       const end = dates[dates.length - 1]!.iso;
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('shift_assignments')
         .select('staff_id, work_date, shift_id')
         .in('staff_id', staffIds)
@@ -180,15 +177,14 @@ export default function RosterGrid({ staffs, selectedCo, onOpenLegacyPlanner }: 
       setAssignments((prev) => ({ ...prev, [key]: nextShiftId ?? '' }));
 
       try {
-        const { error } = await supabase
+        const { error } = await db
           .from('shift_assignments')
           .upsert(
             {
               staff_id: staff.id,
               work_date: dateIso,
               shift_id: nextShiftId,
-              company_name: staff.company,
-            },
+              company_name: staff.company },
             { onConflict: 'staff_id,work_date' },
           );
         if (error) throw error;
@@ -260,9 +256,9 @@ export default function RosterGrid({ staffs, selectedCo, onOpenLegacyPlanner }: 
             <button
               type="button"
               onClick={onOpenLegacyPlanner}
-              className="ml-2 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[var(--accent-hover)]"
+              className="ml-2 rounded-xl bg-purple-600 px-3.5 py-2 text-[12px] font-bold text-white hover:bg-purple-700 shadow-sm transition-all flex items-center gap-1.5"
             >
-              상세 편성 도구
+              <span>✨ AI 자동 편성 & 유형 설정 (Gemini)</span>
             </button>
           )}
         </div>

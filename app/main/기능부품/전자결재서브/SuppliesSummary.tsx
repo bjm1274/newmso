@@ -67,8 +67,7 @@ function SuppliesSummaryImpl({
   note,
   onNoteChange,
   attachments,
-  onAttachmentsChange,
-}: SuppliesSummaryProps) {
+  onAttachmentsChange }: SuppliesSummaryProps) {
   const noteId = useId();
   const noteHelpId = `${noteId}-help`;
   const [fileError, setFileError] = useState<string | null>(null);
@@ -94,8 +93,7 @@ function SuppliesSummaryImpl({
 
           const response = await fetch('/api/approvals/upload', {
             method: 'POST',
-            body: formData,
-          });
+            body: formData });
 
           const payload = (await response.json().catch(() => ({}))) as UploadResponse;
           if (!response.ok || !payload.url || !payload.fileName) {
@@ -110,8 +108,7 @@ function SuppliesSummaryImpl({
             provider: payload.provider || null,
             bucket: payload.bucket || null,
             path: payload.path || null,
-            uploadedAt: new Date().toISOString(),
-          });
+            uploadedAt: new Date().toISOString() });
         } catch (err) {
           console.error('[Approval Supplies] Attachment upload failed:', err);
           failedFiles.push(file.name);

@@ -10,8 +10,7 @@ import type { ErpUser } from '@/types';
 import MFeatureScreen from '../공통/MFeatureScreen';
 
 const FormsWorkcenter = dynamic(() => import('../../기능부품/관리자워크센터/FormsWorkcenter'), {
-  ssr: false,
-});
+  ssr: false });
 
 export default function 결재양식({ onBack }: { user: ErpUser; onBack: () => void }) {
   return (

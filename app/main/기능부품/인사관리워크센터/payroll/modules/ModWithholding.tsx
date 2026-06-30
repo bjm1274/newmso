@@ -12,8 +12,7 @@ const LegacyTaxFileGenerator = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">원천징수 파일 생성기 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -38,8 +37,7 @@ export default function ModWithholding() {
       localTax,
       total: incomeTax + localTax,
       taxable,
-      count: data.records.length,
-    };
+      count: data.records.length };
   }, [data.records]);
 
   const [companyName, setCompanyName] = useState<string>(data.selectedCo);
@@ -55,8 +53,7 @@ export default function ModWithholding() {
       return [s?.name ?? r.staff_id, '-', r.total_taxable, r.income_tax, r.local_tax].join(',');
     });
     const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\n')], {
-      type: 'text/plain;charset=utf-8;',
-    });
+      type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

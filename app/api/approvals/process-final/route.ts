@@ -6,8 +6,7 @@ import {
   approvals as approvalsTable,
   eq,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 // 공용 정규화(lib/approval-shared)로 통일하되, 이 라우트는 권한 검증에서
 // trim된 sessionUserId와 비교하므로 기존 trim 동작을 보존하기 위해 출력만 trim/재dedup한다.
@@ -75,8 +74,7 @@ export async function POST(request: Request) {
         doc_number: approvalsTable.doc_number,
         sender_id: approvalsTable.sender_id,
         sender_company: approvalsTable.sender_company,
-        title: approvalsTable.title,
-      })
+        title: approvalsTable.title })
       .from(approvalsTable)
       .where(eq(approvalsTable.id, approvalId));
     const row = rows[0] ?? null;

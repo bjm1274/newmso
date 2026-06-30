@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, type CSSProperties, type ReactElement } from 'react';
 import { List } from 'react-window';
 import { EmptyState, LoadingPanel } from '@/app/components/StatePanel';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { escapeLikePattern } from '@/lib/like-escape';
@@ -64,7 +64,7 @@ function AuditLogViewerDesktop() {
     const myId = ++requestIdRef.current;
     setLoading(true);
     
-    let query = supabase
+    let query = db
       .from('audit_logs')
       .select('*')
       .order('created_at', { ascending: false });

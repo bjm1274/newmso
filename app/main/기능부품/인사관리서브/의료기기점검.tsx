@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 const INSPECTION_CYCLE = ['월 1회', '분기 1회', '반기 1회', '연 1회', '수시'];
 const DEVICE_CATEGORIES = ['진단장비', '치료장비', '수술장비', '모니터링', '검사장비', '기타'];
@@ -33,12 +33,12 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   const [inspectForm, setInspectForm] = useState({ inspected_at: getKoreanTodayString(), inspector: '', result: '정상', notes: '', next_inspection_date: '' });
 
   const fetchDevices = useCallback(async () => {
-    const { data } = await supabase.from('medical_devices').select('*').order('next_inspection_date');
+    const { data } = await db.from('medical_devices').select('*').order('next_inspection_date');
     setDevices(data || []);
   }, []);
 
   const fetchHistories = useCallback(async () => {
-    const { data } = await supabase.from('device_inspections').select('*').order('inspected_at', { ascending: false }).limit(100);
+    const { data } = await db.from('device_inspections').select('*').order('inspected_at', { ascending: false }).limit(100);
     setHistories(data || []);
   }, []);
 
@@ -77,9 +77,9 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
     setSaving(true);
     try {
       if (editDeviceId) {
-        await supabase.from('medical_devices').update(deviceForm).eq('id', editDeviceId);
+        await db.from('medical_devices').update(deviceForm).eq('id', editDeviceId);
       } else {
-        await supabase.from('medical_devices').insert([deviceForm]);
+        await db.from('medical_devices').insert([deviceForm]);
       }
       setShowDeviceModal(false);
       fetchDevices();
@@ -90,9 +90,9 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
     if (!selectedDevice) return;
     setSaving(true);
     try {
-      await supabase.from('device_inspections').insert([{ device_id: selectedDevice.id, device_name: selectedDevice.name, ...inspectForm }]);
+      await db.from('device_inspections').insert([{ device_id: selectedDevice.id, device_name: selectedDevice.name, ...inspectForm }]);
       if (inspectForm.next_inspection_date) {
-        await supabase.from('medical_devices').update({ next_inspection_date: inspectForm.next_inspection_date, last_inspection_date: inspectForm.inspected_at }).eq('id', selectedDevice.id);
+        await db.from('medical_devices').update({ next_inspection_date: inspectForm.next_inspection_date, last_inspection_date: inspectForm.inspected_at }).eq('id', selectedDevice.id);
       }
       setShowInspectModal(false);
       fetchDevices();
@@ -107,10 +107,9 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
       title: '의료기기 삭제',
       description: `${target?.name || '선택한 장비'}를 삭제합니다.\n점검 주기와 다음 점검 일정도 함께 제거됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
-    await supabase.from('medical_devices').delete().eq('id', id);
+    await db.from('medical_devices').delete().eq('id', id);
     fetchDevices();
   };
 

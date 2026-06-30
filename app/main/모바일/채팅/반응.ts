@@ -8,10 +8,10 @@
  *    `메신저메시지조회훅`의 reactions 집계 패턴을 단순화하여 재구성한다.
  *
  * 제약: JM(단일 책임 + < 500줄), JM3(try/catch + 호출측에서 toast),
- *      JM4(any 금지), JM5(외부 입력 검증은 supabase 제약/RLS 위임).
+ *      JM4(any 금지), JM5(외부 입력 검증은 db 제약/RLS 위임).
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { pokeChannel } from '@/lib/realtime-bus';
 import type { ChatMessage } from '@/types';
 
@@ -41,7 +41,7 @@ export async function fetchReactionsForMessages(
 ): Promise<ReactionsByMessage> {
   if (!messageIds.length) return {};
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('message_reactions')
       .select('message_id, emoji, user_id')
       .in('message_id', messageIds);
@@ -107,7 +107,7 @@ export async function toggleMobileReaction(
   }
 
   try {
-    const existing = await supabase
+    const existing = await db
       .from('message_reactions')
       .select('id')
       .eq('message_id', input.messageId)
@@ -116,7 +116,7 @@ export async function toggleMobileReaction(
       .maybeSingle();
 
     if (existing?.data) {
-      const { error } = await supabase
+      const { error } = await db
         .from('message_reactions')
         .delete()
         .eq('message_id', input.messageId)
@@ -130,14 +130,13 @@ export async function toggleMobileReaction(
       return { ok: true, action: 'removed' };
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from('message_reactions')
       .insert([
         {
           message_id: input.messageId,
           user_id: input.userId,
-          emoji: input.emoji,
-        },
+          emoji: input.emoji },
       ]);
     if (error) {
       const msg = (error as { message?: string }).message || '반응 추가 실패';

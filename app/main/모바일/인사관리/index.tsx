@@ -97,8 +97,7 @@ const HR_MENU: HrMenu[] = [
 export default function 인사관리({
   user,
   initialView = 'hub',
-  onExit,
-}: 인사관리Props) {
+  onExit }: 인사관리Props) {
   const [view, setView] = useState<HrView>(initialView);
   const [selectedCompany, setSelectedCompany] = useState<string | undefined>(
     typeof user.company === 'string' ? user.company : undefined
@@ -190,8 +189,7 @@ function Hub({
   company,
   onCompanyChange,
   onExit,
-  onOpen,
-}: {
+  onOpen }: {
   user: ErpUser;
   company?: string;
   onCompanyChange: (co: string | undefined) => void;
@@ -278,8 +276,7 @@ function Hub({
       if (m.id === 'member') {
         return {
           ...m,
-          badge: loading ? '—' : `${headcount}명`,
-        };
+          badge: loading ? '—' : `${headcount}명` };
       }
       return m;
     });
@@ -313,8 +310,7 @@ function Hub({
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 8,
-            padding: '12px 16px',
-          }}
+            padding: '12px 16px' }}
         >
           <MKpi icon="users" label="전체 인원" value={headcountValue} unit="명" sub={empSub} tone="accent" />
           <MKpi icon="star" label="평균 근속" value={avgTenureValue} unit="년" sub="재직 기준" tone="accent" />
@@ -361,7 +357,7 @@ function Hub({
             <div className="lbl">인사관리 메뉴</div>
             <div className="cnt">{menuList.length}</div>
           </div>
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {menuList.map((m) => (
               <MListRow
                 key={m.id}
@@ -408,8 +404,7 @@ function Hub({
                 textAlign: 'left',
                 fontSize: 14,
                 fontWeight: (company || '전체') === co ? 800 : 600,
-                color: (company || '전체') === co ? 'var(--m-accent)' : 'var(--z-800)',
-              }}
+                color: (company || '전체') === co ? 'var(--m-accent)' : 'var(--z-800)' }}
             >
               <span>{co}</span>
               {(company || '전체') === co && (

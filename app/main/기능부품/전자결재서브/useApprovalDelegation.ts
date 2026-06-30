@@ -5,11 +5,10 @@ import {
   getApprovalRevision,
   isApprovalOverdue,
   markDelayNotification,
-  shouldSendDelayNotification,
-} from '@/lib/approval-workflow';
+  shouldSendDelayNotification } from '@/lib/approval-workflow';
 import { resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
-import { isMissingColumnError } from '@/lib/supabase-compat';
-import { supabase } from '@/lib/supabase';
+import { isMissingColumnError } from '@/lib/db-compat';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 
 type ApprovalRecord = Record<string, unknown>;
@@ -36,8 +35,7 @@ export function useApprovalDelegation({
   resolveStoredCurrentApproverId,
   resolveApprovalDelayConfigForStaff,
   buildApprovalHistoryEntry,
-  setApprovals,
-}: UseApprovalDelegationParams) {
+  setApprovals }: UseApprovalDelegationParams) {
   const resolveEffectiveApproverId = useCallback((approverId: string | null | undefined) => {
     if (!approverId) return null;
     const matchedStaff = approvalStaffMap.get(String(approverId));
@@ -57,8 +55,7 @@ export function useApprovalDelegation({
         delegatedToId: '',
         delegatedFromName: '',
         delegatedToName: '',
-        delegatedAt: '',
-      };
+        delegatedAt: '' };
     }
     const originalApprover = approvalStaffMap.get(originalApproverId);
     const effectiveApprover = approvalStaffMap.get(effectiveApproverId);
@@ -67,8 +64,7 @@ export function useApprovalDelegation({
       delegatedToId: effectiveApproverId,
       delegatedFromName: originalApprover?.name || originalApproverId,
       delegatedToName: effectiveApprover?.name || effectiveApproverId,
-      delegatedAt: String(metaData?.delegated_at || ''),
-    };
+      delegatedAt: String(metaData?.delegated_at || '') };
   }, [approvalStaffMap, resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
 
   const syncDelegatedApprovalDelayNotifications = useCallback(async (items: ApprovalRecord[]) => {
@@ -113,8 +109,7 @@ export function useApprovalDelegation({
         {
           ...buildApprovalHistoryEntry('delay_notified', '결재 지연 알림 발송'),
           current_approver_id: currentApproverId,
-          revision: getApprovalRevision(metaData),
-        }
+          revision: getApprovalRevision(metaData) }
       );
 
       try {
@@ -134,11 +129,9 @@ export function useApprovalDelegation({
             delay_hours: delayConfig.thresholdHours,
             delay_repeat_hours: delayConfig.repeatHours,
             delay_max_notifications: delayConfig.maxNotifications,
-            delay_count: nextCount,
-          },
-          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}`,
-        });
-        await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
+            delay_count: nextCount },
+          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` });
+        await db.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
       } catch (delayError) {
         console.error('approval delay notification failed:', delayError);
       }
@@ -167,13 +160,11 @@ export function useApprovalDelegation({
           ...(metaData || {}),
           delegated_from_id: currentApproverId,
           delegated_to_id: effectiveApproverId,
-          delegated_at: new Date().toISOString(),
-        },
+          delegated_at: new Date().toISOString() },
         {
           ...buildApprovalHistoryEntry('delegated', `${currentApproverId} -> ${effectiveApproverId}`),
           current_approver_id: effectiveApproverId,
-          revision: getApprovalRevision(metaData),
-        }
+          revision: getApprovalRevision(metaData) }
       );
     }
 
@@ -183,7 +174,7 @@ export function useApprovalDelegation({
     while (true) {
       if (Object.keys(effectiveUpdates).length === 0) return null;
 
-      const { error } = await supabase.from('approvals').update(effectiveUpdates).eq('id', item.id);
+      const { error } = await db.from('approvals').update(effectiveUpdates).eq('id', item.id);
       if (!isMissingColumnError(error, 'approver_line') || !('approver_line' in effectiveUpdates)) {
         if (!error) {
           setApprovals((prev) => prev.map((approval) => (
@@ -203,6 +194,5 @@ export function useApprovalDelegation({
     resolveEffectiveApproverId,
     resolveApprovalDelegateSnapshot,
     syncDelegatedApprovalDelayNotifications,
-    syncDelegatedApprovalRouting,
-  };
+    syncDelegatedApprovalRouting };
 }

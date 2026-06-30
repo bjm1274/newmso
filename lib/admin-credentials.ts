@@ -15,8 +15,7 @@ export function getAdminCredentialConfig() {
     adminName: getRuntimeEnv('ADMIN_NAME'),
     adminPasswordHash: getRuntimeEnv('ADMIN_PASSWORD_HASH'),
     masterId: getRuntimeEnv('MASTER_ID'),
-    masterPasswordHash: getRuntimeEnv('MASTER_PASSWORD_HASH'),
-  };
+    masterPasswordHash: getRuntimeEnv('MASTER_PASSWORD_HASH') };
 }
 
 async function matchesConfiguredPassword(

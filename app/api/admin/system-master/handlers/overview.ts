@@ -7,8 +7,7 @@ import {
   payroll_records as payrollRecordsTable,
   chat_rooms as chatRoomsTable,
   messages as messagesTable,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 import {
   normalizeAuditLog,
   normalizeChatRoom,
@@ -18,8 +17,7 @@ import {
   type ChatRoomRow,
   type LooseRecord,
   type PayrollRow,
-  type StaffRow,
-} from '../_shared';
+  type StaffRow } from '../_shared';
 
 export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffRows: StaffRow[]) {
   const d1 = await getD1Binding();
@@ -41,16 +39,14 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
       year_month: payrollRecordsTable.year_month,
       status: payrollRecordsTable.status,
       net_pay: payrollRecordsTable.net_pay,
-      created_at: payrollRecordsTable.created_at,
-    }).from(payrollRecordsTable).orderBy(desc(payrollRecordsTable.created_at)).limit(80),
+      created_at: payrollRecordsTable.created_at }).from(payrollRecordsTable).orderBy(desc(payrollRecordsTable.created_at)).limit(80),
     db.select({
       id: chatRoomsTable.id,
       name: chatRoomsTable.name,
       type: chatRoomsTable.type,
       members: chatRoomsTable.members,
       created_at: chatRoomsTable.created_at,
-      last_message_at: chatRoomsTable.last_message_at,
-    }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(80),
+      last_message_at: chatRoomsTable.last_message_at }).from(chatRoomsTable).orderBy(desc(chatRoomsTable.created_at)).limit(80),
     db.select({
       id: messagesTable.id,
       room_id: messagesTable.room_id,
@@ -59,8 +55,7 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
       file_url: messagesTable.file_url,
       is_deleted: messagesTable.is_deleted,
       created_at: messagesTable.created_at,
-      edited_at: messagesTable.edited_at,
-    }).from(messagesTable).orderBy(desc(messagesTable.created_at)).limit(80),
+      edited_at: messagesTable.edited_at }).from(messagesTable).orderBy(desc(messagesTable.created_at)).limit(80),
   ]);
   // chat_rooms.members는 D1에서 TEXT(JSON) → 파싱
   const parsedRoomRows = (roomRawRows || []).map((row) => {
@@ -87,8 +82,7 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
     auditRows: parsedAuditRows,
     payrollRows: payrollRawRows as unknown as PayrollRow[],
     roomRows: parsedRoomRows,
-    messageRows: messageRawRows as unknown as ChatMessageRow[],
-  };
+    messageRows: messageRawRows as unknown as ChatMessageRow[] };
 
   const rooms = overviewData.roomRows;
   const roomMap = new Map<string, ChatRoomRow>(rooms.map((room) => [String(room.id), room]));
@@ -100,8 +94,7 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
       staff_name: staff?.name || '-',
       employee_no: staff?.employee_no || null,
       company: staff?.company || '',
-      department: staff?.department || '',
-    };
+      department: staff?.department || '' };
   });
 
   return NextResponse.json({
@@ -110,8 +103,7 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
       auditCount: overviewData.auditCount,
       payrollCount: overviewData.payrollCount,
       roomCount: overviewData.roomCount,
-      messageCount: overviewData.messageCount,
-    },
+      messageCount: overviewData.messageCount },
     recentAudits: overviewData.auditRows.map((log) =>
       normalizeAuditLog(log, staffMap),
     ),
@@ -120,6 +112,5 @@ export async function handleOverview(staffMap: Map<string, StaffRow>, safeStaffR
     chatRooms: rooms.map((room) => normalizeChatRoom(room, staffMap)),
     recentMessages: overviewData.messageRows.map((message) =>
       normalizeMessage(message, roomMap, staffMap),
-    ),
-  });
+    ) });
 }

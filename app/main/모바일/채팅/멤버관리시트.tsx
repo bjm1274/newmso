@@ -32,8 +32,7 @@ export function AddMemberSheet({
   currentMemberIds,
   staffs,
   onClose,
-  onSubmit,
-}: AddMemberSheetProps) {
+  onSubmit }: AddMemberSheetProps) {
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -91,8 +90,7 @@ export function AddMemberSheet({
             border: '1px solid rgba(0, 0, 0, 0.08)',
             borderRadius: 10,
             outline: 'none',
-            color: 'var(--z-900)',
-          }}
+            color: 'var(--z-900)' }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '45vh', overflowY: 'auto' }} className="custom-scrollbar">
           {addable.length === 0 ? (
@@ -118,8 +116,7 @@ export function AddMemberSheet({
                     background: checked ? 'rgba(0, 122, 255, 0.08)' : 'rgba(255, 255, 255, 0.65)',
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease-in-out',
-                  }}
+                    transition: 'all 0.15s ease-in-out' }}
                 >
                   <input
                     type="checkbox"
@@ -165,8 +162,7 @@ export function AddMemberSheet({
               fontWeight: 800,
               border: 'none',
               cursor: submitting ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-            }}
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
           >
             취소
           </button>
@@ -185,8 +181,7 @@ export function AddMemberSheet({
               border: 'none',
               cursor: submitting || selectedIds.length === 0 ? 'not-allowed' : 'pointer',
               opacity: submitting ? 0.7 : 1,
-              boxShadow: selectedIds.length > 0 ? '0 4px 12px rgba(0, 122, 255, 0.24)' : 'none',
-            }}
+              boxShadow: selectedIds.length > 0 ? '0 4px 12px rgba(0, 122, 255, 0.24)' : 'none' }}
           >
             {submitting ? '추가 중…' : `추가하기${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
           </button>

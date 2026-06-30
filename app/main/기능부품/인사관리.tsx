@@ -111,8 +111,7 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   문서보관함: 'docs',
   증명서: 'docs',
   서류제출: 'docs',
-  계약서생성기: 'docs',
-};
+  계약서생성기: 'docs' };
 
 const HR_TAB_IDS = HR_TABS.map((tab) => tab.id);
 
@@ -195,8 +194,7 @@ export default function HRMainView({
   staffs,
   onRefresh,
   initialMenu,
-  selectedCo: mainSelectedCo,
-}: HRMainViewProps) {
+  selectedCo: mainSelectedCo }: HRMainViewProps) {
   const { selectedCo: globalSelectedCo, setSelectedCo: setGlobalSelectedCo } = useCompany();
   const [현재메뉴, 메뉴설정] = useState<HrMenuId>(() => getInitialHrMenuState(initialMenu));
   const [선택사업체, 사업체설정] = useState('전체');
@@ -261,8 +259,7 @@ export default function HRMainView({
     return {
       companyCounts,
       activeCount,
-      resignedCount,
-    };
+      resignedCount };
   }, [인사직원목록]);
 
   // 사업체 동기화

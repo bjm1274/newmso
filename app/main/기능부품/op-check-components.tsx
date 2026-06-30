@@ -106,8 +106,7 @@ export function OpCheckStatusFilterTabs({
   className = 'mb-2 flex flex-wrap gap-1',
   activeTab,
   options,
-  onChange,
-}: {
+  onChange }: {
   className?: string;
   activeTab: string;
   options: StatusTabOption[];
@@ -150,8 +149,7 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
   selectedScheduleId,
   statusByScheduleId,
   sanitizeText,
-  onSelect,
-}: {
+  onSelect }: {
   items: T[];
   containerClassName: string;
   emptyMessage: string;
@@ -285,8 +283,7 @@ export function OpCheckWorkspaceHeader({
   onPrev,
   onNext,
   onPrint,
-  onSave,
-}: WorkspaceHeaderProps) {
+  onSave }: WorkspaceHeaderProps) {
   const statusClass = getScheduleBadgeClass(status);
 
   return (
@@ -358,8 +355,7 @@ export function OpCheckWorkspaceProgressPanel({
   status,
   saving,
   onQuickStatusChange,
-  onOpenWardMessage,
-}: WorkspaceProgressPanelProps) {
+  onOpenWardMessage }: WorkspaceProgressPanelProps) {
   const stepIndex = WORKSPACE_STATUS_STEPS.indexOf((status as (typeof WORKSPACE_STATUS_STEPS)[number]) || '준비중');
 
   return (
@@ -491,8 +487,7 @@ export function OpCheckWorkspaceMetaPanel({
   wardMessageSentAt,
   deductingInventory,
   onAnesthesiaTypeChange,
-  onApplyTemplate,
-}: WorkspaceMetaPanelProps) {
+  onApplyTemplate }: WorkspaceMetaPanelProps) {
   const durationMinutes = getDurationMinutes(surgeryStartedAt, surgeryEndedAt);
 
   return (
@@ -590,8 +585,7 @@ export function OpCheckWorkspaceChecklistSection({
   onAdd,
   active = false,
   activeBadgeLabel,
-  children,
-}: WorkspaceChecklistSectionProps) {
+  children }: WorkspaceChecklistSectionProps) {
   return (
     <div
       className={`rounded-[var(--radius-xl)] border p-4 shadow-sm transition-colors ${
@@ -641,8 +635,7 @@ export function OpCheckWorkspaceNotesSection({
   summary,
   value,
   onToggle,
-  onChange,
-}: WorkspaceNotesSectionProps) {
+  onChange }: WorkspaceNotesSectionProps) {
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">

@@ -110,8 +110,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         manager: (v.manager || ctx.userName || '').trim(),
         is_received: false,
         note: (v.note || '').trim(),
-        company: (v.company || ctx.userCompany || '').trim(),
-      }),
+        company: (v.company || ctx.userCompany || '').trim() }),
     buildMeta: (v, ctx) => ({
       request_category: 'official_document_dispatch',
       official_doc_request: {
@@ -122,11 +121,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         manager: (v.manager || ctx.userName || '').trim(),
         is_received: false,
         note: (v.note || '').trim(),
-        company: (v.company || ctx.userCompany || '').trim(),
-      },
-    }),
-    buildTitle: (v) => `[공문 발송 승인] ${(v.doc_title || '제목 미입력').trim()}`,
-  },
+        company: (v.company || ctx.userCompany || '').trim() } }),
+    buildTitle: (v) => `[공문 발송 승인] ${(v.doc_title || '제목 미입력').trim()}` },
 
   // 물품신청 / 비품구매
   purchase: {
@@ -149,8 +145,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         [['구매 사유', v.reason]],
       ),
     buildMeta: (v) => ({ request_category: 'purchase', form_fields: fieldsToMeta(FORM_SCHEMAS.purchase, v) }),
-    buildTitle: (v, ctx) => `${ctx.userName} 물품구매 신청${v.item ? ` - ${v.item}` : ''}`,
-  },
+    buildTitle: (v, ctx) => `${ctx.userName} 물품구매 신청${v.item ? ` - ${v.item}` : ''}` },
 
   // 수리요청서
   repair_request: {
@@ -171,8 +166,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         [['증상/요청 내용', v.symptom]],
       ),
     buildMeta: (v) => ({ request_category: 'repair_request', form_fields: fieldsToMeta(FORM_SCHEMAS.repair_request, v) }),
-    buildTitle: (v, ctx) => `${ctx.userName} 수리요청${v.target ? ` - ${v.target}` : ''}`,
-  },
+    buildTitle: (v, ctx) => `${ctx.userName} 수리요청${v.target ? ` - ${v.target}` : ''}` },
 
   // 보고서작성
   report: {
@@ -186,8 +180,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '주간', label: '주간' },
           { id: '월간', label: '월간' },
           { id: '기타', label: '기타' },
-        ],
-      },
+        ] },
       { key: 'period', label: '보고 기간', type: 'text', placeholder: '예: 2026-06-01 ~ 06-07' },
       { key: 'body', label: '주요 내용', type: 'textarea', required: true, placeholder: '보고 핵심 내용' },
     ],
@@ -200,8 +193,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         ],
         [['주요 내용', v.body]],
       ),
-    buildMeta: (v) => ({ request_category: 'report', form_fields: fieldsToMeta(FORM_SCHEMAS.report, v) }),
-  },
+    buildMeta: (v) => ({ request_category: 'report', form_fields: fieldsToMeta(FORM_SCHEMAS.report, v) }) },
 
   // 업무협조
   cooperation: {
@@ -219,8 +211,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         ],
         [['협조 내용', v.body]],
       ),
-    buildMeta: (v) => ({ request_category: 'cooperation', form_fields: fieldsToMeta(FORM_SCHEMAS.cooperation, v) }),
-  },
+    buildMeta: (v) => ({ request_category: 'cooperation', form_fields: fieldsToMeta(FORM_SCHEMAS.cooperation, v) }) },
 
   // 사직서
   resignation: {
@@ -236,8 +227,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '개인 사정 (건강 문제)', label: '개인 사정 (건강 문제)' },
           { id: '개인 사정 (학업 및 커리어 개발)', label: '개인 사정 (학업 및 커리어 개발)' },
           { id: '기타 (직접 입력)', label: '기타 (직접 입력)' },
-        ],
-      },
+        ] },
       { key: 'reason', label: '상세 사유', type: 'textarea', required: true, placeholder: '상세 사직 사유 및 내용을 입력하세요.' },
     ],
     buildContent: (v, ctx) => {
@@ -250,10 +240,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
       request_category: 'resignation',
       resignDate: v.resign_date,
       handoverTarget: v.handover_target,
-      resignReason: v.reason_select === '기타 (직접 입력)' ? v.reason : v.reason_select,
-    }),
-    buildTitle: (v, ctx) => `사직서 (${ctx.userName})`,
-  },
+      resignReason: v.reason_select === '기타 (직접 입력)' ? v.reason : v.reason_select }),
+    buildTitle: (v, ctx) => `사직서 (${ctx.userName})` },
 
   // 금품청산 지급기일 연장 동의서
   severance_extension_agreement: {
@@ -276,10 +264,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
       employeeResignDate: v.employee_resign_date,
       wagePaymentDate: v.wage_payment_date,
       severancePaymentDate: v.severance_payment_date,
-      otherPaymentDate: v.other_payment_date,
-    }),
-    buildTitle: (v, ctx) => `금품청산 지급기일 연장 동의서 (${ctx.userName})`,
-  },
+      otherPaymentDate: v.other_payment_date }),
+    buildTitle: (v, ctx) => `금품청산 지급기일 연장 동의서 (${ctx.userName})` },
 
   // 퇴직 서약서
   retirement_pledge: {
@@ -292,10 +278,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
     buildMeta: (v) => ({
       request_category: 'retirement_pledge',
       pledgeResignDate: v.pledge_resign_date,
-      pledgePeriod: v.pledge_period,
-    }),
-    buildTitle: (v, ctx) => `퇴직 서약서 (${ctx.userName})`,
-  },
+      pledgePeriod: v.pledge_period }),
+    buildTitle: (v, ctx) => `퇴직 서약서 (${ctx.userName})` },
 
   // 증명서발급
   generic: {
@@ -310,8 +294,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '퇴직증명서', label: '퇴직증명서' },
           { id: '급여인증서', label: '급여인증서' },
           { id: '원천징수영수증', label: '원천징수영수증' },
-        ],
-      },
+        ] },
       { key: 'purpose', label: '발급 용도', type: 'textarea', required: true, placeholder: '예: 금융기관 제출용, 관공서 제출용' },
       {
         key: 'urgency',
@@ -321,8 +304,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '일반', label: '일반' },
           { id: '긴급', label: '긴급' },
           { id: '매우긴급', label: '매우긴급' },
-        ],
-      },
+        ] },
     ],
     buildContent: (v, ctx) =>
       `신청자: ${ctx.userName}\n대상자: ${ctx.userName}\n용도: ${v.purpose}\n긴급도: ${v.urgency}`,
@@ -333,10 +315,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
       purpose: v.purpose,
       urgency: v.urgency,
       auto_issue: true,
-      cc_departments: ['행정팀'],
-    }),
-    buildTitle: (v, ctx) => `${v.form_id || '증명서'} 발급 신청 (${ctx.userName})`,
-  },
+      cc_departments: ['행정팀'] }),
+    buildTitle: (v, ctx) => `${v.form_id || '증명서'} 발급 신청 (${ctx.userName})` },
 
   // 업무기안
   draft_business: {
@@ -350,18 +330,15 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '예산 집행', label: '예산 집행' },
           { id: '제도 변경', label: '제도 변경' },
           { id: '기타', label: '기타' },
-        ],
-      },
+        ] },
       { key: 'body', label: '기안 내용', type: 'textarea', required: true, placeholder: '기안 목적 및 상세 내용을 입력하세요.' },
     ],
     buildContent: (v) =>
       `[업무 기안]\n기안 성격: ${v.kind}\n\n내용:\n${v.body}`,
     buildMeta: (v) => ({
       request_category: 'draft_business',
-      orderCategory: v.kind,
-    }),
-    buildTitle: (v, ctx) => `[업무기안] ${ctx.userName} - ${v.kind}`,
-  },
+      orderCategory: v.kind }),
+    buildTitle: (v, ctx) => `[업무기안] ${ctx.userName} - ${v.kind}` },
 
   // 계약종료 통보
   contract_end_notice: {
@@ -375,10 +352,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
     buildMeta: (v) => ({
       request_category: 'contract_end_notice',
       targetStaffName: v.target_name,
-      endDate: v.end_date,
-    }),
-    buildTitle: (v) => `계약종료 통보 (${v.target_name || ''})`,
-  },
+      endDate: v.end_date }),
+    buildTitle: (v) => `계약종료 통보 (${v.target_name || ''})` },
 
   // 해고통보
   dismissal_notice: {
@@ -392,10 +367,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
     buildMeta: (v) => ({
       request_category: 'dismissal_notice',
       targetStaffName: v.target_name,
-      dismissalDate: v.dismissal_date,
-    }),
-    buildTitle: (v) => `해고통보서 (${v.target_name || ''})`,
-  },
+      dismissalDate: v.dismissal_date }),
+    buildTitle: (v) => `해고통보서 (${v.target_name || ''})` },
 
   // 징계위원회 출석요구서
   disciplinary_attendance_request: {
@@ -411,10 +384,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
       request_category: 'disciplinary_attendance_request',
       targetStaffName: v.target_name,
       meetingDate: v.meeting_date,
-      location: v.location,
-    }),
-    buildTitle: (v) => `징계위원회 출석요구서 (${v.target_name || ''})`,
-  },
+      location: v.location }),
+    buildTitle: (v) => `징계위원회 출석요구서 (${v.target_name || ''})` },
 
   // 수습직원평가서
   probation_evaluation: {
@@ -431,8 +402,7 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
           { id: '정규직 임용 승인', label: '정규직 임용 승인' },
           { id: '수습기간 연장(1~3개월)', label: '수습기간 연장(1~3개월)' },
           { id: '채용 취소 및 근로 계약 종료', label: '채용 취소 및 근로 계약 종료' },
-        ],
-      },
+        ] },
       { key: 'opinion', label: '종합 평가 의견', type: 'textarea', required: true, placeholder: '피평가자의 강약점 및 직무 태도 평가' },
     ],
     buildContent: (v) =>
@@ -454,10 +424,8 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
       periodStart: v.period_start,
       periodEnd: v.period_end,
       decision: v.result,
-      review: v.opinion,
-    }),
-    buildTitle: (v) => `[수습평가] ${v.target || ''} 수습직원 평가 보고`,
-  },
+      review: v.opinion }),
+    buildTitle: (v) => `[수습평가] ${v.target || ''} 수습직원 평가 보고` },
 
   // 급여인상평가서
   salary_increase_evaluation: {
@@ -496,12 +464,9 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         raisePercent: pct,
         newSalary: proposed,
         effectiveMonth: v.effective_month,
-        review: v.opinion,
-      };
+        review: v.opinion };
     },
-    buildTitle: (v) => `[급여인상] ${v.target || ''} 급여 인상 심사 보고`,
-  },
-};
+    buildTitle: (v) => `[급여인상] ${v.target || ''} 급여 인상 심사 보고` } };
 
 export function getFormSchema(slug: string): FormSchema | null {
   return FORM_SCHEMAS[slug] ?? null;
@@ -553,8 +518,7 @@ export function StructuredFields({ schema, values, onChange, idPrefix }: Structu
                   fontSize: 14,
                   fontFamily: 'inherit',
                   resize: 'none',
-                  color: 'var(--z-900)',
-                }}
+                  color: 'var(--z-900)' }}
               />
             </MField>
           );

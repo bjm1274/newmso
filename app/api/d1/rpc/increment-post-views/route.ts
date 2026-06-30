@@ -1,6 +1,6 @@
 // ============================================================
 // app/api/d1/rpc/increment-post-views/route.ts
-// supabase.rpc('increment_post_views', { p_post_id }) 대체 라우트.
+// db.rpc('increment_post_views', { p_post_id }) 대체 라우트.
 //
 // lib/db/functions/counters.ts의 incrementPostViews를 호출.
 //
@@ -23,8 +23,7 @@ import { incrementPostViews } from '@/lib/db/functions/counters';
 export const dynamic = 'force-dynamic';
 
 const BodySchema = z.object({
-  p_post_id: z.string().min(1).max(128),
-});
+  p_post_id: z.string().min(1).max(128) });
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;

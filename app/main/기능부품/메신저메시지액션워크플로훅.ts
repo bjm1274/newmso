@@ -1,7 +1,7 @@
 'use client';
 
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { ChatMessage, ChatRoom } from '@/types';
@@ -59,8 +59,7 @@ export function useChatMessageWorkflow({
   markMessageRead,
   loadReadStatusForMessage,
   deleteMessage,
-  triggerChatPush,
-}: UseChatMessageWorkflowParams) {
+  triggerChatPush }: UseChatMessageWorkflowParams) {
   const openMessageActions = useCallback((message: ChatMessage) => {
     if (activeActionMsg && String(activeActionMsg.id) === String(message.id)) {
       setActiveActionMsg(null);
@@ -84,14 +83,13 @@ export function useChatMessageWorkflow({
         message.file_url,
       ) || '첨부 파일 확인';
 
-    const { error } = await supabase.from('todos').insert([{
+    const { error } = await db.from('todos').insert([{
       user_id: effectiveTodoUserId,
       content: `[채팅] ${content}`,
       is_complete: false,
       task_date: getKoreanTodayString(),
       source_message_id: message.id,
-      source_room_id: message.room_id,
-    }]);
+      source_room_id: message.room_id }]);
 
     if (!error) {
       toast('할 일 등록 완료', 'success');
@@ -130,14 +128,13 @@ export function useChatMessageWorkflow({
 
     try {
       const { data: forwardedMessage, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(
-        supabase,
+        db,
         {
           room_id: room.id,
           sender_id: effectiveChatUserId || fallbackUserId,
           content: buildForwardedMessageContent(forwardSourceMsg),
           file_url: forwardSourceMsg.file_url || null,
-          file_name: forwardSourceMsg.file_name || null,
-        },
+          file_name: forwardSourceMsg.file_name || null },
         'id, room_id',
       );
 
@@ -177,6 +174,5 @@ export function useChatMessageWorkflow({
     handleForwardToRoom,
     openReadStatusPanel,
     openThreadPanel,
-    deleteMessageFromActions,
-  };
+    deleteMessageFromActions };
 }

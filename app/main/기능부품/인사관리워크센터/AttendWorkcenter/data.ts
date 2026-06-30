@@ -201,31 +201,27 @@ export function computeAttendKpis(input: AttendKpiInput): WorkcenterKpi[] {
       value: String(counts.present),
       unit: '명',
       sub: total > 0 ? `전체 ${total}명 중 ${ratio}%` : '데이터 없음',
-      tone: 'success',
-    },
+      tone: 'success' },
     {
       key: 'late',
       label: '지각',
       value: String(counts.late),
       unit: '명',
       sub: lateNamesSub,
-      tone: counts.late > 0 ? 'warn' : 'neutral',
-    },
+      tone: counts.late > 0 ? 'warn' : 'neutral' },
     {
       key: 'absent',
       label: '결근',
       value: String(counts.absent),
       unit: '명',
       sub: counts.absent > 0 ? '미신고 확인 필요' : '결근 없음',
-      tone: counts.absent > 0 ? 'danger' : 'neutral',
-    },
+      tone: counts.absent > 0 ? 'danger' : 'neutral' },
     {
       key: 'onLeave',
       label: '휴가 중',
       value: String(counts.onLeave),
       unit: '명',
-      sub: '연차·반차·병가 합산',
-    },
+      sub: '연차·반차·병가 합산' },
   ];
 }
 
@@ -344,8 +340,7 @@ export function buildRosterDates(start: Date, count: number): RosterDate[] {
       monthLabel: `${date.getMonth() + 1}/${date.getDate()}`,
       weekdayLabel: WEEKDAYS[dow] ?? '',
       weekendLike: dow === 0 || dow === 6,
-      isToday: iso === todayIso,
-    });
+      isToday: iso === todayIso });
   }
   return result;
 }

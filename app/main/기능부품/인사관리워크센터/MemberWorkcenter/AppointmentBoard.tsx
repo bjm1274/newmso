@@ -4,7 +4,7 @@
  * MemberWorkcenter — 인사발령 탭 (새 디자인)
  *
  * - 새 디자인: 카드형 발령 리스트 (유형 chip + 본문 + 효력일)
- * - 데이터 소스: supabase `personnel_appointments` (회사 필터)
+ * - 데이터 소스: db `personnel_appointments` (회사 필터)
  * - 무거운 폼(발령 등록·관보 생성)은 기존 `인사발령관리.tsx`로 위임 (모달 진입점)
  *
  * JM3: fetch 에러는 inline 메시지로 표시 + 콘솔 로그 분리
@@ -13,7 +13,7 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { WorkcenterBackButton } from '../workcenter-common';
 import { appointmentTone, type AppointmentRecord } from './data';
@@ -24,15 +24,13 @@ const PersonnelAppointment = dynamic(() => import('../../인사관리서브/인�
     <div className="flex items-center justify-center py-16">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
     </div>
-  ),
-});
+  ) });
 
 const TONE_BG: Record<string, string> = {
   success: 'bg-emerald-500/15 text-emerald-700',
   accent: 'bg-[var(--accent-soft)] text-[var(--accent)]',
   warn: 'bg-amber-500/15 text-amber-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 interface AppointmentBoardProps {
   staffs: StaffMember[];
@@ -55,7 +53,7 @@ export default function AppointmentBoard({ staffs, selectedCo, user }: Appointme
     setLoading(true);
     setErrorMsg(null);
     try {
-      let query = supabase
+      let query = db
         .from('personnel_appointments')
         .select('id, staff_id, staff_name, company, order_type, effective_date, before_dept, after_dept, before_position, after_position, before_role, after_role, reason, status')
         .order('effective_date', { ascending: false });

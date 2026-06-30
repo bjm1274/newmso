@@ -14,8 +14,7 @@ import {
   companies as companiesTable,
   leave_balances as leaveBalancesTable,
   eq,
-  and,
-} from '@/lib/db';
+  and } from '@/lib/db';
 
 // ─── 입력 검증 스키마 ─────────────────────────────────────────────────────────
 
@@ -23,8 +22,7 @@ const RecalcInputSchema = z.object({
   staffId: z.string().uuid('staffId는 유효한 UUID여야 합니다'),
   year: z.number().int().min(2000).max(2100).optional(),
   expiredOverride: z.number().min(0).optional(),
-  compensatedOverride: z.number().min(0).optional(),
-});
+  compensatedOverride: z.number().min(0).optional() });
 
 export type RecalcOverrides = {
   expiredDays?: number;
@@ -82,8 +80,7 @@ export async function recalculateLeaveBalance(
     staffId,
     year,
     expiredOverride: overrides?.expiredDays,
-    compensatedOverride: overrides?.compensatedDays,
-  });
+    compensatedOverride: overrides?.compensatedDays });
   if (!parsed.success) {
     const msg = parsed.error.issues.map((e) => e.message).join(', ');
     console.error('[recalculateLeaveBalance] 입력 오류:', msg);
@@ -105,8 +102,7 @@ export async function recalculateLeaveBalance(
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
       hire_date: staffMembersTable.hire_date,
-      company_id: staffMembersTable.company_id,
-    })
+      company_id: staffMembersTable.company_id })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.id, staffId))
     .limit(1);
@@ -121,8 +117,7 @@ export async function recalculateLeaveBalance(
     join_date: staffRow.join_date ?? null,
     joined_at: staffRow.joined_at ?? null,
     hire_date: staffRow.hire_date ?? null,
-    company_id: staffRow.company_id ?? null,
-  };
+    company_id: staffRow.company_id ?? null };
 
   // 2. 회사 정책 조회
   let leavePolicy: 'entry_date' | 'fiscal_year' = 'entry_date';
@@ -133,8 +128,7 @@ export async function recalculateLeaveBalance(
         id: companiesTable.id,
         leave_policy: companiesTable.leave_policy,
         fiscal_year_start_month: companiesTable.fiscal_year_start_month,
-        unused_leave_compensation: companiesTable.unused_leave_compensation,
-      })
+        unused_leave_compensation: companiesTable.unused_leave_compensation })
       .from(companiesTable)
       .where(eq(companiesTable.id, staff.company_id))
       .limit(1);
@@ -172,8 +166,7 @@ export async function recalculateLeaveBalance(
     .select({
       id: leaveBalancesTable.id,
       expired_days: leaveBalancesTable.expired_days,
-      compensated_days: leaveBalancesTable.compensated_days,
-    })
+      compensated_days: leaveBalancesTable.compensated_days })
     .from(leaveBalancesTable)
     .where(
       and(
@@ -207,8 +200,7 @@ export async function recalculateLeaveBalance(
         expiry_date: expiryDateStr,
         expired_days: expiredDays,
         compensated_days: compensatedDays,
-        updated_at: new Date().toISOString(),
-      })
+        updated_at: new Date().toISOString() })
       .where(eq(leaveBalancesTable.id, existingRow.id));
   } else {
     await db.insert(leaveBalancesTable).values({
@@ -222,7 +214,6 @@ export async function recalculateLeaveBalance(
       expired_days: expiredDays,
       compensated_days: compensatedDays,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
+      updated_at: new Date().toISOString() });
   }
 }

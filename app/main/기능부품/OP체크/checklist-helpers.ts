@@ -45,8 +45,7 @@ export function normalizeChecklistItems(items: unknown, prefix: string, sourceLa
       unit: String(row.unit || '').trim() || '',
       note: String(row.note || '').trim() || '',
       checked: Boolean(row.checked ?? false),
-      source_label: String(row.source_label || sourceLabel || '').trim() || '',
-    });
+      source_label: String(row.source_label || sourceLabel || '').trim() || '' });
   });
 
   return normalized;
@@ -60,8 +59,7 @@ export function createChecklistItem(prefix: string): ChecklistItemDraft {
     unit: '',
     note: '',
     checked: false,
-    source_label: '',
-  };
+    source_label: '' };
 }
 
 export function dedupeChecklistItems(items: ChecklistItemDraft[]) {
@@ -90,8 +88,7 @@ export function dedupeChecklistItems(items: ChecklistItemDraft[]) {
       quantity: existing.quantity || item.quantity || '',
       unit: existing.unit || item.unit || '',
       note: Array.from(new Set(noteValues)).join(' / '),
-      source_label: Array.from(new Set(sourceValues)).join(', '),
-    });
+      source_label: Array.from(new Set(sourceValues)).join(', ') });
   });
 
   return Array.from(merged.values());
@@ -106,8 +103,7 @@ export function formatChecklistItems(items: ChecklistItemDraft[]) {
       unit: String(item.unit || '').trim(),
       note: String(item.note || '').trim(),
       checked: Boolean(item.checked),
-      source_label: String(item.source_label || '').trim(),
-    }))
+      source_label: String(item.source_label || '').trim() }))
     .filter((item) => item.name);
 }
 
@@ -119,8 +115,7 @@ export function serializeChecklistItemsForDiff(items: ChecklistItemDraft[]) {
       unit: String(item.unit || '').trim(),
       note: String(item.note || '').trim(),
       checked: Boolean(item.checked),
-      source_label: String(item.source_label || '').trim(),
-    }))
+      source_label: String(item.source_label || '').trim() }))
     .filter((item) => item.name || item.quantity || item.unit || item.note || item.checked || item.source_label)
     .sort((left, right) => {
       const nameDiff = normalizeLookupValue(left.name).localeCompare(normalizeLookupValue(right.name), 'ko');
@@ -153,6 +148,5 @@ export function emptyTemplateEditor(): TemplateEditorState {
     prep_items: [createChecklistItem('template-prep')],
     consumable_items: [createChecklistItem('template-consumable')],
     notes: '',
-    is_active: true,
-  };
+    is_active: true };
 }

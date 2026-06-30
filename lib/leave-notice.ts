@@ -99,8 +99,7 @@ export function extractLeaveRequestMeta(metaData: Record<string, unknown> | null
     delegateDepartment,
     delegatePosition,
     delegateLabel,
-    days,
-  };
+    days };
 }
 
 export function formatLeaveNoticeDate(dateKey: string) {
@@ -126,8 +125,7 @@ export function formatLeaveNoticeMessage({
   department,
   startDate,
   endDate,
-  delegateName,
-}: {
+  delegateName }: {
   leaveType: string;
   employeeName: string;
   department: string;
@@ -153,8 +151,7 @@ function getTimeZoneDateParts(date: Date, timeZone = LEAVE_NOTICE_TIMEZONE) {
     timeZone,
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-  });
+    day: '2-digit' });
   const parts = formatter.formatToParts(date);
   const year = Number(parts.find((part) => part.type === 'year')?.value || '0');
   const month = Number(parts.find((part) => part.type === 'month')?.value || '0');

@@ -7,15 +7,14 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
-import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   buildStorageInlineUrl,
   buildStorageDownloadUrl,
   shouldUseManagedBrowserDownload,
-  triggerManagedBrowserDownload,
-} from '@/lib/object-storage-url';
+  triggerManagedBrowserDownload } from '@/lib/object-storage-url';
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
 import SmartDatePicker from './공통/SmartDatePicker';
 import GuideLibrary from './게시판서브/업무가이드';
@@ -34,8 +33,7 @@ import {
   BOARD_TEMPLATE_REQUIRED_SELECT_COLUMNS,
   BOARD_TEMPLATE_OPTIONAL_COLUMNS,
   BOARD_COMMENT_SELECT,
-  BOARD_CHAT_ROOM_SELECT,
-} from './게시판공통';
+  BOARD_CHAT_ROOM_SELECT } from './게시판공통';
 import {
   BOARD_POST_STATUSES,
   buildAttachmentMetaContent,
@@ -61,8 +59,7 @@ import {
   type BoardReadRow,
   type BoardTemplateRow,
   type QueryResult,
-  type StaffSummary,
-} from './게시판-view-utils';
+  type StaffSummary } from './게시판-view-utils';
 import { isAnonymousReadStatusPost, VALID_BODY_IDS } from './게시판/post-helpers';
 import ReadStatusModal from './게시판/ReadStatusModal';
 import CommentComposerSticky from '@/app/components/CommentComposerSticky';
@@ -70,8 +67,7 @@ import { useIsMobile } from '@/app/components/useIsMobile';
 import {
   drawBoardPollPrize,
   type BoardPoll,
-  type BoardPollPrizeWinner,
-} from './게시판서브/board-poll-prize';
+  type BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -268,7 +264,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     }
 
     const loadStaff = async () => {
-      return supabase
+      return db
         .from('staff_members')
         .select('id, name, company, company_id, department, position, status')
         .neq('status', '퇴사')
@@ -297,7 +293,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('board_post_reads')
       .select('post_id, user_id, read_at')
       .in('post_id', targetIds);
@@ -335,7 +331,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return next;
     });
 
-    const { error } = await supabase.from('board_post_reads').upsert(
+    const { error } = await db.from('board_post_reads').upsert(
       [{ post_id: postId, user_id: effectiveBoardUserId, read_at: new Date().toISOString() }],
       { onConflict: 'post_id,user_id' }
     );
@@ -356,7 +352,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     try {
       // 공지사항·경조사 등 전사 공지 게시판은 전 직원이 대상
       // 회사 필터 없이 모든 재직 중 직원 조회
-      const { data: audienceData } = await supabase
+      const { data: audienceData } = await db
         .from('staff_members')
         .select('id, name, company, company_id, department, position, status')
         .neq('status', '퇴사')
@@ -379,8 +375,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         eventsByDate: {} as Record<string, BoardPost[]>,
         days: [] as Date[],
         month: calendarMonth.getMonth(),
-        toKey,
-      };
+        toKey };
     }
 
     const searchLower = deferredSearchKeyword.trim().toLowerCase();
@@ -415,8 +410,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       eventsByDate,
       days,
       month,
-      toKey,
-    };
+      toKey };
   }, [activeBoard, posts, deferredSearchKeyword, calendarMonth]);
 
   const legacySchedulePosts = useMemo(
@@ -461,7 +455,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     setLoading(true);
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
-        const result = await supabase
+        const result = await db
           .from('board_posts')
           .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
           .eq('board_type', requestedBoard)
@@ -527,7 +521,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
                 BOARD_TEMPLATE_OPTIONAL_COLUMNS,
                 omittedColumns,
               );
-              let query = supabase.from('surgery_templates').select(selectedColumns);
+              let query = db.from('surgery_templates').select(selectedColumns);
               if (!omittedColumns.has('sort_order')) {
                 query = query.order('sort_order', { ascending: true });
               }
@@ -543,7 +537,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
                 BOARD_TEMPLATE_OPTIONAL_COLUMNS,
                 omittedColumns,
               );
-              let query = supabase.from('mri_templates').select(selectedColumns);
+              let query = db.from('mri_templates').select(selectedColumns);
               if (!omittedColumns.has('sort_order')) {
                 query = query.order('sort_order', { ascending: true });
               }
@@ -586,8 +580,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       hip: ['고관절', '둔부', '골반'],
       knee: ['무릎', '슬관절', '무릎관절'],
       ankle: ['발목', '족관절', '발'],
-      other: [],
-    };
+      other: [] };
 
     const keywords = keywordMap[resolvedBodyPart] || [];
     if (keywords.length === 0) return currentTemplates;
@@ -611,7 +604,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     void loadBoardAudience();
     // 내 좋아요 목록 로드
     if (effectiveBoardUserId) {
-      supabase.from('board_post_likes').select('post_id').eq('user_id', effectiveBoardUserId).then(({ data }) => {
+      db.from('board_post_likes').select('post_id').eq('user_id', effectiveBoardUserId).then(({ data }) => {
         setMyLikedPostIds(
           new Set(
             ((data || []) as BoardLikeRow[])
@@ -660,7 +653,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   }, [activeBoard, user?.id, loadBoardReadState]);
 
   const fetchComments = async (postId: string) => {
-    const { data } = await supabase
+    const { data } = await db
       .from('board_post_comments')
       .select(BOARD_COMMENT_SELECT)
       .eq('post_id', postId)
@@ -686,21 +679,20 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     const kindLabel = activeBoard === '수술일정' ? '수술' : '검사';
     const roomName = `[${kindLabel}] ${baseName}`;
     try {
-      const { data: existing } = await supabase
+      const { data: existing } = await db
         .from('chat_rooms')
         .select(BOARD_CHAT_ROOM_SELECT)
         .eq('name', roomName)
         .maybeSingle() as unknown as { data: BoardChatRoomRow | null };
       let roomId = existing?.id;
       if (!roomId) {
-        const { data: created, error } = await supabase
+        const { data: created, error } = await db
           .from('chat_rooms')
           .insert([
             {
               name: roomName,
               type: 'group',
-              members: [effectiveBoardUserId],
-            },
+              members: [effectiveBoardUserId] },
           ])
           .select(BOARD_CHAT_ROOM_SELECT)
           .single() as unknown as { data: BoardChatRoomRow | null; error: unknown };
@@ -752,16 +744,16 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
 
     try {
       if (isLiked) {
-        const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', effectiveBoardUserId);
+        const { error: unlikeError } = await db.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', effectiveBoardUserId);
         if (unlikeError && !(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
       } else {
-        const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: effectiveBoardUserId }]);
+        const { error: likeError } = await db.from('board_post_likes').insert([{ post_id: post.id, user_id: effectiveBoardUserId }]);
         if (likeError && !(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
       }
       // ── 실제 COUNT 기반으로 likes_count 동기화 (race condition 방지) ──
-      const { count, error: countError } = await supabase.from('board_post_likes').select('id', { count: 'exact', head: true }).eq('post_id', post.id);
+      const { count, error: countError } = await db.from('board_post_likes').select('id', { count: 'exact', head: true }).eq('post_id', post.id);
       const realCount = countError ? optimisticLikes : (count ?? optimisticLikes);
-      await supabase.from('board_posts').update({ likes_count: realCount }).eq('id', post.id);
+      await db.from('board_posts').update({ likes_count: realCount }).eq('id', post.id);
       updateLocalLikes(realCount);
     } catch (error) {
       // ── 실패 시 롤백 ──
@@ -785,15 +777,14 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       toast('로그인한 후 댓글을 등록할 수 있습니다.', 'success');
       return;
     }
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('board_post_comments')
       .insert([{
         post_id: postId,
         author_id: effectiveBoardUserId,
         author_name: user?.name ?? '익명',
         content: newComment.trim(),
-        parent_comment_id: parentCommentId ?? null,
-      }])
+        parent_comment_id: parentCommentId ?? null }])
       .select()
       .maybeSingle();
     if (error) {
@@ -824,12 +815,11 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       title: '댓글을 삭제할까요?',
       description: '선택한 댓글과 연결된 답글이 함께 삭제됩니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     // 자식 댓글 먼저 DB에서 삭제
-    await supabase.from('board_post_comments').delete().eq('parent_comment_id', commentId);
-    const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
+    await db.from('board_post_comments').delete().eq('parent_comment_id', commentId);
+    const { error } = await db.from('board_post_comments').delete().eq('id', commentId);
     if (error) {
       logger.error('댓글 삭제 실패:', error);
       toast(`댓글 삭제에 실패했습니다.\n\n${error.message || ''}`, 'error');
@@ -907,7 +897,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     (async () => {
       const { data } = await withMissingColumnsFallback<BoardPostRow>(
         async (omittedColumns): Promise<QueryResult<BoardPostRow>> => {
-          const result = await supabase
+          const result = await db
             .from('board_posts')
             .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
             .eq('id', selectedPostId)
@@ -944,20 +934,19 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         const d1Res = await fetch('/api/d1/rpc/increment-post-views', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ p_post_id: selectedPostId }),
-        }).catch(() => null);
+          body: JSON.stringify({ p_post_id: selectedPostId }) }).catch(() => null);
         const d1Ok = d1Res?.ok && ((await d1Res.json().catch(() => ({ ok: false }))) as { ok: boolean }).ok;
         if (!d1Ok) {
-          const { error: rpcErr } = await supabase.rpc('increment_post_views', { p_post_id: selectedPostId });
+          const { error: rpcErr } = await db.rpc('increment_post_views', { p_post_id: selectedPostId });
           if (rpcErr) {
-            const { data: row } = await supabase
+            const { data: row } = await db
               .from('board_posts')
               .select('views')
               .eq('id', selectedPostId)
               .maybeSingle()
               .returns<any>();
             const nextViews = ((row?.views ?? 0) as number) + 1;
-            await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
+            await db.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
           }
         }
         // UI 낙관적 업데이트
@@ -1014,10 +1003,10 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         rows[0].company_id = user.company_id;
       }
       const { error } = await withMissingColumnFallback(
-        () => supabase.from('approvals').insert(rows),
+        () => db.from('approvals').insert(rows),
         () => {
           const legacyRows = rows.map(({ company_id, ...rest }: Record<string, unknown>) => rest);
-          return supabase.from('approvals').insert(legacyRows);
+          return db.from('approvals').insert(legacyRows);
         }
       );
       if (error) throw error;
@@ -1041,10 +1030,9 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         '댓글, 읽음 상태, 첨부 메타 정보가 함께 사라질 수 있습니다.',
       ].join('\n'),
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
-    const { error } = await supabase.from('board_posts').delete().eq('id', post.id);
+    const { error } = await db.from('board_posts').delete().eq('id', post.id);
     if (error) {
       toast('게시물 삭제 중 오류가 발생했습니다.', 'error');
       return;
@@ -1275,16 +1263,14 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
               guardian: scheduleGuardian,
               caregiver: scheduleCaregiver,
               transfusion: scheduleTransfusion,
-              contrast: activeBoard === 'MRI일정' ? scheduleContrastRequired : false,
-            }) || null
+              contrast: activeBoard === 'MRI일정' ? scheduleContrastRequired : false }) || null
           : (activeBoard === '경조사' ? finalContent : normalizedContent) || null,
         status: normalizeBoardPostStatus(postStatus),
         company: user?.company || null,
         tags: tags,
         author_name: useAnonymous ? '익명' : (user?.name || '익명'),
         author_id: useAnonymous ? null : user?.id,
-        is_anonymous: useAnonymous,
-      };
+        is_anonymous: useAnonymous };
       if (!editingPostId) {
         postData.likes_count = 0;
         postData.created_at = new Date().toISOString();
@@ -1301,8 +1287,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
           question: pollQuestion.trim() || normalizedTitle,
           options: validOptions,
           anonymous: pollAnonymous,
-          multiple: pollMultiple,
-        };
+          multiple: pollMultiple };
         if (pollPrizeEnabled && pollPrizeName.trim() && pollPrizeWinnerCount >= 1) {
           pollData.prize = { winnerCount: pollPrizeWinnerCount, name: pollPrizeName.trim() };
           if (editingPostId) {
@@ -1340,8 +1325,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         postData.title = sidePrefix + (postData.title || '');
         postData.content =
           buildBoardMetaContent(String(postData.content || ''), {
-            status: normalizeBoardPostStatus(postStatus),
-          }) || null;
+            status: normalizeBoardPostStatus(postStatus) }) || null;
       }
 
       // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드
@@ -1380,8 +1364,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         let normalizedBoardContent = normalizedContent || '';
         const normalizedPostMeta = {
           scheduled_publish_at: activeBoard === '공지사항' ? normalizedScheduledPublishAt || undefined : undefined,
-          status: normalizeBoardPostStatus(postStatus),
-        };
+          status: normalizeBoardPostStatus(postStatus) };
         if (shouldPersistAttachments) {
           postData.attachments = persistedAttachments;
           if (persistedAttachments.length > 0) {
@@ -1401,8 +1384,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
               '관리자 또는 간호과장에게 승인 요청 문서를 상신하고, 승인 후 일정에 반영됩니다.',
             ].join('\n'),
             confirmText: '승인 요청',
-            tone: 'accent',
-          });
+            tone: 'accent' });
           if (!confirmed) {
             setLoading(false);
             return;
@@ -1415,7 +1397,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         }
 
         const { error: updateError, payload: persistedPostData } = await runBoardPostMutation(
-          (payload) => supabase.from('board_posts').update(payload).eq('id', editingPostId),
+          (payload) => db.from('board_posts').update(payload).eq('id', editingPostId),
           postData
         );
         if (!updateError) {
@@ -1436,7 +1418,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
       }
 
       const { data: insertedPost, error } = await runBoardPostMutation<BoardPost>(
-        (payload) => supabase.from('board_posts').insert([payload]).select().single(),
+        (payload) => db.from('board_posts').insert([payload]).select().single(),
         postData
       );
       if (!error && insertedPost) {
@@ -1466,9 +1448,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
               credentials: 'include',
               body: JSON.stringify({
                 postId: normalizedInsertedPost.id,
-                useAnonymous: Boolean(useAnonymous),
-              }),
-            });
+                useAnonymous: Boolean(useAnonymous) }) });
             if (!res.ok) {
               const errBody = await res.json().catch(() => ({}));
               const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
@@ -2489,7 +2469,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                       }
                       currentVotes[key] = [...(currentVotes[key] || []), String(myId)];
                     }
-                    await supabase.from('board_posts').update({ poll_votes: currentVotes }).eq('id', selectedPost.id);
+                    await db.from('board_posts').update({ poll_votes: currentVotes }).eq('id', selectedPost.id);
                     setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, poll_votes: currentVotes } : p));
                     setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: currentVotes } : prev);
                   };
@@ -2503,8 +2483,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                         poll,
                         pollVotes: votes,
                         actorId: myId,
-                        actorName: user?.name ?? '관리자',
-                      });
+                        actorName: user?.name ?? '관리자' });
                       if (!result.ok) {
                         toast(result.message, 'warning');
                         return;
@@ -2519,7 +2498,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                         prev?.id === selectedPost.id ? { ...prev, poll: updatedPoll, poll_votes: updatedPollVotes } : prev,
                       );
                       // 댓글 목록 새로고침 (추첨 결과 댓글 표시)
-                      const { data: newComments } = await supabase
+                      const { data: newComments } = await db
                         .from('board_post_comments')
                         .select(BOARD_COMMENT_SELECT)
                         .eq('post_id', selectedPost.id)

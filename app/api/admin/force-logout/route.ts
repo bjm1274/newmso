@@ -17,8 +17,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,11 +85,9 @@ export async function POST(request: Request) {
           force_logout_at: nowIso,
           requested_by: String(session.user.id || ''),
           requested_by_name: String(session.user.name || ''),
-          dedupe_key: `force_logout:${nowIso}`,
-        },
+          dedupe_key: `force_logout:${nowIso}` },
         read_at: null,
-        created_at: nowIso,
-      };
+        created_at: nowIso };
 
       await insertNotificationsOrThrow([notificationRow]);
       notificationCreated = true;
@@ -101,8 +98,7 @@ export async function POST(request: Request) {
           type: 'system',
           title: notificationRow.title!,
           body: notificationRow.body!,
-          metadata: notificationRow.metadata ?? null,
-        },
+          metadata: notificationRow.metadata ?? null },
       ]);
       pushSent = pushResult.fcmSent + pushResult.webPushSent;
       if (pushResult.errors.length > 0) {
@@ -118,8 +114,7 @@ export async function POST(request: Request) {
       staffId,
       notificationCreated,
       pushSent,
-      ...(pushError ? { pushError } : {}),
-    });
+      ...(pushError ? { pushError } : {}) });
   } catch (error) {
     const message =
       error instanceof Error

@@ -6,8 +6,7 @@ import {
   getD1Drizzle,
   staff_members as staffMembersTable,
   audit_logs as auditLogsTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 async function insertAuditLogToD1(row: {
   action: string;
@@ -32,8 +31,7 @@ async function insertAuditLogToD1(row: {
       user_name: row.user_name,
       // details는 D1 스키마에서 text — jsonb → JSON.stringify
       details: JSON.stringify(row.details),
-      created_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString() });
   } catch (err) {
     // 감사 로그 실패가 본 흐름을 막지 않도록 swallow + console (기존 Supabase 동작과 동등)
     const message = err instanceof Error ? err.message : String(err);
@@ -103,8 +101,7 @@ export async function POST(request: Request) {
         target_id: staffId,
         user_id: adminUserId,
         user_name: adminUserName,
-        details: clearAuditDetails,
-      });
+        details: clearAuditDetails });
 
       return NextResponse.json({ ok: true, cleared: true, clearedColumns });
     }
@@ -124,8 +121,7 @@ export async function POST(request: Request) {
       target_id: staffId,
       user_id: adminUserId,
       user_name: adminUserName,
-      details: updateAuditDetails,
-    });
+      details: updateAuditDetails });
 
     return NextResponse.json({ ok: true, updatedColumn });
   } catch (error) {

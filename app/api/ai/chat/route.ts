@@ -48,20 +48,17 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: systemInstruction,
-    });
+      systemInstruction: systemInstruction });
 
     // Gemini API에 맞는 히스토리 포맷 변환
     const history = clientMessages.slice(0, -1).map((msg) => ({
       role: msg.role === 'model' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    }));
+      parts: [{ text: msg.content }] }));
 
     const lastMessageText = clientMessages[clientMessages.length - 1].content;
 
     const chat = model.startChat({
-      history: history,
-    });
+      history: history });
 
     const result = await chat.sendMessage(lastMessageText);
     const responseText = result.response.text();

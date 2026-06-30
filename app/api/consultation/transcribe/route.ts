@@ -48,8 +48,7 @@ async function analyzeWithGemini(audioSource: string, mimeType: string, isFileUr
         try {
             const model = genAI.getGenerativeModel({
                 model: modelName,
-                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-            });
+                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' } });
 
             const contentPart = isFileUri
                 ? { fileData: { fileUri: audioSource, mimeType } }
@@ -127,8 +126,7 @@ export async function POST(req: Request) {
                 'X-Goog-Upload-Command': 'start',
                 'X-Goog-Upload-Header-Content-Length': String(fileSize),
                 'X-Goog-Upload-Header-Content-Type': normalizedMimeType,
-                'Content-Type': 'application/json',
-            },
+                'Content-Type': 'application/json' },
             body: JSON.stringify({
                 file: {
                     display_name: `consultation_${Date.now()}`
@@ -151,10 +149,8 @@ export async function POST(req: Request) {
             method: 'PUT',
             headers: {
                 'X-Goog-Upload-Offset': '0',
-                'X-Goog-Upload-Command': 'upload, finalize',
-            },
-            body: r2Response.body as any,
-        });
+                'X-Goog-Upload-Command': 'upload, finalize' },
+            body: r2Response.body as any });
 
         if (!uploadRes.ok) {
             const errText = await uploadRes.text().catch(() => '');

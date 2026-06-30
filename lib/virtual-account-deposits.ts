@@ -191,8 +191,7 @@ function normalizeTossWebhook(
     match_status: inferMatchStatus({
       patient_name: metadata.patientName,
       patient_id: metadata.patientId,
-      transaction_label: metadata.transactionLabel,
-    }),
+      transaction_label: metadata.transactionLabel }),
     amount: pickNumber(
       payload.totalAmount,
       payload.balanceAmount,
@@ -228,8 +227,7 @@ function normalizeTossWebhook(
     matched_target_type: pickText(metadata.matchedTargetType),
     matched_target_id: pickText(metadata.matchedTargetId),
     matched_note: pickText(metadata.matchedNote),
-    raw_payload: payload,
-  };
+    raw_payload: payload };
 }
 
 function normalizeGenericWebhook(
@@ -258,8 +256,7 @@ function normalizeGenericWebhook(
     match_status: inferMatchStatus({
       patient_name: metadata.patientName,
       patient_id: metadata.patientId,
-      transaction_label: metadata.transactionLabel,
-    }),
+      transaction_label: metadata.transactionLabel }),
     amount: pickNumber(payload.amount, payload.totalAmount, payload.price),
     currency: pickText(payload.currency, 'KRW'),
     depositor_name: pickText(payload.depositorName, payload.buyerName, payload.customerName),
@@ -275,8 +272,7 @@ function normalizeGenericWebhook(
     matched_target_type: pickText(metadata.matchedTargetType),
     matched_target_id: pickText(metadata.matchedTargetId),
     matched_note: pickText(metadata.matchedNote),
-    raw_payload: payload,
-  };
+    raw_payload: payload };
 }
 
 export function normalizeVirtualAccountWebhook(
@@ -318,9 +314,7 @@ export function normalizeDepositDraft(
       transaction_label: transactionLabel,
       matched_target_type: matchedTargetType,
       matched_target_id: matchedTargetId,
-      matched_note: matchedNote,
-    }),
-  };
+      matched_note: matchedNote }) };
 }
 
 export function toAmountNumber(value: number | string | null | undefined) {

@@ -130,8 +130,7 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
             startDate: range.startDate,
             endDate: range.endDate || range.startDate,
             days: (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') ? activeDays : computeDays(range.startDate, range.endDate, leaveType),
-            reason,
-          })
+            reason })
         )
       );
       toast(`${dateRanges.length}건의 연차/휴가 신청을 상신했습니다.`, 'success');

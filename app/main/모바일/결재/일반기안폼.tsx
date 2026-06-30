@@ -29,8 +29,7 @@ import {
   getFormSchema,
   initSchemaValues,
   missingRequired,
-  StructuredFields,
-} from './양식필드';
+  StructuredFields } from './양식필드';
 
 export type SApprovalGenericFormProps = {
   user: ErpUser;
@@ -45,8 +44,7 @@ export default function SApprovalGenericForm({
   formSlug,
   formName,
   onCancel,
-  onSubmitted,
-}: SApprovalGenericFormProps) {
+  onSubmitted }: SApprovalGenericFormProps) {
   const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-generic');
@@ -57,8 +55,7 @@ export default function SApprovalGenericForm({
     () => ({
       userName: String(user.name || '').trim(),
       userCompany: company,
-      today,
-    }),
+      today }),
     [user.name, company, today],
   );
 
@@ -84,8 +81,7 @@ export default function SApprovalGenericForm({
     attachments, setAttachments,
     approverDefaults, approverLine, approverLoading, approverManual,
     pickerOpen, setPickerOpen,
-    handleApproverApply, submitApproval, queuedAttachmentCount,
-  } = base;
+    handleApproverApply, submitApproval, queuedAttachmentCount } = base;
 
   const titleOk = schema?.buildTitle ? true : title.trim() !== '';
   const fieldsOk = schema ? !missingRequired(schema, fieldValues) : true;
@@ -126,8 +122,7 @@ export default function SApprovalGenericForm({
         formSlug,
         formDisplayName: formName,
         ccUsers: ccUsers.map((c) => ({ id: c.id, name: c.name })),
-        extraMeta,
-      });
+        extraMeta });
 
       if (queued) {
         toast('오프라인 — 기안이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
@@ -177,8 +172,7 @@ export default function SApprovalGenericForm({
           className="macos-glass macos-squircle"
           style={{
             margin: '16px',
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           {showTitleInput && (
             <MField label="제목" required htmlFor={fieldId('title')}>
@@ -218,8 +212,7 @@ export default function SApprovalGenericForm({
                   color: 'var(--z-900)',
                   background: 'transparent',
                   border: 'none',
-                  outline: 'none',
-                }}
+                  outline: 'none' }}
               />
             </MField>
           )}
@@ -246,8 +239,7 @@ export default function SApprovalGenericForm({
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             {approverLoading ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
@@ -261,8 +253,7 @@ export default function SApprovalGenericForm({
                   fontSize: 12,
                   fontWeight: 800,
                   color: 'var(--m-warning)',
-                  lineHeight: 1.55,
-                }}
+                  lineHeight: 1.55 }}
               >
                 회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 "변경"으로 결재자를
                 직접 지정해 주세요.
@@ -282,8 +273,7 @@ export default function SApprovalGenericForm({
                         gap: 12,
                         padding: '12px 16px',
                         borderBottom: i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                        alignItems: 'center',
-                      }}
+                        alignItems: 'center' }}
                     >
                       <MAvatar tone="violet" size="sm">
                         {(a.name || '?').charAt(0)}
@@ -328,8 +318,7 @@ export default function SApprovalGenericForm({
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             {ccUsers.length === 0 ? (
               <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
@@ -348,8 +337,7 @@ export default function SApprovalGenericForm({
                         alignItems: 'center',
                         gap: 8,
                         padding: '6px 12px 6px 6px',
-                        borderRadius: 999,
-                      }}
+                        borderRadius: 999 }}
                     >
                       <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                       <span style={{ minWidth: 0 }}>

@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
 import type { ErpUser, StaffMember } from '@/types';
@@ -70,14 +70,12 @@ const REASON_BADGE: Record<string, { bg: string; text: string; icon: string }> =
   지각: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '⏰' },
   조퇴: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: '🚶' },
   미체크: { bg: 'bg-slate-100', text: 'text-slate-600', icon: '❓' },
-  미출근: { bg: 'bg-orange-100', text: 'text-orange-600', icon: '⚠️' },
-};
+  미출근: { bg: 'bg-orange-100', text: 'text-orange-600', icon: '⚠️' } };
 
 export default function SApprovalAttendanceFixForm({
   user,
   onCancel,
-  onSubmitted,
-}: SApprovalAttendanceFixFormProps) {
+  onSubmitted }: SApprovalAttendanceFixFormProps) {
   const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-attfix');
@@ -102,8 +100,7 @@ export default function SApprovalAttendanceFixForm({
     pickerOpen,
     setPickerOpen,
     handleApproverApply,
-    submitApproval,
-  } = base;
+    submitApproval } = base;
 
   const fetchProblemDates = useCallback(async () => {
     if (!staffId) return;
@@ -279,8 +276,7 @@ export default function SApprovalAttendanceFixForm({
             label: '지각',
             checkIn: checkInIso,
             checkOut: checkOutIso,
-            scheduledStart,
-          });
+            scheduledStart });
           continue;
         }
 
@@ -293,8 +289,7 @@ export default function SApprovalAttendanceFixForm({
               label: '출퇴근 미체크',
               checkIn: null,
               checkOut: null,
-              scheduledStart,
-            });
+              scheduledStart });
             continue;
           }
         }
@@ -313,8 +308,7 @@ export default function SApprovalAttendanceFixForm({
             label: '결근',
             checkIn: checkInIso,
             checkOut: checkOutIso,
-            scheduledStart,
-          });
+            scheduledStart });
           continue;
         }
 
@@ -325,8 +319,7 @@ export default function SApprovalAttendanceFixForm({
             label: '지각',
             checkIn: checkInIso,
             checkOut: checkOutIso,
-            scheduledStart,
-          });
+            scheduledStart });
           continue;
         }
 
@@ -337,8 +330,7 @@ export default function SApprovalAttendanceFixForm({
             label: '조퇴',
             checkIn: checkInIso,
             checkOut: checkOutIso,
-            scheduledStart,
-          });
+            scheduledStart });
           continue;
         }
 
@@ -349,8 +341,7 @@ export default function SApprovalAttendanceFixForm({
             label: '출퇴근 미체크',
             checkIn: null,
             checkOut: null,
-            scheduledStart,
-          });
+            scheduledStart });
           continue;
         }
 
@@ -361,8 +352,7 @@ export default function SApprovalAttendanceFixForm({
             label: '출근 미기록',
             checkIn: null,
             checkOut: checkOutIso,
-            scheduledStart,
-          });
+            scheduledStart });
         }
       }
 
@@ -425,8 +415,7 @@ export default function SApprovalAttendanceFixForm({
         correction_dates: sorted,
         correction_type: correctionType,
         correction_reason: reason.trim(),
-        content: resolvedContent,
-      };
+        content: resolvedContent };
 
       await submitApproval({
         typeName: '출결정정',
@@ -435,8 +424,7 @@ export default function SApprovalAttendanceFixForm({
         formSlug: 'attendance_fix',
         formDisplayName: '출결정정 신청',
         ccUsers: ccUsers.map((c) => ({ id: c.id, name: c.name })),
-        extraMeta,
-      });
+        extraMeta });
 
       // 신청 완료 후, attendance_corrections 테이블에 병렬 insert (PC 동작 동기화)
       const requestedAt = new Date().toISOString();
@@ -447,8 +435,7 @@ export default function SApprovalAttendanceFixForm({
         reason: reason.trim(),
         correction_type: correctionType,
         requested_at: requestedAt,
-        status: '대기',
-      }));
+        status: '대기' }));
 
       await withAttendanceCorrectionsFallback<null>(
         () => db.from('attendance_corrections').insert(rows),
@@ -545,8 +532,7 @@ export default function SApprovalAttendanceFixForm({
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 12,
-              }}
+                gap: 12 }}
             >
               <div
                 style={{
@@ -557,8 +543,7 @@ export default function SApprovalAttendanceFixForm({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 22,
-                }}
+                  fontSize: 22 }}
               >
                 ⏰
               </div>
@@ -580,8 +565,7 @@ export default function SApprovalAttendanceFixForm({
                   color: '#fff',
                   background: '#007AFF',
                   border: 'none',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
                 className="transition-all active:scale-95 duration-100"
               >
                 조회하기
@@ -597,8 +581,7 @@ export default function SApprovalAttendanceFixForm({
               style={{
                 padding: '24px 16px',
                 textAlign: 'center',
-                margin: '0 16px',
-              }}
+                margin: '0 16px' }}
             >
               <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-500)' }}>
                 정정 대상 기록이 없습니다.
@@ -641,8 +624,7 @@ export default function SApprovalAttendanceFixForm({
                         : 'rgba(255, 255, 255, 0.45)',
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                       textAlign: 'left',
-                      cursor: 'pointer',
-                    }}
+                      cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--z-900)' }}>{short} ({day})</span>
@@ -652,8 +634,7 @@ export default function SApprovalAttendanceFixForm({
                           height: 14,
                           borderRadius: 4,
                           border: '1px solid var(--m-border)',
-                          background: isSelected ? '#007AFF' : 'transparent',
-                        }}
+                          background: isSelected ? '#007AFF' : 'transparent' }}
                       />
                     </div>
                     <span
@@ -664,8 +645,7 @@ export default function SApprovalAttendanceFixForm({
                         fontSize: 10,
                         fontWeight: 900,
                         alignSelf: 'flex-start',
-                        color: 'inherit',
-                      }}
+                        color: 'inherit' }}
                     >
                       {badge.icon} {displayLabel}
                     </span>
@@ -688,8 +668,7 @@ export default function SApprovalAttendanceFixForm({
               className="macos-glass macos-squircle"
               style={{
                 margin: '16px',
-                overflow: 'hidden',
-              }}
+                overflow: 'hidden' }}
             >
               <MField label="정정 유형">
                 <MSegRow
@@ -721,8 +700,7 @@ export default function SApprovalAttendanceFixForm({
                     color: 'var(--z-900)',
                     background: 'transparent',
                     border: 'none',
-                    outline: 'none',
-                  }}
+                    outline: 'none' }}
                 />
               </MField>
             </div>
@@ -748,8 +726,7 @@ export default function SApprovalAttendanceFixForm({
                 style={{
                   overflow: 'hidden',
                   margin: '0 16px',
-                  padding: 0,
-                }}
+                  padding: 0 }}
               >
                 {approverLoading ? (
                   <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
@@ -763,8 +740,7 @@ export default function SApprovalAttendanceFixForm({
                       fontSize: 12,
                       fontWeight: 800,
                       color: 'var(--m-warning)',
-                      lineHeight: 1.55,
-                    }}
+                      lineHeight: 1.55 }}
                   >
                     결재자를 직접 지정해 주세요.
                   </div>
@@ -783,8 +759,7 @@ export default function SApprovalAttendanceFixForm({
                             gap: 12,
                             padding: '12px 16px',
                             borderBottom: i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                            alignItems: 'center',
-                          }}
+                            alignItems: 'center' }}
                         >
                           <MAvatar tone="violet" size="sm">
                             {(a.name || '?').charAt(0)}
@@ -824,8 +799,7 @@ export default function SApprovalAttendanceFixForm({
                 style={{
                   overflow: 'hidden',
                   margin: '0 16px',
-                  padding: 0,
-                }}
+                  padding: 0 }}
               >
                 {ccUsers.length === 0 ? (
                   <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
@@ -844,8 +818,7 @@ export default function SApprovalAttendanceFixForm({
                             alignItems: 'center',
                             gap: 8,
                             padding: '6px 12px 6px 6px',
-                            borderRadius: 999,
-                          }}
+                            borderRadius: 999 }}
                         >
                           <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                           <span style={{ minWidth: 0 }}>

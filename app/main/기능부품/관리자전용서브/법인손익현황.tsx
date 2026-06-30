@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { getPayrollGrossPay, filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface Props {
   staffs: any[];
@@ -53,9 +53,9 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       setLoading(true);
       try {
         const [payrollRes, expensesRes, prevPayrollRes] = await Promise.all([
-          supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', yearMonth),
-          supabase.from('company_expenses').select('*').eq('year_month', yearMonth),
-          prevMonthYM ? supabase.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', prevMonthYM) : Promise.resolve({ data: [] }),
+          db.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', yearMonth),
+          db.from('company_expenses').select('*').eq('year_month', yearMonth),
+          prevMonthYM ? db.from('payroll_records').select('staff_id, total_taxable, total_taxfree, gross_pay, record_type').eq('year_month', prevMonthYM) : Promise.resolve({ data: [] }),
         ]);
         setPayrollData(filterNonInterimPayrollRecords(payrollRes.data || []));
         setExpensesData(expensesRes.data || []);
@@ -107,8 +107,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       rent: existing?.rent || 0,
       materials: existing?.materials || 0,
       utilities: existing?.utilities || 0,
-      others: existing?.others || 0,
-    });
+      others: existing?.others || 0 });
     setExpenseModal(co);
   };
 
@@ -117,14 +116,14 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
     try {
       const existing = expensesData.find(e => e.company === expenseModal);
       if (existing?.id) {
-        await supabase.from('company_expenses').update(expenseForm).eq('id', existing.id);
+        await db.from('company_expenses').update(expenseForm).eq('id', existing.id);
       } else {
-        await supabase.from('company_expenses').insert(expenseForm);
+        await db.from('company_expenses').insert(expenseForm);
       }
       toast('비용이 저장되었습니다.', 'success');
       setExpenseModal(null);
       // 재조회
-      const { data } = await supabase.from('company_expenses').select('*').eq('year_month', yearMonth);
+      const { data } = await db.from('company_expenses').select('*').eq('year_month', yearMonth);
       setExpensesData(data || []);
     } catch {
       toast('저장에 실패했습니다.', 'error');

@@ -26,7 +26,7 @@ import 재고관리 from '../재고';
 import 관리자 from '../관리자';
 import 오프라인배너 from '../공통/오프라인배너';
 import 오프라인실패배너 from '../공통/오프라인실패배너';
-import { initOfflineQueueFlush } from '@/lib/offline-queue-supabase';
+import { initOfflineQueueFlush } from '@/lib/offline-queue-d1';
 import { initUploadQueueFlush } from '@/lib/offline-upload-queue';
 import { useChatRoomsForMobile } from '../채팅/data-hooks';
 import { useNavigation } from '../../contexts/NavigationContext';
@@ -38,8 +38,7 @@ import {
   countUnreadNotifications,
   fetchUnreadNotificationCount,
   NOTIFICATION_LIST_UPDATED_EVENT,
-  NOTIFICATION_READ_EVENT,
-} from '@/app/main/기능부품/알림시스템/notification-api';
+  NOTIFICATION_READ_EVENT } from '@/app/main/기능부품/알림시스템/notification-api';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -162,8 +161,7 @@ export default function MobileShell({
         {
           status: '서명완료',
           requestedAt: (pendingContract.requested_at as string) || null,
-          signedAt,
-        },
+          signedAt },
       );
       const { error: checklistError } = await db.from('onboarding_checklists').upsert(
         {
@@ -171,8 +169,7 @@ export default function MobileShell({
           checklist_type: '입사',
           items: syncedItems,
           target_date: entryChecklistRow?.target_date ?? null,
-          completed_at: isChecklistComplete(syncedItems) ? signedAt : null,
-        },
+          completed_at: isChecklistComplete(syncedItems) ? signedAt : null },
         { onConflict: 'staff_id,checklist_type' },
       );
 
@@ -202,8 +199,7 @@ export default function MobileShell({
         type: 'SUCCESS',
         title: '계약서 서명 완료',
         body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
-        dedupeKey: `contract-signed:${pendingContract.id}`,
-      }]);
+        dedupeKey: `contract-signed:${pendingContract.id}` }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
@@ -426,7 +422,9 @@ export default function MobileShell({
             </div>
           )}
         </div>
-        <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread, notif: notificationUnread }} />
+        {!activeRoomId && (
+          <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread, notif: notificationUnread }} />
+        )}
       </div>
     </div>
   );

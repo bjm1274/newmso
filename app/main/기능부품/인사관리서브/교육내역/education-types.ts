@@ -151,8 +151,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     obligation: 'legal',
     appliesTo: 'all',
     cycleMonths: 12,
-    legalBasis: '남녀고용평등법 제13조',
-  },
+    legalBasis: '남녀고용평등법 제13조' },
   {
     code: 'personal_info',
     name: '개인정보보호',
@@ -161,8 +160,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     obligation: 'legal',
     appliesTo: 'all',
     cycleMonths: 12,
-    legalBasis: '개인정보보호법 제28조',
-  },
+    legalBasis: '개인정보보호법 제28조' },
   {
     code: 'disability_aware',
     name: '직장 내 장애인 인식개선',
@@ -171,8 +169,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     obligation: 'legal',
     appliesTo: 'all',
     cycleMonths: 12,
-    legalBasis: '장애인고용촉진 및 직업재활법 제5조의2',
-  },
+    legalBasis: '장애인고용촉진 및 직업재활법 제5조의2' },
   {
     code: 'workplace_bullying',
     name: '직장 내 괴롭힘 방지',
@@ -180,8 +177,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'company',
     obligation: 'recommended',
     appliesTo: 'all',
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'osha',
     name: '산업안전보건(일반)',
@@ -190,8 +186,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     obligation: 'legal',
     appliesTo: 'all',
     cycleMonths: 12,
-    legalBasis: '산업안전보건법 제29조',
-  },
+    legalBasis: '산업안전보건법 제29조' },
   // ── 권장/내부 또는 의료기관 인증평가 ─────────────────────
   {
     code: 'infection_control',
@@ -200,8 +195,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'hospital',
     obligation: 'recommended',
     appliesTo: [...MEDICAL_STAFF_CODES],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'patient_safety',
     name: '환자안전·의료사고 예방',
@@ -209,8 +203,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'hospital',
     obligation: 'recommended',
     appliesTo: [...MEDICAL_STAFF_CODES],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'medical_law_ethics',
     name: '의료법·의료윤리 교육',
@@ -222,8 +215,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
       'physical_therapist', 'occupational_therapist',
       'clinical_pathologist', 'pharmacist',
     ],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'narcotics_handling',
     name: '마약류 취급자 교육(해당자)',
@@ -231,8 +223,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'hospital',
     obligation: 'legal',
     appliesTo: ['doctor', 'pharmacist'],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'child_abuse_report',
     name: '아동학대신고',
@@ -240,8 +231,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'hospital',
     obligation: 'legal',
     appliesTo: ['doctor', 'nurse', 'nurse_assistant', 'social_worker'],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
   {
     code: 'elder_abuse_report',
     name: '노인학대신고',
@@ -249,8 +239,7 @@ export const EDUCATION_ITEMS: EducationItem[] = [
     category: 'hospital',
     obligation: 'legal',
     appliesTo: ['doctor', 'nurse', 'nurse_assistant', 'social_worker'],
-    cycleMonths: 12,
-  },
+    cycleMonths: 12 },
 ];
 
 export const EDUCATION_DEADLINES: Record<string, { month: number; day: number }> = {
@@ -264,5 +253,4 @@ export const EDUCATION_DEADLINES: Record<string, { month: number; day: number }>
   '의료법·의료윤리 교육': { month: 3, day: 31 },
   '마약류 취급자 교육(해당자)': { month: 5, day: 31 },
   아동학대신고: { month: 3, day: 31 },
-  노인학대신고: { month: 3, day: 31 },
-};
+  노인학대신고: { month: 3, day: 31 } };

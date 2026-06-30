@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { formatPatientBedLabel, normalizeHandoverNote, type HandoverNoteRow } from '@/lib/handover-notes';
 import { escapeLikePattern } from '@/lib/like-escape';
 
@@ -30,8 +30,7 @@ export default function GlobalSearch({
   staffs = [],
   posts = [],
   variant = 'input',
-  compact = false,
-}: GlobalSearchProps) {
+  compact = false }: GlobalSearchProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,8 +81,7 @@ export default function GlobalSearch({
             id: String(staff.id),
             title: staff.name || '이름 없음',
             subtitle: [staff.department, staff.position].filter(Boolean).join(' '),
-            meta: staff.company || '',
-          });
+            meta: staff.company || '' });
         });
 
       (posts || [])
@@ -99,8 +97,7 @@ export default function GlobalSearch({
             id: String(post.id),
             title: post.title || '제목 없음',
             subtitle: String(post.content || '').slice(0, 80),
-            meta: post.board_type || '',
-          });
+            meta: post.board_type || '' });
         });
 
       return nextResults;
@@ -123,14 +120,14 @@ export default function GlobalSearch({
 
       try {
         const [postsByTitleResult, postsByContentResult] = await Promise.all([
-          supabase
+          db
             .from('board_posts')
             .select('id, title, content, board_type')
             .ilike('title', likeTerm)
             .order('created_at', { ascending: false })
             .limit(5)
             .returns<any[]>(),
-          supabase
+          db
             .from('board_posts')
             .select('id, title, content, board_type')
             .ilike('content', likeTerm)
@@ -161,18 +158,17 @@ export default function GlobalSearch({
               id: String(post.id),
               title: post.title || '?쒕ぉ ?놁쓬',
               subtitle: String(post.content || '').slice(0, 80),
-              meta: post.board_type || '',
-            });
+              meta: post.board_type || '' });
           });
 
-        const { data: approvalsByTitle } = await supabase
+        const { data: approvalsByTitle } = await db
           .from('approvals')
           .select('id, title, type, status, sender_name')
           .ilike('title', likeTerm)
           .limit(5)
           .returns<any[]>();
 
-        const { data: approvalsByContent } = await supabase
+        const { data: approvalsByContent } = await db
           .from('approvals')
           .select('id, title, type, status, sender_name')
           .ilike('content', likeTerm)
@@ -191,12 +187,11 @@ export default function GlobalSearch({
               id: String(approval.id),
               title: approval.title || '결재 문서',
               subtitle: approval.sender_name || '',
-              meta: [approval.type, approval.status].filter(Boolean).join(' · '),
-            });
+              meta: [approval.type, approval.status].filter(Boolean).join(' · ') });
           });
 
         if (user?.id) {
-          const { data: myRooms } = await supabase
+          const { data: myRooms } = await db
             .from('chat_rooms')
             .select('id')
             .contains('members', [user.id])
@@ -205,7 +200,7 @@ export default function GlobalSearch({
 
           const roomIds = (myRooms || []).map((room: any) => room.id).filter(Boolean);
           if (roomIds.length > 0) {
-            const { data: messages } = await supabase
+            const { data: messages } = await db
               .from('messages')
               .select('id, content')
               .in('room_id', roomIds)
@@ -220,14 +215,13 @@ export default function GlobalSearch({
                 type: 'message',
                 id: String(message.id),
                 title: String(message.content || '').slice(0, 60) || '채팅 메시지',
-                subtitle: '채팅',
-              });
+                subtitle: '채팅' });
             });
           }
         }
 
         if (user?.department === '병동팀') {
-          const { data: notes } = await supabase
+          const { data: notes } = await db
             .from('handover_notes')
             .select('id, content, author_name, created_at')
             .ilike('content', likeTerm)
@@ -245,8 +239,7 @@ export default function GlobalSearch({
               subtitle: normalized.note_scope === 'patient'
                 ? formatPatientBedLabel(normalized)
                 : (normalized.author_name ? `[인계] ${normalized.author_name}` : '인계노트'),
-              meta: normalized.handover_date || (normalized.created_at ? String(normalized.created_at).slice(0, 10) : ''),
-            });
+              meta: normalized.handover_date || (normalized.created_at ? String(normalized.created_at).slice(0, 10) : '') });
           });
         }
 
@@ -302,8 +295,7 @@ export default function GlobalSearch({
     post: '게시글',
     approval: '결재',
     message: '채팅',
-    handover: '인계',
-  };
+    handover: '인계' };
 
   const dropdown = open ? (
     <div

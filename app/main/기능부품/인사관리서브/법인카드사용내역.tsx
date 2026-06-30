@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import SmartMonthPicker from '../공통/SmartMonthPicker';
@@ -42,18 +42,17 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   );
 
   const fetchCards = useCallback(async () => {
-    const { data, error } = await supabase.from('corporate_cards').select('*').eq('status', 'active').order('company_name');
+    const { data, error } = await db.from('corporate_cards').select('*').eq('status', 'active').order('company_name');
     setCards(error ? [] : (data || []).map((card: any) => ({
       ...card,
-      staff_members: staffById.get(String(card.holder_id || '')),
-    })));
+      staff_members: staffById.get(String(card.holder_id || '')) })));
   }, [staffById]);
 
   const fetchTransactions = useCallback(async () => {
     const [y, m] = month.split('-').map(Number);
     const start = `${month}-01`;
     const end = `${month}-${new Date(y, m, 0).getDate()}`;
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('corporate_card_transactions')
       .select('*')
       .gte('transaction_date', start)
@@ -68,7 +67,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     );
     let cardLookup: Map<string, { card_nickname: string | null; last_four: string | null; company_name: string | null }> = new Map();
     if (cardIds.length > 0) {
-      const { data: cardData } = await supabase
+      const { data: cardData } = await db
         .from('corporate_cards')
         .select('id, card_nickname, last_four, company_name')
         .in('id', cardIds);
@@ -76,16 +75,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         cardLookup.set(String(c.id), {
           card_nickname: c.card_nickname ?? null,
           last_four: c.last_four ?? null,
-          company_name: c.company_name ?? null,
-        });
+          company_name: c.company_name ?? null });
       }
     }
 
     let rows: Record<string, unknown>[] = rawRows.map((row) => ({
       ...row,
       corporate_cards: cardLookup.get(String(row.card_id || '')) ?? null,
-      staff_members: staffById.get(String(row.staff_id || row.holder_id || '')),
-    }));
+      staff_members: staffById.get(String(row.staff_id || row.holder_id || '')) }));
     if (selectedCo !== '전체') rows = rows.filter((r: Record<string, unknown>) => (r.company_name || (r.corporate_cards as Record<string, unknown>)?.company_name) === selectedCo);
     if (filterCat) rows = rows.filter((r: Record<string, unknown>) => r.category === filterCat);
     if (filterCardId) rows = rows.filter((r: Record<string, unknown>) => r.card_id === filterCardId);
@@ -149,12 +146,10 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     {
       key: 'transaction_date',
       label: '날짜',
-      primary: true,
-    },
+      primary: true },
     {
       key: 'merchant',
-      label: '가맹점',
-    },
+      label: '가맹점' },
     {
       key: 'corporate_cards',
       label: '카드',
@@ -163,18 +158,15 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         const card = r.corporate_cards;
         if (!card) return '-';
         return card.card_nickname || (card.last_four ? `****${card.last_four}` : '-');
-      },
-    },
+      } },
     {
       key: 'category',
-      label: '항목',
-    },
+      label: '항목' },
     {
       key: 'amount',
       label: '금액',
       align: 'right',
-      render: (r): ReactNode => <span className="font-bold">{Number(r.amount).toLocaleString()}원</span>,
-    },
+      render: (r): ReactNode => <span className="font-bold">{Number(r.amount).toLocaleString()}원</span> },
   ], []);
 
   const cardsByCo = selectedCo === '전체'
@@ -183,13 +175,12 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
 
   const handleAddCard = async () => {
     if (!cardForm.company_name || !cardForm.card_nickname) return toast('회사와 카드별칭을 입력하세요.', 'warning');
-    const { error } = await supabase.from('corporate_cards').insert({
+    const { error } = await db.from('corporate_cards').insert({
       company_name: cardForm.company_name,
       card_nickname: cardForm.card_nickname,
       last_four: cardForm.last_four || null,
       issuer: cardForm.issuer || null,
-      holder_id: cardForm.holder_id || null,
-    });
+      holder_id: cardForm.holder_id || null });
     if (error) {
       toast('법인카드 저장에 실패했습니다.', 'error');
       return;
@@ -205,10 +196,9 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       title: '법인카드 비활성화',
       description: `${target?.card_name || target?.card_number || '선택한 카드'}를 비활성화합니다.\n거래 내역 조회는 유지되지만 신규 사용 카드 목록에서는 제외됩니다.`,
       confirmText: '비활성화',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
-    const { error } = await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
+    const { error } = await db.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
     if (error) {
       toast('카드 비활성화에 실패했습니다.', 'error');
       return;
@@ -219,15 +209,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   const handleAdd = async () => {
     if (!form.date || !form.merchant || form.amount <= 0) return toast('필수 항목을 입력하세요.', 'warning');
     const co = selectedCo !== '전체' ? selectedCo : (form.card_id ? cards.find((c: any) => c.id === form.card_id)?.company_name : null) || '전체';
-    const { error } = await supabase.from('corporate_card_transactions').insert({
+    const { error } = await db.from('corporate_card_transactions').insert({
       transaction_date: form.date,
       merchant: form.merchant,
       category: form.category,
       amount: form.amount,
       description: form.description,
       company_name: co,
-      card_id: form.card_id || null,
-    });
+      card_id: form.card_id || null });
     if (error) {
       toast('사용내역 저장에 실패했습니다.', 'error');
       return;
@@ -261,14 +250,13 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         if (!date || amount <= 0) continue;
         // 카테고리가 명시되지 않은 경우 자동 분류
         const category = CATEGORIES.includes(parts[3]) ? parts[3] : autoClassify(merchant);
-        const { error } = await supabase.from('corporate_card_transactions').insert({
+        const { error } = await db.from('corporate_card_transactions').insert({
           transaction_date: date,
           merchant,
           amount,
           category,
           description: parts[4] || '',
-          company_name: co,
-        });
+          company_name: co });
         if (error) {
           failed++;
           console.error('corporate_card_transactions csv insert failed:', error);
@@ -292,15 +280,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       title: '법인카드 내역 자동 분류',
       description: `${unclassified.length}건을 가맹점 키워드 기준으로 자동 분류합니다.`,
       confirmText: '자동 분류',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
     let updated = 0;
     let failed = 0;
     for (const r of unclassified) {
       const cat = autoClassify(r.merchant);
       if (cat !== '기타') {
-        const { error } = await supabase.from('corporate_card_transactions').update({ category: cat }).eq('id', r.id);
+        const { error } = await db.from('corporate_card_transactions').update({ category: cat }).eq('id', r.id);
         if (error) {
           failed++;
           console.error('corporate_card_transactions auto classify update failed:', error);

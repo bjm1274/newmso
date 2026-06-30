@@ -28,8 +28,7 @@ import MListRow from '../공통/MListRow';
 import MKpi from '../공통/MKpi';
 import {
   useItemData,
-  toMTone,
-} from './data-hooks';
+  toMTone } from './data-hooks';
 
 export type ItemTab = 'items' | 'cat' | 'asset' | 'udi';
 
@@ -42,8 +41,7 @@ export type 물품자산Props = {
 export default function 물품자산({
   onBack,
   onOpenItemForm,
-  onOpenAssetForm,
-}: 물품자산Props) {
+  onOpenAssetForm }: 물품자산Props) {
   const [tab, setTab] = useState<ItemTab>('items');
   const data = useItemData();
 
@@ -73,8 +71,7 @@ export default function 물품자산({
         style={{
           padding: '10px 16px 12px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="물품·자산 탭">
           <SegTab on={tab === 'items'} label={`물품 ${data.totalCount}`} onClick={() => setTab('items')} />
@@ -103,8 +100,7 @@ export default function 물품자산({
 function SegTab({
   on,
   label,
-  onClick,
-}: {
+  onClick }: {
   on: boolean;
   label: string;
   onClick: () => void;
@@ -129,8 +125,7 @@ function EmptyMsg({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | 'dang
         padding: 24,
         textAlign: 'center',
         color: tone === 'danger' ? 'var(--m-danger)' : 'var(--z-500)',
-        fontSize: 13,
-      }}
+        fontSize: 13 }}
     >
       {msg}
     </div>
@@ -139,8 +134,7 @@ function EmptyMsg({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | 'dang
 
 // ─── 물품 탭 ──────────────────────────────────────────────────
 function ItemsPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useItemData>;
 }) {
   if (data.catalog.length === 0) return <EmptyMsg msg="등록된 물품이 없습니다." />;
@@ -165,8 +159,7 @@ function ItemsPane({
 
 // ─── 카테고리 탭 ──────────────────────────────────────────────
 function CatPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useItemData>;
 }) {
   if (data.categories.length === 0) return <EmptyMsg msg="등록된 카테고리가 없습니다." />;
@@ -190,8 +183,7 @@ function CatPane({
 // ─── 자산 탭 (QR hero) ────────────────────────────────────────
 function AssetPane({
   data,
-  onOpenAssetForm,
-}: {
+  onOpenAssetForm }: {
   data: ReturnType<typeof useItemData>;
   onOpenAssetForm: () => void;
 }) {
@@ -214,8 +206,7 @@ function AssetPane({
           gap: 12,
           border: 0,
           fontSize: 15,
-          fontWeight: 800,
-        }}
+          fontWeight: 800 }}
       >
         <MIcon name="qr" size={28} strokeWidth={1.6} />
         <div style={{ textAlign: 'left' }}>
@@ -254,8 +245,7 @@ function AssetPane({
 
 // ─── UDI 탭 ───────────────────────────────────────────────────
 function UdiPane({
-  data,
-}: {
+  data }: {
   data: ReturnType<typeof useItemData>;
 }) {
   const registered = data.udis.length;
@@ -269,8 +259,7 @@ function UdiPane({
           padding: '14px 14px',
           marginBottom: 12,
           background: 'var(--m-accent-soft)',
-          borderColor: 'transparent',
-        }}
+          borderColor: 'transparent' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <MIcon name="qr" size={20} color="var(--m-accent)" />
@@ -279,8 +268,7 @@ function UdiPane({
               style={{
                 fontSize: 13,
                 fontWeight: 800,
-                color: 'var(--m-accent)',
-              }}
+                color: 'var(--m-accent)' }}
             >
               UDI 통합 관리 · {registered}품목 등록
             </div>
@@ -289,8 +277,7 @@ function UdiPane({
                 fontSize: 11,
                 color: 'var(--z-600)',
                 fontWeight: 600,
-                marginTop: 1,
-              }}
+                marginTop: 1 }}
             >
               식약처 의료기기 통합정보시스템(MFDS) 연동
             </div>
@@ -306,8 +293,7 @@ function UdiPane({
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 8,
-          marginBottom: 12,
-        }}
+          marginBottom: 12 }}
       >
         <MKpi label="등록" value={String(registered)} tone="success" icon="plus" />
         <MKpi label="대상 자산" value={String(data.assetCount)} tone="accent" icon="box" />
@@ -341,8 +327,7 @@ function UdiPane({
           fontWeight: 700,
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-        }}
+          gap: 8 }}
       >
         <MIcon name="info" size={14} />
         상세 UDI 동기화·매칭은 데스크톱에서 진행하세요

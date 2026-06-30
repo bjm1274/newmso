@@ -4,8 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
 import {
   SwipeableKpiCards,
-  type KpiCard,
-} from '@/app/components/SwipeableKpiCards';
+  type KpiCard } from '@/app/components/SwipeableKpiCards';
 import { MobileChartWrapper } from '@/app/components/MobileChartWrapper';
 
 export type ManagementAnalysisMobileDashboardProps = {
@@ -39,8 +38,7 @@ export default function ManagementAnalysisMobileDashboard({
   stats,
   notices,
   quickLinks,
-  leaveUsageRate,
-}: ManagementAnalysisMobileDashboardProps) {
+  leaveUsageRate }: ManagementAnalysisMobileDashboardProps) {
   const kpiCards = useMemo<KpiCard[]>(
     () =>
       stats.map((s, idx) => ({
@@ -51,8 +49,7 @@ export default function ManagementAnalysisMobileDashboard({
         delta: s.trend
           ? { value: s.detail, trend: s.trend }
           : undefined,
-        icon: <MenuIcon name={s.icon} className="h-4 w-4" />,
-      })),
+        icon: <MenuIcon name={s.icon} className="h-4 w-4" /> })),
     [stats],
   );
 

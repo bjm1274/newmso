@@ -27,16 +27,14 @@ const STATE_TONE: Record<OpCheckCardState, '' | 'success' | 'accent' | 'warning'
   '준비완료': 'accent',
   '수술중': 'success',
   '완료': 'accent',
-  '보류': 'warning',
-};
+  '보류': 'warning' };
 
 const STATE_DOT: Record<OpCheckCardState, string> = {
   '준비중': 'var(--z-400)',
   '준비완료': 'var(--m-accent)',
   '수술중': 'var(--m-success)',
   '완료': 'var(--m-accent)',
-  '보류': 'var(--m-warning)',
-};
+  '보류': 'var(--m-warning)' };
 
 export type OPCardActionsProps = {
   card: OpCheckCard;
@@ -51,24 +49,20 @@ function OPCardActions({ card, busy, onChange, onOpenDetail }: OPCardActionsProp
     height: 40,
     borderRadius: 10,
     fontSize: 13,
-    fontWeight: 800,
-  };
+    fontWeight: 800 };
   const ghost: React.CSSProperties = {
     background: 'var(--m-card)',
     color: 'var(--z-700)',
     border: '1px solid var(--m-border)',
-    fontWeight: 700,
-  };
+    fontWeight: 700 };
   const primary: React.CSSProperties = {
     background: 'var(--m-accent)',
     color: '#fff',
-    border: 0,
-  };
+    border: 0 };
   const success: React.CSSProperties = {
     background: 'var(--m-success)',
     color: '#fff',
-    border: 0,
-  };
+    border: 0 };
 
   switch (card.state) {
     case '준비중':
@@ -156,8 +150,7 @@ function OPCardBase({ card, busy, onChange, onOpenDetail }: OPCardProps) {
         padding: '14px 16px',
         position: 'relative',
         overflow: 'hidden',
-        borderColor: inProgress ? 'var(--m-success)' : 'var(--m-border)',
-      }}
+        borderColor: inProgress ? 'var(--m-success)' : 'var(--m-border)' }}
     >
       {inProgress && (
         <div
@@ -176,8 +169,7 @@ function OPCardBase({ card, busy, onChange, onOpenDetail }: OPCardProps) {
               borderRadius: 999,
               background: STATE_DOT[card.state],
               marginRight: 4,
-              verticalAlign: 'middle',
-            }}
+              verticalAlign: 'middle' }}
           />
           {card.state}
         </MChip>
@@ -194,8 +186,7 @@ function OPCardBase({ card, busy, onChange, onOpenDetail }: OPCardProps) {
           textAlign: 'left',
           background: 'transparent',
           border: 0,
-          padding: 0,
-        }}
+          padding: 0 }}
       >
         <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.015em' }}>
           {card.patient}
@@ -204,8 +195,7 @@ function OPCardBase({ card, busy, onChange, onOpenDetail }: OPCardProps) {
               fontSize: 12,
               color: 'var(--z-500)',
               fontWeight: 600,
-              marginLeft: 6,
-            }}
+              marginLeft: 6 }}
           >
             · {card.procedure}
           </span>

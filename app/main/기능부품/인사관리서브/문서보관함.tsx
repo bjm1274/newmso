@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { extractApprovalDocNumberFromDocument, mapApprovalToDocumentRepositoryEntry } from '@/lib/approval-document-archive';
 import ArchivedDocumentView from './ArchivedDocumentView';
 import IssuedCertificateSection from './IssuedCertificateSection';
@@ -46,8 +46,7 @@ export default function DocumentRepository({
   selectedCo,
   linkedTarget,
   canManageDocuments = false,
-  title = '문서 보관함',
-}: {
+  title = '문서 보관함' }: {
   user: UserRecord;
   selectedCo: string;
   linkedTarget?: { id?: string; name?: string };
@@ -66,8 +65,8 @@ export default function DocumentRepository({
 
   const fetchDocs = async () => {
     setLoading(true);
-    const repositoryQuery = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
-    const approvalsQuery = supabase.from('approvals').select('*').order('created_at', { ascending: false });
+    const repositoryQuery = db.from('document_repository').select('*').order('updated_at', { ascending: false });
+    const approvalsQuery = db.from('approvals').select('*').order('created_at', { ascending: false });
     const [{ data: repositoryDocs }, { data: approvalDocs }] = await Promise.all([repositoryQuery, approvalsQuery]);
     const existingDocNumbers = new Set(
       (repositoryDocs || [])
@@ -136,14 +135,14 @@ export default function DocumentRepository({
 
       if (selected) {
         const newVersion = (Number(selected.version) || 1) + 1;
-        await supabase.from('document_versions').insert({
+        await db.from('document_versions').insert({
           document_id: selected.id,
           version: selected.version,
           content: selected.content,
           file_url: selected.file_url,
           created_by: user?.id
         });
-        await supabase.from('document_repository').update({
+        await db.from('document_repository').update({
           title: form.title,
           category: form.category,
           content: form.content,
@@ -153,7 +152,7 @@ export default function DocumentRepository({
           company_name: companyName
         }).eq('id', selected.id);
       } else {
-        await supabase.from('document_repository').insert({
+        await db.from('document_repository').insert({
           title: form.title,
           category: form.category,
           content: form.content,
@@ -192,11 +191,10 @@ export default function DocumentRepository({
       title: '문서 완전 삭제',
       description: '해당 문서를 완전히 삭제합니다.\n삭제 후에는 되돌릴 수 없습니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('document_repository').delete().eq('id', doc.id);
+      const { error } = await db.from('document_repository').delete().eq('id', doc.id);
       if (error) throw error;
       if (selected?.id === doc.id) {
         setSelected(null);

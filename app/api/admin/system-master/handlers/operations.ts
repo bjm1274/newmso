@@ -15,8 +15,7 @@ import {
   isNotNull,
   lte,
   gte,
-  ne,
-} from '@/lib/db';
+  ne } from '@/lib/db';
 import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
 import {
   OPERATION_CRONS,
@@ -28,8 +27,7 @@ import {
   loadPushSubscriptionDiagnostics,
   loadRecentPushFailures,
   type AuditLogRow,
-  type LooseRecord,
-} from '../_shared';
+  type LooseRecord } from '../_shared';
 
 export async function handleOperations() {
   const d1 = await getD1Binding();
@@ -60,8 +58,7 @@ export async function handleOperations() {
         requested_by_name: backupRestoreRunsTable.requested_by_name,
         started_at: backupRestoreRunsTable.started_at,
         finished_at: backupRestoreRunsTable.finished_at,
-        result_summary: backupRestoreRunsTable.result_summary,
-      }).from(backupRestoreRunsTable).orderBy(desc(backupRestoreRunsTable.started_at)).limit(10),
+        result_summary: backupRestoreRunsTable.result_summary }).from(backupRestoreRunsTable).orderBy(desc(backupRestoreRunsTable.started_at)).limit(10),
       // 미완료 + reminder_at 설정 + 기한 경과
       db.select({ id: todosTable.id }).from(todosTable)
         .where(and(
@@ -90,8 +87,7 @@ export async function handleOperations() {
         title: wikiDocumentVersionsTable.title,
         version_no: wikiDocumentVersionsTable.version_no,
         created_at: wikiDocumentVersionsTable.created_at,
-        change_summary: wikiDocumentVersionsTable.change_summary,
-      }).from(wikiDocumentVersionsTable).orderBy(desc(wikiDocumentVersionsTable.created_at)).limit(5),
+        change_summary: wikiDocumentVersionsTable.change_summary }).from(wikiDocumentVersionsTable).orderBy(desc(wikiDocumentVersionsTable.created_at)).limit(5),
     ]);
 
     // audit_logs.details JSON 파싱
@@ -149,8 +145,7 @@ export async function handleOperations() {
       device_id: String(row.device_id || '').trim() || null,
       has_fcm: Boolean(String(row.fcm_token || '').trim()),
       created_at: row.created_at || null,
-      user_agent: String(row.user_agent || '').trim() || null,
-    }));
+      user_agent: String(row.user_agent || '').trim() || null }));
   const recentFailureSummary = buildPushFailureSummary(recentPushFailures);
 
   const latestBackup = backupRows[0] || null;
@@ -168,8 +163,7 @@ export async function handleOperations() {
           severity: queueSummary.ready > 0 ? 'warning' : 'info',
           label: '대기 중인 채팅 푸시 작업',
           count: queueSummary.pending,
-          detail: queueSummary.oldestPendingAt ? `가장 오래된 작업: ${new Date(queueSummary.oldestPendingAt).toLocaleString('ko-KR')}` : '처리 대기 중인 작업이 있습니다.',
-        }
+          detail: queueSummary.oldestPendingAt ? `가장 오래된 작업: ${new Date(queueSummary.oldestPendingAt).toLocaleString('ko-KR')}` : '처리 대기 중인 작업이 있습니다.' }
       : null,
     orphanSubscriptions + nullStaffSubscriptions > 0
       ? { id: 'push-subscription-orphan', severity: 'warning', label: '정리 필요한 푸시 구독', count: orphanSubscriptions + nullStaffSubscriptions, detail: `null staff ${nullStaffSubscriptions}건 · orphan ${orphanSubscriptions}건` }
@@ -186,8 +180,7 @@ export async function handleOperations() {
           severity: 'warning',
           label: '백업 복원 실패 이력',
           count: failedRestoreRuns.length,
-          detail: latestRestoreRun?.started_at ? `최근 복원 시각: ${new Date(String(latestRestoreRun.started_at)).toLocaleString('ko-KR')}` : '최근 복원 작업 중 실패한 이력이 있습니다.',
-        }
+          detail: latestRestoreRun?.started_at ? `최근 복원 시각: ${new Date(String(latestRestoreRun.started_at)).toLocaleString('ko-KR')}` : '최근 복원 작업 중 실패한 이력이 있습니다.' }
       : null,
     dueTodoCount > 0
       ? {
@@ -195,8 +188,7 @@ export async function handleOperations() {
           severity: 'info',
           label: '대기 중인 할일 리마인더',
           count: dueTodoCount,
-          detail: `미완료 리마인더 대상 ${Number(dueTodoCount || 0).toLocaleString('ko-KR')}건이 확인됩니다.`,
-        }
+          detail: `미완료 리마인더 대상 ${Number(dueTodoCount || 0).toLocaleString('ko-KR')}건이 확인됩니다.` }
       : null,
     versionGap > 0
       ? {
@@ -204,8 +196,7 @@ export async function handleOperations() {
           severity: 'info',
           label: '버전 기록이 없는 위키 문서',
           count: versionGap,
-          detail: `문서 ${Number(wikiDocumentCount || 0).toLocaleString('ko-KR')}건 중 버전 기록 ${Number(wikiVersionCount || 0).toLocaleString('ko-KR')}건이 있습니다.`,
-        }
+          detail: `문서 ${Number(wikiDocumentCount || 0).toLocaleString('ko-KR')}건 중 버전 기록 ${Number(wikiVersionCount || 0).toLocaleString('ko-KR')}건이 있습니다.` }
       : null,
   ].filter(Boolean);
 
@@ -222,13 +213,11 @@ export async function handleOperations() {
       webPushOnly: webPushOnlyCount,
       placeholderEndpoints: placeholderEndpointCount,
       platformSummary,
-      recentSubscriptions,
-    },
+      recentSubscriptions },
     pushFailures: {
       total: recentPushFailures.length,
       summary: recentFailureSummary,
-      recent: recentPushFailures,
-    },
+      recent: recentPushFailures },
     recentBackups: backupRows,
     latestBackup,
     restoreRuns,
@@ -237,13 +226,10 @@ export async function handleOperations() {
     todoAutomation: {
       dueReminders: dueTodoCount,
       repeatingOpenTodos: repeatingTodoCount,
-      reminderLogs24h: reminderLogCount24h,
-    },
+      reminderLogs24h: reminderLogCount24h },
     wiki: {
       documents: wikiDocumentCount,
       versions: wikiVersionCount,
-      recentVersions: recentWikiVersions,
-    },
-    failureItems,
-  });
+      recentVersions: recentWikiVersions },
+    failureItems });
 }

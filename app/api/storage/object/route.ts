@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createR2DownloadUrl,
-  getConfiguredR2ChatBucket,
-} from '@/lib/object-storage';
+  getConfiguredR2ChatBucket } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
 
@@ -57,9 +56,7 @@ export async function GET(request: NextRequest) {
         status: 302,
         headers: {
           // 객체 키가 UUID라 영구 불변 → 브라우저 redirect 캐시 길게 유지
-          'Cache-Control': 'public, max-age=86400, immutable',
-        },
-      });
+          'Cache-Control': 'public, max-age=86400, immutable' } });
     }
 
     const signedUrl = await createR2DownloadUrl(bucket, objectKey);
@@ -79,8 +76,7 @@ export async function GET(request: NextRequest) {
     const headers: Record<string, string> = {
       'Content-Type': contentType,
       'Cache-Control': 'private, max-age=3600',
-      'X-Content-Type-Options': 'nosniff',
-    };
+      'X-Content-Type-Options': 'nosniff' };
     if (contentLength) headers['Content-Length'] = contentLength;
     if (download) {
       const ascii = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');

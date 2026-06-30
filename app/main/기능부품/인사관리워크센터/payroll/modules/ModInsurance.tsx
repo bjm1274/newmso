@@ -13,8 +13,7 @@ const LegacyInsuranceEDI = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">4대보험 EDI 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**

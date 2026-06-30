@@ -21,8 +21,7 @@ export default function MultiDateCalendar({
   selected,
   onToggle,
   max,
-  months = 3,
-}: {
+  months = 3 }: {
   selected: Set<string>;
   onToggle: (date: string) => void;
   max: number;
@@ -67,8 +66,7 @@ export default function MultiDateCalendar({
                   fontSize: 11,
                   fontWeight: 700,
                   padding: '4px 0',
-                  color: i === 0 ? 'var(--m-danger)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)',
-                }}
+                  color: i === 0 ? 'var(--m-danger)' : i === 6 ? 'var(--m-accent)' : 'var(--z-500)' }}
               >
                 {w}
               </div>
@@ -102,8 +100,7 @@ export default function MultiDateCalendar({
                         ? 'var(--z-300)'
                         : !isSel && atMax
                           ? 'var(--z-300)'
-                          : 'var(--z-800)',
-                  }}
+                          : 'var(--z-800)' }}
                 >
                   {dayNum}
                 </button>

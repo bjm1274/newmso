@@ -31,8 +31,7 @@ export { mirrorRowsToD1, type MirrorOptions } from './mirror';
 export {
   logD1MirrorFailure,
   logD1BindingMissing,
-  type MirrorFailureContext,
-} from './mirror-metrics';
+  type MirrorFailureContext } from './mirror-metrics';
 
 // Phase 1D — Postgres 함수의 TS 포트
 export {
@@ -42,26 +41,22 @@ export {
   type StaffRow,
   type LicenseRow,
   type JobCategoryRow,
-  type ShiftAssignmentRow,
-} from './functions/staff';
+  type ShiftAssignmentRow } from './functions/staff';
 export {
   atomicStockUpdate,
   atomicStockConsumeWithLog,
   syncInventoryNameStock,
   StockError,
-  type StockUpdateResult,
-} from './functions/inventory';
+  type StockUpdateResult } from './functions/inventory';
 export {
   incrementAnnualLeaveUsed,
   incrementPostViews,
-  cleanupChatMessagesByRetention,
-} from './functions/counters';
+  cleanupChatMessagesByRetention } from './functions/counters';
 export {
   updateChatRoomLastMessage,
   refreshChatRoomLastMessage,
   withUpdatedAt,
-  nowSqlite,
-} from './functions/triggers';
+  nowSqlite } from './functions/triggers';
 
 // Phase 1E — RLS 헬퍼·정책 wrapper
 export {
@@ -75,8 +70,7 @@ export {
   erpInventoryCompanyScopeMatches, erpDepartmentInventoryScopeMatches,
   erpInventoryScopeMatches,
   erpTargetStaffSameCompany, erpTargetStaffInScope,
-  erpIsRosterApprover,
-} from './auth/claims';
+  erpIsRosterApprover } from './auth/claims';
 export {
   canAccess,
   assertAccess,
@@ -87,8 +81,7 @@ export {
   type PolicyPattern,
   type TablePolicy,
   type Op,
-  type PolicyCheckArgs,
-} from './auth/policies';
+  type PolicyCheckArgs } from './auth/policies';
 
 // 로컬·스크립트 환경 (better-sqlite3)는 직접 경로로 import:
 //   import { getLocalDrizzle } from '@/lib/db/client-local';
@@ -103,5 +96,4 @@ export {
   desc, asc,
   between, notBetween,
   exists, notExists,
-  sum, count, avg, min, max,
-} from 'drizzle-orm';
+  sum, count, avg, min, max } from 'drizzle-orm';

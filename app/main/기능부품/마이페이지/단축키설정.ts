@@ -9,16 +9,14 @@ import {
   getInnerTabPendingKey,
   type FavoriteEntry,
   type MainMenuId,
-  type MypageTabId,
-} from './즐겨찾기설정';
+  type MypageTabId } from './즐겨찾기설정';
 import {
   ADMIN_SUBVIEW_KEY,
   APPROVAL_VIEW_KEY,
   HR_TAB_KEY,
   INV_VIEW_KEY,
   MYPAGE_TAB_KEY,
-  FINANCE_VIEW_KEY,
-} from '../../navigation-state';
+  FINANCE_VIEW_KEY } from '../../navigation-state';
 
 export const SHORTCUTS_KEY = 'erp_mypage_shortcuts';
 

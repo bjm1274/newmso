@@ -25,8 +25,7 @@ export function DesktopOnlyNotice({
   description,
   illustration,
   action,
-  className,
-}: DesktopOnlyNoticeProps) {
+  className }: DesktopOnlyNoticeProps) {
   const baseClass =
     'flex flex-col items-center justify-center gap-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-8 text-center shadow-sm';
 

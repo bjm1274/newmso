@@ -6,8 +6,7 @@ import {
   staff_members as staffMembersTable,
   eq,
   and,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 
 const APPROVED_STATUS_LABELS = new Set(['승인', 'approved']);
 
@@ -158,8 +157,7 @@ function buildLeaveRequestPayload(params: EnsureApprovedAnnualLeaveRequestParams
     reason: params.reason,
     status: '승인',
     approved_at: new Date().toISOString(),
-    days: params.days ?? null,
-  };
+    days: params.days ?? null };
 }
 
 // D1 leave_requests 스키마에 존재하는 컬럼만 사용하는 insert 타입
@@ -216,8 +214,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
           approved_at: payload.approved_at,
           // D1 스키마에 company_id 있음
           ...(params.companyId ? { company_id: params.companyId } : {}),
-          days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)),
-        })
+          days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)) })
         .where(eq(leaveRequestsTable.id, matchedRow.id));
     }
     return matchedRow.id;
@@ -236,8 +233,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
     approved_at: payload.approved_at,
     company_id: params.companyId ?? null,
     created_at: new Date().toISOString(),
-    days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)),
-  };
+    days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)) };
   await db.insert(leaveRequestsTable).values(insertValues);
   return newId;
 }
@@ -253,8 +249,7 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string) {
       start_date: leaveRequestsTable.start_date,
       end_date: leaveRequestsTable.end_date,
       status: leaveRequestsTable.status,
-      days: leaveRequestsTable.days,
-    })
+      days: leaveRequestsTable.days })
     .from(leaveRequestsTable)
     .where(eq(leaveRequestsTable.staff_id, staffId));
 

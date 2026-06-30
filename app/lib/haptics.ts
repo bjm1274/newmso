@@ -84,7 +84,6 @@ export const haptics = {
     if (type === 'success') return pulse([10, 50, 10]);
     if (type === 'warning') return pulse([10, 50, 10, 50]);
     return pulse([20, 30, 20, 30, 20]);
-  },
-} as const;
+  } } as const;
 
 export default haptics;

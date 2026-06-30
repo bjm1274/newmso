@@ -36,46 +36,35 @@ export type LicenseRenewalRule = {
 const RENEWAL_RULES: Record<string, LicenseRenewalRule> = {
   의사면허: {
     cycleMonths: 36, label: '면허신고 3년 (의료법 §25조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8평점 (의료법 시행규칙 §20조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8평점 (의료법 시행규칙 §20조)' },
   간호사면허: {
     cycleMonths: 36, label: '면허신고 3년 (간호법 §17조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (간호법 §16조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (간호법 §16조)' },
   약사면허: {
     cycleMonths: 36, label: '면허신고 3년 (약사법 §15조)',
-    ceMonths: 12, ceLabel: '연수교육 매년 6평점 (약사 연수교육 등에 관한 규정)',
-  },
+    ceMonths: 12, ceLabel: '연수교육 매년 6평점 (약사 연수교육 등에 관한 규정)' },
   방사선사면허: {
     cycleMonths: 36, label: '면허신고 3년 (의료기사법 §11조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)' },
   물리치료사면허: {
     cycleMonths: 36, label: '면허신고 3년 (의료기사법 §11조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)' },
   임상병리사면허: {
     cycleMonths: 36, label: '면허신고 3년 (의료기사법 §11조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (의료기사법 시행규칙 §18조)' },
   간호조무사자격: {
     cycleMonths: 36, label: '자격신고 3년 (간호법 §17조)',
-    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (간호법 시행규칙 §16조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 8시간 (간호법 시행규칙 §16조)' },
   응급구조사자격: {
     cycleMonths: 36, label: '자격신고 3년 (응급의료법 §36조의2)',
-    ceMonths: 12, ceLabel: '보수교육 매년 4시간 이상 (응급의료법 시행규칙 §39조)',
-  },
+    ceMonths: 12, ceLabel: '보수교육 매년 4시간 이상 (응급의료법 시행규칙 §39조)' },
   영양사면허: {
     cycleMonths: 36, label: '면허신고 3년 (국민영양관리법 §17조)',
-    ceMonths: 24, ceLabel: '보수교육 2년 6시간 (국민영양관리법 시행규칙 §18조)',
-  },
+    ceMonths: 24, ceLabel: '보수교육 2년 6시간 (국민영양관리법 시행규칙 §18조)' },
   조리사면허: {
     // 신고 제도 없음 → 보수교육이 사실상 갱신 트리거이므로 cycleMonths=24로 통일
     cycleMonths: 24, label: '보수교육 2년 (식품위생법 시행규칙 §83조)',
-    ceMonths: 24, ceLabel: '보수교육 2년 6시간 (식품위생법 시행규칙 §83조)',
-  },
-};
+    ceMonths: 24, ceLabel: '보수교육 2년 6시간 (식품위생법 시행규칙 §83조)' } };
 
 export function getRenewalRule(licenseType?: string | null): LicenseRenewalRule | null {
   if (!licenseType) return null;
@@ -124,15 +113,13 @@ export function computeEffectiveExpiry(input: {
     return {
       date: addMonths(input.renewed_date, rule.cycleMonths),
       source: 'renewed',
-      cycleMonths: rule.cycleMonths,
-    };
+      cycleMonths: rule.cycleMonths };
   }
   if (input.issued_date && input.issued_date.trim()) {
     return {
       date: addMonths(input.issued_date, rule.cycleMonths),
       source: 'issued',
-      cycleMonths: rule.cycleMonths,
-    };
+      cycleMonths: rule.cycleMonths };
   }
   return { date: null, source: 'unknown', cycleMonths: rule.cycleMonths };
 }

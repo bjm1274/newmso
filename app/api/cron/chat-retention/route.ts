@@ -7,8 +7,7 @@ import { NextResponse } from 'next/server';
 import {
   cleanupChatMessagesByRetention,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

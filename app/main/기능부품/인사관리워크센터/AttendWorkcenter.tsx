@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterBackButton,
@@ -31,14 +31,12 @@ import {
   WorkcenterShell,
   WorkcenterTabBar,
   type WorkcenterKpi,
-  type WorkcenterTab,
-} from './workcenter-common';
+  type WorkcenterTab } from './workcenter-common';
 import { isActive } from './MemberWorkcenter/data';
 import {
   computeAttendKpis,
   getTodayIso,
-  type AttendanceRow,
-} from './AttendWorkcenter/data';
+  type AttendanceRow } from './AttendWorkcenter/data';
 import AttendDashboard from './AttendWorkcenter/AttendDashboard';
 import RosterGrid from './AttendWorkcenter/RosterGrid';
 import AttendCalendar from './AttendWorkcenter/AttendCalendar';
@@ -50,8 +48,7 @@ const AttendanceMain = dynamic(() => import('../인사관리서브/근태기록/
     <div className="flex items-center justify-center py-16">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
     </div>
-  ),
-});
+  ) });
 
 type AttendTabId = 'dashboard' | 'schedule' | 'calendar' | 'abnormal';
 type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'issues';
@@ -76,8 +73,7 @@ export default function AttendWorkcenter({
   selectedCo,
   user = null,
   onRefresh,
-  initialTab = 'dashboard',
-}: AttendWorkcenterProps) {
+  initialTab = 'dashboard' }: AttendWorkcenterProps) {
   const [tab, setTab] = useState<AttendTabId>(initialTab);
   const [legacyView, setLegacyView] = useState<AttendanceMainView | null>(null);
   const [todayRows, setTodayRows] = useState<AttendanceRow[]>([]);
@@ -103,7 +99,7 @@ export default function AttendWorkcenter({
         return;
       }
       const today = getTodayIso();
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendances')
         .select('staff_id, work_date, status, check_in_time, check_out_time')
         .in('staff_id', staffIds)

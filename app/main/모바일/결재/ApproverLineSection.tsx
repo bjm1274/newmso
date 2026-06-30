@@ -14,8 +14,7 @@ import type { UseApproverLine } from './useApproverLine';
 export default function ApproverLineSection({
   approver,
   staffId,
-  company,
-}: {
+  company }: {
   approver: UseApproverLine;
   staffId: string | null;
   company: string;
@@ -27,8 +26,7 @@ export default function ApproverLineSection({
     approverManual,
     pickerOpen,
     setPickerOpen,
-    applyPick,
-  } = approver;
+    applyPick } = approver;
 
   return (
     <>
@@ -59,8 +57,7 @@ export default function ApproverLineSection({
                 fontSize: 12,
                 fontWeight: 700,
                 color: 'var(--m-warning)',
-                lineHeight: 1.55,
-              }}
+                lineHeight: 1.55 }}
             >
               회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 "변경"으로 결재자를
               직접 지정해 주세요.
@@ -80,8 +77,7 @@ export default function ApproverLineSection({
                       gap: 12,
                       padding: '12px 16px',
                       borderBottom: i < approverLine.length - 1 ? '1px solid var(--m-border)' : 'none',
-                      alignItems: 'center',
-                    }}
+                      alignItems: 'center' }}
                   >
                     <MAvatar tone="violet" size="sm">
                       {(a.name || '?').charAt(0)}

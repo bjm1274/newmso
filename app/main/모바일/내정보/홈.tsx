@@ -113,8 +113,7 @@ const QUICK_ICON_PATHS: Record<string, React.ReactNode> = {
       <rect x="4" y="14" width="6" height="6" rx="1.5" />
       <rect x="14" y="14" width="6" height="6" rx="1.5" />
     </>
-  ),
-};
+  ) };
 
 /* ─── 빠른 메뉴 타입 ─────────────────────────────────────── */
 type QuickItem = {
@@ -141,8 +140,7 @@ const LAUNCHPAD_COLORS: Record<string, { bg: string; shadow: string }> = {
   approval: { bg: 'linear-gradient(135deg, #007AFF, #0A55E1)', shadow: 'rgba(0, 122, 255, 0.3)' },
   stock: { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', shadow: 'rgba(255, 59, 48, 0.3)' },
   org: { bg: 'linear-gradient(135deg, #5856D6, #3B39C1)', shadow: 'rgba(88, 86, 214, 0.3)' },
-  more: { bg: 'linear-gradient(135deg, #8E8E93, #636366)', shadow: 'rgba(142, 142, 147, 0.3)' },
-};
+  more: { bg: 'linear-gradient(135deg, #8E8E93, #636366)', shadow: 'rgba(142, 142, 147, 0.3)' } };
 
 /* ─── Props ───────────────────────────────────────────────── */
 export type SHomeProps = {
@@ -175,14 +173,12 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     tasks: true,
     account: true,
-    system: false,
-  });
+    system: false });
 
   const toggleSection = useCallback((section: string) => {
     setOpenSections((prev) => ({
       ...prev,
-      [section]: !prev[section],
-    }));
+      [section]: !prev[section] }));
   }, []);
 
   useEffect(() => {
@@ -285,9 +281,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: pw,
-          userId: staffId ?? undefined,
-        }),
-      });
+          userId: staffId ?? undefined }) });
       const data: { verified?: boolean } = await res.json().catch(() => ({}));
       const ok = res.ok && data.verified === true;
       if (!ok) {
@@ -361,8 +355,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               background: 'radial-gradient(circle, rgba(99,102,241,0.25) 0%, rgba(168,85,247,0.15) 50%, rgba(236,72,153,0) 80%)',
               filter: 'blur(25px)',
               pointerEvents: 'none',
-              zIndex: 1,
-            }}
+              zIndex: 1 }}
           />
           <div
             style={{
@@ -375,8 +368,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, rgba(6,182,212,0.1) 60%, rgba(236,72,153,0) 80%)',
               filter: 'blur(20px)',
               pointerEvents: 'none',
-              zIndex: 1,
-            }}
+              zIndex: 1 }}
           />
 
           {/* ── 프로필 히어로 (Apple ID 프로필 카드) ──────────────── */}
@@ -386,8 +378,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               margin: '16px 16px 8px',
               padding: '24px 20px 20px',
               position: 'relative',
-              zIndex: 2,
-            }}
+              zIndex: 2 }}
           >
             {/* 아바타 + 텍스트 가로 배치 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, position: 'relative', zIndex: 2 }}>
@@ -430,8 +421,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     color: 'var(--foreground)',
                     display: 'flex',
                     alignItems: 'baseline',
-                    gap: 6,
-                  }}
+                    gap: 6 }}
                 >
                   {name}
                   {position && (
@@ -448,8 +438,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                       fontSize: 12.5,
                       fontWeight: 500,
                       color: 'var(--z-500)',
-                      letterSpacing: '-0.02em',
-                    }}
+                      letterSpacing: '-0.02em' }}
                   >
                     {department}
                   </div>
@@ -462,8 +451,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     display: 'flex',
                     gap: 5,
                     marginTop: 8,
-                    flexWrap: 'wrap',
-                  }}
+                    flexWrap: 'wrap' }}
                 >
                   {user.company && (
                     <span
@@ -474,8 +462,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         fontWeight: 800,
                         background: 'rgba(0, 122, 255, 0.12)',
                         color: 'var(--m-accent)',
-                        border: '1px solid rgba(0, 122, 255, 0.15)',
-                      }}
+                        border: '1px solid rgba(0, 122, 255, 0.15)' }}
                     >
                       {user.company}
                     </span>
@@ -489,8 +476,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         fontWeight: 800,
                         background: 'rgba(142, 142, 147, 0.12)',
                         color: 'var(--z-600)',
-                        border: '1px solid rgba(142, 142, 147, 0.15)',
-                      }}
+                        border: '1px solid rgba(142, 142, 147, 0.15)' }}
                     >
                       {hireYears}년차
                     </span>
@@ -517,8 +503,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   boxShadow: '0 2px 6px rgba(0, 122, 255, 0.05)',
                   transition: 'background 0.2s ease',
                   alignSelf: 'center',
-                  flexShrink: 0,
-                }}
+                  flexShrink: 0 }}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -547,8 +532,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 paddingTop: 16,
                 borderTop: '1px solid rgba(142, 142, 147, 0.15)',
                 position: 'relative',
-                zIndex: 2,
-              }}
+                zIndex: 2 }}
             >
               {[
                 { label: '이번달 지각', value: lateCountLabel, color: monthlyAttendance?.late && monthlyAttendance.late > 0 ? '#FF3B30' : 'var(--foreground)' },
@@ -560,8 +544,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   style={{
                     textAlign: 'center',
                     borderRight: idx < 2 ? '1px solid rgba(142, 142, 147, 0.15)' : 'none',
-                    padding: '4px 0',
-                  }}
+                    padding: '4px 0' }}
                 >
                   <div style={{ fontSize: 16.5, fontWeight: 900, fontFeatureSettings: '"tnum"', letterSpacing: '-0.02em', color: st.color }}>
                     {st.value}
@@ -584,8 +567,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               display: 'flex',
               alignItems: 'center',
               gap: 14,
-              borderRadius: 18,
-            }}
+              borderRadius: 18 }}
           >
             <div
               style={{
@@ -594,8 +576,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 color: 'var(--m-accent)',
                 display: 'grid',
                 placeItems: 'center',
-                flexShrink: 0,
-              }}
+                flexShrink: 0 }}
             >
               <MIcon name="bell" size={18} />
             </div>
@@ -619,8 +600,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               display: 'grid',
               gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '12px 6px',
-              position: 'relative',
-            }}
+              position: 'relative' }}
           >
             {/* 우측 상단 퀵메뉴 설정 (톱니바퀴) */}
             <button
@@ -636,8 +616,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 color: 'var(--z-400)',
                 cursor: 'pointer',
                 padding: 4,
-                zIndex: 10,
-              }}
+                zIndex: 10 }}
             >
               <svg
                 width={15}
@@ -673,8 +652,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     background: 'transparent',
                     position: 'relative',
                     border: 0,
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <div
                     className="macos-squircle-sm"
@@ -690,8 +668,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         inset 0 1.5px 2px rgba(255, 255, 255, 0.35),
                         inset 0 -1.5px 2px rgba(0, 0, 0, 0.2),
                         0 4px 10px ${lpColor.shadow}
-                      `,
-                    }}
+                      ` }}
                   >
                     <svg
                       width={22}
@@ -728,8 +705,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         placeItems: 'center',
                         border: '2px solid rgba(255, 255, 255, 0.8)',
                         boxShadow: '0 2px 5px rgba(0,0,0,0.15)',
-                        zIndex: 3,
-                      }}
+                        zIndex: 3 }}
                     >
                       {Math.min(q.badge, 99)}
                     </span>
@@ -758,8 +734,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 border: 0,
                 cursor: 'pointer',
                 textAlign: 'left',
-                borderBottom: openSections.tasks ? '1px solid rgba(142,142,147,0.15)' : 'none',
-              }}
+                borderBottom: openSections.tasks ? '1px solid rgba(142,142,147,0.15)' : 'none' }}
             >
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)', letterSpacing: '-0.02em' }}>나의 업무</span>
               <div style={{ transform: openSections.tasks ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', display: 'flex', alignItems: 'center' }}>
@@ -783,8 +758,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     padding: '12px 16px',
                     background: 'transparent',
                     border: 0,
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <div
                     style={{
@@ -795,8 +769,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                       color: '#ffffff',
                       display: 'grid',
                       placeItems: 'center',
-                      boxShadow: '0 2px 6px rgba(0, 122, 255, 0.2)',
-                    }}
+                      boxShadow: '0 2px 6px rgba(0, 122, 255, 0.2)' }}
                   >
                     <MIcon name="checkSquare" size={16} />
                   </div>
@@ -828,8 +801,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 border: 0,
                 cursor: 'pointer',
                 textAlign: 'left',
-                borderBottom: openSections.system ? '1px solid rgba(142,142,147,0.15)' : 'none',
-              }}
+                borderBottom: openSections.system ? '1px solid rgba(142,142,147,0.15)' : 'none' }}
             >
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-600)', letterSpacing: '-0.02em' }}>알림 및 시스템</span>
               <div style={{ transform: openSections.system ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', display: 'flex', alignItems: 'center' }}>
@@ -853,8 +825,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     padding: '12px 16px',
                     background: 'transparent',
                     border: 0,
-                    cursor: 'pointer',
-                  }}
+                    cursor: 'pointer' }}
                 >
                   <div
                     style={{
@@ -865,8 +836,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                       color: '#ffffff',
                       display: 'grid',
                       placeItems: 'center',
-                      boxShadow: '0 2px 6px rgba(255, 59, 48, 0.2)',
-                    }}
+                      boxShadow: '0 2px 6px rgba(255, 59, 48, 0.2)' }}
                   >
                     <MIcon name="bell" size={16} />
                   </div>
@@ -903,8 +873,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               justifyContent: 'center',
               gap: 8,
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(255, 59, 48, 0.05)',
-            }}
+              boxShadow: '0 2px 8px rgba(255, 59, 48, 0.05)' }}
           >
             <MIcon name="out" size={16} />
             로그아웃
@@ -918,8 +887,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             padding: '16px 0 8px',
             fontSize: 11,
             fontWeight: 600,
-            color: 'var(--z-400)',
-          }}
+            color: 'var(--z-400)' }}
         >
           MSO · v2.4.1
         </div>
@@ -935,8 +903,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             background: 'rgba(0,0,0,0.45)',
             display: 'grid',
             placeItems: 'center',
-            zIndex: 50,
-          }}
+            zIndex: 50 }}
           role="dialog"
           aria-modal="true"
           aria-label="보안 확인"
@@ -948,8 +915,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               background: 'var(--m-card)',
               borderRadius: 20,
               padding: '28px 24px 20px',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
-            }}
+              boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}
           >
             {/* 잠금 아이콘 */}
             <div
@@ -961,8 +927,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 color: 'var(--m-accent)',
                 display: 'grid',
                 placeItems: 'center',
-                margin: '0 auto 16px',
-              }}
+                margin: '0 auto 16px' }}
             >
               <MIcon name="shield" size={24} />
             </div>
@@ -993,8 +958,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   fontWeight: 800,
                   cursor: 'pointer',
                   width: '100%',
-                  justifyContent: 'center',
-                }}
+                  justifyContent: 'center' }}
               >
                 <MIcon name="shield" size={16} />
                 생체 인식(FaceID/지문)으로 확인
@@ -1018,8 +982,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   border: `1px solid ${pwErr ? 'var(--m-danger)' : 'var(--m-border)'}`,
                   background: 'var(--z-50)',
                   fontSize: 14,
-                  fontWeight: 600,
-                }}
+                  fontWeight: 600 }}
               />
               {pwErr && (
                 <div
@@ -1029,8 +992,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     color: 'var(--m-danger)',
                     fontWeight: 700,
                     marginTop: 6,
-                    paddingLeft: 4,
-                  }}
+                    paddingLeft: 4 }}
                 >
                   비밀번호가 올바르지 않습니다.
                 </div>
@@ -1049,8 +1011,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   border: '1px solid var(--m-border)',
                   background: 'var(--m-card)',
                   fontSize: 14,
-                  fontWeight: 700,
-                }}
+                  fontWeight: 700 }}
               >
                 취소
               </button>
@@ -1067,8 +1028,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 700,
-                  cursor: pwLoading ? 'not-allowed' : 'pointer',
-                }}
+                  cursor: pwLoading ? 'not-allowed' : 'pointer' }}
               >
                 {pwLoading ? '확인 중…' : '확인'}
               </button>
@@ -1086,8 +1046,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             background: 'rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'flex-end',
-            justifyContent: 'center',
-          }}
+            justifyContent: 'center' }}
         >
           <div
             className="m-card animate-fade-in"
@@ -1099,8 +1058,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               borderTopRightRadius: 24,
               padding: '24px 20px',
               boxShadow: '0 -8px 32px rgba(0,0,0,0.08)',
-              border: '1px solid var(--border)',
-            }}
+              border: '1px solid var(--border)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--foreground)' }}>빠른 메뉴 편집</span>
@@ -1124,8 +1082,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                     padding: '12px 14px',
                     borderRadius: 12,
                     background: 'var(--page-bg)',
-                    border: '1px solid var(--border)',
-                  }}
+                    border: '1px solid var(--border)' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input
@@ -1159,8 +1116,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         border: '1px solid var(--border)',
                         fontSize: 11,
                         fontWeight: 800,
-                        color: idx === 0 ? 'var(--z-300)' : 'var(--z-600)',
-                      }}
+                        color: idx === 0 ? 'var(--z-300)' : 'var(--z-600)' }}
                     >
                       ▲
                     </button>
@@ -1181,8 +1137,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         border: '1px solid var(--border)',
                         fontSize: 11,
                         fontWeight: 800,
-                        color: idx === quickItems.length - 1 ? 'var(--z-300)' : 'var(--z-600)',
-                      }}
+                        color: idx === quickItems.length - 1 ? 'var(--z-300)' : 'var(--z-600)' }}
                     >
                       ▼
                     </button>
@@ -1209,8 +1164,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                 color: '#fff',
                 fontSize: 14,
                 fontWeight: 800,
-                marginTop: 18,
-              }}
+                marginTop: 18 }}
             >
               설정 저장
             </button>

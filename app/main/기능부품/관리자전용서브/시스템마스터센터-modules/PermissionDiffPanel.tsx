@@ -14,8 +14,7 @@ export function PermissionDiffPanel({
   setAuditKeyword,
   onSearch,
   permissionDiffLogs,
-  loading,
-}: PermissionDiffPanelProps) {
+  loading }: PermissionDiffPanelProps) {
   return (
     <section className="space-y-4">
       <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">

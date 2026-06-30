@@ -22,8 +22,7 @@ import {
   deleteBoardComment,
   deleteBoardPost,
   getSafeAttachments,
-  pickAvatarTone,
-} from './data-hooks';
+  pickAvatarTone } from './data-hooks';
 import { toggleLike } from './좋아요훅';
 import { useBoardDetailRealtime, useIncrementPostView } from './상세훅';
 import BoardCommentTree from './댓글트리';
@@ -37,13 +36,11 @@ import {
   canEditMobilePost,
   isAnonymousReadStatusPost,
   markBoardPostRead,
-  useReadStatus,
-} from './권한읽음';
+  useReadStatus } from './권한읽음';
 import type { BoardPoll } from '@/app/main/기능부품/게시판서브/board-poll-prize';
 import {
   buildStorageDownloadUrl,
-  buildStorageInlineUrl,
-} from '@/lib/object-storage-url';
+  buildStorageInlineUrl } from '@/lib/object-storage-url';
 import { extractAttachmentMetaFromContent } from '@/app/main/기능부품/게시판공통';
 import { toast } from '@/lib/toast';
 
@@ -87,8 +84,7 @@ export default function SBoardDetail({
   isLiked,
   onLikedChange,
   onEdit,
-  onDeleted,
-}: SBoardDetailProps) {
+  onDeleted }: SBoardDetailProps) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -329,8 +325,7 @@ export default function SBoardDetail({
       style={{
         background: 'transparent',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <div
         className="macos-glass"
@@ -345,8 +340,7 @@ export default function SBoardDetail({
           zIndex: 99,
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}
+          WebkitBackdropFilter: 'blur(20px)' }}
       >
         <button
           type="button"
@@ -361,8 +355,7 @@ export default function SBoardDetail({
             borderRadius: 8,
             background: 'rgba(0, 0, 0, 0.03)',
             border: '1px solid rgba(0, 0, 0, 0.05)',
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           <MIcon name="chevL" size={18} color="var(--z-600)" />
         </button>
@@ -375,8 +368,7 @@ export default function SBoardDetail({
               letterSpacing: '-0.015em',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
+              textOverflow: 'ellipsis' }}
           >
             {headerTitle}
           </div>
@@ -395,8 +387,7 @@ export default function SBoardDetail({
               borderRadius: 8,
               background: 'rgba(0, 0, 0, 0.03)',
               border: '1px solid rgba(0, 0, 0, 0.05)',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="share" size={18} color="var(--z-600)" />
           </button>
@@ -415,8 +406,7 @@ export default function SBoardDetail({
               borderRadius: 8,
               background: 'rgba(0, 0, 0, 0.03)',
               border: '1px solid rgba(0, 0, 0, 0.05)',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="moreV" size={18} color="var(--z-600)" />
           </button>
@@ -468,8 +458,7 @@ export default function SBoardDetail({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 4,
-                  padding: '2px 6px',
-                }}
+                  padding: '2px 6px' }}
               >
                 <MIcon name="eye" size={13} /> 읽음 현황
               </button>

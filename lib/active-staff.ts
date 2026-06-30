@@ -25,8 +25,7 @@ export function isActiveStaff(staff: StaffLike): boolean {
       timeZone: 'Asia/Seoul',
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit',
-    }).format(new Date()); // YYYY-MM-DD KST
+      day: '2-digit' }).format(new Date()); // YYYY-MM-DD KST
     if (resignDate.trim() <= todayStr) {
       return false;
     }

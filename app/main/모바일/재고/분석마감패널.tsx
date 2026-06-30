@@ -25,8 +25,7 @@ import {
   useReturnsData,
   formatWon,
   type UsageStatsData,
-  type ReturnsData,
-} from './use-analyze-extra';
+  type ReturnsData } from './use-analyze-extra';
 
 // ─── 빈 메시지 ────────────────────────────────────────────────
 export function Empty({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | 'danger' }) {
@@ -36,8 +35,7 @@ export function Empty({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | '
         padding: 24,
         textAlign: 'center',
         color: tone === 'danger' ? 'var(--m-danger)' : 'var(--z-500)',
-        fontSize: 13,
-      }}
+        fontSize: 13 }}
     >
       {msg}
     </div>
@@ -48,8 +46,7 @@ export function Empty({ msg, tone = 'muted' }: { msg: string; tone?: 'muted' | '
 const CLOSE_STATE_TONE: Record<'done' | 'on' | 'pending', 'success' | 'warning' | ''> = {
   done: 'success',
   on: 'warning',
-  pending: '',
-};
+  pending: '' };
 
 export function ClosePane() {
   const { history, steps, currentMonthClosed, loading, error } = useClosingData();
@@ -65,16 +62,14 @@ export function ClosePane() {
         style={{
           padding: '16px 18px',
           background: 'var(--m-accent-soft)',
-          borderColor: 'transparent',
-        }}
+          borderColor: 'transparent' }}
       >
         <div
           style={{
             fontSize: 11,
             color: 'var(--m-accent)',
             fontWeight: 800,
-            letterSpacing: '0.04em',
-          }}
+            letterSpacing: '0.04em' }}
         >
           이번 달 마감 진행
         </div>
@@ -106,8 +101,7 @@ export function ClosePane() {
                         : 'var(--z-200)',
                   color: s.state === 'pending' ? 'var(--z-500)' : '#fff',
                   fontWeight: 800,
-                  fontSize: 13,
-                }}
+                  fontSize: 13 }}
               >
                 {s.state === 'done' ? '✓' : s.n}
               </div>
@@ -216,8 +210,7 @@ export function UsagePane({ data }: { data: AnalyzeWorkcenterData }) {
                       height: 5,
                       background: 'var(--z-100)',
                       borderRadius: 999,
-                      overflow: 'hidden',
-                    }}
+                      overflow: 'hidden' }}
                   >
                     <div style={{ width: `${ratio}%`, height: '100%', background: 'var(--m-accent)' }} />
                   </div>

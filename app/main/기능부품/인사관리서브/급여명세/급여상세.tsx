@@ -3,20 +3,17 @@ import { logger } from '@/lib/logger';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   alphaColor,
   fetchDocumentDesignStore,
-  resolveDocumentDesign,
-} from '@/lib/document-designs';
+  resolveDocumentDesign } from '@/lib/document-designs';
 import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import {
-  calculateEmployeeInsuranceDeductions,
-} from '@/lib/payroll-insurance-rates';
+  calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 
 function toNumber(value: unknown) {
   const numeric = Number(value);
@@ -34,8 +31,7 @@ function InfoItem({
   label,
   value,
   highlight = false,
-  colSpanClass = '',
-}: {
+  colSpanClass = '' }: {
   label: string;
   value?: string;
   highlight?: boolean;
@@ -65,8 +61,7 @@ function SalaryRow({
   toneColor,
   isDeduction = false,
   isTaxFree = false,
-  density = 'regular',
-}: {
+  density = 'regular' }: {
   label: string;
   value: number;
   note?: string;
@@ -79,8 +74,7 @@ function SalaryRow({
     regular: 'py-2.5 print:py-1.5',
     compact: 'py-1.5 print:py-1',
     dense: 'py-1 print:py-0.5',
-    ultra: 'py-0.5 print:py-[1px]',
-  }[density];
+    ultra: 'py-0.5 print:py-[1px]' }[density];
   const labelClass = density === 'regular' ? 'text-[12px] print:text-[9.5px]' : 'text-[11px] print:text-[8.5px]';
   const amountClass = density === 'regular' ? 'text-[12px] print:text-[9.5px]' : 'text-[11px] print:text-[8.5px]';
   const showNote = density === 'regular';
@@ -98,8 +92,7 @@ function SalaryRow({
                 className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold print:hidden"
                 style={{
                   backgroundColor: alphaColor(toneColor, 0.12),
-                  color: toneColor,
-                }}
+                  color: toneColor }}
               >
                 비과세
               </span>
@@ -178,8 +171,7 @@ interface StaffInfo {
 
 export default function SalaryDetail({
   record,
-  staff,
-}: {
+  staff }: {
   record?: SalaryRecord;
   staff?: StaffInfo;
 }) {
@@ -195,7 +187,7 @@ export default function SalaryDetail({
       const companyName = staff?.company || 'SY INC.';
       const [designStore, templateResult] = await Promise.all([
         fetchDocumentDesignStore(),
-        supabase
+        db
           .from('contract_templates')
           .select('seal_url')
           .eq('company_name', companyName)
@@ -237,8 +229,7 @@ export default function SalaryDetail({
       overtime_pay: 0,
       bonus: 0,
       year_month: getKoreanMonthString(),
-      status: null,
-    } satisfies SalaryRecord;
+      status: null } satisfies SalaryRecord;
   }, [record, staff]);
 
   const deductionDetail = useMemo(
@@ -275,8 +266,7 @@ export default function SalaryDetail({
         incomeTax,
         localTax: toNumber(detail.local_tax ?? record.local_tax),
         customDeduction: toNumber(detail.custom_deduction),
-        net: toNumber(record.net_pay),
-      };
+        net: toNumber(record.net_pay) };
     }
 
     const taxable =
@@ -310,8 +300,7 @@ export default function SalaryDetail({
       incomeTax,
       localTax,
       customDeduction: 0,
-      net: taxable + taxfree - totalDeduction,
-    };
+      net: taxable + taxfree - totalDeduction };
   }, [data, deductionDetail, record]);
 
   const companyName = staff?.company || design.companyLabel || 'SY INC.';
@@ -339,8 +328,7 @@ export default function SalaryDetail({
       night_work_allowance: staff?.night_work_allowance || 0,
       holiday_work_allowance: staff?.holiday_work_allowance || 0,
       annual_leave_pay: staff?.annual_leave_pay || 0,
-      manual_extra_allowance: 0,
-    };
+      manual_extra_allowance: 0 };
 
     return {
       position_allowance: toNumber(source.position_allowance),
@@ -348,8 +336,7 @@ export default function SalaryDetail({
       night_work_allowance: toNumber(source.night_work_allowance),
       holiday_work_allowance: toNumber(source.holiday_work_allowance),
       annual_leave_pay: toNumber(source.annual_leave_pay),
-      manual_extra_allowance: toNumber(source.manual_extra_allowance),
-    };
+      manual_extra_allowance: toNumber(source.manual_extra_allowance) };
   }, [deductionDetail, staff]);
 
   // 약정연장/약정야간수당은 통상임금에 산입되므로 비례 배분 추출
@@ -396,91 +383,74 @@ export default function SalaryDetail({
     {
       label: '기본급',
       value: toNumber(data.base_salary),
-      note: '월 기본 급여',
-    },
+      note: '월 기본 급여' },
     {
       label: '직책수당',
       value: taxableAllowanceBreakdown.position_allowance,
-      note: '직책 기준 과세 수당',
-    },
+      note: '직책 기준 과세 수당' },
     {
       label: '연장수당',
       value: taxableAllowanceBreakdown.overtime_allowance - resolvedAgreedOvertime,
-      note: '고정 또는 포괄 연장수당',
-    },
+      note: '고정 또는 포괄 연장수당' },
     {
       label: '약정연장수당',
       value: resolvedAgreedOvertime,
-      note: '약정 연장수당',
-    },
+      note: '약정 연장수당' },
     {
       label: '야간근로수당',
       value: taxableAllowanceBreakdown.night_work_allowance - resolvedAgreedNight,
-      note: '고정 야간근로 과세수당',
-    },
+      note: '고정 야간근로 과세수당' },
     {
       label: '약정야간수당',
       value: resolvedAgreedNight,
-      note: '약정 야간수당',
-    },
+      note: '약정 야간수당' },
     {
       label: '휴일근로수당',
       value: taxableAllowanceBreakdown.holiday_work_allowance,
-      note: '휴일근무 과세수당',
-    },
+      note: '휴일근무 과세수당' },
     {
       label: '연차휴가수당',
       value: taxableAllowanceBreakdown.annual_leave_pay,
-      note: '미사용 연차 또는 연차보전 수당',
-    },
+      note: '미사용 연차 또는 연차보전 수당' },
     {
       label: '추가 연장근로수당',
       value: toNumber(data.overtime_pay),
-      note: hourlyRate > 0 ? `시급 ${hourlyRate.toLocaleString()}원 기준 추가 반영` : undefined,
-    },
+      note: hourlyRate > 0 ? `시급 ${hourlyRate.toLocaleString()}원 기준 추가 반영` : undefined },
     {
       label: '상여',
       value: toNumber(data.bonus),
-      note: '성과 또는 별도 상여',
-    },
+      note: '성과 또는 별도 상여' },
     {
       label: '기타 과세수당',
       value: taxableAllowanceBreakdown.manual_extra_allowance + remainingExtraAllowance,
-      note: '직접 조정된 과세수당',
-    },
+      note: '직접 조정된 과세수당' },
   ].filter((row) => row.value > 0);
 
   const taxFreeRows = [
     {
       label: '식대',
       value: toNumber(data.meal_allowance),
-      note: '월 비과세 식대',
-    },
+      note: '월 비과세 식대' },
     {
       label: '야간 수당',
       value: toNumber(data.night_duty_allowance),
-      note: '야간 근무 반영',
-    },
+      note: '야간 근무 반영' },
     {
       label: '차량 유지비',
       value: toNumber(data.vehicle_allowance),
-      note: '업무용 차량 지원',
-    },
+      note: '업무용 차량 지원' },
     {
       label: '보육 수당',
       value: toNumber(data.childcare_allowance),
-      note: '보육 지원 수당',
-    },
+      note: '보육 지원 수당' },
     {
       label: '연구 활동비',
       value: toNumber(data.research_allowance),
-      note: '연구 활동 지원',
-    },
+      note: '연구 활동 지원' },
     {
       label: '기타 비과세',
       value: toNumber(data.other_taxfree),
-      note: '기타 비과세 수당',
-    },
+      note: '기타 비과세 수당' },
   ];
 
   const deductionRows = [
@@ -595,8 +565,7 @@ export default function SalaryDetail({
             className="salary-print-avoid border px-5 py-4 print:px-3 print:py-2"
             style={{
               borderColor: alphaColor('#d97706', 0.28),
-              backgroundColor: alphaColor('#d97706', 0.06),
-            }}
+              backgroundColor: alphaColor('#d97706', 0.06) }}
           >
             <p className="text-sm font-bold text-amber-800 print:text-[10px]">
               이 문서는 가불 지급 내역입니다. 기본 급여와 공제 항목은 제외하고 지급 금액만 표시합니다.

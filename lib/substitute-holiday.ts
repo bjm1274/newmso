@@ -23,8 +23,7 @@ import {
   eq,
   and,
   gte,
-  lte,
-} from '@/lib/db';
+  lte } from '@/lib/db';
 
 const LEAVE_POLICY_SETTINGS_KEY = 'leave_policy_rules_v1';
 const WORKED_STATUSES = new Set(['present', 'late', 'early_leave', '정상', '지각', '조퇴']);
@@ -70,8 +69,7 @@ async function loadHolidayCompPolicy(db: DrizzleDb): Promise<{ has: (company: st
       const key = String(company || '').trim();
       if (key && key in companies) return companies[key].grantCompDayForHolidayWork === true;
       return all;
-    },
-  };
+    } };
 }
 
 /** 기간 내 회사별 공휴일(company_holidays) 집합 로드. key = `${company_name}|${date}`, 전체는 company='전체'. */
@@ -125,8 +123,7 @@ export async function processSubstituteHolidayGrants(
       company_name: attendancesTable.company_name,
       work_date: attendancesTable.work_date,
       check_in_time: attendancesTable.check_in_time,
-      status: attendancesTable.status,
-    })
+      status: attendancesTable.status })
     .from(attendancesTable)
     .where(and(gte(attendancesTable.work_date, startKey), lte(attendancesTable.work_date, endKey)))) as AttendanceRow[];
 
@@ -170,8 +167,7 @@ export async function processSubstituteHolidayGrants(
           year: Number(workDate.slice(0, 4)) || new Date().getFullYear(),
           source_date: workDate,
           note: `${holidayName} 근무 대체휴무 +1일`,
-          created_at: new Date().toISOString(),
-        })
+          created_at: new Date().toISOString() })
         .onConflictDoNothing()
         .returning({ id: leaveAccrualsTable.id });
 
@@ -202,8 +198,7 @@ export async function processSubstituteHolidayGrants(
         staffId: row.staff_id,
         staffName: String(staff.name || ''),
         workDate,
-        holidayName,
-      });
+        holidayName });
     } catch (err) {
       result.errors.push(`${row.staff_id}@${workDate}: ${err instanceof Error ? err.message : String(err)}`);
     }

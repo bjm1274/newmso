@@ -22,7 +22,7 @@ export function stripHiddenMetaBlocks(value: unknown): string {
     .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
     .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
     .replace(/\[\[(?:SCHEDULE_META|BOARD_META|WARD_MESSAGE_META)\]\][\s\S]*$/g, '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/\s{2 }/g, ' ')
     .trim();
 }
 
@@ -39,14 +39,12 @@ export function groupStaffByDepartment(staffList: StaffMember[]): OrgGroup[] {
       role: s.role || '직원',
       position: s.position ?? s.role ?? '',
       status: s.status ?? '근무중',
-      photo_url: s.photo_url ?? null,
-    });
+      photo_url: s.photo_url ?? null });
     map.set(dept, list);
   }
   return Array.from(map.entries()).map(([dept, members]) => ({
     department: dept,
-    members,
-  }));
+    members }));
 }
 
 export function normalizeWardStaffList<
@@ -78,8 +76,7 @@ export function normalizeWardStaffList<
       department: stripHiddenMetaBlocks(staff.department),
       position: stripHiddenMetaBlocks(staff.position),
       company: stripHiddenMetaBlocks(staff.company),
-      company_id: String(staff.company_id || '').trim() || null,
-    };
+      company_id: String(staff.company_id || '').trim() || null };
 
     if (!normalized.id || !normalized.name || normalized.id === senderId) return;
     deduped.set(normalized.id, normalized);

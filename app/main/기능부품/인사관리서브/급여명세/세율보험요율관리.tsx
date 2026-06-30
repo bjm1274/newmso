@@ -2,16 +2,14 @@
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   DEFAULT_INCOME_TAX_BRACKET,
   hasOfficialMonthlyIncomeTaxTable,
-  validateOfficialMonthlyIncomeTaxTable,
-} from '@/lib/use-tax-insurance-rates';
+  validateOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
 import {
   EMPLOYEE_INSURANCE_RATES_2026,
-  getIndustrialAccidentInsuranceInfo,
-} from '@/lib/payroll-insurance-rates';
+  getIndustrialAccidentInsuranceInfo } from '@/lib/payroll-insurance-rates';
 
 const COMPANY_FILTER = '전체';
 
@@ -46,15 +44,14 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
     long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
     employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
     income_tax_bracket_text: '',
-    official_confirmed: false,
-  });
+    official_confirmed: false });
 
   const scopedCompany = companyName || COMPANY_FILTER;
   const industrialAccidentInfo = useMemo(() => getIndustrialAccidentInsuranceInfo(scopedCompany), [scopedCompany]);
 
   const loadList = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await db
       .from('tax_insurance_rates')
       .select('*')
       .eq('company_name', scopedCompany)
@@ -77,8 +74,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       long_term_care_rate: EMPLOYEE_INSURANCE_RATES_2026.longTermCare,
       employment_insurance_rate: EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
       income_tax_bracket_text: '',
-      official_confirmed: false,
-    });
+      official_confirmed: false });
   };
 
   const openEdit = (row: any) => {
@@ -91,8 +87,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       employment_insurance_rate:
         Number(row.employment_insurance_rate) || EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance,
       income_tax_bracket_text: stringifyBracket(row.income_tax_bracket),
-      official_confirmed: Array.isArray(row.income_tax_bracket) && row.income_tax_bracket.length > 0 && row.income_tax_bracket.every((entry: any) => entry?.official === true),
-    });
+      official_confirmed: Array.isArray(row.income_tax_bracket) && row.income_tax_bracket.length > 0 && row.income_tax_bracket.every((entry: any) => entry?.official === true) });
   };
 
   const bracketConfigured = useMemo(() => {
@@ -113,8 +108,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       return hasOfficialMonthlyIncomeTaxTable(
         parsed.map((entry) => ({
           ...entry,
-          official: form.official_confirmed,
-        }))
+          official: form.official_confirmed }))
       );
     } catch {
       return false;
@@ -135,8 +129,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       return validateOfficialMonthlyIncomeTaxTable(
         parsed.map((entry) => ({
           ...entry,
-          official: true,
-        }))
+          official: true }))
       );
     } catch (error: unknown) {
       return [`월 근로소득 간이세액표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`];
@@ -173,9 +166,8 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
         health_insurance_rate: form.health_insurance_rate,
         long_term_care_rate: form.long_term_care_rate,
         employment_insurance_rate: form.employment_insurance_rate,
-        income_tax_bracket: parsedBracket,
-      };
-      const { error } = await supabase
+        income_tax_bracket: parsedBracket };
+      const { error } = await db
         .from('tax_insurance_rates')
         .upsert(payload, { onConflict: 'effective_year,company_name' });
       if (error) throw error;
@@ -330,8 +322,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
                           null,
                           2
                         ),
-                        official_confirmed: false,
-                      }))
+                        official_confirmed: false }))
                     }
                     className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1.5 text-[11px] font-medium text-[var(--toss-gray-4)] hover:opacity-90"
                   >

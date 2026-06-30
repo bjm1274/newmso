@@ -7,8 +7,7 @@
  */
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
+  PieChart, Pie, Cell, Legend } from 'recharts';
 
 const PIE_COLORS = [
   'var(--accent)',
@@ -27,8 +26,7 @@ type InventoryRow = { category: string; count: number; totalAmount: number };
 const TOOLTIP_STYLE = {
   borderRadius: '10px',
   border: '1px solid var(--border)',
-  background: 'var(--card)',
-};
+  background: 'var(--card)' };
 
 export function HrBarChart({ data }: { data: HrRow[] }) {
   return (

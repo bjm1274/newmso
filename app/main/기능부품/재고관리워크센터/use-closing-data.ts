@@ -9,7 +9,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { CloseHistoryRow, CloseStep, Tone } from './stock-types';
 import { pickNumber, pickString, type Row } from './data-helpers';
 
@@ -30,8 +30,7 @@ function buildSteps(currentMonthClosed: boolean): CloseStep[] {
     n: i + 1,
     title,
     desc: currentMonthClosed ? '완료' : i === 0 ? '진행 중' : '대기',
-    state: currentMonthClosed ? 'done' : i === 0 ? 'on' : 'pending',
-  }));
+    state: currentMonthClosed ? 'done' : i === 0 ? 'on' : 'pending' }));
 }
 
 export type ClosingData = {
@@ -47,8 +46,7 @@ const EMPTY: ClosingData = {
   steps: buildSteps(false),
   currentMonthClosed: false,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useClosingData(): ClosingData {
   const [state, setState] = useState<ClosingData>(EMPTY);
@@ -58,7 +56,7 @@ export function useClosingData(): ClosingData {
 
     const load = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('inventory_closing_snapshots')
           .select('closing_month, status, item_count, total_value, created_by_name, closed_at')
           .order('closing_month', { ascending: false })
@@ -79,8 +77,7 @@ export function useClosingData(): ClosingData {
             amt: formatValue(pickNumber(r, ['total_value'], NaN)),
             diff: locked ? '확정' : '임시',
             tone: (locked ? 'success' : 'warn') as Tone,
-            done: `${pickNumber(r, ['item_count'], 0).toLocaleString('ko-KR')}종`,
-          };
+            done: `${pickNumber(r, ['item_count'], 0).toLocaleString('ko-KR')}종` };
         });
 
         const currentMonthClosed = rows.some(
@@ -94,8 +91,7 @@ export function useClosingData(): ClosingData {
           steps: buildSteps(currentMonthClosed),
           currentMonthClosed,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '월마감 데이터를 불러오지 못했습니다.';

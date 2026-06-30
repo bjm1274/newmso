@@ -37,8 +37,7 @@ export default function 보완요청시트({
   aiLoading,
   onRequestAi,
   onAutoCompare,
-  canAutoCompare,
-}: 보완요청시트Props) {
+  canAutoCompare }: 보완요청시트Props) {
   return (
     <BottomSheet open={open} onClose={onClose} title="심사 점검 / 보완 요청" mode="full">
       <div className="space-y-4">

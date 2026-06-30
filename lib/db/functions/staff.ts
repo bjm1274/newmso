@@ -2,7 +2,7 @@
 // lib/db/functions/staff.ts
 // register_staff_full RPC의 TypeScript 포트.
 //
-// 원본: supabase/migrations/2026-05-11_010_register_staff_rpc.sql
+// 원본: db/migrations/2026-05-11_010_register_staff_rpc.sql
 // PostgreSQL 함수가 했던 5단계 INSERT를 D1 batch로 묶어 원자성을 보존.
 //   1) staff_members
 //   2) staff_licenses (여러 row)
@@ -18,8 +18,7 @@ import {
   staff_licenses,
   staff_job_categories,
   staff_shift_assignments,
-  leave_balances,
-} from '../schema';
+  leave_balances } from '../schema';
 
 // ─────────────────────────────────────────────────────────────
 // 입력 타입 — Supabase RPC 호출 측과 호환되는 키 이름 유지
@@ -198,8 +197,7 @@ export async function registerStaffFull(
     annual_leave_total: 0,
     annual_leave_used: 0,
     role: s.role ?? 'staff',
-    password_reset_required: 1,
-  });
+    password_reset_required: 1 });
 
   // ─── 2) staff_licenses INSERT (여러 row, ON CONFLICT DO NOTHING)
   const licenseStmts = licenses.map((row) =>
@@ -215,8 +213,7 @@ export async function registerStaffFull(
         expiry_date: nullIfEmpty(row.expiry_date),
         issuing_body: nullIfEmpty(row.issuing_body),
         memo: nullIfEmpty(row.memo),
-        is_primary: bnum(row.is_primary),
-      })
+        is_primary: bnum(row.is_primary) })
       .onConflictDoNothing(),
   );
 
@@ -228,12 +225,10 @@ export async function registerStaffFull(
         id: crypto.randomUUID(),
         staff_id: staffId,
         job_category_id: row.job_category_id,
-        is_primary: bnum(row.is_primary),
-      })
+        is_primary: bnum(row.is_primary) })
       .onConflictDoUpdate({
         target: [staff_job_categories.staff_id, staff_job_categories.job_category_id],
-        set: { is_primary: sql`excluded.is_primary` },
-      }),
+        set: { is_primary: sql`excluded.is_primary` } }),
   );
 
   // ─── 4) staff_shift_assignments INSERT
@@ -245,15 +240,12 @@ export async function registerStaffFull(
         staff_id: staffId,
         shift_id: row.shift_id,
         is_primary: bnum(row.is_primary),
-        priority: row.priority ?? 0,
-      })
+        priority: row.priority ?? 0 })
       .onConflictDoUpdate({
         target: [staff_shift_assignments.staff_id, staff_shift_assignments.shift_id],
         set: {
           is_primary: sql`excluded.is_primary`,
-          priority: sql`excluded.priority`,
-        },
-      }),
+          priority: sql`excluded.priority` } }),
   );
 
   // ─── 5) leave_balances 초기 row (ON CONFLICT (staff_id, year) DO NOTHING)
@@ -267,8 +259,7 @@ export async function registerStaffFull(
       total_days: total,
       used_days: 0,
       remaining_days: total,
-      expiry_date: expiry,
-    })
+      expiry_date: expiry })
     .onConflictDoNothing();
 
   // ─── batch — D1은 단일 atomic write로 실행

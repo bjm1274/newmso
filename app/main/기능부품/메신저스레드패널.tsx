@@ -5,8 +5,7 @@ import {
   AttachmentListCard,
   getAttachmentDisplayName,
   getMessageDisplayText,
-  resolveAttachmentKind,
-} from './메신저첨부';
+  resolveAttachmentKind } from './메신저첨부';
 
 type ThreadPanelProps = {
   rootMessage: ChatMessage | null;
@@ -27,8 +26,7 @@ export function ThreadPanel({
   onClose,
   onToggleFollowThread = () => {},
   onPreviewAttachment,
-  onReplyMessage,
-}: ThreadPanelProps) {
+  onReplyMessage }: ThreadPanelProps) {
   if (!rootMessage) return null;
 
   const participantCount = new Set(

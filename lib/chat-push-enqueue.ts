@@ -12,8 +12,7 @@
 import {
   getD1Binding,
   getD1Drizzle,
-  chat_push_jobs as chatPushJobsTable,
-} from '@/lib/db';
+  chat_push_jobs as chatPushJobsTable } from '@/lib/db';
 
 export async function enqueueChatPushJob(params: {
   messageId: string;
@@ -40,7 +39,6 @@ export async function enqueueChatPushJob(params: {
       sender_id: params.senderId ? String(params.senderId).trim() || null : null,
       created_at: nowIso,
       next_attempt_at: nowIso,
-      attempt_count: 0,
-    })
+      attempt_count: 0 })
     .onConflictDoNothing({ target: chatPushJobsTable.message_id });
 }

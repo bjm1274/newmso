@@ -28,8 +28,7 @@ export function parseMarkdownSegments(text: string): MessageSegment[] {
       segments.push({
         type: 'codeblock',
         content: codeBlockMatch[2],
-        language: codeBlockMatch[1] || undefined,
-      });
+        language: codeBlockMatch[1] || undefined });
       remaining = remaining.slice(codeBlockMatch[0].length);
       continue;
     }

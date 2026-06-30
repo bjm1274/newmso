@@ -10,8 +10,7 @@ import {
   formatApprovalAttachmentSize,
   getReportTypeLabel,
   normalizeApprovalAttachments,
-  REPORT_TYPE_OPTIONS,
-} from '@/lib/approval-report-utils';
+  REPORT_TYPE_OPTIONS } from '@/lib/approval-report-utils';
 
 type ReportApprovalFormProps = {
   extraData: Record<string, unknown>;
@@ -35,8 +34,7 @@ export default function ReportApprovalForm({
   extraData,
   setExtraData,
   formTitle,
-  setFormTitle,
-}: ReportApprovalFormProps) {
+  setFormTitle }: ReportApprovalFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingNames, setUploadingNames] = useState<string[]>([]);
@@ -58,8 +56,7 @@ export default function ReportApprovalForm({
   const handleReportTypeChange = (value: string) => {
     patchExtraData({
       report_type: value,
-      report_type_label: getReportTypeLabel(value),
-    });
+      report_type_label: getReportTypeLabel(value) });
   };
 
   const handleFileSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -89,8 +86,7 @@ export default function ReportApprovalForm({
 
         const response = await fetch('/api/approvals/upload', {
           method: 'POST',
-          body: formData,
-        });
+          body: formData });
 
         const payload = (await response.json().catch(() => ({}))) as UploadResponse;
         if (!response.ok || !payload.url || !payload.fileName) {
@@ -105,8 +101,7 @@ export default function ReportApprovalForm({
           provider: payload.provider || null,
           bucket: payload.bucket || null,
           path: payload.path || null,
-          uploadedAt: new Date().toISOString(),
-        });
+          uploadedAt: new Date().toISOString() });
       } catch (error) {
         console.error('[Approval Report] Attachment upload failed:', error);
         failedFiles.push(file.name);
@@ -122,8 +117,7 @@ export default function ReportApprovalForm({
         attachments: [
           ...normalizeApprovalAttachments(prev.attachments),
           ...uploadedAttachments,
-        ],
-      }));
+        ] }));
       toast(`${uploadedAttachments.length}개 파일을 첨부했습니다.`, 'success');
     }
 
@@ -135,8 +129,7 @@ export default function ReportApprovalForm({
   const removeAttachment = (targetIndex: number) => {
     setExtraData((prev) => ({
       ...prev,
-      attachments: normalizeApprovalAttachments(prev.attachments).filter((_, index) => index !== targetIndex),
-    }));
+      attachments: normalizeApprovalAttachments(prev.attachments).filter((_, index) => index !== targetIndex) }));
   };
 
   return (

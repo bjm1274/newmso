@@ -10,8 +10,7 @@ import type { ErpUser } from '@/types';
 import MFeatureScreen from '../공통/MFeatureScreen';
 
 const OpsWorkcenter = dynamic(() => import('../../기능부품/관리자워크센터/OpsWorkcenter'), {
-  ssr: false,
-});
+  ssr: false });
 
 export default function 운영설정({ onBack }: { user: ErpUser; onBack: () => void }) {
   return (

@@ -69,8 +69,7 @@ export default function MessageActionsHost({
   onDelete,
   onReadDetail,
   onOpenThread,
-  threadReplyCount,
-}: MessageActionsHostProps) {
+  threadReplyCount }: MessageActionsHostProps) {
   const [ctxMenu, setCtxMenu] = useState<Anchor | null>(null);
   const [picker, setPicker] = useState<Anchor | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -228,8 +227,7 @@ export default function MessageActionsHost({
         style={{
           transform: `translateX(${swipeOffset}px)`,
           transition: swipeOffset === 0 ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
-          width: '100%',
-        }}
+          width: '100%' }}
       >
         {children}
       </div>

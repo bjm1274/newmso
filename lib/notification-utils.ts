@@ -4,8 +4,7 @@ import {
   getD1Drizzle,
   notifications as notificationsTable,
   staff_members as staffMembersTable,
-  or,
-} from './db';
+  or } from './db';
 import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
 import { sql, eq } from 'drizzle-orm';
 
@@ -46,8 +45,7 @@ function normalizeForD1(row: NotificationRow): NotificationsD1Row {
       ? null
       : JSON.stringify(row.metadata),
     read_at: row.read_at ?? null,
-    created_at: row.created_at ?? new Date().toISOString(),
-  };
+    created_at: row.created_at ?? new Date().toISOString() };
 }
 
 export async function mirrorNotificationsToD1(
@@ -175,7 +173,7 @@ export async function sendAdminNotifications(
 ): Promise<number> {
   if (alerts.length === 0) return 0;
 
-  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
   if (typeof window !== 'undefined') {
     const { db, d1 } = await import('./db-client');
     const { data: adminUsers, error: adminError } = await db
@@ -200,8 +198,7 @@ export async function sendAdminNotifications(
           ? { ...(alert.metadata ?? {}), dedupe_key: alert.dedupeKey }
           : (alert.metadata ?? null),
         read_at: null,
-        created_at: new Date().toISOString(),
-      })),
+        created_at: new Date().toISOString() })),
     );
 
     if (rows.length > 0) {
@@ -239,8 +236,7 @@ export async function sendAdminNotifications(
       Number.isFinite(Number(alert.dedupeWindowHours)) &&
       Number(alert.dedupeWindowHours) > 0
         ? Number(alert.dedupeWindowHours)
-        : 24,
-  }));
+        : 24 }));
 
   const alertsWithDedupe = normalizedAlerts.filter((alert) => alert.dedupeKey);
   let existingNotifications: ExistingAdminNotificationRow[] = [];
@@ -265,8 +261,7 @@ export async function sendAdminNotifications(
             user_id: notificationsTable.user_id,
             type: notificationsTable.type,
             created_at: notificationsTable.created_at,
-            metadata: notificationsTable.metadata,
-          })
+            metadata: notificationsTable.metadata })
           .from(notificationsTable)
           .where(
             sql`${notificationsTable.user_id} IN ${adminUserIds}
@@ -291,8 +286,7 @@ export async function sendAdminNotifications(
             user_id: row.user_id ?? null,
             type: row.type ?? null,
             created_at: row.created_at ?? null,
-            metadata: parsedMetadata,
-          };
+            metadata: parsedMetadata };
         });
       }
     } catch (err) {
@@ -348,9 +342,7 @@ export async function sendAdminNotifications(
           created_at: nowIso,
           metadata: {
             ...(alert.metadata ?? {}),
-            dedupe_key: dedupeKey,
-          },
-        });
+            dedupe_key: dedupeKey } });
       }
 
       return [
@@ -362,12 +354,10 @@ export async function sendAdminNotifications(
           metadata: dedupeKey
             ? {
                 ...(alert.metadata ?? {}),
-                dedupe_key: dedupeKey,
-              }
+                dedupe_key: dedupeKey }
             : (alert.metadata ?? {}),
           read_at: null,
-          created_at: nowIso,
-        },
+          created_at: nowIso },
       ];
     });
   });
@@ -451,13 +441,11 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
     body: input.body,
     metadata: {
       ...(input.metadata ?? {}),
-      dedupe_key: input.dedupeKey,
-    },
+      dedupe_key: input.dedupeKey },
     read_at: null,
-    created_at: new Date().toISOString(),
-  };
+    created_at: new Date().toISOString() };
 
-  // 클라이언트(브라우저)는 D1 binding에 접근 불가 → compat supabase 경유
+  // 클라이언트(브라우저)는 D1 binding에 접근 불가 → compat db 경유
   // (ENABLE_D1_CLIENT=true면 /api/d1/mutate, 아니면 realSupabase). 알림 실패가
   // 본 기능을 막지 않도록 graceful 처리.
   if (typeof window !== 'undefined') {

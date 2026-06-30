@@ -8,8 +8,7 @@ import {
   resolveAttachmentKind,
   sortAlbumMessages,
   type AttachmentPreviewItem,
-  type AttachmentPreviewKind,
-} from './메신저첨부';
+  type AttachmentPreviewKind } from './메신저첨부';
 import { isSelfChatRoom, isActiveChatMember, toChatDate, extractPollMetaFromQuestion } from './메신저유틸';
 
 export type MediaFilter = 'all' | 'media' | 'image' | 'video' | 'file';
@@ -23,8 +22,7 @@ type UseChatDerivedPreviewStateParams = {
 export function useChatDerivedPreviewState({
   noticeMessages,
   mediaMessages,
-  messages,
-}: UseChatDerivedPreviewStateParams) {
+  messages }: UseChatDerivedPreviewStateParams) {
   const currentNoticeMessage = useMemo(
     () => noticeMessages[noticeMessages.length - 1] || null,
     [noticeMessages]
@@ -58,8 +56,7 @@ export function useChatDerivedPreviewState({
     currentNoticeMessage,
     sharedMediaPreviewMessages,
     sharedFilePreviewMessages,
-    sharedLinkPreviewMessages,
-  };
+    sharedLinkPreviewMessages };
 }
 
 type UseChatSelectedPeerParams = {
@@ -75,8 +72,7 @@ export function useChatSelectedPeerState({
   roomMembers,
   effectiveChatUserId,
   resolveStaffProfile,
-  isStaffCurrentlyOnline,
-}: UseChatSelectedPeerParams) {
+  isStaffCurrentlyOnline }: UseChatSelectedPeerParams) {
   const selectedPeer = useMemo(() => {
     if (!selectedRoom || selectedRoom.type !== 'direct') return null;
     if (isSelfChatRoom(selectedRoom, effectiveChatUserId)) {
@@ -98,8 +94,7 @@ export function useChatSelectedPeerState({
   return {
     selectedPeer,
     selectedPeerPhotoUrl,
-    selectedPeerIsOnline,
-  };
+    selectedPeerIsOnline };
 }
 
 type UseChatSelectedRoomLabelParams = {
@@ -113,8 +108,7 @@ export function useChatSelectedRoomLabel({
   selectedRoom,
   allKnownStaffs,
   effectiveChatUserId,
-  getRoomDisplayName,
-}: UseChatSelectedRoomLabelParams) {
+  getRoomDisplayName }: UseChatSelectedRoomLabelParams) {
   return useMemo(
     () => getRoomDisplayName(selectedRoom, allKnownStaffs, effectiveChatUserId),
     [allKnownStaffs, effectiveChatUserId, getRoomDisplayName, selectedRoom],
@@ -208,8 +202,7 @@ function buildThreadGroups(messages: ChatMessage[]) {
         latestMessage: message,
         latestReplyAt: String(message.id) === rootId ? null : (message.created_at || null),
         latestReplySenderId:
-          String(message.id) === rootId ? null : (String(message.sender_id || '').trim() || null),
-      });
+          String(message.id) === rootId ? null : (String(message.sender_id || '').trim() || null) });
       return;
     }
 
@@ -263,8 +256,7 @@ export function useThreadSummaries(messages: ChatMessage[], currentUserId?: stri
         latestActivityAt: thread.latestMessage.created_at || thread.rootMessage.created_at || null,
         latestReplySenderId,
         rootSenderId,
-        needsAttention,
-      };
+        needsAttention };
       return acc;
     }, {});
   }, [currentUserId, messages]);
@@ -296,8 +288,7 @@ export function useThreadOverviews(messages: ChatMessage[], currentUserId?: stri
           latestActivityAt: thread.latestMessage.created_at || thread.rootMessage.created_at || null,
           latestReplySenderId,
           rootSenderId,
-          needsAttention,
-        };
+          needsAttention };
       })
       .filter((thread): thread is ThreadOverview => Boolean(thread))
       .sort(
@@ -366,8 +357,7 @@ export function useChatMentionCandidates({
   showMentionList,
   mentionQuery,
   roomMembers,
-  staffs,
-}: UseChatMentionCandidatesParams) {
+  staffs }: UseChatMentionCandidatesParams) {
   return useMemo(() => {
     if (!showMentionList) return [];
     const base = Array.isArray(roomMembers) && roomMembers.length > 0 ? roomMembers : staffs;
@@ -408,8 +398,7 @@ export function useChatMediaPreviewState({
   setShowMediaPanel,
   buildAttachmentPreviewItem,
   openAttachmentPreviewGallery,
-  openAttachmentPreview,
-}: UseChatMediaPreviewStateParams) {
+  openAttachmentPreview }: UseChatMediaPreviewStateParams) {
   const mediaMessages = useMemo(
     () => messages.filter((message) => message.file_url && !message.is_deleted),
     [messages],
@@ -434,12 +423,10 @@ export function useChatMediaPreviewState({
     currentNoticeMessage,
     sharedMediaPreviewMessages,
     sharedFilePreviewMessages,
-    sharedLinkPreviewMessages,
-  } = useChatDerivedPreviewState({
+    sharedLinkPreviewMessages } = useChatDerivedPreviewState({
     noticeMessages,
     mediaMessages,
-    messages,
-  });
+    messages });
 
   const openMediaArchive = useCallback((nextFilter: MediaFilter) => {
     setMediaFilter(nextFilter);
@@ -533,8 +520,7 @@ export function useChatMediaPreviewState({
     sharedFilePreviewMessages,
     sharedLinkPreviewMessages,
     openMediaArchive,
-    openAttachmentPreviewForMessage,
-  };
+    openAttachmentPreviewForMessage };
 }
 
 type UseChatTimelineItemsParams = {
@@ -552,8 +538,7 @@ export function useChatTimelineItems({
   selectedRoomId,
   deferredChatSearch,
   transientHighlightQuery,
-  effectiveChatUserId,
-}: UseChatTimelineItemsParams) {
+  effectiveChatUserId }: UseChatTimelineItemsParams) {
   const visibleTimelineMessages = useMemo(() => {
     if (!deferredChatSearch.trim()) return messages;
     const query = deferredChatSearch.toLowerCase();
@@ -624,8 +609,7 @@ export function useChatTimelineItems({
       grouped.push({
         ...representative,
         type: 'album',
-        albumMessages,
-      } as Record<string, unknown>);
+        albumMessages } as Record<string, unknown>);
     }
 
     return grouped.sort(
@@ -639,6 +623,5 @@ export function useChatTimelineItems({
     visibleTimelineMessages,
     activeMessageHighlightQuery,
     selectedRoomPollTimelineItems,
-    combinedTimeline,
-  };
+    combinedTimeline };
 }

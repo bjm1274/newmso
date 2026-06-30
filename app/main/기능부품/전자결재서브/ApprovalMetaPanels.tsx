@@ -6,13 +6,12 @@ import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import {
   formatApprovalAttachmentSize,
   getReportApprovalSummary,
-  normalizeApprovalAttachments,
-} from '@/lib/approval-report-utils';
+  normalizeApprovalAttachments } from '@/lib/approval-report-utils';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import { normalizeInventoryText, normalizeSupplyRequestItems } from '@/app/main/inventory-utils';
 import { handleManagedDownloadClick } from '../공통/managed-download';
 import { escapeHtml } from '../전자결재-utils';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 export type ApprovalMetaData = Record<string, unknown> | null | undefined;
 
@@ -91,8 +90,7 @@ export function getLeaveRequestSummary(metaData: ApprovalMetaData) {
     dateLabel:
       startDate === endDate
         ? formatLeaveDateLabel(startDate)
-        : `${formatLeaveDateLabel(startDate)} ~ ${formatLeaveDateLabel(endDate)}`,
-  };
+        : `${formatLeaveDateLabel(startDate)} ~ ${formatLeaveDateLabel(endDate)}` };
 }
 
 export function getResignationRequestSummary(metaData: ApprovalMetaData) {
@@ -104,8 +102,7 @@ export function getResignationRequestSummary(metaData: ApprovalMetaData) {
   return {
     resignDate,
     resignReason,
-    handoverTarget,
-  };
+    handoverTarget };
 }
 
 export function renderSupplyRequestItemsHtml(metaData: ApprovalMetaData) {
@@ -308,8 +305,7 @@ export function SupplyRequestItemsPanel({ metaData }: { metaData: ApprovalMetaDa
       items.map((row, index) => ({
         ...row,
         _rowKey: `${row.name}-${row.qty}-${row.unit}-${index}`,
-        _isUnregistered: unregisteredNameSet.has(normalizeInventoryText(row.name)),
-      })),
+        _isUnregistered: unregisteredNameSet.has(normalizeInventoryText(row.name)) })),
     [items, unregisteredNameSet],
   );
 
@@ -333,25 +329,21 @@ export function SupplyRequestItemsPanel({ metaData }: { metaData: ApprovalMetaDa
               </span>
             ) : null}
           </>
-        ),
-      },
+        ) },
       {
         key: 'qty',
         label: '수량',
         render: (row) => (
           <span className="font-bold text-[var(--accent)]">{`${row.qty} ${row.unit}`}</span>
-        ),
-      },
+        ) },
       {
         key: 'category',
         label: '품목구분',
-        render: (row) => row.category || '-',
-      },
+        render: (row) => row.category || '-' },
       {
         key: 'purpose',
         label: '용도',
-        render: (row) => row.purpose || '-',
-      },
+        render: (row) => row.purpose || '-' },
     ],
     [],
   );
@@ -483,8 +475,7 @@ export function ApprovalAttachmentsPanel({ metaData }: { metaData: ApprovalMetaD
     fileName: string,
   ) => {
     await handleManagedDownloadClick(event, url, fileName, {
-      logLabel: 'approval attachment download',
-    });
+      logLabel: 'approval attachment download' });
   };
 
   return (
@@ -661,8 +652,8 @@ export function RosterRequestInfoPanel({ metaData }: { metaData: ApprovalMetaDat
     const fetchLookups = async () => {
       try {
         const [staffRes, shiftRes] = await Promise.all([
-          needsStaffLoad ? supabase.from('staff_members').select('id, name') : Promise.resolve({ data: [] }),
-          needsShiftLoad ? supabase.from('work_shifts').select('id, name') : Promise.resolve({ data: [] }),
+          needsStaffLoad ? db.from('staff_members').select('id, name') : Promise.resolve({ data: [] }),
+          needsShiftLoad ? db.from('work_shifts').select('id, name') : Promise.resolve({ data: [] }),
         ]);
 
         if (!active) return;

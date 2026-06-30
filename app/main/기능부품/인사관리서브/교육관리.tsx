@@ -28,8 +28,7 @@ import {
   getScopedActiveStaffs,
   selectEducationCompletionRowsWithFallback,
   serializeEducationQueryError,
-  isLicenseQueryRecoverableError,
-} from './교육내역/education-utils';
+  isLicenseQueryRecoverableError } from './교육내역/education-utils';
 
 // ---------------------------------------------------------------------------
 // 타입 / Zod 스키마
@@ -48,14 +47,12 @@ interface LicenseAlert {
 const JobCategorySchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
-  name: z.string(),
-});
+  name: z.string() });
 type JobCategory = z.infer<typeof JobCategorySchema>;
 
 const StaffJobCatSchema = z.object({
   staff_id: z.string(),
-  job_category_id: z.string().uuid(),
-});
+  job_category_id: z.string().uuid() });
 
 // ---------------------------------------------------------------------------
 // 메인 컴포넌트
@@ -175,8 +172,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
               education: item.name,
               dueDate: formatKoreanDateKey(dueDate),
               daysLeft,
-              type: daysLeft <= 14 ? 'URGENT' : 'PENDING',
-            }];
+              type: daysLeft <= 14 ? 'URGENT' : 'PENDING' }];
           });
         })
         .sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number));
@@ -195,8 +191,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
             issuingBody: license.issuing_body as string | null,
             expiryDate: String(license.expiry_date),
             daysLeft,
-            type: daysLeft <= 30 ? 'URGENT' : 'PENDING',
-          };
+            type: daysLeft <= 30 ? 'URGENT' : 'PENDING' };
         })
         .filter((x: LicenseAlert | null): x is LicenseAlert => x !== null)
         .sort((a: LicenseAlert, b: LicenseAlert) => a.daysLeft - b.daysLeft);
@@ -266,8 +261,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
         notifications.filter((item) => item.type === 'URGENT').map((item) => String(item.id))
       ).size,
       completionRate: totalRequiredCount > 0 ? Math.round((completedCount / totalRequiredCount) * 100) : 0,
-      focusItems,
-    };
+      focusItems };
   }, [filteredActiveStaffs, completionMap, notifications]);
 
   const bannerText =
@@ -455,8 +449,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
                       title: '교육/면허 알림 발송',
                       description: `${String(item.name)}님에게 알림을 발송합니다.\n현재 탭의 미이수 또는 갱신 대상 상태가 함께 안내됩니다.`,
                       confirmText: '발송',
-                      tone: 'accent',
-                    });
+                      tone: 'accent' });
                     if (!confirmed) return;
                     const li = item as unknown as LicenseAlert;
                     const { error } = await d1.from('notifications').insert({
@@ -471,8 +464,7 @@ export default function EducationMain({ staffs, selectedCo, onHeaderActions }: E
                           : li.daysLeft < 0
                             ? `${li.licenseName}의 만료일(${li.expiryDate})이 이미 지났습니다.`
                             : `${li.licenseName}의 만료일이 ${li.expiryDate}입니다.`,
-                      read_at: null,
-                    });
+                      read_at: null });
                     if (!error) {
                       toast(`${String(item.name)}님에게 독촉 알림이 전송되었습니다.`, 'success');
                     } else {

@@ -50,22 +50,19 @@ export type EditableGridProps<R> = {
 const alignClass: Record<NonNullable<EditableGridField<unknown>['align']>, string> = {
   left: 'text-left',
   right: 'text-right',
-  center: 'text-center',
-};
+  center: 'text-center' };
 
 const toneRowClass: Record<EditableGridRowTone, string> = {
   normal: '',
   error: 'bg-[color:color-mix(in_oklab,var(--danger)_10%,transparent)]',
   changed: 'bg-[color:color-mix(in_oklab,var(--accent)_8%,transparent)]',
-  ok: 'bg-[color:color-mix(in_oklab,var(--success,#16a34a)_8%,transparent)]',
-};
+  ok: 'bg-[color:color-mix(in_oklab,var(--success,#16a34a)_8%,transparent)]' };
 
 const toneCardClass: Record<EditableGridRowTone, string> = {
   normal: 'border-[var(--border)]',
   error: 'border-[var(--danger)]',
   changed: 'border-[var(--accent)]',
-  ok: 'border-[var(--success,#16a34a)]',
-};
+  ok: 'border-[var(--success,#16a34a)]' };
 
 export function EditableGrid<R>({
   rows,
@@ -75,8 +72,7 @@ export function EditableGrid<R>({
   actions,
   mobileTitle,
   className = '',
-  emptyMessage = '표시할 데이터가 없습니다.',
-}: EditableGridProps<R>) {
+  emptyMessage = '표시할 데이터가 없습니다.' }: EditableGridProps<R>) {
   if (rows.length === 0) {
     return (
       <div className={className}>

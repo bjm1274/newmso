@@ -1,12 +1,11 @@
 import type { StaffMember } from '@/types';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import { INVENTORY_SUPPORT_COMPANY } from '@/app/main/inventory-utils';
 import {
   type ApprovalCcUser,
   type ApprovalReferenceDefaultsMap,
   type ApproverTemplate,
-  SYSTEM_FORM_TYPE_SLUGS,
-} from './전자결재-types';
+  SYSTEM_FORM_TYPE_SLUGS } from './전자결재-types';
 
 // ─────────────────────────────────────────────
 // Staff 관련 유틸
@@ -33,8 +32,7 @@ export function resolveApprovalStaffLine(line: unknown, staffs: StaffMember[] = 
           position: typeof record.position === 'string' ? record.position : null,
           company: typeof record.company === 'string' ? record.company : null,
           department: typeof record.department === 'string' ? record.department : null,
-          team: typeof record.team === 'string' ? record.team : null,
-        } as StaffMember;
+          team: typeof record.team === 'string' ? record.team : null } as StaffMember;
       }
       return null;
     })
@@ -55,8 +53,7 @@ export function normalizeApprovalCcUsers(line: unknown, staffs: StaffMember[] = 
         return {
           id: String(matchedStaff.id),
           name: matchedStaff.name || '이름 없음',
-          position: matchedStaff.position ?? null,
-        } satisfies ApprovalCcUser;
+          position: matchedStaff.position ?? null } satisfies ApprovalCcUser;
       }
       if (typeof entry === 'object' && entry !== null) {
         const record = entry as Record<string, unknown>;
@@ -70,8 +67,7 @@ export function normalizeApprovalCcUsers(line: unknown, staffs: StaffMember[] = 
           position:
             typeof record.position === 'string'
               ? record.position
-              : matchedStaff?.position ?? null,
-        } satisfies ApprovalCcUser;
+              : matchedStaff?.position ?? null } satisfies ApprovalCcUser;
       }
       return null;
     })
@@ -117,8 +113,7 @@ export function normalizeApproverTemplates(value: unknown, staffs: StaffMember[]
         id,
         name,
         line: resolveApprovalStaffLine(record.line, staffs),
-        ccLine: Array.isArray(record.ccLine) ? normalizeApprovalCcUsers(record.ccLine, staffs) : undefined,
-      } satisfies ApproverTemplate;
+        ccLine: Array.isArray(record.ccLine) ? normalizeApprovalCcUsers(record.ccLine, staffs) : undefined } satisfies ApproverTemplate;
     })
     .filter(Boolean) as ApproverTemplate[];
 
@@ -189,8 +184,7 @@ export function getDateRangeFromMonth(monthValue: string) {
   const lastDay = new Date(year, month, 0).getDate();
   return {
     from: `${yearText}-${monthText}-01`,
-    to: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}`,
-  };
+    to: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}` };
 }
 
 export function getDateRangeFromWeek(dateValue: string) {
@@ -218,8 +212,7 @@ export function getDateRangeFromWeek(dateValue: string) {
 
   return {
     from: toLocalDateKey(weekStart),
-    to: toLocalDateKey(weekEnd),
-  };
+    to: toLocalDateKey(weekEnd) };
 }
 
 export function matchesCreatedDateRange(
@@ -306,8 +299,7 @@ export function resolveAttendanceCorrectionStatusPair(correctionTypeValue: strin
   const statusMap: Record<string, { att: string; atts: string }> = {
     정상반영: { att: '정상', atts: 'present' },
     지각처리: { att: '지각', atts: 'late' },
-    결근처리: { att: '결근', atts: 'absent' },
-  };
+    결근처리: { att: '결근', atts: 'absent' } };
 
   return statusMap[correctionTypeValue] || statusMap['정상반영'];
 }
@@ -326,8 +318,7 @@ export function sanitizeCustomFormTypes(
     .filter((row) => row?.is_active !== false)
     .map((row) => ({
       name: String(row?.name || '').trim(),
-      slug: String(row?.slug || '').trim(),
-    }))
+      slug: String(row?.slug || '').trim() }))
     .filter((row) => row.name && row.slug)
     .filter((row) => row.name !== '인사명령')
     .filter((row) => !SYSTEM_FORM_TYPE_SLUGS.has(row.slug))

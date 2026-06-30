@@ -86,8 +86,7 @@ export default function CommentComposerSticky({
   ariaLabel = '댓글 작성',
   maxLength = DEFAULT_MAX_LENGTH,
   withSpacer = true,
-  className,
-}: CommentComposerStickyProps) {
+  className }: CommentComposerStickyProps) {
   const inputId = useId();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 

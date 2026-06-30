@@ -14,8 +14,7 @@ import type { ErpUser } from '@/types';
 import { timeAgo, toNotificationText } from '@/lib/notification-utils';
 import {
   resolveNotificationTarget,
-  toNotificationMetadataRecord,
-} from '@/lib/notification-metadata';
+  toNotificationMetadataRecord } from '@/lib/notification-metadata';
 import { useNavigation } from '@/app/main/contexts/NavigationContext';
 import {
   emitNotificationReadEvent,
@@ -23,8 +22,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   NOTIFICATION_LIST_UPDATED_EVENT,
-  type NotificationRecord,
-} from '@/app/main/기능부품/알림시스템/notification-api';
+  type NotificationRecord } from '@/app/main/기능부품/알림시스템/notification-api';
 import MIcon from '../공통/MIcon';
 
 /** 알림 항목 타입 */
@@ -50,8 +48,7 @@ const NOTIF_LAUNCHPAD_THEMES: Record<string, { bg: string; icon: string }> = {
   attendance:  { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'clock' },
   payroll:     { bg: 'linear-gradient(135deg, #BF5AF2, #8F22D0)', icon: 'won' },
   board:       { bg: 'linear-gradient(135deg, #30B0C7, #007A8D)', icon: 'fileText' },
-  default:     { bg: 'linear-gradient(135deg, #8E8E93, #636366)', icon: 'bell' },
-};
+  default:     { bg: 'linear-gradient(135deg, #8E8E93, #636366)', icon: 'bell' } };
 
 /** notifications.type → macOS 테마 키 맵핑 */
 function mapTypeToThemeKey(type: string): string {
@@ -97,8 +94,7 @@ function normalizeRow(row: NotificationRecord): NotifItem {
     time: created ? timeAgo(created) : '',
     unread: row.read_at == null,
     type,
-    metadata: toNotificationMetadataRecord(row.metadata),
-  };
+    metadata: toNotificationMetadataRecord(row.metadata) };
 }
 
 export type 알림탭Props = {
@@ -190,8 +186,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       {/* macOS 윈도우 스타일 타이틀 바 */}
       <div
@@ -204,8 +199,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           position: 'sticky',
           top: 0,
-          zIndex: 10,
-        }}
+          zIndex: 10 }}
       >
         <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: 8 }}>
           알림
@@ -218,8 +212,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                 background: 'var(--m-accent)',
                 padding: '1px 6px',
                 borderRadius: '6px',
-                lineHeight: 1.25,
-              }}
+                lineHeight: 1.25 }}
             >
               {unreadCount}
             </span>
@@ -239,8 +232,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
             background: unreadCount > 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0, 0, 0, 0.03)',
             border: unreadCount > 0 ? '1px solid rgba(59, 130, 246, 0.18)' : '1px solid rgba(0, 0, 0, 0.05)',
             cursor: unreadCount > 0 ? 'pointer' : 'default',
-            transition: 'all 0.2s ease',
-          }}
+            transition: 'all 0.2s ease' }}
         >
           모두 읽음
         </button>
@@ -286,8 +278,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                     : '0 4px 12px rgba(0, 0, 0, 0.02)',
                   cursor: 'pointer',
                   transition: 'all 0.23s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                }}
+                  position: 'relative' }}
               >
                 {/* lead — macOS 젤리 아이콘 팩과 1대1 매치된 톤 아이콘 */}
                 <div
@@ -300,8 +291,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                     display: 'grid',
                     placeItems: 'center',
                     flexShrink: 0,
-                    boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.25), 0 3px 8px rgba(0,0,0,0.12)',
-                  }}
+                    boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.25), 0 3px 8px rgba(0,0,0,0.12)' }}
                 >
                   <MIcon name={n.icon} size={20} />
                 </div>
@@ -317,8 +307,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                       letterSpacing: '-0.015em',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
-                    }}
+                      gap: 6 }}
                   >
                     {n.unread && (
                       <span
@@ -328,8 +317,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                           borderRadius: '50%',
                           background: 'var(--m-accent)',
                           boxShadow: '0 0 6px var(--m-accent)',
-                          flexShrink: 0,
-                        }}
+                          flexShrink: 0 }}
                       />
                     )}
                     {n.title}
@@ -344,8 +332,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                       lineHeight: 1.45,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
+                      whiteSpace: 'nowrap' }}
                   >
                     {n.body}
                   </div>
@@ -355,8 +342,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                 <div
                   className="meta"
                   style={{
-                    paddingTop: 3,
-                  }}
+                    paddingTop: 3 }}
                 >
                   <span
                     className="time"
@@ -364,8 +350,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
                       fontSize: 10.5,
                       fontWeight: 700,
                       color: 'var(--z-400)',
-                      whiteSpace: 'nowrap',
-                    }}
+                      whiteSpace: 'nowrap' }}
                   >
                     {n.time}
                   </span>

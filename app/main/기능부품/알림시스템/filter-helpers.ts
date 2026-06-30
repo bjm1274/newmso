@@ -2,8 +2,7 @@ import {
   normalizeRoomNotificationKeyword,
   normalizeRoomNotificationMode,
   readStoredRoomPreferences,
-  readStoredThreadPreferences,
-} from '../메신저유틸';
+  readStoredThreadPreferences } from '../메신저유틸';
 import type { NotifSettings } from './settings';
 
 export function normalizeKeywordList(value: unknown): string[] {
@@ -105,16 +104,14 @@ export function resolveChatRoomSurfaceSuppression(params: {
     return {
       suppressLiveSurface: true,
       mode,
-      keyword,
-    };
+      keyword };
   }
 
   if (mode === 'mention_only') {
     return {
       suppressLiveSurface: params.type !== 'mention',
       mode,
-      keyword,
-    };
+      keyword };
   }
 
   if (mode === 'keyword') {
@@ -123,15 +120,13 @@ export function resolveChatRoomSurfaceSuppression(params: {
         params.type !== 'mention' &&
         !matchesChatRoomKeywordPreference(keyword, params.title, params.body, params.metadata),
       mode,
-      keyword,
-    };
+      keyword };
   }
 
   return {
     suppressLiveSurface: false,
     mode,
-    keyword,
-  };
+    keyword };
 }
 
 export function isFollowedThreadNotification(

@@ -24,8 +24,7 @@ import SApprovalDetail from './결재상세';
 import {
   useApprovalList,
   useClassifiedApprovals,
-  type ApprovalRow,
-} from './data-hooks';
+  type ApprovalRow } from './data-hooks';
 
 export type ApprovalView = 'inbox' | 'docs' | 'sent' | 'ref' | 'write' | 'compose' | 'detail';
 
@@ -228,8 +227,7 @@ export default function 결재({ user, sub }: 결재Props) {
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
-      }}
+        background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)' }}
     >
       {contentElement}
     </div>

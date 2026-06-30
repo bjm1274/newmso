@@ -1,7 +1,7 @@
 // 구성원현황 ↔ staff_licenses 연동 헬퍼
 // 자격안전센터(면허자격증관리.tsx)와 동일하게 staff_licenses 테이블을 단일 기준값으로 사용한다.
 // 조회·그룹핑·요약만 담당하며, 화면 컴포넌트(구성원현황.tsx)는 이 함수들을 호출만 한다.
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 // staff_licenses 테이블 row 타입 (자격안전센터의 LicenseRow와 동일 컬럼 집합)
 export interface StaffLicenseRow {
@@ -46,8 +46,7 @@ function normalizeLicenseRow(raw: unknown): StaffLicenseRow | null {
     expiry_date: cleanNullableText(record.expiry_date),
     renewed_date: cleanNullableText(record.renewed_date),
     issuing_body: cleanNullableText(record.issuing_body),
-    memo: cleanNullableText(record.memo),
-  };
+    memo: cleanNullableText(record.memo) };
 }
 
 /**
@@ -63,7 +62,7 @@ export async function fetchStaffLicensesGrouped(
   if (normalizedIds.length === 0) return {};
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_licenses')
       .select(
         'id, staff_id, license_type, license_name, license_number, issued_date, expiry_date, renewed_date, issuing_body, memo',

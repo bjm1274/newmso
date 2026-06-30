@@ -23,7 +23,7 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import MAvatar from '../공통/MAvatar';
@@ -31,8 +31,7 @@ import {
   MFormHeader,
   MField,
   MInput,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 import { canPlaceOrder, formatAmount, type StockMutateUser } from './data-hooks';
 
 // purchase_orders.items jsonb 구조 (PC 발주관리/PurchaseOrderModal과 동일)
@@ -138,8 +137,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
         item_id: null, // 모바일 발주는 카탈로그 미연결 — 후속
         name: it.n,
         qty: it.q,
-        unit_price: it.p,
-      }));
+        unit_price: it.p }));
 
       const noteParts: string[] = [];
       const companyTag = typeof user?.company === 'string' ? user.company.trim() : '';
@@ -154,18 +152,16 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
         status: '대기',
         total_amount: total,
         created_by: typeof user?.id === 'string' ? user.id : null,
-        notes: noteParts.join(' · '),
-      };
+        notes: noteParts.join(' · ') };
       if (expectedDelivery) payload.expected_delivery_date = expectedDelivery;
 
       // PC 패턴 분석: purchase_orders에 status='대기'로 insert.
       // 결재 흐름은 같은 테이블의 status 업데이트(대기→승인)로 처리되며
       // approvals 테이블에는 별도 insert하지 않음(PC 발주관리.tsx 244~256 동일).
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'purchase_orders',
-        payload: payload as Record<string, unknown>,
-      });
+        payload: payload as Record<string, unknown> });
       if (error) {
         toast(`발주 실패: ${error}`, 'error');
         return;
@@ -226,8 +222,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
             padding: '14px 16px 0',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
+            justifyContent: 'space-between' }}
         >
           <div
             style={{
@@ -235,8 +230,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
               fontWeight: 800,
               color: 'var(--z-500)',
               letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
+              textTransform: 'uppercase' }}
           >
             품목 {items.length}
           </div>
@@ -249,8 +243,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
               gap: 4,
               fontSize: 12,
               fontWeight: 700,
-              color: 'var(--m-accent)',
-            }}
+              color: 'var(--m-accent)' }}
           >
             <MIcon name="plus" size={14} />
             품목 추가
@@ -262,8 +255,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
             padding: '8px 16px 0',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-          }}
+            gap: 10 }}
         >
           {items.map((it, i) => (
             <div key={`${it.n}-${i}`} className="m-card" style={{ padding: '12px 14px' }}>
@@ -277,8 +269,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                     background: 'var(--z-100)',
                     color: 'var(--z-700)',
                     display: 'grid',
-                    placeItems: 'center',
-                  }}
+                    placeItems: 'center' }}
                 >
                   <MIcon name="box" size={16} />
                 </div>
@@ -290,8 +281,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                       fontSize: 11,
                       color: 'var(--z-500)',
                       fontWeight: 600,
-                      marginTop: 2,
-                    }}
+                      marginTop: 2 }}
                   >
                     단가 ₩{it.p}/{it.u}
                   </div>
@@ -314,8 +304,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                     gap: 4,
                     background: 'var(--m-bg)',
                     borderRadius: 'var(--m-radius-md)',
-                    padding: 4,
-                  }}
+                    padding: 4 }}
                 >
                   <button
                     type="button"
@@ -327,8 +316,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                       borderRadius: 7,
                       background: 'var(--m-card)',
                       display: 'grid',
-                      placeItems: 'center',
-                    }}
+                      placeItems: 'center' }}
                   >
                     <MIcon name="x" size={14} />
                   </button>
@@ -344,8 +332,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                       textAlign: 'center',
                       fontSize: 15,
                       fontWeight: 800,
-                      padding: '6px 0',
-                    }}
+                      padding: '6px 0' }}
                   />
                   <button
                     type="button"
@@ -357,8 +344,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                       borderRadius: 7,
                       background: 'var(--m-card)',
                       display: 'grid',
-                      placeItems: 'center',
-                    }}
+                      placeItems: 'center' }}
                   >
                     <MIcon name="plus" size={14} />
                   </button>
@@ -421,8 +407,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
                 fontSize: 22,
                 fontWeight: 800,
                 letterSpacing: '-0.025em',
-                color: 'var(--z-900)',
-              }}
+                color: 'var(--z-900)' }}
             >
               ₩ {formatAmount(total)}
             </span>
@@ -445,8 +430,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
               fontSize: 11,
               color: 'var(--m-warning)',
               fontWeight: 700,
-              textAlign: 'center',
-            }}
+              textAlign: 'center' }}
           >
             발주 권한이 없습니다. 관리자에게 요청하세요.
           </div>

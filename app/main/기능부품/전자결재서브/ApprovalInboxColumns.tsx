@@ -4,8 +4,7 @@ import type { StaffMember } from '@/types';
 import type { Column } from '@/app/components/ResponsiveTable';
 import {
   ApprovalProgressSummary,
-  buildApprovalWorkflowSummary,
-} from './ApprovalRiskReviewDialog';
+  buildApprovalWorkflowSummary } from './ApprovalRiskReviewDialog';
 import { getLeaveRequestSummary } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
@@ -58,8 +57,7 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
     handleApproveAction,
     handleRejectAction,
     handleRecallAction,
-    onOpenDetail,
-  } = params;
+    onOpenDetail } = params;
 
   return [
     {
@@ -115,26 +113,22 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
             )}
           </div>
         );
-      },
-    },
+      } },
     {
       key: 'sender_name',
       label: '기안자',
-      render: (item) => String(item.sender_name || '사용자'),
-    },
+      render: (item) => String(item.sender_name || '사용자') },
     {
       key: 'type',
       label: '문서 유형',
       render: (item) => {
         const templateMeta = resolveApprovalTemplateMeta(item);
         return <span className="erp-status erp-status-blue">{templateMeta.name || String(item.type || '결재')}</span>;
-      },
-    },
+      } },
     {
       key: 'created_at',
       label: '기안일',
-      render: (item) => formatInboxDraftDate(item.created_at),
-    },
+      render: (item) => formatInboxDraftDate(item.created_at) },
     {
       key: 'status',
       label: '상태',
@@ -144,8 +138,7 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
           item,
           staffs: lookupStaffs,
           resolveApprovalLineIds,
-          resolveCurrentApproverId,
-        });
+          resolveCurrentApproverId });
         return (
           <div className="flex flex-col items-start gap-1">
             <span className={status.className}>{status.label}</span>
@@ -156,8 +149,7 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
             )}
           </div>
         );
-      },
-    },
+      } },
     {
       key: '__actions',
       label: '관리',
@@ -217,7 +209,6 @@ export function buildApprovalInboxColumns(params: BuildInboxColumnsParams): Colu
             </button>
           </div>
         );
-      },
-    },
+      } },
   ];
 }

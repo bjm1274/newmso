@@ -13,8 +13,7 @@ const LegacyPensionManager = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">퇴직연금 관리 화면 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -50,8 +49,7 @@ export default function ModPension() {
     return {
       totalReserve,
       avgTenure: validCount > 0 ? avgTenure / validCount : 0,
-      validCount,
-    };
+      validCount };
   }, [data.staffs]);
 
   return (

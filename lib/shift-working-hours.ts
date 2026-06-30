@@ -151,8 +151,7 @@ export function parseShiftMeta(shift: Shift): ShiftMeta | null {
     weekly_work_days: Number(shift.weekly_work_days) || 5,
     is_weekend_work: Boolean(shift.is_weekend_work) || false,
     daily_schedules: null,
-    break_plans: null,
-  });
+    break_plans: null });
 
   if (markerIndex === -1) {
     return fallback();
@@ -176,8 +175,7 @@ export function parseShiftMeta(shift: Shift): ShiftMeta | null {
           : Boolean(shift.is_weekend_work) ?? false,
       daily_schedules:
         (parsed.daily_schedules as Record<string, DaySchedule> | null) ?? null,
-      break_plans: (parsed.break_plans as BreakPlan[] | null) ?? null,
-    };
+      break_plans: (parsed.break_plans as BreakPlan[] | null) ?? null };
   } catch {
     return fallback();
   }
@@ -274,8 +272,7 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
               start_time: sched?.start_time,
               end_time: sched?.end_time,
               break_start_time: plan?.start_time ?? null,
-              break_end_time: plan?.end_time ?? null,
-            })
+              break_end_time: plan?.end_time ?? null })
           );
         }, 0);
         // Average daily minutes × 3.5 weeks / 60 → weekly hours
@@ -299,8 +296,7 @@ export function getShiftHoursAndDays(shift: Shift): { hours: number; days: numbe
             start_time: sched.start_time,
             end_time: sched.end_time,
             break_start_time: plan?.start_time ?? null,
-            break_end_time: plan?.end_time ?? null,
-          })
+            break_end_time: plan?.end_time ?? null })
         );
       }, 0);
       calculatedHours = Math.round((totalMins / 60) * 10) / 10;
@@ -335,6 +331,5 @@ export function averageShiftHoursAndDays(
 
   return {
     hours: Math.round((totalHours / valid.length) * 10) / 10,
-    days: Math.round((totalDays / valid.length) * 10) / 10,
-  };
+    days: Math.round((totalDays / valid.length) * 10) / 10 };
 }

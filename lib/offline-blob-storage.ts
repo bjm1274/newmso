@@ -165,8 +165,7 @@ export async function storeBlob(
     mimeType: meta.mimeType,
     filename: meta.filename,
     sizeBytes: blob.size,
-    createdAt: Date.now(),
-  };
+    createdAt: Date.now() };
 
   const db = await openIdb();
   if (db) {

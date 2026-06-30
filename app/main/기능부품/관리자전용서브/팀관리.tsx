@@ -2,15 +2,14 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   createOrgTeam,
   deleteOrgTeam,
   fetchCompanyOptions,
   fetchOrgTeams,
   updateOrgTeam,
-  type OrgTeam,
-} from '@/lib/data/org';
+  type OrgTeam } from '@/lib/data/org';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
@@ -45,8 +44,7 @@ function TeamManagerDesktop({
   selectedCompany,
   hideCompanySelect = false,
   embedded = false,
-  disabled = false,
-}: TeamManagerProps) {
+  disabled = false }: TeamManagerProps) {
   const { dialog, openConfirm } = useActionDialog();
   const [teams, setTeams] = useState<OrgTeam[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
@@ -68,7 +66,7 @@ function TeamManagerDesktop({
       return;
     }
     const fetchActiveShifts = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('work_shifts')
         .select('id, name')
         .eq('is_active', true)
@@ -138,8 +136,7 @@ function TeamManagerDesktop({
     // 회사 변경 시 Division 기본값도 회사 유형에 맞게 변경
     setNewTeam((prev) => ({
       division: effectiveCompany === 'SY INC.' ? MSO_DIVISIONS[0] : HOSPITAL_DIVISIONS[0],
-      team_name: prev.team_name,
-    }));
+      team_name: prev.team_name }));
     fetchTeams();
   }, [effectiveCompany, fetchTeams]);
 
@@ -158,8 +155,7 @@ function TeamManagerDesktop({
       division: resolvedDivision,
       team_name: newTeam.team_name.trim(),
       sort_order: siblings.length + 1,
-      applicable_shifts: selectedShifts.length > 0 ? JSON.stringify(selectedShifts) : null,
-    });
+      applicable_shifts: selectedShifts.length > 0 ? JSON.stringify(selectedShifts) : null });
     if (!error) {
       setNewTeam({ division: currentDivisions[0], team_name: '' });
       setSelectedShifts([]);
@@ -177,8 +173,7 @@ function TeamManagerDesktop({
       title: '팀 삭제',
       description: `${target?.team_name || '선택한 팀'}을 삭제합니다.\n조직도와 팀 기준정보에 영향을 줄 수 있습니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     await deleteOrgTeam(id, effectiveCompany);
     fetchTeams();
@@ -214,8 +209,7 @@ function TeamManagerDesktop({
       company_name: effectiveCompany,
       division: resolvedDivision,
       team_name: editingName.trim(),
-      applicable_shifts: editingSelectedShifts.length > 0 ? JSON.stringify(editingSelectedShifts) : null,
-    });
+      applicable_shifts: editingSelectedShifts.length > 0 ? JSON.stringify(editingSelectedShifts) : null });
     
     if (!error) {
       setEditingTeam(null);
@@ -232,8 +226,7 @@ function TeamManagerDesktop({
     teams: teams.filter((t) => {
       if (effectiveCompany === 'SY INC.') return toUIDivision(t.division) === d;
       return t.division === d;
-    }),
-  }));
+    }) }));
 
   return (
     <div className={`${embedded ? '' : 'bg-[var(--card)]'} rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm p-4 animate-in fade-in`} data-testid="team-manager-view">

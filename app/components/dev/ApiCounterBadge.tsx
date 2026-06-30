@@ -13,8 +13,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   getApiCallCount,
   getLastMinuteCallCount,
-  resetApiCallCount,
-} from '@/lib/measurement/api-counter';
+  resetApiCallCount } from '@/lib/measurement/api-counter';
 import { runAxe } from '@/lib/measurement/axe-runner';
 
 // ─────────────────────────────────────────────
@@ -46,8 +45,7 @@ function ApiCounterBadgeInner(): React.ReactElement {
     const tick = (): void => {
       setCounts({
         total: getApiCallCount(),
-        lastMinute: getLastMinuteCallCount(),
-      });
+        lastMinute: getLastMinuteCallCount() });
     };
 
     tick(); // 즉시 1회

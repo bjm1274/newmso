@@ -15,8 +15,7 @@ const LegacySalaryDetail = dynamic(
       <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">
         명세서 로드 중…
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -50,8 +49,7 @@ export default function ModLedger({ user }: { user?: any }) {
           base: acc.base + r.base,
           allowance: acc.allowance + r.allowance,
           deduction: acc.deduction + r.deduction,
-          net: acc.net + r.net,
-        }),
+          net: acc.net + r.net }),
         { base: 0, allowance: 0, deduction: 0, net: 0 },
       ),
     [filteredRows],

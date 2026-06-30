@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import StickyFormFooter from '@/app/components/StickyFormFooter';
 
 interface Props {
@@ -31,8 +31,7 @@ interface ContractForm {
 const CONTRACT_TEMPLATES: Record<ContractType, { title: string; description: string; color: string }> = {
   근로계약: { title: '근로 계약서', description: '정규직·계약직 근로자와의 표준 근로계약', color: 'bg-blue-500/10 border-blue-500/20 text-blue-700' },
   위임계약: { title: '위임 계약서', description: '업무 위임 및 대리 수행 계약', color: 'bg-purple-500/10 border-purple-500/20 text-purple-700' },
-  용역계약: { title: '용역 계약서', description: '외부 용역 서비스 제공 계약', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-};
+  용역계약: { title: '용역 계약서', description: '외부 용역 서비스 제공 계약', color: 'bg-emerald-50 border-emerald-200 text-emerald-700' } };
 
 const DEFAULT_FORM: ContractForm = {
   contract_type: '근로계약',
@@ -47,8 +46,7 @@ const DEFAULT_FORM: ContractForm = {
   representative: '',
   work_location: '',
   work_hours: '09:00~18:00 (휴게 1시간)',
-  note: '',
-};
+  note: '' };
 
 export default function ContractAutoGenerator({ staffs, selectedCo, user }: Props) {
   const [form, setForm] = useState<ContractForm>({ ...DEFAULT_FORM, company_name: selectedCo !== '전체' ? selectedCo : '' });
@@ -67,8 +65,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         staff_name: s.name || '',
         position: s.position || '',
         department: s.dept || s.department || '',
-        salary: s.base_salary ? String(s.base_salary) : '',
-      }));
+        salary: s.base_salary ? String(s.base_salary) : '' }));
     }
   };
 
@@ -84,7 +81,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
     setSaving(true);
     setMessage(null);
     try {
-      const { error } = await supabase.from('generated_contracts').insert([{
+      const { error } = await db.from('generated_contracts').insert([{
         contract_type: form.contract_type,
         staff_id: form.staff_id || null,
         staff_name: form.staff_name,
@@ -98,8 +95,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         work_location: form.work_location,
         work_hours: form.work_hours,
         note: form.note,
-        created_by: user?.name || '',
-      }]);
+        created_by: user?.name || '' }]);
       if (error) throw error;
       setMessage({ type: 'success', text: '계약서가 저장되었습니다.' });
     } catch (e: unknown) {

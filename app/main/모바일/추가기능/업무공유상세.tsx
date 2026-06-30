@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ErpUser } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { logger } from '@/lib/logger';
 import MobileHeader from '../셸/MobileHeader';
@@ -43,8 +43,7 @@ type Detail = {
 function MobileTaskShareDetail({
   user,
   postId,
-  onBack,
-}: {
+  onBack }: {
   user: ErpUser;
   postId: string;
   onBack: () => void;
@@ -59,8 +58,8 @@ function MobileTaskShareDetail({
     setLoading(true);
     try {
       const [{ data: post, error: postErr }, { data: comm }] = await Promise.all([
-        supabase.from('board_posts').select('*').eq('id', postId).maybeSingle(),
-        supabase
+        db.from('board_posts').select('*').eq('id', postId).maybeSingle(),
+        db
           .from('board_post_comments')
           .select('*')
           .eq('post_id', postId)
@@ -87,17 +86,14 @@ function MobileTaskShareDetail({
         attachments: att.map((a) => ({
           name: pickText(a, 'name', 'filename') || '첨부',
           size: pickText(a, 'size') || '',
-          kind: pickText(a, 'kind', 'type') || 'file',
-        })),
-      });
+          kind: pickText(a, 'kind', 'type') || 'file' })) });
       setComments(
         ((comm ?? []) as Record<string, unknown>[]).map((c) => ({
           id: pickText(c, 'id'),
           author: pickText(c, 'author_name') || '익명',
           author_id: pickText(c, 'author_id'),
           body: pickText(c, 'content', 'body'),
-          created_at: pickText(c, 'created_at'),
-        })),
+          created_at: pickText(c, 'created_at') })),
       );
     } catch (err) {
       logger.warn('[mobile-addon] share detail load', err);
@@ -115,13 +111,12 @@ function MobileTaskShareDetail({
     if (!text || sending) return;
     setSending(true);
     try {
-      const { error } = await supabase.from('board_post_comments').insert([
+      const { error } = await db.from('board_post_comments').insert([
         {
           post_id: postId,
           author_id: user.id,
           author_name: user.name,
-          content: text,
-        },
+          content: text },
       ]);
       if (error) throw error;
       setInput('');
@@ -170,8 +165,7 @@ function MobileTaskShareDetail({
               gap: 8,
               marginTop: 14,
               paddingBottom: 14,
-              borderBottom: '1px solid var(--m-border)',
-            }}
+              borderBottom: '1px solid var(--m-border)' }}
           >
             <MAvatar tone={pickTone(detail.author_id || detail.id)} size="sm">
               {detail.author.charAt(0)}
@@ -191,8 +185,7 @@ function MobileTaskShareDetail({
               color: 'var(--z-800)',
               lineHeight: 1.75,
               fontWeight: 500,
-              whiteSpace: 'pre-wrap',
-            }}
+              whiteSpace: 'pre-wrap' }}
           >
             {detail.body || '(본문 없음)'}
           </div>
@@ -207,8 +200,7 @@ function MobileTaskShareDetail({
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    borderBottom: i < detail.attachments.length - 1 ? '1px solid var(--m-border)' : 'none',
-                  }}
+                    borderBottom: i < detail.attachments.length - 1 ? '1px solid var(--m-border)' : 'none' }}
                 >
                   <div className="ico-tile tone-accent">
                     <MIcon name="paperclip" size={18} />
@@ -220,8 +212,7 @@ function MobileTaskShareDetail({
                         fontWeight: 700,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
+                        textOverflow: 'ellipsis' }}
                     >
                       {a.name}
                     </div>
@@ -256,8 +247,7 @@ function MobileTaskShareDetail({
                     color: 'var(--z-800)',
                     marginTop: 3,
                     lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}
+                    whiteSpace: 'pre-wrap' }}
                 >
                   {c.body}
                 </div>
@@ -282,8 +272,7 @@ function MobileTaskShareDetail({
             gap: 6,
             background: 'var(--m-bg)',
             borderRadius: 22,
-            padding: '4px 6px 4px 12px',
-          }}
+            padding: '4px 6px 4px 12px' }}
         >
           <input
             placeholder="댓글 입력"
@@ -304,8 +293,7 @@ function MobileTaskShareDetail({
               fontFamily: 'inherit',
               background: 'transparent',
               border: 0,
-              outline: 'none',
-            }}
+              outline: 'none' }}
           />
           <button
             type="button"
@@ -321,8 +309,7 @@ function MobileTaskShareDetail({
               display: 'grid',
               placeItems: 'center',
               border: 0,
-              opacity: input.trim() ? 1 : 0.4,
-            }}
+              opacity: input.trim() ? 1 : 0.4 }}
           >
             <MIcon name="send" size={14} />
           </button>

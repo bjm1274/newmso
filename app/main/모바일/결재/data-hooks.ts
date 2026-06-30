@@ -12,23 +12,20 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import {
   APPROVAL_LIST_SELECT,
   APPROVAL_OPTIONAL_COLUMNS,
-  buildApprovalSelect,
-} from '@/lib/approval-query-columns';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+  buildApprovalSelect } from '@/lib/approval-query-columns';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   buildApprovalDocNumber,
-  resolveApprovalDocNumberConfig,
-} from '@/lib/approval-workflow';
+  resolveApprovalDocNumberConfig } from '@/lib/approval-workflow';
 import {
   normalizeApprovalLineIds,
   resolveApprovalLineIds as resolveLineIdsPc,
-  resolveStoredCurrentApproverId,
-} from '@/app/main/기능부품/마이페이지/역할별대시보드/format-utils';
+  resolveStoredCurrentApproverId } from '@/app/main/기능부품/마이페이지/역할별대시보드/format-utils';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -168,7 +165,7 @@ export function useApprovalList(staffId: string | null, company?: string | null)
     try {
       const { data, error: queryError } = await withMissingColumnsFallback(
         (omittedColumns) => {
-          let q = supabase
+          let q = db
             .from('approvals')
             .select(buildApprovalSelect(omittedColumns))
             .order('created_at', { ascending: false })
@@ -204,7 +201,7 @@ export function useApprovalList(staffId: string | null, company?: string | null)
 
 export async function fetchApprovalById(id: string): Promise<ApprovalRow | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('approvals')
       .select(APPROVAL_LIST_SELECT)
       .eq('id', id)
@@ -236,8 +233,7 @@ export async function postRecall(params: {
   const response = await fetch('/api/approval/recall', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ approvalId: params.approvalId, note: params.note ?? null }),
-  });
+    body: JSON.stringify({ approvalId: params.approvalId, note: params.note ?? null }) });
   const payload = (await response.json().catch(() => null)) as RecallResult | null;
   if (!response.ok || !payload?.ok) {
     const errMsg =
@@ -263,8 +259,7 @@ export async function postTransition(params: {
   const response = await fetch('/api/approvals/transition', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
+    body: JSON.stringify(params) });
   const payload = (await response.json().catch(() => null)) as TransitionResult | null;
   if (!response.ok || !payload?.ok) {
     throw new Error(payload && 'results' in payload && payload.results?.[0]?.error
@@ -308,7 +303,7 @@ export async function generateMobileDocNumber(params: {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    let countQuery = supabase
+    let countQuery = db
       .from('approvals')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', dayStart.toISOString())
@@ -334,8 +329,7 @@ export async function generateMobileDocNumber(params: {
       typeName: params.typeName ?? null,
       createdAt: new Date(),
       sequence: (count || 0) + 1,
-      config,
-    });
+      config });
   } catch (err) {
     // silent — 호출측에서 doc_number 없이 insert 진행
     console.warn('[mobile-approval] doc_number generation failed', err);

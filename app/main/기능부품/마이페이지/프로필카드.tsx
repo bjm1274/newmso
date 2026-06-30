@@ -2,12 +2,11 @@
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import {
   getProfilePhotoUrl,
-  normalizeProfileUser,
-} from '@/lib/profile-photo';
+  normalizeProfileUser } from '@/lib/profile-photo';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { ProfileCardUser, ProfileCardProps } from './프로필카드/types';
@@ -24,8 +23,7 @@ export default function MyProfileCard({
   showSecret: controlledShowSecret,
   setShowSecret: setControlledShowSecret,
   isEditing: controlledIsEditing,
-  setIsEditing: setControlledIsEditing,
-}: ProfileCardProps) {
+  setIsEditing: setControlledIsEditing }: ProfileCardProps) {
   const { dialog, openConfirm, openPrompt } = useActionDialog();
   const _iu = normalizeStaffLike((initialUser ?? {}) as ProfileCardUser);
   const [user, setUser] = useState<ProfileCardUser>(normalizeProfileUser(_iu as ProfileCardUser));
@@ -39,8 +37,7 @@ export default function MyProfileCard({
     extension: toSafeText((_iu)?.extension) || toSafeText((_iu.permissions as Record<string, unknown>)?.extension) || '',
     address: ((_iu)?.address as string) || '',
     bank_name: toSafeText((_iu)?.bank_name) || toSafeText((_iu.permissions as Record<string, unknown>)?.bank_name) || '',
-    bank_account: toSafeText((_iu)?.bank_account) || toSafeText((_iu.permissions as Record<string, unknown>)?.bank_account) || '',
-  });
+    bank_account: toSafeText((_iu)?.bank_account) || toSafeText((_iu.permissions as Record<string, unknown>)?.bank_account) || '' });
 
   const showSecret = typeof controlledShowSecret === 'boolean' ? controlledShowSecret : internalShowSecret;
   const isEditing = typeof controlledIsEditing === 'boolean' ? controlledIsEditing : internalIsEditing;
@@ -66,9 +63,7 @@ export default function MyProfileCard({
       new CustomEvent('erp-profile-updated', {
         detail: {
           user: normalizedUser,
-          avatarUrl: getProfilePhotoUrl(normalizedUser),
-        },
-      })
+          avatarUrl: getProfilePhotoUrl(normalizedUser) } })
     );
   };
 
@@ -97,8 +92,7 @@ export default function MyProfileCard({
         extension: toSafeText(user.extension) || toSafeText((user.permissions as Record<string, unknown>)?.extension) || '',
         address: (user.address as string) || '',
         bank_name: toSafeText(user.bank_name) || toSafeText((user.permissions as Record<string, unknown>)?.bank_name) || '',
-        bank_account: toSafeText(user.bank_account) || toSafeText((user.permissions as Record<string, unknown>)?.bank_account) || '',
-      });
+        bank_account: toSafeText(user.bank_account) || toSafeText((user.permissions as Record<string, unknown>)?.bank_account) || '' });
     }
   }, [user]);
 
@@ -132,8 +126,7 @@ export default function MyProfileCard({
         cancelText: '취소',
         inputType: 'password',
         required: true,
-        placeholder: '현재 비밀번호',
-      });
+        placeholder: '현재 비밀번호' });
       if (!input) return false;
 
       const response = await fetch('/api/auth/verify-password', {
@@ -143,9 +136,7 @@ export default function MyProfileCard({
           password: input,
           userId: effectiveUserId || getStaffLikeId(_iu) || undefined,
           name: user?.name || (_iu)?.name,
-          employeeNo: user?.employee_no || (_iu)?.employee_no,
-        }),
-      });
+          employeeNo: user?.employee_no || (_iu)?.employee_no }) });
       await response.json().catch(() => null);
 
       if (!response.ok) {

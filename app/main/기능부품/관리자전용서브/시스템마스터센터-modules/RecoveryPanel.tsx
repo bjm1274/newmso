@@ -24,26 +24,22 @@ export function RecoveryPanel({ opsActionLoading, runOpsAction }: RecoveryPanelP
             id: 'run_backup_full',
             title: '정기 전체 백업 수동 실행',
             description: '즉시 전체 백업을 만들어 최근 백업 목록을 갱신합니다.',
-            button: '전체 백업 실행',
-          },
+            button: '전체 백업 실행' },
           {
             id: 'run_chat_push_dispatch',
             title: '채팅 푸시 큐 재처리',
             description: '대기 중인 채팅 푸시 작업을 바로 다시 처리합니다.',
-            button: '푸시 큐 재처리',
-          },
+            button: '푸시 큐 재처리' },
           {
             id: 'run_todo_reminders',
             title: '할일 리마인더 수동 실행',
             description: '지금 시점까지 도달한 할일 리마인더를 즉시 발송합니다.',
-            button: '리마인더 실행',
-          },
+            button: '리마인더 실행' },
           {
             id: 'cleanup_push_subscriptions',
             title: '푸시 구독 정리',
             description: 'null staff, orphan, 중복 endpoint 구독을 정리합니다.',
-            button: '푸시 구독 정리',
-          },
+            button: '푸시 구독 정리' },
         ].map((action) => (
           <article key={action.id} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
             <h4 className="text-sm font-bold text-[var(--foreground)]">{action.title}</h4>

@@ -39,7 +39,7 @@ const CLOSING_LINE_PATTERNS: RegExp[] = [
   // 서명/날인
   /^서\s*명\s*또는\s*날인\s*[:：]?/,
   /^서\s*명\s*\/\s*날인\s*[:：]?/,
-  /^서\s*명\s*[:：]?\s*_{3,}/,
+  /^서\s*명\s*[:：]?\s*_{3 }/,
   /^날\s*인\s*[:：]?/,
   /^서명\s*\(인\)/,
   // 교부 확인 / 안내
@@ -64,7 +64,7 @@ const CLOSING_LINE_PATTERNS: RegExp[] = [
 function isClosingLine(line: string): boolean {
   const t = line.trim();
   if (!t) return false;
-  if (/^_{3,}$/.test(t)) return true;
+  if (/^_{3 }$/.test(t)) return true;
   return CLOSING_LINE_PATTERNS.some((re) => re.test(t));
 }
 
@@ -146,9 +146,8 @@ export function stripContractClosingLines(text: string): StripClosingResult {
     let cutoff = Math.min(...cutoffCandidates);
     while (cutoff > 0 && !lines[cutoff - 1].trim()) cutoff--;
     return {
-      mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3,}/g, '\n\n').trimEnd(),
-      hasClosing: true,
-    };
+      mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3 }/g, '\n\n').trimEnd(),
+      hasClosing: true };
   }
 
   // 3차 폴백: 마지막부터 역방향으로 닫힘 라인을 걷어낸다.
@@ -167,9 +166,8 @@ export function stripContractClosingLines(text: string): StripClosingResult {
   }
 
   return {
-    mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3,}/g, '\n\n').trimEnd(),
-    hasClosing: cutoff < lines.length,
-  };
+    mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3 }/g, '\n\n').trimEnd(),
+    hasClosing: cutoff < lines.length };
 }
 
 export type ContractClosingData = {
@@ -209,8 +207,7 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
     employeePhone,
     contractDate,
     signatureDataUrl,
-    receiptTraceDataUrl,
-  } = opts;
+    receiptTraceDataUrl } = opts;
 
   // 직인은 실 이미지만 표시(원형 테두리 제거). 회사명 끝 글자에 살짝 겹쳐 위조 방지.
   const sealHTML = sealUrl

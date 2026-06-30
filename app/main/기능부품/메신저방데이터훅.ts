@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { POLL_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom } from '@/types';
 import { fetchUnreadCountsForRoomIds } from './메신저데이터유틸';
@@ -19,21 +19,18 @@ import {
   sortChatRoomsWithNoticeFirst,
   toChatDate,
   writeStoredBookmarks,
-  writeStoredPinnedIds,
-} from './메신저유틸';
+  writeStoredPinnedIds } from './메신저유틸';
 import type {
   LoadedMessageCursor,
   MessageJumpLoadResult,
   ReactionUsersByMessage,
   RoomSummary,
-  UseChatRoomDataSyncParams,
-} from './메신저방데이터-types';
+  UseChatRoomDataSyncParams } from './메신저방데이터-types';
 import {
   CHAT_METADATA_REFRESH_TTL_MS,
   DATE_JUMP_CONTEXT_AFTER,
   DATE_JUMP_CONTEXT_BEFORE,
-  MESSAGE_PAGE_SIZE,
-} from './메신저방데이터-types';
+  MESSAGE_PAGE_SIZE } from './메신저방데이터-types';
 import { defaultLegacySelectChatMessagesWithFallback, describeQueryError, normalizeMessageCursorTime } from './메신저방데이터-utils';
 import { selectMessageBookmarkRows, selectMessageReactionRows } from './메신저방데이터-queries';
 
@@ -68,8 +65,7 @@ export function useChatRoomDataSync({
   setReactions,
   setReactionUsersByMessage,
   setPolls,
-  setPollVotes,
-}: UseChatRoomDataSyncParams) {
+  setPollVotes }: UseChatRoomDataSyncParams) {
   const implicitUnreadBaselineRef = useRef<Record<string, string | null>>({});
 
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
@@ -96,7 +92,7 @@ export function useChatRoomDataSync({
         if (!myRooms.length) return;
 
         const roomIds = myRooms.map((room: ChatRoom) => room.id);
-        const { data: cursors } = await supabase
+        const { data: cursors } = await db
           .from('room_read_cursors')
           .select('room_id, last_read_at')
           .eq('user_id', effectiveChatUserId)
@@ -137,11 +133,10 @@ export function useChatRoomDataSync({
           (roomId) => !openConversationRoomIds.has(roomId) && roomId !== activeRoomId,
         );
 
-        const unreadBatchCounts = await fetchUnreadCountsForRoomIds(supabase, {
+        const unreadBatchCounts = await fetchUnreadCountsForRoomIds(db, {
           roomIds: queryRoomIds,
           userId: effectiveChatUserId,
-          cursorMap: unreadCursorMap,
-        });
+          cursorMap: unreadCursorMap });
         const queriedEntries = queryRoomIds.map(
           (roomId): [string, number] => [roomId, unreadBatchCounts[roomId] || 0],
         );
@@ -188,8 +183,7 @@ export function useChatRoomDataSync({
               ...dbRoom,
               last_message: localRoom.last_message,
               last_message_preview: localRoom.last_message_preview,
-              last_message_at: localRoom.last_message_at,
-            };
+              last_message_at: localRoom.last_message_at };
           }
         }
         return dbRoom;
@@ -217,8 +211,7 @@ export function useChatRoomDataSync({
         return {
           last_message: null,
           last_message_preview: null,
-          last_message_at: null,
-        };
+          last_message_at: null };
       }
 
       const roomScopedMessages = sourceMessages.filter(
@@ -241,8 +234,7 @@ export function useChatRoomDataSync({
         return {
           last_message: null,
           last_message_preview: null,
-          last_message_at: null,
-        };
+          last_message_at: null };
       }
 
       const previewText = latestMessage.is_deleted
@@ -257,8 +249,7 @@ export function useChatRoomDataSync({
       return {
         last_message: previewText,
         last_message_preview: previewText,
-        last_message_at: latestMessage.created_at || null,
-      };
+        last_message_at: latestMessage.created_at || null };
     },
     [],
   );
@@ -283,8 +274,7 @@ export function useChatRoomDataSync({
                   ...room,
                   last_message: summary.last_message,
                   last_message_preview: summary.last_message_preview,
-                  last_message_at: summary.last_message_at,
-                }
+                  last_message_at: summary.last_message_at }
               : room,
           ),
         );
@@ -333,8 +323,7 @@ export function useChatRoomDataSync({
       return {
         selectedRoomRecord,
         roomIdsToLoad,
-        roomMemberIds: getEffectiveRoomMemberIds(selectedRoomRecord),
-      };
+        roomMemberIds: getEffectiveRoomMemberIds(selectedRoomRecord) };
     },
     [chatRoomsRef, getEffectiveRoomMemberIds, selectedRoomId, selectedRoomIdRef],
   );
@@ -382,7 +371,7 @@ export function useChatRoomDataSync({
       if (!context || context.roomIdsToLoad.length === 0 || context.roomMemberIds.length === 0) return;
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('room_read_cursors')
           .select('user_id, last_read_at')
           .in('room_id', context.roomIdsToLoad)
@@ -442,8 +431,7 @@ export function useChatRoomDataSync({
           company: dbStaff?.company || '',
           department: dbStaff?.department || '',
           position: dbStaff?.position || '',
-          photo_url: dbStaff?.photo_url || null,
-        };
+          photo_url: dbStaff?.photo_url || null };
 
         if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
           reactionUsersMap[messageId][emoji].push({
@@ -455,8 +443,7 @@ export function useChatRoomDataSync({
             company: String(resolvedReactionUser.company || dbStaff?.company || ''),
             department: String(resolvedReactionUser.department || dbStaff?.department || ''),
             position: String(resolvedReactionUser.position || dbStaff?.position || ''),
-            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
-          });
+            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null });
         }
       });
 
@@ -503,7 +490,7 @@ export function useChatRoomDataSync({
     if (!roomIdForFetch) return;
 
     try {
-      const pinnedResult = await supabase
+      const pinnedResult = await db
         .from('pinned_messages')
         .select('message_id')
         .eq('room_id', roomIdForFetch);
@@ -526,8 +513,7 @@ export function useChatRoomDataSync({
         if (!nextPinnedIds.includes(messageId)) return;
         pinnedLookup.set(messageId, {
           ...message,
-          staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
-        });
+          staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) });
       });
 
       const missingPinnedIds = nextPinnedIds.filter((messageId: string) => !pinnedLookup.has(messageId));
@@ -535,7 +521,7 @@ export function useChatRoomDataSync({
         const { data: missingPinnedRows, error: missingPinnedRowsError } =
           await selectChatMessagesWithFallback<ChatMessage[]>(
             (selectClause) =>
-              supabase
+              db
                 .from('messages')
                 .select(selectClause)
                 .in('id', missingPinnedIds) as PromiseLike<{
@@ -548,8 +534,7 @@ export function useChatRoomDataSync({
         (missingPinnedRows || []).forEach((message: ChatMessage) => {
           pinnedLookup.set(String(message.id), {
             ...message,
-            staff: resolveStaffProfile(message.sender_id, message.sender_name),
-          });
+            staff: resolveStaffProfile(message.sender_id, message.sender_name) });
         });
       }
 
@@ -576,7 +561,7 @@ export function useChatRoomDataSync({
     if (!roomIdForFetch) return;
 
     try {
-      const pollsResult = (await supabase
+      const pollsResult = (await db
         .from('polls')
         .select(POLL_SELECT)
         .eq('room_id', roomIdForFetch)) as { data: any[] | null; error: unknown };
@@ -591,7 +576,7 @@ export function useChatRoomDataSync({
         return;
       }
 
-      const { data: votes, error: pollVotesError } = await supabase
+      const { data: votes, error: pollVotesError } = await db
         .from('poll_votes')
         .select('poll_id, option_index')
         .in('poll_id', pollIds);
@@ -635,8 +620,7 @@ export function useChatRoomDataSync({
     (sourceMessages: ChatMessage[]) =>
       (sourceMessages || []).map((message: ChatMessage) => ({
         ...message,
-        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
-      })),
+        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) })),
     [resolveStaffProfile],
   );
 
@@ -644,8 +628,7 @@ export function useChatRoomDataSync({
     async ({
       roomIdsToLoad,
       pageSize,
-      beforeMessage,
-    }: {
+      beforeMessage }: {
       roomIdsToLoad: string[];
       pageSize: number;
       beforeMessage?: LoadedMessageCursor | null;
@@ -656,7 +639,7 @@ export function useChatRoomDataSync({
 
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         (selectClause) => {
-          let query = supabase
+          let query = db
             .from('messages')
             .select(selectClause)
             .in('room_id', roomIdsToLoad);
@@ -700,8 +683,7 @@ export function useChatRoomDataSync({
       selectedRoomRecord,
       visibleMessages,
       isCurrentRequest,
-      includeRoomLevelMeta,
-    }: {
+      includeRoomLevelMeta }: {
       roomIdForFetch: string;
       roomIdsToLoad: string[];
       selectedRoomRecord: ChatRoom;
@@ -756,21 +738,21 @@ export function useChatRoomDataSync({
       try {
         const [roomReadCursorsResult, bookmarksResult, reactionsResult] = await Promise.allSettled([
           messageIds.length > 0 && roomMemberIds.length > 0
-            ? supabase
+            ? db
                 .from('room_read_cursors')
                 .select('user_id, last_read_at')
                 .in('room_id', roomIdsToLoad)
                 .in('user_id', roomMemberIds)
             : Promise.resolve({ data: [], error: null }),
           effectiveTodoUserId && messageIds.length > 0
-            ? supabase
+            ? db
                 .from('message_bookmarks')
                 .select('message_id')
                 .eq('user_id', effectiveTodoUserId)
                 .in('message_id', messageIds)
             : Promise.resolve({ data: [], error: null }),
           messageIds.length > 0
-            ? supabase
+            ? db
                 .from('message_reactions')
                 .select('message_id, emoji, user_id')
                 .in('message_id', messageIds)
@@ -874,8 +856,7 @@ export function useChatRoomDataSync({
               company: dbStaff?.company || '',
               department: dbStaff?.department || '',
               position: dbStaff?.position || '',
-              photo_url: dbStaff?.photo_url || null,
-            };
+              photo_url: dbStaff?.photo_url || null };
 
             if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
               reactionUsersMap[messageId][emoji].push({
@@ -887,8 +868,7 @@ export function useChatRoomDataSync({
                 company: String(resolvedReactionUser.company || dbStaff?.company || ''),
                 department: String(resolvedReactionUser.department || dbStaff?.department || ''),
                 position: String(resolvedReactionUser.position || dbStaff?.position || ''),
-                photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
-              });
+                photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null });
             }
           });
 
@@ -908,7 +888,7 @@ export function useChatRoomDataSync({
 
         if (includeRoomLevelMeta) {
           try {
-            const pinnedResult = await supabase
+            const pinnedResult = await db
               .from('pinned_messages')
               .select('message_id')
               .eq('room_id', roomIdForFetch);
@@ -928,15 +908,14 @@ export function useChatRoomDataSync({
                 if (!nextPinnedIds.includes(messageId)) return;
                 pinnedLookup.set(messageId, {
                   ...message,
-                  staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
-                });
+                  staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) });
               });
 
               const missingPinnedIds = nextPinnedIds.filter((messageId: string) => !pinnedLookup.has(messageId));
               if (missingPinnedIds.length > 0) {
                 const { data: missingPinnedRows, error: missingPinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
                   (selectClause) =>
-                    supabase
+                    db
                       .from('messages')
                       .select(selectClause)
                       .in('id', missingPinnedIds) as PromiseLike<{
@@ -950,8 +929,7 @@ export function useChatRoomDataSync({
                 (missingPinnedRows || []).forEach((message: ChatMessage) => {
                   pinnedLookup.set(String(message.id), {
                     ...message,
-                    staff: resolveStaffProfile(message.sender_id, message.sender_name),
-                  });
+                    staff: resolveStaffProfile(message.sender_id, message.sender_name) });
                 });
               }
 
@@ -971,7 +949,7 @@ export function useChatRoomDataSync({
           if (!isCurrentRequest()) return;
 
           try {
-            const pollsResult = (await supabase
+            const pollsResult = (await db
               .from('polls')
               .select(POLL_SELECT)
               .eq('room_id', roomIdForFetch)) as { data: any[] | null; error: unknown };
@@ -985,7 +963,7 @@ export function useChatRoomDataSync({
             if (pollIds.length === 0) {
               setPollVotes({});
             } else {
-              const { data: votes, error: pollVotesError } = await supabase
+              const { data: votes, error: pollVotesError } = await db
                 .from('poll_votes')
                 .select('poll_id, option_index')
                 .in('poll_id', pollIds);
@@ -1078,7 +1056,7 @@ export function useChatRoomDataSync({
       try {
         const { data: targetRows, error: targetError } = await selectChatMessagesWithFallback<ChatMessage[]>(
           (selectClause) =>
-            supabase
+            db
               .from('messages')
               .select(selectClause)
               .in('room_id', roomIdsToLoad)
@@ -1096,7 +1074,7 @@ export function useChatRoomDataSync({
         if (!targetMessage?.id || !targetMessage.created_at) {
           const { data: fallbackRows, error: fallbackError } = await selectChatMessagesWithFallback<ChatMessage[]>(
             (selectClause) =>
-              supabase
+              db
                 .from('messages')
                 .select(selectClause)
                 .eq('id', targetMessageId)
@@ -1143,16 +1121,14 @@ export function useChatRoomDataSync({
           pageSize: DATE_JUMP_CONTEXT_BEFORE,
           beforeMessage: {
             id: String(targetMessage.id),
-            createdAt: String(targetMessage.created_at),
-          },
-        });
+            createdAt: String(targetMessage.created_at) } });
         if (beforeResult.error) throw beforeResult.error;
         if (!isCurrentRequest()) return { ok: false, reason: 'failed' };
 
         const targetCreatedAt = normalizeMessageCursorTime(targetMessage.created_at);
         const { data: afterRows, error: afterError } = await selectChatMessagesWithFallback<ChatMessage[]>(
           (selectClause) =>
-            supabase
+            db
               .from('messages')
               .select(selectClause)
               .in('room_id', roomIdsToLoad)
@@ -1184,8 +1160,7 @@ export function useChatRoomDataSync({
           visibleMessages.length > 0
             ? {
                 id: String(visibleMessages[0].id || ''),
-                createdAt: String(visibleMessages[0].created_at || ''),
-              }
+                createdAt: String(visibleMessages[0].created_at || '') }
             : null;
         setHasOlderMessages(beforeResult.hasOlder);
 
@@ -1202,8 +1177,7 @@ export function useChatRoomDataSync({
           selectedRoomRecord,
           visibleMessages,
           isCurrentRequest,
-          includeRoomLevelMeta: false,
-        });
+          includeRoomLevelMeta: false });
 
         if (!isCurrentRequest()) return { ok: false, reason: 'failed' };
         return { ok: true, messageId: String(targetMessage.id) };
@@ -1321,7 +1295,7 @@ export function useChatRoomDataSync({
 
     const { data: msgs, error: messagesError } = await selectChatMessagesWithFallback<ChatMessage[]>(
       (selectClause) =>
-        supabase
+        db
           .from('messages')
           .select(selectClause)
           .in('room_id', roomIdsToLoad)
@@ -1344,8 +1318,7 @@ export function useChatRoomDataSync({
       loadedMessages.reverse();
       const enrichedMessages = loadedMessages.map((message: ChatMessage) => ({
         ...message,
-        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
-      }));
+        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) }));
       setMessages((prev) => {
         const localOnly = prev.filter((message: ChatMessage) => {
           const messageId = String(message.id || '');
@@ -1375,7 +1348,7 @@ export function useChatRoomDataSync({
       pollsResult,
     ] = await Promise.allSettled([
       messageIds.length > 0 && roomMemberIds.length > 0
-        ? supabase
+        ? db
             .from('room_read_cursors')
             .select('user_id, last_read_at')
             .in('room_id', roomIdsToLoad)
@@ -1384,14 +1357,14 @@ export function useChatRoomDataSync({
       effectiveTodoUserId && messageIds.length > 0
         ? selectMessageBookmarkRows(effectiveTodoUserId, messageIds).then((data) => ({ data, error: null }))
         : Promise.resolve({ data: [], error: null }),
-      supabase
+      db
         .from('pinned_messages')
         .select('message_id')
         .eq('room_id', roomIdForFetch),
       messageIds.length > 0
         ? selectMessageReactionRows(messageIds).then((data) => ({ data, error: null }))
         : Promise.resolve({ data: [], error: null }),
-      supabase
+      db
         .from('polls')
         .select(POLL_SELECT)
         .eq('room_id', roomIdForFetch) as PromiseLike<{ data: any[] | null; error: unknown }>,
@@ -1485,15 +1458,14 @@ export function useChatRoomDataSync({
           if (!nextPinnedIds.includes(messageId)) return;
           pinnedLookup.set(messageId, {
             ...message,
-            staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name),
-          });
+            staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) });
         });
 
         const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
         if (missingPinnedIds.length > 0) {
           const { data: pinnedRows, error: pinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
             (selectClause) =>
-              supabase
+              db
                 .from('messages')
                 .select(selectClause)
                 .in('id', missingPinnedIds) as PromiseLike<{
@@ -1506,8 +1478,7 @@ export function useChatRoomDataSync({
           (pinnedRows || []).forEach((message: ChatMessage) => {
             pinnedLookup.set(String(message.id), {
               ...message,
-              staff: resolveStaffProfile(message.sender_id, message.sender_name),
-            });
+              staff: resolveStaffProfile(message.sender_id, message.sender_name) });
           });
         }
 
@@ -1552,8 +1523,7 @@ export function useChatRoomDataSync({
           company: dbStaff?.company || '',
           department: dbStaff?.department || '',
           position: dbStaff?.position || '',
-          photo_url: dbStaff?.photo_url || null,
-        };
+          photo_url: dbStaff?.photo_url || null };
 
         if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
           reactionUsersMap[messageId][emoji].push({
@@ -1565,8 +1535,7 @@ export function useChatRoomDataSync({
             company: String(resolvedReactionUser.company || dbStaff?.company || ''),
             department: String(resolvedReactionUser.department || dbStaff?.department || ''),
             position: String(resolvedReactionUser.position || dbStaff?.position || ''),
-            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null,
-          });
+            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null });
         }
       });
 
@@ -1593,7 +1562,7 @@ export function useChatRoomDataSync({
       if (pollIds.length === 0) {
         setPollVotes({});
       } else {
-        const { data: votes, error: pollVotesError } = await supabase
+        const { data: votes, error: pollVotesError } = await db
           .from('poll_votes')
           .select('poll_id, option_index')
           .in('poll_id', pollIds);
@@ -1681,6 +1650,5 @@ export function useChatRoomDataSync({
     refreshVisibleMessageBookmarks,
     refreshRoomPinnedMessages,
     refreshRoomPolls,
-    loadMessagesAroundMessage,
-  };
+    loadMessagesAroundMessage };
 }

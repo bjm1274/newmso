@@ -16,8 +16,7 @@ const LegacyLockPanel = dynamic<Record<string, unknown>>(
       <div className="py-6 text-center text-sm text-[var(--toss-gray-3)]">
         마감 잠금 패널 로드 중…
       </div>
-    ),
-  },
+    ) },
 );
 
 /**

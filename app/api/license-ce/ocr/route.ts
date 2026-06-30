@@ -17,8 +17,7 @@ const RequestSchema = z.object({
   image: z.string().min(1, '이미지 데이터가 비어있습니다.'),
   mimeType: z.string().regex(/^image\//, '이미지 MIME 타입만 허용됩니다.'),
   licenseType: z.string().optional(),
-  licenseName: z.string().optional(),
-});
+  licenseName: z.string().optional() });
 
 const OcrResultSchema = z.object({
   education_date: z.string().nullable(),
@@ -26,8 +25,7 @@ const OcrResultSchema = z.object({
   institution: z.string().nullable(),
   certificate_number: z.string().nullable(),
   hours: z.number().nullable().optional(),
-  raw_text: z.string().nullable().optional(),
-});
+  raw_text: z.string().nullable().optional() });
 
 type OcrResult = z.infer<typeof OcrResultSchema>;
 

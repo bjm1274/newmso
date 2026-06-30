@@ -7,8 +7,7 @@ import {
   type StaffMember,
   getShiftBandColorClass,
   getShiftCellLabel,
-  resolveRosterShiftBand,
-} from './근태관리메인-내부유틸';
+  resolveRosterShiftBand } from './근태관리메인-내부유틸';
 
 type OpenPrompt = (options: {
   title: string;
@@ -93,8 +92,7 @@ export default function AttendanceScheduleView({
   setShowSwapModal,
   swapData,
   setSwapData,
-  openPrompt,
-}: AttendanceScheduleViewProps) {
+  openPrompt }: AttendanceScheduleViewProps) {
   return (
     <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
       <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/50 dark:bg-zinc-900/50 flex flex-col gap-3 shrink-0">
@@ -150,8 +148,7 @@ export default function AttendanceScheduleView({
                         inputType: 'textarea',
                         required: true,
                         confirmText: '반려',
-                        tone: 'danger',
-                      });
+                        tone: 'danger' });
                       if (reason?.trim()) handleReject(req, reason.trim());
                     })();
                   }} className="px-3 py-1.5 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:bg-rose-600 transition-colors">❌ 반려</button>
@@ -184,8 +181,7 @@ export default function AttendanceScheduleView({
                         inputType: 'textarea',
                         required: true,
                         confirmText: '반려',
-                        tone: 'danger',
-                      });
+                        tone: 'danger' });
                       if (reason?.trim()) handleRejectSwap(req, reason.trim());
                     })();
                   }} className="px-3 py-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-lg hover:bg-rose-600">반려</button>

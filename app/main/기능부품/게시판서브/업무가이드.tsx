@@ -8,11 +8,10 @@ import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-cont
 import {
   buildStorageDownloadUrl,
   shouldUseManagedBrowserDownload,
-  triggerManagedBrowserDownload,
-} from '@/lib/object-storage-url';
-import { supabase } from '@/lib/d1-supabase-compat';
+  triggerManagedBrowserDownload } from '@/lib/object-storage-url';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { toast } from '@/lib/toast';
 import { logger } from '@/lib/logger';
 import type { AttachmentItem } from '@/types';
@@ -31,8 +30,7 @@ import type {
   GuideTaskPriority,
   OrgStaffRow,
   OrgTeamRow,
-  TeamScope,
-} from './guide-types';
+  TeamScope } from './guide-types';
 import {
   GUIDE_BOARD_TYPE,
   GUIDE_DISPLAY_NAME,
@@ -58,8 +56,7 @@ import {
   normalizeText,
   parseKeywords,
   runGuideMutation,
-  sortGuideTasks,
-} from './guide-utils';
+  sortGuideTasks } from './guide-utils';
 import { 
   Plus, 
   Search, 
@@ -127,8 +124,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         company: s.company ?? null,
         company_id: s.company_id ?? null,
         department: s.department ?? null,
-        status: s.status ?? null,
-      })),
+        status: s.status ?? null })),
     [appData.staffs],
   );
   
@@ -219,7 +215,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       const [resourceResult, taskResult, orgTeamResult] = await Promise.all([
         withMissingColumnsFallback<GuideRow[]>(
           async (omittedColumns): Promise<QueryResult<GuideRow[]>> => {
-            const result = await supabase
+            const result = await db
               .from('board_posts')
               .select(buildSelectColumns(GUIDE_POST_REQUIRED_SELECT_COLUMNS, GUIDE_POST_OPTIONAL_COLUMNS, omittedColumns))
               .eq('board_type', GUIDE_BOARD_TYPE)
@@ -230,7 +226,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         ),
         withMissingColumnsFallback<GuideRow[]>(
           async (omittedColumns): Promise<QueryResult<GuideRow[]>> => {
-            const result = await supabase
+            const result = await db
               .from('board_posts')
               .select(buildSelectColumns(GUIDE_POST_REQUIRED_SELECT_COLUMNS, GUIDE_POST_OPTIONAL_COLUMNS, omittedColumns))
               .eq('board_type', GUIDE_TASK_BOARD_TYPE)
@@ -239,7 +235,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           },
           [...GUIDE_POST_OPTIONAL_COLUMNS],
         ),
-        supabase.from('org_teams').select('id, company_name, division, team_name, sort_order').order('company_name').order('division').order('sort_order'),
+        db.from('org_teams').select('id, company_name, division, team_name, sort_order').order('company_name').order('division').order('sort_order'),
       ]);
 
       setResources(((resourceResult.data || []) as GuideRow[]).map((item) => normalizeGuideResource(item)));
@@ -278,8 +274,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         company: currentCompanyName || '기본 기관',
         company_id: currentCompanyId || null,
         department: normalizeText(user?.department) || '미지정',
-        status: normalizeText(user?.status) || '재직',
-      });
+        status: normalizeText(user?.status) || '재직' });
     }
     return seeds;
   }, [currentCompanyId, currentCompanyName, currentUserId, staffDirectory, user?.department, user?.status]);
@@ -435,8 +430,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     return {
       name: normalizeText(uploaded.name),
       url: normalizeText(uploaded.url),
-      type: inferAttachmentType(normalizeText(uploaded.name), normalizeText(uploaded.type)),
-    } satisfies AttachmentItem;
+      type: inferAttachmentType(normalizeText(uploaded.name), normalizeText(uploaded.type)) } satisfies AttachmentItem;
   }, []);
 
   const startCreate = useCallback((nextTeam?: TeamScope | null) => {
@@ -529,8 +523,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         teamName: targetTeam.teamName,
         divisionName: divisionName.trim() || targetTeam.divisionName,
         companyName: targetTeam.companyName,
-        keywords: keywordsList,
-      };
+        keywords: keywordsList };
 
       const payload: Record<string, unknown> = {
         board_type: GUIDE_BOARD_TYPE,
@@ -541,8 +534,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         company: targetTeam.companyName,
         company_id: targetTeam.companyId || selectedCompanyId || user?.company_id || null,
         updated_at: new Date().toISOString(),
-        attachments,
-      };
+        attachments };
 
       if (editingResourceId) {
         const original = resources.find((resource) => resource.id === editingResourceId) || null;
@@ -552,7 +544,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         }
 
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
-          (nextPayload) => supabase.from('board_posts').update(nextPayload).eq('id', editingResourceId).select().single(),
+          (nextPayload) => db.from('board_posts').update(nextPayload).eq('id', editingResourceId).select().single(),
           payload,
         );
         if (error) throw error;
@@ -561,8 +553,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           ...(original || {}),
           ...(persistedPayload as GuideRow),
           ...(data || {}),
-          id: editingResourceId,
-        } as GuideRow);
+          id: editingResourceId } as GuideRow);
         setResources((prev) => prev.map((resource) => (resource.id === editingResourceId ? normalized : resource)));
         setSelectedResourceId(editingResourceId);
         
@@ -571,15 +562,14 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       } else {
         payload.created_at = new Date().toISOString();
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
-          (nextPayload) => supabase.from('board_posts').insert([nextPayload]).select().single(),
+          (nextPayload) => db.from('board_posts').insert([nextPayload]).select().single(),
           payload,
         );
         if (error) throw error;
 
         const normalized = normalizeGuideResource({
           ...(persistedPayload as GuideRow),
-          ...(data || {}),
-        } as GuideRow);
+          ...(data || {}) } as GuideRow);
         normalized.isNew = true;
         setResources((prev) => [normalized, ...prev]);
         setSelectedResourceId(normalized.id);
@@ -630,12 +620,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       title: '업무자료 삭제',
       description: `"${resource.title}" 자료를 삭제합니다.\n첨부와 연결된 안내 흐름에서 더 이상 보이지 않습니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return false;
 
     try {
-      const { error } = await supabase.from('board_posts').delete().eq('id', resource.id);
+      const { error } = await db.from('board_posts').delete().eq('id', resource.id);
       if (error) throw error;
       setResources((prev) => prev.filter((item) => item.id !== resource.id));
       if (selectedResourceId === resource.id) {
@@ -690,15 +679,13 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         isDone: false,
         completedAt: undefined,
         completedById: undefined,
-        completedByName: undefined,
-      }),
+        completedByName: undefined }),
       author_id: currentUserId || null,
       author_name: user?.name || '익명',
       company: activeTeam.companyName,
       company_id: activeTeam.companyId || selectedCompanyId || user?.company_id || null,
       updated_at: new Date().toISOString(),
-      attachments: [],
-    };
+      attachments: [] };
 
     try {
       setSavingTask(true);
@@ -719,11 +706,10 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           isDone: Boolean(original?.isDone),
           completedAt: original?.completedAt || undefined,
           completedById: original?.completedById || undefined,
-          completedByName: original?.completedByName || undefined,
-        });
+          completedByName: original?.completedByName || undefined });
 
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
-          (nextPayload) => supabase.from('board_posts').update(nextPayload).eq('id', editingTaskId).select().single(),
+          (nextPayload) => db.from('board_posts').update(nextPayload).eq('id', editingTaskId).select().single(),
           payload,
         );
         if (error) throw error;
@@ -732,22 +718,20 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
           ...(original || {}),
           ...(persistedPayload as GuideRow),
           ...(data || {}),
-          id: editingTaskId,
-        } as GuideRow);
+          id: editingTaskId } as GuideRow);
         setTeamTasks((prev) => sortGuideTasks(prev.map((task) => (task.id === editingTaskId ? normalized : task))));
         toast('팀 할일을 수정했습니다.', 'success');
       } else {
         payload.created_at = new Date().toISOString();
         const { data, error, payload: persistedPayload } = await runGuideMutation<GuideRow>(
-          (nextPayload) => supabase.from('board_posts').insert([nextPayload]).select().single(),
+          (nextPayload) => db.from('board_posts').insert([nextPayload]).select().single(),
           payload,
         );
         if (error) throw error;
 
         const normalized = normalizeGuideTask({
           ...(persistedPayload as GuideRow),
-          ...(data || {}),
-        } as GuideRow);
+          ...(data || {}) } as GuideRow);
         setTeamTasks((prev) => sortGuideTasks([normalized, ...prev]));
         toast('팀 할일을 등록했습니다.', 'success');
       }
@@ -798,17 +782,14 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
         isDone: !task.isDone,
         completedAt: task.isDone ? undefined : new Date().toISOString(),
         completedById: task.isDone ? undefined : currentUserId || undefined,
-        completedByName: task.isDone ? undefined : user?.name || undefined,
-      }),
-    };
+        completedByName: task.isDone ? undefined : user?.name || undefined }) };
 
     setTeamTasks((prev) => sortGuideTasks(prev.map((item) => (item.id === task.id ? nextTask : item))));
 
     try {
-      const { error } = await supabase.from('board_posts').update({
+      const { error } = await db.from('board_posts').update({
         content: nextTask.content,
-        updated_at: nextTask.updated_at,
-      }).eq('id', task.id);
+        updated_at: nextTask.updated_at }).eq('id', task.id);
       if (error) throw error;
     } catch (error) {
       logger.error('guide task toggle failed', error);
@@ -825,12 +806,11 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
       title: '팀 할일 삭제',
       description: `"${task.title}" 팀 할일을 삭제합니다.\n담당자와 마감일 기준 목록에서도 함께 사라집니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase.from('board_posts').delete().eq('id', task.id);
+      const { error } = await db.from('board_posts').delete().eq('id', task.id);
       if (error) throw error;
       setTeamTasks((prev) => prev.filter((item) => item.id !== task.id));
       if (editingTaskId === task.id) {

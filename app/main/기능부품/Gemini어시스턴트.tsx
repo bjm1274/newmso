@@ -25,29 +25,25 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     title: '📅 근무 교대표 팁',
     description: '효율적인 나이트/이브닝 순환 듀티 배정 요령',
     query: '교대 근무표를 짤 때 직원 건강과 의료 사고를 막기 위한 배치 팁을 가르쳐줘.',
-    colorClass: 'from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  },
+    colorClass: 'from-blue-500/10 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
   {
     icon: 'Award',
     title: '📋 연차 유급휴가 기준',
     description: '근로기준법에 따른 연차 휴가 발생과 소멸 규정',
     query: '근로기준법 60조에 따른 연차 발생 기준과 연차 소멸/촉진 제도에 대해 쉽게 설명해줘.',
-    colorClass: 'from-amber-500/10 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  },
+    colorClass: 'from-amber-500/10 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
   {
     icon: 'Package',
     title: '📦 소모품 적정 재고선',
     description: '안전재고(Min Stock) 산출식 및 선입선출법',
     query: '병원 내 소모품의 안전재고(Min Stock) 설정식과 재고 관리 최적화 방안을 가르쳐줘.',
-    colorClass: 'from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  },
+    colorClass: 'from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
   {
     icon: 'Sparkles',
     title: '🌟 Gemini 기능 소개',
     description: '이 AI 어시스턴트로 할 수 있는 행정 업무 질문 목록',
     query: '안녕하세요! 당신이 누구인지 소개하고, 병원 행정 비서로서 무엇을 도와줄 수 있는지 가이드라인을 알려주세요.',
-    colorClass: 'from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
-  },
+    colorClass: 'from-purple-500/10 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
 ];
 
 export default function GeminiAssistant({ user }: { user?: any }) {
@@ -66,8 +62,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
 
 인사·근태 규정, 근무표 작성 요령, 소모품 적정 재고 분석 등 궁금한 점이 있으시다면 언제든 무엇이든 편하게 물어보세요!
 아래의 퀵 템플릿 카드를 클릭하시거나 채팅창에 자유롭게 질문을 입력해 주시면 됩니다.`,
-        timestamp: new Date(),
-      },
+        timestamp: new Date() },
     ]);
   }, [user?.name]);
 
@@ -88,8 +83,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
       id: `user-${Date.now()}`,
       role: 'user',
       content: trimmed,
-      timestamp: new Date(),
-    };
+      timestamp: new Date() };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputValue('');
@@ -98,8 +92,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
     try {
       const chatHistory = [...messages, userMsg].map((msg) => ({
         role: msg.role,
-        content: msg.content,
-      }));
+        content: msg.content }));
 
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -108,9 +101,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
           messages: chatHistory,
           systemInstruction: `당신은 병원 행정 및 간호 업무를 돕는 친절한 MSO(병원경영지원) 전문 AI 비서 "Gemini"입니다. 
 사용자 이름은 ${user?.name || '직원'}이고 직책은 ${user?.position || '사원'}, 소속 부서는 ${user?.department || '부서 미정'}입니다.
-답변은 읽기 쉽게 Markdown 형식으로 서식을 제공하고, 병원 업무 관점에서 항상 상냥하고 상세하게 답해 주세요.`,
-        }),
-      });
+답변은 읽기 쉽게 Markdown 형식으로 서식을 제공하고, 병원 업무 관점에서 항상 상냥하고 상세하게 답해 주세요.` }) });
 
       const data = (await res.json().catch(() => null)) as { ok: boolean; text?: string; error?: string } | null;
 
@@ -124,8 +115,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
           id: `model-${Date.now()}`,
           role: 'model',
           content: data.text || '죄송합니다. 답변을 받지 못했습니다.',
-          timestamp: new Date(),
-        },
+          timestamp: new Date() },
       ]);
     } catch (err) {
       console.error('[GeminiAssistant] 전송 실패:', err);
@@ -139,8 +129,7 @@ export default function GeminiAssistant({ user }: { user?: any }) {
           
 서버와의 연결이 일시적으로 원활하지 않거나 API 호출 제한에 도달했을 수 있습니다. 잠시 후 다시 시도해 주세요.
 *오류 내용: ${err instanceof Error ? err.message : '알 수 없는 연결 실패'}*`,
-          timestamp: new Date(),
-        },
+          timestamp: new Date() },
       ]);
     } finally {
       setLoading(false);

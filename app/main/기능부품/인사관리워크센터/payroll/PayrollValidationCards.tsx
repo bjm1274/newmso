@@ -9,8 +9,7 @@ import {
   buildLedgerRows,
   buildMinWageRows,
   buildUnpaidRows,
-  buildWagePeakRows,
-} from './payroll-domain';
+  buildWagePeakRows } from './payroll-domain';
 import LaborCostTrend from '@/app/main/기능부품/인사관리서브/급여명세/인건비추이분석';
 import TotalLaborCostForecast from '@/app/main/기능부품/인사관리서브/급여명세/총인건비예측';
 import UnpaidAllowanceAlert from '@/app/main/기능부품/인사관리서브/급여명세/미지급수당알림';
@@ -18,8 +17,7 @@ import {
   ORDINARY_WAGE_INCLUDED_KEYS,
   ORDINARY_WAGE_EXCLUDED_KEYS,
   calculateTenureYears,
-  calculateAge,
-} from './payroll-policy';
+  calculateAge } from './payroll-policy';
 import { fetchRecentRetirees, type RetirementComputed } from './payroll-fetch';
 import { calculateKpis } from './payroll-kpi';
 import type { StaffMember } from '@/types';
@@ -31,8 +29,7 @@ import {
   fetchTaxInsuranceRates,
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
-  type TaxInsuranceRates,
-} from '@/lib/use-tax-insurance-rates';
+  type TaxInsuranceRates } from '@/lib/use-tax-insurance-rates';
 import { TAX_FREE_LEGAL_LIMITS } from '@/lib/tax-free-limits';
 
 function parseNumber(v: string): number {
@@ -170,8 +167,7 @@ const LegacyInsuranceEDI = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">4대보험 EDI 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -325,8 +321,7 @@ const LegacySalaryDetail = dynamic(
       <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">
         명세서 로드 중…
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -360,8 +355,7 @@ export function ModLedger({ user }: { user?: any }) {
           base: acc.base + r.base,
           allowance: acc.allowance + r.allowance,
           deduction: acc.deduction + r.deduction,
-          net: acc.net + r.net,
-        }),
+          net: acc.net + r.net }),
         { base: 0, allowance: 0, deduction: 0, net: 0 },
       ),
     [filteredRows],
@@ -908,8 +902,7 @@ const LegacyPensionManager = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">퇴직연금 관리 화면 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -945,8 +938,7 @@ export function ModPension() {
     return {
       totalReserve,
       avgTenure: validCount > 0 ? avgTenure / validCount : 0,
-      validCount,
-    };
+      validCount };
   }, [data.staffs]);
 
   return (
@@ -1221,40 +1213,35 @@ export function ModSettlement() {
       body: `${y}년 ${m}월 근로시간 확정 · 지각·조퇴 반영. 총 ${kpis.headcount}명 대상.`,
       state: hasRecord ? 'done' : 'on',
       actionLabel: '근태 워크센터 열기',
-      date: `${m}/3`,
-    },
+      date: `${m}/3` },
     {
       id: 2,
       label: '수당·공제 산정',
       body: `초과·야간·휴일 수당 + 4대보험·소득세 자동 산정. 수당 합계 ${kpis.allowanceSum.toLocaleString()}원.`,
       state: hasRecord ? 'done' : 'pending',
       actionLabel: '시뮬레이션',
-      date: `${m}/7`,
-    },
+      date: `${m}/7` },
     {
       id: 3,
       label: '결재 상신',
       body: `정산 ${data.records.length}건을 결재 상신합니다. 검토자/전결자 지정 필요.`,
       state: allConfirmed ? 'done' : hasRecord ? 'on' : 'pending',
       actionLabel: '결재 상신',
-      date: `${m}/10`,
-    },
+      date: `${m}/10` },
     {
       id: 4,
       label: '지급 처리',
       body: `은행 이체 파일(.xlsx) 생성 · 총 ${kpis.netPaySum.toLocaleString()}원 지급.`,
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '이체 파일 다운로드',
-      date: `예정 ${m}/${payrollDay}`,
-    },
+      date: `예정 ${m}/${payrollDay}` },
     {
       id: 5,
       label: '원천징수 신고',
       body: '국세청 제출 파일 생성 · 지방세 포함 · 간이세액 적용.',
       state: allConfirmed ? 'on' : 'pending',
       actionLabel: '신고 파일 생성',
-      date: `예정 ${m}/20`,
-    },
+      date: `예정 ${m}/20` },
   ];
 
   const doneCount = steps.filter((s) => s.state === 'done').length;
@@ -1519,8 +1506,7 @@ function computeSimulation(
     dependentCount,
     {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    }
+      qualifyingChildCount: 0 }
   );
   const localTax = Math.floor((incomeTax * 0.1) / 10) * 10;
 
@@ -1535,8 +1521,7 @@ function computeSimulation(
     incomeTax,
     localTax,
     netPay,
-    hourly,
-  };
+    hourly };
 }
 
 export function ModSimulator() {
@@ -1592,8 +1577,7 @@ export function ModSimulator() {
     nightHours: parseNumber(nightHours),
     holidayHours: parseNumber(holidayHours),
     taxableExtra: parseNumber(taxableExtra),
-    taxFreeExtra: parseNumber(taxFreeExtra),
-  };
+    taxFreeExtra: parseNumber(taxFreeExtra) };
 
   const result = useMemo(
     () => computeSimulation(inputs, age, taxInsuranceRates, dependentCount),
@@ -1788,8 +1772,7 @@ const TAX_FREE_COLUMN_MAP: Record<string, keyof typeof TAX_FREE_LEGAL_LIMITS> = 
   meal_allowance: 'meal',
   vehicle_allowance: 'vehicle',
   childcare_allowance: 'childcare',
-  research_allowance: 'research',
-};
+  research_allowance: 'research' };
 
 export function ModTaxFree() {
   const data = usePayrollData();
@@ -1813,8 +1796,7 @@ export function ModTaxFree() {
         basis: limit.basis,
         avgApplied: avg,
         staffCount: applied.length,
-        exceededCount: exceeded,
-      });
+        exceededCount: exceeded });
     }
     // 추가 표시용 (법정 한도만 노출)
     (['uniform', 'congratulations', 'housing'] as const).forEach((k) => {
@@ -1826,8 +1808,7 @@ export function ModTaxFree() {
         basis: l.basis,
         avgApplied: 0,
         staffCount: 0,
-        exceededCount: 0,
-      });
+        exceededCount: 0 });
     });
     return out;
   }, [data.records]);
@@ -2072,8 +2053,7 @@ const LegacyWagePeak = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">임금피크제 화면 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -2142,8 +2122,7 @@ const LegacyTaxFileGenerator = dynamic(
       <div className="flex min-h-[120px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
         <span className="text-[12px] text-[var(--toss-gray-3)]">원천징수 파일 생성기 불러오는 중…</span>
       </div>
-    ),
-  },
+    ) },
 );
 
 /**
@@ -2168,8 +2147,7 @@ export function ModWithholding() {
       localTax,
       total: incomeTax + localTax,
       taxable,
-      count: data.records.length,
-    };
+      count: data.records.length };
   }, [data.records]);
 
   const [companyName, setCompanyName] = useState<string>(data.selectedCo);
@@ -2185,8 +2163,7 @@ export function ModWithholding() {
       return [s?.name ?? r.staff_id, '-', r.total_taxable, r.income_tax, r.local_tax].join(',');
     });
     const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\n')], {
-      type: 'text/plain;charset=utf-8;',
-    });
+      type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

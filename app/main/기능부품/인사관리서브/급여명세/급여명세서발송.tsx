@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 
 type SendSummary = {
   notifications: number;
@@ -43,7 +43,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       }
 
       const staffIds = _staffs.map((staff: any) => staff.id);
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('payroll_records')
         .select('staff_id')
         .eq('year_month', yearMonth)
@@ -76,7 +76,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
     }
 
     const staffIds = _staffs.map((staff: any) => staff.id);
-    const { data: records, error } = await supabase
+    const { data: records, error } = await db
       .from('payroll_records')
       .select('staff_id, year_month, net_pay, status, record_type')
       .eq('year_month', yearMonth)
@@ -99,8 +99,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       title: '급여명세서 발송',
       description: `${targetRecords.length}명에게 ${yearMonth} 급여명세서를 발송합니다.`,
       confirmText: '발송',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -125,8 +124,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
           type: '급여명세',
           title: `[${yearMonth}] 급여명세서가 도착했습니다`,
           body: `${yearMonth} 급여명세서가 등록되었습니다. 내정보 > 급여·증명서에서 확인해 주세요.`,
-          read_at: null,
-        });
+          read_at: null });
 
         if (notificationError) {
           console.error('payroll notification send failed:', notificationError);
@@ -139,15 +137,14 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
         const staffEmail = staff.email || staff.staff_email;
         if (!staffEmail || emailQueueAvailable === false) continue;
 
-        const { error: emailError } = await supabase.from('email_queue').insert([
+        const { error: emailError } = await db.from('email_queue').insert([
           {
             recipient: staffEmail,
             subject: `[${yearMonth}] 급여명세서 안내`,
             body: `${staff.name || '직원'}님, ${yearMonth} 급여명세서가 등록되었습니다. ERP 내 급여·증명서 메뉴에서 확인해 주세요.`,
             type: 'payroll_payslip',
             status: 'pending',
-            created_at: new Date().toISOString(),
-          },
+            created_at: new Date().toISOString() },
         ]);
 
         if (!emailError) {
@@ -171,8 +168,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
         notifications: notificationCount,
         emails: emailCount,
         failures: failureCount,
-        emailFallback,
-      };
+        emailFallback };
       setSummary(nextSummary);
 
       const fallbackMessage = emailFallback

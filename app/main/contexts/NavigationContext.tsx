@@ -13,8 +13,7 @@ const NavigationContext = createContext<NavigationState | null>(null);
 
 export function NavigationProvider({
   value,
-  children,
-}: {
+  children }: {
   value: NavigationState;
   children: React.ReactNode;
 }) {

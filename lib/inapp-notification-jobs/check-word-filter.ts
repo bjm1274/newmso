@@ -17,8 +17,7 @@ import {
   emptyResult,
   errorMessage,
   loadExistingDedupeKeys,
-  insertNotificationsChunked,
-} from './types';
+  insertNotificationsChunked } from './types';
 import { DEFAULT_BANNED } from '../banned-words';
 import {
   getD1Binding,
@@ -28,8 +27,7 @@ import {
   eq,
   and,
   gte,
-  isNotNull,
-} from '@/lib/db';
+  isNotNull } from '@/lib/db';
 
 type MessageRow = {
   id: string;
@@ -92,8 +90,7 @@ export async function checkWordFilter(): Promise<CheckJobResult> {
       sender_name: messagesTable.sender_name,
       content: messagesTable.content,
       room_id: messagesTable.room_id,
-      created_at: messagesTable.created_at,
-    })
+      created_at: messagesTable.created_at })
     .from(messagesTable)
     .where(
       and(
@@ -147,10 +144,8 @@ export async function checkWordFilter(): Promise<CheckJobResult> {
           message_id: msg.id,
           room_id: msg.room_id,
           sender_id: msg.sender_id,
-          dedupe_key: dedupeKey,
-        },
-        read_at: null,
-      });
+          dedupe_key: dedupeKey },
+        read_at: null });
     }
   }
 

@@ -28,8 +28,7 @@ import {
   WorkcenterKpiRow,
   WorkcenterShell,
   WorkcenterTabBar,
-  type WorkcenterTab,
-} from './workcenter-common';
+  type WorkcenterTab } from './workcenter-common';
 import { computeMemberKpis } from './MemberWorkcenter/data';
 import StaffTable from './MemberWorkcenter/StaffTable';
 import StaffDrawer from './MemberWorkcenter/StaffDrawer';
@@ -79,10 +78,10 @@ export default function MemberWorkcenter({
   canRegisterNewStaff = false,
   onOpenNewStaff,
   onOpenDocumentRepoForStaff,
-  onRefresh,
-}: MemberWorkcenterProps) {
+  onRefresh }: MemberWorkcenterProps) {
   const [tab, setTab] = useState<MemberTabId>('list');
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -126,6 +125,51 @@ export default function MemberWorkcenter({
     setIsEditing(true);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if (!filteredStaffs.length) return;
+
+      const currentIndex = selectedStaff
+        ? filteredStaffs.findIndex((s) => String(s.id) === String(selectedStaff.id))
+        : -1;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = currentIndex < filteredStaffs.length - 1 ? currentIndex + 1 : 0;
+        setSelectedStaff(filteredStaffs[nextIndex] || null);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredStaffs.length - 1;
+        setSelectedStaff(filteredStaffs[prevIndex] || null);
+      } else if (e.key === 'Enter') {
+        if (selectedStaff) {
+          e.preventDefault();
+          handleEditStaff(selectedStaff);
+        }
+      } else if (e.key === 'Escape') {
+        if (isEditing) {
+          setIsEditing(false);
+          setEditingStaff(null);
+        } else if (isRegistering) {
+          setIsRegistering(false);
+        } else if (selectedStaff) {
+          setSelectedStaff(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredStaffs, selectedStaff, isEditing, isRegistering]);
+
   return (
     <WorkcenterShell
       headerExtra={
@@ -152,6 +196,8 @@ export default function MemberWorkcenter({
                 onOpenNewStaff={() => setIsRegistering(true)}
                 canRegisterNewStaff={canRegisterNewStaff}
                 statusFilter={statusFilter}
+                selectedIds={selectedIds}
+                onSelectIds={setSelectedIds}
               />
               <StaffDrawer
                 staff={selectedStaff}

@@ -7,8 +7,7 @@ import {
   useRef,
   useState,
   type Dispatch,
-  type SetStateAction,
-} from 'react';
+  type SetStateAction } from 'react';
 import type { StaffMember } from '@/types';
 import type { ApprovalCcUser, ApproverTemplate } from '../전자결재-types';
 import { resolveApprovalStaffLine } from '../전자결재-utils';
@@ -53,8 +52,7 @@ function StaffPicker({
   onPick,
   placeholder,
   testid,
-  align = 'left',
-}: StaffPickerProps) {
+  align = 'left' }: StaffPickerProps) {
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -169,8 +167,7 @@ export default function ApprovalFlowCard({
   showApproverTemplateMenu,
   setShowApproverTemplateMenu,
   setTemplateNameInput,
-  setShowTemplateModal,
-}: ApprovalFlowCardProps) {
+  setShowTemplateModal }: ApprovalFlowCardProps) {
   const [approverPickerOpen, setApproverPickerOpen] = useState(false);
   const [ccPickerOpen, setCcPickerOpen] = useState(false);
 
@@ -186,8 +183,7 @@ export default function ApprovalFlowCard({
       sender_name: user?.name || '기안자(나)',
       status: '대기',
       created_at: new Date().toISOString(),
-      meta_data: { approver_line: approverLine.map((approver) => String(approver.id)) },
-    }),
+      meta_data: { approver_line: approverLine.map((approver) => String(approver.id)) } }),
     [user, approverLine],
   );
 

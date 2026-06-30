@@ -12,10 +12,8 @@
 
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
-import { supabase } from '@/lib/supabase';
 import { Check } from 'lucide-react';
 import {
   KpiRow,
@@ -24,68 +22,12 @@ import {
   StockTabs,
   WorkcenterNotes,
   type KpiItem,
-  type TabItem,
-} from './stock-workcenter-common';
-
-// ─────────────────────────────────────────────────
-// 레거시 재고실사 (dynamic import)
-// ─────────────────────────────────────────────────
-
-const LegacyInventoryCount = dynamic(
-  () => import('../재고관리서브/재고실사'),
-  {
-    loading: () => (
-      <div className="flex min-h-[260px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
-      </div>
-    ),
-    ssr: false,
-  },
-);
-
-function InventoryCountOverlay({
-  user,
-  inventory,
-  fetchInventory,
-  onClose,
-}: {
-  user: any;
-  inventory: any[];
-  fetchInventory: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="재고 실사"
-    >
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-          <h2 className="text-base font-bold">재고 실사</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="모달 닫기"
-            className="p-1.5 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="px-4 py-4">
-          <LegacyInventoryCount user={user} inventory={inventory} fetchInventory={fetchInventory} />
-        </div>
-      </div>
-    </div>
-  );
-}
+  type TabItem } from './stock-workcenter-common';
 import type {
   AbcGrade,
   AnalyzeTab,
   ForecastRow,
-  InspectRow,
-} from './stock-types';
+  InspectRow } from './stock-types';
 import { useAnalyzeData, useClosingData, useEmptyMessage } from './stock-workcenter-data';
 
 // ─────────────────────────────────────────────────
@@ -95,31 +37,13 @@ import { useAnalyzeData, useClosingData, useEmptyMessage } from './stock-workcen
 const TABS: TabItem<AnalyzeTab>[] = [
   { id: 'abc', label: 'ABC 분석' },
   { id: 'pred', label: '수요 예측' },
-  { id: 'ins', label: '재고 실사' },
   { id: 'clo', label: '월마감' },
 ];
 
 export default function AnalyzeWorkcenter() {
   const [tab, setTab] = useState<AnalyzeTab>('abc');
-  const [showInspect, setShowInspect] = useState(false);
   const data = useAnalyzeData();
   const { user } = useAppData();
-
-  const [inventory, setInventory] = useState<any[]>([]);
-
-  const fetchInventory = useCallback(async () => {
-    const { data: inv } = await supabase
-      .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (inv) setInventory(inv);
-  }, []);
-
-  useEffect(() => {
-    if (showInspect) {
-      void fetchInventory();
-    }
-  }, [showInspect, fetchInventory]);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [
@@ -127,41 +51,29 @@ export default function AnalyzeWorkcenter() {
         label: 'A등급 (상위 70%)',
         value: data.abcA.toLocaleString(),
         unit: '종',
-        sub: data.loading ? '불러오는 중…' : '중점 관리 대상',
-      },
+        sub: data.loading ? '불러오는 중…' : '중점 관리 대상' },
       {
         label: 'B등급 (20%)',
         value: data.abcB.toLocaleString(),
         unit: '종',
-        sub: '정기 점검',
-      },
+        sub: '정기 점검' },
       {
         label: 'C등급 (10%)',
         value: data.abcC.toLocaleString(),
         unit: '종',
-        sub: '최소 관리',
-      },
+        sub: '최소 관리' },
       {
         label: '예측 부족 품목',
         value: data.forecastMissCount.toLocaleString(),
         unit: '건',
         sub: '30일 내 부족 예상',
-        tone: 'warn',
-      },
+        tone: 'warn' },
     ],
     [data.abcA, data.abcB, data.abcC, data.forecastMissCount, data.loading],
   );
 
   return (
     <div className="flex flex-col gap-4">
-      {showInspect && (
-        <InventoryCountOverlay
-          user={user}
-          inventory={inventory}
-          fetchInventory={fetchInventory}
-          onClose={() => setShowInspect(false)}
-        />
-      )}
       <StockTabs tabs={TABS} active={tab} onChange={setTab} ariaLabel="분석·마감 탭" />
       <KpiRow items={kpiItems} />
 
@@ -173,28 +85,25 @@ export default function AnalyzeWorkcenter() {
           {tab === 'pred' && (
             <ForecastPanel rows={data.forecast} loading={data.loading} error={data.error} />
           )}
-          {tab === 'ins' && (
-            <InspectPanel
-              rows={data.inspects}
-              pct={data.inspectProgressPct}
-              loading={data.loading}
-              error={data.error}
-              onStartInspect={() => setShowInspect(true)}
-            />
-          )}
           {tab === 'clo' && <ClosePanel />}
         </section>
 
         <WorkcenterNotes
           kicker="§ 분석·마감"
-          title="6장 통합 — ABC·수요예측·실사·월마감 한 메뉴"
+          title="재고 자산 관리 및 마감"
           points={[
-            'ABC 분석: 매출 기여도 기준 A/B/C 등급 progress bar + 칩 예시.',
+            'ABC 분석: 매출 기여도 기준 A/B/C 등급 관리.',
             '수요 예측: 다음 30일, 신뢰도 칩으로 발주 권장일 시각화.',
-            '재고 실사: 위치별 진행률 multi-color bar + 표.',
             '월마감 5단계 워크플로는 다크 배너 — 결정 #38 워크플로형 도구.',
           ]}
-        />
+        >
+          <div className="mt-3 pt-2.5 border-t border-[var(--border)] text-[10px] text-[var(--toss-gray-4)] flex items-center gap-1.5 flex-wrap">
+            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase tracking-wider">
+              Legacy Link
+            </span>
+            <span>레거시 AS/반품 및 소모품 통계 딥링크 연동 가능</span>
+          </div>
+        </WorkcenterNotes>
       </div>
     </div>
   );
@@ -207,14 +116,12 @@ export default function AnalyzeWorkcenter() {
 const GRADE_COLOR: Record<AbcGrade['grade'], string> = {
   A: 'var(--accent)',
   B: 'var(--success)',
-  C: 'var(--toss-gray-4)',
-};
+  C: 'var(--toss-gray-4)' };
 
 function AbcPanel({
   grades,
   loading,
-  error,
-}: {
+  error }: {
   grades: AbcGrade[];
   loading: boolean;
   error: string | null;
@@ -289,8 +196,7 @@ function AbcPanel({
 function ForecastPanel({
   rows,
   loading,
-  error,
-}: {
+  error }: {
   rows: ForecastRow[];
   loading: boolean;
   error: string | null;
@@ -366,8 +272,7 @@ function InspectPanel({
   pct,
   loading,
   error,
-  onStartInspect,
-}: {
+  onStartInspect }: {
   rows: InspectRow[];
   pct: number;
   loading: boolean;
@@ -541,8 +446,7 @@ function ClosePanel() {
                       : s.state === 'on'
                         ? 'var(--accent)'
                         : 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                }}
+                  color: '#fff' }}
               >
                 {s.state === 'done' ? <Check size={12} aria-hidden /> : s.n}
               </span>

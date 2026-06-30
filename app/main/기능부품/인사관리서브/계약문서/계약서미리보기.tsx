@@ -1,15 +1,13 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import {
   hasInlineContractReceiptSection,
-  upgradeLegacyContractTemplate,
-} from '@/lib/contract-template-defaults';
+  upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
 import { stripContractClosingLines } from '@/lib/contract-template-closing';
 import {
@@ -17,8 +15,7 @@ import {
   getWeeklyRotationShiftIds,
   isShiftBandGroupRow,
   orderShiftsByIds,
-  withWeeklyRotationShifts,
-} from '@/lib/contract-shift-rotation';
+  withWeeklyRotationShifts } from '@/lib/contract-shift-rotation';
 import ContractStandardPreview from './계약서표준미리보기';
 import ConfidentialityPledge from './비밀유지서약서';
 
@@ -37,8 +34,7 @@ export default function ContractPreview({
   templateOverride,
   sealUrlOverride,
   showToolbar = true,
-  requestedDate,
-}: Props) {
+  requestedDate }: Props) {
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [company, setCompany] = useState<Record<string, unknown> | null>(null);
@@ -62,7 +58,7 @@ export default function ContractPreview({
         let shiftData: any = null;
         const shiftIds = getWeeklyRotationShiftIds(staff, contract?.shift_id ?? staff.shift_id);
         if (shiftIds.length > 0) {
-          const { data: shiftRows } = await supabase
+          const { data: shiftRows } = await db
             .from('work_shifts')
             .select('*')
             .in('id', shiftIds);
@@ -71,7 +67,7 @@ export default function ContractPreview({
             const seedShift = orderedShiftRows[0];
             const seedCompanyName = String(seedShift.company_name || seedShift.company || '');
             const seedShiftType = String(seedShift.shift_type || '');
-            let siblingQuery = supabase
+            let siblingQuery = db
               .from('work_shifts')
               .select('*')
               .eq('is_active', true);
@@ -87,7 +83,7 @@ export default function ContractPreview({
 
         let companyInfo: any = null;
         if (companyName && companyName !== '전체') {
-          const { data: companyRow } = await supabase
+          const { data: companyRow } = await db
             .from('companies')
             .select('*')
             .eq('name', companyName)
@@ -97,7 +93,7 @@ export default function ContractPreview({
 
         let tmpl: { template_content?: string | null; seal_url?: string | null } | null = null;
         if (companyName) {
-          const { data } = await supabase
+          const { data } = await db
             .from('contract_templates')
             .select('template_content, seal_url')
             .eq('company_name', companyName)
@@ -109,7 +105,7 @@ export default function ContractPreview({
           sealUrlOverride !== undefined ? sealUrlOverride : tmpl?.seal_url;
 
         if (!resolvedSealUrl && companyName && companyName !== '전체') {
-          const { data: fallbackTmpl } = await supabase
+          const { data: fallbackTmpl } = await db
             .from('contract_templates')
             .select('seal_url')
             .eq('company_name', '전체')
@@ -123,7 +119,7 @@ export default function ContractPreview({
         if (!hasTemplateOverride) {
           templateText = tmpl?.template_content || '';
           if (!templateText) {
-            const { data: fallback } = await supabase
+            const { data: fallback } = await db
               .from('contract_templates')
               .select('template_content')
               .eq('company_name', '전체')
@@ -230,8 +226,7 @@ export default function ContractPreview({
       // [임금 구성항목 예시] 같은 서브타이틀 포함
       sections.push({
         title: `제${matches[i].num}조 [${matches[i].title}]`,
-        body,
-      });
+        body });
     }
 
     return sections;
@@ -561,8 +556,7 @@ export default function ContractPreview({
                           employeePhone: staff.phone || undefined,
                           contractDate: contractDateText,
                           signatureDataUrl: sig,
-                          receiptTraceDataUrl: receiptSig,
-                        }}
+                          receiptTraceDataUrl: receiptSig }}
                       />
                     </td>
                   </tr>

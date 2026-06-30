@@ -44,8 +44,7 @@ export function recordPushDebug(entry: Omit<PushDebugEntry, 'at'> & { at?: strin
     stage: entry.stage,
     message: entry.message,
     at: entry.at || new Date().toISOString(),
-    detail: normalizePushDebugDetail(entry.detail),
-  };
+    detail: normalizePushDebugDetail(entry.detail) };
 
   try {
     const nextLog = [nextEntry, ...readPushDebugLog()].slice(0, 20);
@@ -56,8 +55,7 @@ export function recordPushDebug(entry: Omit<PushDebugEntry, 'at'> & { at?: strin
 
   try {
     window.dispatchEvent(new CustomEvent('erp-push-debug', {
-      detail: nextEntry,
-    }));
+      detail: nextEntry }));
   } catch {
     // ignore event failures
   }

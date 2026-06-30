@@ -37,8 +37,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
           gap: 10,
           background: 'rgba(255, 255, 255, 0.65)',
           border: '1px solid rgba(255, 255, 255, 0.35)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
-        }}
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)' }}
       >
         <button
           type="button"
@@ -72,8 +71,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               gap: 8,
               paddingTop: 10,
               marginTop: 10,
-              borderTop: '1px solid rgba(0, 0, 0, 0.06)',
-            }}
+              borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}
           >
             <div>
               <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>날짜</div>
@@ -120,8 +118,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
         gap: 0,
         background: 'rgba(255, 255, 255, 0.65)',
         border: '1px solid rgba(255, 255, 255, 0.35)',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
-      }}
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)' }}
     >
       <button
         type="button"
@@ -139,8 +136,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               padding: '2px 6px',
               borderRadius: 6,
               background: 'rgba(0, 122, 255, 0.08)',
-              color: '#007AFF',
-            }}
+              color: '#007AFF' }}
           >
             {post.status || '게시중'}
           </span>
@@ -166,8 +162,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
             fontWeight: 800,
             letterSpacing: '-0.018em',
             lineHeight: 1.45,
-            color: 'var(--z-900)',
-          }}
+            color: 'var(--z-900)' }}
         >
           {post.title}
         </div>
@@ -179,8 +174,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
             marginTop: 10,
             fontSize: 11,
             color: 'var(--z-500)',
-            fontWeight: 700,
-          }}
+            fontWeight: 700 }}
         >
           <MAvatar tone={tone} size="sm">{initial}</MAvatar>
           <b style={{ color: 'var(--z-750)' }}>{authorName}</b>
@@ -200,8 +194,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               display: 'inline-flex',
               alignItems: 'center',
               gap: 3,
-              color: commentCount > 0 ? '#007AFF' : 'var(--z-500)',
-            }}
+              color: commentCount > 0 ? '#007AFF' : 'var(--z-500)' }}
           >
             <MIcon name="chat" size={11} />
             {commentCount}

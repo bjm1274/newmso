@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { AssetRow, CatalogRow, CategoryCard, Tone, UdiRow } from './stock-types';
 import { asString, pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
@@ -18,8 +18,7 @@ function mapCatalogRow(r: Row): CatalogRow {
     unit: pickString(r, ['unit'], 'EA'),
     price: pickNumber(r, ['price', 'unit_price']),
     date: toMonthString(r['created_at']),
-    who: pickString(r, ['created_by_name', 'created_by'], '-'),
-  };
+    who: pickString(r, ['created_by_name', 'created_by'], '-') };
 }
 
 function buildCategoryCards(categories: Row[], inventory: Row[]): CategoryCard[] {
@@ -53,8 +52,7 @@ function mapAssetRow(r: Row): AssetRow {
     date: toMonthString(r['purchase_date'] ?? r['created_at']),
     qr: hasQr,
     status,
-    tone,
-  };
+    tone };
 }
 
 function mapUdiRow(r: Row): UdiRow {
@@ -64,8 +62,7 @@ function mapUdiRow(r: Row): UdiRow {
     mfr: pickString(r, ['manufacturer', 'maker'], '-'),
     model: pickString(r, ['model', 'model_name'], '-'),
     lot: pickString(r, ['lot_number', 'lot'], '-'),
-    date: toMonthString(r['created_at']),
-  };
+    date: toMonthString(r['created_at']) };
 }
 
 export type ItemWorkcenterData = {
@@ -91,8 +88,7 @@ const EMPTY: ItemWorkcenterData = {
   udiCount: 0,
   categoryCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useItemData(): ItemWorkcenterData {
   const [state, setState] = useState<ItemWorkcenterData>(EMPTY);
@@ -103,12 +99,12 @@ export function useItemData(): ItemWorkcenterData {
     const load = async () => {
       try {
         const [invRes, catRes] = await Promise.all([
-          supabase
+          db
             .from('inventory')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(200),
-          supabase.from('inventory_categories').select('*').order('name').limit(100),
+          db.from('inventory_categories').select('*').order('name').limit(100),
         ]);
 
         if (cancelled) return;
@@ -139,8 +135,7 @@ export function useItemData(): ItemWorkcenterData {
           udiCount: udiRows.length,
           categoryCount: catRows.length,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '품목 데이터를 불러오지 못했습니다.';

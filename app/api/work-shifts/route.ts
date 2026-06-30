@@ -17,8 +17,7 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
   mirrorRowsToD1,
   work_shifts as workShiftsTable,
-  sql,
-} from '@/lib/db';
+  sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +33,7 @@ const PayloadSchema = z.object({
   shift_type: z.string().nullable().optional(),
   weekly_work_days: z.number().int().min(0).max(7).optional(),
   is_weekend_work: z.boolean().optional(),
-  is_shift: z.boolean().optional(),
-});
+  is_shift: z.boolean().optional() });
 
 type WorkShiftPayload = z.infer<typeof PayloadSchema>;
 
@@ -71,8 +69,7 @@ async function upsertWorkShift(insertedId: string, payload: WorkShiftPayload) {
       is_weekend_work: payload.is_weekend_work ? 1 : 0,
       is_shift: payload.is_shift ? 1 : 0,
       is_active: 1,
-      created_at: new Date().toISOString(),
-    },
+      created_at: new Date().toISOString() },
     {
       label: 'work_shifts.upsert',
       onConflict: 'update',
@@ -89,9 +86,7 @@ async function upsertWorkShift(insertedId: string, payload: WorkShiftPayload) {
         weekly_work_days: sql`excluded.weekly_work_days`,
         is_weekend_work: sql`excluded.is_weekend_work`,
         is_shift: sql`excluded.is_shift`,
-        is_active: sql`excluded.is_active`,
-      },
-    },
+        is_active: sql`excluded.is_active` } },
   );
 }
 

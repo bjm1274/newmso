@@ -11,8 +11,7 @@ export async function handlePostAction(action: string) {
       return NextResponse.json(
         {
           error: result.error || '백업 실행에 실패했습니다.',
-          hint: result.hint || null,
-        },
+          hint: result.hint || null },
         { status: 500 },
       );
     }

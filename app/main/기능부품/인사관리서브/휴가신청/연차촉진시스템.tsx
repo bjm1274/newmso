@@ -2,11 +2,11 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
+import AnnualLeaveDocumentModal from './AnnualLeaveDocumentModal';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import {
-  getStaffPromotionSchedule,
-} from '@/lib/annual-leave-promotion';
+  getStaffPromotionSchedule } from '@/lib/annual-leave-promotion';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -43,8 +43,7 @@ const PROMOTION_WINDOW_DAYS = 10;
 
 export default function AnnualLeavePromotion({
   staffs,
-  selectedCo,
-}: {
+  selectedCo }: {
   staffs: StaffLite[];
   selectedCo: string;
 }) {
@@ -53,9 +52,11 @@ export default function AnnualLeavePromotion({
   const [loading, setLoading] = useState(false);
   const [submittedPlans, setSubmittedPlans] = useState<{ sender_id: string }[]>([]);
   const [sentKeys, setSentKeys] = useState<Set<SentKey>>(new Set());
+  const [printStaff, setPrintStaff] = useState<PromotionTarget | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const fetchSubmittedPlans = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await db
       .from('approvals')
       .select('sender_id, status, type')
       .eq('type', '연차계획서')
@@ -65,7 +66,7 @@ export default function AnnualLeavePromotion({
 
   // 이미 통보된 로그 조회 (중복 방지)
   const fetchSentLogs = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await db
       .from('annual_leave_promotion_logs')
       .select('staff_id, stage, expiry_date');
     if (data) {
@@ -146,8 +147,7 @@ export default function AnnualLeavePromotion({
       title: `연차사용촉진 ${stageLabel} 통보 발송`,
       description: `${staff.name}님께 연차사용촉진 ${stageLabel} 통보를 발송합니다.\n발송 시 알림과 함께 전자결재 작성이 요청됩니다.`,
       confirmText: '발송',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -165,9 +165,7 @@ export default function AnnualLeavePromotion({
               stage: staff.promotionStage,
               remaining: staff.remainingLeave,
               expiry_date: staff.expiryDateStr,
-              link: '/main/전자결재?view=작성하기&type=연차계획서',
-            },
-          },
+              link: '/main/전자결재?view=작성하기&type=연차계획서' } },
         ])
         .select('id')
         .single();
@@ -181,7 +179,7 @@ export default function AnnualLeavePromotion({
         ? Number(staff.expiryDateStr.slice(0, 4))
         : new Date().getFullYear();
       const step = staff.promotionStage ?? 1;
-      await supabase.from('annual_leave_promotion_logs').upsert(
+      await db.from('annual_leave_promotion_logs').upsert(
         {
           id:
             typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -194,8 +192,7 @@ export default function AnnualLeavePromotion({
           expiry_date: staff.expiryDateStr,
           notified_at: new Date().toISOString(),
           remaining_days_at_notice: staff.remainingLeave,
-          notification_id: notifData?.id ?? null,
-        },
+          notification_id: notifData?.id ?? null },
         { onConflict: 'staff_id,target_year,step', ignoreDuplicates: true },
       );
 
@@ -298,6 +295,16 @@ export default function AnnualLeavePromotion({
                     {staff.status}
                   </span>
                 </div>
+                <button
+                  onClick={() => {
+                    setPrintStaff(staff);
+                    setIsPrintModalOpen(true);
+                  }}
+                  className="px-3 py-3 bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-[var(--radius-lg)] text-[11px] font-semibold hover:bg-[var(--toss-blue-light)] transition-all"
+                  title="서면 촉진 통보서 출력"
+                >
+                  🖨️ 서류 출력
+                </button>
                 {staff.actionRequired ? (
                   <button
                     onClick={() => handleSendPromotion(staff)}
@@ -344,6 +351,12 @@ export default function AnnualLeavePromotion({
           </li>
         </ul>
       </div>
+      
+      <AnnualLeaveDocumentModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        staff={printStaff}
+      />
     </div>
   );
 }
@@ -375,6 +388,5 @@ function makeTarget(
     status,
     actionRequired,
     promotionStage,
-    expiryDateStr,
-  };
+    expiryDateStr };
 }

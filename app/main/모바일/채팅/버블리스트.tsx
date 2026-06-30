@@ -11,8 +11,7 @@ import type { ChatMessage } from '@/types';
 import {
   formatBubbleDateLabel,
   isSameDay,
-  type StaffDirectoryEntry,
-} from './data-hooks';
+  type StaffDirectoryEntry } from './data-hooks';
 import MessageBubble from './메시지버블';
 import { PollCard } from './투표';
 import type { RoomPollsResult } from './메시지액션';
@@ -64,8 +63,7 @@ export default function BubbleList({
   searchMessageId,
   pollData,
   pollVoting = false,
-  onVotePoll,
-}: BubbleListProps) {
+  onVotePoll }: BubbleListProps) {
   // 각 루트 메시지에 달린 답글(reply_to_id) 수 — 스레드 뱃지
   const threadCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -109,8 +107,7 @@ export default function BubbleList({
         out.push({
           kind: 'date',
           label: formatBubbleDateLabel(iso),
-          key: `date-${iso || item.ts}`,
-        });
+          key: `date-${iso || item.ts}` });
       }
       if (item.type === 'msg') {
         out.push({ kind: 'msg', message: item.data, key: String(item.data.id), ts: item.ts });
@@ -184,8 +181,7 @@ function SystemBubble({ label }: { label: string }) {
           background: 'rgba(0, 0, 0, 0.04)',
           fontSize: 11,
           fontWeight: 600,
-          color: 'rgba(0, 0, 0, 0.5)',
-        }}
+          color: 'rgba(0, 0, 0, 0.5)' }}
       >
         {label}
       </span>

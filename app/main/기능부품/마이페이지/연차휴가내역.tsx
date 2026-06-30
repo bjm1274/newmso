@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   calculateApprovedAnnualLeaveUsage,
   calculateLeaveDays,
   isAnnualLeaveType,
   isApprovedLeaveStatus,
-  isHalfLeaveType,
-} from '@/lib/annual-leave-ledger';
+  isHalfLeaveType } from '@/lib/annual-leave-ledger';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 
@@ -66,8 +65,7 @@ function formatDateTimeKst(value: unknown) {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'short',
-    day: 'numeric',
-  });
+    day: 'numeric' });
 }
 
 function formatRange(row: LeaveHistoryRow) {
@@ -115,8 +113,7 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
           id: userIdKey,
           employee_no: userEmployeeNo,
           auth_user_id: userAuthUserId,
-          name: userName,
-        };
+          name: userName };
         const resolvedUser = await resolveStaffLike(lookupInput);
         const staffId = getStaffLikeId(resolvedUser);
 
@@ -130,18 +127,18 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
         }
 
         const [{ data: staffData, error: staffError }, { data: leaveData, error: leaveError }, { data: balanceData, error: balanceError }] = await Promise.all([
-          supabase
+          db
             .from('staff_members')
             .select('id, annual_leave_total, annual_leave_used')
             .eq('id', staffId)
             .maybeSingle(),
-          supabase
+          db
             .from('leave_requests')
             .select('id, leave_type, start_date, end_date, status, reason, approved_at, created_at')
             .eq('staff_id', staffId)
             .order('start_date', { ascending: false })
             .order('created_at', { ascending: false }),
-          supabase
+          db
             .from('leave_balances')
             .select('expired_days, compensated_days')
             .eq('staff_id', staffId)
@@ -163,8 +160,7 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
           const mergedStaff = {
             ...(staffData as StaffLeaveBalance | null),
             expired_days: balanceData?.expired_days ?? 0,
-            compensated_days: balanceData?.compensated_days ?? 0,
-          };
+            compensated_days: balanceData?.compensated_days ?? 0 };
           setStaff(mergedStaff);
           setRows(approvedRows);
         }

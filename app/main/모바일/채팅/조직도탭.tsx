@@ -34,8 +34,7 @@ export default function NewChatOrgTab({
   picked,
   onToggle,
   onTogglePack,
-  empty,
-}: NewChatOrgTabProps) {
+  empty }: NewChatOrgTabProps) {
   if (empty) {
     return (
       <div style={STATE_BOX}>구성원 목록을 불러오는 중…</div>
@@ -95,8 +94,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
         border: '1px solid var(--m-border)',
         borderRadius: 14,
         marginBottom: 10,
-        overflow: 'hidden',
-      }}
+        overflow: 'hidden' }}
     >
       <div
         style={{
@@ -104,8 +102,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
           gridTemplateColumns: '1fr auto auto',
           gap: 8,
           padding: '12px 14px',
-          alignItems: 'center',
-        }}
+          alignItems: 'center' }}
       >
         <button
           type="button"
@@ -119,8 +116,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
             background: 'transparent',
             textAlign: 'left',
             minWidth: 0,
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           <span
             className="ico-tile"
@@ -136,8 +132,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
                 fontSize: 13,
                 fontWeight: 800,
                 color: 'var(--z-900)',
-                letterSpacing: '-0.01em',
-              }}
+                letterSpacing: '-0.01em' }}
             >
               {group.department}
             </span>
@@ -147,8 +142,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
                 fontSize: 11,
                 color: 'var(--z-500)',
                 fontWeight: 700,
-                marginTop: 2,
-              }}
+                marginTop: 2 }}
             >
               부서원 {group.members.length}명
               {pickedCount > 0 ? ` · ${pickedCount}명 선택` : ''}
@@ -163,8 +157,7 @@ function OrgDeptCard({ group, picked, onToggle, onTogglePack }: OrgDeptCardProps
           style={{
             ...PACK_CHIP_STYLE,
             background: allOn ? 'var(--m-accent)' : 'var(--m-accent-soft)',
-            color: allOn ? '#fff' : 'var(--m-accent)',
-          }}
+            color: allOn ? '#fff' : 'var(--m-accent)' }}
         >
           {group.department} 전체
         </button>
@@ -219,8 +212,7 @@ function OrgMemberRow({ member, department, checked, onToggle, last }: OrgMember
         width: '100%',
         textAlign: 'left',
         cursor: 'pointer',
-        borderBottom: last ? 'none' : '1px solid var(--m-border)',
-      }}
+        borderBottom: last ? 'none' : '1px solid var(--m-border)' }}
     >
       <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
       <div>
@@ -238,8 +230,7 @@ function OrgMemberRow({ member, department, checked, onToggle, last }: OrgMember
           background: checked ? 'var(--m-accent)' : 'transparent',
           color: '#fff',
           display: 'grid',
-          placeItems: 'center',
-        }}
+          placeItems: 'center' }}
         aria-hidden="true"
       >
         {checked && <MIcon name="check" size={14} />}
@@ -254,8 +245,7 @@ const STATE_BOX: React.CSSProperties = {
   padding: '48px 24px',
   textAlign: 'center',
   color: 'var(--z-500)',
-  fontSize: 13,
-};
+  fontSize: 13 };
 
 const PACK_CHIP_STYLE: React.CSSProperties = {
   padding: '6px 10px',
@@ -265,5 +255,4 @@ const PACK_CHIP_STYLE: React.CSSProperties = {
   letterSpacing: '-0.01em',
   border: 'none',
   cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
+  whiteSpace: 'nowrap' };

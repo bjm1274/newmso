@@ -64,8 +64,7 @@ export const DISCHARGE_STATUS = {
   inProgress: 'in_progress',
   reviewRequested: 'review_requested',
   rejected: 'rejected',
-  approved: 'approved',
-} as const;
+  approved: 'approved' } as const;
 
 export type DischargeStatus = (typeof DISCHARGE_STATUS)[keyof typeof DISCHARGE_STATUS];
 

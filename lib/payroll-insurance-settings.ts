@@ -145,8 +145,7 @@ export function getPayrollInsuranceSettings(
     duruNuriStart: String(source.duru_nuri_start || '').slice(0, 7),
     duruNuriEnd: String(source.duru_nuri_end || '').slice(0, 7),
     medicalBenefit: Boolean(permissions.is_medical_benefit),
-    nationalPensionAgeEligible,
-  };
+    nationalPensionAgeEligible };
 }
 
 export function hasAnyEmployeePayrollInsurance(settings: PayrollInsuranceSettings) {

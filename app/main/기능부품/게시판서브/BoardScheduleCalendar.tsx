@@ -44,8 +44,7 @@ export default function BoardScheduleCalendar({
   onSearchChange,
   onChangeMonth,
   onToggleNewPost,
-  onSelectPost,
-}: BoardScheduleCalendarProps) {
+  onSelectPost }: BoardScheduleCalendarProps) {
   return (
     <div className="min-w-0 space-y-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:p-4">
       <div className="flex min-w-0 flex-col items-start justify-between gap-4 md:flex-row md:items-center">

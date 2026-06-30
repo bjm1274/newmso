@@ -32,8 +32,7 @@ export function buildPreviewIdentityRows(templateSlug: string | null): PreviewRo
     attendance_fix: '검사팀',
     resignation: '경영지원팀',
     payroll_slip: '인사팀',
-    generic: '경영지원팀',
-  };
+    generic: '경영지원팀' };
 
   return [
     { label: '성명', value: '홍길동' },
@@ -150,8 +149,7 @@ export function buildPreviewDocumentNumber(templateSlug: string | null) {
     attendance_fix: 'AT',
     resignation: 'RS',
     payroll_slip: 'PS',
-    generic: 'DOC',
-  };
+    generic: 'DOC' };
 
   const prefix = prefixBySlug[templateSlug || 'generic'] || 'DOC';
   return `${prefix}-202603-000128`;
@@ -180,8 +178,7 @@ export function buildTemplatePreviewSpec(
       { label: '공유 범위', value: '관련 부서와 결재자에게 즉시 공유됩니다.' },
       { label: '첨부 안내', value: '필요한 첨부 문서는 결재 전 단계에서 추가합니다.' },
     ],
-    footerNote: '전자결재 기본서식',
-  };
+    footerNote: '전자결재 기본서식' };
 
   switch (templateSlug) {
     case 'leave':
@@ -201,8 +198,7 @@ export function buildTemplatePreviewSpec(
           { label: '비상 연락', value: '010-0000-0000' },
           { label: '확인 사항', value: '승인 즉시 관련 부서와 일정이 공유됩니다.' },
         ],
-        footerNote: '휴가 승인 문서',
-      };
+        footerNote: '휴가 승인 문서' };
     case 'annual_plan':
       return {
         badge: '연차 계획',
@@ -220,8 +216,7 @@ export function buildTemplatePreviewSpec(
           { label: '대체 인력', value: '성수기 일정은 팀 내 선조정 후 사용합니다.' },
           { label: '운영 메모', value: '부서 운영상 변동 시 재기안 후 수정합니다.' },
         ],
-        footerNote: '연차 계획 공유',
-      };
+        footerNote: '연차 계획 공유' };
     case 'overtime':
       return {
         badge: '연장 근무',
@@ -239,8 +234,7 @@ export function buildTemplatePreviewSpec(
           { label: '승인 포인트', value: '부서장 승인 후 급여 반영 대상으로 이관합니다.' },
           { label: '확인 메모', value: '연장근무 사유와 실제 근무시간을 함께 보관합니다.' },
         ],
-        footerNote: '근무시간 보상 문서',
-      };
+        footerNote: '근무시간 보상 문서' };
     case 'purchase':
       return {
         badge: '물품 신청',
@@ -258,8 +252,7 @@ export function buildTemplatePreviewSpec(
           { label: '예상 소진', value: '2주 내 사용 예정' },
           { label: '조달 메모', value: '기존 계약 공급처 단가 기준으로 확인합니다.' },
         ],
-        footerNote: '구매 요청 문서',
-      };
+        footerNote: '구매 요청 문서' };
     case 'repair_request':
       return {
         badge: '수리 요청',
@@ -277,8 +270,7 @@ export function buildTemplatePreviewSpec(
           { label: '긴급도', value: '당일 확인 필요' },
           { label: '처리 메모', value: '점검 후 수리 또는 교체 여부를 회신합니다.' },
         ],
-        footerNote: '시설 이슈 접수',
-      };
+        footerNote: '시설 이슈 접수' };
     case 'draft_business':
       return {
         badge: '업무 기안',
@@ -296,8 +288,7 @@ export function buildTemplatePreviewSpec(
           { label: '요청 사항', value: '예산 승인 및 일정 확정' },
           { label: '첨부 예정', value: '비교 견적서, 운영 현황표' },
         ],
-        footerNote: '업무 기안 문서',
-      };
+        footerNote: '업무 기안 문서' };
     case 'cooperation':
       return {
         badge: '업무 협조',
@@ -315,8 +306,7 @@ export function buildTemplatePreviewSpec(
           { label: '우선순위', value: '개원 전 완료 필요' },
           { label: '공유 메모', value: '완료 후 원무팀과 현장 확인 예정' },
         ],
-        footerNote: '부서 협조 문서',
-      };
+        footerNote: '부서 협조 문서' };
     case 'attendance_fix':
       return {
         badge: '출결 정정',
@@ -334,8 +324,7 @@ export function buildTemplatePreviewSpec(
           { label: '사유', value: '단말기 오류로 체크인이 반영되지 않았습니다.' },
           { label: '확인 자료', value: 'CCTV 확인, 부서장 확인 후 승인' },
         ],
-        footerNote: '출결 정정 문서',
-      };
+        footerNote: '출결 정정 문서' };
     case 'payroll_slip':
       return {
         badge: '급여 문서',
@@ -353,8 +342,7 @@ export function buildTemplatePreviewSpec(
           { label: '공제 합계', value: '318,000원' },
           { label: '실지급액', value: '3,302,000원' },
         ],
-        footerNote: '급여 명세 문서',
-      };
+        footerNote: '급여 명세 문서' };
     case 'resignation':
       return {
         badge: '사직서',
@@ -372,8 +360,7 @@ export function buildTemplatePreviewSpec(
           { label: '인수인계 계획', value: '담당 업무 매뉴얼 정리 및 인수인계 파일 전달' },
           { label: '확인 사항', value: '사직서가 승인되면 퇴사 처리가 진행됩니다.' },
         ],
-        footerNote: '사직 승인 문서',
-      };
+        footerNote: '사직 승인 문서' };
     default:
       return genericSpec;
   }

@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
@@ -44,8 +44,7 @@ export default function SApprovalRef({
   rows,
   loading,
   onBack,
-  onOpen,
-}: SApprovalRefProps) {
+  onOpen }: SApprovalRefProps) {
   const [readMap, setReadMap] = useState<Record<string, boolean>>({});
 
   // 알림 테이블에서 본인의 참조 알림 읽음 여부 조회
@@ -112,8 +111,7 @@ export default function SApprovalRef({
               width: 30,
               height: 30,
               border: 'none',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="filter" size={15} color="var(--z-600)" />
           </button>
@@ -140,8 +138,7 @@ export default function SApprovalRef({
               className="macos-glass macos-squircle"
               style={{
                 overflow: 'hidden',
-                padding: 0,
-              }}
+                padding: 0 }}
             >
               {rows.map((row) => {
                 const read = Boolean(readMap[String(row.id)]);
@@ -167,8 +164,7 @@ export default function SApprovalRef({
                       borderRight: 'none',
                       borderTop: 'none',
                       display: 'flex',
-                      alignItems: 'center',
-                    }}
+                      alignItems: 'center' }}
                     onClick={() => onOpen(row.id)}
                     aria-label={`${title} 참조 문서 열기${read ? '' : ', 미열람'}`}
                   >
@@ -184,8 +180,7 @@ export default function SApprovalRef({
                             whiteSpace: 'nowrap',
                             fontSize: 13,
                             fontWeight: 900,
-                            color: 'var(--z-900)',
-                          }}
+                            color: 'var(--z-900)' }}
                         >
                           {title}
                         </span>
@@ -197,8 +192,7 @@ export default function SApprovalRef({
                               height: 6,
                               borderRadius: 999,
                               background: '#007AFF',
-                              flexShrink: 0,
-                            }}
+                              flexShrink: 0 }}
                           />
                         )}
                       </div>

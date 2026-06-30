@@ -40,8 +40,7 @@ function labelFromType(type: string): string {
       insert: '저장',
       update: '수정',
       upsert: '저장/수정',
-      delete: '삭제',
-    };
+      delete: '삭제' };
     const table = parts.slice(2).join(':');
     const kindLabel = kindMap[parts[1]] ?? parts[1];
     return `${table} ${kindLabel}`;
@@ -86,8 +85,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
         zIndex: 1000,
         background: 'rgba(0,0,0,0.45)',
         display: 'flex',
-        alignItems: 'flex-end',
-      }}
+        alignItems: 'flex-end' }}
       onClick={handleBackdropClick}
     >
       <div
@@ -98,8 +96,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
           borderRadius: '14px 14px 0 0',
           padding: '20px 16px 32px',
           maxHeight: '70vh',
-          overflowY: 'auto',
-        }}
+          overflowY: 'auto' }}
       >
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
@@ -116,8 +113,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
               cursor: 'pointer',
               fontSize: 18,
               color: 'var(--toss-gray-4, #9CA3AF)',
-              lineHeight: 1,
-            }}
+              lineHeight: 1 }}
           >
             ✕
           </button>
@@ -138,8 +134,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
                 alignItems: 'center',
                 gap: 8,
                 padding: '10px 0',
-                borderBottom: '1px solid var(--border, #E5E7EB)',
-              }}
+                borderBottom: '1px solid var(--border, #E5E7EB)' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
@@ -149,8 +144,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
                     color: 'var(--foreground)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                    whiteSpace: 'nowrap' }}
                 >
                   {labelFromType(item.type)}
                 </div>
@@ -170,8 +164,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
+                  whiteSpace: 'nowrap' }}
               >
                 다시 시도
               </button>
@@ -187,8 +180,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
+                  whiteSpace: 'nowrap' }}
               >
                 삭제
               </button>
@@ -213,8 +205,7 @@ function DetailSheet({ items, onClose }: DetailSheetProps) {
               padding: '12px',
               fontSize: 14,
               fontWeight: 700,
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             전체 다시 시도 ({items.length}개)
           </button>
@@ -265,8 +256,7 @@ export default function 오프라인실패배너() {
           padding: '7px 12px 7px 16px',
           gap: 8,
           letterSpacing: '-0.01em',
-          cursor: 'pointer',
-        }}
+          cursor: 'pointer' }}
         onClick={() => setShowDetail(true)}
       >
         <span style={{ flex: 1 }}>
@@ -286,8 +276,7 @@ export default function 오프라인실패배너() {
             lineHeight: 1,
             padding: '2px 4px',
             cursor: 'pointer',
-            opacity: 0.8,
-          }}
+            opacity: 0.8 }}
         >
           ✕
         </button>

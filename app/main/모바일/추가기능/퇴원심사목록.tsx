@@ -16,16 +16,14 @@ import { useDischargeReviews } from './data-hooks';
 import {
   DISCHARGE_STATUS,
   dischargeStatusMeta,
-  normalizeDischargeStatus,
-} from '../../기능부품/퇴원심사/공통';
+  normalizeDischargeStatus } from '../../기능부품/퇴원심사/공통';
 
 type Filter = 'mine' | 'request' | 'all' | 'done';
 
 export default function 퇴원심사목록({
   user,
   onBack,
-  onOpenDetail,
-}: {
+  onOpenDetail }: {
   user: ErpUser;
   onBack: () => void;
   onOpenDetail: (id: string) => void;
@@ -43,8 +41,7 @@ export default function 퇴원심사목록({
       mine: rows.filter((r) => r.reviewer_id === user.id || isPending(r.status)).length,
       request: rows.filter((r) => isReviewRequested(r.status)).length,
       all: rows.length,
-      done: rows.filter((r) => isApproved(r.status)).length,
-    }),
+      done: rows.filter((r) => isApproved(r.status)).length }),
     [rows, user.id],
   );
 
@@ -131,8 +128,7 @@ export default function 퇴원심사목록({
                     marginTop: 8,
                     fontSize: 11,
                     color: 'var(--z-500)',
-                    fontWeight: 600,
-                  }}
+                    fontWeight: 600 }}
                 >
                   <span>{it.department}</span>
                   <div style={{ flex: 1 }} />

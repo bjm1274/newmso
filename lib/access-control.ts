@@ -52,8 +52,7 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   입금실시간조회: 'extra_입금실시간조회',
   수술상담: 'extra_수술상담',
   OP체크: 'extra_OP체크',
-  ESL관리: 'extra_ESL관리',
-};
+  ESL관리: 'extra_ESL관리' };
 
 const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
   'extra_입금실시간조회',
@@ -69,15 +68,13 @@ const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
   수술일정: { read: 'board_수술일정_read', write: 'board_수술일정_write' },
   업무가이드: { read: 'board_업무가이드_read', write: 'board_업무가이드_write' },
   익명소리함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
-  직원제안함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
-};
+  직원제안함: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' } };
 
 const APPROVAL_PERMISSION_KEYS: Record<string, string> = {
   기안함: 'approval_기안함',
   결재함: 'approval_결재함',
   '참조 문서함': 'approval_참조문서함',
-  작성하기: 'approval_작성하기',
-};
+  작성하기: 'approval_작성하기' };
 
 const HR_PERMISSION_KEYS: Record<string, string> = {
   '직원등록': 'hr_직원등록',
@@ -99,8 +96,7 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   계약: 'hr_계약',
   문서보관함: 'hr_문서보관함',
   증명서: 'hr_증명서',
-  서류제출: 'hr_서류제출',
-};
+  서류제출: 'hr_서류제출' };
 
 const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   현황: 'inventory_현황',
@@ -126,8 +122,7 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   status: 'inventory_현황',
   io: 'inventory_등록',
   item: 'inventory_자산',
-  analyze: 'inventory_월마감',
-};
+  analyze: 'inventory_월마감' };
 
 const FINANCE_PERMISSION_KEYS: Record<string, string> = {
   복식부기: 'finance_복식부기',
@@ -149,8 +144,7 @@ const FINANCE_PERMISSION_KEYS: Record<string, string> = {
   expense: 'finance_경비청구',
   disbursement: 'finance_지출결의',
   'payroll-link': 'finance_급여연동',
-  'tax-reporting': 'finance_세무신고',
-};
+  'tax-reporting': 'finance_세무신고' };
 
 const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   경영분석: 'admin_경영분석',
@@ -166,8 +160,7 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   문서양식: 'admin_문서양식',
   급여이상치: 'admin_급여이상치',
   공문서대장: 'admin_공문서대장',
-  비품대여설정: 'admin_비품대여설정',
-};
+  비품대여설정: 'admin_비품대여설정' };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   // board 권한을 하나라도 가지면 게시판 메뉴 노출 (결정: board read = 메뉴 노출)
@@ -260,8 +253,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   board_MRI일정_read: ['board_MRI일정_write'],
   board_수술일정_read: ['board_수술일정_write'],
   board_업무가이드_read: ['board_업무가이드_write', 'board_자유게시판_read'],
-  board_업무가이드_write: ['board_자유게시판_write'],
-};
+  board_업무가이드_write: ['board_자유게시판_write'] };
 
 function getPermissions(user?: UserLike | null) {
   if (!user?.permissions || typeof user.permissions !== 'object') return {};
@@ -376,8 +368,7 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
     '전자결재': 'menu_전자결재',
     '인사관리': 'menu_인사관리',
     '재고관리': 'menu_재고관리',
-    '관리자': 'menu_관리자',
-  };
+    '관리자': 'menu_관리자' };
   const explicitMenuPermissionKey = explicitMenuPermissionKeyByMenu[menuId as MainMenuId];
   if (explicitMenuPermissionKey) {
     const explicitPermission = getExplicitPermissionState(user, explicitMenuPermissionKey);
@@ -539,8 +530,7 @@ export function canAccessInventorySection(
     status:  ['inventory_현황', 'inventory_이력', 'inventory_내부서재고'],
     io:      ['inventory_등록', 'inventory_발주', 'inventory_거래처', 'inventory_납품확인서', 'inventory_이관'],
     item:    ['inventory_자산', 'inventory_스캔', 'inventory_카테고리', 'inventory_UDI'],
-    analyze: ['inventory_월마감', 'inventory_수요예측', 'inventory_재고실사', 'inventory_소모품통계', 'inventory_AS반품'],
-  };
+    analyze: ['inventory_월마감', 'inventory_수요예측', 'inventory_재고실사', 'inventory_소모품통계', 'inventory_AS반품'] };
   const group = WORKCENTER_UNIONS[sectionIdOrPermissionKey];
   if (group) {
     return group.some((key) => canAccessDetailedSection(user, '재고관리', key, INVENTORY_PERMISSION_KEYS));

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   Calculator,
   FileText,
@@ -133,7 +133,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
         const targetCompanyId = selectedCompanyId || user?.company_id || null;
 
         // 1. Fetch journal entries scoped by company_id
-        let entriesQuery = supabase.from('journal_entries').select('*');
+        let entriesQuery = db.from('journal_entries').select('*');
         if (targetCompanyId) {
           entriesQuery = entriesQuery.eq('company_id', targetCompanyId);
         }
@@ -159,7 +159,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
         }
 
         // 2. Fetch fixed assets scoped by company_id
-        let assetsQuery = supabase.from('fixed_assets').select('*');
+        let assetsQuery = db.from('fixed_assets').select('*');
         if (targetCompanyId) {
           assetsQuery = assetsQuery.eq('company_id', targetCompanyId);
         }
@@ -185,7 +185,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
         }
 
         // 3. Fetch bank accounts sync scoped by company_id
-        let syncQuery = supabase.from('bank_accounts_sync').select('*');
+        let syncQuery = db.from('bank_accounts_sync').select('*');
         if (targetCompanyId) {
           syncQuery = syncQuery.eq('company_id', targetCompanyId);
         }
@@ -200,7 +200,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             { id: 'acc-2', company_id: targetCompanyId, type: '은행', name: '신한은행', num: '110-234-567890', state: '연동중', updated_at: new Date().toISOString() },
             { id: 'acc-3', company_id: targetCompanyId, type: '카드', name: '현대 법인카드', num: '4311-****-****-1234', state: '연동중', updated_at: new Date().toISOString() },
           ];
-          await supabase.from('bank_accounts_sync').insert(defaults);
+          await db.from('bank_accounts_sync').insert(defaults);
           setBankSyncs(defaults);
         }
       } catch (err) {
@@ -243,7 +243,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
     };
 
     try {
-      const { error } = await supabase.from('journal_entries').insert([row]);
+      const { error } = await db.from('journal_entries').insert([row]);
       if (error) throw new Error(error.message);
 
       setJournalEntries(prev => [
@@ -294,7 +294,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
     };
 
     try {
-      const { error } = await supabase.from('fixed_assets').insert([row]);
+      const { error } = await db.from('fixed_assets').insert([row]);
       if (error) throw new Error(error.message);
 
       setFixedAssets(prev => [
@@ -324,7 +324,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
       const updated = bankSyncs.map(b => ({ ...b, updated_at: nowStr }));
       
       for (const account of updated) {
-        await supabase
+        await db
           .from('bank_accounts_sync')
           .update({ updated_at: nowStr })
           .eq('id', account.id);

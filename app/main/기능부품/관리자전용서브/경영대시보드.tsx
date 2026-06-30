@@ -52,29 +52,25 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: Recor
           : `₩${Math.round(monthlyDeposit).toLocaleString('ko-KR')}`,
       detail: '가상계좌 입금 합계',
       icon: 'analytics',
-      tone: 'text-[var(--success)] bg-[var(--success-light)]',
-    },
+      tone: 'text-[var(--success)] bg-[var(--success-light)]' },
     {
       label: '총 직원',
       value: `${activeStaffs.length}명`,
       detail: '재직 기준',
       icon: 'users',
-      tone: 'text-[var(--accent)] bg-[var(--accent-light)]',
-    },
+      tone: 'text-[var(--accent)] bg-[var(--accent-light)]' },
     {
       label: '미결재 건수',
       value: `${pendingApprovalCount}건`,
       detail: pendingApprovalCount > 0 ? '검토 필요' : '정상',
       icon: 'history',
-      tone: 'text-[var(--warning)] bg-[var(--warning-light)]',
-    },
+      tone: 'text-[var(--warning)] bg-[var(--warning-light)]' },
     {
       label: '재고 이상',
       value: `${lowStockCount}개`,
       detail: lowStockCount > 0 ? '확인 필요' : '정상',
       icon: 'alert',
-      tone: 'text-[var(--danger)] bg-[var(--danger-light)]',
-    },
+      tone: 'text-[var(--danger)] bg-[var(--danger-light)]' },
   ];
 
   const notices = [

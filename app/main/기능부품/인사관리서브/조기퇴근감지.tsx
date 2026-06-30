@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface Props {
@@ -54,7 +54,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       const lastDay = new Date(y, m, 0).getDate();
       const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('early_leave_records')
         .select('*')
         .gte('work_date', startDate)
@@ -76,7 +76,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
 
   const handleApprove = async (id: number) => {
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('early_leave_records')
         .update({ is_approved: true })
         .eq('id', id);
@@ -111,8 +111,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           dept: r.dept || '미분류',
           total_count: 0,
           unapproved_count: 0,
-          total_minutes: 0,
-        };
+          total_minutes: 0 };
       }
       map[r.staff_id].total_count += 1;
       if (!r.is_approved) map[r.staff_id].unapproved_count += 1;
@@ -142,38 +141,32 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       primary: true,
       render: (row) => (
         <span className="font-bold text-[var(--foreground)]">{row.work_date}</span>
-      ),
-    },
+      ) },
     {
       key: 'staff_name',
       label: '직원명',
       render: (row) => (
         <span className="font-bold text-[var(--foreground)]">{row.staff_name}</span>
-      ),
-    },
+      ) },
     {
       key: 'dept',
       label: '부서',
       showOnMobile: false,
-      render: (row) => row.dept || '-',
-    },
+      render: (row) => row.dept || '-' },
     {
       key: 'scheduled_end',
       label: '정상퇴근',
-      showOnMobile: false,
-    },
+      showOnMobile: false },
     {
       key: 'actual_end',
       label: '실제퇴근',
-      showOnMobile: false,
-    },
+      showOnMobile: false },
     {
       key: 'early_minutes',
       label: '조기분',
       render: (row) => (
         <span className="font-bold text-orange-600">{row.early_minutes}분</span>
-      ),
-    },
+      ) },
     {
       key: 'is_approved',
       label: '상태',
@@ -182,14 +175,12 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-[var(--radius-md)]">승인</span>
         ) : (
           <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-500/20 text-red-700 rounded-[var(--radius-md)]">미신청</span>
-        ),
-    },
+        ) },
     {
       key: 'note',
       label: '비고',
       showOnMobile: false,
-      render: (row) => row.note || '-',
-    },
+      render: (row) => row.note || '-' },
     {
       key: 'id',
       label: '',
@@ -201,8 +192,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           >
             승인
           </button>
-        ) : null,
-    },
+        ) : null },
   ], [handleApprove]);
 
   const statsColumns = useMemo<Column<StaffStat>[]>(() => [
@@ -212,20 +202,17 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       primary: true,
       render: (row) => (
         <span className="font-bold text-[var(--foreground)]">{row.staff_name}</span>
-      ),
-    },
+      ) },
     {
       key: 'dept',
       label: '부서',
-      showOnMobile: false,
-    },
+      showOnMobile: false },
     {
       key: 'total_count',
       label: '총횟수',
       render: (row) => (
         <span className="font-bold text-[var(--accent)]">{row.total_count}회</span>
-      ),
-    },
+      ) },
     {
       key: 'unapproved_count',
       label: '미신청',
@@ -234,14 +221,12 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           <span className="font-extrabold text-red-600">{row.unapproved_count}건</span>
         ) : (
           <span className="text-emerald-600 font-bold">-</span>
-        ),
-    },
+        ) },
     {
       key: 'total_minutes',
       label: '총조기분',
       showOnMobile: false,
-      render: (row) => `${row.total_minutes}분`,
-    },
+      render: (row) => `${row.total_minutes}분` },
   ], []);
 
   return (

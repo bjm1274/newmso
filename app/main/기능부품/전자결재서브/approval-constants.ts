@@ -52,8 +52,7 @@ export const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
   backgroundLogoOpacity: 0.055,
   showSeal: true,
   sealLabel: 'SY INC. 직인',
-  sealImageUrl: '',
-};
+  sealImageUrl: '' };
 
 export const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
 

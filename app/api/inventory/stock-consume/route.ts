@@ -12,8 +12,7 @@ import {
   atomicStockConsumeWithLog,
   StockError,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +22,7 @@ const PayloadSchema = z.object({
   company: z.string().nullable().optional(),
   companyId: z.string().nullable().optional(),
   department: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
+  notes: z.string().nullable().optional() });
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
@@ -64,8 +62,7 @@ export async function POST(request: Request) {
         company: company ?? (user?.company as string | null) ?? null,
         company_id: companyId ?? (user?.company_id as string | null) ?? null,
         department: department ?? (user?.department as string | null) ?? null,
-        notes: notes ?? null,
-      }
+        notes: notes ?? null }
     );
 
     return NextResponse.json({ ok: true, data: result });
@@ -73,8 +70,7 @@ export async function POST(request: Request) {
     if (err instanceof StockError) {
       const statusMap: Record<string, number> = {
         INSUFFICIENT_STOCK: 409,
-        ITEM_NOT_FOUND: 404,
-      };
+        ITEM_NOT_FOUND: 404 };
       const status = statusMap[err.code] ?? 500;
       return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });
     }

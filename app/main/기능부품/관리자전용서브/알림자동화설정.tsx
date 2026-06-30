@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
@@ -21,8 +21,7 @@ import {
   type NotificationAutomationSettings,
   DEFAULT_NOTIFICATION_AUTOMATION,
   loadNotificationAutomationSettings,
-  saveNotificationAutomationSettings,
-} from '@/lib/notification-automation-settings';
+  saveNotificationAutomationSettings } from '@/lib/notification-automation-settings';
 
 interface StaffLite {
   id: string;
@@ -104,8 +103,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
         annualLeaveEnabled,
         step1Enabled,
         step2Enabled,
-        ...patch,
-      };
+        ...patch };
       void saveNotificationAutomationSettings(nextSettings).catch((err) => {
         console.error('[NotificationAutomation] 설정 저장 실패:', err);
         toast('설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'error');
@@ -119,7 +117,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
     setLoading(true);
     try {
       // 직원 데이터 조회
-      const { data: staffsData } = await supabase
+      const { data: staffsData } = await db
         .from('staff_members')
         .select('id, name, company, department, position, annual_leave_total, annual_leave_used, join_date, hire_date, joined_at');
       
@@ -133,12 +131,11 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
         annual_leave_used: s.annual_leave_used !== null ? Number(s.annual_leave_used) : undefined,
         join_date: s.join_date ? String(s.join_date) : null,
         hire_date: s.hire_date ? String(s.hire_date) : null,
-        joined_at: s.joined_at ? String(s.joined_at) : null,
-      }));
+        joined_at: s.joined_at ? String(s.joined_at) : null }));
       setStaffs(safeStaffs);
 
       // 연차촉진 이력 조회 (D1)
-      const { data: logsData } = await supabase
+      const { data: logsData } = await db
         .from('annual_leave_promotion_logs')
         .select('*')
         .order('notified_at', { ascending: false });
@@ -155,8 +152,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             stage: l.stage !== undefined ? Number(l.stage) : l.step !== undefined ? Number(l.step) : 1,
             expiryDate: l.expiry_date ? String(l.expiry_date) : '-',
             notifiedAt: l.notified_at ? String(l.notified_at) : l.sent_at ? String(l.sent_at) : l.created_at ? String(l.created_at) : new Date().toISOString(),
-            remainingDays: l.remaining_days_at_notice !== undefined ? Number(l.remaining_days_at_notice) : l.remain_days !== undefined ? Number(l.remain_days) : 0,
-          };
+            remainingDays: l.remaining_days_at_notice !== undefined ? Number(l.remaining_days_at_notice) : l.remain_days !== undefined ? Number(l.remain_days) : 0 };
         });
         setLogs(parsedLogs);
       }
@@ -236,9 +232,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                 stage: stepToday,
                 remaining: remain,
                 expiry_date: expiryLabel,
-                link: '/main/전자결재?view=작성하기&type=연차계획서',
-              },
-            },
+                link: '/main/전자결재?view=작성하기&type=연차계획서' } },
           ])
           .select('id')
           .single();
@@ -247,7 +241,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
 
         // 2) annual_leave_promotion_logs 테이블 로그 INSERT
         // D1 호환성을 위해 stage/step, remain_days/remaining_days_at_notice 두 컬럼 세트 모두 매핑
-        await supabase.from('annual_leave_promotion_logs').upsert(
+        await db.from('annual_leave_promotion_logs').upsert(
           {
             staff_id: s.id,
             stage: stepToday,
@@ -260,8 +254,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             remaining_days_at_notice: remain,
             remain_days: remain,
             notification_id: notifData?.id ?? null,
-            meta: { sent_by: user?.['id'] as string, today: todayYmd, expiry_date: expiryLabel },
-          },
+            meta: { sent_by: user?.['id'] as string, today: todayYmd, expiry_date: expiryLabel } },
           { onConflict: 'staff_id,stage,expiry_date', ignoreDuplicates: true },
         );
 
@@ -514,8 +507,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
                         month: 'numeric',
                         day: 'numeric',
                         hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                        minute: '2-digit' })}
                     </td>
                   </tr>
                 ))}

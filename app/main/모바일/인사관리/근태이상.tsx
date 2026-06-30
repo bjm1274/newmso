@@ -28,8 +28,7 @@ import {
   requestAttendanceClarificationDaily,
   resolveTeamAbnormalForStaffOnDate,
   type AbnormalRow,
-  type DailyAbnormalRow,
-} from './data-hooks';
+  type DailyAbnormalRow } from './data-hooks';
 import AbnormalDailyCard, { type DailyRowStatus } from './근태이상카드';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
@@ -57,8 +56,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
       // PTR 시 짧은 딜레이로 시각 피드백만 제공 (이미 최신 데이터 표시 중)
       await new Promise<void>((r) => setTimeout(r, 500));
     },
-    enabled: !!staffId,
-  });
+    enabled: !!staffId });
 
   const lateCnt = mine.filter((r) => r.kind === 'late').length;
   const earlyCnt = mine.filter((r) => r.kind === 'early_leave').length;
@@ -76,8 +74,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
         style={{
           padding: '10px 16px 0',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="근태이상 탭">
           <button
@@ -112,8 +109,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
               padding: 24,
               textAlign: 'center',
               color: 'var(--z-500)',
-              fontSize: 13,
-            }}
+              fontSize: 13 }}
           >
             팀 근태이상은 인사관리 권한이 있는 사용자만 볼 수 있습니다.
           </div>
@@ -138,8 +134,7 @@ function MineTab({
   rows,
   late,
   early,
-  missing,
-}: {
+  missing }: {
   rows: AbnormalRow[];
   late: number;
   early: number;
@@ -158,8 +153,7 @@ function MineTab({
           padding: '14px 16px 0',
           display: 'grid',
           gridTemplateColumns: 'repeat(3,1fr)',
-          gap: 8,
-        }}
+          gap: 8 }}
       >
         {kpis.map((k) => (
           <MKpi
@@ -176,20 +170,19 @@ function MineTab({
       <div style={{ padding: '14px 16px 0' }}>
         {rows.length === 0 ? (
           <div
-            className="m-card"
+            className="m-card macos-glass macos-squircle-sm"
             style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
           >
             이번 달 이상 항목이 없습니다.
           </div>
         ) : (
-          <div className="m-card flush">
+          <div className="m-card flush macos-glass macos-squircle">
             {rows.map((r, idx) => (
               <div
                 key={r.date + r.kind}
                 style={{
                   padding: '14px 16px',
-                  borderBottom: idx < rows.length - 1 ? '1px solid var(--m-border)' : 'none',
-                }}
+                  borderBottom: idx < rows.length - 1 ? '1px solid var(--m-border)' : 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <MChip tone={r.kind === 'missing' ? 'danger' : 'warning'}>
@@ -214,8 +207,7 @@ function MineTab({
                       fontSize: 12,
                       color: 'var(--z-500)',
                       fontWeight: 600,
-                      paddingLeft: 4,
-                    }}
+                      paddingLeft: 4 }}
                   >
                     {r.reason}
                   </div>
@@ -231,8 +223,7 @@ function MineTab({
                       borderRadius: 8,
                       fontSize: 12,
                       fontWeight: 800,
-                      background: 'var(--m-warning-soft)',
-                    }}
+                      background: 'var(--m-warning-soft)' }}
                   >
                     + 사유 입력 (필요)
                   </button>
@@ -301,8 +292,7 @@ function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
         date: row.date,
         lateMinutes: row.lateMinutes,
         earlyLeaveMinutes: row.earlyLeaveMinutes,
-        missingCount: row.missingCount,
-      });
+        missingCount: row.missingCount });
       if (result.ok) {
         toast(`${row.staffName} (${row.date}) 사유 요청 발송 완료`, 'success');
         setStatusByRow((m) => ({ ...m, [key]: 'clarified' }));
@@ -331,8 +321,7 @@ function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
       const result = await resolveTeamAbnormalForStaffOnDate({
         user,
         targetStaffId: row.staffId,
-        date: row.date,
-      });
+        date: row.date });
       if (result.ok) {
         toast(`${row.staffName} ${row.date} 정상 처리 완료`, 'success');
         setStatusByRow((m) => ({ ...m, [key]: 'resolved' }));
@@ -379,13 +368,12 @@ function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
             color: 'var(--m-warning)',
             borderRadius: 8,
             fontSize: 11,
-            fontWeight: 700,
-          }}
+            fontWeight: 700 }}
         >
           관리자 권한이 없어 사유 요청·정상 처리는 비활성화되어 있습니다.
         </div>
       ) : null}
-      <div className="m-card flush">
+      <div className="m-card flush macos-glass macos-squircle">
         {rows.map((row, idx) => {
           const key = dailyRowKey(row);
           const status = statusByRow[key] ?? 'idle';

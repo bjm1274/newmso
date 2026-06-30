@@ -14,10 +14,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import MIcon from '../공통/MIcon';
@@ -28,8 +28,7 @@ import {
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix,
-} from '../인사관리/form-helpers';
+  useFieldIdPrefix } from '../인사관리/form-helpers';
 import SApprovalApproverPicker from './결재선피커';
 import SApprovalCcPicker, { type CcPick } from './참조피커';
 import AttachmentPicker from './AttachmentPicker';
@@ -72,7 +71,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     (async () => {
       setStaffsLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('id, name, status, company, department, team, position, hire_date, resign_date')
           .eq('company', company);
@@ -115,8 +114,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     attachments, setAttachments,
     approverDefaults, approverLine, approverLoading, approverManual,
     pickerOpen, setPickerOpen,
-    handleApproverApply, submitApproval, queuedAttachmentCount,
-  } = base;
+    handleApproverApply, submitApproval, queuedAttachmentCount } = base;
 
   const days = useMemo(() => calcDays(start, end, kind), [start, end, kind]);
   const canSubmit =
@@ -155,7 +153,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     let leaveRequestInserted = false;
     let leaveQueued = false;
     try {
-      const { queued, error: leaveError } = await enqueueSupabaseMutation({
+      const { queued, error: leaveError } = await enqueueD1Mutation({
         kind: 'insert',
         table: 'leave_requests',
         payload: {
@@ -165,9 +163,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           end_date: end,
           days,
           reason: reason || null,
-          status: '대기',
-        },
-      });
+          status: '대기' } });
       if (leaveError) throw new Error(leaveError);
       leaveRequestInserted = true;
       leaveQueued = queued;
@@ -186,7 +182,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
       // Fetch active staff in the company for cc_users
       let ccUsers: Array<{ id: string; name: string }> = [];
       try {
-        const { data: staffData } = await supabase
+        const { data: staffData } = await db
           .from('staff_members')
           .select('id, name, status, company, hire_date, resign_date')
           .eq('company', senderCompany);
@@ -195,8 +191,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
             .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
             .map((s: StaffMember) => ({
               id: String(s.id),
-              name: s.name || '이름 없음',
-            }));
+              name: s.name || '이름 없음' }));
         }
       } catch (err) {
         console.error('[mobile-approval] failed to fetch cc_users candidates', err);
@@ -232,9 +227,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           delegateId: delegateId || null,
           delegateName: delegate?.name || '',
           delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
-          delegatePosition: String(delegate?.position || '').trim(),
-        },
-      });
+          delegatePosition: String(delegate?.position || '').trim() } });
 
       if (leaveQueued || apprQueued) {
         toast('오프라인 — 연차 신청이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
@@ -272,8 +265,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           className="macos-glass macos-squircle"
           style={{
             margin: '16px',
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           <MField label="휴가 종류">
             <MSegRow
@@ -299,8 +291,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                   color: 'var(--z-900)',
                   backgroundColor: 'rgba(255, 255, 255, 0.45)',
                   border: '1px solid rgba(255, 255, 255, 0.35)',
-                  outline: 'none',
-                }}
+                  outline: 'none' }}
               >
                 <option value="">대행자 선택 안함</option>
                 {leaveDelegateOptions.map((staff) => {
@@ -362,8 +353,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                 color: 'var(--z-900)',
                 background: 'transparent',
                 border: 'none',
-                outline: 'none',
-              }}
+                outline: 'none' }}
             />
           </MField>
         </div>
@@ -386,8 +376,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                 padding: '4px 8px',
                 background: 'transparent',
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               변경
             </button>
@@ -397,8 +386,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             {approverLoading ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
@@ -412,8 +400,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                   fontSize: 12,
                   fontWeight: 800,
                   color: 'var(--m-warning)',
-                  lineHeight: 1.55,
-                }}
+                  lineHeight: 1.55 }}
               >
                 회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 “변경”으로 결재자를 직접 지정해 주세요.
               </div>
@@ -437,8 +424,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                         padding: '12px 16px',
                         borderBottom:
                           i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                        alignItems: 'center',
-                      }}
+                        alignItems: 'center' }}
                     >
                       <MAvatar tone="violet" size="sm">
                         {(a.name || '?').charAt(0)}
@@ -487,8 +473,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             {manualCcUsers.length === 0 ? (
               <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
@@ -507,8 +492,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                         alignItems: 'center',
                         gap: 8,
                         padding: '6px 12px 6px 6px',
-                        borderRadius: 999,
-                      }}
+                        borderRadius: 999 }}
                     >
                       <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
                       <span style={{ minWidth: 0 }}>

@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { db } from './db-client';
 import { asTrimmedString, asNumber } from './data-normalizer';
 import { normalizeDateString, formatWon } from './date-formatter';
 
@@ -89,8 +89,7 @@ function formatSalaryDescription(record: Record<string, unknown>) {
     holiday_work_allowance: '휴일근로수당',
     annual_leave_pay: '연차휴가수당',
     other: '기타수당',
-    other_taxfree: '기타 비과세',
-  };
+    other_taxfree: '기타 비과세' };
 
   const pieces = [`${labels[changeType] || changeType} ${formatWon(beforeValue ?? 0)} -> ${formatWon(afterValue ?? 0)}`];
   if (reason) pieces.push(`사유: ${reason}`);
@@ -120,7 +119,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
     await Promise.all([
       safeQuery<Record<string, unknown>>(
         'personnel_appointments',
-        supabase
+        db
           .from('personnel_appointments')
           .select('id, order_type, effective_date, created_at, status, staff_id, before_dept, after_dept, before_position, after_position, before_role, after_role, reason')
           .eq('staff_id', staffId)
@@ -129,7 +128,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       ),
       safeQuery<Record<string, unknown>>(
         'employment_contracts',
-        supabase
+        db
           .from('employment_contracts')
           .select('id, contract_type, effective_date, requested_at, signed_at, created_at, staff_id, status, base_salary')
           .eq('staff_id', staffId)
@@ -138,7 +137,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       ),
       safeQuery<Record<string, unknown>>(
         'salary_change_history',
-        supabase
+        db
           .from('salary_change_history')
           .select('id, effective_date, created_at, staff_id, change_type, before_value, after_value, reason')
           .eq('staff_id', staffId)
@@ -147,7 +146,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       ),
       safeQuery<Record<string, unknown>>(
         'work_type_change_history',
-        supabase
+        db
           .from('work_type_change_history')
           .select('id, changed_date, created_at, staff_id, previous_type, new_type, reason')
           .eq('staff_id', staffId)
@@ -156,7 +155,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       ),
       safeQuery<Record<string, unknown>>(
         'leave_requests',
-        supabase
+        db
           .from('leave_requests')
           .select('id, leave_type, start_date, end_date, created_at, staff_id, status')
           .eq('staff_id', staffId)
@@ -177,8 +176,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       description: formatAppointmentDescription(record),
       badge: '인사발령',
       status: asTrimmedString(record.status) || null,
-      accentClass: 'bg-blue-50 text-blue-700 border-blue-200',
-    });
+      accentClass: 'bg-blue-50 text-blue-700 border-blue-200' });
   });
 
   contracts.forEach((record) => {
@@ -207,8 +205,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       description: lines.join(' · ') || '근로계약 문서가 등록되었습니다.',
       badge: '계약',
       status: status || null,
-      accentClass: 'bg-violet-50 text-violet-700 border-violet-200',
-    });
+      accentClass: 'bg-violet-50 text-violet-700 border-violet-200' });
   });
 
   salaryChanges.forEach((record) => {
@@ -220,8 +217,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       description: formatSalaryDescription(record),
       badge: '급여',
       status: null,
-      accentClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    });
+      accentClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
   });
 
   workTypeChanges.forEach((record) => {
@@ -233,8 +229,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       description: formatWorkTypeDescription(record),
       badge: '근무형태',
       status: null,
-      accentClass: 'bg-amber-50 text-amber-700 border-amber-200',
-    });
+      accentClass: 'bg-amber-50 text-amber-700 border-amber-200' });
   });
 
   leaveRequests.forEach((record) => {
@@ -252,8 +247,7 @@ export async function fetchHrHistoryLedger(staffId: string) {
       description: formatLeaveDescription(record),
       badge: '휴가',
       status: status || null,
-      accentClass: 'bg-sky-50 text-sky-700 border-sky-200',
-    });
+      accentClass: 'bg-sky-50 text-sky-700 border-sky-200' });
   });
 
   return sortDescByDate(events);

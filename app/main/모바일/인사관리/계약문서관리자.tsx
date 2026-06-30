@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
@@ -46,7 +46,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
   const fetchContracts = async () => {
     setLoadingContracts(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('employment_contracts')
         .select('*')
         .order('start_date', { ascending: false });
@@ -63,7 +63,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
     setLoadingCerts(true);
     try {
       // approvals 테이블 중 증명서 관련 대기 건 조회
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('approvals')
         .select('*')
         .ilike('form_type', '%증명서%')
@@ -80,7 +80,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
   const fetchRepoFiles = async () => {
     setLoadingRepo(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('document_repository')
         .select('*')
         .order('created_at', { ascending: false });
@@ -102,12 +102,11 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
   // 증명서 승인
   const handleApproveCert = async (certId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('approvals')
         .update({
           status: '승인',
-          approved_at: new Date().toISOString(),
-        })
+          approved_at: new Date().toISOString() })
         .eq('id', certId);
       if (error) throw error;
       toast('증명서 발급이 승인되었습니다.', 'success');
@@ -141,10 +140,9 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
         file_url: fileUrl,
         file_size: file.size,
         created_by: user.id || 'admin',
-        created_at: new Date().toISOString(),
-      };
+        created_at: new Date().toISOString() };
 
-      const { error } = await supabase.from('document_repository').insert([payload]);
+      const { error } = await db.from('document_repository').insert([payload]);
       if (error) throw error;
 
       toast('문서가 업로드되었습니다.', 'success');
@@ -163,8 +161,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
         style={{
           padding: '10px 16px',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg" role="tablist" aria-label="계약 문서 관리 탭">
           <button
@@ -220,7 +217,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
               조회된 근로계약 내역이 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {contracts.map((c) => {
                 const staffName = staffs.find((s) => s.id === c.staff_id)?.name || '퇴사자';
                 const isCurrent = c.status === '적용중' || c.status === 'active';
@@ -246,7 +243,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
 
       {subTab === 'autogen' && (
         <div style={{ padding: '14px 16px 0' }}>
-          <div className="m-card" style={{ padding: 14, marginBottom: 12 }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>인쇄용 수기 계약서 자동생성</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <select
@@ -258,8 +255,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
                   fontSize: 13,
-                  background: 'white',
-                }}
+                  background: 'white' }}
               >
                 <option value="">직원을 선택하세요</option>
                 {staffs.map((s) => (
@@ -278,8 +274,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
                   fontSize: 13,
-                  background: 'white',
-                }}
+                  background: 'white' }}
               >
                 <option value="표준근로계약서">표준근로계약서</option>
                 <option value="연봉위임계약서">연봉위임계약서</option>
@@ -296,8 +291,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   padding: 10,
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
-                  fontSize: 13,
-                }}
+                  fontSize: 13 }}
               />
 
               <input
@@ -310,8 +304,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   padding: 10,
                   border: '1px solid var(--m-border)',
                   borderRadius: 8,
-                  fontSize: 13,
-                }}
+                  fontSize: 13 }}
               />
 
               <MBtn variant="primary" block onClick={handleGenerateContract}>
@@ -325,7 +318,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
       {subTab === 'repository' && (
         <div style={{ padding: '14px 16px 0' }}>
           {/* 규정 파일 업로드 */}
-          <div className="m-card" style={{ padding: 14, marginBottom: 12 }}>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>공용 규정 및 서식 업로드</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
@@ -338,8 +331,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   border: '1px solid var(--m-border)',
                   fontSize: 13,
                   fontWeight: 700,
-                  background: 'white',
-                }}
+                  background: 'white' }}
               >
                 <option value="회사규정">회사규정</option>
                 <option value="각종서식">각종서식</option>
@@ -376,7 +368,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
               보관함에 등록된 문서가 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {repoFiles.map((file) => (
                 <div key={file.id} className="m-list-row">
                   <div className="ico-tile tone-accent">
@@ -414,7 +406,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
               대기 중인 증명서 발급 요청이 없습니다.
             </div>
           ) : (
-            <div className="m-card flush">
+            <div className="m-card flush macos-glass macos-squircle">
               {certificates.map((c) => (
                 <div
                   key={c.id}
@@ -440,8 +432,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                           background: 'var(--m-accent)',
                           color: 'white',
                           fontSize: 11,
-                          fontWeight: 700,
-                        }}
+                          fontWeight: 700 }}
                       >
                         발급 승인
                       </button>

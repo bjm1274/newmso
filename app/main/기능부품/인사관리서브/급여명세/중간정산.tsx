@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
@@ -9,8 +9,7 @@ import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-upsert';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import {
   calculateDcRetirementBenefitFromMonthlyWage,
-  formatWorkPeriod,
-} from '@/lib/severance-pay';
+  formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
@@ -20,12 +19,10 @@ import {
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
   normalizeWithholdingRatePercent,
-  type TaxInsuranceRates,
-} from '@/lib/use-tax-insurance-rates';
+  type TaxInsuranceRates } from '@/lib/use-tax-insurance-rates';
 import {
   calculateHourlyRateFromMonthlySalary,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
 import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
 import { NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
@@ -50,8 +47,7 @@ const EMPTY_INTERIM_ADJUSTMENTS: InterimAdjustments = {
   overtimePay: 0,
   bonus: 0,
   allowanceDeduction: 0,
-  attendanceDeduction: 0,
-};
+  attendanceDeduction: 0 };
 
 function parseInterimWonInput(value: unknown) {
   const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
@@ -88,8 +84,7 @@ function InterimTenMinuteUnitField({
   hourlyRate,
   onChange,
   testId,
-  tone = 'default',
-}: {
+  tone = 'default' }: {
   label: string;
   value: number | '';
   hourlyRate: number;
@@ -402,8 +397,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   const updateAdjustment = (key: InterimAdjustmentKey, value: number | '') => {
     setAdjustments((prev) => ({
       ...prev,
-      [key]: value === '' ? '' : parseInterimWonInput(value),
-    }));
+      [key]: value === '' ? '' : parseInterimWonInput(value) }));
   };
 
   const calculateSettlement = (staff: any) => {
@@ -566,8 +560,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       withholdingRatePercent,
       applyNationalPension: resolvedIns.national,
       applyHealthInsurance: resolvedIns.health,
-      applyEmploymentInsurance: resolvedIns.employment,
-    });
+      applyEmploymentInsurance: resolvedIns.employment });
 
     const nationalPension = deductions.national_pension;
     const healthInsurance = deductions.health_insurance;
@@ -578,16 +571,13 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
     const baselineIncomeTax = calculateMonthlyIncomeTax(totalTaxable, taxInsuranceRates, 0, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const familyAdjustedIncomeTax = calculateMonthlyIncomeTax(totalTaxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const preRatioIncomeTax = calculateMonthlyIncomeTax(totalTaxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount,
-    });
+      qualifyingChildCount });
     const dependentTaxCredit = hasExactWithholdingTable
       ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12_500;
@@ -620,10 +610,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         overtime_pay: overtimePay,
         bonus,
         allowance_deduction: allowanceDeduction,
-        attendance_deduction: attendanceDeduction,
-      },
-      retirement_benefit_basis: includeSeverance && reason === '퇴사' ? RETIREMENT_BENEFIT_BASIS : null,
-    };
+        attendance_deduction: attendanceDeduction },
+      retirement_benefit_basis: includeSeverance && reason === '퇴사' ? RETIREMENT_BENEFIT_BASIS : null };
     const net = total - deduction;
 
     return {
@@ -650,8 +638,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       overtimePay,
       bonus,
       allowanceDeduction,
-      attendanceDeduction,
-    };
+      attendanceDeduction };
   };
 
   const result = selectedStaff ? calculateSettlement(selectedStaff) : null;
@@ -663,8 +650,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       title: '중간정산 확정 저장',
       description: '정산 내역을 확정하고 저장합니다.\n확정 후 급여 레코드에 반영됩니다.',
       confirmText: '확정 저장',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -674,7 +660,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
       // E-1: 마감 잠금된 월은 중간정산 저장(확정)도 차단한다. 조회 실패 시 막지 않음(fail-open).
       const lockScopes = companyScope && companyScope !== '전체' ? ['전체', companyScope] : ['전체'];
-      const { data: lockRows, error: lockError } = await supabase
+      const { data: lockRows, error: lockError } = await db
         .from('payroll_locks')
         .select('year_month, company_name')
         .eq('year_month', yearMonth)
@@ -716,15 +702,13 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           source: 'interim_manual_adjustment',
           allowance_deduction: calc.allowanceDeduction,
           attendance_deduction: calc.attendanceDeduction,
-          amount: calc.allowanceDeduction + calc.attendanceDeduction,
-        },
+          amount: calc.allowanceDeduction + calc.attendanceDeduction },
         advance_pay: 0,
         status: '확정',
         record_type: 'interim',
         settlement_reason: reason,
         settlement_date: settlementDate,
-        severance_pay: calc.severance,
-      };
+        severance_pay: calc.severance };
 
       const { error: payrollSaveError } = await upsertPayrollRecordWithFallback({
         record: record as Record<string, unknown>,
@@ -749,8 +733,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           'settlement_reason',
           'settlement_date',
           'severance_pay',
-        ],
-      });
+        ] });
       if (payrollSaveError) throw payrollSaveError;
 
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
@@ -769,8 +752,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         message,
         error: e,
         staffId: selectedStaff?.id,
-        settlementDate,
-      });
+        settlementDate });
       toast(`저장 중 오류가 발생했습니다. ${message}`, 'error');
     } finally {
       setLoading(false);

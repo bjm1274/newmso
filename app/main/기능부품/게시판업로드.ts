@@ -55,8 +55,7 @@ async function uploadViaAppServer(file: File, boardType: string) {
 
   const response = await fetch(BOARD_UPLOAD_ENDPOINT, {
     method: 'POST',
-    body: formData,
-  });
+    body: formData });
   const payload = (await response.json().catch(() => null)) as UploadResponsePayload | null;
 
   if (!response.ok || !payload?.url) {
@@ -79,9 +78,7 @@ export async function uploadBoardAttachmentFile(
       boardType,
       fileName: uploadFileName,
       mimeType: getUploadContentType(file),
-      fileSize: file.size,
-    }),
-  });
+      fileSize: file.size }) });
   const payload = (await response.json().catch(() => null)) as UploadResponsePayload | null;
 
   if (!response.ok || !payload?.path || !payload?.signedUrl || !payload?.provider) {

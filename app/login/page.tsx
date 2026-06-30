@@ -19,8 +19,7 @@ export default function LoginPage() {
       try {
         const response = await fetch('/api/auth/session', {
           method: 'GET',
-          cache: 'no-store',
-        });
+          cache: 'no-store' });
 
         if (!response.ok) {
           localStorage.removeItem(STORAGE_KEYS.USER);
@@ -64,8 +63,7 @@ export default function LoginPage() {
       const loginRes = await fetch('/api/auth/master-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginId, password }),
-      });
+        body: JSON.stringify({ loginId, password }) });
       const payload = await loginRes.json();
 
       if (!loginRes.ok || !payload?.success || !payload?.user) {

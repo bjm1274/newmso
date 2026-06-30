@@ -61,9 +61,7 @@ export async function runAxe(target?: Element): Promise<AxeResults | null> {
     results = await axe.default.run(context, {
       runOnly: {
         type: 'tag',
-        values: ['wcag2a', 'wcag2aa', 'best-practice'],
-      },
-    });
+        values: ['wcag2a', 'wcag2aa', 'best-practice'] } });
   } catch (err: unknown) {
     console.warn('[axe-core] 실행 실패:', err);
     return null;

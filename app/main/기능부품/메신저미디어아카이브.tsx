@@ -22,8 +22,7 @@ export function MediaArchivePanel({
   onClose,
   onFilterChange,
   onPreviewMessage,
-  onReplyMessage,
-}: MediaArchivePanelProps) {
+  onReplyMessage }: MediaArchivePanelProps) {
   if (!open) return null;
 
   return (

@@ -15,13 +15,11 @@ import { useCallback } from 'react';
 import { toast } from '@/lib/toast';
 import {
   formatApprovalAttachmentSize,
-  type ApprovalAttachmentMeta,
-} from '@/lib/approval-report-utils';
+  type ApprovalAttachmentMeta } from '@/lib/approval-report-utils';
 import {
   buildStorageDownloadUrl,
   buildStorageInlineUrl,
-  extractStorageUrlExtension,
-} from '@/lib/object-storage-url';
+  extractStorageUrlExtension } from '@/lib/object-storage-url';
 import MIcon from '../공통/MIcon';
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'heic', 'heif']);
@@ -44,8 +42,7 @@ export function AttachmentsSection({ attachments }: { attachments: ApprovalAttac
           fontWeight: 800,
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          padding: '0 4px 6px',
-        }}
+          padding: '0 4px 6px' }}
       >
         첨부 {attachments.length}건
       </div>
@@ -93,8 +90,7 @@ function AttachmentCard({ attachment }: { attachment: ApprovalAttachmentMeta }) 
             width: '100%',
             maxHeight: 320,
             objectFit: 'cover',
-            background: 'var(--m-bg)',
-          }}
+            background: 'var(--m-bg)' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
           <div className="ico-tile tone-accent" style={{ width: 32, height: 32 }}>
@@ -108,8 +104,7 @@ function AttachmentCard({ attachment }: { attachment: ApprovalAttachmentMeta }) 
                 color: 'var(--z-900)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+                whiteSpace: 'nowrap' }}
             >
               {attachment.name}
             </div>
@@ -137,8 +132,7 @@ function AttachmentCard({ attachment }: { attachment: ApprovalAttachmentMeta }) 
         alignItems: 'center',
         gap: 12,
         textAlign: 'left',
-        width: '100%',
-      }}
+        width: '100%' }}
     >
       <div className="ico-tile tone-accent" style={{ width: 40, height: 40 }}>
         <MIcon name="fileText" size={20} />
@@ -151,8 +145,7 @@ function AttachmentCard({ attachment }: { attachment: ApprovalAttachmentMeta }) 
             color: 'var(--z-900)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
+            whiteSpace: 'nowrap' }}
         >
           {attachment.name}
         </div>

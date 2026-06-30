@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getPayrollGrossPay, filterNonInterimPayrollRecords } from '@/lib/payroll-records';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface Props {
   staffs: any[];
@@ -26,7 +26,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
           months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
         }
         // N+1 waterfall 방지를 위해 .in('year_month', months) 벌크 쿼리 수행
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('payroll_records')
           .select('year_month, total_taxable, total_taxfree, staff_id, record_type')
           .in('year_month', months);
@@ -70,8 +70,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
     return {
       month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
       total: forecastBase,
-      isForecast: true,
-    };
+      isForecast: true };
   });
 
   const allData = [...monthlyData, ...forecasts];

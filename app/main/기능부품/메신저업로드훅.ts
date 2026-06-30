@@ -10,8 +10,7 @@ import {
   type ClipboardEvent,
   type Dispatch,
   type MutableRefObject,
-  type SetStateAction,
-} from 'react';
+  type SetStateAction } from 'react';
 import { toast } from '@/lib/toast';
 import { buildUploadRequestFileName } from './메신저첨부';
 import type { SendMessageOptions } from './메신저전송훅';
@@ -21,8 +20,7 @@ import {
   queueFailedAttachmentRetryEntry,
   readFailedAttachmentRetryQueue,
   removeFailedAttachmentRetryEntry,
-  type AttachmentRetryQueueEntry,
-} from './메신저첨부재시도큐';
+  type AttachmentRetryQueueEntry } from './메신저첨부재시도큐';
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import { getUploadContentType } from '@/lib/upload-mime';
@@ -67,8 +65,7 @@ export function useChatUploads({
   inputMsgRef,
   setInputMsg,
   handleSendMessage,
-  scrollToBottom,
-}: UseChatUploadsParams) {
+  scrollToBottom }: UseChatUploadsParams) {
   const [pendingAlbumFiles, setPendingAlbumFiles] = useState<File[]>([]);
   const [albumPreviewUrls, setAlbumPreviewUrls] = useState<string[]>([]);
   const [fileUploading, setFileUploading] = useState(false);
@@ -207,8 +204,7 @@ export function useChatUploads({
 
           const fallbackResponse = await fetch('/api/chat/upload', {
             method: 'POST',
-            body: formData,
-          });
+            body: formData });
           const fallbackPayload = (await fallbackResponse.json().catch(() => null)) as {
             provider?: 'supabase' | 'r2';
             bucket?: string;
@@ -232,9 +228,7 @@ export function useChatUploads({
             body: JSON.stringify({
               fileName: uploadFileName,
               mimeType: uploadContentType,
-              fileSize: file.size,
-            }),
-          });
+              fileSize: file.size }) });
           return { res, payload: (await res.json().catch(() => null)) as {
             provider?: 'supabase' | 'r2';
             bucket?: string;
@@ -267,8 +261,7 @@ export function useChatUploads({
           const directUploadResponse = await fetch(payload.signedUrl, {
             method: 'PUT',
             headers: payload.headers || { 'content-type': uploadContentType },
-            body: file,
-          });
+            body: file });
 
           if (!directUploadResponse.ok) {
             throw new Error(`Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
@@ -293,8 +286,7 @@ export function useChatUploads({
           replyToIdOverride: options?.replyToId ?? replyToId ?? undefined,
           albumId: options?.albumId ?? null,
           albumIndex: options?.albumIndex ?? null,
-          albumTotal: options?.albumTotal ?? null,
-        });
+          albumTotal: options?.albumTotal ?? null });
       } catch (error: unknown) {
         logger.error('file upload failed:', error);
         const message = (error as Error)?.message || String(error);
@@ -311,8 +303,7 @@ export function useChatUploads({
             content: contentSnapshot.trim(),
             replyToId: options?.replyToId ?? replyToId ?? null,
             file,
-            error: hint,
-          });
+            error: hint });
           await refreshFailedAttachmentRetries();
           toast(`파일 업로드에 실패했습니다.\n\n${hint}\n\n재시도 보관함에 저장했습니다.`, 'error');
           return false;
@@ -335,8 +326,7 @@ export function useChatUploads({
 
     for (const [index, attachmentFile] of queuedFiles.entries()) {
       await processFileUpload(attachmentFile, {
-        contentSnapshot: index === 0 ? contentSnapshot : '',
-      });
+        contentSnapshot: index === 0 ? contentSnapshot : '' });
     }
   }, [inputMsgRef, pendingAttachmentFiles, processFileUpload]);
 
@@ -395,8 +385,7 @@ export function useChatUploads({
         shouldClearSnapshot: !captionConsumed,
         albumId,
         albumIndex: index,
-        albumTotal: files.length,
-      });
+        albumTotal: files.length });
       if (sent) {
         successCount += 1;
         captionConsumed = true;
@@ -480,8 +469,7 @@ export function useChatUploads({
       contentSnapshot: target.content,
       shouldClearSnapshot: false,
       replyToId: target.replyToId,
-      skipRetryQueue: true,
-    });
+      skipRetryQueue: true });
 
     if (sent && actorId) {
       await removeFailedAttachmentRetryEntry(actorId, entryId);
@@ -548,6 +536,5 @@ export function useChatUploads({
     retryFailedAttachmentUpload,
     retryAllFailedAttachmentUploads,
     dismissFailedAttachmentUpload,
-    clearAllFailedAttachmentUploads,
-  };
+    clearAllFailedAttachmentUploads };
 }

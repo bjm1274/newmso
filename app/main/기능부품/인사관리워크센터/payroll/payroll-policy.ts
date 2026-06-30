@@ -19,13 +19,11 @@ import {
   MINIMUM_WAGE_2025,
   MINIMUM_WAGE_2026,
   TAX_FREE_LEGAL_LIMITS,
-  MONTHLY_STANDARD_HOURS,
-} from '@/lib/tax-free-limits';
+  MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
 import {
   EMPLOYEE_INSURANCE_RATES_2026,
   EMPLOYER_INSURANCE_RATES_2026,
-  LONG_TERM_CARE_HEALTH_RATIO_2026,
-} from '@/lib/payroll-insurance-rates';
+  LONG_TERM_CARE_HEALTH_RATIO_2026 } from '@/lib/payroll-insurance-rates';
 
 // ─── 임금피크 단계 ─────────────────────────────────────────
 export interface WagePeakStage {
@@ -105,8 +103,7 @@ const DEFAULT_POLICY: PayrollPolicy = {
   wagePeakStartAge: 60,
   wagePeakStages: DEFAULT_WAGE_PEAK_STAGES,
 
-  retirementAge: 60,
-};
+  retirementAge: 60 };
 
 export function getPayrollPolicy(override?: PayrollPolicyOverride): PayrollPolicy {
   if (!override) return DEFAULT_POLICY;
@@ -115,8 +112,7 @@ export function getPayrollPolicy(override?: PayrollPolicyOverride): PayrollPolic
     minimumWageHourly: override.minimumWageHourly ?? DEFAULT_POLICY.minimumWageHourly,
     wagePeakStartAge: override.wagePeakStartAge ?? DEFAULT_POLICY.wagePeakStartAge,
     wagePeakStages: override.wagePeakStages ?? DEFAULT_POLICY.wagePeakStages,
-    retirementAge: override.retirementAge ?? DEFAULT_POLICY.retirementAge,
-  };
+    retirementAge: override.retirementAge ?? DEFAULT_POLICY.retirementAge };
 }
 
 // ─── 헬퍼: 만 나이 ─────────────────────────────────────────

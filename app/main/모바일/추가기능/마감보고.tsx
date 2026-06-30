@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -41,13 +41,12 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
 
     setSubmitting(true);
     try {
-      const { queued, error } = await enqueueSupabaseMutation({
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'update',
         table: 'daily_closures',
         match: { id: day.closureId },
         payload: { status: 'submitted' },
-        retryable: true,
-      });
+        retryable: true });
 
       if (error) { toast(`제출 실패: ${error}`, 'error'); return; }
       if (queued) { toast('오프라인 — 마감 보고 대기 중', 'info'); return; }
@@ -64,8 +63,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
       <div
         style={{
           padding: '12px 16px',
-          background: 'transparent',
-        }}
+          background: 'transparent' }}
       >
         <div
           className="m-seg macos-glass"
@@ -75,8 +73,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
             border: '1px solid rgba(0, 0, 0, 0.05)',
             display: 'flex',
             borderRadius: '12px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-          }}
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)' }}
         >
           <button
             type="button"
@@ -92,8 +89,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               background: tab === 'today' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
               boxShadow: tab === 'today' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
               border: 'none',
-              transition: 'all 0.2s',
-            }}
+              transition: 'all 0.2s' }}
           >
             일 마감
           </button>
@@ -111,8 +107,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               background: tab === 'week' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
               boxShadow: tab === 'week' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
               border: 'none',
-              transition: 'all 0.2s',
-            }}
+              transition: 'all 0.2s' }}
           >
             주 마감
           </button>
@@ -130,8 +125,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               background: tab === 'month' ? 'rgba(255, 255, 255, 0.95)' : 'transparent',
               boxShadow: tab === 'month' ? '0 2px 5px rgba(0, 0, 0, 0.08)' : 'none',
               border: 'none',
-              transition: 'all 0.2s',
-            }}
+              transition: 'all 0.2s' }}
           >
             월 마감
           </button>
@@ -148,8 +142,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            boxShadow: '0 4px 16px 0 rgba(245, 158, 11, 0.04)',
-          }}
+            boxShadow: '0 4px 16px 0 rgba(245, 158, 11, 0.04)' }}
         >
           <MIcon name="alertTri" size={18} color="rgba(217, 119, 6, 0.85)" />
           <div
@@ -157,8 +150,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               flex: 1,
               fontSize: 12,
               fontWeight: 700,
-              color: 'rgba(217, 119, 6, 0.95)',
-            }}
+              color: 'rgba(217, 119, 6, 0.95)' }}
           >
             Chart 시스템으로 이관 예정 — 2026 Q4
           </div>
@@ -183,8 +175,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
                     fontWeight: 800,
                     color: 'var(--foreground)',
                     letterSpacing: '-0.025em',
-                    marginTop: 6,
-                  }}
+                    marginTop: 6 }}
                 >
                   ₩ {fmt(day.total)}
                 </div>
@@ -212,8 +203,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
                   <div
                     key={r.id}
                     style={{
-                      borderBottom: idx === day.items.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
-                    }}
+                      borderBottom: idx === day.items.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)' }}
                   >
                     <MListRow
                       icon={r.status === '완료' ? 'check' : 'clock'}
@@ -241,8 +231,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)',
-              }}
+                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)' }}
             >
               <MIcon name="info" size={16} color="#007aff" />
               주간 마감 현황은 데스크톱에서 확인하세요. 모바일은 오늘 체크리스트만 제공합니다.
@@ -263,8 +252,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)',
-              }}
+                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)' }}
             >
               <MIcon name="info" size={16} color="#007aff" />
               월 마감 보고서·차트는 데스크톱에서 PDF 발행
@@ -279,8 +267,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
           borderTop: '1px solid rgba(0, 0, 0, 0.08)',
           background: 'rgba(255, 255, 255, 0.7)',
           backdropFilter: 'blur(20px)',
-          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
-        }}
+          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
       >
         <MBtn block icon="download">초안 보기</MBtn>
         <MBtn

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   buildChatAttachmentObjectKey,
   createChatAttachmentUploadPlan,
-  uploadToR2,
-} from '@/lib/object-storage';
+  uploadToR2 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
@@ -123,8 +122,7 @@ async function createSignedUploadPlan(payload: UploadPlanRequest): Promise<NextR
     signedUrl: r2Plan.signedUrl,
     fileName,
     url: r2Plan.url,
-    headers: r2Plan.headers,
-  };
+    headers: r2Plan.headers };
   return NextResponse.json(response);
 }
 
@@ -179,8 +177,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bucket: uploaded.bucket,
       path: uploaded.path,
       fileName: normalizedFileName,
-      url: uploaded.url,
-    });
+      url: uploaded.url });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : '채팅 첨부 업로드 중 오류가 발생했습니다.';

@@ -16,15 +16,14 @@
  * JM5: staffId 고정 — 본인 외 데이터 접근 금지.
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import {
   openIssuedCertificatePrintView,
   type IssuedCertificate,
-  type IssuedCertificateContext,
-} from '@/app/main/기능부품/마이페이지/certificate-print-utils';
+  type IssuedCertificateContext } from '@/app/main/기능부품/마이페이지/certificate-print-utils';
 
 /** PC buildSerialNo()와 동일 규칙. */
 function buildSerialNo(): string {
@@ -115,7 +114,7 @@ export async function issueAndPrintMyCert(
 
   try {
     // 본인 1건만 조회 (JM5: staffId 고정).
-    const { data: staffData, error: staffError } = await supabase
+    const { data: staffData, error: staffError } = await db
       .from('staff_members')
       .select(
         'id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, base_salary, base, meal_allowance, meal, status, resigned_at, resign_date, resigned_reason, resign_reason, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions',
@@ -136,12 +135,12 @@ export async function issueAndPrintMyCert(
     if (companyName) {
       try {
         const [sealRes, companyRes] = await Promise.all([
-          supabase
+          db
             .from('contract_templates')
             .select('seal_url')
             .eq('company_name', companyName)
             .limit(1),
-          supabase
+          db
             .from('companies')
             .select('logo_url')
             .eq('name', companyName)
@@ -165,13 +164,12 @@ export async function issueAndPrintMyCert(
 
     // certificate_issuances insert (PC와 동일 컬럼셋).
     try {
-      const { error: insertError } = await supabase.from('certificate_issuances').insert({
+      const { error: insertError } = await db.from('certificate_issuances').insert({
         staff_id: staff.id,
         cert_type: certType,
         serial_no: serialNo,
         purpose,
-        issued_by: issuedBy,
-      });
+        issued_by: issuedBy });
       if (insertError) throw insertError;
     } catch (insertError) {
       console.error('[mobile-cert] issuance insert failed', insertError);
@@ -211,8 +209,7 @@ export async function issueAndPrintMyCert(
       serial_no: serialNo,
       purpose,
       issued_at: new Date().toISOString(),
-      staff_members: { name: str(staff.name) },
-    };
+      staff_members: { name: str(staff.name) } };
 
     const context: IssuedCertificateContext = {
       companyLabel: companyName || 'SY INC.',
@@ -229,8 +226,7 @@ export async function issueAndPrintMyCert(
       extraInfoRows,
       resignedAt,
       resignationReason: str(staff.resigned_reason) || str(staff.resign_reason) || '일신상의 사정',
-      isResigned,
-    };
+      isResigned };
 
     openIssuedCertificatePrintView(cert, context);
     return true;

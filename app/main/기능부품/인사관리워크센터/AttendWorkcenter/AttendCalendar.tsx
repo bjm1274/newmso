@@ -12,15 +12,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { getKoreanPublicHolidayName } from '@/lib/korean-public-holidays';
 import { isActive } from '../MemberWorkcenter/data';
 import {
   formatIsoDate,
   resolveAttendanceStatus,
-  type AttendanceRow,
-} from './data';
+  type AttendanceRow } from './data';
 
 interface AttendCalendarProps {
   staffs: StaffMember[];
@@ -68,8 +67,7 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
       lastIso: formatIsoDate(lastDay),
       daysInMonth: lastDay.getDate(),
       // 월요일=0 기준 (월~일)
-      startWeekday: (firstDay.getDay() + 6) % 7,
-    };
+      startWeekday: (firstDay.getDay() + 6) % 7 };
   }, [monthAnchor]);
 
   const fetchMonth = useCallback(async () => {
@@ -84,7 +82,7 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
         setRows([]);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendances')
         .select('staff_id, work_date, status, check_in_time, check_out_time')
         .in('staff_id', staffIds)

@@ -62,8 +62,7 @@ const APPROVAL_TYPE_CODES: Record<string, string> = {
   업무협조: 'COP',
   양식신청: 'GEN',
   출결정정: 'ATD',
-  인사명령: 'ORD',
-};
+  인사명령: 'ORD' };
 
 const asMetaData = asRecord;
 
@@ -173,13 +172,11 @@ export function appendApprovalHistory(
     actor_name: entry.actor_name ?? null,
     note: entry.note ?? null,
     revision: entry.revision ?? null,
-    current_approver_id: entry.current_approver_id ?? null,
-  };
+    current_approver_id: entry.current_approver_id ?? null };
 
   return {
     ...meta,
-    edit_history: [...getApprovalEditHistory(meta), nextEntry],
-  };
+    edit_history: [...getApprovalEditHistory(meta), nextEntry] };
 }
 
 export function buildRevisionDocNumber(existingDocNumber: unknown, revision: number) {
@@ -193,8 +190,7 @@ export function lockApprovalMeta(metaData: unknown, actorId?: string | null) {
   return {
     ...meta,
     edit_locked_at: meta.edit_locked_at || new Date().toISOString(),
-    edit_locked_by: actorId ?? meta.edit_locked_by ?? null,
-  };
+    edit_locked_by: actorId ?? meta.edit_locked_by ?? null };
 }
 
 export function isApprovalLocked(metaData: unknown) {
@@ -253,8 +249,7 @@ export function resolveApprovalDelayConfig(staff: Record<string, unknown> | null
   return {
     thresholdHours: parseApprovalDelayHours(permissions?.approval_delay_hours, 24),
     repeatHours: parseApprovalDelayRepeatHours(permissions?.approval_delay_repeat_hours, 24),
-    maxNotifications: parseApprovalDelayMaxNotifications(permissions?.approval_delay_max_notifications, 3),
-  };
+    maxNotifications: parseApprovalDelayMaxNotifications(permissions?.approval_delay_max_notifications, 3) };
 }
 
 export function resolveApprovalDocNumberConfig(
@@ -269,8 +264,7 @@ export function resolveApprovalDocNumberConfig(
     prefix: asNullableString(permissions?.approval_doc_number_prefix),
     includeDepartment: Boolean(permissions?.approval_doc_number_include_department),
     dateMode: parseApprovalDocNumberDateMode(permissions?.approval_doc_number_date_mode, 'full'),
-    sequencePadding: parseApprovalDocNumberSequencePadding(permissions?.approval_doc_number_sequence_padding, 3),
-  };
+    sequencePadding: parseApprovalDocNumberSequencePadding(permissions?.approval_doc_number_sequence_padding, 3) };
 }
 
 export function resolveApprovalDelegateConfig(staff: Record<string, unknown> | null | undefined, at = new Date()) {
@@ -293,8 +287,7 @@ export function resolveApprovalDelegateConfig(staff: Record<string, unknown> | n
     active:
       Boolean(delegateId) &&
       (!hasValidStart || at.getTime() >= (startsAt as Date).getTime()) &&
-      (!hasValidEnd || at.getTime() <= (endsAt as Date).getTime()),
-  };
+      (!hasValidEnd || at.getTime() <= (endsAt as Date).getTime()) };
 }
 
 export function shouldSendDelayNotification(
@@ -338,9 +331,7 @@ export function markDelayNotification(
       count,
       threshold_hours: parseApprovalDelayHours(thresholdHours),
       repeat_hours: parseApprovalDelayRepeatHours(repeatHours),
-      max_notifications: parseApprovalDelayMaxNotifications(maxNotifications),
-    },
-  };
+      max_notifications: parseApprovalDelayMaxNotifications(maxNotifications) } };
 }
 
 export function formatApprovalHistoryActionLabel(action: ApprovalHistoryAction) {

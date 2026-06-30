@@ -5,8 +5,7 @@ import type { AttachmentItem } from '@/types';
 import { EmptyState } from '@/app/components/StatePanel';
 import {
   buildManagedDownloadUrl,
-  handleManagedDownloadClick,
-} from '../공통/managed-download';
+  handleManagedDownloadClick } from '../공통/managed-download';
 import type { GuideResource } from './guide-types';
 import { formatDate, getGuideAudienceLabel, getGuideKindLabel } from './guide-utils';
 
@@ -25,8 +24,7 @@ export default function GuideDetailPanel({
   canEditSelected,
   onEdit,
   onDelete,
-  onAttachmentPreview,
-}: GuideDetailPanelProps) {
+  onAttachmentPreview }: GuideDetailPanelProps) {
   // 모바일/데스크톱 공용 집중 몰입 모드 (Focus Mode)
   const [isFocusMode, setIsFocusMode] = useState(false);
   // 본문 폰트 크기 상태 (가독성 사용성 개선)
@@ -210,8 +208,7 @@ export default function GuideDetailPanel({
                         return;
                       }
                       void handleManagedDownloadClick(event, attachment.url, attachment.name, {
-                        logLabel: 'guide attachment download',
-                      });
+                        logLabel: 'guide attachment download' });
                     }}
                     className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3.5 transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-md group"
                   >

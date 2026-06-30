@@ -1,4 +1,4 @@
-import { withMissingColumnsFallback } from './supabase-compat';
+import { withMissingColumnsFallback } from './db-compat';
 
 const MESSAGE_INSERT_OPTIONAL_COLUMNS = [
   'file_name',

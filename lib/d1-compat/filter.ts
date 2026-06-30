@@ -2,7 +2,7 @@
 // lib/d1-compat/filter.ts
 // PostgREST 스타일 .or() 필터 문자열을 구조화된 트리(FilterNode)로 파싱.
 //
-// d1-supabase-compat(클라이언트)가 .or() 문자열을 parseOrFilter로 트리화해
+// d1-db-compat(클라이언트)가 .or() 문자열을 parseOrFilter로 트리화해
 // /api/d1/query로 전송하고, 서버 라우트가 FilterNodeSchema로 검증 후 SQL로
 // 변환한다. 클라이언트·서버가 공유하는 단일 계약 파일.
 //
@@ -46,16 +46,13 @@ export const FilterNodeSchema: z.ZodType<FilterNode> = z.lazy(() =>
       kind: z.literal('cond'),
       field: z.string().regex(COLUMN_RE),
       op: z.enum(['eq', 'neq', 'lt', 'gt', 'lte', 'gte', 'is', 'isNot', 'like', 'ilike', 'in']),
-      value: FilterValueSchema,
-    }),
+      value: FilterValueSchema }),
     z.object({
       kind: z.literal('and'),
-      children: z.array(FilterNodeSchema).min(1).max(FILTER_MAX_NODES),
-    }),
+      children: z.array(FilterNodeSchema).min(1).max(FILTER_MAX_NODES) }),
     z.object({
       kind: z.literal('or'),
-      children: z.array(FilterNodeSchema).min(1).max(FILTER_MAX_NODES),
-    }),
+      children: z.array(FilterNodeSchema).min(1).max(FILTER_MAX_NODES) }),
   ]),
 );
 
@@ -170,7 +167,7 @@ function parseList(inner: string, depth: number): FilterNode[] {
 }
 
 /**
- * supabase `.or(input)`의 input 문자열을 OR 그룹 FilterNode로 파싱.
+ * db `.or(input)`의 input 문자열을 OR 그룹 FilterNode로 파싱.
  * 잘못된 입력은 throw — 호출 측(QueryBuilder.or)에서 처리.
  */
 export function parseOrFilter(input: string): FilterNode {

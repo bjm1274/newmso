@@ -26,8 +26,7 @@ const COLOR: Record<MKpiTone, string> = {
   accent: 'var(--m-accent)',
   success: 'var(--m-success)',
   warning: 'var(--m-warning)',
-  danger: 'var(--m-danger)',
-};
+  danger: 'var(--m-danger)' };
 
 function MKpiBase({ label, value, unit, sub, tone = '', icon }: MKpiProps) {
   // 아이콘 미지정 — 기존 세로 레이아웃(라벨 위 / 값 아래)
@@ -45,8 +44,7 @@ function MKpiBase({ label, value, unit, sub, tone = '', icon }: MKpiProps) {
             color: COLOR[tone],
             display: 'flex',
             alignItems: 'baseline',
-            gap: 3,
-          }}
+            gap: 3 }}
         >
           {value}
           {unit && <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{unit}</span>}
@@ -66,8 +64,7 @@ function MKpiBase({ label, value, unit, sub, tone = '', icon }: MKpiProps) {
         padding: '12px 14px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-      }}
+        gap: 10 }}
     >
       <div className={'m-kpi-ico' + (tone ? ' tone-' + tone : '')}>
         <MIcon name={icon} size={18} />
@@ -85,8 +82,7 @@ function MKpiBase({ label, value, unit, sub, tone = '', icon }: MKpiProps) {
               marginTop: 1,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
+              whiteSpace: 'nowrap' }}
           >
             {sub}
           </div>
@@ -102,8 +98,7 @@ function MKpiBase({ label, value, unit, sub, tone = '', icon }: MKpiProps) {
           display: 'flex',
           alignItems: 'baseline',
           gap: 2,
-          flexShrink: 0,
-        }}
+          flexShrink: 0 }}
       >
         {value}
         {unit && <span style={{ fontSize: 10.5, color: 'var(--z-500)', fontWeight: 700 }}>{unit}</span>}

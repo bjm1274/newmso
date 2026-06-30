@@ -17,8 +17,7 @@ import { loadNotificationAutomationSettings } from '@/lib/notification-automatio
 import {
   getD1Binding,
   getD1Drizzle,
-  system_settings as systemSettingsTable,
-} from '@/lib/db';
+  system_settings as systemSettingsTable } from '@/lib/db';
 
 export const PAYROLL_NOTICE_LAST_SENT_KEY = 'payroll_notice_last_sent';
 
@@ -65,8 +64,7 @@ export async function dispatchPayrollNotice(
       type: 'INFO',
       title: '급여명세서 발송일',
       body: '오늘은 급여 지급일입니다. 급여명세서 발송을 확인해 주세요.',
-      dedupeKey: `payroll-notice:${monthKey}`,
-    },
+      dedupeKey: `payroll-notice:${monthKey}` },
   ]);
 
   // 멱등 마킹: system_settings.key PK 충돌 시 value/updated_at 갱신
@@ -76,15 +74,12 @@ export async function dispatchPayrollNotice(
     .values({
       key: PAYROLL_NOTICE_LAST_SENT_KEY,
       value: monthKey,
-      updated_at: now.toISOString(),
-    })
+      updated_at: now.toISOString() })
     .onConflictDoUpdate({
       target: systemSettingsTable.key,
       set: {
         value: sql`excluded.value`,
-        updated_at: sql`excluded.updated_at`,
-      },
-    });
+        updated_at: sql`excluded.updated_at` } });
 
   return { sent: true, month: monthKey };
 }

@@ -28,8 +28,7 @@ const SUBVIEW_STORAGE_KEY_BY_MENU: Partial<Record<SupportedMenuId, string>> = {
   재고관리: INV_VIEW_KEY,
   전자결재: APPROVAL_VIEW_KEY,
   관리자: ADMIN_SUBVIEW_KEY,
-  재무회계: FINANCE_VIEW_KEY,
-};
+  재무회계: FINANCE_VIEW_KEY };
 
 function readLocalStorage(key: string) {
   if (typeof window === 'undefined') {
@@ -83,8 +82,7 @@ export function readStoredMainNavigationState(): StoredMainNavigationState {
   return {
     savedMenu: readLocalStorage(LAST_MENU_KEY),
     savedSubView: readLocalStorage(LAST_SUBVIEW_KEY),
-    savedCo: readLocalStorage(LAST_COMPANY_KEY),
-  };
+    savedCo: readLocalStorage(LAST_COMPANY_KEY) };
 }
 
 export function persistTopLevelNavigationState(mainMenu: string, subView: string, selectedCo: string) {

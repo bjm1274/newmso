@@ -8,19 +8,17 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   withMissingColumnFallback,
-  withMissingColumnsFallback,
-} from '@/lib/supabase-compat';
+  withMissingColumnsFallback } from '@/lib/db-compat';
 import { isActiveStaff } from '@/lib/active-staff';
 import type {
   BoardPost,
   InventoryItem,
   OpCheckTemplate,
   OpPatientCheck,
-  StaffMember,
-} from '@/types';
+  StaffMember } from '@/types';
 import {
   buildSelectColumns,
   buildWardSearchVariants,
@@ -36,8 +34,7 @@ import {
   QueryResult,
   resolveWardStaffCandidates,
   stripHiddenMetaBlocks,
-  withOptionalQueryFallback,
-} from './op-check-utils';
+  withOptionalQueryFallback } from './op-check-utils';
 import {
   OpCheckScheduleList,
   OpCheckStatusFilterTabs,
@@ -45,8 +42,7 @@ import {
   OpCheckWorkspaceHeader,
   OpCheckWorkspaceMetaPanel,
   OpCheckWorkspaceNotesSection,
-  OpCheckWorkspaceProgressPanel,
-} from './op-check-components';
+  OpCheckWorkspaceProgressPanel } from './op-check-components';
 import {
   ANESTHESIA_OPTIONS,
   ITEM_SUGGESTION_ID,
@@ -56,8 +52,7 @@ import {
   OP_CHECK_TEMPLATE_SELECT,
   OP_PATIENT_CHECK_OPTIONAL_COLUMNS,
   OP_PATIENT_CHECK_REQUIRED_COLUMNS,
-  STATUS_OPTIONS,
-} from './OP체크/constants';
+  STATUS_OPTIONS } from './OP체크/constants';
 import {
   buildTemplateLabel,
   compareSchedules,
@@ -67,36 +62,30 @@ import {
   getScheduleStatusOrder,
   mapSchedulePost,
   sortSchedulesForWorkspace,
-  updateRecentTargetIds,
-} from './OP체크/schedule-helpers';
+  updateRecentTargetIds } from './OP체크/schedule-helpers';
 import type {
   LinkedSchedulePost,
   ScheduleStatus,
   SurgeryTemplateRow,
-  WorkspaceSortKey,
-} from './OP체크/schedule-helpers';
+  WorkspaceSortKey } from './OP체크/schedule-helpers';
 import {
   createChecklistItem,
   dedupeChecklistItems,
   emptyTemplateEditor,
   formatChecklistItems,
   normalizeChecklistItems,
-  summarizeChecklistItems,
-} from './OP체크/checklist-helpers';
+  summarizeChecklistItems } from './OP체크/checklist-helpers';
 import type {
   ChecklistItemDraft,
   TemplateEditorState,
-  TemplateScope,
-} from './OP체크/checklist-helpers';
+  TemplateScope } from './OP체크/checklist-helpers';
 import {
   buildPatientCheckSignature,
   buildWardMessageContent,
-  buildWardMessageTemplateOptions,
-} from './OP체크/patient-check-helpers';
+  buildWardMessageTemplateOptions } from './OP체크/patient-check-helpers';
 import type { PatientCheckState } from './OP체크/patient-check-helpers';
 import {
-  OpCheckPatientChecklistItemRows,
-} from './OP체크/ChecklistItemRows';
+  OpCheckPatientChecklistItemRows } from './OP체크/ChecklistItemRows';
 import { OpCheckPrintModal } from './OP체크/PrintModal';
 import { OpCheckWardMessageDialog } from './OP체크/WardMessageDialog';
 import { OpCheckTemplateManagerPanel } from './OP체크/TemplateManagerPanel';
@@ -137,8 +126,7 @@ function mergeChecklistItems(existingItems: ChecklistItemDraft[], nextItems: Che
       checked: Boolean(matched.checked),
       quantity: matched.quantity || item.quantity || '',
       unit: matched.unit || item.unit || '',
-      note: matched.note || item.note || '',
-    };
+      note: matched.note || item.note || '' };
   });
 
   const customItems = existingItems.filter((item) => {
@@ -155,8 +143,7 @@ export default function OperationCheckView({
   selectedCo,
   selectedCompanyId,
   viewMode = 'patients',
-  title,
-}: {
+  title }: {
   user?: OpCheckViewUser | null;
   staffs?: StaffMember[];
   selectedCo?: string | null;
@@ -206,8 +193,7 @@ export default function OperationCheckView({
   const [workspaceSections, setWorkspaceSections] = useState<Record<WorkspaceSectionKey, boolean>>({
     prep: true,
     consumable: true,
-    notes: true,
-  });
+    notes: true });
 
   const [statusFilterTab, setStatusFilterTab] = useState<'전체' | ScheduleStatus>('전체');
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -487,7 +473,7 @@ export default function OperationCheckView({
       const [scheduleRes, templateRes, patientCheckRes, surgeryTemplateRes, inventoryRes] = await Promise.all([
         withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns): Promise<QueryResult<BoardPost[]>> => {
-            const result = await supabase
+            const result = await db
               .from('board_posts')
               .select(
                 buildSelectColumns(
@@ -502,14 +488,14 @@ export default function OperationCheckView({
           },
           [...OP_CHECK_BOARD_POST_OPTIONAL_COLUMNS],
         ),
-        supabase
+        db
           .from('op_check_templates')
           .select(OP_CHECK_TEMPLATE_SELECT)
           .order('template_scope', { ascending: true })
           .order('template_name', { ascending: true }) as unknown as Promise<QueryResult<OpCheckTemplate[]>>,
         withMissingColumnsFallback<OpPatientCheck[]>(
           async (omittedColumns): Promise<QueryResult<OpPatientCheck[]>> => {
-            const result = await supabase
+            const result = await db
               .from('op_patient_checks')
               .select(
                 buildSelectColumns(
@@ -531,7 +517,7 @@ export default function OperationCheckView({
                 const selectedColumns = ['id', 'name', 'sort_order', 'is_active']
                   .filter((columnName) => !omittedColumns.has(columnName))
                   .join(', ');
-                let query = supabase.from('surgery_templates').select(selectedColumns);
+                let query = db.from('surgery_templates').select(selectedColumns);
                 if (!omittedColumns.has('is_active')) {
                   query = query.eq('is_active', true);
                 }
@@ -546,8 +532,7 @@ export default function OperationCheckView({
           {
             fallbackData: [] as SurgeryTemplateRow[],
             relationNames: ['surgery_templates'],
-            columnNames: ['sort_order', 'is_active'],
-          },
+            columnNames: ['sort_order', 'is_active'] },
         ),
         withOptionalQueryFallback<InventoryItem[]>(
           async (): Promise<QueryResult<InventoryItem[]>> =>
@@ -556,7 +541,7 @@ export default function OperationCheckView({
                 const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
                   .filter((columnName) => !omittedColumns.has(columnName))
                   .join(', ');
-                const result = await supabase
+                const result = await db
                   .from('inventory_items')
                   .select(selectedColumns)
                   .order('name', { ascending: true });
@@ -567,8 +552,7 @@ export default function OperationCheckView({
           {
             fallbackData: [] as InventoryItem[],
             relationNames: ['inventory_items', 'inventory'],
-            columnNames: ['unit', 'quantity', 'company', 'company_id', 'department'],
-          },
+            columnNames: ['unit', 'quantity', 'company', 'company_id', 'department'] },
         ),
       ]);
 
@@ -681,8 +665,7 @@ export default function OperationCheckView({
             : selectedDateSchedules.filter((post) => {
                 const currentStatus = patientCheckStatusByScheduleId[post.id] || '준비중';
                 return currentStatus === tab;
-              }).length,
-      })),
+              }).length })),
     [patientCheckStatusByScheduleId, selectedDateSchedules],
   );
 
@@ -723,8 +706,7 @@ export default function OperationCheckView({
       eventsByDate,
       days,
       month,
-      toKey,
-    };
+      toKey };
   }, [calendarMonth, deferredSearchTerm, schedulePosts]);
 
   useEffect(() => {
@@ -759,8 +741,7 @@ export default function OperationCheckView({
         ? prev
         : {
             ...prev,
-            [post.schedule_date]: post.id,
-          },
+            [post.schedule_date]: post.id },
     );
   }, []);
 
@@ -913,8 +894,7 @@ export default function OperationCheckView({
             : applicableTemplates.map((template) => String(template.id)),
           surgery_started_at: (existingCheck as Record<string, unknown>).surgery_started_at as string | null ?? null,
           surgery_ended_at: (existingCheck as Record<string, unknown>).surgery_ended_at as string | null ?? null,
-          ward_message_sent_at: (existingCheck as Record<string, unknown>).ward_message_sent_at as string | null ?? null,
-        };
+          ward_message_sent_at: (existingCheck as Record<string, unknown>).ward_message_sent_at as string | null ?? null };
       }
 
       return {
@@ -932,8 +912,7 @@ export default function OperationCheckView({
         consumable_items: consumableItems.length ? consumableItems : [createChecklistItem('patient-consumable')],
         notes: '',
         status: '준비중',
-        applied_template_ids: applicableTemplates.map((template) => String(template.id)),
-      };
+        applied_template_ids: applicableTemplates.map((template) => String(template.id)) };
     },
     [opTemplates, surgeryTemplates]
   );
@@ -955,8 +934,7 @@ export default function OperationCheckView({
         title: '저장되지 않은 변경사항',
         description: `저장되지 않은 OP체크 변경사항이 있습니다.\n\n${actionLabel} 전에 저장하지 않은 내용이 사라질 수 있습니다.\n계속하시겠습니까?`,
         confirmText: '계속',
-        tone: 'danger',
-      });
+        tone: 'danger' });
     },
     [checkFormIsDirty, openConfirm],
   );
@@ -972,8 +950,7 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(post.schedule_date, post, {
-        openWorkspace: false,
-      });
+        openWorkspace: false });
     },
     [applyDateAndScheduleSelection, confirmWorkspaceTransition, selectedScheduleId]
   );
@@ -991,8 +968,7 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(dateKey, nextSchedule, {
-        openWorkspace: false,
-      });
+        openWorkspace: false });
     },
     [applyDateAndScheduleSelection, confirmWorkspaceTransition, getPreferredScheduleForDate, selectedDate, selectedSchedule]
   );
@@ -1058,8 +1034,7 @@ export default function OperationCheckView({
       ready: 0,
       prepComplete: 0,
       inProgress: 0,
-      done: 0,
-    };
+      done: 0 };
 
     selectedDateSchedules.forEach((post) => {
       const currentStatus = String(patientChecksByScheduleId[post.id]?.status || '준비중');
@@ -1091,8 +1066,7 @@ export default function OperationCheckView({
           testId: 'ready',
           idleClass: 'bg-[var(--muted)]/45 text-[var(--foreground)]',
           labelClass: 'text-[var(--toss-gray-3)]',
-          activeClass: 'bg-[var(--foreground)] text-white shadow-sm',
-        },
+          activeClass: 'bg-[var(--foreground)] text-white shadow-sm' },
         {
           value: '준비완료' as const,
           label: '준비완료',
@@ -1100,8 +1074,7 @@ export default function OperationCheckView({
           testId: 'prep-complete',
           idleClass: 'bg-[var(--toss-blue-light)]/75 text-[var(--accent)]',
           labelClass: 'text-[var(--accent)]',
-          activeClass: 'bg-[var(--accent)] text-white shadow-sm',
-        },
+          activeClass: 'bg-[var(--accent)] text-white shadow-sm' },
         {
           value: '수술중' as const,
           label: '수술중',
@@ -1109,8 +1082,7 @@ export default function OperationCheckView({
           testId: 'in-progress',
           idleClass: 'bg-orange-50 text-orange-700',
           labelClass: 'text-orange-700',
-          activeClass: 'bg-orange-500 text-white shadow-sm',
-        },
+          activeClass: 'bg-orange-500 text-white shadow-sm' },
         {
           value: '완료' as const,
           label: '완료',
@@ -1118,8 +1090,7 @@ export default function OperationCheckView({
           testId: 'done',
           idleClass: 'bg-emerald-50 text-emerald-700',
           labelClass: 'text-emerald-700',
-          activeClass: 'bg-emerald-500 text-white shadow-sm',
-        },
+          activeClass: 'bg-emerald-500 text-white shadow-sm' },
       ] satisfies ReadonlyArray<{
         value: '준비중' | '준비완료' | '수술중' | '완료';
         label: string;
@@ -1158,8 +1129,7 @@ export default function OperationCheckView({
   const toggleWorkspaceSection = useCallback((sectionKey: WorkspaceSectionKey) => {
     setWorkspaceSections((prev) => ({
       ...prev,
-      [sectionKey]: !prev[sectionKey],
-    }));
+      [sectionKey]: !prev[sectionKey] }));
   }, []);
 
   const handleWorkspaceStatusSummaryClick = useCallback(
@@ -1189,8 +1159,7 @@ export default function OperationCheckView({
 
           if (nextSchedule) {
             applyDateAndScheduleSelection(selectedDate, nextSchedule, {
-              openWorkspace: true,
-            });
+              openWorkspace: true });
           }
         }
       }
@@ -1237,8 +1206,7 @@ export default function OperationCheckView({
       }
 
       applyDateAndScheduleSelection(nextDate, nextSchedule, {
-        openWorkspace: false,
-      });
+        openWorkspace: false });
     },
     [
       applyDateAndScheduleSelection,
@@ -1383,8 +1351,7 @@ export default function OperationCheckView({
           prev.consumable_items,
           templateConsumableItems.length ? templateConsumableItems : [createChecklistItem('patient-consumable')]
         ),
-        applied_template_ids: applicableTemplates.map((template) => String(template.id)),
-      };
+        applied_template_ids: applicableTemplates.map((template) => String(template.id)) };
     },
     [opTemplates, selectedSchedule, surgeryTemplates]
   );
@@ -1432,12 +1399,11 @@ export default function OperationCheckView({
         created_by_name: String(user?.name || '').trim() || null,
         updated_by: String(user?.id || '').trim() || null,
         updated_by_name: String(user?.name || '').trim() || null,
-        updated_at: new Date().toISOString(),
-      };
+        updated_at: new Date().toISOString() };
 
       const { data, error } = await withMissingColumnsFallback<OpPatientCheck>(
         async (omittedColumns): Promise<QueryResult<OpPatientCheck>> => {
-          const result = await supabase
+          const result = await db
             .from('op_patient_checks')
             .upsert(payload, { onConflict: 'schedule_post_id' })
             .select(
@@ -1542,22 +1508,20 @@ export default function OperationCheckView({
         is_active: templateEditor.is_active,
         created_by: String(user?.id || '').trim() || null,
         created_by_name: String(user?.name || '').trim() || null,
-        updated_at: new Date().toISOString(),
-      };
+        updated_at: new Date().toISOString() };
 
       const response = (templateEditor.id
-        ? await supabase
+        ? await db
             .from('op_check_templates')
             .update(payload)
             .eq('id', templateEditor.id)
             .select(OP_CHECK_TEMPLATE_SELECT)
             .single()
-        : await supabase
+        : await db
             .from('op_check_templates')
             .insert({
               ...payload,
-              created_at: new Date().toISOString(),
-            })
+              created_at: new Date().toISOString() })
             .select(OP_CHECK_TEMPLATE_SELECT)
             .single()) as unknown as QueryResult<OpCheckTemplate>;
 
@@ -1591,8 +1555,7 @@ export default function OperationCheckView({
       prep_items: normalizeChecklistItems(template.prep_items, 'template-prep'),
       consumable_items: normalizeChecklistItems(template.consumable_items, 'template-consumable'),
       notes: String(template.notes || '').trim(),
-      is_active: template.is_active !== false,
-    });
+      is_active: template.is_active !== false });
   }, []);
 
   const quickStatusChange = useCallback(async (newStatus: string) => {
@@ -1607,8 +1570,7 @@ export default function OperationCheckView({
         cancelText: '취소',
         tone: 'danger',
         centerText: true,
-        largeText: true,
-      });
+        largeText: true });
       if (!confirmPatient) return;
 
       const confirmSite = await openConfirm({
@@ -1618,8 +1580,7 @@ export default function OperationCheckView({
         cancelText: '취소',
         tone: 'danger',
         centerText: true,
-        largeText: true,
-      });
+        largeText: true });
       if (!confirmSite) return;
 
       const unchecked = checkForm.prep_items.filter((item) => item.name && !item.checked);
@@ -1630,8 +1591,7 @@ export default function OperationCheckView({
           confirmText: '준비완료',
           tone: 'danger',
           centerText: true,
-          largeText: true,
-        });
+          largeText: true });
         if (!proceed) return;
       }
     }
@@ -1668,14 +1628,13 @@ export default function OperationCheckView({
           ? (checkForm.surgery_started_at || now)
           : (checkForm.surgery_started_at || null),
         surgery_ended_at: newStatus === '완료' ? now : (checkForm.surgery_ended_at || null),
-        ward_message_sent_at: checkForm.ward_message_sent_at || null,
-      };
+        ward_message_sent_at: checkForm.ward_message_sent_at || null };
 
       const { data, error } = await withMissingColumnsFallback<OpPatientCheck>(
         async (omittedColumns) => {
           const payload = { ...basePayload };
           omittedColumns.forEach((col) => delete (payload as Record<string, unknown>)[col]);
-          return supabase
+          return db
             .from('op_patient_checks')
             .upsert(payload, { onConflict: 'schedule_post_id' })
             .select(
@@ -1711,8 +1670,7 @@ export default function OperationCheckView({
                 title: '소모품 재고 자동 차감',
                 description: `수술 완료 처리되었습니다.\n\n사용된 소모품 ${itemsWithQty.length}종의 재고를 자동으로 차감하시겠습니까?\n\n${itemsWithQty.map((i) => `  · ${i.name} ${i.quantity}${i.unit || ''}`).join('\n')}`,
                 confirmText: '차감',
-                tone: 'accent',
-              });
+                tone: 'accent' });
               if (proceed) void deductInventoryItems(itemsWithQty);
             })();
           }, 300);
@@ -1777,7 +1735,7 @@ export default function OperationCheckView({
           ),
         );
       } else {
-        const { data } = await supabase
+        const { data } = await db
           .from('staff_members')
           .select('id, name, department, position, company, company_id, status')
           .order('name');
@@ -1820,13 +1778,13 @@ export default function OperationCheckView({
     try {
       const roomLookupResult = await withMissingColumnFallback<ChatRoomMemberLookupRow[]>(
         async () =>
-          supabase
+          db
             .from('chat_rooms')
             .select('id, members')
             .eq('type', 'direct')
             .contains('members', [senderId]) as unknown as Promise<QueryResult<ChatRoomMemberLookupRow[]>>,
         async () =>
-          supabase
+          db
             .from('chat_rooms')
             .select('id, member_ids')
             .eq('type', 'direct')
@@ -1860,8 +1818,7 @@ export default function OperationCheckView({
             async (omittedColumns) => {
               const roomPayload: Record<string, unknown> = {
                 type: 'direct',
-                name: targetStaff?.name || '개인 메시지',
-              };
+                name: targetStaff?.name || '개인 메시지' };
               if (omittedColumns.has('members')) {
                 roomPayload.member_ids = [senderId, targetId];
               } else {
@@ -1870,7 +1827,7 @@ export default function OperationCheckView({
               if (!omittedColumns.has('company_id') && companyId) {
                 roomPayload.company_id = companyId;
               }
-              return supabase
+              return db
                 .from('chat_rooms')
                 .insert(roomPayload)
                 .select('id')
@@ -1890,7 +1847,7 @@ export default function OperationCheckView({
           }
         }
         if (roomId) {
-          const { error: msgErr } = await supabase
+          const { error: msgErr } = await db
             .from('messages')
             .insert({ room_id: roomId, sender_id: senderId, content: storedWardMessageText });
           if (msgErr) {
@@ -1909,7 +1866,7 @@ export default function OperationCheckView({
           await withMissingColumnsFallback(
             async (omittedColumns) => {
               if (omittedColumns.has('ward_message_sent_at')) return { data: null, error: null };
-              return supabase
+              return db
                 .from('op_patient_checks')
                 .upsert(
                   { schedule_post_id: checkForm.schedule_post_id, ward_message_sent_at: now },
@@ -1950,7 +1907,7 @@ export default function OperationCheckView({
         const match = inventoryNameMap[normalizeLookupValue(item.name)];
         if (!match) continue;
         const newQty = Math.max(0, (match.quantity || 0) - Number(item.quantity || 0));
-        const { error } = await supabase
+        const { error } = await db
           .from('inventory_items')
           .update({ quantity: newQty })
           .eq('id', match.id);
@@ -1975,11 +1932,10 @@ export default function OperationCheckView({
       title: 'OP체크 템플릿 삭제',
       description: '이 템플릿을 삭제합니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('op_check_templates').delete().eq('id', templateId);
+      const { error } = await db.from('op_check_templates').delete().eq('id', templateId);
       if (error) throw error;
       setOpTemplates((prev) => prev.filter((template) => String(template.id || '') !== templateId));
       if (templateEditor.id === templateId) {
@@ -1995,8 +1951,7 @@ export default function OperationCheckView({
   const templatesByScope = useMemo(
     () => ({
       surgery: opTemplates.filter((template) => template.template_scope !== 'anesthesia'),
-      anesthesia: opTemplates.filter((template) => template.template_scope === 'anesthesia'),
-    }),
+      anesthesia: opTemplates.filter((template) => template.template_scope === 'anesthesia') }),
     [opTemplates]
   );
 
@@ -2019,8 +1974,7 @@ export default function OperationCheckView({
       openWorkspaceOnSelect,
       layout = 'stack',
       testIdPrefix,
-      schedules = filteredSchedules,
-    }: {
+      schedules = filteredSchedules }: {
       containerClassName: string;
       emptyMessage: string;
       openWorkspaceOnSelect: boolean;
@@ -2460,8 +2414,7 @@ export default function OperationCheckView({
                 containerClassName: 'max-h-[calc(100vh-420px)] min-h-[120px] space-y-2 overflow-y-auto pr-1 custom-scrollbar',
                 emptyMessage: '선택한 날짜에 연결할 수술 환자가 없습니다.',
                 openWorkspaceOnSelect: false,
-                testIdPrefix: 'op-check-schedule-card',
-              })}
+                testIdPrefix: 'op-check-schedule-card' })}
             </div>
 
             {checkForm && (

@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { BoardListPost } from './data-hooks';
 
 // ─────────────────────────────────────────────
@@ -124,7 +124,7 @@ export function useReadStatus(post: BoardListPost | null): UseReadStatusResult {
     setLoading(true);
     try {
       // 전 직원(재직자) — 회사 필터 없이 전사 대상 (PC와 동일)
-      const { data: audienceData } = await supabase
+      const { data: audienceData } = await db
         .from('staff_members')
         .select('id, name, company, department, position, status')
         .neq('status', '퇴사')
@@ -138,14 +138,13 @@ export function useReadStatus(post: BoardListPost | null): UseReadStatusResult {
             name: String(r.name ?? '').trim(),
             department: r.department == null ? null : String(r.department),
             position: r.position == null ? null : String(r.position),
-            company: r.company == null ? null : String(r.company),
-          };
+            company: r.company == null ? null : String(r.company) };
         })
         .filter((m) => m.id);
 
       // 읽음 집합
       const readSet = new Set<string>();
-      const { data: readRows, error: readErr } = await supabase
+      const { data: readRows, error: readErr } = await db
         .from('board_post_reads')
         .select('user_id')
         .eq('post_id', postId);
@@ -193,7 +192,7 @@ export async function markBoardPostRead(
   const postId = String(post.id ?? '').trim();
   if (!postId) return;
   try {
-    await supabase.from('board_post_reads').upsert(
+    await db.from('board_post_reads').upsert(
       [{ post_id: postId, user_id: String(userId), read_at: new Date().toISOString() }],
       { onConflict: 'post_id,user_id' },
     );

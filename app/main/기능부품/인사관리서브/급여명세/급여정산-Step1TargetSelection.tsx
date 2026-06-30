@@ -14,8 +14,7 @@ export function Step1TargetSelection({
   onToggleStaff,
   onNext,
   loading,
-  isLocked,
-}: {
+  isLocked }: {
   hasExactTaxTable: boolean;
   yearMonth: string;
   onYearMonthChange: (value: string) => void;

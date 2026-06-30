@@ -55,8 +55,7 @@ export type {
   BoardPostRow,
   BoardTemplateRow,
   BoardLikeRow,
-  BoardChatRoomRow,
-} from './게시판-view-utils';
+  BoardChatRoomRow } from './게시판-view-utils';
 
 export {
   BOARD_POST_STATUSES,
@@ -80,5 +79,4 @@ export {
   isMissingBoardReadStorageError,
   normalizeBoardPostStatus,
   getBoardStatusTone,
-  runBoardPostMutation,
-} from './게시판-view-utils';
+  runBoardPostMutation } from './게시판-view-utils';

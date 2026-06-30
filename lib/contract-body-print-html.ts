@@ -325,7 +325,7 @@ export function buildContractBodyPrintHTML(templateText: string): string {
 
             // 급여 항목(기본급/식대/직책수당/기타수당/비과세) → 라벨-금액 행
             if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
-                const parts = t.split(/\s{2,}/);
+                const parts = t.split(/\s{2 }/);
                 const label = esc(parts[0] ?? '');
                 const amount = esc(parts[1] ?? '');
                 return `<div style="

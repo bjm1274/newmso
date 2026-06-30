@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   buildStaffBootstrapSelect,
-  STAFF_BOOTSTRAP_OPTIONAL_COLUMNS,
-} from '@/lib/staff-query-columns';
+  STAFF_BOOTSTRAP_OPTIONAL_COLUMNS } from '@/lib/staff-query-columns';
 
 let cachedStaffs: StaffMember[] | null = null;
 let fetchPromise: Promise<StaffMember[]> | null = null;
@@ -15,7 +14,7 @@ let fetchPromise: Promise<StaffMember[]> | null = null;
 async function fetchStaffs(): Promise<StaffMember[]> {
   const { data, error } = await withMissingColumnsFallback<StaffMember[]>(
     (omittedColumns) =>
-      supabase
+      db
         .from('staff_members')
         .select(buildStaffBootstrapSelect(omittedColumns))
         .order('employee_no', { ascending: true })

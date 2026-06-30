@@ -48,8 +48,7 @@ export function useChatTypingD1({
   effectiveChatUserId,
   userName,
   setTypingUsers,
-  typingClearRef,
-}: UseChatTypingD1Params) {
+  typingClearRef }: UseChatTypingD1Params) {
   const lastEmitAtRef = useRef<number>(0);
   const lastEmittedTypingRef = useRef<boolean>(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,8 +74,7 @@ export function useChatTypingD1({
         await fetch('/api/chat/typing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ room_id: roomId, user_name: name }),
-        });
+          body: JSON.stringify({ room_id: roomId, user_name: name }) });
       } catch {
         // 네트워크 오류는 무시 — typing 표시는 비필수 기능
       }
@@ -89,8 +87,7 @@ export function useChatTypingD1({
       await fetch('/api/chat/typing', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId }),
-      });
+        body: JSON.stringify({ room_id: roomId }) });
     } catch {
       // 무시
     }

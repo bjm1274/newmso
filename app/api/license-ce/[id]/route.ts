@@ -14,8 +14,7 @@ import {
   staff_licenses as staffLicensesTable,
   notifications as notificationsTable,
   eq,
-  and,
-} from '@/lib/db';
+  and } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -34,8 +33,7 @@ const PatchSchema = z.object({
   // 적용할 신규 만료일 (수기 override 가능)
   override_expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   reject_reason: z.string().max(1000).optional(),
-  memo: z.string().max(1000).optional(),
-});
+  memo: z.string().max(1000).optional() });
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -84,8 +82,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         ocr_education_date: licenseCETable.ocr_education_date,
         ocr_extracted_meta: licenseCETable.ocr_extracted_meta,
         status: licenseCETable.status,
-        memo: licenseCETable.memo,
-      })
+        memo: licenseCETable.memo })
       .from(licenseCETable)
       .where(eq(licenseCETable.id, id))
       .limit(1);
@@ -114,8 +111,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         ocr_text: parsed.data.ocr_text ?? ceRow.ocr_text,
         ocr_education_date: parsed.data.ocr_education_date ?? ceRow.ocr_education_date,
         ocr_extracted_meta: ocrExtractedMeta,
-        updated_at: now,
-      };
+        updated_at: now };
 
       const d1RejectPayload = {
         ...rejectPayload,
@@ -123,8 +119,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         ocr_extracted_meta:
           ocrExtractedMeta !== null && ocrExtractedMeta !== undefined && typeof ocrExtractedMeta !== 'string'
             ? JSON.stringify(ocrExtractedMeta)
-            : (ocrExtractedMeta as string | null),
-      };
+            : (ocrExtractedMeta as string | null) };
       await db.update(licenseCETable).set(d1RejectPayload).where(eq(licenseCETable.id, id));
       return NextResponse.json({ ok: true, action: 'reject' });
     }
@@ -149,8 +144,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           license_type: staffLicensesTable.license_type,
           renewed_date: staffLicensesTable.renewed_date,
           expiry_date: staffLicensesTable.expiry_date,
-          issued_date: staffLicensesTable.issued_date,
-        })
+          issued_date: staffLicensesTable.issued_date })
         .from(staffLicensesTable)
         .where(eq(staffLicensesTable.id, ceRow.license_id))
         .limit(1);
@@ -163,8 +157,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           license_type: staffLicensesTable.license_type,
           renewed_date: staffLicensesTable.renewed_date,
           expiry_date: staffLicensesTable.expiry_date,
-          issued_date: staffLicensesTable.issued_date,
-        })
+          issued_date: staffLicensesTable.issued_date })
         .from(staffLicensesTable)
         .where(
           and(
@@ -213,16 +206,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       ocr_extracted_meta: approveOcrMeta,
       memo: parsed.data.memo ?? ceRow.memo,
       license_id: licenseRow?.id ?? ceRow.license_id,
-      updated_at: now,
-    };
+      updated_at: now };
 
     const d1ApprovePayload = {
       ...approvePayload,
       ocr_extracted_meta:
         approveOcrMeta !== null && approveOcrMeta !== undefined && typeof approveOcrMeta !== 'string'
           ? JSON.stringify(approveOcrMeta)
-          : (approveOcrMeta as string | null),
-    };
+          : (approveOcrMeta as string | null) };
     await db.update(licenseCETable).set(d1ApprovePayload).where(eq(licenseCETable.id, id));
 
     // 승인 완료 알림 (직원에게)
@@ -237,9 +228,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             ce_id: id,
             license_id: licenseRow?.id ?? null,
             new_expiry: newExpiry,
-            education_date: educationDate,
-          },
-        };
+            education_date: educationDate } };
         await db.insert(notificationsTable).values({
           id: crypto.randomUUID(),
           user_id: notifRow.user_id,
@@ -248,8 +237,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           body: notifRow.body,
           metadata: JSON.stringify(notifRow.metadata),
           read_at: null,
-          created_at: now,
-        });
+          created_at: now });
       } catch {
         // 알림 실패는 메인 트랜잭션에 영향 없음
       }
@@ -260,8 +248,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       license_type: licenseRow?.license_type ?? ceRow.license_type_hint,
       expiry_date: newExpiry,
       renewed_date: educationDate,
-      issued_date: licenseRow?.issued_date,
-    });
+      issued_date: licenseRow?.issued_date });
 
     return NextResponse.json({
       ok: true,
@@ -269,8 +256,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       newExpiry,
       educationDate,
       effective,
-      licenseUpdated: Boolean(licenseRow),
-    });
+      licenseUpdated: Boolean(licenseRow) });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });

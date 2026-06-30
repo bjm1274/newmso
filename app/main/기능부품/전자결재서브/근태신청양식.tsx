@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -25,8 +25,7 @@ export default function AttendanceForms({
   setExtraData,
   setFormTitle,
   setFormContent,
-  initialExtraData,
-}: Record<string, unknown>) {
+  initialExtraData }: Record<string, unknown>) {
   const currentUser = (user ?? {}) as Record<string, unknown>;
   const staffRows = ((staffs as StaffMember[]) ?? []);
   const updateExtraData = setExtraData as (value: Record<string, unknown>) => void;
@@ -92,8 +91,7 @@ export default function AttendanceForms({
       delegateId: nextDelegateId,
       delegateName: delegate?.name || '',
       delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
-      delegatePosition: String(delegate?.position || '').trim(),
-    };
+      delegatePosition: String(delegate?.position || '').trim() };
   }, [leaveDelegateOptions]);
 
   useEffect(() => {
@@ -120,8 +118,7 @@ export default function AttendanceForms({
       delegateId: selectedDelegateId,
       delegateName: delegate?.name || '',
       delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
-      delegatePosition: String(delegate?.position || '').trim(),
-    });
+      delegatePosition: String(delegate?.position || '').trim() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formType]);
 
@@ -132,14 +129,14 @@ export default function AttendanceForms({
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
       const dateString = formatKoreanDateKey(sixtyDaysAgo);
 
-      const { data: attendance } = await supabase
+      const { data: attendance } = await db
         .from('attendance')
         .select('*')
         .eq('staff_id', currentUser.id as string)
         .gte('date', dateString)
         .order('date', { ascending: false });
 
-      const { data: workSchedules } = await supabase.from('work_shifts').select('*');
+      const { data: workSchedules } = await db.from('work_shifts').select('*');
 
       setAttendanceRows(attendance || []);
       setSchedules(workSchedules || []);
@@ -209,10 +206,8 @@ export default function AttendanceForms({
           hours: Math.round((mins / 60) * 100) / 100,
           amount: Math.floor((mins / 60) * 15000),
           check_out: r.check_out,
-          check_out_local: formatLocalTime(r.check_out),
-        };
-      }),
-    });
+          check_out_local: formatLocalTime(r.check_out) };
+      }) });
 
     let nextTitle = '';
     if (dates.length === 1) {

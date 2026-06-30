@@ -12,21 +12,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import {
   DOC_ALLOWED_FORMATS_LABEL,
   DOC_MAX_FILE_SIZE_LABEL,
-  validateDocUpload,
-} from '@/lib/document-submission-shared';
+  validateDocUpload } from '@/lib/document-submission-shared';
 import { useActionDialog } from '@/app/components/useActionDialog';
 
 const StaffLicenseSchema = z.object({
   id: z.string(),
   license_type: z.string().nullable().optional(),
   license_name: z.string().nullable().optional(),
-  expiry_date: z.string().nullable().optional(),
-});
+  expiry_date: z.string().nullable().optional() });
 type StaffLicense = z.infer<typeof StaffLicenseSchema>;
 
 const CESubmissionSchema = z.object({
@@ -39,15 +37,13 @@ const CESubmissionSchema = z.object({
   file_url: z.string(),
   file_name: z.string().nullable().optional(),
   applied_expiry_date: z.string().nullable().optional(),
-  reject_reason: z.string().nullable().optional(),
-});
+  reject_reason: z.string().nullable().optional() });
 type CESubmission = z.infer<typeof CESubmissionSchema>;
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   pending: { label: '검토 대기', cls: 'bg-amber-500/15 text-amber-700' },
   approved: { label: '승인 · 만료일 연장됨', cls: 'bg-emerald-500/15 text-emerald-700' },
-  rejected: { label: '반려', cls: 'bg-red-500/15 text-red-600' },
-};
+  rejected: { label: '반려', cls: 'bg-red-500/15 text-red-600' } };
 
 type Props = {
   user?: { id?: string; name?: string } | null;
@@ -73,7 +69,7 @@ export default function LicenseCESubmit({ user }: Props) {
     setLoading(true);
     try {
       const [licRes, ceRes] = await Promise.all([
-        supabase
+        db
           .from('staff_licenses')
           .select('id, license_type, license_name, expiry_date')
           .eq('staff_id', user.id)
@@ -122,8 +118,7 @@ export default function LicenseCESubmit({ user }: Props) {
 
       const uploadRes = await fetch('/api/approvals/upload', {
         method: 'POST',
-        body: uploadForm,
-      });
+        body: uploadForm });
       if (!uploadRes.ok) {
         const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
         throw new Error(`업로드 실패: ${errJson.error || uploadRes.statusText}`);
@@ -141,9 +136,7 @@ export default function LicenseCESubmit({ user }: Props) {
           license_name_hint: selectedLicense?.license_name ?? undefined,
           file_url: fileUrl,
           file_name: file.name,
-          memo: memo || undefined,
-        }),
-      });
+          memo: memo || undefined }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? '제출 실패');
 
@@ -163,8 +156,7 @@ export default function LicenseCESubmit({ user }: Props) {
       description: '이 제출 기록을 취소(삭제)하시겠습니까?',
       confirmText: '삭제',
       cancelText: '취소',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     try {
       const res = await fetch(`/api/license-ce/${id}`, { method: 'DELETE' });

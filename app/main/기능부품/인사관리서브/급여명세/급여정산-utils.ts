@@ -1,18 +1,16 @@
 // 급여정산 순수 헬퍼/상수 (순수 추출 — 동작 보존, 금액 계산 로직 불변)
 import type { StaffMember } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   calculateHourlyRateFromMonthlySalary,
-  resolveWeeklyWorkingHours,
-} from '@/lib/payroll-working-hours';
+  resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import type {
   SettlementEntry,
   TaxableAllowanceBreakdown,
   SalaryAmountField,
   SalaryChangeHistoryRow,
   SalaryChangeProrationSegment,
-  SalaryChangeProrationSummary,
-} from './급여정산-types';
+  SalaryChangeProrationSummary } from './급여정산-types';
 
 export const PAYROLL_RECORD_OPTIONAL_COLUMNS = [
   'meal_allowance',
@@ -39,8 +37,7 @@ export const EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN: TaxableAllowanceBreakdown = {
   night_work_allowance: 0,
   holiday_work_allowance: 0,
   annual_leave_pay: 0,
-  manual_extra_allowance: 0,
-};
+  manual_extra_allowance: 0 };
 
 export const PAYROLL_TIME_STEP_MINUTES = 10;
 export const HOLD_TO_UNIT_INPUT_MS = 450;
@@ -63,8 +60,7 @@ const SALARY_CHANGE_FIELD_BY_TYPE: Record<string, SalaryAmountField> = {
   overtime_allowance: 'overtime_allowance',
   night_work_allowance: 'night_work_allowance',
   holiday_work_allowance: 'holiday_work_allowance',
-  annual_leave_pay: 'annual_leave_pay',
-};
+  annual_leave_pay: 'annual_leave_pay' };
 
 const SALARY_CHANGE_FIELD_LABELS: Record<SalaryAmountField, string> = {
   base_salary: '기본급',
@@ -79,8 +75,7 @@ const SALARY_CHANGE_FIELD_LABELS: Record<SalaryAmountField, string> = {
   night_work_allowance: '야간근로수당',
   holiday_work_allowance: '휴일근로수당',
   annual_leave_pay: '연차휴가수당',
-  manual_extra_allowance: '기타 과세수당',
-};
+  manual_extra_allowance: '기타 과세수당' };
 
 export function parsePayrollWonInput(value: unknown) {
   const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
@@ -160,8 +155,7 @@ export function getStaffTaxableAllowanceBreakdown(staff: StaffMember): TaxableAl
     night_work_allowance: Number(staff.night_work_allowance || 0) + Number(staff.agreed_night_allowance || 0),
     holiday_work_allowance: Number(staff.holiday_work_allowance || 0),
     annual_leave_pay: Number(staff.annual_leave_pay || 0),
-    manual_extra_allowance: 0,
-  };
+    manual_extra_allowance: 0 };
 }
 
 export function normalizeTaxableAllowanceBreakdown(value: unknown): TaxableAllowanceBreakdown {
@@ -174,8 +168,7 @@ export function normalizeTaxableAllowanceBreakdown(value: unknown): TaxableAllow
     night_work_allowance: Number(source.night_work_allowance || 0),
     holiday_work_allowance: Number(source.holiday_work_allowance || 0),
     annual_leave_pay: Number(source.annual_leave_pay || 0),
-    manual_extra_allowance: Number(source.manual_extra_allowance || 0),
-  };
+    manual_extra_allowance: Number(source.manual_extra_allowance || 0) };
 }
 
 function parsePayrollDate(value: unknown): Date | null {
@@ -220,8 +213,7 @@ function getPayrollMonthBounds(yearMonth: string) {
   return {
     start: new Date(year, month - 1, 1),
     end: new Date(year, month - 1, lastDay),
-    lastDay,
-  };
+    lastDay };
 }
 
 function shiftPayrollDate(date: Date, days: number) {
@@ -263,8 +255,7 @@ function getSalaryChangesForField(
     .map((change) => ({
       change,
       field: getSalaryChangeField(change.change_type),
-      effectiveDate: parsePayrollDate(change.effective_date),
-    }))
+      effectiveDate: parsePayrollDate(change.effective_date) }))
     .filter(
       (entry): entry is {
         change: SalaryChangeHistoryRow;
@@ -286,8 +277,7 @@ function calculateSalaryAmountWithChanges({
   field,
   yearMonth,
   salaryChanges,
-  staff,
-}: {
+  staff }: {
   fallback: unknown;
   field: SalaryAmountField;
   yearMonth: string;
@@ -365,11 +355,8 @@ function calculateSalaryAmountWithChanges({
               period_end: formatPayrollDateKey(effectiveEnd),
               days: employedDays,
               monthly_amount: defaultAmount,
-              prorated_amount: proratedAmount,
-            },
-          ],
-        },
-      };
+              prorated_amount: proratedAmount },
+          ] } };
     }
     return { amount: defaultAmount, summary: null as SalaryChangeProrationSummary | null };
   }
@@ -391,8 +378,7 @@ function calculateSalaryAmountWithChanges({
       period_end: formatPayrollDateKey(periodEnd),
       days,
       monthly_amount: normalizedMonthlyAmount,
-      prorated_amount: proratedAmount,
-    });
+      prorated_amount: proratedAmount });
   };
 
   const firstChange = orderedChanges[0];
@@ -428,17 +414,14 @@ function calculateSalaryAmountWithChanges({
       ),
       reason: reason || '사유 미입력',
       amount,
-      segments,
-    },
-  };
+      segments } };
 }
 
 function resolveSavedOrCalculatedAmount({
   savedValue,
   fallback,
   calculation,
-  status,
-}: {
+  status }: {
   savedValue: unknown;
   fallback: unknown;
   calculation: ReturnType<typeof calculateSalaryAmountWithChanges>;
@@ -460,8 +443,7 @@ export function resolveSalaryAmountForSettlement({
   yearMonth,
   salaryChanges,
   staff,
-  status,
-}: {
+  status }: {
   savedValue: unknown;
   fallback: unknown;
   field: SalaryAmountField;
@@ -477,15 +459,14 @@ export function resolveSalaryAmountForSettlement({
   }
   return {
     amount,
-    summary: calculation.summary ? { ...calculation.summary, amount } : null,
-  };
+    summary: calculation.summary ? { ...calculation.summary, amount } : null };
 }
 
 export async function fetchSalaryChangeHistoryForMonth(yearMonth: string, staffIds: string[]) {
   const bounds = getPayrollMonthBounds(yearMonth);
   if (!bounds || staffIds.length === 0) return {};
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('salary_change_history')
     .select('id, staff_id, change_type, before_value, after_value, effective_date, reason, created_at')
     .in('staff_id', staffIds)

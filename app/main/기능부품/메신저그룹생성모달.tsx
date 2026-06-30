@@ -21,8 +21,7 @@ export function GroupChatModal({
   onGroupNameChange,
   onToggleMember,
   onClose,
-  onCreate,
-}: GroupChatModalProps) {
+  onCreate }: GroupChatModalProps) {
   if (!open) return null;
 
   return (

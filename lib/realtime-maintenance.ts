@@ -22,8 +22,7 @@ export function bindPageRefresh(
     intervalMs,
     skipWhenHidden = true,
     onFocus = true,
-    onVisibilityChange = true,
-  }: BindPageRefreshOptions
+    onVisibilityChange = true }: BindPageRefreshOptions
 ) {
   const runRefresh = () => {
     if (shouldSkipRefresh(skipWhenHidden)) return;

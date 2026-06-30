@@ -3,13 +3,12 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
-import { d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { useCompaniesCache } from '@/lib/use-companies-cache';
 import {
   CONTRACT_TEMPLATE_VARIABLES,
   DEFAULT_CONTRACT_TEMPLATE,
-  upgradeLegacyContractTemplate,
-} from '@/lib/contract-template-defaults';
+  upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
 import type { ContractClosingData } from '@/lib/contract-template-closing';
 import ContractStandardPreview from '@/app/main/기능부품/인사관리서브/계약문서/계약서표준미리보기';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
@@ -110,8 +109,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
       title: '표준 근로계약서로 초기화',
       description: '현재 본문 내용을 지우고 표준 근로계약서 양식으로 초기화합니다.\n저장 전까지는 데이터베이스에 반영되지 않습니다.',
       confirmText: '초기화',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setTemplate(DEFAULT_CONTRACT_TEMPLATE);
   };
@@ -230,8 +228,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                       formData.append('company', selectedCo);
                       const res = await fetch('/api/admin/seal/upload', {
                         method: 'POST',
-                        body: formData,
-                      });
+                        body: formData });
                       const payload = await res.json().catch(() => ({}));
                       if (!res.ok || !payload?.url) {
                         const message =
@@ -283,13 +280,11 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                         probation_percent: 90,
                         base_salary: 2500000,
                         meal_allowance: 100000,
-                        resident_no: '950101-1234567',
-                      },
+                        resident_no: '950101-1234567' },
                       {
                         contract_start_date: getKoreanTodayString(),
                         probation_months: 3,
-                        probation_percent: 90,
-                      },
+                        probation_percent: 90 },
                       null,
                       {
                         name: selectedCo,
@@ -297,8 +292,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                         business_no: companyInfo?.business_no || '123-45-67890',
                         address: companyInfo?.address || '서울특별시 강남구',
                         phone: companyInfo?.phone || '02-123-4567',
-                        payment_day: '10',
-                      }
+                        payment_day: '10' }
                     )}
                     closingData={{
                       companyName: selectedCo,
@@ -310,8 +304,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                       employeeName: '홍길동',
                       employeeAddress: '자동 연동',
                       employeePhone: '자동 연동',
-                      contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`,
-                    }}
+                      contractDate: `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일` }}
                   />
                 </div>
               ) : (

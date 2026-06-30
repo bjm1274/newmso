@@ -22,8 +22,7 @@ export function OpCheckPatientChecklistItemRows({
   items,
   kind,
   inventoryNameMap,
-  onChange,
-}: PatientChecklistItemRowsProps) {
+  onChange }: PatientChecklistItemRowsProps) {
   return (
     <div className="space-y-2">
       {items.map((item, index) => {
@@ -170,8 +169,7 @@ type TemplateChecklistItemRowsProps = {
 export function OpCheckTemplateChecklistItemRows({
   items,
   kind,
-  onChange,
-}: TemplateChecklistItemRowsProps) {
+  onChange }: TemplateChecklistItemRowsProps) {
   return (
     <div className="space-y-1">
       {items.map((item, index) => (

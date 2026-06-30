@@ -2,8 +2,8 @@
 
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 import { useAppData } from '@/app/main/contexts/AppDataContext';
@@ -47,8 +47,7 @@ function createInitialProductForm(user: Record<string, unknown>): ProductFormSta
     unit: 'EA',
     is_udi: false,
     company: (user?.company as string) || 'SY INC.',
-    department: (user?.department as string) || '',
-  };
+    department: (user?.department as string) || '' };
 }
 
 function normalizeInventoryUnit(value: unknown): InventoryUnit {
@@ -60,8 +59,7 @@ export default function ProductRegistration({
   inventory: _inventory,
   suppliers: _suppliers,
   fetchInventory: _fetchInventory,
-  fetchSuppliers: _fetchSuppliers,
-}: Record<string, unknown>) {
+  fetchSuppliers: _fetchSuppliers }: Record<string, unknown>) {
   const user = (_user ?? {}) as Record<string, unknown>;
   const inventory = Array.isArray(_inventory) ? (_inventory as Record<string, unknown>[]) : [];
   const suppliers = (_suppliers ?? []) as Record<string, unknown>[];
@@ -86,8 +84,7 @@ export default function ProductRegistration({
       if (!current) {
         merged.set(key, {
           name: itemName,
-          unit: rowUnit,
-        });
+          unit: rowUnit });
         return;
       }
 
@@ -106,7 +103,7 @@ export default function ProductRegistration({
   }, [inventoryCatalog, productForm.item_name]);
 
   useEffect(() => {
-    // AppDataContext.staffs[]에서 부서 추출 (별도 supabase 호출 제거)
+    // AppDataContext.staffs[]에서 부서 추출 (별도 db 호출 제거)
     const deptList = appData.staffs
       .map((staff) => String(staff?.department || '').trim())
       .filter(Boolean);
@@ -116,7 +113,7 @@ export default function ProductRegistration({
 
     const loadDeptsAndComps = async () => {
       try {
-        const { data: compData, error: compError } = await supabase
+        const { data: compData, error: compError } = await db
           .from('companies')
           .select('name')
           .eq('is_active', true);
@@ -135,8 +132,7 @@ export default function ProductRegistration({
   const updateForm = (patch: Partial<ProductFormState>) => {
     setProductForm((prev) => ({
       ...prev,
-      ...patch,
-    }));
+      ...patch }));
   };
 
   const handleRegisterProduct = async () => {
@@ -158,8 +154,7 @@ export default function ProductRegistration({
           lot_number: productForm.lot_number || null,
           serial_number: productForm.serial_number || null,
           insurance_code: productForm.insurance_code || null,
-          stock: productForm.quantity || 0,
-        };
+          stock: productForm.quantity || 0 };
 
         if (omittedColumns.has('department')) {
           delete submissionData.department;
@@ -175,7 +170,7 @@ export default function ProductRegistration({
       };
 
       const { error, data: insertedData } = await withMissingColumnsFallback(
-        (omittedColumns) => supabase.from('inventory').insert([buildSubmissionData(omittedColumns)]).select('id'),
+        (omittedColumns) => db.from('inventory').insert([buildSubmissionData(omittedColumns)]).select('id'),
         ['department', 'unit', 'serial_number'],
       );
 
@@ -230,8 +225,7 @@ export default function ProductRegistration({
 
                 updateForm({
                   item_name: nextItemName,
-                  ...(exactMatch ? { unit: exactMatch.unit } : {}),
-                });
+                  ...(exactMatch ? { unit: exactMatch.unit } : {}) });
               }}
               className="w-full rounded-[var(--radius-md)] bg-[var(--input-bg)] p-4 text-sm font-bold outline-none transition focus:ring-2 focus:ring-[var(--accent)]/20"
               placeholder="제품명을 입력하거나 자동완성에서 선택하세요"

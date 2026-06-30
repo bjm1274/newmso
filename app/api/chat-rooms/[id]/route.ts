@@ -17,8 +17,7 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
   chat_rooms as chatRoomsTable,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,11 +25,9 @@ const PatchSchema = z
   .object({
     name: z.string().min(1).optional(),
     members: z.array(z.string()).optional(),
-    type: z.string().min(1).optional(),
-  })
+    type: z.string().min(1).optional() })
   .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field required',
-  });
+    message: 'At least one field required' });
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;

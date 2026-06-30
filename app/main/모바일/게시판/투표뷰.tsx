@@ -14,8 +14,7 @@ import { useCallback, useState } from 'react';
 import {
   drawBoardPollPrize,
   type BoardPoll,
-  type BoardPollPrizeWinner,
-} from '@/app/main/기능부품/게시판서브/board-poll-prize';
+  type BoardPollPrizeWinner } from '@/app/main/기능부품/게시판서브/board-poll-prize';
 import { togglePollVote, type PollVotes } from './게시판변경';
 import { toast } from '@/lib/toast';
 
@@ -56,14 +55,12 @@ export function extractPoll(raw: unknown): BoardPoll | null {
     question: String(obj.question ?? ''),
     options,
     anonymous: Boolean(obj.anonymous),
-    multiple: Boolean(obj.multiple),
-  };
+    multiple: Boolean(obj.multiple) };
   const prize = obj.prize as { winnerCount?: unknown; name?: unknown } | undefined;
   if (prize && typeof prize === 'object' && String(prize.name ?? '').trim()) {
     poll.prize = {
       winnerCount: Number(prize.winnerCount) >= 1 ? Number(prize.winnerCount) : 1,
-      name: String(prize.name).trim(),
-    };
+      name: String(prize.name).trim() };
   }
   if (Array.isArray(obj.prizeWinners)) {
     poll.prizeWinners = obj.prizeWinners
@@ -88,8 +85,7 @@ export default function BoardPollView({
   currentUserName,
   onVotesChange,
   onPollChange,
-  onRefetchComments,
-}: BoardPollViewProps) {
+  onRefetchComments }: BoardPollViewProps) {
   const [voting, setVoting] = useState(false);
   const [drawing, setDrawing] = useState(false);
 
@@ -126,8 +122,7 @@ export default function BoardPollView({
         poll,
         pollVotes: votes,
         actorId: currentUserId,
-        actorName: currentUserName ?? '관리자',
-      });
+        actorName: currentUserName ?? '관리자' });
       if (!result.ok) {
         toast(result.message, 'warning');
         return;
@@ -147,8 +142,7 @@ export default function BoardPollView({
         background: 'var(--m-accent-soft)',
         borderRadius: 14,
         padding: 14,
-        marginBottom: 16,
-      }}
+        marginBottom: 16 }}
     >
       <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--z-900)' }}>
         {poll.question || postTitle}
@@ -179,8 +173,7 @@ export default function BoardPollView({
                 border: myVote ? '1px solid var(--m-accent)' : '1px solid var(--m-border)',
                 background: 'var(--m-card)',
                 padding: '12px',
-                opacity: voting ? 0.7 : 1,
-              }}
+                opacity: voting ? 0.7 : 1 }}
             >
               <span
                 aria-hidden
@@ -189,8 +182,7 @@ export default function BoardPollView({
                   inset: 0,
                   width: `${pct}%`,
                   background: 'var(--m-accent-soft)',
-                  transition: 'width .2s',
-                }}
+                  transition: 'width .2s' }}
               />
               <span
                 style={{
@@ -198,8 +190,7 @@ export default function BoardPollView({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  gap: 8,
-                }}
+                  gap: 8 }}
               >
                 <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)' }}>
                   {myVote ? '✓ ' : ''}
@@ -225,8 +216,7 @@ export default function BoardPollView({
               style={{
                 background: 'var(--m-warning-soft, #fff7ed)',
                 borderRadius: 10,
-                padding: '8px 10px',
-              }}
+                padding: '8px 10px' }}
             >
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-warning, #b45309)' }}>
                 🎁 상품: {poll.prize.name}
@@ -253,8 +243,7 @@ export default function BoardPollView({
                     color: '#fff',
                     fontSize: 13,
                     fontWeight: 800,
-                    opacity: drawing ? 0.5 : 1,
-                  }}
+                    opacity: drawing ? 0.5 : 1 }}
                 >
                   {drawing ? '추첨 중…' : '🎁 추첨하기'}
                 </button>

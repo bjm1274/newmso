@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 
 import { useEffect, useMemo, useState } from 'react';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
@@ -153,9 +153,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          password: pwd,
-        }),
-      });
+          password: pwd }) });
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
@@ -186,7 +184,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
 
     const fetchIssuedSalaryRecords = async () => {
       const [recordsResult, notificationsResult] = await Promise.all([
-        supabase
+        db
           .from('payroll_records')
           .select('*')
           .eq('staff_id', effectiveUserId)
@@ -243,8 +241,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         .reverse()
         .map((record) => ({
           year_month: String(record.year_month || ''),
-          net_pay: Number(record.net_pay || 0),
-        }))
+          net_pay: Number(record.net_pay || 0) }))
         .filter((record) => record.net_pay > 0),
     [issuedRecords],
   );
@@ -324,8 +321,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
             night_work_allowance: typeof mobileStaff.night_work_allowance === 'number' ? mobileStaff.night_work_allowance : undefined,
             position_allowance: typeof mobileStaff.position_allowance === 'number' ? mobileStaff.position_allowance : undefined,
             holiday_work_allowance: typeof mobileStaff.holiday_work_allowance === 'number' ? mobileStaff.holiday_work_allowance : undefined,
-            annual_leave_pay: typeof mobileStaff.annual_leave_pay === 'number' ? mobileStaff.annual_leave_pay : undefined,
-          }}
+            annual_leave_pay: typeof mobileStaff.annual_leave_pay === 'number' ? mobileStaff.annual_leave_pay : undefined }}
           record={salaryData}
           availableMonths={availableMonths}
           selectedYearMonth={selectedYearMonth}

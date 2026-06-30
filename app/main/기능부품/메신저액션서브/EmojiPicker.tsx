@@ -23,8 +23,7 @@ import {
   STATIC_HOSPITAL_LABELS,
   STATIC_CAT_LABELS,
   type EmojiEntry,
-  type CategoryId,
-} from './emoji-data';
+  type CategoryId } from './emoji-data';
 
 // Re-export for backward compatibility — other modules import these from EmojiPicker
 export { STATIC_WORKER_LABELS, STATIC_HOSPITAL_LABELS, STATIC_CAT_LABELS } from './emoji-data';

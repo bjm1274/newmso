@@ -17,8 +17,7 @@ export default function ContractClosingBlock(props: Props) {
         employeePhone,
         contractDate,
         signatureDataUrl,
-        receiptTraceDataUrl,
-    } = props;
+        receiptTraceDataUrl } = props;
 
     const renderRow = (
         label: string,
@@ -71,8 +70,7 @@ export default function ContractClosingBlock(props: Props) {
                                         style={{
                                             mixBlendMode: 'multiply',
                                             top: '50%',
-                                            transform: 'translateY(-50%)',
-                                        }}
+                                            transform: 'translateY(-50%)' }}
                                     />
                                 ) : (
                                     <span className="inline-flex items-center justify-center px-2 py-0.5 text-red-500 font-black text-[10px] shrink-0">

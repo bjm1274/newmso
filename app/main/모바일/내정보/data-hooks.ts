@@ -8,14 +8,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { getMonthBoundaries } from '@/lib/date-utils';
 import { fetchUnreadNotificationCount } from '@/app/main/기능부품/알림시스템/notification-api';
 import {
   calculateMonthlyAttendance,
-  type MonthlyAttendance,
-} from '@/app/main/기능부품/마이페이지/출퇴근기록/attendance-utils';
+  type MonthlyAttendance } from '@/app/main/기능부품/마이페이지/출퇴근기록/attendance-utils';
 
 type CommuteLogRow = {
   check_in?: string | null;
@@ -33,7 +32,7 @@ export function useMonthlyAttendance(staffId: string | null | undefined) {
     // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
     const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
     try {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await db
         .from('attendance')
         .select('check_in, check_out, status, date')
         .eq('staff_id', staffId)
@@ -74,8 +73,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
     unreadChat: 0,
     newBoard: 0,
     unreadAlert: 0,
-    todoCount: 0,
-  });
+    todoCount: 0 });
 
   useEffect(() => {
     if (!staffId) return;
@@ -83,13 +81,13 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
     const fetchCounts = async () => {
       try {
         const [approvalRes, unreadAlert, todoRes] = await Promise.all([
-          supabase
+          db
             .from('approvals')
             .select('id', { count: 'exact', head: true })
             .eq('current_approver_id', staffId)
             .eq('status', '대기'),
           fetchUnreadNotificationCount(),
-          supabase
+          db
             .from('todos')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', staffId)
@@ -101,8 +99,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
           unreadChat: 0,
           newBoard: 0,
           unreadAlert,
-          todoCount: todoRes.count ?? 0,
-        });
+          todoCount: todoRes.count ?? 0 });
       } catch {
         // silent
       }
@@ -118,8 +115,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
 import {
   calculateApprovedAnnualLeaveUsage,
   calculateLeaveDays,
-  isAnnualLeaveType,
-} from '@/lib/annual-leave-ledger';
+  isAnnualLeaveType } from '@/lib/annual-leave-ledger';
 
 export type MyLeaveHistory = {
   id: string;
@@ -155,8 +151,7 @@ function normalizeLeaveStatus(raw: unknown): MyLeaveHistory['status'] {
 
 export function useMyLeave(staffId: string | null | undefined): MyLeave {
   const [state, setState] = useState<MyLeave>({
-    total: 0, used: 0, remaining: 0, usageRate: 0, history: [], loading: true,
-  });
+    total: 0, used: 0, remaining: 0, usageRate: 0, history: [], loading: true });
 
   useEffect(() => {
     if (!staffId) { setState((p) => ({ ...p, loading: false })); return; }
@@ -165,18 +160,18 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
       try {
         const currentYear = new Date().getFullYear();
         const [staffRes, leaveRes, balanceRes] = await Promise.all([
-          supabase
+          db
             .from('staff_members')
             .select('annual_leave_total, annual_leave_used')
             .eq('id', staffId)
             .maybeSingle(),
-          supabase
+          db
             .from('leave_requests')
             .select('id, leave_type, start_date, end_date, status')
             .eq('staff_id', staffId)
             .order('start_date', { ascending: false })
             .limit(50),
-          supabase
+          db
             .from('leave_balances')
             .select('expired_days, compensated_days')
             .eq('staff_id', staffId)
@@ -210,8 +205,7 @@ export function useMyLeave(staffId: string | null | undefined): MyLeave {
               type: String(r.leave_type ?? '연차'),
               days: `${d}일`,
               date: start === end ? start.replace(/-/g, '.') : `${start.replace(/-/g, '.')} ~ ${end.slice(5).replace(/-/g, '.')}`,
-              status: normalizeLeaveStatus(r.status),
-            };
+              status: normalizeLeaveStatus(r.status) };
           });
 
         setState({ total, used, remaining, usageRate, history, loading: false });
@@ -241,7 +235,7 @@ export function useMyRecentCerts(
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
+        const { data } = await db
           .from('certificate_issuances')
           .select('id, cert_type, issued_at')
           .eq('staff_id', staffId)
@@ -252,8 +246,7 @@ export function useMyRecentCerts(
         setRows(list.map((r) => ({
           id: String(r['id'] ?? ''),
           title: String(r['cert_type'] ?? '증명서'),
-          date: String(r['issued_at'] ?? '').slice(0, 10).replace(/-/g, '.'),
-        })).filter((r) => r.id));
+          date: String(r['issued_at'] ?? '').slice(0, 10).replace(/-/g, '.') })).filter((r) => r.id));
       } catch {
         if (!cancelled) setRows([]);
       } finally {
@@ -281,7 +274,7 @@ export function useLeaveBalance(staffId: string | null | undefined) {
     if (!staffId) return;
     const currentYear = new Date().getFullYear();
     try {
-      const { data: row, error } = await supabase
+      const { data: row, error } = await db
         .from('leave_balances')
         .select('total_days, used_days, expired_days, compensated_days, remaining_days')
         .eq('staff_id', staffId)

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import MIcon from '../공통/MIcon';
@@ -63,7 +63,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
   const fetchCommittees = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
+      let query = db
         .from('disciplinary_committees')
         .select('*')
         .order('created_at', { ascending: false });
@@ -115,10 +115,9 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
         reason: newReason.trim(),
         committee_members: JSON.stringify(selectedMembers),
         status: '대기',
-        company: company && company !== '전체' ? company : (targetStaff?.company || '전체'),
-      };
+        company: company && company !== '전체' ? company : (targetStaff?.company || '전체') };
 
-      const { error } = await supabase.from('disciplinary_committees').insert([insertData]);
+      const { error } = await db.from('disciplinary_committees').insert([insertData]);
       if (error) throw error;
 
       toast('징계위원회가 등록되었습니다.', 'success');
@@ -150,10 +149,9 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
       const updateData = {
         status: editStatus,
         result_type: editStatus === '의결완료' ? editResultType : null,
-        result_details: editStatus === '의결완료' ? editResultDetails.trim() : null,
-      };
+        result_details: editStatus === '의결완료' ? editResultDetails.trim() : null };
 
-      const { error } = await supabase
+      const { error } = await db
         .from('disciplinary_committees')
         .update(updateData)
         .eq('id', selectedCommittee.id);
@@ -188,14 +186,13 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
           진행 예정이거나 의결된 징계위원회가 없습니다.
         </div>
       ) : (
-        <div className="m-card flush">
+        <div className="m-card flush macos-glass macos-squircle">
           {committees.map((com) => {
             const statusTones: Record<string, 'warning' | 'accent' | 'success' | 'danger'> = {
               대기: 'warning',
               진행중: 'accent',
               의결완료: 'success',
-              취소: 'danger',
-            };
+              취소: 'danger' };
             return (
               <button
                 key={com.id}
@@ -242,8 +239,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
               padding: '20px 16px 24px',
               maxHeight: '85vh',
               display: 'flex',
-              flexDirection: 'column',
-            }}
+              flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: 16 }}>
@@ -271,8 +267,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -288,8 +283,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -305,8 +299,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    background: 'white',
-                  }}
+                    background: 'white' }}
                 >
                   <option value="">대상 직원을 선택하세요</option>
                   {staffs.map((s) => (
@@ -326,8 +319,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     maxHeight: 100,
                     overflowY: 'auto',
                     padding: 8,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 >
                   {staffs.map((s) => (
                     <label
@@ -338,8 +330,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                         gap: 6,
                         padding: '4px 0',
                         fontSize: 12,
-                        cursor: 'pointer',
-                      }}
+                        cursor: 'pointer' }}
                     >
                       <input
                         type="checkbox"
@@ -374,8 +365,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    resize: 'none',
-                  }}
+                    resize: 'none' }}
                 />
               </div>
             </div>
@@ -406,8 +396,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
               padding: '20px 16px 24px',
               maxHeight: '85vh',
               display: 'flex',
-              flexDirection: 'column',
-            }}
+              flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: 16 }}>
@@ -446,8 +435,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                               border: '1px solid var(--m-border)',
                               padding: '2px 6px',
                               borderRadius: 4,
-                              fontSize: 10,
-                            }}
+                              fontSize: 10 }}
                           >
                             {m.name} ({m.position})
                           </span>
@@ -469,8 +457,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                     borderRadius: 8,
                     fontSize: 13,
                     whiteSpace: 'pre-wrap',
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 >
                   {selectedCommittee.reason}
                 </p>
@@ -490,8 +477,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                         borderRadius: 8,
                         fontSize: 13,
                         marginTop: 4,
-                        background: 'white',
-                      }}
+                        background: 'white' }}
                     >
                       <option value="대기">대기</option>
                       <option value="진행중">진행중</option>
@@ -516,8 +502,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                             marginTop: 4,
                             background: 'white',
                             color: 'var(--m-danger)',
-                            fontWeight: 800,
-                          }}
+                            fontWeight: 800 }}
                         >
                           <option value="">결과를 선택하세요</option>
                           <option value="견책">견책</option>
@@ -543,8 +528,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
                             borderRadius: 8,
                             fontSize: 13,
                             marginTop: 4,
-                            resize: 'none',
-                          }}
+                            resize: 'none' }}
                         />
                       </div>
                     </>

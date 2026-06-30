@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 import type { FormTypeRow, TemplateDesign, TemplateDesignStore, FormTypeStore } from './types';
@@ -42,15 +42,13 @@ export function normalizeTemplateDesignStore(value: unknown): TemplateDesignStor
       companies:
         typeof raw.companies === 'object' && raw.companies && !Array.isArray(raw.companies)
           ? raw.companies
-          : {},
-    };
+          : {} };
   }
 
   return {
     version: 2,
     defaults: value as Record<string, TemplateDesign>,
-    companies: {},
-  };
+    companies: {} };
 }
 
 export function normalizeFormTypeStore(value: unknown): FormTypeStore {
@@ -69,8 +67,7 @@ export function normalizeFormTypeStore(value: unknown): FormTypeStore {
           typeof raw.companies === 'object' &&
           !Array.isArray(raw.companies)
             ? raw.companies
-            : {},
-      };
+            : {} };
     }
   }
 
@@ -114,8 +111,7 @@ export async function persistDesignsForCompany(
   const nextStore: TemplateDesignStore = {
     version: 2,
     defaults: { ...previousStore.defaults },
-    companies: { ...previousStore.companies },
-  };
+    companies: { ...previousStore.companies } };
 
   if (key === '전체') {
     nextStore.defaults = designs;
@@ -124,14 +120,13 @@ export async function persistDesignsForCompany(
   }
 
   writeLocalStorage(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, nextStore);
-  const result = await supabase
+  const result = await db
     .from('system_settings')
     .upsert(
       {
         key: 'form_template_designs',
         value: JSON.stringify(nextStore),
-        updated_at: new Date().toISOString(),
-      },
+        updated_at: new Date().toISOString() },
       { onConflict: 'key' },
     );
 

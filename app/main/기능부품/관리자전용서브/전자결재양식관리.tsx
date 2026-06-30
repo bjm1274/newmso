@@ -3,14 +3,13 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 import type { FormTypeRow, TemplateDesign, TemplateDesignStore } from './전자결재양식관리/types';
 import {
   builtinTemplates,
   mergeWithDefaultDesigns,
-  resolveCurrentDesign,
-} from './전자결재양식관리/design-utils';
+  resolveCurrentDesign } from './전자결재양식관리/design-utils';
 import DocumentPreviewCanvas from './전자결재양식관리/DocumentPreviewCanvas';
 import {
   buildPreviewIdentityRows,
@@ -19,8 +18,7 @@ import {
   buildPreviewDateLabel,
   buildPreviewDocumentNumber,
   buildTemplatePreviewSpec,
-  readRuntimeCompanyLabel,
-} from './전자결재양식관리/preview-builder';
+  readRuntimeCompanyLabel } from './전자결재양식관리/preview-builder';
 import {
   createEmptyDesignStore,
   getDesignsForCompany,
@@ -32,8 +30,7 @@ import {
   readLocalRowsForCompany,
   slugFromName,
   writeLocalDesignsStore,
-  writeLocalRowsForCompany,
-} from './전자결재양식관리/store-utils';
+  writeLocalRowsForCompany } from './전자결재양식관리/store-utils';
 
 export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   const { dialog, openConfirm } = useActionDialog();
@@ -73,7 +70,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       const names = new Set<string>([fallback]);
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('companies')
           .select('name')
           .order('name', { ascending: true });
@@ -106,8 +103,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
           name: row.name,
           summary: row.base_slug
             ? `${builtinTemplates.find((template) => template.slug === row.base_slug)?.name || '기본양식'} 기반 추가 양식`
-            : '기본양식을 복제해서 만든 추가 양식',
-        })),
+            : '기본양식을 복제해서 만든 추가 양식' })),
     [list],
   );
 
@@ -195,9 +191,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         ...prev,
         [selectedDesignKey]: {
           ...base,
-          ...patch,
-        },
-      };
+          ...patch } };
     });
   };
 
@@ -223,7 +217,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       const localRows = readLocalRowsForCompany(currentCompanyLabel);
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('approval_form_types')
           .select('*')
           .order('sort_order', { ascending: true })
@@ -261,7 +255,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       setDesignLoading(true);
       try {
         const localDesigns = readLocalDesignsStore();
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('system_settings')
           .select('value')
           .eq('key', 'form_template_designs')
@@ -336,9 +330,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       ...designs,
       [slug]: {
         ...resolveCurrentDesign(baseTemplate.slug, baseTemplate.name, designs, currentCompanyLabel),
-        title: name,
-      },
-    };
+        title: name } };
 
     const { data: nextDesignStore, error: designError } = await persistDesignsForCompany(
       currentCompanyLabel,
@@ -358,11 +350,10 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       sort_order: list.length,
       is_active: true,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      updated_at: new Date().toISOString() };
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('approval_form_types')
         .insert(newRow)
         .select('*')
@@ -423,7 +414,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       row.id === editingId ? { ...row, name, slug, updated_at: new Date().toISOString() } : row,
     );
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('approval_form_types')
         .update({ name, slug, company_name: currentCompanyLabel, updated_at: new Date().toISOString() })
         .eq('id', editingId);
@@ -448,7 +439,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       item.id === row.id ? { ...item, is_active: !row.is_active, updated_at: new Date().toISOString() } : item,
     );
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('approval_form_types')
         .update({ is_active: !row.is_active, updated_at: new Date().toISOString() })
         .eq('id', row.id);
@@ -467,8 +458,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       title: '추가 결재 양식 삭제',
       description: `${row.name || '선택한 추가 양식'}을 삭제합니다.\n연결된 디자인 설정도 함께 정리됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     const key = row.slug || row.id;
@@ -484,7 +474,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     }
 
     try {
-      const { error } = await supabase.from('approval_form_types').delete().eq('id', row.id);
+      const { error } = await db.from('approval_form_types').delete().eq('id', row.id);
 
       if (error && !isMissingTableError(error, 'approval_form_types')) {
         console.warn('approval_form_types delete failed:', error);

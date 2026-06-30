@@ -29,8 +29,7 @@ import {
   useStatusData,
   toMTone,
   type StockStatusRow,
-  type MTone,
-} from './data-hooks';
+  type MTone } from './data-hooks';
 
 export type StockCatFilter = 'all' | 'shortage' | 'warn' | string; // 그 외는 cat 이름
 
@@ -133,8 +132,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
             style={{
               padding: '14px 16px',
               borderColor: 'transparent',
-              background: 'var(--m-danger-soft)',
-            }}
+              background: 'var(--m-danger-soft)' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div
@@ -145,8 +143,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
                   background: 'var(--m-danger)',
                   color: '#fff',
                   display: 'grid',
-                  placeItems: 'center',
-                }}
+                  placeItems: 'center' }}
               >
                 <MIcon name="alertTri" size={18} />
               </div>
@@ -155,8 +152,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
                   style={{
                     fontSize: 13,
                     fontWeight: 800,
-                    color: 'var(--m-danger)',
-                  }}
+                    color: 'var(--m-danger)' }}
                 >
                   부족 품목 {shortageTop.count}개 · 자동 발주 권장
                 </div>
@@ -165,8 +161,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
                     fontSize: 11,
                     color: 'var(--z-600)',
                     fontWeight: 600,
-                    marginTop: 1,
-                  }}
+                    marginTop: 1 }}
                 >
                   {shortageTop.first.name} — 안전재고 미달
                 </div>
@@ -184,8 +179,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
               padding: 24,
               textAlign: 'center',
               color: 'var(--z-500)',
-              fontSize: 13,
-            }}
+              fontSize: 13 }}
           >
             재고를 불러오는 중…
           </div>
@@ -196,8 +190,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
               padding: 24,
               textAlign: 'center',
               color: 'var(--m-danger)',
-              fontSize: 13,
-            }}
+              fontSize: 13 }}
           >
             재고 로드 실패: {error}
           </div>
@@ -208,8 +201,7 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
               padding: 24,
               textAlign: 'center',
               color: 'var(--z-500)',
-              fontSize: 13,
-            }}
+              fontSize: 13 }}
           >
             해당 분류의 품목이 없습니다.
           </div>
@@ -252,8 +244,7 @@ function ChipButton({
   on,
   label,
   count,
-  onClick,
-}: {
+  onClick }: {
   on: boolean;
   label: string;
   count: number;
@@ -287,8 +278,7 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
     <div
       style={{
         padding: '14px 16px',
-        borderBottom: last ? 'none' : '1px solid var(--m-border)',
-      }}
+        borderBottom: last ? 'none' : '1px solid var(--m-border)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -301,8 +291,7 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                maxWidth: 200,
-              }}
+                maxWidth: 200 }}
             >
               {row.name}
             </span>
@@ -313,8 +302,7 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
               fontSize: 11,
               color: 'var(--z-500)',
               fontWeight: 600,
-              marginTop: 2,
-            }}
+              marginTop: 2 }}
           >
             안전재고 {row.min}
             {row.unit} · {row.cat} · {row.loc}
@@ -327,8 +315,7 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
               fontSize: 18,
               fontWeight: 800,
               color: 'var(--z-900)',
-              letterSpacing: '-0.02em',
-            }}
+              letterSpacing: '-0.02em' }}
           >
             {row.stock}
           </div>
@@ -336,8 +323,7 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
             style={{
               fontSize: 10,
               color: 'var(--z-500)',
-              fontWeight: 700,
-            }}
+              fontWeight: 700 }}
           >
             {row.unit} 현재고
           </div>
@@ -350,16 +336,14 @@ function StatusRow({ row, last }: { row: StockStatusRow; last: boolean }) {
           background: 'var(--z-100)',
           borderRadius: 999,
           overflow: 'hidden',
-          position: 'relative',
-        }}
+          position: 'relative' }}
       >
         <div
           style={{
             width: `${Math.min(pct, 100)}%`,
             height: '100%',
             background: barColor,
-            transition: 'width .3s',
-          }}
+            transition: 'width .3s' }}
         />
       </div>
     </div>

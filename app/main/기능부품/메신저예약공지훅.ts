@@ -3,23 +3,21 @@
 import { useEffect, type MutableRefObject } from 'react';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
 import {
   isActiveNoticeMember,
   isMessageReadByCursor,
   NOTICE_ROOM_ID,
-  NOTICE_ROOM_NAME,
-} from './메신저유틸';
+  NOTICE_ROOM_NAME } from './메신저유틸';
 import {
   CHAT_NOTICE_SCHEDULE_EVENT,
   getDueScheduledNoticeJobs,
   getDueScheduledNoticeReminderStages,
   getNextScheduledNoticeRunAt,
   markScheduledNoticeSent,
-  recordScheduledNoticeReminder,
-} from './메신저공지스케줄';
+  recordScheduledNoticeReminder } from './메신저공지스케줄';
 
 type UseScheduledNoticeDispatcherParams = {
   allKnownStaffs: StaffMember[];
@@ -42,8 +40,7 @@ export function useScheduledNoticeDispatcher({
   fetchDataRef,
   fetchMessageByIdWithRetry,
   roomPrefsUserId,
-  triggerChatPush,
-}: UseScheduledNoticeDispatcherParams) {
+  triggerChatPush }: UseScheduledNoticeDispatcherParams) {
   useEffect(() => {
     if (!roomPrefsUserId || !canManageNoticeOps || typeof window === 'undefined') return;
     let timeoutId: number | null = null;
@@ -55,14 +52,13 @@ export function useScheduledNoticeDispatcher({
       const dueJobs = getDueScheduledNoticeJobs(roomPrefsUserId);
       for (const job of dueJobs) {
         const { data: inserted, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(
-          supabase,
+          db,
           {
             room_id: NOTICE_ROOM_ID,
             sender_id: roomPrefsUserId,
             content: job.content,
             file_url: null,
-            file_name: null,
-          },
+            file_name: null },
           'id, room_id',
         );
 
@@ -93,7 +89,7 @@ export function useScheduledNoticeDispatcher({
 
         const [messageRow, { data: readCursors }] = await Promise.all([
           fetchMessageByIdWithRetry(messageId, 1),
-          supabase
+          db
             .from('room_read_cursors')
             .select('user_id, last_read_at')
             .eq('room_id', NOTICE_ROOM_ID)
@@ -139,10 +135,7 @@ export function useScheduledNoticeDispatcher({
               extra: {
                 reminder_kind: 'scheduled_notice_auto',
                 reminder_offset_minutes: offsetMinutes,
-                room_name: NOTICE_ROOM_NAME,
-              },
-            }),
-          }));
+                room_name: NOTICE_ROOM_NAME } }) }));
 
           const { error } = await d1.from('notifications').insert(payload);
           if (error) {

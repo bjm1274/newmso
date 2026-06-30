@@ -6,7 +6,7 @@
  *   - 큰 체크인/체크아웃 버튼 (그라데이션)
  *   - 오늘 기록 (출근/외출/복귀/퇴근)
  *   - 이번 주 요약 (KPI 3개)
- * 기존 모바일체크인.tsx의 GPS·supabase mutation 로직 그대로 재사용.
+ * 기존 모바일체크인.tsx의 GPS·db mutation 로직 그대로 재사용.
  * JM(파일당 500줄), JM3(에러 분기), JM4(any 금지), JM6(button 시맨틱, aria-live)
  */
 
@@ -14,10 +14,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGeolocationCheckin } from '@/app/hooks/useGeolocationCheckin';
 import { ALLOWED_DISTANCE_M, WORKPLACE_LOCATION } from '@/lib/location';
 import { calculateDistance } from '@/lib/geo';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { formatLocalDateKey } from '@/lib/use-local-date-key';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { getOfflineQueue } from '@/lib/offline-queue';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -28,8 +28,7 @@ import {
   resolveCheckInStatus,
   syncToAttendances,
   resolveLateThreshold,
-  calculateEarlyLeaveMinutes,
-} from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
+  calculateEarlyLeaveMinutes } from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
 
 type OpenLog = {
   id: string;
@@ -94,7 +93,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
 
       try {
         // 1. 오늘 날짜 기록 (중복 에러 방지를 위해 limit(1) 사용)
-        const { data: todayData } = await supabase
+        const { data: todayData } = await db
           .from('attendance')
           .select('id, staff_id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
@@ -109,7 +108,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayKey = formatLocalDateKey(yesterday);
 
-        const { data: staleData } = await supabase
+        const { data: staleData } = await db
           .from('attendance')
           .select('id, staff_id, date, check_in, check_out, status')
           .eq('staff_id', staffId)
@@ -177,22 +176,19 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               date: today,
               check_in: checkInFromQueue[today],
               check_out: checkOutFromQueue[today] ?? null,
-              status: statusFromQueue[today],
-            };
+              status: statusFromQueue[today] };
           } else {
             activeLog = {
               ...activeLog,
               check_in: checkInFromQueue[today] ?? activeLog.check_in,
               check_out: checkOutFromQueue[today] ?? activeLog.check_out,
-              status: statusFromQueue[today] ?? activeLog.status,
-            };
+              status: statusFromQueue[today] ?? activeLog.status };
           }
         } else if (checkOutFromQueue[today] !== undefined && activeLog) {
           activeLog = {
             ...activeLog,
             check_out: checkOutFromQueue[today],
-            status: statusFromQueue[today] ?? activeLog.status,
-          };
+            status: statusFromQueue[today] ?? activeLog.status };
         }
 
         // 어제 미퇴근 기록 큐 병합
@@ -203,14 +199,12 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               ...staleLogCandidate,
               check_in: checkInFromQueue[staleDate] ?? staleLogCandidate.check_in,
               check_out: checkOutFromQueue[staleDate] ?? staleLogCandidate.check_out,
-              status: statusFromQueue[staleDate] ?? staleLogCandidate.status,
-            };
+              status: statusFromQueue[staleDate] ?? staleLogCandidate.status };
           } else if (checkOutFromQueue[staleDate] !== undefined) {
             staleLogCandidate = {
               ...staleLogCandidate,
               check_out: checkOutFromQueue[staleDate],
-              status: statusFromQueue[staleDate] ?? staleLogCandidate.status,
-            };
+              status: statusFromQueue[staleDate] ?? staleLogCandidate.status };
           }
         }
       } catch (queueErr) {
@@ -313,7 +307,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         // 온라인 시 기존 행 확인 — 이미 출근 기록이 있으면 DB를 덮어쓰지 않고 실제 시각 표시
         if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           try {
-            const { data: existingRows } = await supabase
+            const { data: existingRows } = await db
               .from('attendance')
               .select('id, staff_id, date, check_in, check_out, status')
               .eq('staff_id', staffId)
@@ -329,12 +323,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           } catch {/* 조회 실패 시 upsert로 진행 */}
         }
 
-        const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
+        const { data, queued, error } = await enqueueD1Mutation<OpenLog>({
           kind: 'upsert',
           table: 'attendance',
           payload: { staff_id: staffId, date: today, check_in: nowIso, status: checkInStatus },
-          onConflict: 'staff_id,date',
-        });
+          onConflict: 'staff_id,date' });
         if (error) throw new Error(error);
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
@@ -368,12 +361,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           }
         } catch {/* 판정 실패 시 기존 상태 유지 */}
 
-        const { data, queued, error } = await enqueueSupabaseMutation<OpenLog>({
+        const { data, queued, error } = await enqueueD1Mutation<OpenLog>({
           kind: 'update',
           table: 'attendance',
           payload: { check_out: nowIso, status: finalStatus },
-          match: { staff_id: staffId, date: dateKey },
-        });
+          match: { staff_id: staffId, date: dateKey } });
         if (error) throw new Error(error);
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
@@ -444,12 +436,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         }
       } catch {}
 
-      const { data, queued, error: dbErr } = await enqueueSupabaseMutation<OpenLog>({
+      const { data, queued, error: dbErr } = await enqueueD1Mutation<OpenLog>({
         kind: 'update',
         table: 'attendance',
         payload: { check_out: nowIso, status: finalStatus },
-        match: { staff_id: staffId, date: dateKey },
-      });
+        match: { staff_id: staffId, date: dateKey } });
       if (dbErr) throw new Error(dbErr);
       if (queued) {
         setStaleLog({ ...staleLog, check_out: nowIso, status: finalStatus });
@@ -571,8 +562,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               maxWidth: '320px',
               margin: '16px auto 0',
               border: '1px solid rgba(0, 0, 0, 0.08)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
-            }}
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)' }}
           >
             {/* 신호 게이지 막대 4개 */}
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2.5px', height: '14px', width: '20px' }}>
@@ -601,8 +591,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                       height: `${height}px`,
                       backgroundColor: active ? color : 'rgba(120, 120, 128, 0.2)',
                       borderRadius: '1.5px',
-                      transition: 'background-color 0.25s ease',
-                    }}
+                      transition: 'background-color 0.25s ease' }}
                   />
                 );
               })}
@@ -621,8 +610,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   marginTop: '1px',
-                  fontWeight: 600,
-                }}
+                  fontWeight: 600 }}
               >
                 {gpsLabel}
               </div>
@@ -639,8 +627,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                 backgroundColor:
                   gpsTone === 'success' ? 'rgba(16, 185, 129, 0.1)' :
                   gpsTone === 'warning' ? 'rgba(245, 158, 11, 0.1)' :
-                                          'rgba(239, 68, 68, 0.1)',
-              }}
+                                          'rgba(239, 68, 68, 0.1)' }}
             >
               {status === 'success' && withinRange ? '연결됨' : '대기'}
             </div>
@@ -706,8 +693,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               textAlign: 'left',
               cursor: !canAct || state === 'done' ? 'default' : 'pointer',
               opacity: !canAct || state === 'done' ? 0.75 : 1,
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
+              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}
           >
             {/* 왼쪽: 둥근 모양의 활성 상태 아이콘 백그라운드 */}
             <div
@@ -720,8 +706,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'all 0.25s ease, color 0.25s ease',
-              }}
+                transition: 'all 0.25s ease, color 0.25s ease' }}
             >
               <MIcon name="clock" size={24} />
             </div>
@@ -744,8 +729,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                 borderRadius: '10px',
                 backgroundColor: switchBg,
                 position: 'relative',
-                transition: 'background-color 0.25s ease',
-              }}
+                transition: 'background-color 0.25s ease' }}
             >
               <div
                 style={{
@@ -757,8 +741,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                   top: '2px',
                   left: state === 'before' ? '2px' : '18px',
                   transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)',
-                }}
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)' }}
               />
             </div>
           </button>
@@ -776,8 +759,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                 className="m-tnum"
                 style={{
                   fontSize: 13, fontWeight: 800,
-                  color: openLog?.check_in ? 'var(--m-success)' : 'var(--z-400)',
-                }}
+                  color: openLog?.check_in ? 'var(--m-success)' : 'var(--z-400)' }}
               >
                 {formatHHmm(openLog?.check_in ?? null)}
               </div>
@@ -792,8 +774,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
                 className="m-tnum"
                 style={{
                   fontSize: 13, fontWeight: 800,
-                  color: openLog?.check_out ? 'var(--m-success)' : 'var(--z-400)',
-                }}
+                  color: openLog?.check_out ? 'var(--m-success)' : 'var(--z-400)' }}
               >
                 {formatHHmm(openLog?.check_out ?? null)}
               </div>

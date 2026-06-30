@@ -22,39 +22,32 @@ export const ADMIN_WORKCENTERS: Record<AdminWorkcenterId, AdminWorkcenterMeta> =
     label: '경영 대시보드',
     mergedCount: 7,
     mergedTitles: ['경영 대시보드', '재무 대시보드', '예산 관리', '통합 보고서', '법인 손익', '경영 분석 a', '경영 분석 b'],
-    primary: true,
-  },
+    primary: true },
   company: {
     id: 'company',
     label: '회사 관리',
     mergedCount: 7,
-    mergedTitles: ['기본정보', '근무형태', '법인카드', '계약 템플릿', '휴가·공휴일', '급여 기준', '문서 보관'],
-  },
+    mergedTitles: ['기본정보', '근무형태', '법인카드', '계약 템플릿', '휴가·공휴일', '급여 기준', '문서 보관'] },
   roles: {
     id: 'roles',
     label: '권한 관리',
     mergedCount: 1,
-    mergedTitles: ['직원 권한'],
-  },
+    mergedTitles: ['직원 권한'] },
   ops: {
     id: 'ops',
     label: '운영 설정',
     mergedCount: 5,
-    mergedTitles: ['운영 설정', '템플릿 a', '템플릿 b', '템플릿 c', '팝업 관리'],
-  },
+    mergedTitles: ['운영 설정', '템플릿 a', '템플릿 b', '템플릿 c', '팝업 관리'] },
   forms: {
     id: 'forms',
     label: '결재 양식',
     mergedCount: 2,
-    mergedTitles: ['양식 관리', '양식 편집'],
-  },
+    mergedTitles: ['양식 관리', '양식 편집'] },
   audit: {
     id: 'audit',
     label: '감사·백업',
     mergedCount: 4,
-    mergedTitles: ['감사센터 a', '감사센터 b', '백업·복원', '급여 이상치 검사'],
-  },
-};
+    mergedTitles: ['감사센터 a', '감사센터 b', '백업·복원', '급여 이상치 검사'] } };
 
 // ─── 권한 매트릭스 값 union (JM4) ───────────────────────
 export type RolePermissionValue = '전체' | '부서' | '본인' | '요청' | null;

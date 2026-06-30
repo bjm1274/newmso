@@ -10,8 +10,7 @@ import type { ErpUser } from '@/types';
 import MFeatureScreen from '../공통/MFeatureScreen';
 
 const RolesWorkcenter = dynamic(() => import('../../기능부품/관리자워크센터/RolesWorkcenter'), {
-  ssr: false,
-});
+  ssr: false });
 
 export default function 권한관리({ user, onBack }: { user: ErpUser; onBack: () => void }) {
   return (

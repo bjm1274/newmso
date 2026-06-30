@@ -10,7 +10,7 @@
  * - any 금지 (JM4)
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
@@ -120,8 +120,7 @@ function normalizeRecord(row: Record<string, unknown>): AttendanceRecord | null 
     lateMinutes: lateMinutes > 0 ? lateMinutes : status.includes('late') || status.includes('지각') ? 5 : 0,
     earlyLeaveMinutes,
     hasCheckIn: checkIn.length > 0,
-    hasCheckOut: checkOut.length > 0,
-  };
+    hasCheckOut: checkOut.length > 0 };
 }
 
 function severityForCount(count: number, low: number, mid: number, high: number): Severity {
@@ -222,15 +221,13 @@ const KIND_LABELS: Record<AbnormalKind, { label: string; description: string; to
   earlyLeave: { label: '조기 퇴근',   description: '정해진 시간보다 일찍 퇴근',   tone: 'warn'   },
   missing:    { label: '미기록',      description: '출근/퇴근 기록 누락',         tone: 'muted'  },
   absent:     { label: '연속 결근',   description: '3일 이상 연속 결근',          tone: 'danger' },
-  pattern:    { label: '패턴 이상',   description: '같은 요일 반복 지각 등',      tone: 'accent' },
-};
+  pattern:    { label: '패턴 이상',   description: '같은 요일 반복 지각 등',      tone: 'accent' } };
 
 export async function fetchAbnormalData({
   staffs,
   selectedCo,
   signal,
-  rules = DEFAULT_RULES,
-}: FetchAbnormalOptions): Promise<AbnormalDataResult> {
+  rules = DEFAULT_RULES }: FetchAbnormalOptions): Promise<AbnormalDataResult> {
   const targetStaff = staffs.filter((staff) => {
     if (!isActiveStaff(staff)) return false;
     if (selectedCo && selectedCo !== '전체' && staff.company !== selectedCo) return false;
@@ -246,7 +243,7 @@ export async function fetchAbnormalData({
   const allDays = build4WeekDays(now);
   const sinceIso = allDays[0];
 
-  const { data } = await supabase
+  const { data } = await db
     .from('attendances')
     .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
     .in('staff_id', staffIds)
@@ -272,8 +269,7 @@ export async function fetchAbnormalData({
   }
 
   const groupsMap: Record<AbnormalKind, AbnormalPattern[]> = {
-    late: [], leaveEarly: [], earlyLeave: [], missing: [], absent: [], pattern: [],
-  };
+    late: [], leaveEarly: [], earlyLeave: [], missing: [], absent: [], pattern: [] };
 
   for (const staff of targetStaff) {
     const list = byStaff.get(String(staff.id)) ?? [];
@@ -295,8 +291,7 @@ export async function fetchAbnormalData({
         count: lateRecs.length,
         severity: severityForCount(lateRecs.length, 3, 5, 8),
         description: describePattern('late', lateRecs.length, name),
-        suggestion: suggestionFor('late'),
-      });
+        suggestion: suggestionFor('late') });
     }
     if (leaveEarlyRecs.length >= 2) {
       groupsMap.leaveEarly.push({
@@ -307,8 +302,7 @@ export async function fetchAbnormalData({
         count: leaveEarlyRecs.length,
         severity: severityForCount(leaveEarlyRecs.length, 2, 4, 6),
         description: describePattern('leaveEarly', leaveEarlyRecs.length, name),
-        suggestion: suggestionFor('leaveEarly'),
-      });
+        suggestion: suggestionFor('leaveEarly') });
     }
     // 조기퇴근은 별도 컬럼이 없으므로 조퇴와 분리해 큰 분(>30) 케이스로 단순 사용
     const earlyLeaveStrong = leaveEarlyRecs.filter((r) => r.earlyLeaveMinutes >= 30);
@@ -321,8 +315,7 @@ export async function fetchAbnormalData({
         count: earlyLeaveStrong.length,
         severity: severityForCount(earlyLeaveStrong.length, 2, 4, 6),
         description: describePattern('earlyLeave', earlyLeaveStrong.length, name),
-        suggestion: suggestionFor('earlyLeave'),
-      });
+        suggestion: suggestionFor('earlyLeave') });
     }
     if (missingRecs.length >= 1) {
       groupsMap.missing.push({
@@ -333,8 +326,7 @@ export async function fetchAbnormalData({
         count: missingRecs.length,
         severity: severityForCount(missingRecs.length, 1, 3, 5),
         description: describePattern('missing', missingRecs.length, name),
-        suggestion: suggestionFor('missing'),
-      });
+        suggestion: suggestionFor('missing') });
     }
     if (consecAbsent >= 3) {
       groupsMap.absent.push({
@@ -345,8 +337,7 @@ export async function fetchAbnormalData({
         count: consecAbsent,
         severity: '경고',
         description: describePattern('absent', consecAbsent, name),
-        suggestion: suggestionFor('absent'),
-      });
+        suggestion: suggestionFor('absent') });
     }
     if (dowRepeat >= 3) {
       groupsMap.pattern.push({
@@ -357,8 +348,7 @@ export async function fetchAbnormalData({
         count: dowRepeat,
         severity: severityForCount(dowRepeat, 3, 4, 6),
         description: describePattern('pattern', dowRepeat, name),
-        suggestion: suggestionFor('pattern'),
-      });
+        suggestion: suggestionFor('pattern') });
     }
   }
 
@@ -370,8 +360,7 @@ export async function fetchAbnormalData({
       description: KIND_LABELS[kind].description,
       tone: KIND_LABELS[kind].tone,
       count: items.length,
-      items,
-    };
+      items };
   });
 
   const today = formatKoreanDateKey(now);
@@ -384,8 +373,7 @@ export async function fetchAbnormalData({
     unresolved: totalDetections,
     resolved: 0,
     ruleActiveCount: rules.filter((r) => r.active).length,
-    actionLog: [],
-  };
+    actionLog: [] };
 }
 
 // ─── 정상 처리: 실제 DB 보정 ─────────────────────────────────────
@@ -430,7 +418,7 @@ export async function resolveStaffAbnormalRecords(
   const sinceIso = allDays[0];
 
   // 1) attendances(복수) 4주 row 조회 — 어떤 날짜가 abnormal인지 식별
-  const { data: rawAttendances, error: fetchErr } = await supabase
+  const { data: rawAttendances, error: fetchErr } = await db
     .from('attendances')
     .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
     .eq('staff_id', staffId)
@@ -458,19 +446,18 @@ export async function resolveStaffAbnormalRecords(
 
   // 2) attendances 보정 — 누락 컬럼은 withMissingColumnFallback 없이 직접 시도
   //    (이미 한 번 select 했으므로 컬럼은 존재. 실패 시 throw)
-  const { error: updateAttendancesErr } = await supabase
+  const { error: updateAttendancesErr } = await db
     .from('attendances')
     .update({
       status: 'present',
       late_minutes: 0,
-      early_leave_minutes: 0,
-    })
+      early_leave_minutes: 0 })
     .eq('staff_id', staffId)
     .in('work_date', abnormalDates);
 
   if (updateAttendancesErr) {
     // late_minutes/early_leave_minutes 컬럼이 없는 환경 폴백
-    const { error: fallbackErr } = await supabase
+    const { error: fallbackErr } = await db
       .from('attendances')
       .update({ status: 'present' })
       .eq('staff_id', staffId)
@@ -480,7 +467,7 @@ export async function resolveStaffAbnormalRecords(
 
   // 3) attendance(단수) 동기화 — 마이페이지가 보는 테이블. 컬럼: date, status
   //    한국어 상태값 '정상' 사용 (COMMUTE_STATUS_LABELS 참조).
-  const { error: updateAttendanceErr } = await supabase
+  const { error: updateAttendanceErr } = await db
     .from('attendance')
     .update({ status: '정상' })
     .eq('staff_id', staffId)
@@ -503,14 +490,12 @@ function emptyResult(rules: AbnormalRule[]): AbnormalDataResult {
     description: KIND_LABELS[kind].description,
     tone: KIND_LABELS[kind].tone,
     count: 0,
-    items: [],
-  }));
+    items: [] }));
   return {
     groups,
     todayDetected: 0,
     unresolved: 0,
     resolved: 0,
     ruleActiveCount: rules.filter((r) => r.active).length,
-    actionLog: [],
-  };
+    actionLog: [] };
 }

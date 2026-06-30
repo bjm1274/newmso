@@ -10,8 +10,7 @@ export const access_logs = sqliteTable("access_logs", {
 	action: text(),
 	ip_address: text(),
 	user_agent: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_access_logs_user_created_at").on(table.user_id, table.created_at),
 	index("idx_access_logs_created_at").on(table.created_at),
@@ -33,8 +32,7 @@ export const annual_leave_promotion_logs = sqliteTable("annual_leave_promotion_l
 	plan_submitted_at: text(),
 	remaining_days_at_notice: real(),
 	notification_id: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_annual_leave_promotion_logs_staff_year").on(table.staff_id, table.target_year, table.step),
 	index("idx_alpl_stage").on(table.stage),
@@ -49,8 +47,7 @@ export const approval_delegation = sqliteTable("approval_delegation", {
 	start_date: text(),
 	end_date: text(),
 	is_active: integer().default(1),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const approval_form_types = sqliteTable("approval_form_types", {
 	id: text().primaryKey().notNull(),
@@ -62,8 +59,7 @@ export const approval_form_types = sqliteTable("approval_form_types", {
 	base_slug: text(),
 	company_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_approval_form_types_active").on(table.is_active),
 ]);
@@ -75,8 +71,7 @@ export const approval_history = sqliteTable("approval_history", {
 	approver_name: text(),
 	action: text().notNull(),
 	comment: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_approval_history_approval").on(table.approval_id),
 ]);
@@ -85,8 +80,7 @@ export const approval_templates = sqliteTable("approval_templates", {
 	id: text().primaryKey().notNull(),
 	form_type: text().notNull(),
 	default_values: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const approvals = sqliteTable("approvals", {
 	id: text().primaryKey().notNull(),
@@ -107,8 +101,7 @@ export const approvals = sqliteTable("approvals", {
 	doc_number: text(),
 	approval_line: text(),
 	name: text(),
-	doc_type: text(),
-},
+	doc_type: text() },
 (table) => [
 	index("idx_approvals_doc_number").on(table.doc_number),
 	index("idx_approvals_company_id_status_created_at").on(table.company_id, table.status, table.created_at),
@@ -117,8 +110,7 @@ export const approvals = sqliteTable("approvals", {
 export const asset_loan_item_settings = sqliteTable("asset_loan_item_settings", {
 	company_name: text().primaryKey(),
 	items: text().default("[]").notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() });
 
 export const asset_loans = sqliteTable("asset_loans", {
 	id: text().primaryKey().notNull(),
@@ -128,8 +120,7 @@ export const asset_loans = sqliteTable("asset_loans", {
 	loaned_at: text().notNull(),
 	returned_at: text(),
 	condition_notes: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_asset_staff").on(table.staff_id),
 ]);
@@ -143,8 +134,7 @@ export const attendance = sqliteTable("attendance", {
 	status: text().default("정상"),
 	notes: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	company_id: text().references(() => companies.id),
-},
+	company_id: text().references(() => companies.id) },
 (table) => [
 	uniqueIndex("idx_attendance_staff_date_unique").on(table.staff_id, table.date),
 	index("idx_attendance_staff_date").on(table.staff_id, table.date),
@@ -160,8 +150,7 @@ export const attendance_corrections = sqliteTable("attendance_corrections", {
 	status: text().default("대기"),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	attendance_date: text(),
-	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_attendance_corrections_staff_date_unique").on(table.staff_id, table.attendance_date),
 ]);
@@ -175,8 +164,7 @@ export const attendance_deduction_rules = sqliteTable("attendance_deduction_rule
 	early_leave_deduction_amount: integer().default(10000),
 	absent_use_daily_rate: integer().default(1),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const attendances = sqliteTable("attendances", {
 	id: text().primaryKey().notNull(),
@@ -191,8 +179,7 @@ export const attendances = sqliteTable("attendances", {
 	notes: text(),
 	current_status: text(),
 	current_status_at: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_attendances_staff_date_unique").on(table.staff_id, table.work_date),
 	index("idx_attendances_work_date").on(table.work_date),
@@ -209,8 +196,7 @@ export const audit_logs = sqliteTable("audit_logs", {
 	details: text(),
 	ip_address: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	actor_name: text(),
-},
+	actor_name: text() },
 (table) => [
 	index("idx_audit_logs_created").on(table.created_at),
 ]);
@@ -228,8 +214,7 @@ export const backup_restore_runs = sqliteTable("backup_restore_runs", {
 	requested_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	requested_by_name: text(),
 	started_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	finished_at: text(),
-},
+	finished_at: text() },
 (table) => [
 	index("idx_backup_restore_runs_started").on(table.started_at),
 ]);
@@ -242,8 +227,7 @@ export const board_post_comments = sqliteTable("board_post_comments", {
 	content: text().notNull(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	parent_comment_id: text(),
-	is_anonymous: integer().default(0),
-},
+	is_anonymous: integer().default(0) },
 (table) => [
 	index("idx_board_post_comments_parent_comment_id").on(table.parent_comment_id),
 	foreignKey(() => ({
@@ -257,8 +241,7 @@ export const board_post_likes = sqliteTable("board_post_likes", {
 	id: text().primaryKey().notNull(),
 	post_id: text(),
 	user_id: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_board_post_likes_user_id").on(table.user_id),
 ]);
@@ -268,8 +251,7 @@ export const board_post_reads = sqliteTable("board_post_reads", {
 	post_id: text().notNull().references(() => board_posts.id, { onDelete: "cascade" } ),
 	user_id: text().notNull().references(() => staff_members.id, { onDelete: "cascade" } ),
 	read_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_board_post_reads_user_id").on(table.user_id),
 	index("idx_board_post_reads_post_id").on(table.post_id),
@@ -306,8 +288,7 @@ export const board_posts = sqliteTable("board_posts", {
 	surgery_guardian: integer().default(0),
 	surgery_caregiver: integer().default(0),
 	surgery_transfusion: integer().default(0),
-	mri_contrast_required: integer().default(0),
-},
+	mri_contrast_required: integer().default(0) },
 (table) => [
 	index("idx_board_posts_schedule_date").on(table.schedule_date),
 	index("idx_board_posts_company_id_board_type_created_at").on(table.company_id, table.board_type, table.created_at),
@@ -323,8 +304,7 @@ export const certificate_issuances = sqliteTable("certificate_issuances", {
 	serial_no: text(),
 	purpose: text(),
 	issued_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
-	issued_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	issued_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const chat_messages = sqliteTable("chat_messages", {
 	id: text().primaryKey().notNull(),
@@ -332,8 +312,7 @@ export const chat_messages = sqliteTable("chat_messages", {
 	sender_id: text().references(() => staff_members.id),
 	content: text().notNull(),
 	type: text().default("text"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const chat_push_jobs = sqliteTable("chat_push_jobs", {
 	id: text().primaryKey().notNull(),
@@ -346,8 +325,7 @@ export const chat_push_jobs = sqliteTable("chat_push_jobs", {
 	attempt_count: integer().default(0),
 	last_error: text(),
 	next_attempt_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	dead_lettered_at: text(),
-},
+	dead_lettered_at: text() },
 (table) => [
 	index("idx_chat_push_jobs_ready").on(table.next_attempt_at, table.created_at),
 	index("idx_chat_push_jobs_processing_started_at").on(table.processing_started_at),
@@ -359,8 +337,7 @@ export const chat_room_favorites = sqliteTable("chat_room_favorites", {
 	id: text().primaryKey().notNull(),
 	user_id: text().notNull(),
 	room_id: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const chat_room_prefs = sqliteTable("chat_room_prefs", {
 	id: text().primaryKey().notNull(),
@@ -368,8 +345,7 @@ export const chat_room_prefs = sqliteTable("chat_room_prefs", {
 	room_id: text().notNull(),
 	pinned: integer().default(0),
 	hidden: integer().default(0),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_chat_room_prefs_user_id").on(table.user_id),
 	index("idx_chat_room_prefs_room_id").on(table.room_id),
@@ -386,8 +362,7 @@ export const chat_rooms = sqliteTable("chat_rooms", {
 	last_message_at: text(),
 	last_message: text(),
 	last_message_preview: text(),
-	member_ids: text().default("{}"),
-},
+	member_ids: text().default("{}") },
 (table) => [
 	index("idx_chat_rooms_last_message_at_desc").on(table.last_message_at, table.created_at),
 ]);
@@ -396,8 +371,7 @@ export const chat_typing_status = sqliteTable("chat_typing_status", {
 	room_id: text().notNull(),
 	user_id: text().notNull(),
 	user_name: text().notNull().default(''),
-	updated_at: text().notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
-},
+	updated_at: text().notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`) },
 (table) => [
 	index("idx_chat_typing_status_room_updated").on(table.room_id, table.updated_at),
 ]);
@@ -419,8 +393,7 @@ export const companies = sqliteTable("companies", {
 	seal_url: text(),
 	leave_policy: text().default("입사일"),
 	unused_leave_compensation: integer().default(0),
-	fiscal_year_start_month: integer().default(1),
-},
+	fiscal_year_start_month: integer().default(1) },
 (table) => [
 	foreignKey(() => ({
 			columns: [table.mso_id],
@@ -438,8 +411,7 @@ export const company_expenses = sqliteTable("company_expenses", {
 	utilities: real(),
 	others: real(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_company_expenses_company_month").on(table.company, table.year_month),
 ]);
@@ -453,8 +425,7 @@ export const company_holidays = sqliteTable("company_holidays", {
 	created_by: text(),
 	created_by_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_company_holidays_scope_date").on(table.company_name, table.holiday_date),
 ]);
@@ -466,8 +437,7 @@ export const company_seals = sqliteTable("company_seals", {
 	image_url: text().notNull(),
 	is_active: integer().default(1).notNull(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() });
 
 export const contract_templates = sqliteTable("contract_templates", {
 	id: text().primaryKey().notNull(),
@@ -475,8 +445,7 @@ export const contract_templates = sqliteTable("contract_templates", {
 	template_content: text(),
 	seal_url: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const corporate_card_transactions = sqliteTable("corporate_card_transactions", {
 	id: text().primaryKey().notNull(),
@@ -489,8 +458,7 @@ export const corporate_card_transactions = sqliteTable("corporate_card_transacti
 	receipt_url: text(),
 	company_name: text().default("전체"),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	card_id: text().references(() => corporate_cards.id, { onDelete: "set null" } ),
-},
+	card_id: text().references(() => corporate_cards.id, { onDelete: "set null" } ) },
 (table) => [
 	index("idx_card_date").on(table.transaction_date),
 	index("idx_card_category").on(table.category),
@@ -504,8 +472,7 @@ export const corporate_cards = sqliteTable("corporate_cards", {
 	issuer: text(),
 	holder_id: text(),
 	status: text().default("active"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_corporate_cards_company").on(table.company_name),
 ]);
@@ -516,8 +483,7 @@ export const daily_checks = sqliteTable("daily_checks", {
 	check_number: text().notNull(),
 	amount: integer().notNull(),
 	bank_name: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const daily_closure_items = sqliteTable("daily_closure_items", {
 	id: text().primaryKey().notNull(),
@@ -527,8 +493,7 @@ export const daily_closure_items = sqliteTable("daily_closure_items", {
 	payment_method: text(),
 	receipt_type: text(),
 	memo: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const daily_closures = sqliteTable("daily_closures", {
 	id: text().primaryKey().notNull(),
@@ -541,8 +506,7 @@ export const daily_closures = sqliteTable("daily_closures", {
 	created_by: text().references(() => staff_members.id),
 	memo: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const delivery_confirmations = sqliteTable("delivery_confirmations", {
 	id: text().primaryKey().notNull(),
@@ -558,8 +522,7 @@ export const delivery_confirmations = sqliteTable("delivery_confirmations", {
 	total_amount: real(),
 	created_by: text(),
 	created_by_id: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_delivery_confirmations_created_at").on(table.created_at),
 ]);
@@ -581,8 +544,7 @@ export const department_private_inventory_items = sqliteTable("department_privat
 	updated_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("department_private_inventory_unique_item").on(table.company_id, table.department, table.item_name),
 	index("department_private_inventory_scope_idx").on(table.company_id, table.department, table.item_name),
@@ -602,8 +564,7 @@ export const department_private_inventory_logs = sqliteTable("department_private
 	actor_id: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	actor_name: text(),
 	notes: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("department_private_inventory_logs_scope_idx").on(table.company_id, table.department, table.created_at),
 	index("department_private_inventory_logs_item_idx").on(table.item_id, table.created_at),
@@ -618,8 +579,7 @@ export const device_inspections = sqliteTable("device_inspections", {
 	result: text(),
 	notes: text(),
 	next_inspection_date: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const discharge_reviews = sqliteTable("discharge_reviews", {
 	id: text().primaryKey().notNull(),
@@ -647,15 +607,13 @@ export const discharge_reviews = sqliteTable("discharge_reviews", {
 	admission_route: text().default(""),
 	discharge_type: text().default(""),
 	drg_code: text().default(""),
-	disease_codes: text().default(""),
-});
+	disease_codes: text().default("") });
 
 export const discharge_templates = sqliteTable("discharge_templates", {
 	id: text().default("default").primaryKey(),
 	items: text().default("[]"),
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	title: text().default(""),
-});
+	title: text().default("") });
 
 export const document_repository = sqliteTable("document_repository", {
 	id: text().primaryKey().notNull(),
@@ -667,8 +625,7 @@ export const document_repository = sqliteTable("document_repository", {
 	company_name: text().default("전체"),
 	created_by: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_document_repo_company").on(table.company_name),
 	index("idx_document_repo_category").on(table.category),
@@ -681,8 +638,7 @@ export const document_versions = sqliteTable("document_versions", {
 	content: text(),
 	file_url: text(),
 	created_by: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_document_versions_doc").on(table.document_id),
 ]);
@@ -694,8 +650,7 @@ export const education_records = sqliteTable("education_records", {
 	deadline: text(),
 	completed_at: text(),
 	status: text().default("대기"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const employment_contracts = sqliteTable("employment_contracts", {
 	id: text().primaryKey().notNull(),
@@ -726,8 +681,7 @@ export const employment_contracts = sqliteTable("employment_contracts", {
 	requested_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	signed_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	start_date: text(),
-},
+	start_date: text() },
 (table) => [
 	index("idx_contracts_staff_id").on(table.staff_id),
 	uniqueIndex("idx_contracts_staff_contract_type").on(table.staff_id, table.contract_type),
@@ -746,8 +700,7 @@ export const freelancer_payments = sqliteTable("freelancer_payments", {
 	note: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_freelancer_payments_company_month").on(table.company_name, table.year_month, table.payment_date),
 ]);
@@ -759,8 +712,7 @@ export const generated_reports = sqliteTable("generated_reports", {
 	period: text().notNull(),
 	status: text().default("completed"),
 	summary: text().default("{}"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_generated_reports_type_period").on(table.report_type, table.period),
 	index("idx_generated_reports_schedule_created").on(table.schedule_id, table.created_at),
@@ -774,8 +726,7 @@ export const handover_notes = sqliteTable("handover_notes", {
 	shift: text().notNull(),
 	priority: text().default("Normal"),
 	is_completed: integer().default(0),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const health_checkups = sqliteTable("health_checkups", {
 	id: text().primaryKey().notNull(),
@@ -790,8 +741,7 @@ export const health_checkups = sqliteTable("health_checkups", {
 	hospital: text(),
 	result: text(),
 	memo: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const incident_reports = sqliteTable("incident_reports", {
 	id: text().primaryKey().notNull(),
@@ -808,8 +758,7 @@ export const incident_reports = sqliteTable("incident_reports", {
 	reporter_id: text(),
 	reporter_name: text(),
 	status: text().default("보고완료"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const insurance_records = sqliteTable("insurance_records", {
 	id: text().primaryKey().notNull(),
@@ -825,8 +774,7 @@ export const insurance_records = sqliteTable("insurance_records", {
 	status: text().default("").notNull(),
 	resident_no: text(),
 	memo: text().default("").notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() },
 (table) => [
 	index("idx_insurance_records_created_at").on(table.created_at),
 	index("idx_insurance_records_company_status").on(table.company, table.status),
@@ -861,8 +809,7 @@ export const inventory = sqliteTable("inventory", {
 	price: integer().default(0),
 	serial_number: text(),
 	name: text(),
-	min_stock: integer().default(10),
-},
+	min_stock: integer().default(10) },
 (table) => [
 	index("idx_inventory_lot_number").on(table.lot_number),
 	index("idx_inventory_location").on(table.location),
@@ -878,8 +825,7 @@ export const inventory_categories = sqliteTable("inventory_categories", {
 	description: text(),
 	color: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_inventory_categories_parent_name").on(table.parent_id, table.name),
 	index("idx_inventory_categories_parent_id").on(table.parent_id),
@@ -905,8 +851,7 @@ export const inventory_closing_snapshots = sqliteTable("inventory_closing_snapsh
 	created_by_id: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_by_name: text(),
 	closed_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_inventory_closing_snapshots_company_month").on(table.company, table.closing_month),
 ]);
@@ -941,8 +886,7 @@ export const inventory_cost_entries = sqliteTable("inventory_cost_entries", {
 	posted_by_name: text(),
 	idempotency_key: text(),
 	notes: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_inventory_cost_entries_purchase_order").on(table.purchase_order_id),
 	uniqueIndex("idx_inventory_cost_entries_idempotency_key").on(table.idempotency_key),
@@ -959,8 +903,7 @@ export const inventory_count_sessions = sqliteTable("inventory_count_sessions", 
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	company: text(),
 	company_id: text().references(() => companies.id, { onDelete: "set null" } ),
-	department: text(),
-},
+	department: text() },
 (table) => [
 	index("idx_inventory_count_sessions_scope_created_at").on(table.company_id, table.department, table.created_at),
 	index("idx_inventory_count_sessions_created_at").on(table.created_at),
@@ -989,8 +932,7 @@ export const inventory_logs = sqliteTable("inventory_logs", {
 	expiry_date: text(),
 	location: text(),
 	unit_price: real(),
-	supplier_name: text(),
-},
+	supplier_name: text() },
 (table) => [
 	index("idx_inventory_logs_scope_created_at").on(table.company_id, table.department, table.created_at),
 	index("idx_inventory_logs_purchase_order_id").on(table.purchase_order_id),
@@ -1012,8 +954,7 @@ export const inventory_price_history = sqliteTable("inventory_price_history", {
 	recorded_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	recorded_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	purchase_order_id: text().references(() => purchase_orders.id, { onDelete: "set null" } ),
-	notes: text(),
-},
+	notes: text() },
 (table) => [
 	index("idx_inventory_price_history_purchase_order_id").on(table.purchase_order_id),
 	index("idx_inventory_price_history_item_recorded_at").on(table.inventory_item_id, table.recorded_at),
@@ -1032,8 +973,7 @@ export const inventory_receipts = sqliteTable("inventory_receipts", {
 	invoice_number: text(),
 	notes: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const inventory_transfers = sqliteTable("inventory_transfers", {
 	id: text().primaryKey().notNull(),
@@ -1051,8 +991,7 @@ export const inventory_transfers = sqliteTable("inventory_transfers", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	approval_id: text().references(() => approvals.id, { onDelete: "set null" } ),
 	purchase_order_id: text().references(() => purchase_orders.id, { onDelete: "set null" } ),
-	serial_number: text(),
-},
+	serial_number: text() },
 (table) => [
 	index("idx_inventory_transfers_purchase_order_id").on(table.purchase_order_id),
 	index("idx_inventory_transfers_created_at").on(table.created_at),
@@ -1065,8 +1004,7 @@ export const job_categories = sqliteTable("job_categories", {
 	name: text().notNull(),
 	is_medical_staff: integer().default(1),
 	display_order: integer().default(0),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const job_category_required_trainings = sqliteTable("job_category_required_trainings", {
 	id: text().primaryKey().notNull(),
@@ -1078,8 +1016,7 @@ export const job_category_required_trainings = sqliteTable("job_category_require
 	mandatory: integer().default(1),
 	obligation_type: text().default("legal"),
 	legal_basis: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_jcrt_job_category_id").on(table.job_category_id),
 	index("idx_jcrt_applies_to_all").on(table.applies_to_all),
@@ -1098,8 +1035,7 @@ export const leave_balances = sqliteTable("leave_balances", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	compensated_days: real(),
-	compensated_at: text(),
-},
+	compensated_at: text() },
 (table) => [
 	index("idx_leave_balances_staff_id").on(table.staff_id),
 	index("idx_leave_balances_expiry_date").on(table.expiry_date),
@@ -1119,8 +1055,7 @@ export const leave_accruals = sqliteTable("leave_accruals", {
 	year: integer().notNull(),
 	source_date: text(),
 	note: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_leave_accruals_unique").on(table.staff_id, table.kind, table.period_key),
 	index("idx_leave_accruals_staff").on(table.staff_id),
@@ -1137,8 +1072,7 @@ export const leave_requests = sqliteTable("leave_requests", {
 	approved_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	company_id: text().references(() => companies.id),
-	days: real(),
-},
+	days: real() },
 (table) => [
 	index("idx_leave_requests_staff_id").on(table.staff_id),
 	index("idx_leave_requests_company_id").on(table.company_id),
@@ -1166,8 +1100,7 @@ export const license_continuing_education = sqliteTable("license_continuing_educ
 	reviewed_at: text(),
 	memo: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_license_ce_submitted_at").on(table.submitted_at),
 	index("idx_license_ce_status").on(table.status),
@@ -1181,8 +1114,7 @@ export const login_logs = sqliteTable("login_logs", {
 	user_name: text(),
 	action: text(),
 	ip_address: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const medical_devices = sqliteTable("medical_devices", {
 	id: text().primaryKey().notNull(),
@@ -1195,8 +1127,7 @@ export const medical_devices = sqliteTable("medical_devices", {
 	next_inspection_date: text(),
 	last_inspection_date: text(),
 	memo: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const meeting_bookings = sqliteTable("meeting_bookings", {
 	id: text().primaryKey().notNull(),
@@ -1207,16 +1138,14 @@ export const meeting_bookings = sqliteTable("meeting_bookings", {
 	booker_id: text().references(() => staff_members.id),
 	booker_name: text(),
 	status: text().default("예약"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const message_bookmarks = sqliteTable("message_bookmarks", {
 	id: text().primaryKey().notNull(),
 	user_id: text().notNull(),
 	message_id: text().notNull().references(() => messages.id, { onDelete: "cascade" } ),
 	room_id: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_message_bookmarks_user_message").on(table.user_id, table.message_id),
 ]);
@@ -1226,8 +1155,7 @@ export const message_reactions = sqliteTable("message_reactions", {
 	message_id: text().notNull(),
 	user_id: text().notNull(),
 	emoji: text().default("👍"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_message_reactions_msg").on(table.message_id),
 ]);
@@ -1237,8 +1165,7 @@ export const message_reads = sqliteTable("message_reads", {
 	message_id: text().references(() => chat_messages.id, { onDelete: "cascade" } ),
 	reader_id: text().references(() => staff_members.id),
 	read_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	user_id: text(),
-});
+	user_id: text() });
 
 export const messages = sqliteTable("messages", {
 	id: text().primaryKey().notNull(),
@@ -1257,8 +1184,7 @@ export const messages = sqliteTable("messages", {
 	album_index: integer(),
 	album_total: integer(),
 	message_type: text().default("text"),
-	sender_name: text(),
-},
+	sender_name: text() },
 (table) => [
 	index("idx_messages_sender").on(table.sender_id),
 	index("idx_messages_room_unread_count").on(table.room_id, table.created_at),
@@ -1281,8 +1207,7 @@ export const messenger_drive_links = sqliteTable("messenger_drive_links", {
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_messenger_drive_links_room").on(table.room_id),
 	index("idx_messenger_drive_links_company").on(table.company_name, table.sort_order, table.created_at),
@@ -1295,8 +1220,7 @@ export const monthly_off_quota = sqliteTable("monthly_off_quota", {
 	default_off_days: integer().default(8),
 	staff_overrides: text().default("{}"),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_monthly_off_quota_year_month").on(table.year_month),
 	index("idx_monthly_off_quota_company").on(table.company),
@@ -1307,8 +1231,7 @@ export const mri_templates = sqliteTable("mri_templates", {
 	name: text().notNull(),
 	sort_order: integer().default(0),
 	is_active: integer().default(1),
-	body_part: text(),
-});
+	body_part: text() });
 
 export const notification_templates = sqliteTable("notification_templates", {
 	id: text().primaryKey().notNull(),
@@ -1318,8 +1241,7 @@ export const notification_templates = sqliteTable("notification_templates", {
 	variables: text().default("[]"),
 	is_active: integer().default(1),
 	company_name: text().default("전체"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const notifications = sqliteTable("notifications", {
 	id: text().primaryKey().notNull(),
@@ -1329,8 +1251,7 @@ export const notifications = sqliteTable("notifications", {
 	body: text(),
 	metadata: text(),
 	read_at: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_notifications_user_id").on(table.user_id),
 ]);
@@ -1345,8 +1266,7 @@ export const official_doc_log = sqliteTable("official_doc_log", {
 	is_received: integer().default(0),
 	note: text().default(""),
 	company: text().default(""),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_official_doc_log_sent_date").on(table.sent_date),
 	index("idx_official_doc_log_company").on(table.company),
@@ -1359,8 +1279,7 @@ export const onboarding_checklists = sqliteTable("onboarding_checklists", {
 	items: text().default("[]"),
 	target_date: text(),
 	completed_at: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_onboarding_staff").on(table.staff_id),
 ]);
@@ -1381,8 +1300,7 @@ export const op_check_templates = sqliteTable("op_check_templates", {
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_by_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_op_check_templates_surgery_name").on(table.surgery_name),
 	index("idx_op_check_templates_company_scope").on(table.company_id, table.template_scope, table.is_active),
@@ -1415,8 +1333,7 @@ export const op_patient_checks = sqliteTable("op_patient_checks", {
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	surgery_started_at: text(),
 	surgery_ended_at: text(),
-	ward_message_sent_at: text(),
-},
+	ward_message_sent_at: text() },
 (table) => [
 	index("idx_op_patient_checks_patient_name").on(table.patient_name),
 	index("idx_op_patient_checks_company_date").on(table.company_id, table.schedule_date, table.updated_at),
@@ -1429,8 +1346,7 @@ export const org_teams = sqliteTable("org_teams", {
 	team_name: text().notNull(),
 	sort_order: integer().default(0),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	applicable_shifts: text(),
-});
+	applicable_shifts: text() });
 
 export const payroll = sqliteTable("payroll", {
 	id: text().primaryKey().notNull(),
@@ -1440,8 +1356,7 @@ export const payroll = sqliteTable("payroll", {
 	base_salary: real().notNull(),
 	total_salary: real().notNull(),
 	status: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const payroll_approval_logs = sqliteTable("payroll_approval_logs", {
 	id: text().primaryKey().notNull(),
@@ -1451,8 +1366,7 @@ export const payroll_approval_logs = sqliteTable("payroll_approval_logs", {
 	actor_name: text().notNull(),
 	action: text().notNull(),
 	comment: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_approval_logs_scope").on(table.company_name, table.year_month, table.created_at),
 ]);
@@ -1470,8 +1384,7 @@ export const payroll_approval_workflows = sqliteTable("payroll_approval_workflow
 	step1_updated_at: text(),
 	step2_updated_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_approval_workflows_scope").on(table.company_name, table.year_month),
 ]);
@@ -1486,8 +1399,7 @@ export const payroll_bonus_items = sqliteTable("payroll_bonus_items", {
 	note: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_bonus_items_staff").on(table.staff_id, table.year_month),
 	index("idx_payroll_bonus_items_company_month").on(table.company_name, table.year_month, table.created_at),
@@ -1505,8 +1417,7 @@ export const payroll_calendar_items = sqliteTable("payroll_calendar_items", {
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_calendar_items_scope").on(table.company_name, table.year_month, table.sort_order),
 ]);
@@ -1522,8 +1433,7 @@ export const payroll_deduction_controls = sqliteTable("payroll_deduction_control
 	is_active: integer().default(1),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_deduction_controls_staff").on(table.staff_id, table.is_active),
 	index("idx_payroll_deduction_controls_company").on(table.company_name, table.is_active, table.created_at),
@@ -1542,8 +1452,7 @@ export const payroll_locks = sqliteTable("payroll_locks", {
 	reopen_request_status: text(),
 	reopen_reviewed_at: text(),
 	reopen_reviewed_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
-	reopen_review_comment: text(),
-},
+	reopen_review_comment: text() },
 (table) => [
 	index("idx_payroll_locks_reopen_status").on(table.year_month, table.company_name, table.reopen_request_status),
 ]);
@@ -1556,8 +1465,7 @@ export const payroll_policy_versions = sqliteTable("payroll_policy_versions", {
 	snapshot: text().default("{}"),
 	note: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_policy_versions_scope").on(table.company_name, table.effective_year, table.created_at),
 ]);
@@ -1596,8 +1504,7 @@ export const payroll_records = sqliteTable("payroll_records", {
 	long_term_care: real(),
 	employment_insurance: real(),
 	income_tax: real(),
-	local_tax: real(),
-},
+	local_tax: real() },
 (table) => [
 	uniqueIndex("idx_payroll_records_staff_ym_type_unique").on(table.staff_id, table.year_month, table.record_type),
 	index("idx_payroll_records_staff_ym").on(table.staff_id, table.year_month),
@@ -1615,8 +1522,7 @@ export const payroll_retro_adjustments = sqliteTable("payroll_retro_adjustments"
 	reason: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_payroll_retro_adjustments_staff").on(table.staff_id, table.start_month, table.end_month),
 	index("idx_payroll_retro_adjustments_company").on(table.company_name, table.created_at),
@@ -1641,16 +1547,14 @@ export const personnel_appointments = sqliteTable("personnel_appointments", {
 	issued_by: text(),
 	issued_at: text().default(sql`(CURRENT_TIMESTAMP)`),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	new_department: text(),
-});
+	new_department: text() });
 
 export const pinned_messages = sqliteTable("pinned_messages", {
 	id: text().primaryKey().notNull(),
 	room_id: text().notNull(),
 	message_id: text().notNull(),
 	pinned_by: text(),
-	pinned_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	pinned_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_pinned_room").on(table.room_id),
 ]);
@@ -1660,8 +1564,7 @@ export const poll_votes = sqliteTable("poll_votes", {
 	poll_id: text().notNull().references(() => polls.id, { onDelete: "cascade" } ),
 	user_id: text().notNull(),
 	option_index: integer().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const polls = sqliteTable("polls", {
 	id: text().primaryKey().notNull(),
@@ -1670,8 +1573,7 @@ export const polls = sqliteTable("polls", {
 	creator_id: text(),
 	question: text().notNull(),
 	options: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_polls_room").on(table.room_id),
 ]);
@@ -1688,8 +1590,7 @@ export const popups = sqliteTable("popups", {
 	link_url: text(),
 	start_at: text(),
 	end_at: text(),
-	priority: integer().default(0),
-},
+	priority: integer().default(0) },
 (table) => [
 	index("idx_popups_schedule_priority").on(table.is_active, table.priority, table.created_at),
 	index("idx_popups_active_created").on(table.is_active, table.created_at),
@@ -1705,8 +1606,7 @@ export const posts = sqliteTable("posts", {
 	company: text(),
 	views: integer().default(0),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	company_id: text().references(() => companies.id),
-},
+	company_id: text().references(() => companies.id) },
 (table) => [
 	index("idx_posts_company_id_created_at").on(table.company_id, table.created_at),
 ]);
@@ -1756,8 +1656,7 @@ export const purchase_orders = sqliteTable("purchase_orders", {
 	source_supply_approval_id: text().references(() => approvals.id, { onDelete: "set null" } ),
 	source_supply_request_index: integer(),
 	requester_company: text(),
-	requester_department: text(),
-},
+	requester_department: text() },
 (table) => [
 	index("idx_purchase_orders_status").on(table.status),
 	index("idx_purchase_orders_source_supply_approval").on(table.source_supply_approval_id, table.source_supply_request_index),
@@ -1775,8 +1674,7 @@ export const push_subscriptions = sqliteTable("push_subscriptions", {
 	fcm_token: text(),
 	device_id: text(),
 	platform: text(),
-	user_agent: text(),
-},
+	user_agent: text() },
 (table) => [
 	index("idx_push_subscriptions_staff_id").on(table.staff_id),
 	uniqueIndex("idx_push_subscriptions_staff_endpoint").on(table.staff_id, table.endpoint),
@@ -1804,8 +1702,7 @@ export const report_schedules = sqliteTable("report_schedules", {
 	enabled: integer().default(1),
 	last_generated_at: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_report_schedules_enabled").on(table.enabled, table.report_type),
 ]);
@@ -1822,8 +1719,7 @@ export const retirement_pensions = sqliteTable("retirement_pensions", {
 	total_accumulated: real(),
 	memo: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_retirement_pensions_type").on(table.pension_type),
 	uniqueIndex("idx_retirement_pensions_staff_id").on(table.staff_id),
@@ -1846,22 +1742,19 @@ export const reward_discipline = sqliteTable("reward_discipline", {
 	committee_result: text(),
 	memo: text(),
 	issued_by: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const room_notification_settings = sqliteTable("room_notification_settings", {
 	id: text().primaryKey().notNull(),
 	user_id: text().notNull(),
 	room_id: text().notNull(),
-	notifications_enabled: integer().default(1),
-});
+	notifications_enabled: integer().default(1) });
 
 export const room_read_cursors = sqliteTable("room_read_cursors", {
 	id: text().primaryKey().notNull(),
 	user_id: text().notNull(),
 	room_id: text().notNull(),
-	last_read_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	last_read_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_room_read_cursors_room_user").on(table.room_id, table.user_id),
 	// [4차 전수조사 lib-10] (user_id, room_id) 유니크 — onConflictDoUpdate upsert의 충돌키.
@@ -1884,8 +1777,7 @@ export const roster_approval_requests = sqliteTable("roster_approval_requests", 
 	rejected_at: text(),
 	reject_reason: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() });
 
 export const roster_policy_settings = sqliteTable("roster_policy_settings", {
 	id: numeric().primaryKey(),
@@ -1898,8 +1790,7 @@ export const roster_policy_settings = sqliteTable("roster_policy_settings", {
 	created_by: numeric().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by: numeric().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() },
 (table) => [
 	uniqueIndex("idx_roster_policy_settings_type_id_unique").on(table.policy_type, table.policy_id),
 ]);
@@ -1922,8 +1813,7 @@ export const roster_swap_requests = sqliteTable("roster_swap_requests", {
 	rejected_at: text(),
 	reject_reason: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() });
 
 export const salary_change_history = sqliteTable("salary_change_history", {
 	id: text().primaryKey().notNull(),
@@ -1935,8 +1825,7 @@ export const salary_change_history = sqliteTable("salary_change_history", {
 	reason: text(),
 	created_by: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	previous_salary: real(),
-},
+	previous_salary: real() },
 (table) => [
 	index("idx_salary_change_staff_date").on(table.staff_id, table.effective_date),
 	index("idx_salary_change_staff").on(table.staff_id),
@@ -1951,8 +1840,7 @@ export const scheduled_messages = sqliteTable("scheduled_messages", {
 	scheduled_at: text().notNull(),
 	is_sent: integer().default(0),
 	reply_to_id: text().references(() => messages.id, { onDelete: "set null" } ),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_scheduled_messages_sender").on(table.sender_id, table.is_sent, table.scheduled_at),
 ]);
@@ -1964,8 +1852,7 @@ export const shift_assignments = sqliteTable("shift_assignments", {
 	shift_id: text(),
 	company_name: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	shift_name: text(),
-},
+	shift_name: text() },
 (table) => [
 	index("idx_shift_assignments_work_date").on(table.work_date),
 	index("idx_shift_assignments_staff").on(table.staff_id),
@@ -1978,8 +1865,7 @@ export const staff_certifications = sqliteTable("staff_certifications", {
 	issuer: text(),
 	issue_date: text(),
 	expiry_date: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const staff_evaluations = sqliteTable("staff_evaluations", {
 	id: text().primaryKey().notNull(),
@@ -1988,8 +1874,7 @@ export const staff_evaluations = sqliteTable("staff_evaluations", {
 	category: text().notNull(),
 	content: text().notNull(),
 	score: integer(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_staff_evaluations_staff_id").on(table.staff_id),
 ]);
@@ -1999,8 +1884,7 @@ export const staff_job_categories = sqliteTable("staff_job_categories", {
 	staff_id: text().notNull().references(() => staff_members.id, { onDelete: "cascade" } ),
 	job_category_id: text().notNull().references(() => job_categories.id),
 	is_primary: integer().default(0),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_staff_job_categories_staff_id").on(table.staff_id),
 	index("idx_staff_job_categories_job_category_id").on(table.job_category_id),
@@ -2024,8 +1908,7 @@ export const staff_licenses = sqliteTable("staff_licenses", {
 	copy_url: text(),
 	document_url: text(),
 	document_file_url: text(),
-	license_file_url: text(),
-},
+	license_file_url: text() },
 (table) => [
 	uniqueIndex("uq_staff_licenses_staff_number").on(table.staff_id, table.license_number),
 	index("idx_staff_licenses_staff_id_is_primary").on(table.staff_id, table.is_primary),
@@ -2097,8 +1980,7 @@ export const staff_members = sqliteTable("staff_members", {
 	salary: real(),
 	extension: text(),
 	contract_type: text(),
-	password_reset_required: integer().default(0),
-},
+	password_reset_required: integer().default(0) },
 (table) => [
 	index("idx_staff_members_shift_id").on(table.shift_id),
 	index("idx_staff_members_company_id").on(table.company_id),
@@ -2113,8 +1995,7 @@ export const staff_preferred_off = sqliteTable("staff_preferred_off", {
 	preferred_dates: text().default("{}"),
 	notes: text().default(""),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_staff_preferred_off_year_month").on(table.year_month),
 	index("idx_staff_preferred_off_staff_id").on(table.staff_id),
@@ -2128,8 +2009,7 @@ export const staff_shift_assignments = sqliteTable("staff_shift_assignments", {
 	priority: integer().default(0),
 	effective_from: text(),
 	effective_to: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_staff_shift_assignments_staff_id_is_primary").on(table.staff_id, table.is_primary),
 	index("idx_staff_shift_assignments_staff_id").on(table.staff_id),
@@ -2150,8 +2030,7 @@ export const staff_trainings = sqliteTable("staff_trainings", {
 	certificate_url: text(),
 	memo: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_staff_trainings_training_code").on(table.training_code),
 	index("idx_staff_trainings_status").on(table.status),
@@ -2166,8 +2045,7 @@ export const staff_transfer_history = sqliteTable("staff_transfer_history", {
 	after_value: text(),
 	effective_date: text(),
 	approval_id: text().references(() => approvals.id, { onDelete: "set null" } ),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const suppliers = sqliteTable("suppliers", {
 	id: text().primaryKey().notNull(),
@@ -2185,29 +2063,25 @@ export const suppliers = sqliteTable("suppliers", {
 	contract_end: text(),
 	payment_terms: text(),
 	notes: text(),
-	created_by: text(),
-});
+	created_by: text() });
 
 export const surgery_templates = sqliteTable("surgery_templates", {
 	id: text().primaryKey().notNull(),
 	name: text().notNull(),
 	sort_order: integer().default(0),
 	is_active: integer().default(1),
-	body_part: text(),
-});
+	body_part: text() });
 
 export const system_configs = sqliteTable("system_configs", {
 	key: text().primaryKey().notNull(),
 	value: text(),
 	description: text(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const system_settings = sqliteTable("system_settings", {
 	key: text().primaryKey().notNull(),
 	value: text(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const tasks = sqliteTable("tasks", {
 	id: text().primaryKey().notNull(),
@@ -2216,8 +2090,7 @@ export const tasks = sqliteTable("tasks", {
 	status: text().default("todo"),
 	priority: text().default("medium"),
 	assignee_id: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const tax_free_settings = sqliteTable("tax_free_settings", {
 	id: text().primaryKey().notNull(),
@@ -2232,8 +2105,7 @@ export const tax_free_settings = sqliteTable("tax_free_settings", {
 	other_taxfree_limit: integer().default(0),
 	effective_year: integer().default(2025),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const tax_insurance_rates = sqliteTable("tax_insurance_rates", {
 	id: text().primaryKey().notNull(),
@@ -2244,8 +2116,7 @@ export const tax_insurance_rates = sqliteTable("tax_insurance_rates", {
 	long_term_care_rate: real().default(0.00459),
 	employment_insurance_rate: real().default(0.009),
 	income_tax_bracket: text().default("[]"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const tax_reports = sqliteTable("tax_reports", {
 	id: text().primaryKey().notNull(),
@@ -2256,8 +2127,7 @@ export const tax_reports = sqliteTable("tax_reports", {
 	data: text().default("[]"),
 	status: text().default("draft"),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_tax_reports_year_company").on(table.year, table.company_name, table.report_type),
 ]);
@@ -2271,8 +2141,7 @@ export const todo_reminder_logs = sqliteTable("todo_reminder_logs", {
 	status: text().default("sent"),
 	title: text(),
 	body: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_todo_reminder_logs_unique").on(table.user_id, table.todo_id, table.reminder_at),
 	index("idx_todo_reminder_logs_created").on(table.user_id, table.created_at),
@@ -2292,8 +2161,7 @@ export const todos = sqliteTable("todos", {
 	priority: text().default("medium"),
 	reminder_at: text(),
 	repeat_type: text().default("none"),
-	assignee_kind: text().default("self"),
-},
+	assignee_kind: text().default("self") },
 (table) => [
 	index("idx_todos_user_date").on(table.user_id, table.task_date),
 	index("idx_todos_source_message").on(table.user_id, table.source_room_id, table.source_message_id),
@@ -2313,8 +2181,7 @@ export const unpaid_absence_records = sqliteTable("unpaid_absence_records", {
 	daily_wage: real(),
 	deduction_amount: integer().default(0),
 	note: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 export const virtual_account_deposits = sqliteTable("virtual_account_deposits", {
 	id: text().primaryKey().notNull(),
@@ -2347,8 +2214,7 @@ export const virtual_account_deposits = sqliteTable("virtual_account_deposits", 
 	matched_note: text(),
 	raw_payload: text().default("{}"),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_virtual_account_deposits_status").on(table.deposit_status, table.match_status),
 	index("idx_virtual_account_deposits_deposited_at").on(table.deposited_at),
@@ -2370,8 +2236,7 @@ export const wiki_document_versions = sqliteTable("wiki_document_versions", {
 	change_summary: text(),
 	restore_of_version_id: text(),
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_wiki_document_versions_document_created").on(table.document_id, table.created_at),
 	foreignKey(() => ({
@@ -2396,8 +2261,7 @@ export const wiki_documents = sqliteTable("wiki_documents", {
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_wiki_documents_folder_updated").on(table.folder_id, table.updated_at),
 	index("idx_wiki_documents_company_title").on(table.company_id, table.title),
@@ -2415,8 +2279,7 @@ export const wiki_folders = sqliteTable("wiki_folders", {
 	created_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	updated_by: text().references(() => staff_members.id, { onDelete: "set null" } ),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_wiki_folders_company_sort").on(table.company_id, table.sort_order, table.created_at),
 ]);
@@ -2435,8 +2298,7 @@ export const work_shifts = sqliteTable("work_shifts", {
 	is_weekend_work: integer().default(0),
 	is_shift: integer().default(0),
 	is_active: integer().default(1),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 // ---------------------------------------------------------------------------
 // rate_limit_attempts — 분산 Workers 환경에서 레이트리밋 상태를 D1에 영속
@@ -2447,8 +2309,7 @@ export const rate_limit_attempts = sqliteTable("rate_limit_attempts", {
 	key: text().primaryKey().notNull(),
 	count: integer().notNull().default(0),
 	window_start: text().notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_rate_limit_attempts_window_start").on(table.window_start),
 ]);
@@ -2459,8 +2320,7 @@ export const company_welfare_policies = sqliteTable("company_welfare_policies", 
 	rule_name: text().notNull(),
 	rule_value: text().notNull(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_company_welfare_policies_unique").on(table.company_name, table.rule_name),
 ]);
@@ -2471,15 +2331,14 @@ export const company_payroll_policies = sqliteTable("company_payroll_policies", 
 	rule_label: text().notNull(),
 	rule_value: text().notNull(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_company_payroll_policies_unique").on(table.company_name, table.rule_label),
 ]);
 
 // ─────────────────────────────────────────────────────────────
 // 무음 실패 복구 — 미존재 기능 테이블 8종 (2026-05-30)
-// 소비처가 supabase.from()/enqueueSupabaseMutation으로 호출하나 D1에
+// 소비처가 db.from()/enqueueD1Mutation으로 호출하나 D1에
 // 실테이블이 없어 무음 실패하던 기능들을 신설. 컬럼은 각 소비처 코드의
 // insert/select/update 실제 사용 컬럼에서 추출.
 // ─────────────────────────────────────────────────────────────
@@ -2494,8 +2353,7 @@ export const op_consultations = sqliteTable("op_consultations", {
 	staff_id: text().references(() => staff_members.id),
 	staff_name: text(),
 	company: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_op_consultations_company_created").on(table.company, table.created_at),
 	index("idx_op_consultations_staff_id").on(table.staff_id),
@@ -2516,8 +2374,7 @@ export const congratulations_condolences = sqliteTable("congratulations_condolen
 	wreath_sent: integer().default(0),
 	company: text(),
 	status: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_congrats_company_event_date").on(table.company, table.event_date),
 	index("idx_congrats_event_type").on(table.event_type),
@@ -2536,8 +2393,7 @@ export const early_leave_records = sqliteTable("early_leave_records", {
 	is_approved: integer().default(0),
 	note: text(),
 	company: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_early_leave_work_date").on(table.work_date),
 	index("idx_early_leave_staff_id").on(table.staff_id),
@@ -2560,8 +2416,7 @@ export const generated_contracts = sqliteTable("generated_contracts", {
 	work_hours: text(),
 	note: text(),
 	created_by: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_generated_contracts_company").on(table.company_name, table.created_at),
 	index("idx_generated_contracts_staff_id").on(table.staff_id),
@@ -2572,8 +2427,7 @@ export const board_post_stars = sqliteTable("board_post_stars", {
 	id: text().primaryKey().notNull(),
 	post_id: text().notNull(),
 	user_id: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_board_post_stars_post_user").on(table.post_id, table.user_id),
 	index("idx_board_post_stars_user_id").on(table.user_id),
@@ -2591,8 +2445,7 @@ export const as_repair_records = sqliteTable("as_repair_records", {
 	status: text(),
 	created_by: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_as_repair_status_created").on(table.status, table.created_at),
 ]);
@@ -2608,8 +2461,7 @@ export const return_records = sqliteTable("return_records", {
 	status: text(),
 	created_by: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_return_records_status_created").on(table.status, table.created_at),
 ]);
@@ -2625,8 +2477,7 @@ export const message_templates = sqliteTable("message_templates", {
 	content: text(),
 	template_group: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_message_templates_name").on(table.name),
 ]);
@@ -2640,8 +2491,7 @@ export const external_integrations = sqliteTable("external_integrations", {
 	status: text().default("connected"),
 	last_synced_label: text(),
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_external_integrations_vendor").on(table.vendor),
 ]);
@@ -2658,11 +2508,10 @@ export const disciplinary_committees = sqliteTable("disciplinary_committees", {
 	result_type: text(),
 	result_details: text(),
 	committee_members: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-});
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) });
 
 // ── 2026-06-10 무음 실패 복구 (G7) — migration 0013로 D1에 신설된 기능 테이블 5종.
-//    소비처가 supabase.from()으로 호출하나 schema.ts/d1_schema_final.sql 둘 다에
+//    소비처가 db.from()으로 호출하나 schema.ts/d1_schema_final.sql 둘 다에
 //    없어 무음 실패하던 기능을 실테이블 신설과 함께 복구. 컬럼은 소비처 코드의
 //    insert/select/upsert/delete 사용 컬럼에서 추출.
 
@@ -2673,8 +2522,7 @@ export const nurse_schedules = sqliteTable("nurse_schedules", {
 	year_month: text(),
 	day: integer(),
 	shift_code: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_nurse_schedules_year_month").on(table.year_month),
 	index("idx_nurse_schedules_staff_id").on(table.staff_id),
@@ -2686,8 +2534,7 @@ export const leave_policies = sqliteTable("leave_policies", {
 	label: text(),
 	value: text(),
 	company: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_leave_policies_company").on(table.company),
 ]);
@@ -2700,8 +2547,7 @@ export const work_type_change_history = sqliteTable("work_type_change_history", 
 	previous_type: text(),
 	new_type: text(),
 	reason: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_work_type_change_history_staff_changed").on(table.staff_id, table.changed_date),
 ]);
@@ -2712,8 +2558,7 @@ export const education_completions = sqliteTable("education_completions", {
 	staff_id: text(),
 	education_name: text(),
 	certificate_url: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	uniqueIndex("idx_education_completions_staff_education").on(table.staff_id, table.education_name),
 ]);
@@ -2726,8 +2571,7 @@ export const email_queue = sqliteTable("email_queue", {
 	body: text(),
 	type: text(),
 	status: text().default("pending"),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_email_queue_status_created").on(table.status, table.created_at),
 ]);
@@ -2747,8 +2591,7 @@ export const budget_settings = sqliteTable("budget_settings", {
 	month: integer(),
 	item: text(),
 	amount: integer(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_budget_settings_year_month").on(table.year, table.month),
 	index("idx_budget_settings_dept").on(table.dept),
@@ -2763,8 +2606,7 @@ export const budget_executions = sqliteTable("budget_executions", {
 	amount: integer(),
 	exec_date: text(),
 	memo: text(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_budget_executions_exec_date").on(table.exec_date),
 	index("idx_budget_executions_dept").on(table.dept),
@@ -2781,8 +2623,7 @@ export const journal_entries = sqliteTable("journal_entries", {
 	debit_acc: text().notNull(),
 	credit_acc: text().notNull(),
 	amount: integer().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_journal_entries_date").on(table.date),
 	index("idx_journal_entries_company_id").on(table.company_id),
@@ -2798,8 +2639,7 @@ export const fixed_assets = sqliteTable("fixed_assets", {
 	salvage: integer().notNull(),
 	useful_life: integer().notNull(),
 	method: text().notNull(),
-	created_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_fixed_assets_company_id").on(table.company_id),
 ]);
@@ -2811,8 +2651,7 @@ export const bank_accounts_sync = sqliteTable("bank_accounts_sync", {
 	name: text().notNull(),
 	num: text().notNull(),
 	state: text().notNull(),
-	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`),
-},
+	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_bank_accounts_sync_company_id").on(table.company_id),
 ]);

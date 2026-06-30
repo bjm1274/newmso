@@ -7,8 +7,7 @@ import {
   readSessionFromRequest,
   resolveLatestSessionUser,
   SESSION_COOKIE_NAME,
-  SESSION_MAX_AGE_SECONDS,
-} from '@/lib/server-session';
+  SESSION_MAX_AGE_SECONDS } from '@/lib/server-session';
 
 export async function GET(request: NextRequest) {
   const session = await readSessionFromRequest(request);
@@ -33,8 +32,7 @@ export async function GET(request: NextRequest) {
     authenticated: true,
     user: freshSessionUser,
     expiresAt: session.exp,
-    issuedAt: new Date(session.iat * 1000).toISOString(),
-  });
+    issuedAt: new Date(session.iat * 1000).toISOString() });
 
   const remainingAgeSeconds = Math.max(1, session.exp - Math.floor(Date.now() / 1000));
   const userChanged = JSON.stringify(currentSessionUser) !== JSON.stringify(freshSessionUser);

@@ -3,16 +3,14 @@
 import { useMemo, useState, useEffect } from 'react';
 import { usePayrollData } from '../payroll-context';
 import {
-  calculateEmployeeInsuranceDeductions,
-} from '@/lib/payroll-insurance-rates';
+  calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import { calculateAge } from '../payroll-policy';
 import {
   calculateMonthlyIncomeTax,
   fetchTaxInsuranceRates,
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
-  type TaxInsuranceRates,
-} from '@/lib/use-tax-insurance-rates';
+  type TaxInsuranceRates } from '@/lib/use-tax-insurance-rates';
 
 /**
  * #3 급여 시뮬레이터 — 좌측 입력 / 우측 실시간 계산
@@ -82,8 +80,7 @@ function computeSimulation(
     dependentCount,
     {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    }
+      qualifyingChildCount: 0 }
   );
   const localTax = Math.floor((incomeTax * 0.1) / 10) * 10;
 
@@ -98,8 +95,7 @@ function computeSimulation(
     incomeTax,
     localTax,
     netPay,
-    hourly,
-  };
+    hourly };
 }
 
 export default function ModSimulator() {
@@ -155,8 +151,7 @@ export default function ModSimulator() {
     nightHours: parseNumber(nightHours),
     holidayHours: parseNumber(holidayHours),
     taxableExtra: parseNumber(taxableExtra),
-    taxFreeExtra: parseNumber(taxFreeExtra),
-  };
+    taxFreeExtra: parseNumber(taxFreeExtra) };
 
   const result = useMemo(
     () => computeSimulation(inputs, age, taxInsuranceRates, dependentCount),

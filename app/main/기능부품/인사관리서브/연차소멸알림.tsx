@@ -67,8 +67,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
             remaining,
             expiryDate,
             daysLeft,
-            estimatedLoss: Math.round(remaining * dailyWage),
-          };
+            estimatedLoss: Math.round(remaining * dailyWage) };
         });
 
         setLeaveData(result.sort((a, b) => a.daysLeft - b.daysLeft));
@@ -97,8 +96,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
       title: '연차 소멸 예정 알림',
       description: `${info.staff.name}님에게 연차 소멸 예정 알림을 발송합니다.\n남은 연차 ${info.remaining}일 기준으로 안내됩니다.`,
       confirmText: '발송',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
     setSendingId(String(info.staff.id));
 
@@ -109,8 +107,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
         body: `보유 연차 ${info.remaining}일이 ${info.expiryDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}에 소멸 예정입니다. 사용 계획을 확인해 주세요.`,
         type: 'attendance',
         read_at: null,
-        created_at: new Date().toISOString(),
-      });
+        created_at: new Date().toISOString() });
 
       toast('알림을 발송했습니다.', 'success');
     } catch (error) {

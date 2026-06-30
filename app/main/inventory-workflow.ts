@@ -1,5 +1,5 @@
 import { db } from '@/lib/db-client';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnFallback } from '@/lib/db-compat';
 import {
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
@@ -15,8 +15,7 @@ import {
   type LooseRecord,
   type InventoryLike,
   type InventoryUserLike,
-  type ApprovalLike,
-} from './inventory-validation';
+  type ApprovalLike } from './inventory-validation';
 
 export type SupplyRequestWorkflowItem = {
   request_index: number;
@@ -94,8 +93,7 @@ export function buildSupplyRequestMonthlySuggestions(
         total_qty: 0,
         line_count: 0,
         document_ids: new Set<string>(),
-        last_requested_at: null as string | null,
-      };
+        last_requested_at: null as string | null };
 
       current.total_qty += item.qty;
       current.line_count += 1;
@@ -121,8 +119,7 @@ export function buildSupplyRequestMonthlySuggestions(
         line_count: item.line_count,
         document_count: documentCount,
         average_qty: Math.max(1, Math.round(item.total_qty / documentCount)),
-        last_requested_at: item.last_requested_at,
-      } satisfies SupplyRequestMonthlySuggestion;
+        last_requested_at: item.last_requested_at } satisfies SupplyRequestMonthlySuggestion;
     })
     .sort((left, right) => {
       if (right.total_qty !== left.total_qty) {
@@ -200,8 +197,7 @@ export function buildSupplyRequestWorkflowItems(
       processed_by_id: previousItem?.processed_by_id || null,
       processed_by_name: previousItem?.processed_by_name || null,
       order_approval_requested: Boolean(previousItem?.order_approval_requested),
-      note: previousItem?.note || null,
-    } satisfies SupplyRequestWorkflowItem;
+      note: previousItem?.note || null } satisfies SupplyRequestWorkflowItem;
   });
 }
 
@@ -219,8 +215,7 @@ export function summarizeSupplyRequestWorkflow(items: SupplyRequestWorkflowItem[
       issue_ready_count: 0,
       order_required_count: 0,
       issued_count: 0,
-      ordered_count: 0,
-    },
+      ordered_count: 0 },
   );
 }
 
@@ -239,8 +234,7 @@ export async function requestInventoryReorder({
   selectedCompanyId,
   quantity,
   reason,
-  metaData,
-}: RequestInventoryReorderParams) {
+  metaData }: RequestInventoryReorderParams) {
   const itemName = getItemName(item);
   const currentStock = getItemQuantity(item);
   const minQuantity = getItemMinQuantity(item);
@@ -265,9 +259,7 @@ export async function requestInventoryReorder({
         unit_price: getItemUnitPrice(item),
         supplier_name: item?.supplier_name || item?.supplier || null,
         is_auto_generated: true,
-        ...(metaData || {}),
-      },
-    },
+        ...(metaData || {}) } },
   ];
 
   if (item?.company_id || user?.company_id || selectedCompanyId) {

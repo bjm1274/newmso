@@ -1,8 +1,7 @@
 import {
   getD1Binding,
   getD1Drizzle,
-  room_read_cursors as roomReadCursorsTable,
-} from '@/lib/db';
+  room_read_cursors as roomReadCursorsTable } from '@/lib/db';
 
 export type RoomReadCursorWriteResult = {
   ok: boolean;
@@ -51,8 +50,7 @@ export async function upsertRoomReadCursors(
       ok: false,
       roomIds,
       readAt,
-      error: null,
-    };
+      error: null };
   }
 
   const d1 = await getD1Binding();
@@ -70,13 +68,11 @@ export async function upsertRoomReadCursors(
             id: crypto.randomUUID(),
             user_id: userId,
             room_id: roomId,
-            last_read_at: readAt,
-          })),
+            last_read_at: readAt })),
         )
         .onConflictDoUpdate({
           target: [roomReadCursorsTable.user_id, roomReadCursorsTable.room_id],
-          set: { last_read_at: readAt },
-        });
+          set: { last_read_at: readAt } });
     }
     return { ok: true, roomIds, readAt, error: null };
   } catch (error) {

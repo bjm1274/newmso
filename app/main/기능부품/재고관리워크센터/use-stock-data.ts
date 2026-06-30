@@ -18,16 +18,14 @@ import type {
   AbcGrade,
   ForecastRow,
   InspectRow,
-  Tone,
-} from './stock-types';
+  Tone } from './stock-types';
 import {
   asString,
   pickNumber,
   pickString,
   toMonthString,
   toTimeString,
-  type Row,
-} from './data-helpers';
+  type Row } from './data-helpers';
 
 // ─────────────────────────────────────────────────
 // Status 워크센터
@@ -90,8 +88,7 @@ const STATUS_EMPTY: StatusWorkcenterData = {
   myCount: 0,
   deptUsageTop5: [],
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useStatusData(
   userCompany?: string,
@@ -149,8 +146,7 @@ export function useStatusData(
           myCount,
           deptUsageTop5,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '재고 데이터를 불러오지 못했습니다.';
@@ -186,8 +182,7 @@ const MOVE_KIND_TONE: Record<StockMoveRow['kind'], Tone> = {
   입고: 'success',
   출고: 'accent',
   이관: 'warn',
-  반품: 'danger',
-};
+  반품: 'danger' };
 
 function normalizeMoveKind(v: unknown): StockMoveRow['kind'] {
   const s = asString(v);
@@ -208,8 +203,7 @@ function mapMoveRow(r: Row): StockMoveRow {
     from: pickString(r, ['from_location', 'source', 'from_dept'], '-'),
     to: pickString(r, ['to_location', 'destination', 'to_dept', 'department'], '-'),
     who: pickString(r, ['actor_name', 'worker_name', 'user_name'], '-'),
-    tone: MOVE_KIND_TONE[kind],
-  };
+    tone: MOVE_KIND_TONE[kind] };
 }
 
 const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; tone: Tone }> = {
@@ -220,8 +214,7 @@ const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; ton
   배송: { status: '배송 중', tone: 'accent' },
   '배송 중': { status: '배송 중', tone: 'accent' },
   완료: { status: '납품 완료', tone: 'success' },
-  '납품 완료': { status: '납품 완료', tone: 'success' },
-};
+  '납품 완료': { status: '납품 완료', tone: 'success' } };
 
 function mapOrderRow(r: Row): PurchaseOrderRow {
   const rawStatus = asString(r['status'], '대기').trim();
@@ -244,8 +237,7 @@ function mapOrderRow(r: Row): PurchaseOrderRow {
     status: mapped.status,
     tone: mapped.tone,
     placed: toMonthString(r['created_at']).slice(5).replace('-', '/'),
-    due: toMonthString(r['expected_delivery_date'] ?? r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-',
-  };
+    due: toMonthString(r['expected_delivery_date'] ?? r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-' };
 }
 
 function mapVendorCard(r: Row, orderCount: number, paid: number, due: number): VendorCard {
@@ -257,8 +249,7 @@ function mapVendorCard(r: Row, orderCount: number, paid: number, due: number): V
     paid,
     due,
     contact: `${pickString(r, ['contact_name'], '-')} ${pickString(r, ['phone'], '')}`.trim(),
-    tone,
-  };
+    tone };
 }
 
 export type IOWorkcenterData = {
@@ -282,8 +273,7 @@ const IO_EMPTY: IOWorkcenterData = {
   shippingOrders: 0,
   monthAmount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useIOData(): IOWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<IOWorkcenterData>(IO_EMPTY);
@@ -372,8 +362,7 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
           shippingOrders,
           monthAmount: Math.round((monthAmount / 1_000_000) * 10) / 10,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '입출고 데이터를 불러오지 못했습니다.';
@@ -413,8 +402,7 @@ function mapCatalogRow(r: Row): CatalogRow {
     unit: pickString(r, ['unit'], 'EA'),
     price: pickNumber(r, ['price', 'unit_price']),
     date: toMonthString(r['created_at']),
-    who: pickString(r, ['created_by_name', 'created_by'], '-'),
-  };
+    who: pickString(r, ['created_by_name', 'created_by'], '-') };
 }
 
 function buildCategoryCards(categories: Row[], inventory: Row[]): CategoryCard[] {
@@ -448,8 +436,7 @@ function mapAssetRow(r: Row): AssetRow {
     date: toMonthString(r['purchase_date'] ?? r['created_at']),
     qr: hasQr,
     status,
-    tone,
-  };
+    tone };
 }
 
 function mapUdiRow(r: Row): UdiRow {
@@ -459,8 +446,7 @@ function mapUdiRow(r: Row): UdiRow {
     mfr: pickString(r, ['manufacturer', 'maker'], '-'),
     model: pickString(r, ['model', 'model_name'], '-'),
     lot: pickString(r, ['lot_number', 'lot'], '-'),
-    date: toMonthString(r['created_at']),
-  };
+    date: toMonthString(r['created_at']) };
 }
 
 export type ItemWorkcenterData = {
@@ -486,8 +472,7 @@ const ITEM_EMPTY: ItemWorkcenterData = {
   udiCount: 0,
   categoryCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useItemData(): ItemWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<ItemWorkcenterData>(ITEM_EMPTY);
@@ -536,8 +521,7 @@ export function useItemData(): ItemWorkcenterData & { refresh: () => void } {
           udiCount: udiRows.length,
           categoryCount: catRows.length,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '품목 데이터를 불러오지 못했습니다.';
@@ -585,8 +569,7 @@ function classifyAbc(
   const items = inventory
     .map((i) => ({
       name: pickString(i, ['name', 'item_name'], ''),
-      value: usageMap.get(pickString(i, ['name', 'item_name'], '')) ?? 0,
-    }))
+      value: usageMap.get(pickString(i, ['name', 'item_name'], '')) ?? 0 }))
     .filter((x) => x.name)
     .sort((a, b) => b.value - a.value);
 
@@ -609,20 +592,17 @@ function classifyAbc(
       head: `상위 ${A.length} 종`,
       contributionPct: 70,
       desc: '매출 기여 70% · 발주 1순위 · 안전재고 충분히 확보',
-      examples: A.slice(0, 3),
-    },
+      examples: A.slice(0, 3) },
     {
       grade: 'B',
       head: `${B.length} 종`,
       contributionPct: 20,
-      desc: '매출 기여 20% · 정기 점검 · 일반 안전재고',
-    },
+      desc: '매출 기여 20% · 정기 점검 · 일반 안전재고' },
     {
       grade: 'C',
       head: `${C.length} 종`,
       contributionPct: 10,
-      desc: '매출 기여 10% · 최소 관리 · 통합 발주',
-    },
+      desc: '매출 기여 10% · 최소 관리 · 통합 발주' },
   ];
 
   return { grades, counts: { A: A.length, B: B.length, C: C.length } };
@@ -678,8 +658,7 @@ function buildInspects(inventory: Row[]): InspectRow[] {
       done: v.done,
       diff: 0,
       who: '-',
-      tone: 'success' as Tone,
-    }))
+      tone: 'success' as Tone }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 }
@@ -707,8 +686,7 @@ const ANALYZE_EMPTY: AnalyzeWorkcenterData = {
   abcC: 0,
   forecastMissCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useAnalyzeData(): AnalyzeWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<AnalyzeWorkcenterData>(ANALYZE_EMPTY);
@@ -754,8 +732,7 @@ export function useAnalyzeData(): AnalyzeWorkcenterData & { refresh: () => void 
           abcC: counts.C,
           forecastMissCount,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '분석 데이터를 불러오지 못했습니다.';
@@ -804,8 +781,7 @@ function buildSteps(currentMonthClosed: boolean): CloseStep[] {
     n: i + 1,
     title,
     desc: currentMonthClosed ? '완료' : i === 0 ? '진행 중' : '대기',
-    state: currentMonthClosed ? 'done' : i === 0 ? 'on' : 'pending',
-  }));
+    state: currentMonthClosed ? 'done' : i === 0 ? 'on' : 'pending' }));
 }
 
 export type ClosingData = {
@@ -821,8 +797,7 @@ const CLOSING_EMPTY: ClosingData = {
   steps: buildSteps(false),
   currentMonthClosed: false,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useClosingData(): ClosingData & { refresh: () => void } {
   const [state, setState] = useState<ClosingData>(CLOSING_EMPTY);
@@ -855,8 +830,7 @@ export function useClosingData(): ClosingData & { refresh: () => void } {
             amt: formatValue(pickNumber(r, ['total_value'], NaN)),
             diff: locked ? '확정' : '임시',
             tone: (locked ? 'success' : 'warn') as Tone,
-            done: `${pickNumber(r, ['item_count'], 0).toLocaleString('ko-KR')}종`,
-          };
+            done: `${pickNumber(r, ['item_count'], 0).toLocaleString('ko-KR')}종` };
         });
 
         const currentMonthClosed = rows.some(
@@ -870,8 +844,7 @@ export function useClosingData(): ClosingData & { refresh: () => void } {
           steps: buildSteps(currentMonthClosed),
           currentMonthClosed,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '월마감 데이터를 불러오지 못했습니다.';
@@ -927,8 +900,7 @@ const USAGE_EMPTY: UsageStatsData = {
   prevTotalAmount: 0,
   logCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 function isConsumption(r: Row): boolean {
   const s = asString(r['change_type'] ?? r['type']);
@@ -1013,8 +985,7 @@ export function useUsageStats(): UsageStatsData & { refresh: () => void } {
             dept,
             amount: v.amount,
             count: v.count,
-            delta: v.amount - (prev.get(dept) ?? 0),
-          }))
+            delta: v.amount - (prev.get(dept) ?? 0) }))
           .sort((a, b) => b.amount - a.amount)
           .slice(0, 8);
 
@@ -1024,8 +995,7 @@ export function useUsageStats(): UsageStatsData & { refresh: () => void } {
           prevTotalAmount,
           logCount,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '사용 통계를 불러오지 못했습니다.';
@@ -1075,8 +1045,7 @@ const RETURNS_EMPTY: ReturnsData = {
   count30: 0,
   qty30: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 function isReturn(r: Row): boolean {
   return asString(r['change_type'] ?? r['type']).includes('반품');
@@ -1112,8 +1081,7 @@ export function useReturnsData(): ReturnsData & { refresh: () => void } {
           qty: Math.abs(pickNumber(r, ['quantity', 'amount', 'qty'], 0)),
           dept: pickString(r, ['department', 'location'], '-'),
           who: pickString(r, ['actor_name'], '-'),
-          note: pickString(r, ['notes'], ''),
-        }));
+          note: pickString(r, ['notes'], '') }));
 
         let count30 = 0;
         let qty30 = 0;

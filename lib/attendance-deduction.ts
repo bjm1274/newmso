@@ -23,8 +23,7 @@ const DEFAULT_RULE: DeductionRule = {
   late_deduction_amount: 10000,
   early_leave_deduction_type: 'fixed',
   early_leave_deduction_amount: 10000,
-  absent_use_daily_rate: true,
-};
+  absent_use_daily_rate: true };
 
 export function getWorkDaysInMonth(yearMonth: string): number {
   const [year, month] = yearMonth.split('-').map(Number);
@@ -77,8 +76,7 @@ export function calculateAttendanceDeduction(
     late_deduction_amount: rule.late_deduction_amount ?? DEFAULT_RULE.late_deduction_amount,
     early_leave_deduction_type: rule.early_leave_deduction_type ?? DEFAULT_RULE.early_leave_deduction_type,
     early_leave_deduction_amount: rule.early_leave_deduction_amount ?? DEFAULT_RULE.early_leave_deduction_amount,
-    absent_use_daily_rate: rule.absent_use_daily_rate ?? DEFAULT_RULE.absent_use_daily_rate,
-  };
+    absent_use_daily_rate: rule.absent_use_daily_rate ?? DEFAULT_RULE.absent_use_daily_rate };
   const divisorDays =
     options.scheduledWorkDays && options.scheduledWorkDays > 0
       ? options.scheduledWorkDays

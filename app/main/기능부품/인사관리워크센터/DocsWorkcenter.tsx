@@ -20,13 +20,13 @@
  * JM2: 활성 탭만 마운트. KPI fetch 마운트 시 1회.
  * JM3: KPI 실패 시 '-' 폴백, 본문은 WorkcenterEmbed의 ErrorBoundary로 격리.
  * JM4: any 금지. 도메인 row 타입 좁게.
- * JM5: 계약·증명서·서류는 supabase RLS에 의존. 클라이언트 측 권한 변경 X.
+ * JM5: 계약·증명서·서류는 db RLS에 의존. 클라이언트 측 권한 변경 X.
  * JM6: 탭 a11y는 workcenter-common, 워크플로는 <ol> + aria-current="step".
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
   WorkcenterDarkBanner,
@@ -35,8 +35,7 @@ import {
   WorkcenterShell,
   WorkcenterTabBar,
   type WorkcenterKpi,
-  type WorkcenterTab,
-} from './workcenter-common';
+  type WorkcenterTab } from './workcenter-common';
 import ContractGenWizard from './DocsWorkcenter/ContractGenWizard';
 import DocsContractSummary from './DocsWorkcenter/DocsContractSummary';
 import DocsGenSummary from './DocsWorkcenter/DocsGenSummary';
@@ -57,8 +56,7 @@ const DocsLoading = () => (
 
 const ContractMain = dynamic(() => import('../인사관리서브/계약관리'), {
   ssr: false,
-  loading: DocsLoading,
-});
+  loading: DocsLoading });
 
 const ContractAutoGenerator = dynamic(
   () => import('../인사관리서브/계약서자동생성'),
@@ -67,8 +65,7 @@ const ContractAutoGenerator = dynamic(
 
 const DocumentRepository = dynamic(() => import('../인사관리서브/문서보관함'), {
   ssr: false,
-  loading: DocsLoading,
-});
+  loading: DocsLoading });
 
 const CertificateGenerator = dynamic(
   () => import('../인사관리서브/증명서발급'),
@@ -101,8 +98,7 @@ const INITIAL_COUNTS: DocsCounts = {
   activeContracts: 0,
   expiringContracts: 0,
   pendingCertificates: 0,
-  pendingSubmissions: 0,
-};
+  pendingSubmissions: 0 };
 
 // ─── DB row 타입 (KPI 집계용 — 좁게) ────────────────────────────────
 interface ContractLite {
@@ -169,8 +165,7 @@ export default function DocsWorkcenter({
   onRefresh,
   initialTab = 'contract',
   linkedTarget,
-  canManageDocuments = false,
-}: DocsWorkcenterProps) {
+  canManageDocuments = false }: DocsWorkcenterProps) {
   const [tab, setTab] = useState<DocsTabId>(initialTab);
   const [counts, setCounts] = useState<DocsCounts>(INITIAL_COUNTS);
   const [countsReady, setCountsReady] = useState(false);
@@ -252,8 +247,7 @@ export default function DocsWorkcenter({
           activeContracts,
           expiringContracts,
           pendingCertificates,
-          pendingSubmissions,
-        });
+          pendingSubmissions });
       } catch (err) {
         // JM3: KPI 실패해도 화면은 살아 있어야 한다.
         console.error('[DocsWorkcenter] KPI fetch failed', err);
@@ -284,32 +278,28 @@ export default function DocsWorkcenter({
         label: '활성 계약',
         value: fmt(counts.activeContracts),
         unit: '건',
-        sub: activeStaffCount > 0 ? `재직 ${activeStaffCount}명` : '데이터 없음',
-      },
+        sub: activeStaffCount > 0 ? `재직 ${activeStaffCount}명` : '데이터 없음' },
       {
         key: 'expiringContracts',
         label: '만료 임박 (90일)',
         value: fmt(counts.expiringContracts),
         unit: '건',
         sub: '재계약 권고 대상',
-        tone: 'warn',
-      },
+        tone: 'warn' },
       {
         key: 'pendingCertificates',
         label: '발급 대기 증명서',
         value: fmt(counts.pendingCertificates),
         unit: '건',
         sub: '결재·요청 대기 합계',
-        tone: 'accent',
-      },
+        tone: 'accent' },
       {
         key: 'pendingSubmissions',
         label: '미제출 서류',
         value: fmt(counts.pendingSubmissions),
         unit: '건',
         sub: '제출 마감 임박',
-        tone: 'danger',
-      },
+        tone: 'danger' },
     ];
   }, [counts, countsReady, activeStaffCount]);
 

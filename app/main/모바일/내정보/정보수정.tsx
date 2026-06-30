@@ -13,13 +13,12 @@
 
 import { memo, useState, useCallback, useEffect } from 'react';
 import type { ErpUser } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import {
   submitProfileChangeRequest,
   type ProfileEditableFields,
-  type ProfileChangeUser,
-} from '@/lib/profile-change-request';
+  type ProfileChangeUser } from '@/lib/profile-change-request';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { hasPermission } from '@/lib/access-control';
@@ -58,8 +57,7 @@ const EMPTY_FORM: ProfileEditableFields = {
   extension: '',
   address: '',
   bank_name: '',
-  bank_account: '',
-};
+  bank_account: '' };
 
 export type 정보수정Props = {
   user: ErpUser;
@@ -76,14 +74,12 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
   const [form, setForm] = useState<ProfileEditableFields>(() => ({
     ...EMPTY_FORM,
     phone: typeof user.phone === 'string' ? user.phone : '',
-    email: typeof user.email === 'string' ? user.email : '',
-  }));
+    email: typeof user.email === 'string' ? user.email : '' }));
   const [currentUser, setCurrentUser] = useState<ProfileChangeUser>(() => ({
     id: staffId,
     name,
     email: typeof user.email === 'string' ? user.email : null,
-    phone: typeof user.phone === 'string' ? user.phone : null,
-  }));
+    phone: typeof user.phone === 'string' ? user.phone : null }));
   const [saving, setSaving] = useState(false);
 
   const { dialog, openPrompt } = useActionDialog();
@@ -96,8 +92,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
       cancelText: '취소',
       inputType: 'password',
       required: true,
-      placeholder: '현재 비밀번호',
-    });
+      placeholder: '현재 비밀번호' });
     if (!currentPassword) return;
 
     const nextPassword = await openPrompt({
@@ -108,8 +103,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
       inputType: 'password',
       required: true,
       placeholder: '새 비밀번호',
-      helperText: '4자 이상 입력해 주세요.',
-    });
+      helperText: '4자 이상 입력해 주세요.' });
     if (!nextPassword) return;
     if (nextPassword.trim().length < 4) {
       toast('새 비밀번호는 4자 이상 입력해 주세요.', 'warning');
@@ -123,8 +117,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
       cancelText: '취소',
       inputType: 'password',
       required: true,
-      placeholder: '새 비밀번호 확인',
-    });
+      placeholder: '새 비밀번호 확인' });
     if (!nextPasswordConfirm) return;
 
     if (nextPassword !== nextPasswordConfirm) {
@@ -136,8 +129,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword: nextPassword }),
-      });
+        body: JSON.stringify({ currentPassword, newPassword: nextPassword }) });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.ok) {
         toast(payload?.error || '비밀번호 변경에 실패했습니다.', 'error');
@@ -155,7 +147,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
+        const { data } = await db
           .from('staff_members')
           .select('phone, email, address, extension, bank_name, bank_account, permissions, name')
           .eq('id', staffId)
@@ -172,8 +164,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
           extension,
           address: toText(row.address),
           bank_name: bankName,
-          bank_account: toText(row.bank_account),
-        });
+          bank_account: toText(row.bank_account) });
         setCurrentUser({
           id: staffId,
           name: toText(row.name) || name,
@@ -183,8 +174,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
           bank_account: toText(row.bank_account) || null,
           bank_name: bankName || null,
           extension: extension || null,
-          permissions,
-        });
+          permissions });
       } catch {
         /* 세션 값 유지 */
       }
@@ -233,21 +223,18 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
     background: 'var(--m-card)',
     fontSize: 14,
     fontWeight: 600,
-    color: 'var(--z-900)',
-  };
+    color: 'var(--z-900)' };
 
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
     fontWeight: 700,
     color: 'var(--z-500)',
-    marginBottom: 6,
-  };
+    marginBottom: 6 };
 
   const readOnlyFieldStyle: React.CSSProperties = {
     ...fieldStyle,
     background: 'var(--z-50)',
-    color: 'var(--z-500)',
-  };
+    color: 'var(--z-500)' };
 
   return (
     <div className="m-screen">
@@ -258,8 +245,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
           style={{
             display: 'flex',
             justifyContent: 'center',
-            padding: '28px 0 8px',
-          }}
+            padding: '28px 0 8px' }}
         >
           <div style={{ position: 'relative', width: 80, height: 80 }}>
             <div
@@ -272,8 +258,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
                 fontSize: 28,
                 fontWeight: 800,
                 display: 'grid',
-                placeItems: 'center',
-              }}
+                placeItems: 'center' }}
             >
               {initial}
             </div>
@@ -291,8 +276,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
                 color: '#fff',
                 border: '2px solid var(--m-card)',
                 display: 'grid',
-                placeItems: 'center',
-              }}
+                placeItems: 'center' }}
             >
               <MIcon name="camera" size={14} />
             </button>
@@ -413,8 +397,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
                 fontWeight: 800,
                 cursor: 'pointer',
                 width: '100%',
-                justifyContent: 'center',
-              }}
+                justifyContent: 'center' }}
             >
               <MIcon name="shield" size={16} />
               비밀번호 변경하기
@@ -446,8 +429,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
-            }}
+              gap: 8 }}
           >
             {saving ? '전송 중…' : '변경사항 저장'}
           </button>

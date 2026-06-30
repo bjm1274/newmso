@@ -39,8 +39,7 @@ function ProfilePhotoThumbnail({
   dataTestId,
   loading = 'lazy',
   decoding = 'async',
-  draggable = false,
-}: ProfilePhotoThumbnailProps) {
+  draggable = false }: ProfilePhotoThumbnailProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const resolvedAlt = useMemo(() => resolveAltText(name, alt), [alt, name]);
   const resolvedPreviewTitle =

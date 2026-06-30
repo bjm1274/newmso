@@ -26,7 +26,7 @@ export interface DualWriteContext {
 
 export interface DualWriteResult<T = unknown> {
   backend: DataBackend;
-  supabase?: { ok: boolean; data?: T; error?: unknown };
+  db?: { ok: boolean; data?: T; error?: unknown };
   d1?: { ok: boolean; data?: T; error?: unknown };
 }
 
@@ -56,9 +56,9 @@ export async function dualInsert<T = unknown>(
 
   if (backend === 'supabase') {
     try {
-      result.supabase = { ok: true, data: await supabaseFn() };
+      result.db = { ok: true, data: await supabaseFn() };
     } catch (error) {
-      result.supabase = { ok: false, error };
+      result.db = { ok: false, error };
       throw error;
     }
     return result;
@@ -99,7 +99,7 @@ export async function dualInsert<T = unknown>(
   })();
 
   const [supa, d1] = await Promise.all([supabasePromise, d1Promise]);
-  result.supabase = supa;
+  result.db = supa;
   result.d1 = d1;
 
   // Supabase가 진실 — 실패하면 throw. D1 실패는 alert 수준
@@ -108,8 +108,7 @@ export async function dualInsert<T = unknown>(
     // structured log — Phase 3에서 alert/metric으로 연결
     console.warn('[dual-write] D1 mirror failed', {
       table,
-      error: d1.error instanceof Error ? d1.error.message : String(d1.error),
-    });
+      error: d1.error instanceof Error ? d1.error.message : String(d1.error) });
   }
   return result;
 }
@@ -127,7 +126,7 @@ export async function dualWrite<T = unknown>(
   const result: DualWriteResult<T> = { backend };
 
   if (backend === 'supabase') {
-    result.supabase = { ok: true, data: await supabaseFn() };
+    result.db = { ok: true, data: await supabaseFn() };
     return result;
   }
 
@@ -148,13 +147,12 @@ export async function dualWrite<T = unknown>(
     catch (e) { return { ok: false as const, error: e }; }
   })();
   const [supa, d1] = await Promise.all([supabasePromise, d1Promise]);
-  result.supabase = supa;
+  result.db = supa;
   result.d1 = d1;
   if (!supa.ok) throw supa.error;
   if (!d1.ok) {
     console.warn('[dual-write] D1 mirror failed', {
-      error: d1.error instanceof Error ? d1.error.message : String(d1.error),
-    });
+      error: d1.error instanceof Error ? d1.error.message : String(d1.error) });
   }
   return result;
 }

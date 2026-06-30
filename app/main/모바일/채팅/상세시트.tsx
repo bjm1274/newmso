@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { ChatMessage } from '@/types';
 import MSheet from '../공통/MSheet';
 import MAvatar from '../공통/MAvatar';
@@ -33,8 +33,7 @@ function StaffRow({ staff, tone }: { staff: StaffDirectoryEntry; tone?: 'success
         marginBottom: 6,
         background: 'rgba(255, 255, 255, 0.65)',
         border: '1px solid rgba(255, 255, 255, 0.35)',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-      }}
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)' }}
     >
       <MAvatar tone={avatarTone} size="sm">
         {photoUrl ? (
@@ -71,8 +70,7 @@ function resolveStaff(
     photo_url: null,
     avatar_url: null,
     status: null,
-    permissions: null,
-  } as StaffDirectoryEntry;
+    permissions: null } as StaffDirectoryEntry;
 }
 
 // ─────────────────────────────────────────────
@@ -92,8 +90,7 @@ export function ReactionDetailSheet({ message, staffs, onClose }: ReactionDetail
     return Object.entries(r)
       .map(([emoji, users]) => ({
         emoji,
-        users: (Array.isArray(users) ? users.map(String) : []).map((uid) => resolveStaff(uid, staffs)),
-      }))
+        users: (Array.isArray(users) ? users.map(String) : []).map((uid) => resolveStaff(uid, staffs)) }))
       .filter((g) => g.users.length > 0);
   }, [message, staffs]);
 
@@ -152,7 +149,7 @@ export function ReadStatusSheet({ message, roomId, memberIds, staffs, onClose }:
     (async () => {
       try {
         const recipientIds = memberIds.filter((id) => id !== String(message.sender_id));
-        const { data } = await supabase
+        const { data } = await db
           .from('room_read_cursors')
           .select('user_id, last_read_at')
           .eq('room_id', roomId)

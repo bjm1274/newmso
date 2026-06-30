@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { CalendarTable } from '@/app/components/CalendarTable';
 import { toast } from '@/lib/toast';
 
@@ -23,7 +23,7 @@ export default function SharedCalendar() {
         const ym = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
         
         // 1. 근무표(Shift) 데이터 로드
-        const { data: shifts } = await supabase
+        const { data: shifts } = await db
           .from('nurse_schedules')
           .select('staff_id, day, shift_code')
           .eq('year_month', ym);

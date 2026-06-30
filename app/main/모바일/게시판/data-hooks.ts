@@ -2,16 +2,16 @@
 
 /**
  * 게시판 모바일 — 데이터 훅·유틸·상수.
- * PC `app/main/기능부품/게시판.tsx`의 supabase 쿼리 패턴을 발췌해 모바일 전용으로 압축.
+ * PC `app/main/기능부품/게시판.tsx`의 db 쿼리 패턴을 발췌해 모바일 전용으로 압축.
  * JM: 단일 책임 (데이터 계층), ~250줄 이내
  * JM2: select는 필요한 컬럼만, 리스트는 limit(100)
  * JM3: try/catch + toast
  * JM4: any 금지, 모든 타입 명시
- * JM5: SQL 인젝션 회피(supabase eq 사용), 본문은 텍스트 렌더
+ * JM5: SQL 인젝션 회피(db eq 사용), 본문은 텍스트 렌더
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost } from '@/types';
 import {
@@ -20,9 +20,8 @@ import {
   BOARD_POST_REQUIRED_SELECT_COLUMNS,
   buildAttachmentMetaContent,
   buildSelectColumns,
-  normalizeBoardPost,
-} from '@/app/main/기능부품/게시판공통';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+  normalizeBoardPost } from '@/app/main/기능부품/게시판공통';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { loadStarSet } from './별표훅';
 import { normalizePoll } from './게시판변경';
 
@@ -42,7 +41,7 @@ export type BoardCatId =
 export type BoardCatDef = {
   id: BoardCatId;
   label: string;
-  /** supabase board_type 값(=PC와 동일). all은 mapping 없음 */
+  /** db board_type 값(=PC와 동일). all은 mapping 없음 */
   boardType?: string;
   tone?: 'accent' | 'success' | 'warning' | 'danger' | '';
 };
@@ -92,7 +91,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
     try {
       const { data } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
-          const q = supabase
+          const q = db
             .from('board_posts')
             .select(
               buildSelectColumns(
@@ -126,7 +125,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
       const ids = list.map((p) => String(p.id)).filter(Boolean);
       let commentCounts: Record<string, number> = {};
       if (ids.length > 0) {
-        const { data: commentRows } = await supabase
+        const { data: commentRows } = await db
           .from('board_post_comments')
           .select('post_id')
           .in('post_id', ids);
@@ -148,8 +147,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
       const enriched: BoardListPost[] = list.map((p) => ({
         ...(p as BoardListPost),
         comment_count: commentCounts[String(p.id)] || 0,
-        starred: starSet.has(String(p.id)),
-      }));
+        starred: starSet.has(String(p.id)) }));
 
       setPosts(enriched);
     } catch (err) {
@@ -207,7 +205,7 @@ export function useBoardDetail(
     try {
       const { data } = await withMissingColumnsFallback<BoardPost>(
         async (omittedColumns) => {
-          const result = await supabase
+          const result = await db
             .from('board_posts')
             .select(
               buildSelectColumns(
@@ -233,7 +231,7 @@ export function useBoardDetail(
   const refetchComments = useCallback(async () => {
     if (!postId) return;
     try {
-      const { data } = await supabase
+      const { data } = await db
         .from('board_post_comments')
         .select(BOARD_COMMENT_SELECT)
         .eq('post_id', postId)
@@ -259,7 +257,7 @@ export function useBoardDetail(
         return false;
       }
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('board_post_comments')
           .insert([
             {
@@ -267,8 +265,7 @@ export function useBoardDetail(
               author_id: user.id,
               author_name: user.name ?? '익명',
               content: trimmed,
-              parent_comment_id: parentCommentId,
-            },
+              parent_comment_id: parentCommentId },
           ])
           .select()
           .maybeSingle();
@@ -393,8 +390,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     scheduledPublishAt = null,
     poll = null,
     schedule = null,
-    user,
-  } = input;
+    user } = input;
   const cat = BOARD_CATS.find((c) => c.id === catId);
   const boardType = cat?.boardType ?? '자유게시판';
   // PC와 동일: 익명소리함은 무조건 익명
@@ -412,8 +408,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
           name: String(a?.name ?? '').trim(),
           url: String(a?.url ?? '').trim(),
           type: String(a?.type ?? '').trim() || undefined,
-          size: typeof a?.size === 'number' ? a.size : undefined,
-        }))
+          size: typeof a?.size === 'number' ? a.size : undefined }))
         .filter((a) => a.name && a.url)
     : [];
 
@@ -469,8 +464,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     author_name: useAnonymous ? '익명' : (user.name ?? '익명'),
     company: useAnonymous ? null : (user.company ?? null),
     company_id: useAnonymous ? null : (user.company_id ?? null),
-    is_anonymous: useAnonymous,
-  };
+    is_anonymous: useAnonymous };
   if (normalizedAttachments.length > 0) payload.attachments = normalizedAttachments;
   if (pinned) payload.is_pinned = true;
   if (statusValue) payload.status = statusValue;
@@ -490,7 +484,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
   }
 
   try {
-    let { data, error } = await supabase
+    let { data, error } = await db
       .from('board_posts')
       .insert([payload])
       .select()
@@ -508,7 +502,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
       if (toOmit.length > 0) {
         const retryPayload: InsertPayload = { ...payload };
         toOmit.forEach((k) => { delete retryPayload[k]; });
-        const retry = await supabase.from('board_posts').insert([retryPayload]).select().single();
+        const retry = await db.from('board_posts').insert([retryPayload]).select().single();
         data = retry.data;
         error = retry.error;
       }
@@ -529,8 +523,7 @@ export {
   deleteBoardPost,
   deleteBoardComment,
   togglePollVote,
-  type PollVotes,
-} from './게시판변경';
+  type PollVotes } from './게시판변경';
 
 // ─────────────────────────────────────────────
 // 작성자 아바타 톤(이름 기반 결정)
@@ -591,8 +584,7 @@ export function getSafeAttachments(post: BoardPost | null): SafeAttachment[] {
         url,
         size: typeof item?.size === 'number' ? item.size : undefined,
         type,
-        kind,
-      };
+        kind };
     })
     .filter((a) => a.name && a.url);
 }

@@ -21,8 +21,7 @@ async function executeMutate<T>(body: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      credentials: 'same-origin',
-    });
+      credentials: 'same-origin' });
     const json = (await res.json().catch(() => null)) as
       | { ok: true; data?: T }
       | { ok: false; error: string; code?: string; details?: string }
@@ -30,8 +29,7 @@ async function executeMutate<T>(body: {
     if (!res.ok || !json) {
       return {
         data: null,
-        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` },
-      };
+        error: { message: json && 'error' in json ? json.error : `HTTP ${res.status}` } };
     }
     if (!json.ok) {
       return { data: null, error: { message: json.error, code: json.code, details: json.details } };
@@ -40,8 +38,7 @@ async function executeMutate<T>(body: {
   } catch (err) {
     return {
       data: null,
-      error: { message: err instanceof Error ? err.message : 'Network error' },
-    };
+      error: { message: err instanceof Error ? err.message : 'Network error' } };
   }
 }
 
@@ -74,8 +71,7 @@ export class InsertBuilder<T = any> implements PromiseLike<QueryResult<T>> {
       op: 'insert' as const,
       table: rest.table,
       values: rest.values,
-      returning: rest.returning,
-    };
+      returning: rest.returning };
     // conflict 필드가 있으면 우선 사용, 없으면 legacy onConflict 폴백
     if (conflict) {
       body.conflict = conflict;
@@ -175,8 +171,7 @@ export class UpdateBuilder<T = any> implements PromiseLike<QueryResult<T>> {
       op: 'update' as const,
       table: this.state.table,
       set: this.state.set,
-      where: this.state.where,
-    };
+      where: this.state.where };
     if (this.state.returning && this.state.returning.length > 0) {
       body.returning = this.state.returning;
     }
@@ -247,7 +242,6 @@ export class DeleteBuilder<T = any> implements PromiseLike<QueryResult<T>> {
     return executeMutate<T>({
       op: 'delete',
       table: this.state.table,
-      where: this.state.where,
-    }).then(onfulfilled, onrejected);
+      where: this.state.where }).then(onfulfilled, onrejected);
   }
 }

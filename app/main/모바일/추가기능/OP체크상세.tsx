@@ -15,7 +15,7 @@ import { db, d1 } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toast } from '@/lib/toast';
 import { logger } from '@/lib/logger';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -47,8 +47,7 @@ const STEP_LABELS: OpCheckCardState[] = ['준비중', '준비완료', '수술중
 export default function OP체크상세({
   user,
   card,
-  onBack,
-}: {
+  onBack }: {
   user: ErpUser;
   card: OpCheckCard;
   onBack: () => void;
@@ -85,8 +84,7 @@ export default function OP체크상세({
             return {
               id: pickText(r, 'id') || `c-${idx}`,
               label: pickText(r, 'label', 'name') || `체크 ${idx + 1}`,
-              checked: Boolean(r.checked),
-            };
+              checked: Boolean(r.checked) };
           })
         : [
             { id: '1', label: '환자 신원 확인', checked: false },
@@ -107,8 +105,7 @@ export default function OP체크상세({
           return {
             id: pickText(r, 'id') || `s-${idx}`,
             name: pickText(r, 'name', 'label') || `소모품 ${idx + 1}`,
-            qty: Number(r.qty ?? r.quantity ?? 1) || 1,
-          };
+            qty: Number(r.qty ?? r.quantity ?? 1) || 1 };
         }),
       );
     } catch (err) {
@@ -131,9 +128,8 @@ export default function OP체크상세({
         id: c.id,
         name: c.label,
         label: c.label,
-        checked: c.checked,
-      }));
-      const { queued, error } = await enqueueSupabaseMutation({
+        checked: c.checked }));
+      const { queued, error } = await enqueueD1Mutation({
         kind: 'upsert',
         table: 'op_patient_checks',
         payload: {
@@ -142,9 +138,7 @@ export default function OP체크상세({
           prep_items: prepItems as unknown as Record<string, unknown>[],
           updated_by: user.id,
           updated_by_name: user.name ?? null,
-          updated_at: new Date().toISOString(),
-        },
-      });
+          updated_at: new Date().toISOString() } });
       if (error) {
         const err = new Error(error);
         logger.warn('[mobile-addon] checklist save', err);
@@ -191,8 +185,7 @@ export default function OP체크상세({
       await setOpCardState({ ...card, state: prev }, next, {
         id: user.id,
         name: user.name,
-        company: typeof user.company === 'string' ? user.company : null,
-      });
+        company: typeof user.company === 'string' ? user.company : null });
 
       // 2) 같은 부서 담당자에게 notifications 알림 (JM5: 회사·부서 일치만)
       try {
@@ -221,11 +214,9 @@ export default function OP체크상세({
               patient: card.patient,
               next_state: next,
               sender_id: user.id,
-              sender_name: user.name ?? '',
-            },
+              sender_name: user.name ?? '' },
             read_at: null,
-            created_at: now,
-          }));
+            created_at: now }));
           const { error: notiErr } = await d1.from('notifications').insert(rows);
           if (notiErr) {
             // 알림은 보조 — 실패해도 상태 전환은 유지
@@ -315,8 +306,7 @@ export default function OP체크상세({
                   alignItems: 'center',
                   textAlign: 'left',
                   width: '100%',
-                  background: 'transparent',
-                }}
+                  background: 'transparent' }}
                 disabled={saving}
               >
                 <span
@@ -328,8 +318,7 @@ export default function OP체크상세({
                     background: p.checked ? 'var(--m-success)' : 'transparent',
                     color: '#fff',
                     display: 'grid',
-                    placeItems: 'center',
-                  }}
+                    placeItems: 'center' }}
                   aria-hidden="true"
                 >
                   {p.checked && <MIcon name="check" size={14} />}
@@ -339,8 +328,7 @@ export default function OP체크상세({
                     fontSize: 14,
                     fontWeight: 600,
                     color: p.checked ? 'var(--z-500)' : 'var(--z-900)',
-                    textDecoration: p.checked ? 'line-through' : 'none',
-                  }}
+                    textDecoration: p.checked ? 'line-through' : 'none' }}
                 >
                   {p.label}
                 </span>
@@ -408,8 +396,7 @@ function Step({
   active,
   current,
   last,
-  index,
-}: {
+  index }: {
   label: string;
   active: boolean;
   current: boolean;
@@ -424,8 +411,7 @@ function Step({
           flexDirection: 'column',
           alignItems: 'center',
           gap: 5,
-          flex: 1,
-        }}
+          flex: 1 }}
       >
         <div
           style={{
@@ -437,8 +423,7 @@ function Step({
             display: 'grid',
             placeItems: 'center',
             fontSize: 12,
-            fontWeight: 800,
-          }}
+            fontWeight: 800 }}
         >
           {active && !current ? '✓' : index + 1}
         </div>
@@ -446,8 +431,7 @@ function Step({
           style={{
             fontSize: 10,
             fontWeight: 800,
-            color: current ? 'var(--m-accent)' : 'var(--z-500)',
-          }}
+            color: current ? 'var(--m-accent)' : 'var(--z-500)' }}
         >
           {label}
         </span>
@@ -459,8 +443,7 @@ function Step({
             flex: 0.4,
             height: 2,
             background: active ? 'var(--m-accent)' : 'var(--z-200)',
-            marginBottom: 14,
-          }}
+            marginBottom: 14 }}
         />
       )}
     </>

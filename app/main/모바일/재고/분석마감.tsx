@@ -29,8 +29,7 @@ import MListRow from '../공통/MListRow';
 import {
   useAnalyzeData,
   toMTone,
-  type AnalyzeWorkcenterData,
-} from './data-hooks';
+  type AnalyzeWorkcenterData } from './data-hooks';
 // 월마감/소모품통계/AS·반품 패널은 분석마감패널.tsx 로 분리(파일 길이 ≤500줄 유지).
 import { Empty, ClosePane, UsagePane, RmaPane } from './분석마감패널';
 
@@ -113,8 +112,7 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
             marginTop: 12,
             height: 14,
             borderRadius: 7,
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           <div style={{ flex: aPct, background: 'var(--m-accent)', height: '100%' }} />
           <div style={{ flex: bPct, background: '#A78BFA', height: '100%' }} />
@@ -126,8 +124,7 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
             justifyContent: 'space-between',
             marginTop: 8,
             fontSize: 11,
-            fontWeight: 700,
-          }}
+            fontWeight: 700 }}
         >
           <span style={{ color: 'var(--m-accent)' }}>A · {aPct}%</span>
           <span style={{ color: '#7C3AED' }}>B · {bPct}%</span>
@@ -144,8 +141,7 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
             key={g.grade}
             style={{
               padding: '14px 16px',
-              borderBottom: '1px solid var(--m-border)',
-            }}
+              borderBottom: '1px solid var(--m-border)' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
@@ -168,8 +164,7 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
                   display: 'grid',
                   placeItems: 'center',
                   fontWeight: 800,
-                  fontSize: 12,
-                }}
+                  fontSize: 12 }}
               >
                 {g.grade}
               </span>
@@ -186,8 +181,7 @@ function AbcPane({ data }: { data: AnalyzeWorkcenterData }) {
                   marginTop: 8,
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: 4,
-                }}
+                  gap: 4 }}
               >
                 {g.examples.map((ex) => (
                   <MChip key={ex} tone="">
@@ -233,8 +227,7 @@ function ForecastPane({ data }: { data: AnalyzeWorkcenterData }) {
                         fontWeight: 700,
                         color: gapColor,
                         width: 52,
-                        textAlign: 'right',
-                      }}
+                        textAlign: 'right' }}
                     >
                       {r.gap > 0 ? '+' : ''}
                       {r.gap}
@@ -246,15 +239,13 @@ function ForecastPane({ data }: { data: AnalyzeWorkcenterData }) {
                       height: 5,
                       background: 'var(--z-100)',
                       borderRadius: 999,
-                      overflow: 'hidden',
-                    }}
+                      overflow: 'hidden' }}
                   >
                     <div
                       style={{
                         width: `${ratio}%`,
                         height: '100%',
-                        background: 'var(--m-accent)',
-                      }}
+                        background: 'var(--m-accent)' }}
                     />
                   </div>
                   <div
@@ -264,8 +255,7 @@ function ForecastPane({ data }: { data: AnalyzeWorkcenterData }) {
                       marginTop: 4,
                       fontSize: 10.5,
                       color: 'var(--z-500)',
-                      fontWeight: 600,
-                    }}
+                      fontWeight: 600 }}
                   >
                     <span>
                       현재고 <b className="m-tnum">{r.stock}</b> · 30일 예측{' '}
@@ -302,8 +292,7 @@ function CountPane({ data }: { data: AnalyzeWorkcenterData }) {
             fontWeight: 800,
             letterSpacing: '-0.025em',
             color: 'var(--m-accent)',
-            marginTop: 4,
-          }}
+            marginTop: 4 }}
         >
           {done}
           <span style={{ fontSize: 14, color: 'var(--z-500)', marginLeft: 4 }}>/ {total}</span>
@@ -314,15 +303,13 @@ function CountPane({ data }: { data: AnalyzeWorkcenterData }) {
             height: 8,
             background: 'var(--z-100)',
             borderRadius: 999,
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           <div
             style={{
               width: `${data.inspectProgressPct}%`,
               height: '100%',
-              background: 'var(--m-accent)',
-            }}
+              background: 'var(--m-accent)' }}
           />
         </div>
         <div
@@ -332,8 +319,7 @@ function CountPane({ data }: { data: AnalyzeWorkcenterData }) {
             marginTop: 6,
             fontSize: 11,
             color: 'var(--z-500)',
-            fontWeight: 700,
-          }}
+            fontWeight: 700 }}
         >
           <span>{data.inspectProgressPct}% 완료</span>
         </div>

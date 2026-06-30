@@ -1,15 +1,14 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   buildExportRows,
   generateEdiTxt,
   generateExcelCsv,
   generateHometaxTxt,
   type PayrollExportRow,
-  type TaxFileCompanyInfo,
-} from '@/lib/withholding-tax-file';
+  type TaxFileCompanyInfo } from '@/lib/withholding-tax-file';
 
 type Props = { staffs: any[]; selectedCo: string };
 
@@ -25,8 +24,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
   const [companyInfo, setCompanyInfo] = useState<TaxFileCompanyInfo>({
     companyName: selectedCo === '전체' ? '' : selectedCo,
     businessNumber: '',
-    representativeName: '',
-  });
+    representativeName: '' });
 
   const yearMonth = `${selectedYear}-${selectedMonth}`;
 
@@ -42,7 +40,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         setRecordCount(0);
         return;
       }
-      const { count } = await supabase
+      const { count } = await db
         .from('payroll_records')
         .select('id', { count: 'exact', head: true })
         .eq('year_month', yearMonth)
@@ -57,7 +55,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
   useEffect(() => {
     if (selectedCo === '전체') return;
     (async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('companies')
         .select('name, business_no, ceo_name')
         .eq('name', selectedCo)
@@ -66,8 +64,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         setCompanyInfo({
           companyName: String(data.name || selectedCo),
           businessNumber: String(data.business_no || ''),
-          representativeName: String(data.ceo_name || ''),
-        });
+          representativeName: String(data.ceo_name || '') });
       }
     })();
   }, [selectedCo]);
@@ -86,7 +83,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
       }
 
       // 확정된 급여 데이터 조회
-      const { data: payrollData } = await supabase
+      const { data: payrollData } = await db
         .from('payroll_records')
         .select('*')
         .eq('year_month', yearMonth)
@@ -98,8 +95,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
           title: '확정 급여 데이터 없음',
           description: '해당 월에 확정된 급여 데이터가 없습니다.',
           confirmText: '확인',
-          tone: 'default',
-        });
+          tone: 'default' });
         setIsGenerating(false);
         return;
       }
@@ -148,8 +144,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         title: '파일 생성 실패',
         description: '파일 생성 중 오류가 발생했습니다.',
         confirmText: '확인',
-        tone: 'danger',
-      });
+        tone: 'danger' });
     } finally {
       setIsGenerating(false);
     }

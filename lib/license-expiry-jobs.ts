@@ -13,8 +13,7 @@ import {
   inArray,
   isNotNull,
   lte,
-  desc,
-} from './db';
+  desc } from './db';
 import { logD1BindingMissing } from './db/mirror-metrics';
 
 // Phase 8-G — notifications 테이블 D1 직접 INSERT 전용 normalizer
@@ -31,8 +30,7 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
         ? null
         : JSON.stringify(row.metadata),
     read_at: row.read_at ?? null,
-    created_at: row.created_at ?? new Date().toISOString(),
-  };
+    created_at: row.created_at ?? new Date().toISOString() };
 }
 
 async function requireD1ForLicenseJobs(label: string) {
@@ -131,10 +129,8 @@ function buildNotification(license: LicenseRow, daysLeft: number, milestone: Mil
       license_name: licenseName,
       expiry_date: license.expiry_date,
       days_left: daysLeft,
-      milestone,
-    },
-    read_at: null,
-  };
+      milestone },
+    read_at: null };
 }
 
 export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
@@ -160,8 +156,7 @@ export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
         license_name: staffLicensesTable.license_name,
         license_number: staffLicensesTable.license_number,
         expiry_date: staffLicensesTable.expiry_date,
-        issuing_body: staffLicensesTable.issuing_body,
-      })
+        issuing_body: staffLicensesTable.issuing_body })
       .from(staffLicensesTable)
       .where(
         and(
@@ -264,8 +259,7 @@ export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
     scanned: licenses.length,
     sent,
     skipped: candidates.length - toInsert.length,
-    errors,
-  };
+    errors };
 }
 
 function pickCEMilestone(daysLeft: number): CEMilestone | null {
@@ -305,10 +299,8 @@ function buildCENotification(
       license_name: licenseName,
       ce_due_date: dueDate,
       days_left: daysLeft,
-      milestone,
-    },
-    read_at: null,
-  };
+      milestone },
+    read_at: null };
 }
 
 export async function processCEDue(): Promise<LicenseExpiryJobResult> {
@@ -331,8 +323,7 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
         expiry_date: staffLicensesTable.expiry_date,
         issuing_body: staffLicensesTable.issuing_body,
         renewed_date: staffLicensesTable.renewed_date,
-        issued_date: staffLicensesTable.issued_date,
-      })
+        issued_date: staffLicensesTable.issued_date })
       .from(staffLicensesTable)
       .where(isNotNull(staffLicensesTable.license_type));
     licenses = (rows ?? []) as LicenseFullRow[];
@@ -354,8 +345,7 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
         license_id: licenseCETable.license_id,
         staff_id: licenseCETable.staff_id,
         education_date: licenseCETable.education_date,
-        status: licenseCETable.status,
-      })
+        status: licenseCETable.status })
       .from(licenseCETable)
       .where(
         and(
@@ -386,8 +376,7 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
       license_type: license.license_type,
       last_ce_date: lastCE ?? null,
       renewed_date: license.renewed_date,
-      issued_date: license.issued_date,
-    });
+      issued_date: license.issued_date });
     if (!due.date || due.daysLeft == null) continue;
     const milestone = pickCEMilestone(due.daysLeft);
     if (milestone == null) continue;
@@ -469,8 +458,7 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
     scanned: licenses.length,
     sent,
     skipped: candidates.length - toInsert.length,
-    errors,
-  };
+    errors };
 }
 
 export async function runLicenseExpiryJobs(): Promise<LicenseExpiryJobsResult> {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
@@ -56,8 +56,7 @@ export default function PersonnelAppointment({
   staffs = [],
   selectedCo = '전체',
   user = null,
-  onHeaderActions,
-}: Props) {
+  onHeaderActions }: Props) {
   const [records, setRecords] = useState<AppointmentRecord[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'발령목록' | '관보생성'>('발령목록');
@@ -74,8 +73,7 @@ export default function PersonnelAppointment({
     before_role: '',
     after_role: '',
     reason: '',
-    memo: '',
-  });
+    memo: '' });
 
   // 발령 등록 대상은 현직 직원만 (퇴사자 제외 — 이미 status=퇴사면 발령 불필요)
   const filteredStaffs = useMemo(() => {
@@ -84,7 +82,7 @@ export default function PersonnelAppointment({
 
   const fetchRecords = useCallback(async () => {
     try {
-      let query = supabase
+      let query = db
         .from('personnel_appointments')
         .select('*')
         .order('effective_date', { ascending: false })
@@ -119,8 +117,7 @@ export default function PersonnelAppointment({
   const tableRows = useMemo<AppointmentRow[]>(() => {
     return filteredRecords.map((record, index) => ({
       ...record,
-      rowKey: record.id != null ? String(record.id) : `idx-${index}`,
-    }));
+      rowKey: record.id != null ? String(record.id) : `idx-${index}` }));
   }, [filteredRecords]);
 
   const columns = useMemo<Column<AppointmentRow>[]>(() => [
@@ -128,8 +125,7 @@ export default function PersonnelAppointment({
       key: 'staff_name',
       label: '직원',
       primary: true,
-      render: (r) => <span className="font-bold text-[var(--foreground)]">{r.staff_name}</span>,
-    },
+      render: (r) => <span className="font-bold text-[var(--foreground)]">{r.staff_name}</span> },
     {
       key: 'order_type',
       label: '유형',
@@ -137,8 +133,7 @@ export default function PersonnelAppointment({
         <span className="rounded-lg bg-blue-500/10 px-2 py-1 font-bold text-blue-700">
           {r.order_type}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'change',
       label: '변경 내용',
@@ -161,18 +156,15 @@ export default function PersonnelAppointment({
             </span>
           )}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'effective_date',
       label: '발령일',
-      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.effective_date}</span>,
-    },
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.effective_date}</span> },
     {
       key: 'reason',
       label: '사유',
-      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason || '-'}</span>,
-    },
+      render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason || '-'}</span> },
   ], []);
 
   const resetForm = () => {
@@ -187,8 +179,7 @@ export default function PersonnelAppointment({
       before_role: '',
       after_role: '',
       reason: '',
-      memo: '',
-    });
+      memo: '' });
   };
 
   const handleStaffSelect = (staffId: string) => {
@@ -203,8 +194,7 @@ export default function PersonnelAppointment({
       staff_id: staffId,
       before_dept: staff.department || '',
       before_position: staff.position || '',
-      before_role: staff.role || '',
-    }));
+      before_role: staff.role || '' }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -245,10 +235,9 @@ export default function PersonnelAppointment({
             : typeof (user as Record<string, unknown> | null)?.['name'] === 'string'
               ? ((user as Record<string, unknown>).name as string)
               : '관리자',
-        issued_at: new Date().toISOString(),
-      };
+        issued_at: new Date().toISOString() };
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('personnel_appointments')
         .insert([newRecord])
         .select()
@@ -264,7 +253,7 @@ export default function PersonnelAppointment({
       if (form.after_role.trim()) staffUpdates.role = form.after_role.trim();
 
       if (Object.keys(staffUpdates).length > 0) {
-        const { error: staffUpdateError } = await supabase
+        const { error: staffUpdateError } = await db
           .from('staff_members')
           .update(staffUpdates)
           .eq('id', form.staff_id);
@@ -286,18 +275,15 @@ export default function PersonnelAppointment({
             {
               department: form.before_dept || null,
               position: form.before_position || null,
-              role: form.before_role || null,
-            },
+              role: form.before_role || null },
             {
               department: form.after_dept || form.before_dept || null,
               position: form.after_position || form.before_position || null,
-              role: form.after_role || form.before_role || null,
-            },
+              role: form.after_role || form.before_role || null },
             ['department', 'position', 'role'],
           ),
           reason: newRecord.reason || null,
-          memo: newRecord.memo || null,
-        },
+          memo: newRecord.memo || null },
         actor.userId,
         actor.userName,
       );

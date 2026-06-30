@@ -67,8 +67,7 @@ const ALLOWED_TABLES = new Set<string>([
 const TABLE_TIMESTAMP_COLUMN: Record<string, string> = {
   room_read_cursors: 'last_read_at',
   pinned_messages: 'pinned_at',
-  chat_rooms: 'last_message_at',
-};
+  chat_rooms: 'last_message_at' };
 
 
 function userId(user: SessionUser | null | undefined): string | null {

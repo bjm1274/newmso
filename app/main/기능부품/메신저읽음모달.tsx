@@ -17,8 +17,7 @@ export function ReadStatusModal({
   loading,
   unreadUsers,
   readUsers,
-  onClose,
-}: ReadStatusModalProps) {
+  onClose }: ReadStatusModalProps) {
   if (!message) return null;
 
   return (

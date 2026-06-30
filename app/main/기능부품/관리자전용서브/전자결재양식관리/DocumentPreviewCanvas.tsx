@@ -18,16 +18,14 @@ export default function DocumentPreviewCanvas({
   statement,
   detailRows,
   dateLabel,
-  documentNumber,
-}: Props) {
+  documentNumber }: Props) {
   return (
     <div className="mt-5 flex min-h-[700px] items-center justify-center rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#dde4e8] px-5 py-5">
       <div
         className="relative aspect-[210/297] w-full max-w-[430px] overflow-hidden bg-[var(--card)] shadow-[0_28px_70px_rgba(15,23,42,0.14)]"
         style={{
           border: `1px solid ${design.borderColor || '#d5dce4'}`,
-          boxShadow: '0 28px 70px rgba(15,23,42,0.14), 0 0 0 1px rgba(255,255,255,0.85) inset',
-        }}
+          boxShadow: '0 28px 70px rgba(15,23,42,0.14), 0 0 0 1px rgba(255,255,255,0.85) inset' }}
       >
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#fdfefe_76%,#f5f8fa_100%)]" />
         {design.showBackgroundLogo !== false && design.backgroundLogoUrl && (
@@ -97,8 +95,7 @@ export default function DocumentPreviewCanvas({
             className="mt-4 shrink-0 overflow-hidden bg-[var(--card)]"
             style={{
               borderTop: `2px solid ${design.primaryColor || '#2d93a8'}`,
-              borderBottom: `2px solid ${design.primaryColor || '#2d93a8'}`,
-            }}
+              borderBottom: `2px solid ${design.primaryColor || '#2d93a8'}` }}
           >
             {detailRows.map((row, index) => (
               <div

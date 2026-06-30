@@ -81,8 +81,7 @@ export function GlobalSearchModal({
   onOpenGroup,
   onOpenMember,
   onOpenRoom,
-  onPreviewAttachment,
-}: GlobalSearchModalProps) {
+  onPreviewAttachment }: GlobalSearchModalProps) {
   if (!open) return null;
 
   const targetResults =

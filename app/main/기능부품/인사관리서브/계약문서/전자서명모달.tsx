@@ -8,16 +8,14 @@ import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
 import {
     buildClosingPrintHTML,
     stripContractClosingLines,
-    type ContractClosingData,
-} from '@/lib/contract-template-closing';
+    type ContractClosingData } from '@/lib/contract-template-closing';
 import { buildContractBodyPrintHTML } from '@/lib/contract-body-print-html';
 import {
     buildConfidentialityPledgePrintHTML,
     CONFIDENTIALITY_PLEDGE_CLAUSES,
     CONFIDENTIALITY_PLEDGE_INTRO_PREFIX,
     CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX,
-    CONFIDENTIALITY_PLEDGE_AFFIRMATION,
-} from '@/lib/contract-confidentiality-pledge';
+    CONFIDENTIALITY_PLEDGE_AFFIRMATION } from '@/lib/contract-confidentiality-pledge';
 import ContractClosingBlock from './계약서마무리블록';
 import ContractBodyBlock from './계약서본문블록';
 import {
@@ -25,8 +23,7 @@ import {
     getWeeklyRotationShiftIds,
     isShiftBandGroupRow,
     orderShiftsByIds,
-    withWeeklyRotationShifts,
-} from '@/lib/contract-shift-rotation';
+    withWeeklyRotationShifts } from '@/lib/contract-shift-rotation';
 
 type Props = {
     contract: any;
@@ -225,8 +222,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             timeZone: 'Asia/Seoul',
             year: 'numeric',
             month: 'long',
-            day: 'numeric',
-        });
+            day: 'numeric' });
     };
 
     const contractIssueDate =
@@ -252,8 +248,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         employeeName: String(user?.name || ''),
         employeeAddress: String(user?.address || ''),
         employeePhone: String(user?.phone || ''),
-        contractDate: contractIssueDate,
-    };
+        contractDate: contractIssueDate };
 
     const handleNext = () => {
         if (step === 1) {
@@ -475,16 +470,14 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 companyName: company?.name || user?.company || '',
                 employeeName: user?.name || '',
                 contractDate: today,
-                signatureDataUrl: signatureData,
-            });
+                signatureDataUrl: signatureData });
 
             const { mainText: strippedTemplate } = stripContractClosingLines(localTemplateText);
             const bodyText = strippedTemplate || localTemplateText;
             const closingHTML = buildClosingPrintHTML({
                 ...closingData,
                 signatureDataUrl: signatureData,
-                receiptTraceDataUrl: receiptTraceData,
-            });
+                receiptTraceDataUrl: receiptTraceData });
 
             let resolvedBodyText = bodyText;
             if (privacyConsent !== null) {

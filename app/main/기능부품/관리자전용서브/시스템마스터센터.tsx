@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import {
   includesBannedWord,
-  pickFirstFlaggedChatMessage,
-} from '@/lib/system-master-chat-filter';
+  pickFirstFlaggedChatMessage } from '@/lib/system-master-chat-filter';
 import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/system-master';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { loadBannedWords } from '@/lib/banned-words';
@@ -27,16 +26,14 @@ import type {
   SystemMasterPermissionDiffPayload,
   SystemMasterChatsPayload,
   SystemMasterActionId,
-  SystemMasterSensitiveStaff,
-} from './시스템마스터센터-modules/types';
+  SystemMasterSensitiveStaff } from './시스템마스터센터-modules/types';
 import { type Column } from '@/app/components/ResponsiveTable';
 import {
   formatCurrency,
   maskResidentNo,
   maskAccount,
   readJson,
-  isEmptyChatRoom,
-} from './시스템마스터센터-modules/utils';
+  isEmptyChatRoom } from './시스템마스터센터-modules/utils';
 import { OverviewPanel } from './시스템마스터센터-modules/OverviewPanel';
 import { OperationsPanel } from './시스템마스터센터-modules/OperationsPanel';
 import { AuditPanel } from './시스템마스터센터-modules/AuditPanel';
@@ -61,8 +58,7 @@ function SystemMasterCenterDesktop({
   user,
   staffs = [],
   onRefresh,
-  initialTab,
-}: SystemMasterCenterProps) {
+  initialTab }: SystemMasterCenterProps) {
   const { dialog, openConfirm } = useActionDialog();
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
   const [overview, setOverview] = useState<SystemMasterOverviewPayload | null>(null);
@@ -121,8 +117,7 @@ function SystemMasterCenterDesktop({
         scope: 'audit',
         category: auditCategory,
         keyword: auditKeyword,
-        limit: '200',
-      });
+        limit: '200' });
       const payload = await readJson<SystemMasterAuditPayload>(`/api/admin/system-master?${query.toString()}`);
       setAuditLogs(payload.logs || []);
     } catch (loadError) {
@@ -138,8 +133,7 @@ function SystemMasterCenterDesktop({
     try {
       const query = new URLSearchParams({
         scope: 'operations',
-        limit: '200',
-      });
+        limit: '200' });
       const payload = await readJson<SystemMasterOperationsPayload>(`/api/admin/system-master?${query.toString()}`);
       setOperations(payload || null);
       lastFetchedAtRef.current = Date.now();
@@ -157,8 +151,7 @@ function SystemMasterCenterDesktop({
       const query = new URLSearchParams({
         scope: 'permission-diffs',
         keyword: auditKeyword,
-        limit: '200',
-      });
+        limit: '200' });
       const payload = await readJson<SystemMasterPermissionDiffPayload>(`/api/admin/system-master?${query.toString()}`);
       setPermissionDiffLogs(payload.logs || []);
     } catch (loadError) {
@@ -189,8 +182,7 @@ function SystemMasterCenterDesktop({
         scope: 'chats',
         keyword: chatKeyword,
         limit: CHAT_FETCH_LIMIT,
-        roomLimit: CHAT_ROOM_FETCH_LIMIT,
-      };
+        roomLimit: CHAT_ROOM_FETCH_LIMIT };
       // 단어 필터 선택검색 — 서버에서 매칭 채팅방 전체 조회
       if (showFlaggedOnly && bannedWords.length > 0) {
         catalogParams.bannedWords = bannedWords.join(',');
@@ -200,8 +192,7 @@ function SystemMasterCenterDesktop({
       const roomQuery = new URLSearchParams({
         scope: 'chats',
         keyword: chatKeyword,
-        limit: CHAT_FETCH_LIMIT,
-      });
+        limit: CHAT_FETCH_LIMIT });
       if (selectedRoomId) {
         roomQuery.set('roomId', selectedRoomId);
       }
@@ -311,15 +302,13 @@ function SystemMasterCenterDesktop({
       title: '채팅방 삭제',
       description: `"${room.room_label || '채팅방'}" 채팅방 자체를 삭제합니다.\n대화내역과 관련 데이터도 함께 삭제됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     setDeletingRoomId(room.id);
     try {
       const response = await fetch(`/api/admin/system-master?scope=chats&roomId=${encodeURIComponent(String(room.id))}`, {
-        method: 'DELETE',
-      });
+        method: 'DELETE' });
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -349,8 +338,7 @@ function SystemMasterCenterDesktop({
       title: '대화 없는 채팅방 일괄 삭제',
       description: `대화 내역이 전혀 없는 채팅방 ${targets.length}개를 한 번에 삭제합니다.\n참여자 목록, 알림 설정 등 관련 데이터도 함께 정리됩니다.`,
       confirmText: `${targets.length}개 삭제`,
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     setDeletingRoomId('__bulk__');
@@ -389,11 +377,10 @@ function SystemMasterCenterDesktop({
       title: '채팅 메시지 삭제',
       description: '선택한 메시지를 삭제합니다.\n전체 채팅 모니터링 목록에서도 제거됩니다.',
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setDeletingMsgId(message.id);
-    const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
+    const { error: delErr } = await db.from('messages').delete().eq('id', message.id);
     if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
     else {
       setChatCatalogMessages((prev) => prev.filter((item) => item.id !== message.id));
@@ -410,8 +397,7 @@ function SystemMasterCenterDesktop({
       const response = await fetch('/api/admin/system-master', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
+        body: JSON.stringify({ action }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(payload?.error || '작업 실행에 실패했습니다.');
@@ -545,32 +531,27 @@ function SystemMasterCenterDesktop({
           <p className="font-bold text-[var(--foreground)]">{s.name}</p>
           <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">#{s.employee_no || '-'}</p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'company',
       label: '소속',
       render: (s) => (
         <span className="text-[var(--toss-gray-4)]">{s.company || '-'} / {s.department || '-'}</span>
-      ),
-    },
+      ) },
     {
       key: 'resident_no',
       label: '주민번호',
       render: (s) => (
         <span className="font-mono text-[var(--foreground)]">{maskResidentNo(s.resident_no || '', showSensitiveRaw)}</span>
-      ),
-    },
+      ) },
     {
       key: 'phone',
       label: '연락처',
-      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.phone || '-'}</span>,
-    },
+      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.phone || '-'}</span> },
     {
       key: 'email',
       label: '이메일',
-      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.email || '-'}</span>,
-    },
+      render: (s) => <span className="text-[var(--toss-gray-4)]">{s.email || '-'}</span> },
     {
       key: 'bank_account',
       label: '은행 / 계좌',
@@ -579,16 +560,14 @@ function SystemMasterCenterDesktop({
           <p className="font-semibold text-[var(--foreground)]">{s.bank_name || '-'}</p>
           <p className="mt-1 font-mono text-[11px] text-[var(--toss-gray-3)]">{maskAccount(s.bank_account || '', showSensitiveRaw)}</p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'base_salary',
       label: '기본급',
       align: 'right',
       render: (s) => (
         <span className="font-semibold text-[var(--foreground)]">{formatCurrency(s.base_salary)}</span>
-      ),
-    },
+      ) },
   ], [showSensitiveRaw]);
 
   if (!isSystemMaster) {

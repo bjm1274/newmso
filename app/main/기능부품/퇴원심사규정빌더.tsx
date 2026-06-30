@@ -5,8 +5,7 @@ import type {
   DischargeCustomRule,
   DischargeCustomRuleCategory,
   DischargeCustomRuleMatchType,
-  DischargeCustomRuleSeverity,
-} from '@/lib/discharge-custom-rules';
+  DischargeCustomRuleSeverity } from '@/lib/discharge-custom-rules';
 
 type DraftRule = {
   id: string | null;
@@ -30,8 +29,7 @@ function createEmptyDraft(): DraftRule {
     keywords: '',
     detail: '',
     basis: '',
-    enabled: true,
-  };
+    enabled: true };
 }
 
 function matchTypeLabel(value: DischargeCustomRuleMatchType) {
@@ -60,8 +58,7 @@ function severityLabel(value: DischargeCustomRuleSeverity) {
 
 export default function DischargeRuleBuilder({
   rules,
-  onChange,
-}: {
+  onChange }: {
   rules: DischargeCustomRule[];
   onChange: (rules: DischargeCustomRule[]) => void;
 }) {
@@ -89,8 +86,7 @@ export default function DischargeRuleBuilder({
       keywords,
       detail: draft.detail.trim(),
       basis: draft.basis.trim() || '퇴원심사 사용자 정의 규정',
-      enabled: draft.enabled,
-    };
+      enabled: draft.enabled };
 
     const exists = rules.some((rule) => rule.id === nextRule.id);
     onChange(exists ? rules.map((rule) => (rule.id === nextRule.id ? nextRule : rule)) : [...rules, nextRule]);
@@ -107,8 +103,7 @@ export default function DischargeRuleBuilder({
       keywords: rule.keywords.join(', '),
       detail: rule.detail,
       basis: rule.basis,
-      enabled: rule.enabled,
-    });
+      enabled: rule.enabled });
   };
 
   const removeRule = (ruleId: string) => {

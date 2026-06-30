@@ -5,14 +5,12 @@ import {
   approvals as approvalsTable,
   eq,
   and,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 import { announceLeaveApprovalIfNeeded } from '@/lib/leave-notice-cron';
 import {
   isAdminSession,
   isSystemMasterSession,
-  readSessionFromRequest,
-} from '@/lib/server-session';
+  readSessionFromRequest } from '@/lib/server-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,8 +41,7 @@ export async function POST(req: NextRequest) {
         company_id: approvalsTable.company_id,
         title: approvalsTable.title,
         meta_data: approvalsTable.meta_data,
-        created_at: approvalsTable.created_at,
-      })
+        created_at: approvalsTable.created_at })
       .from(approvalsTable)
       .where(
         and(
@@ -87,8 +84,7 @@ export async function POST(req: NextRequest) {
           company_id: app.company_id,
           title: app.title,
           meta_data: meta,
-          created_at: app.created_at,
-        };
+          created_at: app.created_at };
 
         const announced = await announceLeaveApprovalIfNeeded(db, approvalRow);
         if (announced) {
@@ -112,8 +108,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: err instanceof Error ? err.message : '연차 공지 소급 실행 중 오류가 발생했습니다.',
-      },
+        error: err instanceof Error ? err.message : '연차 공지 소급 실행 중 오류가 발생했습니다.' },
       { status: 500 },
     );
   }

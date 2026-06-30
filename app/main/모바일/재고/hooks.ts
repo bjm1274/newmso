@@ -15,12 +15,10 @@ import {
   type UsageDeptRow,
   type UsageStatsData,
   type ReturnRow,
-  type ReturnsData,
-} from '../../기능부품/재고관리워크센터/use-stock-data';
+  type ReturnsData } from '../../기능부품/재고관리워크센터/use-stock-data';
 import type {
   StockStatusRow,
-  Tone,
-} from '../../기능부품/재고관리워크센터/stock-types';
+  Tone } from '../../기능부품/재고관리워크센터/stock-types';
 import { formatAmount } from './data-hooks';
 import { formatWon } from '@/lib/date-formatter';
 
@@ -32,8 +30,7 @@ export {
   useUsageStats,
   useReturnsData,
   formatAmount,
-  formatWon,
-};
+  formatWon };
 
 export type {
   StatusWorkcenterData,
@@ -45,8 +42,7 @@ export type {
   ReturnRow,
   ReturnsData,
   StockStatusRow,
-  Tone,
-};
+  Tone };
 
 // ─── tone 매핑: 워크센터 Tone(warn) → 모바일 MChip(warning) ─────
 export type MTone = '' | 'accent' | 'success' | 'warning' | 'danger';

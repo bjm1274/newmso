@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import dynamic from 'next/dynamic';
 const OperationCheckView = dynamic(() => import('../OP체크'), { ssr: false, loading: () => <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div> });
 
@@ -46,13 +46,12 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
   const loadAll = async () => {
     try {
       const [{ data: s }, { data: m }] = await Promise.all([
-        supabase
+        db
           .from('surgery_templates')
           .select('*')
           .order('sort_order', { ascending: true }),
-        supabase.from('mri_templates').select('*').order('sort_order', {
-          ascending: true,
-        }),
+        db.from('mri_templates').select('*').order('sort_order', {
+          ascending: true }),
       ]);
       setSurgeryTemplates((s || []) as Template[]);
       setMriTemplates((m || []) as Template[]);
@@ -78,13 +77,12 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
       const bodyPart = type === 'surgery' ? newSurgeryPart : newMriPart;
       const maxSort =
         list.length > 0 ? Math.max(...list.map((t) => t.sort_order || 0)) : 0;
-      const { error } = await supabase.from(table).insert([
+      const { error } = await db.from(table).insert([
         {
           name,
           sort_order: maxSort + 1,
           is_active: true,
-          body_part: bodyPart || null,
-        },
+          body_part: bodyPart || null },
       ]);
       if (error) throw error;
       if (type === 'surgery') {
@@ -108,13 +106,12 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
       title: '템플릿 삭제',
       description: `${target?.name || '선택한 템플릿'}을 삭제합니다.\n수술/검사 항목 목록에서 제거됩니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     setLoading(true);
     try {
       const table = type === 'surgery' ? 'surgery_templates' : 'mri_templates';
-      await supabase.from(table).delete().eq('id', id);
+      await db.from(table).delete().eq('id', id);
       await loadAll();
     } catch (e) {
       console.error('템플릿 삭제 실패', e);
@@ -128,7 +125,7 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
     setLoading(true);
     try {
       const table = type === 'surgery' ? 'surgery_templates' : 'mri_templates';
-      await supabase
+      await db
         .from(table)
         .update({ is_active: !tmpl.is_active })
         .eq('id', tmpl.id);

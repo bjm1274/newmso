@@ -67,8 +67,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       path: uploaded.path,
-      url: buildR2AccessUrl(R2_BUCKET, objectKey),
-    });
+      url: buildR2AccessUrl(R2_BUCKET, objectKey) });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '직인 업로드 중 오류가 발생했습니다.';
     return NextResponse.json({ error: message }, { status: 500 });

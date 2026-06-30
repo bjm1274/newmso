@@ -39,33 +39,27 @@ const STATE_STYLE: Record<
     border: 'var(--accent)',
     pillBg: 'var(--accent-selected-subtle)',
     pillColor: 'var(--accent)',
-    nameColor: 'var(--foreground)',
-  },
+    nameColor: 'var(--foreground)' },
   done: {
     border: 'var(--success)',
     pillBg: 'var(--success-light)',
     pillColor: 'var(--success)',
-    nameColor: 'var(--foreground)',
-  },
+    nameColor: 'var(--foreground)' },
   rejected: {
     border: 'var(--danger)',
     pillBg: 'var(--danger-light)',
     pillColor: 'var(--danger)',
-    nameColor: 'var(--foreground)',
-  },
+    nameColor: 'var(--foreground)' },
   on: {
     border: 'var(--warning)',
     pillBg: 'var(--warning-light)',
     pillColor: 'var(--warning)',
-    nameColor: 'var(--foreground)',
-  },
+    nameColor: 'var(--foreground)' },
   pending: {
     border: 'var(--border)',
     pillBg: 'var(--muted)',
     pillColor: 'var(--muted-foreground)',
-    nameColor: 'var(--muted-foreground)',
-  },
-};
+    nameColor: 'var(--muted-foreground)' } };
 
 function formatTimeShort(value?: string | null): string {
   if (!value) return '';
@@ -111,8 +105,7 @@ function buildSteps({
   staffs,
   resolveApprovalLineIds,
   resolveCurrentApproverId,
-  composeMode,
-}: ApprovalLineTimelineProps): { drafterStep: Step | null; steps: Step[] } {
+  composeMode }: ApprovalLineTimelineProps): { drafterStep: Step | null; steps: Step[] } {
   const lineIds = resolveApprovalLineIds(item);
   const currentApproverId = resolveCurrentApproverId(item);
   const status = String(item.status || '대기');
@@ -131,8 +124,7 @@ function buildSteps({
         role: '기안자',
         state: 'draft',
         actionLabel: '기안',
-        timeLabel: composeMode ? '지금' : formatTimeShort(createdAt),
-      }
+        timeLabel: composeMode ? '지금' : formatTimeShort(createdAt) }
     : null;
 
   const currentIndex = currentApproverId
@@ -152,8 +144,7 @@ function buildSteps({
         role,
         state: 'rejected',
         actionLabel: '반려',
-        timeLabel: formatTimeShort(historyEntry.at),
-      };
+        timeLabel: formatTimeShort(historyEntry.at) };
     }
     if (historyEntry?.action === 'approved_step' || historyEntry?.action === 'approved_final') {
       return {
@@ -162,8 +153,7 @@ function buildSteps({
         role,
         state: 'done',
         actionLabel: '승인',
-        timeLabel: formatTimeShort(historyEntry.at),
-      };
+        timeLabel: formatTimeShort(historyEntry.at) };
     }
 
     // 최종 승인 상태인데 history 항목이 누락된 경우 — 현재 인덱스 이전은 done
@@ -174,8 +164,7 @@ function buildSteps({
         role,
         state: 'done',
         actionLabel: '승인',
-        timeLabel: '',
-      };
+        timeLabel: '' };
     }
     if (rejected) {
       // 반려된 문서에서 현재 단계 이후는 그냥 미진행
@@ -185,8 +174,7 @@ function buildSteps({
         role,
         state: 'pending',
         actionLabel: '대기 예정',
-        timeLabel: '',
-      };
+        timeLabel: '' };
     }
 
     const isCurrent = !composeMode && index === currentIndex;
@@ -198,8 +186,7 @@ function buildSteps({
         role,
         state: 'on',
         actionLabel: '대기 중',
-        timeLabel: elapsed > 0 ? `${elapsed}시간 경과` : '대기 중',
-      };
+        timeLabel: elapsed > 0 ? `${elapsed}시간 경과` : '대기 중' };
     }
     // 미래 단계
     return {
@@ -208,8 +195,7 @@ function buildSteps({
       role,
       state: 'pending',
       actionLabel: composeMode ? '상신 시 알림' : '대기 예정',
-      timeLabel: '',
-    };
+      timeLabel: '' };
   });
 
   return { drafterStep, steps };
@@ -221,8 +207,7 @@ const STATE_STEP_CLASS: Record<ApprovalLineStepState, string> = {
   done: 'done',
   rejected: 'rejected',
   on: 'on',
-  pending: 'pending',
-};
+  pending: 'pending' };
 
 // 라이브 정답 state → .ap-line-when 톤 매핑
 const STATE_WHEN_TONE: Record<ApprovalLineStepState, string> = {
@@ -230,13 +215,11 @@ const STATE_WHEN_TONE: Record<ApprovalLineStepState, string> = {
   done: 'success',
   rejected: 'danger',
   on: 'waiting',
-  pending: 'muted',
-};
+  pending: 'muted' };
 
 function StepCard({
   step,
-  onRemove,
-}: {
+  onRemove }: {
   step: Step;
   onRemove?: () => void;
 }) {

@@ -11,8 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+  ResponsiveContainer } from 'recharts';
 
 type BudgetRow = {
   dept: string;
@@ -39,8 +38,7 @@ export default function BudgetBarChart({ data }: { data: BudgetRow[] }) {
           contentStyle={{
             borderRadius: '10px',
             border: '1px solid var(--border)',
-            background: 'var(--card)',
-          }}
+            background: 'var(--card)' }}
         />
         <Bar dataKey="budget" name="예산" fill="var(--accent)" radius={[4, 4, 0, 0]} />
         <Bar dataKey="executed" name="집행" fill="var(--danger, #FF6B6B)" radius={[4, 4, 0, 0]} />

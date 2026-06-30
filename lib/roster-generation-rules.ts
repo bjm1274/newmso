@@ -110,8 +110,7 @@ function normalizeRoleCoverageRules(
         keywords,
         minDayStaff,
         minEveningStaff,
-        minNightStaff,
-      } satisfies RosterRoleCoverageRule;
+        minNightStaff } satisfies RosterRoleCoverageRule;
     })
     .filter((rule): rule is RosterRoleCoverageRule => Boolean(rule));
 }
@@ -141,8 +140,7 @@ function normalizeDateCoverageOverrides(
         date,
         minDayStaff,
         minEveningStaff,
-        minNightStaff,
-      } satisfies RosterDateCoverageOverride;
+        minNightStaff } satisfies RosterDateCoverageOverride;
     })
     .filter((entry): entry is RosterDateCoverageOverride => Boolean(entry))
     .sort((left, right) => left.date.localeCompare(right.date));
@@ -195,8 +193,7 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
     minSeniorNightStaff: clampInteger(rule.minSeniorNightStaff, 0, 20, 0),
     minDedicatedDayStaff: clampInteger(rule.minDedicatedDayStaff, 0, 20, 0),
     minDedicatedEveningStaff: clampInteger(rule.minDedicatedEveningStaff, 0, 20, 0),
-    minDedicatedNightStaff: clampInteger(rule.minDedicatedNightStaff, 0, 20, 0),
-  };
+    minDedicatedNightStaff: clampInteger(rule.minDedicatedNightStaff, 0, 20, 0) };
 }
 
 export function buildDefaultGenerationRule(companyName = '', companyId: string | null = null): RosterGenerationRule {
@@ -245,8 +242,7 @@ export function buildDefaultGenerationRule(companyName = '', companyId: string |
     minDedicatedNightStaff: 0,
     roleCoverageRules: [],
     dateCoverageOverrides: [],
-    updatedAt: new Date().toISOString(),
-  };
+    updatedAt: new Date().toISOString() };
 }
 
 export function normalizeGenerationRule(record: unknown): RosterGenerationRule | null {
@@ -324,8 +320,7 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
       source.dateCoverageOverrides,
       `${id || 'date-rule'}-override`
     ),
-    updatedAt: String(source.updatedAt || new Date().toISOString()),
-  });
+    updatedAt: String(source.updatedAt || new Date().toISOString()) });
 }
 
 export function readCachedGenerationRules() {

@@ -32,8 +32,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
     return groups
       .map((g) => ({
         ...g,
-        members: g.members.filter((m) => m.name.includes(q) || g.department.includes(q)),
-      }))
+        members: g.members.filter((m) => m.name.includes(q) || g.department.includes(q)) }))
       .filter((g) => g.members.length > 0);
   }, [groups, search]);
 
@@ -43,8 +42,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
       style={{
         background: 'linear-gradient(145deg, #f3ecfc 0%, #f6f0fd 30%, #ecf5fc 70%, #ecfaf4 100%)',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       <MobileHeader
         title="조직도"
@@ -62,8 +60,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
         style={{
           padding: '12px 16px 10px',
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-          background: 'rgba(255, 255, 255, 0.4)',
-        }}
+          background: 'rgba(255, 255, 255, 0.4)' }}
       >
         <div className="m-seg macos-glass macos-squircle-sm" style={{ background: 'rgba(0, 0, 0, 0.04)', border: 'none', padding: '2px' }}>
           <button
@@ -76,8 +73,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
               background: view === 'tree' ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
               boxShadow: view === 'tree' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               color: view === 'tree' ? 'var(--z-900)' : 'var(--z-600)',
-              fontWeight: 800,
-            }}
+              fontWeight: 800 }}
           >
             부서
           </button>
@@ -91,8 +87,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
               background: view === 'card' ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
               boxShadow: view === 'card' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               color: view === 'card' ? 'var(--z-900)' : 'var(--z-600)',
-              fontWeight: 800,
-            }}
+              fontWeight: 800 }}
           >
             카드
           </button>
@@ -106,8 +101,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
               background: view === 'org' ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
               boxShadow: view === 'org' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               color: view === 'org' ? 'var(--z-900)' : 'var(--z-600)',
-              fontWeight: 800,
-            }}
+              fontWeight: 800 }}
           >
             조직도
           </button>
@@ -131,8 +125,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
               fontSize: 13,
               border: '1px solid rgba(0, 0, 0, 0.08)',
               outline: 'none',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
-            }}
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)' }}
           />
         </div>
       </div>
@@ -150,8 +143,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                 overflow: 'hidden',
                 padding: '4px 0',
                 border: '1px solid rgba(0, 0, 0, 0.06)',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
-              }}
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)' }}
             >
               {filtered.map((g, idx) => {
                 const lead = g.members[0]?.name ?? '-';
@@ -162,8 +154,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                     className="m-list-row"
                     style={{
                       background: 'transparent',
-                      borderBottom: isLast ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
-                    }}
+                      borderBottom: isLast ? 'none' : '1px solid rgba(0, 0, 0, 0.04)' }}
                   >
                     <MAvatar tone={pickTone(g.department)}>{g.department.charAt(0)}</MAvatar>
                     <div style={{ minWidth: 0 }}>
@@ -197,8 +188,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                       fontSize: 12,
                       fontWeight: 800,
                       color: 'var(--z-700)',
-                      letterSpacing: '-0.01em',
-                    }}
+                      letterSpacing: '-0.01em' }}
                   >
                     {g.department}
                   </span>
@@ -211,8 +201,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2,1fr)',
                     gap: 8,
-                    marginBottom: 14,
-                  }}
+                    marginBottom: 14 }}
                 >
                   {g.members.map((m) => (
                     <div
@@ -222,8 +211,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                         padding: '12px 14px',
                         border: '1px solid rgba(0, 0, 0, 0.06)',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
-                        background: 'rgba(255, 255, 255, 0.65)',
-                      }}
+                        background: 'rgba(255, 255, 255, 0.65)' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <MAvatar tone={pickTone(m.id)} size="sm">{m.name.charAt(0)}</MAvatar>
@@ -238,8 +226,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                                 ? 'var(--m-success)'
                                 : m.status === '휴가'
                                 ? 'var(--m-warning)'
-                                : 'var(--z-400)',
-                          }}
+                                : 'var(--z-400)' }}
                         />
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 800, marginTop: 8, color: 'var(--z-800)' }}>{m.name}</div>
@@ -248,8 +235,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                           fontSize: 11,
                           color: 'var(--z-500)',
                           fontWeight: 600,
-                          marginTop: 1,
-                        }}
+                          marginTop: 1 }}
                       >
                         {m.position || '-'}
                       </div>
@@ -271,8 +257,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 800,
-                  boxShadow: '0 4px 12px rgba(10, 85, 225, 0.25)',
-                }}
+                  boxShadow: '0 4px 12px rgba(10, 85, 225, 0.25)' }}
               >
                 {company === '전체' ? 'MSO 전체' : company ?? '본사'}
               </div>
@@ -289,8 +274,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                       fontSize: 11,
                       fontWeight: 700,
-                      textAlign: 'center',
-                    }}
+                      textAlign: 'center' }}
                   >
                     <div style={{ color: 'var(--z-800)', fontWeight: 800 }}>{g.department}</div>
                     <div style={{ fontSize: 9, color: 'var(--z-500)', fontWeight: 600, marginTop: 1 }}>
@@ -313,8 +297,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                 color: '#007AFF',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-              }}
+                gap: 8 }}
             >
               <MIcon name="info" size={16} color="#007AFF" />
               풀 조직도(드래그·재구성)는 데스크톱에서 확인하세요.

@@ -50,8 +50,7 @@ export function getCompanyScopeFromUser(user: any): CompanyScope {
     allowedCompanyIds: isMso ? MSO_COMPANY_IDS : user?.company_id ? [user.company_id] : [],
     isMsoAdmin: isMso,
     isHospitalAdmin: user?.role === 'admin' && !isMso,
-    companyName,
-  };
+    companyName };
 }
 
 /**

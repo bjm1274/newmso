@@ -4,8 +4,7 @@ import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
   insertNotificationsOrThrow,
-  type NotificationRow,
-} from '@/lib/notification-utils';
+  type NotificationRow } from '@/lib/notification-utils';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -13,8 +12,7 @@ import {
   staff_members as staffMembersTable,
   board_posts as boardPostsTable,
   messages as messagesTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import { isActiveStaff } from '@/lib/active-staff';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
@@ -23,12 +21,10 @@ export const dynamic = 'force-dynamic';
 const AUTO_BROADCAST_BOARDS = new Set(['공지사항', '경조사']);
 const BOARD_ICON: Record<string, string> = {
   공지사항: '📢',
-  경조사: '🎉',
-};
+  경조사: '🎉' };
 const NOTIFICATION_LABEL: Record<string, string> = {
   공지사항: '📢 새 공지사항',
-  경조사: '🎉 새 경조사',
-};
+  경조사: '🎉 새 경조사' };
 const PREVIEW_LIMIT = 100;
 const TITLE_LIMIT = 120;
 
@@ -47,7 +43,7 @@ type StaffSummary = {
   role?: string | null;
 };
 
-// D1 binding 필수 — Phase 8-F: supabase 의존 제거
+// D1 binding 필수 — Phase 8-F: db 의존 제거
 async function requireD1ForNoticeBroadcast(label: string) {
   const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
@@ -107,8 +103,7 @@ export async function POST(request: NextRequest) {
           content: boardPostsTable.content,
           board_type: boardPostsTable.board_type,
           author_id: boardPostsTable.author_id,
-          scheduled_publish_at: boardPostsTable.scheduled_publish_at,
-        })
+          scheduled_publish_at: boardPostsTable.scheduled_publish_at })
         .from(boardPostsTable)
         .where(eq(boardPostsTable.id, postId))
         .limit(1);
@@ -149,8 +144,7 @@ export async function POST(request: NextRequest) {
           .select({
             id: staffMembersTable.id,
             name: staffMembersTable.name,
-            role: staffMembersTable.role,
-          })
+            role: staffMembersTable.role })
           .from(staffMembersTable)
           .where(eq(staffMembersTable.id, sessionUserId))
           .limit(1);
@@ -173,8 +167,7 @@ export async function POST(request: NextRequest) {
           .select({
             id: staffMembersTable.id,
             name: staffMembersTable.name,
-            role: staffMembersTable.role,
-          })
+            role: staffMembersTable.role })
           .from(staffMembersTable)
           .where(eq(staffMembersTable.id, sessionUserId))
           .limit(1);
@@ -197,15 +190,13 @@ export async function POST(request: NextRequest) {
         room_id: NOTICE_ROOM_ID,
         sender_id: null,
         sender_name: '공지봇',
-        content: chatContent,
-      });
+        content: chatContent });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       return NextResponse.json(
         {
           error: '공지 채팅방 메시지 저장에 실패했습니다.',
-          detail,
-        },
+          detail },
         { status: 500 },
       );
     }
@@ -226,8 +217,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           type: 'board',
           title: NOTIFICATION_LABEL[boardType] || `🔔 ${boardType}`,
-          body: String(post.title || '(제목 없음)').slice(0, 80),
-        }));
+          body: String(post.title || '(제목 없음)').slice(0, 80) }));
         await insertNotificationsOrThrow(rows as unknown as Record<string, unknown>[]);
         notificationCount = staffIds.length;
       }
@@ -241,8 +231,7 @@ export async function POST(request: NextRequest) {
     try {
       pushResult = await dispatchChatPushForMessage({
         roomId: NOTICE_ROOM_ID,
-        messageId,
-      });
+        messageId });
     } catch (err) {
       pushError = String((err as Error)?.message || err);
     }
@@ -252,8 +241,7 @@ export async function POST(request: NextRequest) {
       messageId,
       notificationCount,
       push: pushResult,
-      pushError,
-    });
+      pushError });
   } catch (error) {
     const message = String((error as Error)?.message || '');
     return NextResponse.json(

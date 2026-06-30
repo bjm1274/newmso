@@ -16,8 +16,7 @@ import MIcon from '../공통/MIcon';
 import {
   formatBubbleTimestamp,
   pickAvatarTone,
-  type StaffDirectoryEntry,
-} from './data-hooks';
+  type StaffDirectoryEntry } from './data-hooks';
 import { toast } from '@/lib/toast';
 import MessageActionsHost from '../../기능부품/메신저액션서브/MessageActionsHost';
 
@@ -94,8 +93,7 @@ export default function MessageBubble({
   onReadDetail,
   onOpenThread,
   threadReplyCount = 0,
-  searchMessageId,
-}: MessageBubbleProps) {
+  searchMessageId }: MessageBubbleProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [swiping, setSwiping] = useState(false);
   const [highlighted, setHighlighted] = useState(false);
@@ -136,8 +134,7 @@ export default function MessageBubble({
     return Object.entries(r)
       .map(([emoji, users]) => ({
         emoji,
-        users: Array.isArray(users) ? users.map(String) : [],
-      }))
+        users: Array.isArray(users) ? users.map(String) : [] }))
       .filter((entry) => entry.users.length > 0);
   }, [message.reactions]);
 
@@ -190,8 +187,7 @@ export default function MessageBubble({
           padding: '4px 0',
           opacity: swiping ? 0.9 : 1,
           transition: 'opacity 0.2s, background-color 0.5s',
-          backgroundColor: highlighted ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
-        }}
+          backgroundColor: highlighted ? 'rgba(0, 122, 255, 0.1)' : 'transparent' }}
       >
         {!mine && (
           <div style={{ width: 4, flexShrink: 0 }} />
@@ -202,8 +198,7 @@ export default function MessageBubble({
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: mine ? 'flex-end' : 'flex-start',
-          }}
+            alignItems: mine ? 'flex-end' : 'flex-start' }}
         >
           {!mine && (
             <div
@@ -212,8 +207,7 @@ export default function MessageBubble({
                 fontWeight: 700,
                 color: 'var(--z-600)',
                 marginBottom: 3,
-                padding: '0 4px',
-              }}
+                padding: '0 4px' }}
             >
               {senderName}
             </div>
@@ -225,8 +219,7 @@ export default function MessageBubble({
               gap: 6,
               position: 'relative',
               minWidth: 0,
-              maxWidth: '100%',
-            }}
+              maxWidth: '100%' }}
           >
             {mine && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
@@ -237,8 +230,7 @@ export default function MessageBubble({
                       fontWeight: 700,
                       color: 'var(--m-green)',
                       textDecoration: 'underline',
-                      textUnderlineOffset: '2px',
-                    }}
+                      textUnderlineOffset: '2px' }}
                   >
                     {displayedReadCount}
                   </span>
@@ -248,8 +240,7 @@ export default function MessageBubble({
                     fontSize: 10,
                     color: 'var(--z-400)',
                     fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                  }}
+                    whiteSpace: 'nowrap' }}
                 >
                   {ts}
                 </span>
@@ -285,8 +276,7 @@ export default function MessageBubble({
                 overflow: 'hidden',
                 minWidth: 0,
                 flexShrink: 1,
-                boxShadow: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? undefined : '0 4px 12px rgba(0, 0, 0, 0.05)',
-              }}
+                boxShadow: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? undefined : '0 4px 12px rgba(0, 0, 0, 0.05)' }}
             >
               {replyTarget && (
                 <div style={{
@@ -296,8 +286,7 @@ export default function MessageBubble({
                   fontSize: 12,
                   borderLeft: `3px solid ${mine ? 'rgba(255, 255, 255, 0.8)' : '#007AFF'}`,
                   color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
-                  marginBottom: 8,
-                }}>
+                  marginBottom: 8 }}>
                   <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : '#007AFF' }}>
                     {replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장
                   </div>
@@ -323,8 +312,7 @@ export default function MessageBubble({
                       maxWidth: 220,
                       maxHeight: 260,
                       borderRadius: 12,
-                      objectFit: 'cover',
-                    }}
+                      objectFit: 'cover' }}
                     loading="lazy"
                   />
                 </a>
@@ -339,8 +327,7 @@ export default function MessageBubble({
                     alignItems: 'center',
                     gap: 8,
                     color: mine ? '#fff' : 'var(--z-900)',
-                    textDecoration: 'none',
-                  }}
+                    textDecoration: 'none' }}
                 >
                   <MIcon name="paperclip" size={18} />
                   <span style={{ flex: 1, minWidth: 0 }}>
@@ -351,8 +338,7 @@ export default function MessageBubble({
                         fontWeight: 700,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
+                        textOverflow: 'ellipsis' }}
                     >
                       {fileName}
                     </span>
@@ -362,8 +348,7 @@ export default function MessageBubble({
                           display: 'block',
                           fontSize: 11,
                           fontWeight: 600,
-                          opacity: 0.75,
-                        }}
+                          opacity: 0.75 }}
                       >
                         {fileSize}
                       </span>
@@ -386,8 +371,7 @@ export default function MessageBubble({
                       fontWeight: 700,
                       color: 'var(--m-green)',
                       textDecoration: 'underline',
-                      textUnderlineOffset: '2px',
-                    }}
+                      textUnderlineOffset: '2px' }}
                   >
                     {displayedReadCount}
                   </span>
@@ -397,8 +381,7 @@ export default function MessageBubble({
                     fontSize: 10,
                     color: 'var(--z-400)',
                     fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                  }}
+                    whiteSpace: 'nowrap' }}
                 >
                   {ts}
                 </span>
@@ -413,8 +396,7 @@ export default function MessageBubble({
                 gap: 4,
                 marginTop: 4,
                 flexWrap: 'wrap',
-                justifyContent: mine ? 'flex-end' : 'flex-start',
-              }}
+                justifyContent: mine ? 'flex-end' : 'flex-start' }}
             >
               {reactionEntries.map((entry) => {
                 const mineReaction = myUserId
@@ -443,8 +425,7 @@ export default function MessageBubble({
                       fontSize: 11,
                       fontWeight: 700,
                       border: mineReaction ? '1px solid rgba(0, 122, 255, 0.3)' : '1px solid transparent',
-                      cursor: 'pointer',
-                    }}
+                      cursor: 'pointer' }}
                   >
                     {entry.emoji} {entry.users.length}
                   </button>
@@ -462,8 +443,7 @@ export default function MessageBubble({
                 marginTop: 3,
                 padding: '0 4px',
                 flexWrap: 'wrap',
-                justifyContent: mine ? 'flex-end' : 'flex-start',
-              }}
+                justifyContent: mine ? 'flex-end' : 'flex-start' }}
             >
               <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>수정됨</span>
             </div>
@@ -481,5 +461,4 @@ const metaBtnStyle: React.CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
   color: 'var(--z-500)',
-  cursor: 'pointer',
-};
+  cursor: 'pointer' };

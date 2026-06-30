@@ -40,15 +40,13 @@ const INPUT_TONE: Record<FieldTone, string> = {
   default: 'border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]',
   taxfree: 'border border-emerald-200 bg-emerald-50/30 text-emerald-700',
   deduction: 'border border-orange-300 bg-orange-50/40 text-orange-700',
-  base: 'border-none bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  base: 'border-none bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 const LABEL_TONE: Record<FieldTone, string> = {
   default: 'text-[var(--toss-gray-4)]',
   taxfree: 'text-emerald-700',
   deduction: 'text-orange-600',
-  base: 'text-[var(--toss-gray-4)]',
-};
+  base: 'text-[var(--toss-gray-4)]' };
 
 // 절반 크기 컴팩트 금액 입력 (h-7 · 11px)
 function CompactAmountField({
@@ -57,8 +55,7 @@ function CompactAmountField({
   onChange,
   tone = 'default',
   testId,
-  readOnly = false,
-}: {
+  readOnly = false }: {
   label: string;
   value: number | '';
   onChange?: (value: number | '') => void;
@@ -109,8 +106,7 @@ export function SettlementStaffCard({
   res,
   hourlyRate,
   getAdvanceAdjustedNet,
-  onUpdate,
-}: {
+  onUpdate }: {
   staff: StaffMember;
   data: SettlementEntry;
   res: SalaryCalcResult;

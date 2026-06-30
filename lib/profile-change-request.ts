@@ -7,7 +7,7 @@
  *
  * PC/모바일이 같은 동작을 갖도록(= 모바일이 승인 절차를 우회하지 않도록) 이 모듈로 추출했다.
  */
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { buildAuditDiff } from '@/lib/audit';
 
 export type ProfileEditableFields = {
@@ -71,9 +71,7 @@ export async function submitProfileChangeRequest(
     permissions: {
       ...currentPermissions,
       extension: form.extension.trim() || null,
-      bank_name: form.bank_name.trim() || null,
-    },
-  };
+      bank_name: form.bank_name.trim() || null } };
 
   const beforeUser = {
     email: currentUser.email ?? null,
@@ -82,8 +80,7 @@ export async function submitProfileChangeRequest(
     bank_account: currentUser.bank_account ?? null,
     bank_name: toSafeText(currentUser.bank_name) || toSafeText(currentPermissions.bank_name) || null,
     extension: toSafeText(currentUser.extension) || toSafeText(currentPermissions.extension) || null,
-    permissions: currentPermissions,
-  };
+    permissions: currentPermissions };
   const nextUser = {
     email: requestedChanges.email,
     phone: requestedChanges.phone,
@@ -91,8 +88,7 @@ export async function submitProfileChangeRequest(
     bank_account: requestedChanges.bank_account,
     bank_name: requestedChanges.bank_name,
     extension: (requestedChanges.permissions as Record<string, unknown>).extension ?? null,
-    permissions: requestedChanges.permissions,
-  };
+    permissions: requestedChanges.permissions };
 
   const diff = buildAuditDiff(beforeUser, nextUser, [
     'email',
@@ -116,12 +112,10 @@ export async function submitProfileChangeRequest(
       bank_account: currentUser.bank_account || null,
       bank_name: toSafeText(currentUser.bank_name) || toSafeText(currentPermissions.bank_name) || null,
       extension: toSafeText(currentUser.extension) || toSafeText(currentPermissions.extension) || null,
-      permissions: currentPermissions,
-    },
-  };
+      permissions: currentPermissions } };
 
   try {
-    const existing = await supabase
+    const existing = await db
       .from('audit_logs')
       .select('id')
       .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
@@ -133,18 +127,17 @@ export async function submitProfileChangeRequest(
     if (existing.error) throw existing.error;
 
     if (existing.data?.id) {
-      const { error } = await supabase
+      const { error } = await db
         .from('audit_logs')
         .update({
           user_name: currentUser.name ?? null,
           action: '인사변경',
           details,
-          created_at: new Date().toISOString(),
-        })
+          created_at: new Date().toISOString() })
         .eq('id', existing.data.id);
       if (error) throw error;
     } else {
-      const { error } = await supabase.from('audit_logs').insert([
+      const { error } = await db.from('audit_logs').insert([
         {
           user_id: userId,
           user_name: currentUser.name ?? null,
@@ -152,8 +145,7 @@ export async function submitProfileChangeRequest(
           target_type: 'ESS_PROFILE_UPDATE_PENDING',
           target_id: String(userId),
           details,
-          created_at: new Date().toISOString(),
-        },
+          created_at: new Date().toISOString() },
       ]);
       if (error) throw error;
     }

@@ -77,8 +77,7 @@ export const COLOR_MAP: Record<string, string> = {
   pink:   'bg-pink-500/10 border-pink-500/20 text-pink-900 dark:text-pink-200',
   cyan:   'bg-cyan-500/10 border-cyan-500/20 text-cyan-900 dark:text-cyan-200',
   lime:   'bg-lime-500/10 border-lime-500/20 text-lime-900 dark:text-lime-200',
-  slate:  'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]',
-};
+  slate:  'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]' };
 
 export const BADGE_MAP: Record<string, string> = {
   blue:   'bg-blue-500/20 text-blue-700 dark:text-blue-300',
@@ -93,8 +92,7 @@ export const BADGE_MAP: Record<string, string> = {
   pink:   'bg-pink-500/20 text-pink-700 dark:text-pink-300',
   cyan:   'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300',
   lime:   'bg-lime-500/20 text-lime-700 dark:text-lime-300',
-  slate:  'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  slate:  'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 export const SUPPORTED_MIME: Record<string, string> = {
   'audio/webm': 'audio/webm',
@@ -106,7 +104,6 @@ export const SUPPORTED_MIME: Record<string, string> = {
   'audio/wav':  'audio/wav',
   'audio/ogg':  'audio/ogg',
   'video/webm': 'video/webm',
-  'video/mp4':  'video/mp4',
-};
+  'video/mp4':  'video/mp4' };
 
 export const LS_KEY = 'erp_consultation_records';

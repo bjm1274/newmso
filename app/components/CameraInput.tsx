@@ -60,8 +60,7 @@ export function CameraInput({
   label,
   className,
   disabled,
-  ariaLabel,
-}: CameraInputProps) {
+  ariaLabel }: CameraInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const [busy, setBusy] = useState(false);

@@ -11,18 +11,16 @@
  *      JM4(any 금지), JM5(MIME·size 검증, 파일명 sanitize는 서버 위임).
  */
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { pokeChannel } from '@/lib/realtime-bus';
 import { triggerMobileChatPush } from './푸시트리거';
 import {
   buildChatMessageInsertPayload,
-  type MessageRetryPayload,
-} from '@/app/main/기능부품/메신저유틸';
+  type MessageRetryPayload } from '@/app/main/기능부품/메신저유틸';
 import {
   CHAT_MAX_FILE_SIZE_BYTES,
-  CHAT_MAX_VIDEO_SIZE_BYTES,
-} from '@/lib/chat-upload-constants';
+  CHAT_MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import type { ChatMessage } from '@/types';
 import { enqueueUpload } from '@/lib/offline-upload-queue';
 
@@ -107,9 +105,7 @@ async function requestUploadPlan(file: File): Promise<{ ok: true; payload: Uploa
       body: JSON.stringify({
         fileName: file.name,
         mimeType: normalizeMimeType(file),
-        fileSize: file.size,
-      }),
-    });
+        fileSize: file.size }) });
     const payload = (await res.json().catch(() => null)) as UploadPlanResponse | null;
     if (!res.ok || !payload?.signedUrl || !payload?.url) {
       return { ok: false, error: payload?.error || `업로드 준비 실패 (HTTP ${res.status})` };
@@ -128,8 +124,7 @@ async function uploadViaServerFallback(file: File): Promise<{ ok: true; url: str
     const res = await fetch('/api/chat/upload', {
       method: 'POST',
       credentials: 'same-origin',
-      body: formData,
-    });
+      body: formData });
     const payload = (await res.json().catch(() => null)) as FallbackUploadResponse | null;
     if (!res.ok || !payload?.url) {
       return { ok: false, error: payload?.error || `업로드 실패 (HTTP ${res.status})` };
@@ -173,8 +168,7 @@ export async function sendMobileFileMessage(
       message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
       file_url: '{fileUrl}',
       file_name: input.file.name,
-      file_size_bytes: input.file.size,
-    };
+      file_size_bytes: input.file.size };
     const result = await enqueueUpload({
       file: input.file,
       filename: input.file.name,
@@ -184,9 +178,7 @@ export async function sendMobileFileMessage(
       onSuccessAction: {
         kind: 'insert',
         table: 'messages',
-        payloadTemplate: insertPayloadTemplate,
-      },
-    });
+        payloadTemplate: insertPayloadTemplate } });
     if (result.queued) return { ok: true, queued: true, message: null };
     if (result.error) return { ok: false, error: result.error };
   }
@@ -199,8 +191,7 @@ export async function sendMobileFileMessage(
       const putRes = await fetch(plan.payload.signedUrl as string, {
         method: 'PUT',
         headers: plan.payload.headers || { 'content-type': mime },
-        body: input.file,
-      });
+        body: input.file });
       if (!putRes.ok) {
         throw new Error(`R2 직접 업로드 실패 (HTTP ${putRes.status})`);
       }
@@ -219,8 +210,7 @@ export async function sendMobileFileMessage(
           message_type: fileKind === 'image' ? 'image' : fileKind === 'video' ? 'video' : 'file',
           file_url: '{fileUrl}',
           file_name: input.file.name,
-          file_size_bytes: input.file.size,
-        };
+          file_size_bytes: input.file.size };
         const qResult = await enqueueUpload({
           file: input.file,
           filename: input.file.name,
@@ -230,9 +220,7 @@ export async function sendMobileFileMessage(
           onSuccessAction: {
             kind: 'insert',
             table: 'messages',
-            payloadTemplate: insertPayloadTemplate,
-          },
-        });
+            payloadTemplate: insertPayloadTemplate } });
         if (qResult.queued) return { ok: true, queued: true, message: null };
         return { ok: false, error: fb.error };
       }
@@ -259,13 +247,12 @@ export async function sendMobileFileMessage(
     replyToId: null,
     albumId: null,
     albumIndex: null,
-    albumTotal: null,
-  };
+    albumTotal: null };
   const insertPayload = buildChatMessageInsertPayload(input.senderId, retryPayload);
 
   try {
     const { data, error } = await insertChatMessageWithFallback<ChatMessage>(
-      supabase,
+      db,
       insertPayload,
     );
     if (error || !data) {

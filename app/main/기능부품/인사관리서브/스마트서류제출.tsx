@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { MatrixTable, type MatrixColumn, type MatrixCellTone } from '@/app/components/MatrixTable';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
@@ -54,13 +54,13 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
 
     const fetchDocs = async () => {
         // 1) My Docs
-        const { data: my } = await supabase
+        const { data: my } = await db
             .from('employment_contracts') // reusing contracts/docs concept or we can use a dedicated table, for now let's use document_repository
             .select('*') // actually it's better to read from a unified table
             .limit(0);
 
         // Let's use document_repository for HR docs as well
-        const { data: repositoryDocs } = await supabase
+        const { data: repositoryDocs } = await db
             .from('document_repository')
             .select('*')
             .in('category', docTypes)
@@ -112,15 +112,14 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
 
             const uploadRes = await fetch('/api/approvals/upload', {
                 method: 'POST',
-                body: uploadForm,
-            });
+                body: uploadForm });
             if (!uploadRes.ok) {
                 const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
                 throw new Error(errJson.error || '파일 업로드에 실패했습니다.');
             }
             const uploadResult = (await uploadRes.json()) as { url: string };
 
-            await supabase.from('document_repository').insert([{
+            await db.from('document_repository').insert([{
                 title: `${_user.name as string} - ${docType}`,
                 category: docType,
                 company_name: _user.company as string || '전체',
@@ -245,8 +244,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                     id: doc.id,
                     label: doc.label,
                     shortLabel: doc.id,
-                    data: doc,
-                }));
+                    data: doc }));
 
                 type StaffRow = Record<string, unknown> & { id: string | number; name: string; join_date?: string; department?: string; company?: string };
                 const weekAgo = new Date();
@@ -274,8 +272,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                             title: '미제출자 일괄 독촉',
                                             description: `${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송합니다.\n입사 후 7일이 지나고 필수 서류가 부족한 직원만 대상입니다.`,
                                             confirmText: '발송',
-                                            tone: 'accent',
-                                        });
+                                            tone: 'accent' });
                                         if (!confirmed) return;
                                         toast("독촉 알림이 전송되었습니다.", 'success');
                                     }}

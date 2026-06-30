@@ -26,14 +26,12 @@ import {
   selectLatestFcmToken,
   dedupeWebPushSubscriptions,
   invalidateExpiredFcmTokens,
-  deleteExpiredWebPushSubscriptions,
-} from '@/lib/notification-shared';
+  deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
 import {
   getD1Binding,
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 import type { D1Database } from '@cloudflare/workers-types';
 
 export type NotificationPushRow = {
@@ -75,8 +73,7 @@ function emptyResult(): DispatchPushResult {
     webPushExpired: 0,
     webPushDisabled: false,
     quietHoursSkipped: false,
-    errors: [],
-  };
+    errors: [] };
 }
 
 function buildTagFor(row: NotificationPushRow): string {
@@ -113,8 +110,7 @@ async function loadSubscriptionsForUsers(
         p256dh: pushSubscriptionsTable.p256dh,
         auth: pushSubscriptionsTable.auth,
         fcm_token: pushSubscriptionsTable.fcm_token,
-        created_at: pushSubscriptionsTable.created_at,
-      })
+        created_at: pushSubscriptionsTable.created_at })
       .from(pushSubscriptionsTable)
       .where(inArray(pushSubscriptionsTable.staff_id, chunk));
 
@@ -126,8 +122,7 @@ async function loadSubscriptionsForUsers(
         p256dh: r.p256dh ?? null,
         auth: r.auth ?? null,
         fcm_token: r.fcm_token ?? null,
-        created_at: r.created_at ?? null,
-      });
+        created_at: r.created_at ?? null });
     }
   }
   return rows;
@@ -153,8 +148,7 @@ async function dispatchSingleUser(
   const data = toStringRecord({
     ...(row.metadata ?? {}),
     notification_type: row.type,
-    tag,
-  });
+    tag });
 
   if (fcmToken) {
     let fcmDelivered = false;
@@ -162,8 +156,7 @@ async function dispatchSingleUser(
       const fcmResult = await sendFcmBatch([fcmToken], {
         title: row.title,
         body: row.body,
-        data,
-      });
+        data });
       result.fcmSent += fcmResult.success.length;
       fcmDelivered = fcmResult.success.length > 0;
       if (fcmResult.expired.length > 0) {
@@ -186,8 +179,7 @@ async function dispatchSingleUser(
     title: row.title,
     body: row.body,
     tag,
-    data: { ...(row.metadata ?? {}), notification_type: row.type, tag },
-  });
+    data: { ...(row.metadata ?? {}), notification_type: row.type, tag } });
 
   // endpoint dedupe (같은 사용자의 잔재 구독 중복 발송 방지)
   const targets = dedupeWebPushSubscriptions(userSubs);

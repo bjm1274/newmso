@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
@@ -63,8 +63,7 @@ const emptyForm = (): Report => ({
   preventive_measures: '',
   reporter_id: '',
   reporter_name: '',
-  status: STATUSES[0],
-});
+  status: STATUSES[0] });
 
 export default function 사고보고서탭({ staffs, company, user }: IncidentReportTabProps) {
   const [reports, setReports] = useState<Report[]>([]);
@@ -92,7 +91,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('incident_reports')
         .select('*')
         .order('created_at', { ascending: false });
@@ -100,8 +99,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
       setReports(
         (data || []).map((row: any) => ({
           ...row,
-          involved_persons: normalizeInvolvedPersons(row.involved_persons),
-        }))
+          involved_persons: normalizeInvolvedPersons(row.involved_persons) }))
       );
     } catch (err) {
       console.error('[IncidentReportTab] 사고보고서 조회 실패:', err);
@@ -153,23 +151,21 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
         preventive_measures: form.preventive_measures.trim(),
         reporter_id: form.reporter_id || user.id || '',
         reporter_name: form.reporter_name || user.name || user.email || '',
-        status: form.status || STATUSES[0],
-      };
+        status: form.status || STATUSES[0] };
 
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await db
           .from('incident_reports')
           .update(payload)
           .eq('id', editingId);
         if (error) throw error;
         toast('사고 보고서가 수정되었습니다.', 'success');
       } else {
-        const { error } = await supabase.from('incident_reports').insert({
+        const { error } = await db.from('incident_reports').insert({
           ...payload,
           reporter_id: user.id || '',
           reporter_name: user.name || user.email || '',
-          created_at: new Date().toISOString(),
-        });
+          created_at: new Date().toISOString() });
         if (error) throw error;
         toast('사고 보고서가 등록되었습니다.', 'success');
       }
@@ -185,7 +181,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
   const handleDelete = async (id: string) => {
     if (!confirm('정말로 이 사고 보고서를 삭제하시겠습니까?')) return;
     try {
-      const { error } = await supabase.from('incident_reports').delete().eq('id', id);
+      const { error } = await db.from('incident_reports').delete().eq('id', id);
       if (error) throw error;
       toast('사고 보고서가 삭제되었습니다.', 'success');
       setShowFormModal(false);
@@ -200,8 +196,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
     경미: 'success',
     중간: 'warning',
     중대: 'danger',
-    심각: 'danger',
-  };
+    심각: 'danger' };
 
   return (
     <div style={{ padding: '14px 16px 24px' }}>
@@ -217,8 +212,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
             background: 'var(--m-card)',
             fontSize: 13,
             fontWeight: 700,
-            color: 'var(--z-800)',
-          }}
+            color: 'var(--z-800)' }}
         >
           <option value="전체">모든 유형</option>
           {INCIDENT_TYPES.map((t) => (
@@ -243,7 +237,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
           등록된 사고 보고서가 없습니다.
         </div>
       ) : (
-        <div className="m-card flush">
+        <div className="m-card flush macos-glass macos-squircle">
           {filteredReports.map((r) => (
             <button
               key={r.id}
@@ -272,8 +266,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
+                    overflow: 'hidden' }}
                 >
                   {r.description}
                 </p>
@@ -291,20 +284,31 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.3)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
           onClick={() => setShowFormModal(false)}
         >
           <div
-            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl border-t border-slate-200"
+            className="w-full max-w-md macos-glass macos-squircle animate-in slide-in-from-bottom duration-250"
             style={{
               padding: '20px 16px 24px',
               maxHeight: '85vh',
               display: 'flex',
               flexDirection: 'column',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <span style={{ fontSize: 16, fontWeight: 800 }}>
                 {editingId ? '사고 보고서 수정' : '새 사고 보고서 작성'}
               </span>
@@ -331,8 +335,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
                       fontSize: 13,
-                      marginTop: 4,
-                    }}
+                      marginTop: 4 }}
                   />
                 </div>
                 <div>
@@ -347,8 +350,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                       border: '1px solid var(--m-border)',
                       borderRadius: 8,
                       fontSize: 13,
-                      marginTop: 4,
-                    }}
+                      marginTop: 4 }}
                   />
                 </div>
               </div>
@@ -366,8 +368,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                       borderRadius: 8,
                       fontSize: 13,
                       marginTop: 4,
-                      background: 'white',
-                    }}
+                      background: 'white' }}
                   >
                     {INCIDENT_TYPES.map((t) => (
                       <option key={t} value={t}>
@@ -388,8 +389,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                       borderRadius: 8,
                       fontSize: 13,
                       marginTop: 4,
-                      background: 'white',
-                    }}
+                      background: 'white' }}
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s} value={s}>
@@ -413,8 +413,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     fontSize: 13,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 />
               </div>
 
@@ -432,8 +431,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    resize: 'none',
-                  }}
+                    resize: 'none' }}
                 />
               </div>
 
@@ -449,8 +447,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     border: '1px solid var(--m-border)',
                     borderRadius: 8,
                     padding: 8,
-                    marginTop: 4,
-                  }}
+                    marginTop: 4 }}
                 >
                   {filteredStaffs.map((s) => (
                     <button
@@ -468,8 +465,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                         border: 'none',
                         background: selectedPersons.includes(s.name) ? 'var(--m-accent)' : 'var(--m-muted)',
                         color: selectedPersons.includes(s.name) ? 'white' : 'var(--z-800)',
-                        fontWeight: 700,
-                      }}
+                        fontWeight: 700 }}
                     >
                       {s.name}
                     </button>
@@ -491,8 +487,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    resize: 'none',
-                  }}
+                    resize: 'none' }}
                 />
               </div>
 
@@ -510,8 +505,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     borderRadius: 8,
                     fontSize: 13,
                     marginTop: 4,
-                    resize: 'none',
-                  }}
+                    resize: 'none' }}
                 />
               </div>
             </div>
@@ -529,8 +523,7 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
                     background: 'white',
                     color: 'var(--m-danger)',
                     fontWeight: 700,
-                    fontSize: 13,
-                  }}
+                    fontSize: 13 }}
                 >
                   삭제
                 </button>

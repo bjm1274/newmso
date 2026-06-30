@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type { StaffMember } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
-import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/db-compat';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getChecklistTargetDate, getDefaultChecklist } from '@/lib/hr-checklists';
 import { getMinimumWageByYear, MONTHLY_STANDARD_HOURS } from '@/lib/tax-free-limits';
@@ -15,8 +15,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   getMonthlyWorkingHours,
   resolveWeeklyWorkingHours,
-  resolveWorkingDaysPerWeek,
-} from '@/lib/payroll-working-hours';
+  resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import {
   cleanOptionalText,
@@ -25,13 +24,11 @@ import {
   getStaffExtension,
   getStaffProbationMonths,
   getStaffProbationPercent,
-  toIntegerOrFallback,
-} from '@/lib/staff-meta';
+  toIntegerOrFallback } from '@/lib/staff-meta';
 import {
   fetchStaffLicensesGrouped,
   summarizeLicenses,
-  type StaffLicenseRow,
-} from './구성원현황/staff-license-link';
+  type StaffLicenseRow } from './구성원현황/staff-license-link';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -45,8 +42,7 @@ import {
   allowanceWonFromHours,
   getAllowanceMultiplier,
   isHoursBasedAllowance,
-  type AllowanceHoursKey,
-} from '@/lib/payroll-allowance-hours';
+  type AllowanceHoursKey } from '@/lib/payroll-allowance-hours';
 
 const formatWon = (amount: number) => libFormatWon(Math.round(amount || 0));
 
@@ -72,8 +68,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
-    allowance_hours: { ...EMPTY_ALLOWANCE_HOURS },
-  };
+    allowance_hours: { ...EMPTY_ALLOWANCE_HOURS } };
 }
 
 const TAXABLE_SALARY_FIELDS = [
@@ -125,8 +120,7 @@ const ESS_FIELD_LABELS: Record<string, string> = {
   address: '거주지 주소',
   bank_name: '급여 은행',
   bank_account: '급여 계좌번호',
-  permissions: '권한/복지 정보',
-};
+  permissions: '권한/복지 정보' };
 
 function buildStaffMutationPayload(
   payload: Record<string, unknown>,
@@ -245,8 +239,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     if (rem <= 0) {
       return {
         isValid: false,
-        message: '고정 수당 합계가 목표 월급보다 큽니다. 고정 수당을 조정하거나 목표 월급을 높여주세요.',
-      };
+        message: '고정 수당 합계가 목표 월급보다 큽니다. 고정 수당을 조정하거나 목표 월급을 높여주세요.' };
     }
 
     const wHours = Number(신규직원.working_hours_per_week || 40);
@@ -282,8 +275,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         isValid: false,
         derivedHourlyRate,
         minTarget,
-        message: `최저시급 미달 (역산시급: ${derivedHourlyRate.toLocaleString()}원 / 기준: ${previewMinimumWage.toLocaleString()}원). 최소 세전 ${minTarget.toLocaleString()}원 이상 입력하셔야 합니다.`,
-      };
+        message: `최저시급 미달 (역산시급: ${derivedHourlyRate.toLocaleString()}원 / 기준: ${previewMinimumWage.toLocaleString()}원). 최소 세전 ${minTarget.toLocaleString()}원 이상 입력하셔야 합니다.` };
     }
 
     const calculatedBase = Math.floor(derivedHourlyRate * hBase);
@@ -296,8 +288,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       base_salary: calculatedBase,
       agreed_overtime_allowance: calculatedAgreedOvertime,
       agreed_night_allowance: calculatedAgreedNight,
-      message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)`,
-    };
+      message: `최저시급 준수 완료 (역산시급: ${derivedHourlyRate.toLocaleString()}원)` };
   }, [targetSalaryInput, targetNightHoursInput, 신규직원.meal_allowance, 신규직원.vehicle_allowance, 신규직원.childcare_allowance, 신규직원.research_allowance, 신규직원.other_taxfree, 신규직원.position_allowance, 신규직원.working_hours_per_week, 신규직원.근무형태ID, 근무형태목록, previewMinimumWage]);
 
   const handleApplySplit = () => {
@@ -309,8 +300,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       ...prev,
       base_salary: reverseCalculateSplit.base_salary || 0,
       agreed_overtime_allowance: reverseCalculateSplit.agreed_overtime_allowance || 0,
-      agreed_night_allowance: reverseCalculateSplit.agreed_night_allowance || 0,
-    }));
+      agreed_night_allowance: reverseCalculateSplit.agreed_night_allowance || 0 }));
     toast('기본급과 약정수당이 최적의 법적 비율로 분할 적용되었습니다.');
   };
   // staff_licenses 연동: staff_id별 면허 rows. 자격안전센터와 공유하는 단일 기준값.
@@ -438,8 +428,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         weekly_work_days: primaryShift.weekly_work_days || 5,
         is_weekend_work: primaryShift.is_weekend_work || false,
         daily_schedules: null as any,
-        break_plans: null as any,
-      };
+        break_plans: null as any };
     }
     try {
       const metaText = description.slice(markerIndex + marker.length).trim();
@@ -449,16 +438,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         weekly_work_days: parsed.weekly_work_days ?? primaryShift.weekly_work_days ?? 5,
         is_weekend_work: parsed.is_weekend_work ?? primaryShift.is_weekend_work ?? false,
         daily_schedules: parsed.daily_schedules || null,
-        break_plans: parsed.break_plans || null,
-      };
+        break_plans: parsed.break_plans || null };
     } catch {
       return {
         shift_type: primaryShift.shift_type || null,
         weekly_work_days: primaryShift.weekly_work_days || 5,
         is_weekend_work: primaryShift.is_weekend_work || false,
         daily_schedules: null as any,
-        break_plans: null as any,
-      };
+        break_plans: null as any };
     }
   }, [primaryShift]);
 
@@ -583,22 +570,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         hours: monthlyOvertimeHours,
         amount: recommendedAgreedOvertime,
         dailyOvertime: isAlternateDayShift ? Math.max(0, dailyHours - 8) : 0,
-        dailyHours,
-      },
+        dailyHours },
       agreedNight: {
         show: showAgreedNight,
         hours: monthlyNightHours,
-        amount: recommendedAgreedNight,
-      },
+        amount: recommendedAgreedNight },
       holiday: {
         show: showHoliday,
         hours: monthlyHolidayHours,
-        amount: recommendedHoliday,
-      },
+        amount: recommendedHoliday },
       annualLeave: {
         show: showAnnualLeave,
-        amount: recommendedAnnualLeave,
-      }
+        amount: recommendedAnnualLeave }
     };
   }, [신규직원.working_hours_per_week, 신규직원.working_days_per_week, 신규직원.연차총개수, hourlySalaryAmount, isAlternateDayShift, parsedShiftMeta, primaryShift, previewMinimumWage]);
 
@@ -625,15 +608,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       return {
         isNumeric: true,
         numericValue: Number(digitsOnly),
-        textValue: raw,
-      };
+        textValue: raw };
     }
 
     return {
       isNumeric: false,
       numericValue: Number.POSITIVE_INFINITY,
-      textValue: raw,
-    };
+      textValue: raw };
   };
 
   // 다중 근무형태(주간 로테이션) 헬퍼 (JM4)
@@ -718,8 +699,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           근무형태ID: nextShiftId,
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
     } catch (error) {
       console.error('대표 근무형태 설정 실패:', error);
@@ -750,8 +730,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           근무형태ID: nextIds[0] || '',
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
       추가근무형태ID설정('');
       새근무형태표시설정(false);
@@ -774,8 +753,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           근무형태ID: nextIds[0] || '',
           근무형태IDs: nextIds,
           working_hours_per_week: hours,
-          working_days_per_week: days,
-        };
+          working_days_per_week: days };
       });
     } catch (error) {
       console.error('근무형태 제거 실패:', error);
@@ -785,7 +763,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   useEffect(() => {
     const loadCompanyOptions = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('companies')
         .select('name, is_active')
         .eq('is_active', true)
@@ -814,7 +792,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         return;
       }
 
-      const { data: logs } = await supabase
+      const { data: logs } = await db
         .from('audit_logs')
         .select('*')
         .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
@@ -844,15 +822,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       .map((key) => ({
         label: ESS_FIELD_LABELS[key] || key,
         before: typeof original[key] === 'object' ? JSON.stringify(original[key]) : String(original[key] ?? '(빈 값)'),
-        after: typeof changes[key] === 'object' ? JSON.stringify(changes[key]) : String(changes[key] ?? '(빈 값)'),
-      }));
+        after: typeof changes[key] === 'object' ? JSON.stringify(changes[key]) : String(changes[key] ?? '(빈 값)') }));
   };
 
   const handleApproveEssSafe = async (request: Record<string, unknown>) => {
     try {
       const updates =
         ((request.details as Record<string, unknown> | undefined)?.requested_changes as Record<string, unknown> | undefined) || {};
-      const { data: staffRow, error: staffLoadError } = await supabase
+      const { data: staffRow, error: staffLoadError } = await db
         .from('staff_members')
         .select('permissions')
         .eq('id', request.target_id)
@@ -876,15 +853,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         bank_account: (updates.bank_account as string | null | undefined) ?? null,
         permissions: {
           ...currentPermissions,
-          ...requestedPermissions,
-        },
+          ...requestedPermissions },
         bank_name:
           (updates.bank_name as string | null | undefined) ??
           (requestedPermissions.bank_name as string | null | undefined) ??
-          null,
-      };
+          null };
 
-      const primaryUpdate = await supabase
+      const primaryUpdate = await db
         .from('staff_members')
         .update(updatePayload)
         .eq('id', request.target_id);
@@ -894,7 +869,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
         const fallbackPayload = { ...updatePayload };
         delete fallbackPayload.bank_name;
-        const fallbackUpdate = await supabase
+        const fallbackUpdate = await db
           .from('staff_members')
           .update(fallbackPayload)
           .eq('id', request.target_id);
@@ -902,15 +877,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         if (fallbackUpdate.error) throw fallbackUpdate.error;
       }
 
-      await supabase
+      await db
         .from('audit_logs')
         .update({
           target_type: 'ESS_PROFILE_UPDATE_APPROVED',
           details: {
             ...((request.details as Record<string, unknown>) || {}),
-            approved_at: new Date().toISOString(),
-          },
-        })
+            approved_at: new Date().toISOString() } })
         .eq('id', request.id);
 
       toast('승인했습니다.');
@@ -926,9 +899,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     try {
       const updates = (request.details as Record<string, unknown>)?.requested_changes as Record<string, unknown>;
       // 1. 실제 직원 정보 업데이트
-      await supabase.from('staff_members').update(updates).eq('id', request.target_id);
+      await db.from('staff_members').update(updates).eq('id', request.target_id);
       // 2. 요청 상태 변경
-      await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
+      await db.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
 
       toast('승인되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
@@ -940,7 +913,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const handleRejectEss = async (request: Record<string, unknown>) => {
     try {
-      await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
+      await db.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
       toast('반려되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
@@ -950,7 +923,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   useEffect(() => {
     const fetchShifts = async () => {
-      const { data } = await supabase.from('work_shifts').select('*');
+      const { data } = await db.from('work_shifts').select('*');
       if (data) {
         근무형태목록설정(
           [...data].sort((a: StaffMember, b: StaffMember) => 한글정렬(a?.name || '', b?.name || ''))
@@ -974,15 +947,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       신규직원설정((prev) => ({
         ...prev,
         근무형태ID: filteredIds[0] || '',
-        근무형태IDs: filteredIds,
-      }));
+        근무형태IDs: filteredIds }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [신규직원.사업체, 선택근무형태IDs.join('|'), 근무형태목록]);
 
   useEffect(() => {
     const fetchTeams = async () => {
-      const { data } = await supabase.from('org_teams').select('company_name, team_name, division').order('division').order('sort_order');
+      const { data } = await db.from('org_teams').select('company_name, team_name, division').order('division').order('sort_order');
       if (!data) return;
       const byCo: Record<string, string[]> = {};
       (data as { company_name: string; team_name: string; division?: string }[]).forEach((r) => {
@@ -1060,8 +1032,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     const response = await fetch('/api/staff/profile-photo/upload', {
       method: 'POST',
-      body: formData,
-    });
+      body: formData });
     if (!response.ok) {
       const json = (await response.json().catch(() => ({}))) as { error?: string };
       throw new Error(json.error || '프로필 사진 업로드에 실패했습니다.');
@@ -1077,10 +1048,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       ...currentPermissions,
       profile_photo_path: filePath,
       profile_photo_updated_at: uploadedAt,
-      profile_photo_url: photoUrl,
-    };
+      profile_photo_url: photoUrl };
 
-    const avatarUpdate = await supabase
+    const avatarUpdate = await db
       .from('staff_members')
       .update({ avatar_url: photoUrl, permissions: nextPermissions })
       .eq('id', String(staffId));
@@ -1090,7 +1060,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         throw avatarUpdate.error;
       }
 
-      const photoUpdate = await supabase
+      const photoUpdate = await db
         .from('staff_members')
         .update({ photo_url: photoUrl, permissions: nextPermissions })
         .eq('id', String(staffId));
@@ -1100,7 +1070,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           throw photoUpdate.error;
         }
 
-        const permissionsUpdate = await supabase
+        const permissionsUpdate = await db
           .from('staff_members')
           .update({ permissions: nextPermissions })
           .eq('id', String(staffId));
@@ -1146,8 +1116,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
-      팀: defaultTeam,
-    });
+      팀: defaultTeam });
     setTargetSalaryInput('');
     setTargetNightHoursInput('');
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
@@ -1158,7 +1127,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     if (!normalizedName || !normalizedResident) return null;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('staff_members')
       .select('id, name, employee_no, resident_no, status')
       .eq('name', normalizedName);
@@ -1176,8 +1145,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     license_name: 신규직원.면허사항?.trim() || '',
     license_number: 신규직원.면허번호?.trim() || null,
     issued_date: 신규직원.취득일자?.trim() || null,
-    memo: 신규직원.면허기타내용?.trim() || null,
-  });
+    memo: 신규직원.면허기타내용?.trim() || null });
   const hasLicenseInput = () =>
     Boolean(
       신규직원.면허사항?.trim() ||
@@ -1193,7 +1161,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       if (편집중면허ID) {
         // 입력값을 전부 비웠으면 기존 row를 건드리지 않는다(삭제·공란화 방지 — 자격안전센터에서 관리).
         if (!hasLicenseInput()) return null;
-        const { error } = await supabase
+        const { error } = await db
           .from('staff_licenses')
           .update(payload)
           .eq('id', 편집중면허ID);
@@ -1202,12 +1170,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       }
       // 신규 row: 면허 입력값이 하나라도 있을 때만 insert
       if (!hasLicenseInput()) return null;
-      const { error } = await supabase.from('staff_licenses').insert([
+      const { error } = await db.from('staff_licenses').insert([
         {
           staff_id: String(staffId),
           ...payload,
-          license_name: payload.license_name || '(이름 없음)',
-        },
+          license_name: payload.license_name || '(이름 없음)' },
       ]);
       if (error) throw error;
       return null;
@@ -1267,8 +1234,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         working_days_per_week: workingDaysPerWeek,
         shift_group_ids: selectedShiftIds,
         weekly_rotation_shift_ids: selectedShiftIds.slice(1),
-        secondary_shift_id: selectedShiftIds[1] || null,
-      };
+        secondary_shift_id: selectedShiftIds[1] || null };
 
       // ── 주민번호 기반 생일 자동 추출 ──────────────────────────────
       let birthDateStr: string | null = null;
@@ -1343,8 +1309,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           work_conditions: nextWorkConditions,
           shift_group_ids: selectedShiftIds,
           weekly_rotation_shift_ids: selectedShiftIds.slice(1),
-          secondary_shift_id: selectedShiftIds[1] || null,
-        },
+          secondary_shift_id: selectedShiftIds[1] || null },
         annual_leave_total: 신규직원.연차총개수,
         annual_leave_used: 신규직원.연차사용개수,
         shift_id: primaryShiftId || null,
@@ -1372,14 +1337,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           ...beforeStaff,
           ...commonData,
           annual_leave_total: 신규직원.연차총개수,
-          annual_leave_used: 신규직원.연차사용개수,
-        };
+          annual_leave_used: 신규직원.연차사용개수 };
 
         const updatePayload: Record<string, unknown> = {
           ...commonData,
           annual_leave_total: afterStaff.annual_leave_total,
-          annual_leave_used: afterStaff.annual_leave_used,
-        };
+          annual_leave_used: afterStaff.annual_leave_used };
         // ── 주민번호 안전 가드(JM5) ───────────────────────────────────
         // 폼의 주민번호가 비어 있으면 DB 기존 값을 덮어쓰지 않음.
         const residentDigits = String(신규직원.주민번호 ?? '').replace(/[^0-9]/g, '');
@@ -1395,7 +1358,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               ...omittedColumns,
               ...forcedOmittedWorkConditionColumns,
             ]);
-            return supabase
+            return db
               .from('staff_members')
               .update(buildStaffMutationPayload(updatePayload, allOmittedColumns))
               .eq('id', String(afterStaff.id || ''))
@@ -1415,8 +1378,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           {
             staff_name: 신규직원.성명,
             employee_no: beforeStaff?.employee_no || null,
-            ...buildAuditDiff(beforeStaff, afterStaff, Object.keys(afterStaff)),
-          },
+            ...buildAuditDiff(beforeStaff, afterStaff, Object.keys(afterStaff)) },
           actor.userId,
           actor.userName
         );
@@ -1437,7 +1399,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       } else {
         // 사번 부여 로직: 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
-        const { data: employeeNos, error: employeeNoError } = await supabase
+        const { data: employeeNos, error: employeeNoError } = await db
           .from('staff_members')
           .select('employee_no');
 
@@ -1471,8 +1433,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           role: 'staff',
           password: '',
           join_date: dateOrNull(신규직원.입사일),
-          password_reset_required: 1,
-        };
+          password_reset_required: 1 };
         const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
@@ -1482,7 +1443,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               ...omittedColumns,
               ...forcedInsertOmittedColumns,
             ]);
-            return supabase
+            return db
               .from('staff_members')
               .insert([buildStaffMutationPayload(insertPayload, allOmittedColumns)])
               .select()
@@ -1497,7 +1458,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
         let onboardingChecklistInitFailed = false;
         if (insertedStaff?.id) {
-          const { error: onboardingInitError } = await supabase
+          const { error: onboardingInitError } = await db
             .from('onboarding_checklists')
             .upsert(
               {
@@ -1510,8 +1471,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     (insertedStaff.join_date as string) ||
                     dateOrNull(신규직원.입사일),
                 ),
-                completed_at: null,
-              },
+                completed_at: null },
               { onConflict: 'staff_id,checklist_type' },
             );
 
@@ -1528,8 +1488,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           {
             staff_name: 신규직원.성명,
             employee_no: newEmployeeNo,
-            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after,
-          },
+            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after },
           actor.userId,
           actor.userName
         );
@@ -1629,8 +1588,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       working_days_per_week: resolveWorkingDaysPerWeek(직원, 5),
       allowance_hours: {
         ...EMPTY_ALLOWANCE_HOURS,
-        ...((직원.permissions?.payroll_allowance_hours as Record<string, number>) || {}),
-      }
+        ...((직원.permissions?.payroll_allowance_hours as Record<string, number>) || {}) }
     });
     편집모드설정(true);
 
@@ -1639,7 +1597,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     // 편집 진입 시 빈 값으로 시작 → 그대로 저장하면 빈 문자열로 덮어쓰는 버그가 있었음.
     // 주민번호는 전역 메모리에 띄우지 않고 편집 시점에만 별도 select.
     const staffId = String(직원.id);
-    supabase
+    db
       .from('staff_members')
       .select('resident_no')
       .eq('id', staffId)
@@ -1675,8 +1633,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
-      팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀',
-    });
+      팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀' });
     창닫기?.();
   };
 
@@ -1687,14 +1644,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       const afterStaff = {
         ...직원,
         status: '퇴사',
-        resigned_at: 직원.resigned_at || today,
-      };
-      const { error: updateErr } = await supabase
+        resigned_at: 직원.resigned_at || today };
+      const { error: updateErr } = await db
         .from('staff_members')
         .update({
           status: '퇴사',
-          resigned_at: 직원.resigned_at || today,
-        })
+          resigned_at: 직원.resigned_at || today })
         .eq('id', 직원.id);
 
       if (updateErr) throw updateErr;
@@ -1706,8 +1661,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         {
           staff_name: 직원.name,
           employee_no: 직원.employee_no || null,
-          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']),
-        },
+          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']) },
         actor.userId,
         actor.userName
       );
@@ -1725,7 +1679,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     setIsDeleting(true);
     try {
       const actor = readClientAuditActor();
-      const { error } = await supabase
+      const { error } = await db
         .from('staff_members')
         .delete()
         .eq('id', 직원.id);
@@ -1738,8 +1692,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         String(직원.id),
         {
           staff_name: 직원.name,
-          employee_no: 직원.employee_no || null,
-        },
+          employee_no: 직원.employee_no || null },
         actor.userId,
         actor.userName
       );
@@ -1794,16 +1747,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
         const employeeNoCompare = aEmployeeNo.textValue.localeCompare(bEmployeeNo.textValue, 'ko', {
           numeric: true,
-          sensitivity: 'base',
-        });
+          sensitivity: 'base' });
 
         if (employeeNoCompare !== 0) {
           return employeeNoCompare;
         }
 
         return String(a.name || '').localeCompare(String(b.name || ''), 'ko', {
-          sensitivity: 'base',
-        });
+          sensitivity: 'base' });
       });
   }, [appliedStaffNameSearch, 보기상태, 선택사업체, 직원목록]);
   const 면허등록인원수 = 필터목록.filter(
@@ -1818,8 +1769,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       label: '사번',
       render: (직원) => (
         <span className="font-semibold text-[var(--accent)] text-xs">{직원.employee_no ?? '-'}</span>
-      ),
-    },
+      ) },
     {
       key: 'name',
       label: '성명/직함',
@@ -1832,22 +1782,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             {직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}
           </p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'company',
       label: '소속',
       render: (직원) => (
         <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</span>
-      ),
-    },
+      ) },
     {
       key: 'department',
       label: '부서/팀',
       render: (직원) => (
         <span className="text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</span>
-      ),
-    },
+      ) },
     {
       key: 'contact',
       label: '연락/계정',
@@ -1858,8 +1805,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             입사일 {(직원.joined_at as string) || (직원.join_date as string) || '-'}
           </p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'work',
       label: '근무정보',
@@ -1878,8 +1824,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             {직원고용형태(직원)}
           </span>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'license',
       label: '면허/자격',
@@ -1890,8 +1835,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             취득일 {licensesByStaff[String(직원.id || '').toLowerCase().trim()]?.[0]?.issued_date || '-'}
           </p>
         </div>
-      ),
-    },
+      ) },
     {
       key: 'status',
       label: '상태',
@@ -1905,8 +1849,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         >
           {직원.status || '재직중'}
         </span>
-      ),
-    },
+      ) },
     {
       key: 'actions',
       label: '관리',
@@ -1940,8 +1883,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             </button>
           )}
         </div>
-      ),
-    },
+      ) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [근무형태목록, licensesByStaff, onOpenDocumentRepoForStaff]);
 
@@ -2699,8 +2641,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                       신규직원설정(prev => ({
                                         ...prev,
                                         allowance_hours: { ...prev.allowance_hours, [hoursKey]: h },
-                                        [hoursKey]: won,
-                                      }));
+                                        [hoursKey]: won }));
                                     }}
                                     placeholder="시간 입력"
                                     className="flex-1 min-w-0 p-1.5 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30"

@@ -40,8 +40,7 @@ function getDateInfo(dateValue: string | null | undefined) {
   return {
     dayOfWeek,
     dayKey: DAY_KEYS[dayOfWeek] as ShiftDayKey,
-    isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
-  };
+    isWeekend: dayOfWeek === 0 || dayOfWeek === 6 };
 }
 
 function parseDailySchedules(description: string | null | undefined) {
@@ -81,8 +80,7 @@ function applyDailyScheduleForDate(
   return {
     ...shift,
     start_time: dailySchedule.start_time || shift.start_time,
-    end_time: dailySchedule.end_time || shift.end_time,
-  };
+    end_time: dailySchedule.end_time || shift.end_time };
 }
 
 export function isShiftScheduledOnDate(

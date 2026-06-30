@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { WelfareTabId } from './types';
 
@@ -97,8 +97,7 @@ interface WelfareExpiryBoardProps {
 
 export default function WelfareExpiryBoard({
   staffs,
-  onJumpTab,
-}: WelfareExpiryBoardProps) {
+  onJumpTab }: WelfareExpiryBoardProps) {
   const [items, setItems] = useState<ExpiryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -121,18 +120,18 @@ export default function WelfareExpiryBoard({
       setErrorMsg(null);
       try {
         const [licRes, chkRes, devRes] = await Promise.all([
-          supabase
+          db
             .from('staff_licenses')
             .select('id, staff_id, license_name, expiry_date')
             .not('expiry_date', 'is', null)
             .order('expiry_date', { ascending: true }),
-          supabase
+          db
             .from('health_checkups')
             .select('id, staff_id, scheduled_date, status')
             .not('scheduled_date', 'is', null)
             .neq('status', '완료')
             .order('scheduled_date', { ascending: true }),
-          supabase
+          db
             .from('medical_devices')
             .select('id, name, next_inspection_date')
             .not('next_inspection_date', 'is', null)
@@ -158,8 +157,7 @@ export default function WelfareExpiryBoard({
             until: r.expiry_date ?? '',
             days,
             tone: toneFor(days),
-            tabId: 'license',
-          });
+            tabId: 'license' });
         }
 
         // 건강검진 (예약·미수검 중 임박)
@@ -177,8 +175,7 @@ export default function WelfareExpiryBoard({
             until: r.scheduled_date ?? '',
             days,
             tone: toneFor(days),
-            tabId: 'checkup',
-          });
+            tabId: 'checkup' });
         }
 
         // 의료기기
@@ -196,8 +193,7 @@ export default function WelfareExpiryBoard({
             until: r.next_inspection_date ?? '',
             days,
             tone: toneFor(days),
-            tabId: 'device',
-          });
+            tabId: 'device' });
         }
 
         // 임박 → 멀게 정렬, 동률은 도메인 가나다
@@ -294,8 +290,7 @@ export default function WelfareExpiryBoard({
 // ─── 필터 segmented ─────────────────────────────────────────────────
 function ExpiryFilterSegment({
   value,
-  onChange,
-}: {
+  onChange }: {
   value: ExpiryFilter;
   onChange: (v: ExpiryFilter) => void;
 }) {
@@ -335,8 +330,7 @@ function ExpiryFilterSegment({
 // ─── 만료 row (클릭 시 해당 탭으로 점프) ─────────────────────────────
 function ExpiryRow({
   item,
-  onJump,
-}: {
+  onJump }: {
   item: ExpiryItem;
   onJump: (tab: WelfareTabId) => void;
 }) {

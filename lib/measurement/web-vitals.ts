@@ -34,8 +34,7 @@ function toReport(metric: Metric): VitalReport {
     rating: metric.rating as RatingLabel,
     delta: metric.delta,
     id: metric.id,
-    navigationType: metric.navigationType,
-  };
+    navigationType: metric.navigationType };
 }
 
 /**

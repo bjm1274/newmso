@@ -29,10 +29,20 @@ export function MFormHeader({
   title,
   sub,
   saveLabel = '저장',
-  saveDisabled = false,
-}: MFormHeaderProps) {
+  saveDisabled = false }: MFormHeaderProps) {
   return (
-    <div className="m-header" style={{ paddingTop: 18, paddingBottom: 14 }}>
+    <div 
+      className="m-header" 
+      style={{ 
+        paddingTop: 18, 
+        paddingBottom: 14, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}
+    >
       <button
         type="button"
         onClick={onCancel}
@@ -40,18 +50,24 @@ export function MFormHeader({
           color: 'var(--z-700)',
           fontSize: 14,
           fontWeight: 700,
-          padding: '0 4px',
+          padding: '8px 12px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          flexShrink: 0,
+          minWidth: 60,
+          textAlign: 'left'
         }}
         aria-label="취소"
       >
         취소
       </button>
-      <div style={{ flex: 1, textAlign: 'center' }}>
-        <div className="title" style={{ fontSize: 15 }}>
+      <div style={{ flex: 1, textAlign: 'center', minWidth: 0, padding: '0 8px' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--z-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {title}
         </div>
         {sub && (
-          <div className="sub" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {sub}
           </div>
         )}
@@ -64,7 +80,13 @@ export function MFormHeader({
           color: saveDisabled ? 'var(--z-400)' : 'var(--m-accent)',
           fontSize: 14,
           fontWeight: 800,
-          padding: '0 4px',
+          padding: '8px 12px',
+          background: 'none',
+          border: 'none',
+          cursor: saveDisabled ? 'default' : 'pointer',
+          flexShrink: 0,
+          minWidth: 60,
+          textAlign: 'right'
         }}
       >
         {saveLabel}
@@ -94,8 +116,7 @@ export function MField({ label, required, htmlFor, sub, children }: MFieldProps)
           fontWeight: 800,
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          marginBottom: 6,
-        }}
+          marginBottom: 6 }}
       >
         {label}{' '}
         {required && <span style={{ color: 'var(--m-danger)' }}>*</span>}
@@ -107,8 +128,7 @@ export function MField({ label, required, htmlFor, sub, children }: MFieldProps)
             fontSize: 11,
             color: 'var(--z-500)',
             fontWeight: 600,
-            marginTop: 4,
-          }}
+            marginTop: 4 }}
         >
           {sub}
         </div>
@@ -137,8 +157,7 @@ export function MInput({
   placeholder,
   kind = 'text',
   autoFocus,
-  ariaLabel,
-}: MInputProps) {
+  ariaLabel }: MInputProps) {
   const handle = (event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value);
   return (
     <input
@@ -160,11 +179,16 @@ export function MInput({
       aria-label={ariaLabel}
       style={{
         width: '100%',
-        padding: '8px 0',
+        boxSizing: 'border-box',
+        padding: '10px 12px',
         fontSize: 15,
         fontFamily: 'inherit',
         color: 'var(--z-900)',
-      }}
+        background: 'var(--m-bg)',
+        border: '1px solid var(--m-border)',
+        borderRadius: 10,
+        outline: 'none',
+        marginTop: 4 }}
     />
   );
 }
@@ -208,8 +232,7 @@ export function MStepDots({ total, cur }: { total: number; cur: number }) {
         justifyContent: 'center',
         padding: '14px 16px',
         background: 'var(--m-card)',
-        borderBottom: '1px solid var(--m-border)',
-      }}
+        borderBottom: '1px solid var(--m-border)' }}
       aria-label={`${cur + 1}/${total} 단계`}
     >
       {Array.from({ length: total }).map((_, i) => {
@@ -218,8 +241,7 @@ export function MStepDots({ total, cur }: { total: number; cur: number }) {
           height: 8,
           borderRadius: 999,
           background: i <= cur ? 'var(--m-accent)' : 'var(--z-200)',
-          transition: 'flex .2s',
-        };
+          transition: 'flex .2s' };
         return <div key={i} style={style} />;
       })}
     </div>

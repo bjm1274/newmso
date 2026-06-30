@@ -111,8 +111,7 @@ export const INVENTORY_VIEW_META: Record<string, { title: string; description: s
   월마감: { title: '분석/마감', description: '' },
   재고실사: { title: '재고 실사', description: '' },
   이관: { title: '재고 이관', description: '' },
-  내부서재고: { title: '내 부서 재고', description: '' },
-};
+  내부서재고: { title: '내 부서 재고', description: '' } };
 
 // EXPIRY_SOON_MS는 inventory-utils.ts에서 가져오세요
 export { EXPIRY_SOON_MS } from '@/app/main/inventory-utils';

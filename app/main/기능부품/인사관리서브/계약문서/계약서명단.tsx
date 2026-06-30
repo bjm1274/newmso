@@ -31,8 +31,7 @@ export default function ContractList({
   onSelect,
   checkedIds: _checkedIds,
   setCheckedIds: _setCheckedIds,
-  isCompact,
-}: ContractListProps) {
+  isCompact }: ContractListProps) {
   const [filter, setFilter] = useState('');
 
   const checkedIds = (_checkedIds ?? []) as any[];
@@ -97,8 +96,7 @@ export default function ContractList({
                 {r.department} · {r.position}
               </p>
             </div>
-          ),
-        },
+          ) },
         {
           key: '__status',
           label: '상태',
@@ -107,8 +105,7 @@ export default function ContractList({
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${r.__statusClass}`}>
               {r.__status}
             </span>
-          ),
-        },
+          ) },
       ]
     : [
         {
@@ -116,14 +113,12 @@ export default function ContractList({
           label: '사번',
           render: (r) => (
             <span className="text-xs font-medium text-[var(--toss-gray-3)]">{r.employee_no || '-'}</span>
-          ),
-        },
+          ) },
         {
           key: 'name',
           label: '성명',
           primary: true,
-          render: (r) => <span className="text-xs font-bold text-[var(--foreground)]">{r.name}</span>,
-        },
+          render: (r) => <span className="text-xs font-bold text-[var(--foreground)]">{r.name}</span> },
         {
           key: 'department',
           label: '부서 / 직위',
@@ -131,8 +126,7 @@ export default function ContractList({
             <span className="text-xs font-medium text-[var(--toss-gray-3)]">
               {r.department} / {r.position}
             </span>
-          ),
-        },
+          ) },
         {
           key: '__status',
           label: '상태',
@@ -140,8 +134,7 @@ export default function ContractList({
             <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${r.__statusClass}`}>
               {r.__status}
             </span>
-          ),
-        },
+          ) },
       ];
 
   return (
@@ -208,8 +201,7 @@ export default function ContractList({
             onToggleAll: toggleAll,
             allSelected,
             indeterminate,
-            getRowAriaLabel: (key) => `${key}번 직원 선택`,
-          }}
+            getRowAriaLabel: (key) => `${key}번 직원 선택` }}
         />
       </div>
     </div>

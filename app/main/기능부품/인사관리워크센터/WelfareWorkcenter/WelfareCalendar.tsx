@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanPublicHolidayName } from '@/lib/korean-public-holidays';
 import type { StaffMember } from '@/types';
 
@@ -91,28 +91,28 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
         const monthEnd = `${year}-${String(month0 + 1).padStart(2, '0')}-${lastDayStr}`;
 
         const [famRes, chkRes, licRes, devRes, incRes] = await Promise.all([
-          supabase
+          db
             .from('congratulations_condolences')
             .select('*')
             .gte('event_date', monthStart)
             .lte('event_date', monthEnd),
-          supabase
+          db
             .from('health_checkups')
             .select('*')
             .eq('status', '완료')
             .gte('completed_date', monthStart)
             .lte('completed_date', monthEnd),
-          supabase
+          db
             .from('staff_licenses')
             .select('*')
             .gte('expiry_date', monthStart)
             .lte('expiry_date', monthEnd),
-          supabase
+          db
             .from('medical_devices')
             .select('*')
             .gte('next_inspection_date', monthStart)
             .lte('next_inspection_date', monthEnd),
-          supabase
+          db
             .from('incident_reports')
             .select('*')
             .gte('incident_date', monthStart)
@@ -189,8 +189,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'birthday',
           label: `🎂 ${staff.name} 생일`,
           color: 'bg-blue-500/10 text-blue-700 border-blue-200/50 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/30',
-          details: `${staff.name} (${staff.position} / ${staff.department || '부서 없음'}) 생일`,
-        });
+          details: `${staff.name} (${staff.position} / ${staff.department || '부서 없음'}) 생일` });
       }
     });
 
@@ -215,8 +214,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'congrat',
           label: `🎉 ${item.staff_name} ${item.event_type}`,
           color: 'bg-pink-500/10 text-pink-700 border-pink-200/50 dark:bg-pink-950/40 dark:text-pink-300 dark:border-pink-900/30',
-          details: `${item.staff_name} ${item.event_type} (${item.relation || '본인'}${item.recipient ? ` / ${item.recipient}` : ''})`,
-        });
+          details: `${item.staff_name} ${item.event_type} (${item.relation || '본인'}${item.recipient ? ` / ${item.recipient}` : ''})` });
       }
     });
 
@@ -230,8 +228,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'checkup',
           label: `🩺 ${staffName} 검진`,
           color: 'bg-emerald-500/10 text-emerald-700 border-emerald-200/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/30',
-          details: `${staffName} 건강검진 완료`,
-        });
+          details: `${staffName} 건강검진 완료` });
       }
     });
 
@@ -245,8 +242,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'license',
           label: `💳 ${staffName} 면허만료`,
           color: 'bg-orange-500/10 text-orange-700 border-orange-200/50 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/30',
-          details: `${staffName} ${item.license_name || '면허'} 만료일`,
-        });
+          details: `${staffName} ${item.license_name || '면허'} 만료일` });
       }
     });
 
@@ -259,8 +255,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'device',
           label: `⚙️ ${item.name || item.device_name} 점검`,
           color: 'bg-violet-500/10 text-violet-700 border-violet-200/50 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900/30',
-          details: `${item.name || item.device_name} 정기점검일`,
-        });
+          details: `${item.name || item.device_name} 정기점검일` });
       }
     });
 
@@ -272,8 +267,7 @@ export default function WelfareCalendar({ staffs = [], selectedCo = '전체' }: 
           type: 'incident',
           label: `🚨 ${item.type} 사고`,
           color: 'bg-rose-500/10 text-rose-700 border-rose-200/50 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/30',
-          details: `🚨 ${item.type} 사고 발생 (${item.location}) - 상태: ${item.status}`,
-        });
+          details: `🚨 ${item.type} 사고 발생 (${item.location}) - 상태: ${item.status}` });
       }
     });
 

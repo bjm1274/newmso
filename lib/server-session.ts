@@ -4,8 +4,7 @@ import {
   getD1Drizzle,
   staff_members as staffMembersTable,
   eq,
-  or,
-} from '@/lib/db';
+  or } from '@/lib/db';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -183,8 +182,7 @@ export function normalizeSessionUser(input: any): SessionUser {
       typeof normalizedProfile.permissions === 'object' &&
       !Array.isArray(normalizedProfile.permissions)
         ? normalizedProfile.permissions
-        : {},
-  };
+        : {} };
 }
 
 type StaffSessionRow = {
@@ -225,8 +223,7 @@ function normalizeD1SessionRow(row: StaffSessionRow) {
   return {
     ...row,
     is_system_master: row.is_system_master === 1,
-    permissions: parseSessionRowPermissions(row),
-  };
+    permissions: parseSessionRowPermissions(row) };
 }
 
 export async function resolveLatestSessionUser(sessionUser: unknown): Promise<SessionUser> {
@@ -265,8 +262,7 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
       phone: staffMembersTable.phone,
       auth_user_id: staffMembersTable.auth_user_id,
       is_system_master: staffMembersTable.is_system_master,
-      permissions: staffMembersTable.permissions,
-    })
+      permissions: staffMembersTable.permissions })
     .from(staffMembersTable)
     .where(or(...conditions))
     .limit(10);
@@ -312,8 +308,7 @@ function createSessionUserSnapshot(input: any): SessionUser {
     auth_user_id: String(normalizedUser.auth_user_id ?? '').trim() || null,
     is_system_master: normalizedUser.is_system_master === true,
     login_id: (normalizedUser as any).login_id ?? null,
-    permissions: compactSessionPermissions(normalizedUser.permissions || {}),
-  };
+    permissions: compactSessionPermissions(normalizedUser.permissions || {}) };
 }
 
 export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_AGE_SECONDS) {
@@ -322,8 +317,7 @@ export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_
     ver: 1,
     iat: now,
     exp: now + maxAgeSeconds,
-    user: createSessionUserSnapshot(user),
-  };
+    user: createSessionUserSnapshot(user) };
 
   const body = stringToBase64Url(JSON.stringify(payload));
   const signature = await signValue(body);
@@ -347,8 +341,7 @@ export async function verifySessionToken(token?: string | null) {
     }
     return {
       ...payload,
-      user: normalizeSessionUser(payload.user),
-    };
+      user: normalizeSessionUser(payload.user) };
   } catch {
     return null;
   }
@@ -394,8 +387,7 @@ export function getSessionCookieOptions(maxAgeSeconds = SESSION_MAX_AGE_SECONDS)
     path: '/',
     maxAge: maxAgeSeconds,
     // 일부 모바일 웹뷰는 Max-Age 만 있으면 세션 쿠키로 취급해 앱 종료 시 소실시킨다 → Expires 동시 지정.
-    expires: new Date(Date.now() + maxAgeSeconds * 1000),
-  };
+    expires: new Date(Date.now() + maxAgeSeconds * 1000) };
 }
 
 export function clearSessionCookie<T extends { cookies: { set: (name: string, value: string, options: CookieOptions) => void } }>(response: T): T {
@@ -404,8 +396,7 @@ export function clearSessionCookie<T extends { cookies: { set: (name: string, va
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    expires: new Date(0),
-  });
+    expires: new Date(0) });
   return response;
 }
 

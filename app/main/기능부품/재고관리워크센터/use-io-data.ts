@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { PurchaseOrderRow, StockMoveRow, Tone, VendorCard } from './stock-types';
 import { asString, pickNumber, pickString, toMonthString, toTimeString, type Row } from './data-helpers';
@@ -16,8 +16,7 @@ const MOVE_KIND_TONE: Record<StockMoveRow['kind'], Tone> = {
   입고: 'success',
   출고: 'accent',
   이관: 'warn',
-  반품: 'danger',
-};
+  반품: 'danger' };
 
 function normalizeMoveKind(v: unknown): StockMoveRow['kind'] {
   const s = asString(v);
@@ -38,8 +37,7 @@ function mapMoveRow(r: Row): StockMoveRow {
     from: pickString(r, ['from_location', 'source', 'from_dept'], '-'),
     to: pickString(r, ['to_location', 'destination', 'to_dept', 'department'], '-'),
     who: pickString(r, ['actor_name', 'worker_name', 'user_name'], '-'),
-    tone: MOVE_KIND_TONE[kind],
-  };
+    tone: MOVE_KIND_TONE[kind] };
 }
 
 const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; tone: Tone }> = {
@@ -50,8 +48,7 @@ const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; ton
   배송: { status: '배송 중', tone: 'accent' },
   '배송 중': { status: '배송 중', tone: 'accent' },
   완료: { status: '납품 완료', tone: 'success' },
-  '납품 완료': { status: '납품 완료', tone: 'success' },
-};
+  '납품 완료': { status: '납품 완료', tone: 'success' } };
 
 function mapOrderRow(r: Row): PurchaseOrderRow {
   const rawStatus = asString(r['status'], '대기').trim();
@@ -76,8 +73,7 @@ function mapOrderRow(r: Row): PurchaseOrderRow {
     tone: mapped.tone,
     placed: toMonthString(r['created_at']).slice(5).replace('-', '/'),
     // 정본 납기 컬럼은 expected_delivery_date (legacy delivery_date/due_date 폴백).
-    due: toMonthString(r['expected_delivery_date'] ?? r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-',
-  };
+    due: toMonthString(r['expected_delivery_date'] ?? r['delivery_date'] ?? r['due_date']).slice(5).replace('-', '/') || '-' };
 }
 
 function mapVendorCard(r: Row, orderCount: number, paid: number, due: number): VendorCard {
@@ -89,8 +85,7 @@ function mapVendorCard(r: Row, orderCount: number, paid: number, due: number): V
     paid,
     due,
     contact: `${pickString(r, ['contact_name'], '-')} ${pickString(r, ['phone'], '')}`.trim(),
-    tone,
-  };
+    tone };
 }
 
 export type IOWorkcenterData = {
@@ -114,11 +109,13 @@ const EMPTY: IOWorkcenterData = {
   shippingOrders: 0,
   monthAmount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
-export function useIOData(): IOWorkcenterData {
+export function useIOData(): IOWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<IOWorkcenterData>(EMPTY);
+  const [refreshCount, setRefreshCount] = useState(0);
+
+  const refresh = () => setRefreshCount((c) => c + 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,18 +127,18 @@ export function useIOData(): IOWorkcenterData {
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
         const [logsRes, ordersRes, suppliersRes] = await Promise.all([
-          supabase
+          db
             .from('inventory_logs')
             .select('*')
             .gte('created_at', todayKey)
             .order('created_at', { ascending: false })
             .limit(50),
-          supabase
+          db
             .from('purchase_orders')
             .select('*')
             .order('created_at', { ascending: false })
             .limit(50),
-          supabase.from('suppliers').select('*').order('name').limit(30),
+          db.from('suppliers').select('*').order('name').limit(30),
         ]);
 
         if (cancelled) return;
@@ -202,8 +199,7 @@ export function useIOData(): IOWorkcenterData {
           shippingOrders,
           monthAmount: Math.round((monthAmount / 1_000_000) * 10) / 10,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '입출고 데이터를 불러오지 못했습니다.';
@@ -215,7 +211,7 @@ export function useIOData(): IOWorkcenterData {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshCount]);
 
-  return state;
+  return { ...state, refresh };
 }

@@ -43,8 +43,7 @@ const ALLOWED_TABLES = new Set<string>([
 const TABLE_TIMESTAMP_COLUMN: Record<string, string> = {
   room_read_cursors: 'last_read_at',
   pinned_messages: 'pinned_at',
-  chat_rooms: 'last_message_at',
-};
+  chat_rooms: 'last_message_at' };
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
@@ -163,16 +162,13 @@ export async function GET(request: Request) {
       },
       cancel() {
         // 취소 처리
-      },
-    });
+      } });
 
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-      },
-    });
+        'Connection': 'keep-alive' } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal error';
     return new Response(message, { status: 500 });

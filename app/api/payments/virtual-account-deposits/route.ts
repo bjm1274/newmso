@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getDepositCompanyScope,
-  readAuthorizedDepositUser,
-} from '@/lib/server-deposit-access';
+  readAuthorizedDepositUser } from '@/lib/server-deposit-access';
 import { normalizeDepositDraft } from '@/lib/virtual-account-deposits';
 import {
   getD1Binding,
@@ -10,8 +9,7 @@ import {
   virtual_account_deposits as virtualAccountDepositsTable,
   and,
   eq,
-  desc,
-} from '@/lib/db';
+  desc } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 
@@ -80,8 +78,7 @@ async function authorizeDepositRequest(request: NextRequest) {
       response: NextResponse.json(
         { error: access.status === 401 ? 'Unauthorized' : '권한이 없습니다.' },
         { status: access.status ?? 401 }
-      ),
-    };
+      ) };
   }
 
   const scope = getDepositCompanyScope(access.user);
@@ -89,15 +86,13 @@ async function authorizeDepositRequest(request: NextRequest) {
     return {
       user: null,
       scope: null,
-      response: NextResponse.json({ error: '회사 정보가 없습니다.' }, { status: 403 }),
-    };
+      response: NextResponse.json({ error: '회사 정보가 없습니다.' }, { status: 403 }) };
   }
 
   return {
     user: access.user,
     scope,
-    response: null,
-  };
+    response: null };
 }
 
 export async function GET(request: NextRequest) {
@@ -189,8 +184,7 @@ export async function POST(request: NextRequest) {
       deposited_at: String(body.deposited_at || '').trim() || now,
       matched_target_type: null as string | null,
       matched_target_id: null as string | null,
-      matched_note: String(body.matched_note || '').trim() || null,
-    };
+      matched_note: String(body.matched_note || '').trim() || null };
     const rawPayloadObj = { source: 'manual', entered_by: access.user.id, ...body };
 
     const d1 = await getD1Binding();
@@ -205,8 +199,7 @@ export async function POST(request: NextRequest) {
       ...newRow,
       raw_payload: JSON.stringify(rawPayloadObj),
       created_at: now,
-      updated_at: now,
-    });
+      updated_at: now });
     const rows = await db
       .select()
       .from(virtualAccountDepositsTable)
@@ -283,8 +276,7 @@ export async function PATCH(request: NextRequest) {
       const rows = await db
         .select({
           id: virtualAccountDepositsTable.id,
-          company_id: virtualAccountDepositsTable.company_id,
-        })
+          company_id: virtualAccountDepositsTable.company_id })
         .from(virtualAccountDepositsTable)
         .where(existingWhere)
         .limit(1);

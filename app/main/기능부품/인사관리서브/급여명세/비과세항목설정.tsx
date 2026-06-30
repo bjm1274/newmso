@@ -5,8 +5,7 @@ import {
   saveTaxFreeSettings,
   DEFAULT_SETTINGS,
   TAX_FREE_LEGAL_LIMITS,
-  type TaxFreeSettings,
-} from '@/lib/use-tax-free-settings';
+  type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 
 const ITEMS: { key: keyof TaxFreeSettings; label: string; basis: string }[] = [
   { key: 'meal_limit', label: '식대·식사비', basis: '소득세법 시행령' },
@@ -51,8 +50,7 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
       uniform_limit: TAX_FREE_LEGAL_LIMITS.uniform.limit,
       congratulations_limit: TAX_FREE_LEGAL_LIMITS.congratulations.limit,
       housing_limit: TAX_FREE_LEGAL_LIMITS.housing.limit,
-      other_taxfree_limit: 0,
-    });
+      other_taxfree_limit: 0 });
   };
 
   const handleSave = async () => {

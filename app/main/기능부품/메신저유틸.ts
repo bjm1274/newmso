@@ -107,8 +107,7 @@ export function extractWardMessageMeta(value: unknown): {
   if (start < 0 || end < 0 || end <= start) {
     return {
       displayContent: stripHiddenMessageMetaBlocks(raw),
-      meta: null,
-    };
+      meta: null };
   }
 
   const displayContent = stripHiddenMessageMetaBlocks(
@@ -119,13 +118,11 @@ export function extractWardMessageMeta(value: unknown): {
   try {
     return {
       displayContent,
-      meta: JSON.parse(metaText) as WardMessageMeta,
-    };
+      meta: JSON.parse(metaText) as WardMessageMeta };
   } catch {
     return {
       displayContent,
-      meta: null,
-    };
+      meta: null };
   }
 }
 
@@ -325,8 +322,7 @@ export function buildChatMessageInsertPayload(
     reply_to_id: payload.replyToId,
     album_id: payload.albumId ?? null,
     album_index: payload.albumIndex ?? null,
-    album_total: payload.albumTotal ?? null,
-  };
+    album_total: payload.albumTotal ?? null };
 }
 
 export function shouldTriggerImmediateChatPush(payload: {
@@ -378,8 +374,7 @@ export function readStoredRoomPreferences(userId: string | null | undefined): Re
         pinned: roomPref.pinned === true,
         hidden: roomPref.hidden === true,
         notifyMode: normalizeRoomNotificationMode(roomPref.notifyMode),
-        notifyKeyword: normalizeRoomNotificationKeyword(roomPref.notifyKeyword),
-      };
+        notifyKeyword: normalizeRoomNotificationKeyword(roomPref.notifyKeyword) };
       return acc;
     }, {});
   } catch {
@@ -453,8 +448,7 @@ export function readStoredThreadPreferences(userId: string | null | undefined): 
         lastOpenedAt:
           typeof record.lastOpenedAt === 'string' && record.lastOpenedAt.trim()
             ? record.lastOpenedAt.trim()
-            : null,
-      };
+            : null };
       return acc;
     }, {});
   } catch {
@@ -572,8 +566,7 @@ export function extractPollMetaFromQuestion(value: unknown): {
       prize: parsed?.prize ?? null,
       prizeWinners: parsed?.prizeWinners ?? null,
       isKickPoll: parsed?.isKickPoll ?? false,
-      kickTargetId: parsed?.kickTargetId ?? null,
-    };
+      kickTargetId: parsed?.kickTargetId ?? null };
   } catch {
     return {
       displayQuestion: raw.trim(),
@@ -581,8 +574,7 @@ export function extractPollMetaFromQuestion(value: unknown): {
       prize: null,
       prizeWinners: null,
       isKickPoll: false,
-      kickTargetId: null,
-    };
+      kickTargetId: null };
   }
 }
 

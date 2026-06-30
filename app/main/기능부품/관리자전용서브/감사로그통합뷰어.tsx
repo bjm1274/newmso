@@ -224,42 +224,35 @@ const AUDIT_COLUMNS: Column<AccessLog>[] = [
       return (
         <span className={`font-bold ${suspicious ? 'text-danger' : ''}`}>
           {new Date(log.created_at).toLocaleString('ko-KR', {
-            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-          })}
+            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
           {suspicious && (
             <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>
           )}
         </span>
       );
-    },
-  },
+    } },
   {
     key: 'user_name',
     label: '직원명',
-    render: (log) => <span className="font-bold">{log.user_name || '-'}</span>,
-  },
+    render: (log) => <span className="font-bold">{log.user_name || '-'}</span> },
   {
     key: 'company',
     label: '소속',
     render: (log) => <span className="text-[var(--toss-gray-4)]">{log.company || '-'}</span>,
-    showOnMobile: false,
-  },
+    showOnMobile: false },
   {
     key: 'menu',
     label: '메뉴',
-    render: (log) => <>{log.menu || '-'}</>,
-  },
+    render: (log) => <>{log.menu || '-'}</> },
   {
     key: 'action',
     label: '액션',
-    render: (log) => <>{log.action || '-'}</>,
-  },
+    render: (log) => <>{log.action || '-'}</> },
   {
     key: 'ip_address',
     label: 'IP',
     render: (log) => <span className="text-[var(--toss-gray-3)]">{log.ip_address || '-'}</span>,
-    showOnMobile: false,
-  },
+    showOnMobile: false },
 ];
 
 export function AccessAuditLog(props: Props) {

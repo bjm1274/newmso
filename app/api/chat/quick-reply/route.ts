@@ -10,8 +10,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   updateChatRoomLastMessage,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,8 +42,7 @@ export async function POST(req: NextRequest) {
       .select({
         id: chatRoomsTable.id,
         members: chatRoomsTable.members,
-        type: chatRoomsTable.type,
-      })
+        type: chatRoomsTable.type })
       .from(chatRoomsTable)
       .where(eq(chatRoomsTable.id, room_id))
       .limit(1);
@@ -78,14 +76,12 @@ export async function POST(req: NextRequest) {
       room_id,
       sender_id: senderId,
       content: trimmedContent,
-      created_at: messageCreatedAt,
-    });
+      created_at: messageCreatedAt });
     try {
       await updateChatRoomLastMessage(db, {
         room_id,
         created_at: messageCreatedAt,
-        content: trimmedContent,
-      });
+        content: trimmedContent });
     } catch (err) {
       console.warn('[quick-reply] chat_rooms last_message D1 update failed', err);
     }
@@ -96,8 +92,7 @@ export async function POST(req: NextRequest) {
       void fetch(`${appUrl}/api/notifications/chat-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: room_id, messageId }),
-      });
+        body: JSON.stringify({ roomId: room_id, messageId }) });
     } catch {
       // push trigger 실패는 치명적 오류 아님
     }

@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { Card, Chip, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_HOLIDAYS, FALLBACK_LEAVE_RULES } from './fallback-data';
 import type { HolidayItem, RuleRow } from './types';
@@ -47,8 +47,7 @@ function toHolidayItem(r: Record<string, unknown>): HolidayItem {
   return {
     date: dbDate,
     name: typeof r.name === 'string' ? r.name : '-',
-    kind,
-  };
+    kind };
 }
 
 async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
@@ -56,13 +55,13 @@ async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
   // 기본 공휴일이 통째로 사라지던 문제 방지 → 기본 + 커스텀 병합.
   const base = FALLBACK_HOLIDAYS;
   try {
-    let { data } = await supabase
+    let { data } = await db
       .from('company_holidays')
       .select('holiday_date,name,note')
       .eq('company_name', companyName)
       .limit(100);
     if ((!Array.isArray(data) || data.length === 0) && companyName !== '전체') {
-      const res = await supabase
+      const res = await db
         .from('company_holidays')
         .select('holiday_date,name,note')
         .eq('company_name', '전체')
@@ -80,15 +79,14 @@ async function loadHolidays(companyName: string): Promise<HolidayItem[]> {
 
 async function loadLeaveRules(): Promise<RuleRow[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('leave_policies')
       .select('label,value')
       .limit(50);
     if (error || !Array.isArray(data) || data.length === 0) return FALLBACK_LEAVE_RULES;
     return data.filter(isRecord).map((r): RuleRow => ({
       label: typeof r.label === 'string' ? r.label : '-',
-      value: typeof r.value === 'string' ? r.value : '-',
-    }));
+      value: typeof r.value === 'string' ? r.value : '-' }));
   } catch {
     return FALLBACK_LEAVE_RULES;
   }
@@ -96,7 +94,7 @@ async function loadLeaveRules(): Promise<RuleRow[]> {
 
 async function loadWelfareRules(companyName: string): Promise<WelfareRule[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('company_welfare_policies')
       .select('rule_name,rule_value')
       .eq('company_name', companyName)
@@ -138,7 +136,7 @@ export default function CompanyLeaveTab() {
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('companies')
           .select('name')
           .limit(50);
@@ -193,12 +191,11 @@ export default function CompanyLeaveTab() {
     setSavingWelfare(true);
     setWelfareSavedAt(null);
     try {
-      const { error } = await supabase.from('company_welfare_policies').upsert(
+      const { error } = await db.from('company_welfare_policies').upsert(
         welfareRules.map(r => ({
           company_name: selectedCompany,
           rule_name: r.name,
-          rule_value: r.rule,
-        })),
+          rule_value: r.rule })),
         { onConflict: 'company_name,rule_name' }
       );
       if (error) throw error;
@@ -231,8 +228,7 @@ export default function CompanyLeaveTab() {
       const newHoli: HolidayItem = {
         date: newHoliDate,
         name: newHoliName,
-        kind: newHoliKind,
-      };
+        kind: newHoliKind };
 
       // M/D 형식(예: 10/9)을 DB DATE 요건에 맞는 YYYY-MM-DD 형식으로 변환
       let dbDate = newHoliDate;
@@ -250,15 +246,14 @@ export default function CompanyLeaveTab() {
         }
       }
 
-      const { error } = await supabase
+      const { error } = await db
         .from('company_holidays')
         .insert({
           id: newId,
           company_name: selectedCompany,
           holiday_date: dbDate,
           name: newHoliName,
-          note: newHoliKind,
-        });
+          note: newHoliKind });
 
       if (error) throw error;
       
@@ -273,8 +268,7 @@ export default function CompanyLeaveTab() {
       const newHoli: HolidayItem = {
         date: newHoliDate,
         name: newHoliName,
-        kind: newHoliKind,
-      };
+        kind: newHoliKind };
       setHolidays(prev => {
         const filtered = prev.filter(h => h.date !== newHoliDate);
         return [...filtered, newHoli];

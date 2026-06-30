@@ -14,8 +14,7 @@ export default function AnnualLeavePlanForm({
   user,
   staffs,
   setExtraData,
-  setFormTitle,
-}: Record<string, unknown>) {
+  setFormTitle }: Record<string, unknown>) {
   const _user = (user ?? {}) as Record<string, unknown>;
   const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const _setFormTitle = setFormTitle as (v: string) => void;
@@ -40,8 +39,7 @@ export default function AnnualLeavePlanForm({
     _setExtraData({
       planDates,
       remainingLeave,
-      type: 'annual_leave_plan',
-    });
+      type: 'annual_leave_plan' });
   }, [planDates, remainingLeave, _setExtraData, _setFormTitle, _user.name]);
 
   const addDateRow = () => {

@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server';
 import { runLicenseExpiryJobs, type LicenseExpiryJobsResult } from '@/lib/license-expiry-jobs';
 import {
   runContractExpiryJobs,
-  type ContractExpiryJobResult,
-} from '@/lib/contract-expiry-jobs';
+  type ContractExpiryJobResult } from '@/lib/contract-expiry-jobs';
 import {
   runInappNotificationJobs,
-  type InappNotificationJobsResult,
-} from '@/lib/inapp-notification-jobs';
+  type InappNotificationJobsResult } from '@/lib/inapp-notification-jobs';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -18,8 +16,7 @@ import {
   inArray,
   isNotNull,
   lt,
-  and,
-} from '@/lib/db';
+  and } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 async function requireD1ForCleanup(label: string) {
@@ -122,8 +119,7 @@ async function cleanupPushSubscriptions() {
       .select({
         id: pushSubscriptionsTable.id,
         staff_id: pushSubscriptionsTable.staff_id,
-        endpoint: pushSubscriptionsTable.endpoint,
-      })
+        endpoint: pushSubscriptionsTable.endpoint })
       .from(pushSubscriptionsTable),
     db
       .select({ id: staffMembersTable.id, status: staffMembersTable.status })
@@ -172,8 +168,7 @@ async function cleanupPushSubscriptions() {
     validRows.push({
       ...row,
       endpoint,
-      staff_id: staffId,
-    });
+      staff_id: staffId });
   }
 
   const endpointGroups = new Map<string, PushSubscriptionRow[]>();
@@ -212,8 +207,7 @@ async function cleanupPushSubscriptions() {
     orphanStaff,
     duplicateGroups,
     duplicateRowsDeleted,
-    totalAfter: rows.length - deleteIds.size,
-  };
+    totalAfter: rows.length - deleteIds.size };
 }
 
 export async function GET(req: Request) {
@@ -293,8 +287,7 @@ export async function GET(req: Request) {
       retention,
       ...(retentionError ? { retentionError } : {}),
       inappNotifications,
-      ...(inappNotificationsError ? { inappNotificationsError } : {}),
-    });
+      ...(inappNotificationsError ? { inappNotificationsError } : {}) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Push subscription cleanup failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

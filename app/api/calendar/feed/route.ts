@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 // Helper to format date array to ICS datetime (e.g. 20260617T090000Z)
 function formatICSDate(date: Date): string {
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Get staff info
-    const { data: staff } = await supabase
+    const { data: staff } = await db
       .from('staff_members')
       .select('name')
       .eq('id', staffId)
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const staffName = staff?.name || '직원';
 
     // 2. Get shift schedules (nurse_schedules)
-    const { data: schedules } = await supabase
+    const { data: schedules } = await db
       .from('nurse_schedules')
       .select('year_month, day, shift_code')
       .eq('staff_id', staffId);
@@ -92,9 +92,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="shift_${staffId}.ics"`,
-      },
-    });
+        'Content-Disposition': `attachment; filename="shift_${staffId}.ics"` } });
 
   } catch (error) {
     console.error('ICS export error:', error);

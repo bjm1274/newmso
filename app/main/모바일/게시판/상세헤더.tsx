@@ -70,8 +70,7 @@ export default function BoardDetailHeader({
   onDownloadAttachment,
   onVotesChange,
   onPollChange,
-  onRefetchComments,
-}: BoardDetailHeaderProps) {
+  onRefetchComments }: BoardDetailHeaderProps) {
   return (
     <>
       {/* 메타 */}
@@ -100,8 +99,7 @@ export default function BoardDetailHeader({
           gap: 8,
           marginTop: 14,
           paddingBottom: 14,
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         {isAnonymousPost ? (
           <div
@@ -116,8 +114,7 @@ export default function BoardDetailHeader({
               placeItems: 'center',
               fontSize: 12,
               fontWeight: 800,
-              flexShrink: 0,
-            }}
+              flexShrink: 0 }}
           >
             ?
           </div>
@@ -192,8 +189,7 @@ export default function BoardDetailHeader({
           padding: '12px 0',
           borderTop: '1px solid var(--m-border)',
           borderBottom: '1px solid var(--m-border)',
-          marginBottom: 16,
-        }}
+          marginBottom: 16 }}
       >
         <button
           type="button"
@@ -211,8 +207,7 @@ export default function BoardDetailHeader({
             color: isLiked ? 'var(--m-danger)' : 'var(--z-700)',
             fontSize: 13,
             fontWeight: 700,
-            opacity: likeBusy ? 0.5 : 1,
-          }}
+            opacity: likeBusy ? 0.5 : 1 }}
         >
           <MIcon name="heart" size={16} />
           좋아요 {likesCount}

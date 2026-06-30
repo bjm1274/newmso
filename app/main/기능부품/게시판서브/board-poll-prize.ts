@@ -4,7 +4,7 @@
  * 화면 렌더링(React)과 분리하여 순수 비즈니스 로직만 보유.
  */
 
-import { supabase } from '@/lib/d1-supabase-compat';
+import { db } from '@/lib/db-client';
 import { logger } from '@/lib/logger';
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ export async function drawBoardPollPrize(
     const selectedIds = shuffled.slice(0, Math.min(poll.prize.winnerCount, shuffled.length));
 
     // 3. staff_members 에서 이름 조회 (단일 쿼리)
-    const { data: staffRows, error: staffError } = await supabase
+    const { data: staffRows, error: staffError } = await db
       .from('staff_members')
       .select('id, name')
       .in('id', selectedIds);
@@ -130,7 +130,7 @@ export async function drawBoardPollPrize(
 
     // 4. board_posts.poll 에 prizeWinners 추가 업데이트
     const updatedPoll: BoardPoll = { ...poll, prizeWinners: winners };
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('board_posts')
       .update({ poll: updatedPoll })
       .eq('id', postId);
@@ -145,15 +145,14 @@ export async function drawBoardPollPrize(
     const commentContent =
       `🎉 추첨 결과\n🎁 상품: ${poll.prize.name}\n🏆 당첨: ${winnerNames}`;
 
-    const { error: commentError } = await supabase
+    const { error: commentError } = await db
       .from('board_post_comments')
       .insert([{
         post_id: postId,
         author_id: actorId,
         author_name: actorName,
         content: commentContent,
-        parent_comment_id: null,
-      }]);
+        parent_comment_id: null }]);
 
     if (commentError) {
       // 추첨 성공·댓글 실패는 경고 수준으로만 처리

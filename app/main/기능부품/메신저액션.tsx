@@ -13,8 +13,7 @@ type ReactionDetailModalProps = {
 export function ReactionDetailModal({
   target,
   users,
-  onClose,
-}: ReactionDetailModalProps) {
+  onClose }: ReactionDetailModalProps) {
   if (!target) return null;
 
   return (

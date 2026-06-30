@@ -59,5 +59,4 @@ export const STORAGE_KEYS = {
   chatSavedSearches: (userId: string) => `erp_chat_saved_searches:${userId || 'guest'}`,
   chatThreadPrefs: (userId: string) => `erp_chat_thread_prefs:${userId || 'guest'}`,
   chatNoticeSchedules: (userId: string) => `erp_chat_notice_schedules:${userId || 'guest'}`,
-  chatAttachmentRetryQueue: (userId: string) => `erp_chat_attachment_retry_queue:${userId || 'guest'}`,
-} as const;
+  chatAttachmentRetryQueue: (userId: string) => `erp_chat_attachment_retry_queue:${userId || 'guest'}` } as const;

@@ -1,7 +1,7 @@
 /**
  * 관리자 — 직원 역할·권한 변경 (SEC-1 CRITICAL 서버 가드)
  *
- * 클라이언트가 직접 staff_members.role / permissions 를 supabase SDK 로 update 하면
+ * 클라이언트가 직접 staff_members.role / permissions 를 db SDK 로 update 하면
  * RLS 또는 세션 검증 없이 권한 상승이 가능하다(SEC-1). 이 라우트가 유일한 진입점이며
  * 비관리자 요청은 403 으로 차단한다.
  *
@@ -23,8 +23,7 @@ import {
   getD1Drizzle,
   staff_members as staffMembersTable,
   audit_logs as auditLogsTable,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,8 +57,7 @@ async function insertAuditLog(row: {
       user_id: row.user_id,
       user_name: row.user_name,
       details: JSON.stringify(row.details),
-      created_at: new Date().toISOString(),
-    });
+      created_at: new Date().toISOString() });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[staff-permission] audit_logs insert failed:', message);
@@ -155,9 +153,7 @@ export async function POST(request: Request) {
       details: {
         updated_fields: requestedKeys,
         ...(dbSet.role !== undefined ? { role: dbSet.role } : {}),
-        ...(dbSet.permissions !== undefined ? { permissions_updated: true } : {}),
-      },
-    });
+        ...(dbSet.permissions !== undefined ? { permissions_updated: true } : {}) } });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { Card, Chip, ProgressBar, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_CARDS } from './fallback-data';
 import type { CorpCardRow } from './types';
@@ -33,7 +33,7 @@ export default function CompanyCardTab() {
   const loadCards = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('corporate_cards')
         .select('issuer,card_nickname,last_four,status,company_name,id')
         .limit(100);
@@ -76,7 +76,7 @@ export default function CompanyCardTab() {
 
   const loadCompanies = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('companies')
         .select('name')
         .limit(50);
@@ -107,8 +107,7 @@ export default function CompanyCardTab() {
       users: rows.length,
       used: totalUsed.toFixed(1),
       limit: totalLimit.toFixed(1),
-      pct: avgPct,
-    };
+      pct: avgPct };
   }, [rows]);
 
   const handleAddCard = async () => {
@@ -132,10 +131,9 @@ export default function CompanyCardTab() {
         usedM,
         limitM,
         pct,
-        status,
-      };
+        status };
 
-      const { error } = await supabase
+      const { error } = await db
         .from('corporate_cards')
         .insert({
           id: newId,
@@ -143,8 +141,7 @@ export default function CompanyCardTab() {
           card_nickname: newNickname,
           last_four: newLastFour,
           issuer: newIssuer,
-          status: status === '정지' ? 'inactive' : 'active',
-        });
+          status: status === '정지' ? 'inactive' : 'active' });
 
       if (error) throw error;
       
@@ -167,8 +164,7 @@ export default function CompanyCardTab() {
         usedM,
         limitM,
         pct,
-        status: pct >= 90 ? '정지' : (pct >= 70 ? '한도 임박' : '정상'),
-      };
+        status: pct >= 90 ? '정지' : (pct >= 70 ? '한도 임박' : '정상') };
       setRows(prev => [...prev, newCardRow]);
       setShowAddModal(false);
     }

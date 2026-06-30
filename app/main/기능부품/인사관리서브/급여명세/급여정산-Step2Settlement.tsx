@@ -11,15 +11,13 @@ import {
   calculateQualifyingChildTaxCredit,
   hasExactIncomeTaxBracket,
   normalizeWithholdingRatePercent,
-  type TaxInsuranceRates,
-} from '@/lib/use-tax-insurance-rates';
+  type TaxInsuranceRates } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
 import {
   buildShiftBoundary,
   buildFallbackShiftBoundary,
   calculateEarlyLeaveMinutes,
-  buildDateWithTime,
-} from '../../마이페이지/출퇴근기록/checkin-utils';
+  buildDateWithTime } from '../../마이페이지/출퇴근기록/checkin-utils';
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
@@ -35,8 +33,7 @@ import type {
   SalaryAmountField,
   SalaryChangeHistoryRow,
   SalaryChangeProrationSummary,
-  SavedPayrollRecord,
-} from './급여정산-types';
+  SavedPayrollRecord } from './급여정산-types';
 import {
   PAYROLL_RECORD_OPTIONAL_COLUMNS,
   EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN,
@@ -45,8 +42,7 @@ import {
   getStaffTaxableAllowanceBreakdown,
   normalizeTaxableAllowanceBreakdown,
   resolveSalaryAmountForSettlement,
-  getEmploymentProratedBaseForMonth,
-} from './급여정산-utils';
+  getEmploymentProratedBaseForMonth } from './급여정산-utils';
 import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
 import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
 import { KOREAN_PUBLIC_HOLIDAY_DATES } from '@/lib/korean-public-holidays';
@@ -78,8 +74,7 @@ export function Step2Settlement({
   onBack,
   onSaveSuccess,
   setSavedRecordsByStaff,
-  onRefresh,
-}: Step2SettlementProps) {
+  onRefresh }: Step2SettlementProps) {
   const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -89,8 +84,7 @@ export function Step2Settlement({
     meal: taxFreeLimits.meal_limit,
     vehicle: taxFreeLimits.vehicle_limit,
     childcare: taxFreeLimits.childcare_limit,
-    research: taxFreeLimits.research_limit,
-  };
+    research: taxFreeLimits.research_limit };
 
   // 회사 급여기준(company_payroll_policies)의 '원천징수 비율'을 정산 단일 기본값으로 로드
   useEffect(() => {
@@ -141,8 +135,7 @@ export function Step2Settlement({
         yearMonth,
         salaryChanges: staffSalaryChanges,
         staff,
-        status: savedRecord?.status,
-      });
+        status: savedRecord?.status });
       if (result.summary) salaryChangeProration.push(result.summary);
       return result.amount;
     };
@@ -169,8 +162,7 @@ export function Step2Settlement({
       childcare_allowance: Number(staff.childcare_allowance) || 0,
       research_allowance: Number(staff.research_allowance) || 0,
       other_taxfree: Number(staff.other_taxfree) || 0,
-      taxable_allowance_breakdown: getStaffTaxableAllowanceBreakdown(staff),
-    };
+      taxable_allowance_breakdown: getStaffTaxableAllowanceBreakdown(staff) };
     const calculatedHourlyRate = getRegularHourlyRate(staff, draftEntryForHourlyRate);
 
     const autoOvertimePay = Math.round((autoOvertimeMins / 60) * calculatedHourlyRate * 1.5);
@@ -200,8 +192,7 @@ export function Step2Settlement({
         yearMonth,
         salaryChanges: staffSalaryChanges,
         staff,
-        status: savedRecord?.status,
-      });
+        status: savedRecord?.status });
       changeAwareBreakdown[field] = result.amount;
       if (result.summary) salaryChangeProration.push(result.summary);
     });
@@ -295,8 +286,7 @@ export function Step2Settlement({
       auto_holiday_hours: autoHolidayHours,
       auto_night_pay: autoNightPay,
       auto_night_minutes: autoNightWorkMins,
-      calculated_hourly_rate: calculatedHourlyRate,
-    };
+      calculated_hourly_rate: calculatedHourlyRate };
   };
 
   useEffect(() => {
@@ -404,8 +394,7 @@ export function Step2Settlement({
                       {
                         start_time: String(shift.start_time || ''),
                         end_time: String(shift.end_time || ''),
-                        shift_type: shift.shift_type ? String(shift.shift_type) : null,
-                      },
+                        shift_type: shift.shift_type ? String(shift.shift_type) : null },
                     ])
                 );
 
@@ -439,8 +428,7 @@ export function Step2Settlement({
                       ? {
                           ...buildShiftBoundary(shiftInfo.start_time, shiftInfo.end_time),
                           shiftType: shiftInfo.shift_type ?? null,
-                          rosterAssigned: true,
-                        }
+                          rosterAssigned: true }
                       : buildFallbackShiftBoundary();
 
                     let lateMinutes: number | null = null;
@@ -469,8 +457,7 @@ export function Step2Settlement({
                         staff_id: staffId,
                         work_date: workDate,
                         late_minutes: lateMinutes,
-                        early_leave_minutes: earlyLeaveMinutes,
-                      });
+                        early_leave_minutes: earlyLeaveMinutes });
                     }
 
                     if (checkIn && checkOut) {
@@ -605,8 +592,7 @@ export function Step2Settlement({
             `${row.staff_id}_${String(row.work_date || '').slice(0, 10)}`,
             {
               late_minutes: row.late_minutes ?? null,
-              early_leave_minutes: row.early_leave_minutes ?? null,
-            },
+              early_leave_minutes: row.early_leave_minutes ?? null },
           ])
         );
 
@@ -615,8 +601,7 @@ export function Step2Settlement({
             .filter((a: any) => a.staff_id === s.id)
             .map((attendance: any) => ({
               ...attendance,
-              ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}),
-            }));
+              ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}) }));
           const { total, detail } = calculateAttendanceDeduction(
             getEmploymentProratedBaseForMonth(s, yearMonth, s.base_salary),
             yearMonth,
@@ -627,8 +612,7 @@ export function Step2Settlement({
                   late_deduction_amount: r.late_deduction_amount,
                   early_leave_deduction_type: r.early_leave_deduction_type,
                   early_leave_deduction_amount: r.early_leave_deduction_amount,
-                  absent_use_daily_rate: r.absent_use_daily_rate,
-                }
+                  absent_use_daily_rate: r.absent_use_daily_rate }
               : undefined,
             { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
           );
@@ -677,8 +661,7 @@ export function Step2Settlement({
           Number(nextBreakdown.manual_extra_allowance || 0);
         return {
           ...prev,
-          [id]: { ...current, taxable_allowance_breakdown: nextBreakdown, extra_allowance: nextExtra },
-        };
+          [id]: { ...current, taxable_allowance_breakdown: nextBreakdown, extra_allowance: nextExtra } };
       }
 
       const nextEntry = { ...current, [field]: value } as SettlementEntry;
@@ -704,8 +687,7 @@ export function Step2Settlement({
 
       return {
         ...prev,
-        [id]: nextEntry,
-      };
+        [id]: nextEntry };
     });
   };
 
@@ -722,8 +704,7 @@ export function Step2Settlement({
         deduction: 0,
         deductionDetail: {},
         attendance_deduction: 0,
-        net: 0,
-      };
+        net: 0 };
     }
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
 
@@ -783,8 +764,7 @@ export function Step2Settlement({
       withholdingRatePercent,
       applyNationalPension: resolvedIns.national,
       applyHealthInsurance: resolvedIns.health,
-      applyEmploymentInsurance: resolvedIns.employment,
-    });
+      applyEmploymentInsurance: resolvedIns.employment });
 
     const national_pension = deductions.national_pension;
     const health_insurance = deductions.health_insurance;
@@ -795,16 +775,13 @@ export function Step2Settlement({
 
     const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const familyAdjustedIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const preRatioIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount,
-    });
+      qualifyingChildCount });
     const dependentTaxCredit = hasExactWithholdingTable
       ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12500;
@@ -835,8 +812,7 @@ export function Step2Settlement({
       taxable_allowance_breakdown: data.taxable_allowance_breakdown,
       salary_change_proration: data.salary_change_proration || [],
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
-      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
-    };
+      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable };
 
     return {
       taxable: total_taxable,
@@ -900,8 +876,7 @@ export function Step2Settlement({
           auto_holiday_hours: Number(data?.auto_holiday_hours || 0),
           auto_night_pay: Number(data?.auto_night_pay || 0),
           auto_night_minutes: Number(data?.auto_night_minutes || 0),
-          calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0),
-        };
+          calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0) };
         const dd = (calc?.deductionDetail ?? {}) as Record<string, unknown>;
 
         return {
@@ -932,8 +907,7 @@ export function Step2Settlement({
           attendance_deduction_detail: data?.attendance_deduction_detail || {},
           advance_pay: advancePay,
           record_type: 'regular',
-          status: targetStatus,
-        };
+          status: targetStatus };
       });
 
       const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
@@ -946,15 +920,13 @@ export function Step2Settlement({
           'employment_insurance',
           'income_tax',
           'local_tax',
-        ],
-      });
+        ] });
       if (payrollSaveError) throw payrollSaveError;
 
       if (setSavedRecordsByStaff) {
         setSavedRecordsByStaff((prev) => ({
           ...prev,
-          ...Object.fromEntries(records.map((record) => [String(record.staff_id), record as SavedPayrollRecord])),
-        }));
+          ...Object.fromEntries(records.map((record) => [String(record.staff_id), record as SavedPayrollRecord])) }));
       }
 
       setSettlementData((prev) =>
@@ -977,8 +949,7 @@ export function Step2Settlement({
         error: err,
         yearMonth,
         status: targetStatus,
-        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id),
-      });
+        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id) });
       toast(`정산 저장 중 오류가 발생했습니다. ${message}`, 'error');
       return null;
     } finally {
@@ -1034,10 +1005,8 @@ export function Step2Settlement({
               total_deduction: record.total_deduction,
               attendance_deduction: record.attendance_deduction,
               advance_pay: record.advance_pay,
-              net_pay: record.net_pay,
-            };
-          }),
-        },
+              net_pay: record.net_pay };
+          }) },
         u.id,
         u.name,
       );
@@ -1071,12 +1040,10 @@ export function Step2Settlement({
       applyTax: data?.apply_tax !== false,
       exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
       bankName: String(staff.bank_name || ''),
-      bankAccount: String(staff.bank_account || ''),
-    };
+      bankAccount: String(staff.bank_account || '') };
   });
   const verificationReport = buildPayrollVerificationReport(verificationRows, {
-    requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax),
-  });
+    requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax) });
   const hasBlockingVerificationIssues = verificationReport.errorCount > 0;
 
   if (loading) {

@@ -75,8 +75,7 @@ export function generateHometaxTxt(
       taxable: acc.taxable + r.totalTaxable,
       taxfree: acc.taxfree + r.totalTaxfree,
       income: acc.income + r.incomeTax,
-      local: acc.local + r.localTax,
-    }),
+      local: acc.local + r.localTax }),
     { taxable: 0, taxfree: 0, income: 0, local: 0 },
   );
   lines.push(
@@ -128,8 +127,7 @@ export function generateEdiTxt(
       np: acc.np + r.nationalPension,
       hi: acc.hi + r.healthInsurance,
       ltc: acc.ltc + r.longTermCare,
-      ei: acc.ei + r.employmentInsurance,
-    }),
+      ei: acc.ei + r.employmentInsurance }),
     { np: 0, hi: 0, ltc: 0, ei: 0 },
   );
   lines.push(
@@ -182,7 +180,7 @@ export function generateExcelCsv(
   const sum = (key: keyof PayrollExportRow) =>
     COMMA_NUM(rows.reduce((s, r) => s + (Number(r[key]) || 0), 0));
   lines.push(
-    `,합계,,,${sum('baseSalary')},${sum('totalTaxable')},${sum('totalTaxfree')},${sum('incomeTax')},${sum('localTax')},${sum('nationalPension')},${sum('healthInsurance')},${sum('longTermCare')},${sum('employmentInsurance')},${sum('totalDeduction')},${sum('netPay')}`,
+    `,합계,,${sum('baseSalary')},${sum('totalTaxable')},${sum('totalTaxfree')},${sum('incomeTax')},${sum('localTax')},${sum('nationalPension')},${sum('healthInsurance')},${sum('longTermCare')},${sum('employmentInsurance')},${sum('totalDeduction')},${sum('netPay')}`,
   );
 
   return '\uFEFF' + lines.join('\r\n'); // BOM for Excel
@@ -216,8 +214,7 @@ export function buildExportRows(
         longTermCare: Number(pr.long_term_care) || 0,
         employmentInsurance: Number(pr.employment_insurance) || 0,
         totalDeduction: Number(pr.total_deduction) || 0,
-        netPay: Number(pr.net_pay) || 0,
-      };
+        netPay: Number(pr.net_pay) || 0 };
     })
     .filter((r): r is PayrollExportRow => r !== null);
 }

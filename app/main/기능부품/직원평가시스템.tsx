@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 
 interface Evaluation {
@@ -51,7 +51,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
         setLoading(true);
         setFetchError(null);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('staff_evaluations')
                 .select('*')
                 .eq('staff_id', staffId)
@@ -101,7 +101,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
 
         setIsSubmitting(true);
         try {
-            const { error } = await supabase.from('staff_evaluations').insert([{
+            const { error } = await db.from('staff_evaluations').insert([{
                 staff_id: selectedStaff.id,
                 evaluator_id: user.id,
                 category,
@@ -121,8 +121,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                     score: category === '성과' ? score : null,
                     created_at: new Date().toISOString(),
                     evaluator_name: user.name || '관리자',
-                    evaluator_position: user.position || '',
-                },
+                    evaluator_position: user.position || '' },
                 ...prev,
             ]);
 
@@ -147,11 +146,10 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             title: '직원 평가 기록 삭제',
             description: '선택한 직원 평가 기록을 삭제합니다.\n삭제 후에는 평가 목록에서 복구할 수 없습니다.',
             confirmText: '삭제',
-            tone: 'danger',
-        });
+            tone: 'danger' });
         if (!confirmed) return;
         try {
-            const { error } = await supabase.from('staff_evaluations').delete().eq('id', id);
+            const { error } = await db.from('staff_evaluations').delete().eq('id', id);
             if (error) throw error;
             setEvaluations(prev => prev.filter((item) => item.id !== id));
         } catch (err) {
@@ -402,8 +400,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                                                         ev.category === '칭찬'    ? 'var(--success)'  :
                                                                         ev.category === '주의'    ? 'var(--warning)'  :
                                                                         ev.category === '기타'    ? 'var(--toss-gray-4)' :
-                                                                                                    'var(--accent)',
-                                                                }}
+                                                                                                    'var(--accent)' }}
                                                             >
                                                                 {ev.category}
                                                             </span>

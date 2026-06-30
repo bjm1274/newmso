@@ -147,8 +147,7 @@ export async function triggerManagedBrowserDownload(downloadUrl: string, fileNam
 
   const response = await fetch(downloadUrl, {
     credentials: 'include',
-    cache: 'no-store',
-  });
+    cache: 'no-store' });
 
   if (!response.ok) {
     throw new Error(`Download failed with status ${response.status}`);

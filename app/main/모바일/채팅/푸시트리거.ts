@@ -20,8 +20,7 @@ export function triggerMobileChatPush(roomId: string, messageId: string): void {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       keepalive: true,
-      body: JSON.stringify({ roomId: room, messageId: message }),
-    }).catch(() => {
+      body: JSON.stringify({ roomId: room, messageId: message }) }).catch(() => {
       // 트리거 실패는 무시 — 메시지 INSERT 시 적재된 chat_push_jobs 큐를 cron/flush가 회수한다.
     });
   } catch {

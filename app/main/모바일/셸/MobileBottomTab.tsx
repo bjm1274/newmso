@@ -81,8 +81,7 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
       <path d="M12 3 19 6v5c0 4.5-2.8 8.2-7 10-4.2-1.8-7-5.5-7-10V6z" />
       <path d="M9.5 12.5 11 14l3.5-4" />
     </>
-  ),
-};
+  ) };
 
 const TABS: { id: MTab; label: string }[] = [
   { id: 'notif',    label: '알림' },
@@ -107,8 +106,7 @@ function MobileBottomTabBase({
   active,
   onChange,
   badges,
-  dots,
-}: MobileBottomTabProps) {
+  dots }: MobileBottomTabProps) {
   return (
     <nav
       className="m-bottom-tab macos-glass"
@@ -132,8 +130,7 @@ function MobileBottomTabBase({
         WebkitOverflowScrolling: 'touch',
         zIndex: 999,
         maskImage: 'linear-gradient(to right, transparent, white 6%, white 94%, transparent)',
-        WebkitMaskImage: 'linear-gradient(to right, transparent, white 6%, white 94%, transparent)',
-      }}
+        WebkitMaskImage: 'linear-gradient(to right, transparent, white 6%, white 94%, transparent)' }}
     >
       <style>{`
         .m-bottom-tab::-webkit-scrollbar {
@@ -175,8 +172,7 @@ function MobileBottomTabBase({
               outline: 'none',
               position: 'relative',
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: on ? 'scale(1.08) translateY(-1px)' : 'scale(1)',
-            }}
+              transform: on ? 'scale(1.08) translateY(-1px)' : 'scale(1)' }}
           >
             <div
               className="ico-wrap"
@@ -186,8 +182,7 @@ function MobileBottomTabBase({
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: on ? 'var(--m-accent)' : 'var(--z-500)',
-                transition: 'color 0.2s ease',
-              }}
+                transition: 'color 0.2s ease' }}
             >
               <svg
                 width={22}
@@ -200,8 +195,7 @@ function MobileBottomTabBase({
                 strokeLinejoin="round"
                 aria-hidden="true"
                 style={{
-                  filter: on ? 'drop-shadow(0 2px 8px rgba(0, 122, 255, 0.35))' : 'none',
-                }}
+                  filter: on ? 'drop-shadow(0 2px 8px rgba(0, 122, 255, 0.35))' : 'none' }}
               >
                 {TAB_ICONS[t.id]}
               </svg>
@@ -215,8 +209,7 @@ function MobileBottomTabBase({
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: 'var(--m-accent)',
-                  }}
+                    background: 'var(--m-accent)' }}
                 />
               )}
               {typeof badgeCount === 'number' && badgeCount > 0 && (
@@ -238,8 +231,7 @@ function MobileBottomTabBase({
                     alignItems: 'center',
                     justifyContent: 'center',
                     lineHeight: 1,
-                    boxShadow: '0 2px 5px rgba(255, 59, 48, 0.3)',
-                  }}
+                    boxShadow: '0 2px 5px rgba(255, 59, 48, 0.3)' }}
                 >
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>
@@ -257,8 +249,7 @@ function MobileBottomTabBase({
                   background: 'var(--m-accent)',
                   boxShadow: '0 0 5px var(--m-accent)',
                   marginTop: 6,
-                  display: 'block',
-                }}
+                  display: 'block' }}
               />
             ) : (
               <span
@@ -268,8 +259,7 @@ function MobileBottomTabBase({
                   fontWeight: 700,
                   color: 'var(--z-500)',
                   marginTop: 4,
-                  letterSpacing: '-0.02em',
-                }}
+                  letterSpacing: '-0.02em' }}
               >
                 {t.label}
               </span>

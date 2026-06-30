@@ -32,8 +32,7 @@ const CERowSchema = z.object({
   education_date: z.string().nullable().optional(),
   applied_expiry_date: z.string().nullable().optional(),
   reject_reason: z.string().nullable().optional(),
-  memo: z.string().nullable().optional(),
-});
+  memo: z.string().nullable().optional() });
 type CERow = z.infer<typeof CERowSchema>;
 
 const OcrResponseSchema = z.object({
@@ -44,10 +43,8 @@ const OcrResponseSchema = z.object({
     institution: z.string().nullable(),
     certificate_number: z.string().nullable(),
     hours: z.number().nullable().optional(),
-    raw_text: z.string().nullable().optional(),
-  }),
-  rawText: z.string().optional(),
-});
+    raw_text: z.string().nullable().optional() }),
+  rawText: z.string().optional() });
 
 type Props = {
   onClose: () => void;
@@ -149,9 +146,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
           image: base64,
           mimeType: blob.type,
           licenseType: selected.license_type_hint ?? undefined,
-          licenseName: selected.license_name_hint ?? undefined,
-        }),
-      });
+          licenseName: selected.license_name_hint ?? undefined }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'OCR 실패');
       const parsed = OcrResponseSchema.safeParse(json);
@@ -183,9 +178,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
           ocr_text: ocrText || undefined,
           ocr_education_date: ocrMeta?.education_date ?? undefined,
           ocr_extracted_meta: ocrMeta ?? undefined,
-          memo: memo || undefined,
-        }),
-      });
+          memo: memo || undefined }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? '승인 실패');
       toast(`승인 완료. 새 만료일: ${json.newExpiry ?? '-'}`, 'success');
@@ -210,9 +203,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
         body: JSON.stringify({
           action: 'reject',
           reject_reason: rejectReason,
-          memo: memo || undefined,
-        }),
-      });
+          memo: memo || undefined }) });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? '반려 실패');
       toast('반려 처리되었습니다.', 'success');
@@ -406,8 +397,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
                       const eff = computeEffectiveExpiry({
                         license_type: selected.license_type_hint,
                         expiry_date: overrideExpiry || previewExpiry,
-                        renewed_date: educationDate,
-                      });
+                        renewed_date: educationDate });
                       return (
                         <p className="text-[9px] text-emerald-600 mt-0.5">
                           산출 근거: {eff.source === 'explicit' ? '입력값' : '갱신일 + 법정 갱신주기'}

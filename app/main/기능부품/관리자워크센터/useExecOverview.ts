@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { getKoreanTodayString, getKoreanMonthString } from '@/lib/seoul-time';
 import { getPayrollGrossPay, filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { fetchPendingApprovalCount } from '@/lib/data/dashboard-widgets';
@@ -64,8 +64,7 @@ export function useExecOverview(staffs: StaffMember[]): ExecOverviewData {
     cashCompanyCount: 0,
     corpRows: [],
     activeStaffCount: 0,
-    yearMonth: getKoreanMonthString(),
-  });
+    yearMonth: getKoreanMonthString() });
 
   useEffect(() => {
     let cancelled = false;
@@ -77,9 +76,9 @@ export function useExecOverview(staffs: StaffMember[]): ExecOverviewData {
         const [pendingCount, closuresRes, payrollRes] = await Promise.all([
           fetchPendingApprovalCount(),
           // 전사 합산: 오늘자 daily_closures 모든 법인 행 (MSO 전사 집계 — 필터 없음)
-          supabase.from('daily_closures').select('company_id, total_amount').eq('date', today),
+          db.from('daily_closures').select('company_id, total_amount').eq('date', today),
           // 이번 달 급여명세 (법인손익현황과 동일 컬럼)
-          supabase
+          db
             .from('payroll_records')
             .select('staff_id, total_taxable, total_taxfree, gross_pay, record_type')
             .eq('year_month', yearMonth),
@@ -116,8 +115,7 @@ export function useExecOverview(staffs: StaffMember[]): ExecOverviewData {
             cashCompanyCount,
             corpRows,
             activeStaffCount: activeStaffs.length,
-            yearMonth,
-          });
+            yearMonth });
         }
       } catch (err) {
         console.error('경영 개요 데이터 로드 실패:', err);

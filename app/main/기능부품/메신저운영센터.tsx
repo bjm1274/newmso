@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { StaffMember } from '@/types';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { isActiveChatMember, isMessageReadByCursor, NOTICE_ROOM_ID, NOTICE_ROOM_NAME } from './메신저유틸';
 import {
   CHAT_NOTICE_SCHEDULE_EVENT,
@@ -13,8 +13,7 @@ import {
   readScheduledNoticeJobs,
   removeScheduledNoticeJob,
   saveScheduledNoticeJob,
-  type NoticeScheduleJob,
-} from './메신저공지스케줄';
+  type NoticeScheduleJob } from './메신저공지스케줄';
 const DEFAULT_DRIVE_LINKS = [
   { name: 'OneDrive 공유문서', url: '', sort_order: 0 },
   { name: '병원 NAS', url: '', sort_order: 1 },
@@ -59,8 +58,7 @@ function formatDateLabel(dateString: string) {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit',
-  });
+    minute: '2-digit' });
 }
 
 function normalizeReminderInput(value: string) {
@@ -79,8 +77,7 @@ export default function MessengerOperationsCenter({
   user,
   staffs = [],
   selectedRoomId,
-  onClose,
-}: {
+  onClose }: {
   user?: unknown;
   staffs?: Record<string, unknown>[];
   selectedRoomId?: string | null;
@@ -110,7 +107,7 @@ export default function MessengerOperationsCenter({
   const scheduleActorId = String(_user.id || '').trim() || null;
 
   const loadDriveLinks = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('messenger_drive_links')
       .select('id, company_name, name, url, sort_order')
       .eq('company_name', companyScope)
@@ -125,8 +122,7 @@ export default function MessengerOperationsCenter({
         company_name: (row.company_name as string) || companyScope,
         name: (row.name as string) || '',
         url: (row.url as string) || '',
-        sort_order: Number(row.sort_order || 0),
-      })));
+        sort_order: Number(row.sort_order || 0) })));
       return;
     }
 
@@ -136,10 +132,9 @@ export default function MessengerOperationsCenter({
       url: item.url,
       sort_order: item.sort_order,
       created_by: (_user.id as string) || null,
-      updated_by: (_user.id as string) || null,
-    }));
+      updated_by: (_user.id as string) || null }));
 
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await db
       .from('messenger_drive_links')
       .insert(defaults)
       .select('id, company_name, name, url, sort_order');
@@ -150,8 +145,7 @@ export default function MessengerOperationsCenter({
       company_name: (row.company_name as string) || companyScope,
       name: (row.name as string) || '',
       url: (row.url as string) || '',
-      sort_order: Number(row.sort_order || 0),
-    })));
+      sort_order: Number(row.sort_order || 0) })));
   }, [companyScope, _user.id]);
 
   useEffect(() => {
@@ -160,14 +154,14 @@ export default function MessengerOperationsCenter({
       try {
         const today = getKoreanTodayString();
         const [noticeRes, fileRes, attendanceRes, shiftRes] = await Promise.all([
-          supabase
+          db
             .from('messages')
             .select('id, content, created_at, sender_id')
             .eq('room_id', NOTICE_ROOM_ID)
             .order('created_at', { ascending: false })
             .limit(40),
           selectedRoomId
-            ? supabase
+            ? db
               .from('messages')
               .select('id, content, created_at, file_url, sender_id')
               .eq('room_id', selectedRoomId)
@@ -175,11 +169,11 @@ export default function MessengerOperationsCenter({
               .order('created_at', { ascending: false })
               .limit(60)
             : Promise.resolve({ data: [], error: null }),
-          supabase
+          db
             .from('attendances')
             .select('staff_id, status, work_date')
             .eq('work_date', today),
-          supabase
+          db
             .from('shift_assignments')
             .select('staff_id, shift_id, work_date')
             .eq('work_date', today),
@@ -193,7 +187,7 @@ export default function MessengerOperationsCenter({
         await loadDriveLinks();
 
         if (notices.length > 0 && activeStaffs.length > 0) {
-          const { data: readCursors } = await supabase
+          const { data: readCursors } = await db
             .from('room_read_cursors')
             .select('user_id, last_read_at')
             .eq('room_id', NOTICE_ROOM_ID)
@@ -201,8 +195,7 @@ export default function MessengerOperationsCenter({
           setNoticeReadCursors(
             (readCursors || []).map((cursor: any) => ({
               user_id: String(cursor.user_id || ''),
-              last_read_at: typeof cursor.last_read_at === 'string' ? cursor.last_read_at : null,
-            }))
+              last_read_at: typeof cursor.last_read_at === 'string' ? cursor.last_read_at : null }))
           );
         } else {
           setNoticeReadCursors([]);
@@ -270,8 +263,7 @@ export default function MessengerOperationsCenter({
         readRate,
         hoursAgo,
         isOverSla,
-        isImportant: String(message.content || '').startsWith('[중요공지]'),
-      };
+        isImportant: String(message.content || '').startsWith('[중요공지]') };
     });
   }, [activeStaffs, noticeMessages, noticeReadCursorMap]);
 
@@ -304,8 +296,7 @@ export default function MessengerOperationsCenter({
         key,
         name: extractFileName(items[0].file_url),
         versions: items.length,
-        latest: items[0],
-      }))
+        latest: items[0] }))
       .sort((a, b) => b.versions - a.versions || new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime());
   }, [roomFiles]);
 
@@ -328,8 +319,7 @@ export default function MessengerOperationsCenter({
       busyStaff,
       awayStaff,
       scheduledCount,
-      pendingReminderCount,
-    };
+      pendingReminderCount };
   }, [importantNotices.length, noticeRows, presenceRows, scheduledNotices]);
 
   const markAsImportant = async (message: NoticeMessage) => {
@@ -337,7 +327,7 @@ export default function MessengerOperationsCenter({
     if (!trimmed || trimmed.startsWith('[중요공지]')) return;
     setBusyId(message.id);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('messages')
         .update({ content: `[중요공지] ${trimmed}` })
         .eq('id', message.id);
@@ -376,10 +366,7 @@ export default function MessengerOperationsCenter({
           notificationType: 'message',
           extra: {
             reminder_kind: 'notice_ops',
-            room_name: NOTICE_ROOM_NAME,
-          },
-        }),
-      }));
+            room_name: NOTICE_ROOM_NAME } }) }));
       const { error } = await d1.from('notifications').insert(payload);
       if (error) throw error;
       toast(`${nonReaders.length}명에게 공지 확인 알림을 보냈습니다.`, 'warning');
@@ -408,8 +395,7 @@ export default function MessengerOperationsCenter({
       actorName: String(_user.name || '알 수 없음'),
       content,
       sendAt: new Date(sendAt).toISOString(),
-      reminderMinutes,
-    });
+      reminderMinutes });
     setScheduleContent('');
     setScheduleSendAt('');
     setScheduleReminderInput(reminderMinutes.join(', '));
@@ -423,8 +409,7 @@ export default function MessengerOperationsCenter({
       actorName: job.actorName,
       content: job.content,
       sendAt: new Date().toISOString(),
-      reminderMinutes: job.reminderMinutes,
-    });
+      reminderMinutes: job.reminderMinutes });
     toast('예약 공지를 즉시 발송 대상으로 전환했습니다.', 'success');
   };
 
@@ -449,7 +434,7 @@ export default function MessengerOperationsCenter({
       const nextSortOrder = driveLinks.length > 0
         ? Math.max(...driveLinks.map((item) => Number(item.sort_order || 0))) + 1
         : 0;
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('messenger_drive_links')
         .insert({
           company_name: companyScope,
@@ -457,8 +442,7 @@ export default function MessengerOperationsCenter({
           url,
           sort_order: nextSortOrder,
           created_by: (_user.id as string) || null,
-          updated_by: (_user.id as string) || null,
-        })
+          updated_by: (_user.id as string) || null })
         .select('id, company_name, name, url, sort_order')
         .single();
       if (error) throw error;
@@ -468,8 +452,7 @@ export default function MessengerOperationsCenter({
           company_name: data.company_name || companyScope,
           name: data.name || '',
           url: data.url || '',
-          sort_order: Number(data.sort_order || 0),
-        }].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+          sort_order: Number(data.sort_order || 0) }].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)));
       }
       setNewDriveName('');
       setNewDriveUrl('');
@@ -490,13 +473,12 @@ export default function MessengerOperationsCenter({
     if (!target) return;
     setBusyId(id);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('messenger_drive_links')
         .update({
           name: target.name.trim(),
           url: target.url.trim(),
-          updated_by: (_user.id as string) || null,
-        })
+          updated_by: (_user.id as string) || null })
         .eq('id', id);
       if (error) throw error;
     } catch (error) {
@@ -510,7 +492,7 @@ export default function MessengerOperationsCenter({
   const removeDriveLink = async (id: string) => {
     setBusyId(id);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('messenger_drive_links')
         .delete()
         .eq('id', id);

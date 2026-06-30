@@ -23,10 +23,9 @@ import {
   createBoardPost,
   getSafeAttachments,
   isVoiceBoardType,
-  updateBoardPost,
-} from './data-hooks';
+  updateBoardPost } from './data-hooks';
 import { uploadBoardAttachments, type DraftAttachment, type UploadProgress, validateFile } from './첨부업로드';
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { enqueueUpload } from '@/lib/offline-upload-queue';
 import { extractAttachmentMetaFromContent } from '@/app/main/기능부품/게시판공통';
 import { toast } from '@/lib/toast';
@@ -86,8 +85,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
     pin: Boolean(editPost?.is_pinned),
     importance: editPost?.status === '중요' ? 'urgent' : 'normal',
     anonymous: Boolean((editPost as { is_anonymous?: boolean } | null)?.is_anonymous),
-    scheduledPublishAt: '',
-  }));
+    scheduledPublishAt: '' }));
   const [poll, setPoll] = useState<PollDraft>(() => pollDraftFromPost(editPost));
   const [schedule, setSchedule] = useState<ScheduleDraft>(() => editSchedule.draft);
   const [submitting, setSubmitting] = useState(false);
@@ -131,8 +129,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
         content: isScheduleCat ? schedule.chartNo : form.body,
         attachments: attachmentItems,
         // 투표 토글 OFF → null(제거), ON+유효 → 입력값
-        poll: poll.enabled ? pollInput : null,
-      });
+        poll: poll.enabled ? pollInput : null });
       setSubmitting(false);
       if (ok) {
         toast('게시글이 수정되었습니다.', 'success');
@@ -154,8 +151,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
         scheduledPublishAt: scheduledFinal,
         poll: pollInput,
         schedule: isScheduleCat ? toScheduleMetaInput(schedule) : null,
-        user,
-      });
+        user });
       setSubmitting(false);
       if (inserted) onCreated(String(inserted.id));
       return;
@@ -172,14 +168,13 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
         catId: form.cat, title: form.title, content: form.body,
         attachments: attachmentItems,
         anonymous: anonymousFinal, pinned: pinFinal, importance: form.importance,
-        scheduledPublishAt: scheduledFinal, user,
-      });
+        scheduledPublishAt: scheduledFinal, user });
       setSubmitting(false);
       if (inserted) onCreated(String(inserted.id));
       return;
     }
 
-    // 나머지 경로 — enqueueSupabaseMutation (텍스트 전용 or 오프라인 첨부 포함)
+    // 나머지 경로 — enqueueD1Mutation (텍스트 전용 or 오프라인 첨부 포함)
     const importance = form.importance === 'urgent' ? '중요' : null;
     const payload: Record<string, unknown> = {
       board_type: boardType,
@@ -189,8 +184,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
       company: anonymousFinal ? null : (user.company ?? null),
       company_id: anonymousFinal ? null : (user.company_id ?? null),
       is_anonymous: anonymousFinal,
-      attachments: attachmentItems,
-    };
+      attachments: attachmentItems };
     if (pinFinal) payload.is_pinned = true;
     if (importance) payload.status = importance;
     if (!hasPendingAtts && scheduledFinal) {
@@ -200,9 +194,8 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
       }
     }
 
-    const { data, queued, error } = await enqueueSupabaseMutation<{ id: string }>({
-      kind: 'insert', table: 'board_posts', payload,
-    });
+    const { data, queued, error } = await enqueueD1Mutation<{ id: string }>({
+      kind: 'insert', table: 'board_posts', payload });
     setSubmitting(false);
     if (error) { toast(`등록 실패: ${error}`, 'error'); return; }
     if (queued) {
@@ -244,8 +237,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
           filename: file.name,
           mimeType: file.type || 'application/octet-stream',
           planRequester: 'board',
-          planParams: { boardType },
-        });
+          planParams: { boardType } });
         if (result.queued) {
           pending.push({ name: file.name, url: `queued:${file.name}`, type: 'file', size: file.size });
         } else if (result.error) {
@@ -277,8 +269,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
       style={{
         background: 'transparent',
         display: 'flex',
-        flexDirection: 'column',
-      }}
+        flexDirection: 'column' }}
     >
       {/* FormHeader */}
       <div
@@ -290,8 +281,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
           borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}
+          WebkitBackdropFilter: 'blur(20px)' }}
       >
         <button
           type="button"
@@ -305,8 +295,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
             border: '1px solid rgba(0, 0, 0, 0.05)',
             padding: '5px 12px',
             borderRadius: 8,
-            cursor: 'pointer',
-          }}
+            cursor: 'pointer' }}
         >
           취소
         </button>
@@ -328,8 +317,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
             borderRadius: 8,
             cursor: 'pointer',
             opacity: submitting ? 0.5 : 1,
-            boxShadow: canSubmit ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none',
-          }}
+            boxShadow: canSubmit ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none' }}
         >
           {submitting ? '저장중…' : isEdit ? '수정' : '게시'}
         </button>
@@ -344,8 +332,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
             background: 'rgba(255, 255, 255, 0.65)',
             border: '1px solid rgba(255, 255, 255, 0.35)',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
-            overflow: 'hidden',
-          }}
+            overflow: 'hidden' }}
         >
           {/* 카테고리 — EDIT 모드는 게시판 이동 금지(고정 표시) */}
           <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)' }}>
@@ -372,8 +359,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
                       opacity: isEdit && !on ? 0.4 : 1,
                       border: 'none',
                       cursor: isEdit && !on ? 'not-allowed' : 'pointer',
-                      boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none',
-                    }}
+                      boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none' }}
                   >
                     {c.label}
                   </button>

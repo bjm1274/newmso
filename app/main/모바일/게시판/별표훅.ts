@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 
 // ─────────────────────────────────────────────
@@ -72,7 +72,7 @@ function isMissingOrDeniedError(err: unknown): boolean {
 export async function loadStarSet(userId: string | null): Promise<Set<string>> {
   if (!userId) return new Set();
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from(TABLE_NAME)
       .select('post_id')
       .eq('user_id', userId);
@@ -126,7 +126,7 @@ export async function toggleStarServer(
 
   try {
     if (nextStarred) {
-      const { error } = await supabase
+      const { error } = await db
         .from(TABLE_NAME)
         .insert([{ post_id: postId, user_id: userId }]);
       if (error) {
@@ -141,7 +141,7 @@ export async function toggleStarServer(
         throw error;
       }
     } else {
-      const { error } = await supabase
+      const { error } = await db
         .from(TABLE_NAME)
         .delete()
         .eq('post_id', postId)

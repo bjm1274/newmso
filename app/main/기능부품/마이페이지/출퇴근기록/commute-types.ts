@@ -53,7 +53,6 @@ export const COMMUTE_STATUS_LABELS: Record<string, string> = {
   half_day: '반차',
   half_leave: '반차',
   sick_leave: '병가',
-  absent: '결근',
-};
+  absent: '결근' };
 
 export const NON_ABSENT_DISPLAY_STATUSES = new Set(['연차', '반차', '병가', '공가', '휴무']);

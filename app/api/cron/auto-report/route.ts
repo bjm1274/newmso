@@ -2,15 +2,13 @@ import { NextResponse } from 'next/server';
 import {
   generateMonthlyHRReport,
   generateMonthlyPayrollReport,
-  notifyRecipients,
-} from '@/lib/auto-report-generator';
+  notifyRecipients } from '@/lib/auto-report-generator';
 import {
   generated_reports as generatedReportsTable,
   report_schedules as reportSchedulesTable,
   getD1Binding,
   getD1Drizzle,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const runtime = 'nodejs';
@@ -45,8 +43,7 @@ export async function GET(request: Request) {
           report_type: reportSchedulesTable.report_type,
           company_id: reportSchedulesTable.company_id,
           recipients: reportSchedulesTable.recipients,
-          enabled: reportSchedulesTable.enabled,
-        })
+          enabled: reportSchedulesTable.enabled })
         .from(reportSchedulesTable)
         .where(eq(reportSchedulesTable.enabled, 1));
       schedules = rows as ScheduleRow[];
@@ -85,8 +82,7 @@ export async function GET(request: Request) {
           report_type: reportType,
           period,
           status: 'completed',
-          summary,
-        };
+          summary };
         {
           const d1 = await getD1Binding();
           if (!d1) {
@@ -101,8 +97,7 @@ export async function GET(request: Request) {
             period: reportRow.period,
             status: reportRow.status,
             summary: JSON.stringify(reportRow.summary),
-            created_at: new Date().toISOString(),
-          });
+            created_at: new Date().toISOString() });
         }
 
         // 스케줄 last_generated_at 업데이트
@@ -127,8 +122,7 @@ export async function GET(request: Request) {
         results.push({
           type: String(schedule.report_type),
           period,
-          status: `failed: ${err instanceof Error ? err.message : 'unknown'}`,
-        });
+          status: `failed: ${err instanceof Error ? err.message : 'unknown'}` });
       }
     }
 

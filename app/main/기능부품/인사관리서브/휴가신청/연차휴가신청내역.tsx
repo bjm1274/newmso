@@ -54,8 +54,7 @@ export default function LeaveRequestList({
   onShowPending,
   canManage,
   onEdit,
-  onDelete,
-}: {
+  onDelete }: {
   leaves: Leave[];
   staffList: StaffLite[];
   onStatusUpdate: (id: string, status: '승인' | '반려') => void;
@@ -72,8 +71,7 @@ export default function LeaveRequestList({
     start_date: '',
     end_date: '',
     reason: '',
-    status: '대기',
-  });
+    status: '대기' });
   const [saving, setSaving] = useState(false);
 
   const openEdit = (l: Leave) => {
@@ -83,8 +81,7 @@ export default function LeaveRequestList({
       start_date: l.start_date || '',
       end_date: l.end_date || l.start_date || '',
       reason: l.reason || '',
-      status: l.status,
-    });
+      status: l.status });
   };
 
   const submitEdit = async () => {
@@ -96,8 +93,7 @@ export default function LeaveRequestList({
         start_date: form.start_date,
         end_date: form.end_date || form.start_date,
         reason: form.reason,
-        status: form.status,
-      });
+        status: form.status });
       setEditing(null);
     } finally {
       setSaving(false);
@@ -164,8 +160,7 @@ export default function LeaveRequestList({
           >
             {l.leave_type}
           </span>
-        ),
-      },
+        ) },
       {
         key: 'period',
         label: '기간',
@@ -174,8 +169,7 @@ export default function LeaveRequestList({
             {l.start_date}
             {l.end_date && l.end_date !== l.start_date ? ` ~ ${l.end_date}` : ''}
           </span>
-        ),
-      },
+        ) },
       {
         key: 'reason',
         label: '사유',
@@ -183,8 +177,7 @@ export default function LeaveRequestList({
           <span className="text-[var(--toss-gray-3)] block max-w-xs truncate">
             {l.reason || '—'}
           </span>
-        ),
-      },
+        ) },
       {
         key: 'status',
         label: '상태',
@@ -200,8 +193,7 @@ export default function LeaveRequestList({
           >
             {l.status}
           </span>
-        ),
-      },
+        ) },
       {
         key: 'actions',
         label: '관리',
@@ -257,8 +249,7 @@ export default function LeaveRequestList({
               </>
             )}
           </div>
-        ),
-      },
+        ) },
     ],
     [canManage, onStatusUpdate, onDelete],
   );

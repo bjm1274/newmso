@@ -1,6 +1,6 @@
 import type { AttachmentItem } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
-import { isMissingColumnError } from '@/lib/supabase-compat';
+import { isMissingColumnError } from '@/lib/db-compat';
 import type {
   CompanyScope,
   GuideAudience,
@@ -13,8 +13,7 @@ import type {
   GuideTaskPriority,
   OrgStaffRow,
   OrgTeamRow,
-  TeamScope,
-} from './guide-types';
+  TeamScope } from './guide-types';
 
 export const GUIDE_BOARD_TYPE = '업무가이드';
 export const GUIDE_DISPLAY_NAME = '업무공유';
@@ -82,8 +81,7 @@ function extractMetaMarker<T>(value: unknown, prefix: string, suffix: string) {
   if (start < 0 || end < 0 || end <= start) {
     return {
       displayContent: raw.trim(),
-      meta: null as T | null,
-    };
+      meta: null as T | null };
   }
 
   const displayContent = `${raw.slice(0, start)}${raw.slice(end + suffix.length)}`.trim();
@@ -92,13 +90,11 @@ function extractMetaMarker<T>(value: unknown, prefix: string, suffix: string) {
   try {
     return {
       displayContent,
-      meta: JSON.parse(metaText) as T,
-    };
+      meta: JSON.parse(metaText) as T };
   } catch {
     return {
       displayContent,
-      meta: null as T | null,
-    };
+      meta: null as T | null };
   }
 }
 
@@ -109,8 +105,7 @@ export function extractAttachmentMetaFromContent(value: unknown) {
         .map((item) => ({
           name: normalizeText(item?.name),
           url: normalizeText(item?.url),
-          type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)),
-        }))
+          type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)) }))
         .filter((item) => item.name && item.url)
     : [];
 
@@ -125,8 +120,7 @@ export function buildAttachmentMetaContent(visibleContent: string, attachments: 
     .map((item) => ({
       name: normalizeText(item.name),
       url: normalizeText(item.url),
-      type: inferAttachmentType(normalizeText(item.name || item.url), normalizeText(item.type)),
-    }))
+      type: inferAttachmentType(normalizeText(item.name || item.url), normalizeText(item.type)) }))
     .filter((item) => item.name && item.url);
 
   if (!payload.length) return normalizedVisibleContent;
@@ -150,8 +144,7 @@ export function buildGuideContent(description: string, attachments: AttachmentIt
     companyName: normalizeText(meta.companyName) || undefined,
     keywords: Array.isArray(meta.keywords)
       ? meta.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean)
-      : undefined,
-  };
+      : undefined };
 
   const hasExtraMeta =
     normalizedMeta.teamName ||
@@ -180,8 +173,7 @@ export function buildGuideTaskContent(note: string, meta: GuideTaskMetaPayload) 
     isDone: Boolean(meta.isDone),
     completedAt: normalizeText(meta.completedAt) || undefined,
     completedById: normalizeText(meta.completedById) || undefined,
-    completedByName: normalizeText(meta.completedByName) || undefined,
-  };
+    completedByName: normalizeText(meta.completedByName) || undefined };
 
   return `${normalizedNote}${normalizedNote ? '\n' : ''}${GUIDE_TASK_META_PREFIX}${JSON.stringify(normalizedMeta)}${GUIDE_TASK_META_SUFFIX}`;
 }
@@ -213,8 +205,7 @@ export function normalizeGuideResource(post: GuideRow): GuideResource {
     .map((item) => ({
       name: normalizeText(item?.name),
       url: normalizeText(item?.url),
-      type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)),
-    }))
+      type: inferAttachmentType(normalizeText(item?.name || item?.url), normalizeText(item?.type)) }))
     .filter((item) => item.name && item.url);
 
   return {
@@ -226,8 +217,7 @@ export function normalizeGuideResource(post: GuideRow): GuideResource {
     teamName: normalizeText(meta?.teamName || meta?.department),
     divisionName: normalizeText(meta?.divisionName),
     companyName: normalizeText(meta?.companyName || post.company),
-    keywords: Array.isArray(meta?.keywords) ? meta.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean) : [],
-  };
+    keywords: Array.isArray(meta?.keywords) ? meta.keywords.map((keyword) => normalizeText(keyword)).filter(Boolean) : [] };
 }
 
 export function normalizeGuideTask(post: GuideRow): GuideTask {
@@ -243,8 +233,7 @@ export function normalizeGuideTask(post: GuideRow): GuideTask {
     isDone: Boolean(meta?.isDone),
     completedAt: normalizeText(meta?.completedAt),
     completedById: normalizeText(meta?.completedById),
-    completedByName: normalizeText(meta?.completedByName),
-  };
+    completedByName: normalizeText(meta?.completedByName) };
 }
 
 // ─── 포맷터 ───────────────────────────────────────────────────────────────────
@@ -260,8 +249,7 @@ export function formatDate(value: unknown) {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit',
-  });
+    minute: '2-digit' });
 }
 
 export function formatDateOnly(value: unknown) {
@@ -273,8 +261,7 @@ export function formatDateOnly(value: unknown) {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit',
-  });
+    day: '2-digit' });
 }
 
 export function getGuideKindLabel(kind: GuideKind) {
@@ -417,8 +404,7 @@ export function buildCompanyScopes(
         divisionName: normalizeText(divisionName) || '기타',
         teamName: normalizedTeamName,
         sortOrder: typeof sortOrder === 'number' ? sortOrder : seedIndex,
-        memberCount: memberCountByKey.get(key) || 0,
-      });
+        memberCount: memberCountByKey.get(key) || 0 });
       seedIndex += 1;
       return;
     }
@@ -429,8 +415,7 @@ export function buildCompanyScopes(
       companyId: current.companyId || nextCompanyId,
       divisionName: current.divisionName === '기타' ? normalizeText(divisionName) || current.divisionName : current.divisionName,
       sortOrder: typeof sortOrder === 'number' ? Math.min(current.sortOrder, sortOrder) : current.sortOrder,
-      memberCount: memberCountByKey.get(key) || current.memberCount,
-    });
+      memberCount: memberCountByKey.get(key) || current.memberCount });
   };
 
   orgTeams.forEach((row, index) => {
@@ -459,8 +444,7 @@ export function buildCompanyScopes(
         companyMap.set(team.companyName, {
           companyName: team.companyName,
           companyId: team.companyId,
-          divisions: [],
-        });
+          divisions: [] });
       }
 
       const company = companyMap.get(team.companyName)!;
@@ -476,8 +460,7 @@ export function buildCompanyScopes(
         companyId: team.companyId,
         divisionName: team.divisionName,
         teamName: team.teamName,
-        memberCount: team.memberCount,
-      });
+        memberCount: team.memberCount });
     });
 
   return Array.from(companyMap.values());

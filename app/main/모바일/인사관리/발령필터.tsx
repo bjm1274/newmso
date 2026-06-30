@@ -96,17 +96,16 @@ export default function 발령필터({
   search,
   onSearch,
   onReset,
-  canReset,
-}: 발령필터Props) {
+  canReset }: 발령필터Props) {
   return (
     <div
+      className="macos-glass"
       style={{
-        padding: '10px 16px',
-        background: 'var(--m-card)',
-        borderBottom: '1px solid var(--m-border)',
+        margin: '12px 16px 0',
+        padding: '12px 16px',
+        borderRadius: '16px',
         display: 'grid',
-        gap: 8,
-      }}
+        gap: 8 }}
     >
       <ChipRow ariaLabel="발령 기간 필터">
         {RANGE_OPTIONS.map((opt) => {
@@ -148,8 +147,7 @@ export default function 발령필터({
             border: '1px solid var(--m-border)',
             background: 'var(--m-card)',
             color: 'var(--z-700)',
-            maxWidth: 120,
-          }}
+            maxWidth: 120 }}
         >
           {deptOptions.map((d) => (
             <option key={d} value={d}>
@@ -167,8 +165,7 @@ export default function 발령필터({
             background: 'var(--m-bg)',
             borderRadius: 8,
             padding: '6px 10px',
-            border: '1px solid var(--m-border)',
-          }}
+            border: '1px solid var(--m-border)' }}
         >
           <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }} aria-hidden>
             검색
@@ -185,8 +182,7 @@ export default function 발령필터({
               fontFamily: 'inherit',
               background: 'transparent',
               border: 'none',
-              outline: 'none',
-            }}
+              outline: 'none' }}
             aria-label="발령 검색 (이름·종류·부서·직급)"
           />
         </label>
@@ -205,8 +201,7 @@ export default function 발령필터({
             fontSize: 12,
             fontWeight: 700,
             cursor: canReset ? 'pointer' : 'not-allowed',
-            flexShrink: 0,
-          }}
+            flexShrink: 0 }}
         >
           초기화
         </button>
@@ -225,8 +220,7 @@ function ChipRow({ children, ariaLabel }: { children: ReactNode; ariaLabel: stri
         gap: 6,
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-      }}
+        scrollbarWidth: 'none' }}
     >
       {children}
     </div>
@@ -236,8 +230,7 @@ function ChipRow({ children, ariaLabel }: { children: ReactNode; ariaLabel: stri
 function ChipButton({
   on,
   onClick,
-  children,
-}: {
+  children }: {
   on: boolean;
   onClick: () => void;
   children: ReactNode;
@@ -258,8 +251,7 @@ function ChipButton({
         fontWeight: 800,
         cursor: 'pointer',
         whiteSpace: 'nowrap',
-        flexShrink: 0,
-      }}
+        flexShrink: 0 }}
     >
       {children}
     </button>
@@ -271,5 +263,4 @@ const srOnly = {
   width: 1,
   height: 1,
   overflow: 'hidden' as const,
-  clip: 'rect(0 0 0 0)',
-};
+  clip: 'rect(0 0 0 0)' };

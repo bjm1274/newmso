@@ -20,8 +20,7 @@ export default function ApproverTemplateModal({
   ccLine,
   approverTemplates,
   setApproverTemplates,
-  persistApproverTemplates,
-}: ApproverTemplateModalProps) {
+  persistApproverTemplates }: ApproverTemplateModalProps) {
   const [templateNameInput, setTemplateNameInput] = useState('');
 
   React.useEffect(() => {
@@ -44,8 +43,7 @@ export default function ApproverTemplateModal({
       id: Date.now().toString(),
       name: templateNameInput.trim(),
       line: approverLine,
-      ccLine,
-    };
+      ccLine };
     const next = [...approverTemplates, newTpl];
     setApproverTemplates(next);
     persistApproverTemplates(next);

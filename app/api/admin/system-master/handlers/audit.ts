@@ -4,16 +4,14 @@ import {
   getD1Drizzle,
   audit_logs as auditLogsTable,
   desc,
-  eq,
-} from '@/lib/db';
+  eq } from '@/lib/db';
 import {
   buildPermissionChangeSummary,
   matchSearch,
   normalizeAuditLog,
   type AuditLogRow,
   type LooseRecord,
-  type StaffRow,
-} from '../_shared';
+  type StaffRow } from '../_shared';
 
 export async function handleAudit(
   staffMap: Map<string, StaffRow>,
@@ -70,8 +68,7 @@ export async function handlePermissionDiffs(
     .map((log) => normalizeAuditLog(log, staffMap))
     .map((log) => ({
       ...log,
-      permission_summary: buildPermissionChangeSummary(log.details || {}),
-    }))
+      permission_summary: buildPermissionChangeSummary(log.details || {}) }))
     .filter((log) => matchSearch(log, keyword));
 
   return NextResponse.json({ logs });

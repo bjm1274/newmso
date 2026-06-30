@@ -54,8 +54,7 @@ export function buildApprovalCertificatePrintHtml(
   // 마이페이지 단독에서는 외부 design store 가 없으므로 기본값 + 증명서 프리셋으로 채운다.
   const resolveApprovalTemplateMeta = () => ({
     slug: 'generic',
-    name: '증명서 발급 신청서',
-  });
+    name: '증명서 발급 신청서' });
 
   const genericPreset = BUILTIN_TEMPLATE_DEFAULTS.generic || {};
   const companyLabel =
@@ -69,16 +68,14 @@ export function buildApprovalCertificatePrintHtml(
     companyLabel,
     sealLabel: `${companyLabel} 직인`,
     templateName: '증명서발급',
-    templateSlug: 'generic',
-  });
+    templateSlug: 'generic' });
 
   return buildApprovalPrintHtml({
     item: approval,
     approvalDirectoryStaffs: [],
     resolveApprovalTemplateDesign,
     resolveApprovalTemplateMeta,
-    options,
-  });
+    options });
 }
 
 /**
@@ -88,8 +85,7 @@ export function buildApprovalCertificatePrintHtml(
 export function openApprovalCertificatePrintView(approval: ApprovalRecord) {
   openApprovalPrintView({
     item: approval,
-    buildHtml: (item, opts) => buildApprovalCertificatePrintHtml(item, opts),
-  });
+    buildHtml: (item, opts) => buildApprovalCertificatePrintHtml(item, opts) });
 }
 
 // ─────────────────────────────────────────────
@@ -141,8 +137,7 @@ function getClosingText(certType: string) {
     원천징수영수증: '위와 같이 원천징수 사실을 확인합니다.',
     소득금액증명원: '위와 같이 소득 금액을 확인합니다.',
     소득금액증명서: '위와 같이 소득 금액을 확인합니다.',
-    근로소득원천징수필증: '위와 같이 근로소득 원천징수 사실을 확인합니다.',
-  };
+    근로소득원천징수필증: '위와 같이 근로소득 원천징수 사실을 확인합니다.' };
   return map[certType] || '위와 같이 증명합니다.';
 }
 

@@ -127,8 +127,7 @@ export default function ApprovalComposerView({
   hasApproverSelection,
   handleSubmit,
   isSubmitting = false,
-  onSaveDraft,
-}: ApprovalComposerViewProps) {
+  onSaveDraft }: ApprovalComposerViewProps) {
   const allOptions: FormOption[] = useMemo(() => {
     return composeFormTabs.map((tab) => {
       const normalized = normalizeComposeFormType(tab);
@@ -142,8 +141,7 @@ export default function ApprovalComposerView({
         label,
         isCustom,
         group: classifyGroup(label, normalized),
-        requiresPermission: PERMISSION_KEYWORDS.some((kw) => label.includes(kw) || normalized.includes(kw)),
-      };
+        requiresPermission: PERMISSION_KEYWORDS.some((kw) => label.includes(kw) || normalized.includes(kw)) };
     });
   }, [composeFormTabs, builtinFormTypes, customFormTypes]);
 

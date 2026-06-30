@@ -24,8 +24,7 @@ import {
   useMyLeaveBalance,
   useStaffList,
   canMutateTeamAbnormal,
-  type LeaveHistoryRow,
-} from './data-hooks';
+  type LeaveHistoryRow } from './data-hooks';
 import 연차관리자 from './연차관리자';
 import type { ErpUser } from '@/types';
 
@@ -128,8 +127,7 @@ function HeroSection({
   remaining,
   total,
   used,
-  progressPct,
-}: {
+  progressPct }: {
   remaining: number;
   total: number;
   used: number;
@@ -143,16 +141,14 @@ function HeroSection({
         padding: '24px 20px 16px',
         textAlign: 'center',
         background: 'var(--m-card)',
-        borderBottom: '1px solid var(--m-border)',
-      }}
+        borderBottom: '1px solid var(--m-border)' }}
     >
       <div
         style={{
           fontSize: 11,
           color: 'var(--z-500)',
           fontWeight: 800,
-          letterSpacing: '0.04em',
-        }}
+          letterSpacing: '0.04em' }}
       >
         잔여 연차
       </div>
@@ -163,8 +159,7 @@ function HeroSection({
           fontWeight: 800,
           letterSpacing: '-0.04em',
           color: 'var(--m-accent)',
-          marginTop: 4,
-        }}
+          marginTop: 4 }}
       >
         {remaining}
         <span
@@ -172,8 +167,7 @@ function HeroSection({
             fontSize: 20,
             color: 'var(--z-500)',
             fontWeight: 700,
-            marginLeft: 4,
-          }}
+            marginLeft: 4 }}
         >
           일
         </span>
@@ -193,15 +187,13 @@ function HeroSection({
           background: 'var(--z-100)',
           borderRadius: 999,
           overflow: 'hidden',
-          display: 'flex',
-        }}
+          display: 'flex' }}
       >
         <div
           style={{
             flex: remainingFlex,
             background: 'var(--m-accent)',
-            borderRadius: '999px 0 0 999px',
-          }}
+            borderRadius: '999px 0 0 999px' }}
         />
         <div style={{ flex: usedFlex, background: 'var(--z-300)' }} />
       </div>
@@ -212,8 +204,7 @@ function HeroSection({
           marginTop: 6,
           fontSize: 10,
           color: 'var(--z-500)',
-          fontWeight: 700,
-        }}
+          fontWeight: 700 }}
       >
         <span>잔여 {remaining}일</span>
         <span>사용 {used}일</span>
@@ -230,15 +221,14 @@ function ExpiryAlert({ remaining, year }: { remaining: number; year: number }) {
         <div className="lbl">소멸 알림</div>
       </div>
       <div
-        className="m-card"
+        className="m-card macos-glass macos-squircle-sm"
         style={{
           padding: '14px 16px',
           background: 'var(--m-warning-soft)',
           borderColor: 'transparent',
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-        }}
+          gap: 12 }}
       >
         <div
           style={{
@@ -248,8 +238,7 @@ function ExpiryAlert({ remaining, year }: { remaining: number; year: number }) {
             background: 'var(--m-warning)',
             color: '#fff',
             display: 'grid',
-            placeItems: 'center',
-          }}
+            placeItems: 'center' }}
         >
           <MIcon name="alertTri" size={18} />
         </div>
@@ -291,7 +280,7 @@ function MonthlySection({ monthly, max }: { monthly: number[]; max: number }) {
       <div className="m-section-h">
         <div className="lbl">월별 사용</div>
       </div>
-      <div className="m-card" style={{ padding: '14px 14px' }}>
+      <div className="m-card macos-glass macos-squircle-sm" style={{ padding: '14px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
           {monthly.map((v, i) => (
             <div
@@ -301,8 +290,7 @@ function MonthlySection({ monthly, max }: { monthly: number[]; max: number }) {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 4,
-              }}
+                gap: 4 }}
             >
               <div
                 style={{
@@ -314,8 +302,7 @@ function MonthlySection({ monthly, max }: { monthly: number[]; max: number }) {
                       : v > 0
                         ? 'var(--m-accent-soft)'
                         : 'var(--z-100)',
-                  borderRadius: '4px 4px 2px 2px',
-                }}
+                  borderRadius: '4px 4px 2px 2px' }}
               />
             </div>
           ))}
@@ -327,8 +314,7 @@ function MonthlySection({ monthly, max }: { monthly: number[]; max: number }) {
             marginTop: 8,
             fontSize: 10,
             color: 'var(--z-500)',
-            fontWeight: 600,
-          }}
+            fontWeight: 600 }}
         >
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map((m, i) => (
             <div
@@ -337,8 +323,7 @@ function MonthlySection({ monthly, max }: { monthly: number[]; max: number }) {
                 flex: 1,
                 textAlign: 'center',
                 color: i === thisMonth ? 'var(--m-accent)' : 'var(--z-500)',
-                fontWeight: i === thisMonth ? 800 : 600,
-              }}
+                fontWeight: i === thisMonth ? 800 : 600 }}
             >
               {m}
             </div>
@@ -369,13 +354,13 @@ function HistorySection({ history, year }: { history: LeaveHistoryRow[]; year: n
       </div>
       {filtered.length === 0 ? (
         <div
-          className="m-card"
+          className="m-card macos-glass macos-squircle-sm"
           style={{ padding: 16, fontSize: 13, color: 'var(--z-500)' }}
         >
           올해 신청 내역이 없습니다.
         </div>
       ) : (
-        <div className="m-card flush">
+        <div className="m-card flush macos-glass macos-squircle">
           {filtered.slice(0, 10).map((r) => {
             const tone = leaveTone(r.status);
             return (

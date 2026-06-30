@@ -28,8 +28,7 @@ import {
   access_logs as accessLogsTable,
   backup_restore_runs as backupRestoreRunsTable,
   desc,
-  gte,
-} from '@/lib/db';
+  gte } from '@/lib/db';
 import { detectAnomalies, detectPayrollOutliers, guardAuditAdmin } from '../_shared';
 
 export const dynamic = 'force-dynamic';
@@ -75,8 +74,7 @@ export async function GET(request: NextRequest) {
     payrollOutlierCount: 0,
     payrollOutlierSub: '전월 대비 이상치 없음',
     lastBackupHoursAgo: 0,
-    lastBackupSub: '자동 백업 정보 없음',
-  };
+    lastBackupSub: '자동 백업 정보 없음' };
 
   try {
     const d1 = await getD1Binding();
@@ -146,8 +144,7 @@ export async function GET(request: NextRequest) {
       payrollOutlierSub:
         payrollOutlierCount > 0 ? `전월 대비 ${payrollOutlierCount}건 이상치` : '전월 대비 이상치 없음',
       lastBackupHoursAgo,
-      lastBackupSub,
-    });
+      lastBackupSub });
   } catch {
     return NextResponse.json(fallback);
   }

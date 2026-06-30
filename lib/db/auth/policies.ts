@@ -43,8 +43,7 @@ import {
   erpDepartmentInventoryScopeMatches,
   erpTargetStaffSameCompany,
   erpTargetStaffInScope,
-  erpIsRosterApprover,
-} from './claims';
+  erpIsRosterApprover } from './claims';
 
 // ─────────────────────────────────────────────────────────────
 // 정책 패턴
@@ -181,8 +180,7 @@ const PUBLIC_ALL = (table: string): TablePolicy => ({
   select: 'PUBLIC',
   insert: 'PUBLIC',
   update: 'PUBLIC',
-  delete: 'PUBLIC',
-});
+  delete: 'PUBLIC' });
 
 export const POLICY_REGISTRY: Registry = {
   // ── PUBLIC: FOR ALL USING (true) — 인증 무관 또는 to authenticated USING true
@@ -193,16 +191,13 @@ export const POLICY_REGISTRY: Registry = {
     ...PUBLIC_ALL('staff_members'),
     guards: {
       insert: staffPrivilegeGuard,
-      update: staffPrivilegeGuard,
-    },
-  },
+      update: staffPrivilegeGuard } },
   companies: {
     table: 'companies',
     select: 'PUBLIC',
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
-    delete: 'ADMIN_OR_MANAGER',
-  },
+    delete: 'ADMIN_OR_MANAGER' },
   board_posts: PUBLIC_ALL('board_posts'),
   daily_closures: PUBLIC_ALL('daily_closures'),
   daily_closure_items: PUBLIC_ALL('daily_closure_items'),
@@ -229,9 +224,7 @@ export const POLICY_REGISTRY: Registry = {
     update: 'PUBLIC',
     delete: 'PUBLIC',
     asyncGuards: {
-      update: messagesSelfDeleteGuard,
-    },
-  },
+      update: messagesSelfDeleteGuard } },
 
   // ── STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY / SELF_ONLY (직원 단위)
   push_subscriptions: {
@@ -239,52 +232,45 @@ export const POLICY_REGISTRY: Registry = {
     select: 'STAFF_IN_SCOPE',
     insert: 'SELF_ONLY',
     update: 'SELF_ONLY',
-    delete: 'SELF_ONLY',
-  },
+    delete: 'SELF_ONLY' },
   notifications: {
     table: 'notifications',
     select: 'STAFF_IN_SCOPE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'STAFF_IN_SCOPE',
     delete: 'SELF_ONLY',
-    staffIdField: 'user_id',
-  },
+    staffIdField: 'user_id' },
   todo_reminder_logs: {
     table: 'todo_reminder_logs',
     select: 'STAFF_IN_SCOPE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'STAFF_IN_SCOPE',
     delete: 'SELF_ONLY',
-    staffIdField: 'user_id',
-  },
+    staffIdField: 'user_id' },
   attendance: {
     table: 'attendance',
     select: 'STAFF_IN_SCOPE',
     insert: 'STAFF_IN_SCOPE',
     update: 'STAFF_IN_SCOPE',
-    delete: 'SELF_ONLY',
-  },
+    delete: 'SELF_ONLY' },
   attendances: {
     table: 'attendances',
     select: 'SELF_OR_SAME_COMPANY',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY',
-  },
+    delete: 'SELF_OR_SAME_COMPANY' },
   leave_requests: {
     table: 'leave_requests',
     select: 'SELF_OR_SAME_COMPANY',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY',
-  },
+    delete: 'SELF_OR_SAME_COMPANY' },
   insurance_records: {
     table: 'insurance_records',
     select: 'STAFF_IN_SCOPE',
     insert: 'STAFF_IN_SCOPE',
     update: 'STAFF_IN_SCOPE',
-    delete: 'STAFF_IN_SCOPE',
-  },
+    delete: 'STAFF_IN_SCOPE' },
 
   // ── PAYROLL_MANAGE는 별도 패턴이 아니라 select=STAFF_IN_SCOPE,
   //    write=MANAGE_COMPANY + staff_id same_company 조건은 evalPattern에서 처리.
@@ -297,8 +283,7 @@ export const POLICY_REGISTRY: Registry = {
     select: 'STAFF_IN_SCOPE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY',
-  },
+    delete: 'SELF_OR_SAME_COMPANY' },
 
   // ── AUTHENTICATED + ADMIN_OR_MANAGER (회사 단위 단순 회사 관리)
   corporate_cards: {
@@ -306,29 +291,25 @@ export const POLICY_REGISTRY: Registry = {
     select: 'AUTHENTICATED',
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
-    delete: 'ADMIN_OR_MANAGER',
-  },
+    delete: 'ADMIN_OR_MANAGER' },
   corporate_card_transactions: {
     table: 'corporate_card_transactions',
     select: 'AUTHENTICATED',
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
-    delete: 'ADMIN_OR_MANAGER',
-  },
+    delete: 'ADMIN_OR_MANAGER' },
   company_holidays: {
     table: 'company_holidays',
     select: 'AUTHENTICATED',
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
-    delete: 'ADMIN_OR_MANAGER',
-  },
+    delete: 'ADMIN_OR_MANAGER' },
   company_seals: {
     table: 'company_seals',
     select: 'AUTHENTICATED',
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
-    delete: 'ADMIN_OR_MANAGER',
-  },
+    delete: 'ADMIN_OR_MANAGER' },
 
   // ── COMPANY_SCOPE_OR_NULL (회사 scope, null company_id는 전사)
   wiki_documents: {
@@ -336,36 +317,31 @@ export const POLICY_REGISTRY: Registry = {
     select: 'COMPANY_SCOPE_OR_NULL',
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
-    delete: 'COMPANY_SCOPE_OR_NULL',
-  },
+    delete: 'COMPANY_SCOPE_OR_NULL' },
   wiki_folders: {
     table: 'wiki_folders',
     select: 'COMPANY_SCOPE_OR_NULL',
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
-    delete: 'COMPANY_SCOPE_OR_NULL',
-  },
+    delete: 'COMPANY_SCOPE_OR_NULL' },
   wiki_document_versions: {
     table: 'wiki_document_versions',
     select: 'COMPANY_SCOPE_OR_NULL',
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
-    delete: 'COMPANY_SCOPE_OR_NULL',
-  },
+    delete: 'COMPANY_SCOPE_OR_NULL' },
   op_check_templates: {
     table: 'op_check_templates',
     select: 'COMPANY_SCOPE_OR_NULL',
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
-    delete: 'COMPANY_SCOPE_OR_NULL',
-  },
+    delete: 'COMPANY_SCOPE_OR_NULL' },
   op_patient_checks: {
     table: 'op_patient_checks',
     select: 'COMPANY_SCOPE_OR_NULL',
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
-    delete: 'COMPANY_SCOPE_OR_NULL',
-  },
+    delete: 'COMPANY_SCOPE_OR_NULL' },
 
   // ── MANAGE_COMPANY_OR_NULL — roster_policy_settings (can_manage + null/match)
   roster_policy_settings: {
@@ -373,8 +349,7 @@ export const POLICY_REGISTRY: Registry = {
     select: 'MANAGE_COMPANY_OR_NULL',
     insert: 'MANAGE_COMPANY_OR_NULL',
     update: 'MANAGE_COMPANY_OR_NULL',
-    delete: 'MANAGE_COMPANY_OR_NULL',
-  },
+    delete: 'MANAGE_COMPANY_OR_NULL' },
 
   // ── ROSTER_APPROVER_OR_SELF (근무표 결재 워크플로우)
   roster_approval_requests: {
@@ -383,16 +358,14 @@ export const POLICY_REGISTRY: Registry = {
     insert: 'ROSTER_APPROVER_OR_SELF',
     update: 'ROSTER_APPROVER_OR_SELF', // update는 approver만 (원본) — 단순화
     delete: 'SELF_ONLY',
-    staffIdField: 'requested_by',
-  },
+    staffIdField: 'requested_by' },
   roster_swap_requests: {
     table: 'roster_swap_requests',
     select: 'ROSTER_APPROVER_OR_SELF',
     insert: 'ROSTER_APPROVER_OR_SELF',
     update: 'ROSTER_APPROVER_OR_SELF',
     delete: 'SELF_ONLY',
-    staffIdField: 'requested_by',
-  },
+    staffIdField: 'requested_by' },
 
   // ── APPROVAL_SCOPE (전자결재)
   approvals: {
@@ -402,8 +375,7 @@ export const POLICY_REGISTRY: Registry = {
     update: 'APPROVAL_SCOPE',
     delete: 'SELF_ONLY',
     staffIdField: 'sender_id',
-    approvalFields: { sender: 'sender_id', approver: 'current_approver_id' },
-  },
+    approvalFields: { sender: 'sender_id', approver: 'current_approver_id' } },
 
   // ── INVENTORY_SCOPE
   inventory: {
@@ -412,50 +384,43 @@ export const POLICY_REGISTRY: Registry = {
     insert: 'INVENTORY_SCOPE',
     update: 'INVENTORY_SCOPE',
     delete: 'INVENTORY_SCOPE',
-    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
   inventory_logs: {
     table: 'inventory_logs',
     select: 'INVENTORY_SCOPE',
     insert: 'INVENTORY_SCOPE',
-    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
   inventory_count_sessions: {
     table: 'inventory_count_sessions',
     select: 'INVENTORY_SCOPE',
     insert: 'INVENTORY_SCOPE',
-    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
   inventory_cost_entries: {
     table: 'inventory_cost_entries',
     select: 'INVENTORY_SCOPE',
     insert: 'INVENTORY_SCOPE',
-    inventoryFields: { company: 'company_name', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company_name', company_id: 'company_id', department: 'department' } },
   purchase_orders: {
     table: 'purchase_orders',
     select: 'INVENTORY_SCOPE',
     insert: 'INVENTORY_SCOPE',
     update: 'INVENTORY_SCOPE',
     delete: 'INVENTORY_SCOPE',
-    inventoryFields: { company: 'requester_company', department: 'requester_department' },
-  },
+    inventoryFields: { company: 'requester_company', department: 'requester_department' } },
 
   // ── COMPANY_INVENTORY_SCOPE
   inventory_closing_snapshots: {
     table: 'inventory_closing_snapshots',
     select: 'COMPANY_INVENTORY_SCOPE',
     insert: 'COMPANY_INVENTORY_SCOPE',
-    inventoryFields: { company: 'company', company_id: 'company_id' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id' } },
   delivery_confirmations: {
     table: 'delivery_confirmations',
     select: 'COMPANY_INVENTORY_SCOPE',
     insert: 'COMPANY_INVENTORY_SCOPE',
     update: 'COMPANY_INVENTORY_SCOPE',
     delete: 'COMPANY_INVENTORY_SCOPE',
-    inventoryFields: { company: 'receiver_company' },
-  },
+    inventoryFields: { company: 'receiver_company' } },
 
   // ── DEPARTMENT_INVENTORY_SCOPE
   department_private_inventory_items: {
@@ -464,15 +429,13 @@ export const POLICY_REGISTRY: Registry = {
     insert: 'DEPARTMENT_INVENTORY_SCOPE',
     update: 'DEPARTMENT_INVENTORY_SCOPE',
     delete: 'DEPARTMENT_INVENTORY_SCOPE',
-    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
   department_private_inventory_logs: {
     table: 'department_private_inventory_logs',
     select: 'DEPARTMENT_INVENTORY_SCOPE',
     insert: 'DEPARTMENT_INVENTORY_SCOPE',
     // update/delete는 admin-only (원본) — 등록 X = default deny (admin only)
-    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' },
-  },
+    inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
 
   // 미등록 (default deny = admin only):
   //   inventory_transfers (from/to OR — 별도 패턴 필요, 일단 admin-only)
@@ -595,7 +558,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'report_schedules',
 
   // ── 2026-05-20 컷오버 회귀 수정 — 누락 발견분 (7개)
-  //    클라이언트 코드가 supabase.from()으로 호출하나 POLICY_REGISTRY·
+  //    클라이언트 코드가 db.from()으로 호출하나 POLICY_REGISTRY·
   //    ADDITIONAL_PUBLIC_TABLES 어디에도 없어 403이 발생하던 테이블.
   'annual_leave_promotion_logs', // 연차 이월/프로모션 로그
   'attendance_corrections',      // 출퇴근 정정 요청
@@ -612,7 +575,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'system_settings',         // 시스템 설정(전자결재 양식 등) — key-value
 
   // ── 2026-05-30 무음 실패 복구 — migration 0007로 D1에 신설된 기능 테이블 9종.
-  //    소비처가 supabase.from()/enqueueSupabaseMutation으로 호출하던 기능을
+  //    소비처가 db.from()/enqueueD1Mutation으로 호출하던 기능을
   //    실테이블 신설과 함께 복구. 형제 테이블(board_*, inventory aux, 관리자 설정)과
   //    동일하게 PUBLIC_ALL(로그인 사용자 접근). PII(상담/계약/경조) 포함이나 기존
   //    컨벤션(staff_*, board_*가 PUBLIC_ALL)을 따라 앱 동작 유지 우선.
@@ -627,7 +590,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'external_integrations',       // 관리자 외부 연동
 
   // ── 2026-06-10 무음 실패 복구 (G7) — migration 0013로 D1에 신설된 기능 테이블 5종.
-  //    소비처가 supabase.from()으로 호출하나 실테이블이 schema.ts/d1_schema_final.sql
+  //    소비처가 db.from()으로 호출하나 실테이블이 schema.ts/d1_schema_final.sql
   //    둘 다에 없어 무음 실패하던 기능을 실테이블 신설과 함께 복구. MSO 설계상 회사
   //    격리 불필요 — 형제 테이블과 동일하게 PUBLIC_ALL.
   'nurse_schedules',             // 간호근무표
@@ -642,7 +605,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'fixed_assets',                // 고정자산 대장
   'bank_accounts_sync',          // 금융 연동 현황
 
-  // ── 2026-05-20 확인 — 아래는 클라이언트 코드가 supabase.from()으로
+  // ── 2026-05-20 확인 — 아래는 클라이언트 코드가 db.from()으로
   //    호출하지만 Supabase에 테이블이 실제로 존재하지 않음(probe 결과 PGRST205
   //    + information_schema 부재). 즉 현재도 동작하지 않는 미완성/사장된 기능
   //    참조이며 D1 이관 대상이 아님. whitelist 등록 자체는 무해하고, 향후 해당

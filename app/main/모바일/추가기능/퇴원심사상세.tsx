@@ -2,7 +2,7 @@
 
 /**
  * 퇴원심사 상세 — 요약 / 진료기록 / 코멘트 + sticky 액션(승인·반려·보완요청).
- * supabase.from('discharge_reviews').update({status}).
+ * db.from('discharge_reviews').update({status}).
  * 🟡 신규 작성은 데스크톱 안내, 코멘트·승인만 모바일에서 가능.
  * 핸드오프 m-screens-addon-details §AD4 (SDischargeDetail) 이식.
  * JM: ~250줄.
@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ErpUser } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -26,8 +26,7 @@ type Detail = DischargeRow & { items: unknown[] };
 export default function 퇴원심사상세({
   user,
   reviewId,
-  onBack,
-}: {
+  onBack }: {
   user: ErpUser;
   reviewId: string;
   onBack: () => void;
@@ -40,7 +39,7 @@ export default function 퇴원심사상세({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('discharge_reviews')
         .select('*')
         .eq('id', reviewId)
@@ -65,8 +64,7 @@ export default function 퇴원심사상세({
         reviewer_name: pickText(row, 'reviewer_name'),
         created_at: pickText(row, 'created_at'),
         ai_analysis: pickText(row, 'ai_analysis'),
-        items: Array.isArray(row.items) ? (row.items as unknown[]) : [],
-      });
+        items: Array.isArray(row.items) ? (row.items as unknown[]) : [] });
     } catch (err) {
       console.warn('[mobile-addon] discharge detail load', err);
       toast('퇴원심사 정보를 불러오지 못했습니다.', 'error');
@@ -87,7 +85,7 @@ export default function 퇴원심사상세({
     const prevStatus = detail.status;
     setDetail({ ...detail, status: next });
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('discharge_reviews')
         .update({ status: next, reviewer_id: user.id, reviewer_name: user.name })
         .eq('id', detail.id);
@@ -146,8 +144,7 @@ export default function 퇴원심사상세({
         style={{
           padding: '10px 16px 0',
           background: 'var(--m-card)',
-          borderBottom: '1px solid var(--m-border)',
-        }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div className="m-seg">
           <button type="button" className={tab === 'summary' ? 'on' : ''} onClick={() => setTab('summary')}>요약</button>
@@ -176,16 +173,14 @@ export default function 퇴원심사상세({
                   marginTop: 12,
                   padding: '14px 16px',
                   background: 'var(--m-accent-soft)',
-                  borderColor: 'transparent',
-                }}
+                  borderColor: 'transparent' }}
               >
                 <div
                   style={{
                     fontSize: 11,
                     color: 'var(--m-accent)',
                     fontWeight: 800,
-                    letterSpacing: '0.04em',
-                  }}
+                    letterSpacing: '0.04em' }}
                 >
                   AI 분석
                 </div>
@@ -195,8 +190,7 @@ export default function 퇴원심사상세({
                     color: 'var(--z-800)',
                     marginTop: 6,
                     lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}
+                    whiteSpace: 'pre-wrap' }}
                 >
                   {detail.ai_analysis}
                 </div>
@@ -218,8 +212,7 @@ export default function 퇴원심사상세({
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-              }}
+                gap: 8 }}
             >
               <MIcon name="info" size={16} />
               풀 진료기록(EMR)은 데스크톱에서 — 모바일은 요약만 노출
@@ -245,8 +238,7 @@ export default function 퇴원심사상세({
                       style={{
                         fontSize: 11,
                         color: it.checked ? 'var(--m-success)' : 'var(--z-500)',
-                        fontWeight: 700,
-                      }}
+                        fontWeight: 700 }}
                     >
                       {it.checked ? '확인' : '미확인'}
                     </span>
@@ -267,8 +259,7 @@ export default function 퇴원심사상세({
                 fontSize: 12,
                 background: 'var(--m-card)',
                 borderRadius: 'var(--m-radius-lg)',
-                border: '1px solid var(--m-border)',
-              }}
+                border: '1px solid var(--m-border)' }}
             >
               코멘트 모듈은 데스크톱에서 작성하세요.
             </div>

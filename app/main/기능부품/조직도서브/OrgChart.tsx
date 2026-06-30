@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toDateKey } from '@/lib/date-utils';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import type { StaffMember } from '@/types';
@@ -84,8 +84,7 @@ const DIVISION_STYLE_MAP = {
   blue:   { headerClass: 'bg-blue-600 text-white',   borderClass: 'border-blue-200',   bgClass: 'bg-blue-50'   },
   green:  { headerClass: 'bg-emerald-600 text-white', borderClass: 'border-emerald-200', bgClass: 'bg-emerald-50' },
   orange: { headerClass: 'bg-orange-500 text-white',  borderClass: 'border-orange-200',  bgClass: 'bg-orange-50'  },
-  violet: { headerClass: 'bg-violet-600 text-white',  borderClass: 'border-violet-200',  bgClass: 'bg-violet-50'  },
-} as const;
+  violet: { headerClass: 'bg-violet-600 text-white',  borderClass: 'border-violet-200',  bgClass: 'bg-violet-50'  } } as const;
 
 function getDivisionStyle(divisionName: string): typeof DIVISION_STYLE_MAP[keyof typeof DIVISION_STYLE_MAP] {
   if (divisionName.includes('간호')) return DIVISION_STYLE_MAP.blue;
@@ -134,8 +133,7 @@ function formatClockLabel(value: unknown) {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-      timeZone: 'Asia/Seoul',
-    }).format(new Date(parsed));
+      timeZone: 'Asia/Seoul' }).format(new Date(parsed));
   }
   return text.length >= 16 && text[10] === 'T' ? text.slice(11, 16) : text.slice(0, 5);
 }
@@ -163,8 +161,7 @@ function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
       toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
       dotClass: 'bg-emerald-500',
       checkInLabel,
-      checkOutLabel: null,
-    };
+      checkOutLabel: null };
   }
 
   if (checkInLabel && checkOutLabel) {
@@ -174,8 +171,7 @@ function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
       toneClass: 'border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-4)]',
       dotClass: 'bg-[var(--toss-gray-3)]',
       checkInLabel,
-      checkOutLabel,
-    };
+      checkOutLabel };
   }
 
   return {
@@ -184,8 +180,7 @@ function getPresenceMeta(attendance?: AttendanceSnapshot | null): PresenceMeta {
     toneClass: 'border-amber-200 bg-amber-50 text-amber-700',
     dotClass: 'bg-amber-400',
     checkInLabel: null,
-    checkOutLabel: null,
-  };
+    checkOutLabel: null };
 }
 
 function isResignedStaff(staff: StaffMember) {
@@ -297,7 +292,7 @@ async function fetchOrgChartDirectory() {
   if (!orgChartDirectoryPromise) {
     orgChartDirectoryPromise = (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('*')
           .order('company', { ascending: true })
@@ -324,7 +319,7 @@ async function fetchOrgTeams(): Promise<OrgTeamIndex> {
   if (!orgTeamsPromise) {
     orgTeamsPromise = (async () => {
       try {
-        const { data } = await supabase
+        const { data } = await db
           .from('org_teams')
           .select('company_name, division, team_name, sort_order')
           .order('division')
@@ -415,8 +410,7 @@ function buildCompanyTree(
     .map(([name, members], index) => ({
       name,
       members: members.sort(compareStaff),
-      accentClass: DEPARTMENT_ACCENTS[index % DEPARTMENT_ACCENTS.length],
-    }))
+      accentClass: DEPARTMENT_ACCENTS[index % DEPARTMENT_ACCENTS.length] }))
     .sort(compareDepartment);
 
   // 병원: org_teams DB에서 division 구조 읽기
@@ -431,8 +425,7 @@ function Avatar({
   staff,
   size = 'md',
   isWorking = false,
-  presenceState,
-}: {
+  presenceState }: {
   staff: StaffMember;
   size?: 'sm' | 'md' | 'lg';
   isWorking?: boolean;
@@ -506,8 +499,7 @@ function PresenceBadge({ presence, compact = false, testId }: { presence: Presen
 function StaffChip({
   staff,
   onSelect,
-  presence,
-}: {
+  presence }: {
   staff: StaffMember;
   onSelect: (s: StaffMember) => void;
   presence: PresenceMeta;
@@ -530,8 +522,7 @@ function StaffChip({
 function DepartmentColumn({
   department,
   onSelect,
-  attendanceByStaffId,
-}: {
+  attendanceByStaffId }: {
   department: DepartmentGroup;
   onSelect: (s: StaffMember) => void;
   attendanceByStaffId: Map<string, AttendanceSnapshot>;
@@ -563,8 +554,7 @@ function DepartmentColumn({
 function LeaderCard({
   leader,
   onSelect,
-  presence,
-}: {
+  presence }: {
   leader: StaffMember;
   onSelect: (s: StaffMember) => void;
   presence: PresenceMeta;
@@ -588,8 +578,7 @@ function LeaderCard({
 function ManagerRow({
   managers,
   onSelect,
-  attendanceByStaffId,
-}: {
+  attendanceByStaffId }: {
   managers: StaffMember[];
   onSelect: (s: StaffMember) => void;
   attendanceByStaffId: Map<string, AttendanceSnapshot>;
@@ -631,8 +620,7 @@ function ManagerRow({
 function DivisionSection({
   division,
   onSelect,
-  attendanceByStaffId,
-}: {
+  attendanceByStaffId }: {
   division: DivisionGroup;
   onSelect: (s: StaffMember) => void;
   attendanceByStaffId: Map<string, AttendanceSnapshot>;
@@ -683,8 +671,7 @@ function countWorkingMembers(tree: CompanyTree, attendanceByStaffId: Map<string,
 function CompanyPyramid({
   tree,
   onSelect,
-  attendanceByStaffId,
-}: {
+  attendanceByStaffId }: {
   tree: CompanyTree;
   onSelect: (s: StaffMember) => void;
   attendanceByStaffId: Map<string, AttendanceSnapshot>;
@@ -763,8 +750,7 @@ export default function OrgChart({
   staffs = [],
   selectedCo,
   setSelectedCo,
-  compact = false,
-}: OrgChartProps) {
+  compact = false }: OrgChartProps) {
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showWorkingOnly, setShowWorkingOnly] = useState(false);
@@ -815,11 +801,11 @@ export default function OrgChart({
       setIsLoadingAttendance(true);
       try {
         const [attendanceRows, legacyAttendanceRows] = await Promise.allSettled([
-          supabase
+          db
             .from('attendance')
             .select('staff_id, date, check_in, check_out, status')
             .eq('date', todayKey),
-          supabase
+          db
             .from('attendances')
             .select('staff_id, work_date, check_in_time, check_out_time, status')
             .eq('work_date', todayKey),
@@ -843,8 +829,7 @@ export default function OrgChart({
               ...existing,
               ...row,
               staff_id: key,
-              date: existing?.date ?? row.work_date ?? todayKey,
-            });
+              date: existing?.date ?? row.work_date ?? todayKey });
           });
         }
 
@@ -930,8 +915,7 @@ export default function OrgChart({
         .filter((staff) => !isResignedStaff(staff))
         .map((staff) => ({
           staff,
-          attendance: attendanceByStaffId.get(staff.id) ?? null,
-        }))
+          attendance: attendanceByStaffId.get(staff.id) ?? null }))
         .filter(
           (entry): entry is { staff: StaffMember; attendance: AttendanceSnapshot } =>
             isWorkingAttendance(entry.attendance),
@@ -993,8 +977,7 @@ export default function OrgChart({
     return Array.from(grouped.entries())
       .map(([label, members]) => ({
         label,
-        members: members.sort((left, right) => compareStaff(left.staff, right.staff)),
-      }))
+        members: members.sort((left, right) => compareStaff(left.staff, right.staff)) }))
       .sort((left, right) => {
         const sizeDiff = right.members.length - left.members.length;
         if (sizeDiff !== 0) return sizeDiff;
@@ -1138,8 +1121,7 @@ export default function OrgChart({
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
-                      timeZone: 'Asia/Seoul',
-                    })} 갱신
+                      timeZone: 'Asia/Seoul' })} 갱신
                   </span>
                 ) : null}
               </div>

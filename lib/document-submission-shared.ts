@@ -65,8 +65,7 @@ export function validateDocUpload(file: { type: string; size: number }): DocVali
     return {
       ok: false,
       reason: 'size',
-      message: `파일 크기는 ${DOC_MAX_FILE_SIZE_LABEL} 이하여야 합니다. 현재: ${currentMb} MB`,
-    };
+      message: `파일 크기는 ${DOC_MAX_FILE_SIZE_LABEL} 이하여야 합니다. 현재: ${currentMb} MB` };
   }
   const mime = normalizeDocMime(file.type || '');
   if (!ALLOWED_MIME_SET.has(mime)) {
@@ -75,8 +74,7 @@ export function validateDocUpload(file: { type: string; size: number }): DocVali
       reason: 'mime',
       message: file.type
         ? `허용되지 않는 파일 형식입니다 (${file.type}). ${DOC_ALLOWED_FORMATS_LABEL}만 가능합니다.`
-        : `파일 형식을 확인할 수 없습니다. ${DOC_ALLOWED_FORMATS_LABEL} 파일을 사용하세요.`,
-    };
+        : `파일 형식을 확인할 수 없습니다. ${DOC_ALLOWED_FORMATS_LABEL} 파일을 사용하세요.` };
   }
   return { ok: true, mime };
 }
@@ -171,8 +169,7 @@ export function mapRepositoryRowToSubmission(row: DocumentRepositoryRow): DocSub
     status: DOC_DEFAULT_SUBMISSION_STATUS,
     submitted_at: row.created_at,
     // 단순 제출은 별도 처리시각이 없다.
-    processed_at: null,
-  };
+    processed_at: null };
 }
 
 // ─────────────────────────────────────────────────────────────

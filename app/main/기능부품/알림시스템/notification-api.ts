@@ -41,8 +41,7 @@ function asNotificationRecord(row: unknown): NotificationRecord | null {
     body: source.body == null ? null : String(source.body),
     metadata,
     read_at: source.read_at == null ? null : String(source.read_at),
-    created_at: source.created_at == null ? null : String(source.created_at),
-  };
+    created_at: source.created_at == null ? null : String(source.created_at) };
 }
 
 async function parseNotificationResponse(response: Response): Promise<NotificationApiListResponse> {
@@ -76,8 +75,7 @@ async function mutateNotifications(method: 'PUT' | 'DELETE', body: Record<string
   const response = await fetch('/api/notifications', {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+    body: JSON.stringify(body) });
   await parseNotificationResponse(response);
 }
 

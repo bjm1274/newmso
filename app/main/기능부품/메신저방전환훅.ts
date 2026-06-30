@@ -57,8 +57,7 @@ export function useChatRoomNavigation({
   persistRoomReadCursors,
   markConversationNotificationsAsRead,
   broadcastChatSync,
-  onRoomChangeCleanup,
-}: UseChatRoomNavigationParams) {
+  onRoomChangeCleanup }: UseChatRoomNavigationParams) {
   const setRoom = useCallback((roomId: string | null) => {
     const previousSelectedRoomId = selectedRoomIdRef.current;
     const conversationRoomIds = roomId
@@ -211,6 +210,5 @@ export function useChatRoomNavigation({
     setRoom,
     scrollToBottom,
     handleRoomListClick,
-    updateScrollPositionState,
-  };
+    updateScrollPositionState };
 }

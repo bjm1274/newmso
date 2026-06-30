@@ -48,8 +48,7 @@ const KOREAN_ALIASES: Record<string, WorkcenterId> = {
   // 신규 사이드바2가 채택할 가능성이 있는 통합 라벨 (Legacy 메뉴와 겹치지 않는 것만)
   '근태이상 감지': 'abnormal',
   '연차·휴가': 'leave',
-  '계약·문서': 'docs',
-};
+  '계약·문서': 'docs' };
 
 /**
  * 주어진 id가 워크센터 라우팅 대상인지 판단.
@@ -99,8 +98,7 @@ export default function HrWorkcenterRouter({
   onOpenDocumentRepoForStaff,
   linkedTarget,
   canManageDocuments = false,
-  initialMenu,
-}: HrWorkcenterRouterProps) {
+  initialMenu }: HrWorkcenterRouterProps) {
   const view = useMemo(() => {
     switch (workcenterId) {
       case 'member':
@@ -196,6 +194,5 @@ export {
   AbnormalWorkcenter,
   PayrollWorkcenter,
   WelfareWorkcenter,
-  DocsWorkcenter,
-};
+  DocsWorkcenter };
 export type { WorkcenterId };

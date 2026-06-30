@@ -1,10 +1,10 @@
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { chunkArray } from './메신저방데이터-utils';
 
 export async function selectMessageReactionRows(messageIds: string[]) {
   const rows: Record<string, unknown>[] = [];
   for (const chunk of chunkArray(messageIds)) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('message_reactions')
       .select('message_id, emoji, user_id')
       .in('message_id', chunk);
@@ -17,7 +17,7 @@ export async function selectMessageReactionRows(messageIds: string[]) {
 export async function selectMessageBookmarkRows(userId: string, messageIds: string[]) {
   const rows: Record<string, unknown>[] = [];
   for (const chunk of chunkArray(messageIds)) {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('message_bookmarks')
       .select('message_id')
       .eq('user_id', userId)

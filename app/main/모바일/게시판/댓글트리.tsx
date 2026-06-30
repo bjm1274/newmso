@@ -64,8 +64,7 @@ function buildTree(comments: BoardComment[]): CommentNode[] {
       const at = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
       return at - bt;
-    }),
-  }));
+    }) }));
 }
 
 function CommentBody({
@@ -74,8 +73,7 @@ function CommentBody({
   onReply,
   onDelete,
   currentUserId,
-  canAdmin,
-}: {
+  canAdmin }: {
   comment: BoardComment;
   isReply: boolean;
   onReply: (c: BoardComment) => void;
@@ -101,8 +99,7 @@ function CommentBody({
         background: isReply ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.65)',
         border: '1px solid rgba(255, 255, 255, 0.3)',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-        position: 'relative',
-      }}
+        position: 'relative' }}
     >
       {isReply && (
         <span
@@ -113,8 +110,7 @@ function CommentBody({
             top: 14,
             color: 'rgba(0, 122, 255, 0.4)',
             fontSize: 12,
-            fontWeight: 800,
-          }}
+            fontWeight: 800 }}
         >
           ↳
         </span>
@@ -138,8 +134,7 @@ function CommentBody({
                 borderRadius: 4,
                 background: 'rgba(0, 122, 255, 0.06)',
                 border: 'none',
-                cursor: 'pointer',
-              }}
+                cursor: 'pointer' }}
             >
               답글
             </button>
@@ -161,8 +156,7 @@ function CommentBody({
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 2,
-              }}
+                gap: 2 }}
             >
               <MIcon name="trash" size={11} color="var(--danger)" />
               삭제
@@ -177,8 +171,7 @@ function CommentBody({
             lineHeight: 1.5,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            fontWeight: 500,
-          }}
+            fontWeight: 500 }}
         >
           {body}
         </div>
@@ -198,8 +191,7 @@ export default function BoardCommentTree({ comments, onReply, onDelete, currentU
           padding: '20px 0',
           fontSize: 12,
           color: 'var(--z-500)',
-          fontWeight: 600,
-        }}
+          fontWeight: 600 }}
       >
         아직 댓글이 없습니다. 첫 댓글을 남겨보세요.
       </div>

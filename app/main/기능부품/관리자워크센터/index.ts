@@ -49,8 +49,7 @@ const ADMIN_WORKCENTER_MAP: Record<AdminWorkcenterId, ComponentType<any>> = {
   roles: RolesWorkcenter,
   ops: OpsWorkcenter,
   forms: FormsWorkcenter,
-  audit: AuditWorkcenter,
-};
+  audit: AuditWorkcenter };
 
 /**
  * 주어진 값이 관리자 워크센터 id인지 판단.

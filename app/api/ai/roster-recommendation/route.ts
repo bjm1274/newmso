@@ -217,15 +217,11 @@ const responseSchema: ResponseSchema = {
         includesNight: { type: SchemaType.BOOLEAN },
         reasoning: {
           type: SchemaType.ARRAY,
-          items: { type: SchemaType.STRING },
-        },
+          items: { type: SchemaType.STRING } },
         planningFocus: {
           type: SchemaType.ARRAY,
-          items: { type: SchemaType.STRING },
-        },
-      },
-      required: ['teamPurpose', 'workMode', 'includesNight', 'reasoning', 'planningFocus'],
-    },
+          items: { type: SchemaType.STRING } } },
+      required: ['teamPurpose', 'workMode', 'includesNight', 'reasoning', 'planningFocus'] },
     staffPlans: {
       type: SchemaType.ARRAY,
       items: {
@@ -236,15 +232,9 @@ const responseSchema: ResponseSchema = {
           rationale: { type: SchemaType.STRING },
           assignments: {
             type: SchemaType.ARRAY,
-            items: { type: SchemaType.STRING },
-          },
-        },
-        required: ['staffId', 'modeLabel', 'rationale', 'assignments'],
-      },
-    },
-  },
-  required: ['summary', 'teamAnalysis', 'staffPlans'],
-};
+            items: { type: SchemaType.STRING } } },
+        required: ['staffId', 'modeLabel', 'rationale', 'assignments'] } } },
+  required: ['summary', 'teamAnalysis', 'staffPlans'] };
 
 function normalizeShiftName(name: string) {
   return String(name || '').replace(/\s+/g, '').toLowerCase();
@@ -333,31 +323,27 @@ function deriveTeamHint({ selectedDepartment, workShifts }: RequestBody) {
     return {
       mode: '24시간 교대 가능성 높음',
       reason:
-        '팀명상 병동/입원/응급/수술 계열로 보이며, 등록된 근무형태에 야간이 있어 주야간 편성이 필요할 가능성이 높습니다.',
-    };
+        '팀명상 병동/입원/응급/수술 계열로 보이며, 등록된 근무형태에 야간이 있어 주야간 편성이 필요할 가능성이 높습니다.' };
   }
 
   if (matchesDayOnly && !hasNightShift) {
     return {
       mode: '주간 전용 가능성 높음',
       reason:
-        '외래/행정/원무 계열 팀명이며 야간 근무형태가 없어 평일 중심 주간 근무일 가능성이 높습니다.',
-    };
+        '외래/행정/원무 계열 팀명이며 야간 근무형태가 없어 평일 중심 주간 근무일 가능성이 높습니다.' };
   }
 
   if (hasNightShift && hasEveningShift && hasSevenDayShift) {
     return {
       mode: '야간 포함 운영 가능성 있음',
       reason:
-        '등록된 근무형태에 이브닝/나이트/주말 포함 근무가 있어 야간 포함 순환 편성이 필요한 팀일 수 있습니다.',
-    };
+        '등록된 근무형태에 이브닝/나이트/주말 포함 근무가 있어 야간 포함 순환 편성이 필요한 팀일 수 있습니다.' };
   }
 
   return {
     mode: '주간 중심 운영 가능성 있음',
     reason:
-      '팀명과 등록 근무형태만으로는 24시간 운영 근거가 강하지 않아, 주간 중심 편성 여부를 우선 검토해야 합니다.',
-  };
+      '팀명과 등록 근무형태만으로는 24시간 운영 근거가 강하지 않아, 주간 중심 편성 여부를 우선 검토해야 합니다.' };
 }
 
 function isSeniorStaff(staff: RequestStaff) {
@@ -381,8 +367,7 @@ function normalizePreAssignedEntries(preAssigned?: Record<string, string>) {
         key,
         staffId: String(staffId || '').trim(),
         date: String(date || '').trim(),
-        shiftId: String(shiftId || '').trim(),
-      };
+        shiftId: String(shiftId || '').trim() };
     })
     .filter((entry) => entry.staffId && entry.date && entry.shiftId);
 }
@@ -510,8 +495,7 @@ function createEmptyBandCounts() {
   return {
     day: 0,
     evening: 0,
-    night: 0,
-  } satisfies Record<'day' | 'evening' | 'night', number>;
+    night: 0 } satisfies Record<'day' | 'evening' | 'night', number>;
 }
 
 function normalizeRequestRoleCoverageRules(value: RequestRoleCoverageRule[] | undefined) {
@@ -522,8 +506,7 @@ function normalizeRequestRoleCoverageRules(value: RequestRoleCoverageRule[] | un
       keywords: normalizeCoverageRoleTags(roleRule.keywords || []),
       minDayStaff: Math.max(0, Math.floor(roleRule.minDayStaff || 0)),
       minEveningStaff: Math.max(0, Math.floor(roleRule.minEveningStaff || 0)),
-      minNightStaff: Math.max(0, Math.floor(roleRule.minNightStaff || 0)),
-    }))
+      minNightStaff: Math.max(0, Math.floor(roleRule.minNightStaff || 0)) }))
     .filter(
       (roleRule) =>
         roleRule.keywords.length > 0 &&
@@ -538,8 +521,7 @@ function normalizeRequestDateCoverageOverrides(value: RequestDateCoverageOverrid
       date: String(entry.date || '').trim().slice(0, 10),
       minDayStaff: Math.max(0, Math.floor(entry.minDayStaff || 0)),
       minEveningStaff: Math.max(0, Math.floor(entry.minEveningStaff || 0)),
-      minNightStaff: Math.max(0, Math.floor(entry.minNightStaff || 0)),
-    }))
+      minNightStaff: Math.max(0, Math.floor(entry.minNightStaff || 0)) }))
     .filter(
       (entry) =>
         /^\d{4}-\d{2}-\d{2}$/.test(entry.date) &&
@@ -564,8 +546,7 @@ function normalizeRequestPairRules(value: RequestPairRule[] | undefined, staffId
         primaryStaffId,
         secondaryStaffId,
         mode,
-        band,
-      };
+        band };
     })
     .filter(
       (
@@ -607,8 +588,7 @@ function getBandTargetsForDate(payload: RequestBody, dateKey: string) {
   const baseTargets = {
     day: Math.max(0, Math.floor(payload.constraints?.minDayReq ?? 0)),
     evening: Math.max(0, Math.floor(payload.constraints?.minEveReq ?? 0)),
-    night: Math.max(0, Math.floor(payload.constraints?.minNightReq ?? 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
+    night: Math.max(0, Math.floor(payload.constraints?.minNightReq ?? 0)) } satisfies Record<'day' | 'evening' | 'night', number>;
   const dateOverride = normalizeRequestDateCoverageOverrides(
     payload.constraints?.dateCoverageOverrides
   ).find((entry) => entry.date === dateKey);
@@ -617,10 +597,8 @@ function getBandTargetsForDate(payload: RequestBody, dateKey: string) {
       targets: {
         day: dateOverride.minDayStaff,
         evening: dateOverride.minEveningStaff,
-        night: dateOverride.minNightStaff,
-      },
-      source: `${dateKey} override`,
-    };
+        night: dateOverride.minNightStaff },
+      source: `${dateKey} override` };
   }
 
   if (isKoreanPublicHoliday(dateKey)) {
@@ -633,10 +611,8 @@ function getBandTargetsForDate(payload: RequestBody, dateKey: string) {
         targets: {
           day: Math.max(0, Math.floor(payload.constraints?.holidayMinDayReq ?? 0)),
           evening: Math.max(0, Math.floor(payload.constraints?.holidayMinEveReq ?? 0)),
-          night: Math.max(0, Math.floor(payload.constraints?.holidayMinNightReq ?? 0)),
-        },
-        source: 'holiday override',
-      };
+          night: Math.max(0, Math.floor(payload.constraints?.holidayMinNightReq ?? 0)) },
+        source: 'holiday override' };
     }
   }
 
@@ -650,17 +626,14 @@ function getBandTargetsForDate(payload: RequestBody, dateKey: string) {
         targets: {
           day: Math.max(0, Math.floor(payload.constraints?.weekendMinDayReq ?? 0)),
           evening: Math.max(0, Math.floor(payload.constraints?.weekendMinEveReq ?? 0)),
-          night: Math.max(0, Math.floor(payload.constraints?.weekendMinNightReq ?? 0)),
-        },
-        source: 'weekend override',
-      };
+          night: Math.max(0, Math.floor(payload.constraints?.weekendMinNightReq ?? 0)) },
+        source: 'weekend override' };
     }
   }
 
   return {
     targets: baseTargets,
-    source: 'base rule',
-  };
+    source: 'base rule' };
 }
 
 function getRoleCoverageTargetByBand(
@@ -993,13 +966,11 @@ function buildFallbackRecommendation(
   const seniorTargets = {
     day: Math.max(0, Math.floor(payload.constraints?.minSeniorDayReq ?? 0)),
     evening: Math.max(0, Math.floor(payload.constraints?.minSeniorEveReq ?? 0)),
-    night: Math.max(0, Math.floor(payload.constraints?.minSeniorNightReq ?? 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
+    night: Math.max(0, Math.floor(payload.constraints?.minSeniorNightReq ?? 0)) } satisfies Record<'day' | 'evening' | 'night', number>;
   const dedicatedTargets = {
     day: Math.max(0, Math.floor(payload.constraints?.minDedicatedDayReq ?? 0)),
     evening: Math.max(0, Math.floor(payload.constraints?.minDedicatedEveReq ?? 0)),
-    night: Math.max(0, Math.floor(payload.constraints?.minDedicatedNightReq ?? 0)),
-  } satisfies Record<'day' | 'evening' | 'night', number>;
+    night: Math.max(0, Math.floor(payload.constraints?.minDedicatedNightReq ?? 0)) } satisfies Record<'day' | 'evening' | 'night', number>;
   const roleRules = normalizeRequestRoleCoverageRules(payload.constraints?.roleCoverageRules);
 
   const makeDefaultStaffPlans = () =>
@@ -1032,8 +1003,7 @@ function buildFallbackRecommendation(
         rationale: supportsNight
           ? '팀 특성과 등록 근무형태를 기준으로 주야간 교대형 초안을 먼저 배치했습니다.'
           : '팀 특성과 등록 근무형태를 기준으로 주간형 초안을 먼저 배치했습니다.',
-        assignments,
-      };
+        assignments };
     });
 
   if (!supportsNight || !dayShift || !nightShift) {
@@ -1048,10 +1018,8 @@ function buildFallbackRecommendation(
         reasoning: [teamHint.reason].concat(errorMessage ? ['Gemini 응답 오류로 기본 로직 사용'] : []),
         planningFocus: supportsNight
           ? ['주야간 순환 유지', '야간 인력 공백 방지', 'OFF 분산']
-          : ['평일 근무 유지', '주말 휴무 반영', '주간 인력 우선'],
-      },
-      staffPlans: makeDefaultStaffPlans(),
-    };
+          : ['평일 근무 유지', '주말 휴무 반영', '주간 인력 우선'] },
+      staffPlans: makeDefaultStaffPlans() };
   }
 
   const availableBands = new Set(
@@ -1084,8 +1052,7 @@ function buildFallbackRecommendation(
       avoidWeekendWork: staff.avoidWeekendWork === true,
       avoidHolidayWork: staff.avoidHolidayWork === true,
       minNight,
-      maxNight: requestedMaxNight > 0 ? requestedMaxNight : payload.monthDates.length,
-    };
+      maxNight: requestedMaxNight > 0 ? requestedMaxNight : payload.monthDates.length };
   });
 
   staffStates.forEach((state) => {
@@ -1170,8 +1137,7 @@ function buildFallbackRecommendation(
   const canAssignFallbackShift = ({
     state,
     shift,
-    dateIndex,
-  }: {
+    dateIndex }: {
     state: (typeof staffStates)[number];
     shift: RequestWorkShift;
     dateIndex: number;
@@ -1463,8 +1429,7 @@ function buildFallbackRecommendation(
   const promoteCandidateToBand = ({
     state,
     dateIndex,
-    targetBand,
-  }: {
+    targetBand }: {
     state: (typeof staffStates)[number];
     dateIndex: number;
     targetBand: 'day' | 'evening' | 'night';
@@ -1581,8 +1546,7 @@ function buildFallbackRecommendation(
                         id: left.assignments[dateIndex] || '',
                         name: '',
                         start_time: null,
-                        end_time: null,
-                      }
+                        end_time: null }
                     )
                   : null;
               const rightCurrentBand =
@@ -1592,8 +1556,7 @@ function buildFallbackRecommendation(
                         id: right.assignments[dateIndex] || '',
                         name: '',
                         start_time: null,
-                        end_time: null,
-                      }
+                        end_time: null }
                     )
                   : null;
               const leftPriority = leftCurrentBand === null ? 0 : leftCurrentBand === targetBand ? 2 : 1;
@@ -1650,8 +1613,7 @@ function buildFallbackRecommendation(
         : '제약 기반 병동 fallback',
     rationale:
       'Gemini 응답 실패 시에도 최소 인원, 희망 OFF, 나이트 제한, 회복휴무 기준을 우선 반영한 병동 3교대 초안입니다.',
-    assignments: state.assignments,
-  }));
+    assignments: state.assignments }));
 
   return {
     summary: errorMessage
@@ -1664,10 +1626,8 @@ function buildFallbackRecommendation(
       reasoning: [teamHint.reason].concat(errorMessage ? ['Gemini 응답 오류로 제약 기반 fallback 사용'] : []),
       planningFocus: supportsNight
         ? ['최소 D/E/N 충족 우선', '나이트 후 회복휴무 보호', '희망 OFF 및 승인휴가 유지']
-        : ['평일 근무 유지', '주말 휴무 반영', '주간 인력 우선'],
-    },
-    staffPlans,
-  };
+        : ['평일 근무 유지', '주말 휴무 반영', '주간 인력 우선'] },
+    staffPlans };
 }
 
 async function requestRecommendation(payload: RequestBody): Promise<GeminiRecommendationResponse> {
@@ -1688,9 +1648,7 @@ async function requestRecommendation(payload: RequestBody): Promise<GeminiRecomm
           temperature: 0.2,
           maxOutputTokens: 8192,
           responseMimeType: 'application/json',
-          responseSchema,
-        },
-      });
+          responseSchema } });
 
       const result = await withTimeout(
         model.generateContent(prompt),
@@ -1745,8 +1703,7 @@ export async function POST(request: NextRequest) {
       patternProfile: body.patternProfile || null,
       generationBasis: String(body.generationBasis || '').trim(),
       constraints: body.constraints,
-      preAssigned: body.preAssigned,
-    };
+      preAssigned: body.preAssigned };
 
     if (!payload.selectedMonth || !payload.selectedCompany || !payload.selectedDepartment) {
       return NextResponse.json(

@@ -17,14 +17,12 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import {
   work_shifts as workShiftsTable,
   getD1Binding,
-  getD1Drizzle,
-} from '@/lib/db';
+  getD1Drizzle } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 const PayloadSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(100),
-});
+  ids: z.array(z.string().uuid()).min(1).max(100) });
 
 function hasPermission(user: SessionUser | null | undefined): boolean {
   if (!user) return false;

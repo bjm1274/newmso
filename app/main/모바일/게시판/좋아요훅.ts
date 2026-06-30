@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 
 const LIKE_TABLE = 'board_post_likes';
@@ -29,7 +29,7 @@ function isMissingTable(err: unknown): boolean {
 export async function loadMyLikes(userId: string | null): Promise<Set<string>> {
   if (!userId) return new Set();
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from(LIKE_TABLE)
       .select('post_id')
       .eq('user_id', userId);
@@ -73,14 +73,14 @@ export async function toggleLike(
 
   try {
     if (prevLiked) {
-      const { error } = await supabase
+      const { error } = await db
         .from(LIKE_TABLE)
         .delete()
         .eq('post_id', postId)
         .eq('user_id', userId);
       if (error && !isMissingTable(error)) throw error;
     } else {
-      const { error } = await supabase
+      const { error } = await db
         .from(LIKE_TABLE)
         .insert([{ post_id: postId, user_id: userId }]);
       // 23505 = unique 충돌 → 이미 like 상태였다고 보고 진행
@@ -90,14 +90,14 @@ export async function toggleLike(
     }
 
     // 실제 count 동기화
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await db
       .from(LIKE_TABLE)
       .select('id', { count: 'exact', head: true })
       .eq('post_id', postId);
     const realCount = countError ? (nextLiked ? prevLikes + 1 : Math.max(prevLikes - 1, 0)) : (count ?? 0);
 
     // board_posts.likes_count 업데이트는 best-effort
-    void supabase.from('board_posts').update({ likes_count: realCount }).eq('id', postId);
+    void db.from('board_posts').update({ likes_count: realCount }).eq('id', postId);
 
     return { liked: nextLiked, likesCount: realCount, ok: true };
   } catch (err) {

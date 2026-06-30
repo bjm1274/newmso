@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { db } from './db-client';
 
 export const DOCUMENT_DESIGN_SETTING_KEY = 'document_designs_v2';
 const LOCAL_SYSTEM_SETTING_PREFIX = 'erp_local_system_setting_';
@@ -44,8 +44,7 @@ export const DEFAULT_DOCUMENT_DESIGNS: Record<DocumentDesignType, DocumentDesign
     primaryColor: '#163b70',
     borderColor: '#d8e1ee',
     footerText: '본 문서는 전자 발급된 급여 확인 문서이며 회사 보관본과 동일한 효력을 가집니다.',
-    showSignArea: true,
-  },
+    showSignArea: true },
   certificate: {
     title: '재직증명서',
     subtitle: '',
@@ -53,15 +52,12 @@ export const DEFAULT_DOCUMENT_DESIGNS: Record<DocumentDesignType, DocumentDesign
     primaryColor: '#197c86',
     borderColor: '#d7dee5',
     footerText: '',
-    showSignArea: true,
-  },
-};
+    showSignArea: true } };
 
 const EMPTY_STORE: DocumentDesignStore = {
   version: 2,
   defaults: {},
-  companies: {},
-};
+  companies: {} };
 
 function isMissingTableError(error: any, tableName = 'system_settings') {
   if (!error) return false;
@@ -166,13 +162,12 @@ export function normalizeDocumentDesignStore(value: unknown): DocumentDesignStor
   return {
     version: 2,
     defaults,
-    companies,
-  };
+    companies };
 }
 
 async function readSetting(key: string) {
   const localValue = readLocalSystemSetting(key);
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('system_settings')
     .select('value')
     .eq('key', key)
@@ -239,8 +234,7 @@ export function resolveDocumentDesignReference(
     return {
       ...base,
       title: fallbackTitle,
-      companyLabel: base.companyLabel,
-    };
+      companyLabel: base.companyLabel };
   }
 
   const defaults = store?.defaults?.[type] || {};
@@ -248,8 +242,7 @@ export function resolveDocumentDesignReference(
     ...base,
     ...defaults,
     title: defaults.title || fallbackTitle,
-    companyLabel: buildCompanyLabel(base, defaults, companyName),
-  };
+    companyLabel: buildCompanyLabel(base, defaults, companyName) };
 }
 
 export function resolveDocumentDesign(
@@ -269,8 +262,7 @@ export function resolveDocumentDesign(
     title: companyScoped.title || defaults.title || fallbackTitle,
     companyLabel:
       companyScoped.companyLabel ||
-      buildCompanyLabel(base, defaults, companyName),
-  };
+      buildCompanyLabel(base, defaults, companyName) };
 }
 
 export function getDocumentDesignScopePatch(
@@ -339,8 +331,7 @@ export function compactDocumentDesignStore(store: DocumentDesignStore | null | u
   return {
     version: 2,
     defaults,
-    companies,
-  } satisfies DocumentDesignStore;
+    companies } satisfies DocumentDesignStore;
 }
 
 export async function fetchDocumentDesignStore() {
@@ -356,12 +347,11 @@ export async function saveDocumentDesignStore(store: DocumentDesignStore) {
   const payload = {
     key: DOCUMENT_DESIGN_SETTING_KEY,
     value: JSON.stringify(compacted),
-    updated_at: new Date().toISOString(),
-  };
+    updated_at: new Date().toISOString() };
 
   writeLocalSystemSetting(DOCUMENT_DESIGN_SETTING_KEY, compacted);
 
-  const result = await supabase
+  const result = await db
     .from('system_settings')
     .upsert(payload, { onConflict: 'key' });
   if (isMissingTableError(result.error, 'system_settings')) {
@@ -379,12 +369,9 @@ export function updateDocumentDesignStore(
   const next: DocumentDesignStore = {
     version: 2,
     defaults: {
-      ...store.defaults,
-    },
+      ...store.defaults },
     companies: {
-      ...store.companies,
-    },
-  };
+      ...store.companies } };
 
   const reference = resolveDocumentDesignReference(store, type, companyName);
   const patch = buildDocumentDesignPatch(reference, design);
@@ -400,8 +387,7 @@ export function updateDocumentDesignStore(
   }
 
   const currentScoped = {
-    ...(store.companies[companyName] || {}),
-  };
+    ...(store.companies[companyName] || {}) };
 
   if (hasPatchValue(patch)) {
     currentScoped[type] = patch;
@@ -427,12 +413,9 @@ export function resetDocumentDesignScope(
   const next: DocumentDesignStore = {
     version: 2,
     defaults: {
-      ...store.defaults,
-    },
+      ...store.defaults },
     companies: {
-      ...store.companies,
-    },
-  };
+      ...store.companies } };
 
   if (!companyName) {
     const { [type]: _removed, ...rest } = next.defaults;

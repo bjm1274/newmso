@@ -12,8 +12,7 @@ import type { SurgeryTemplateRow } from './schedule-helpers';
 import {
   createChecklistItem,
   emptyTemplateEditor,
-  normalizeChecklistItems,
-} from './checklist-helpers';
+  normalizeChecklistItems } from './checklist-helpers';
 import type { ChecklistItemDraft, TemplateEditorState } from './checklist-helpers';
 import { OpCheckTemplateChecklistItemRows } from './ChecklistItemRows';
 
@@ -46,8 +45,7 @@ export function OpCheckTemplateManagerPanel({
   updateTemplateEditorList,
   onSaveTemplate,
   onLoadTemplate,
-  onRemoveTemplate,
-}: OpCheckTemplateManagerPanelProps) {
+  onRemoveTemplate }: OpCheckTemplateManagerPanelProps) {
   return (
     <div
       data-testid="op-check-template-layout"
@@ -76,8 +74,7 @@ export function OpCheckTemplateManagerPanel({
                   ...prev,
                   template_scope: 'anesthesia',
                   surgery_template_id: '',
-                  surgery_name: '',
-                }))
+                  surgery_name: '' }))
               }
               className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold ${
                 templateEditor.template_scope === 'anesthesia'
@@ -121,8 +118,7 @@ export function OpCheckTemplateManagerPanel({
                       ...prev,
                       surgery_template_id: event.target.value,
                       surgery_name: selectedTemplate?.name || prev.surgery_name,
-                      template_name: prev.template_name || selectedTemplate?.name || '',
-                    }));
+                      template_name: prev.template_name || selectedTemplate?.name || '' }));
                   }}
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-medium"
                 >
@@ -143,8 +139,7 @@ export function OpCheckTemplateManagerPanel({
                     setTemplateEditor((prev) => ({
                       ...prev,
                       anesthesia_type: event.target.value,
-                      template_name: prev.template_name || event.target.value,
-                    }))
+                      template_name: prev.template_name || event.target.value }))
                   }
                   className="mt-1 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none cursor-pointer"
                 >

@@ -24,8 +24,7 @@ import {
   canAccessMainMenu,
   hasUserPayloadChanged,
   normalizeMainMenuForUser,
-  canAccessFinanceSection,
-} from '@/lib/access-control';
+  canAccessFinanceSection } from '@/lib/access-control';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 import { getDisplayedAdminSubView } from './admin-menu-config';
 import {
@@ -33,8 +32,7 @@ import {
   getSavedSubViewForMenu,
   persistTopLevelNavigationState,
   readStoredMainNavigationState,
-  resetPersistedMenuState,
-} from './navigation-state';
+  resetPersistedMenuState } from './navigation-state';
 
 import Sidebar, { MenuIcon, SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -175,8 +173,7 @@ function MainPageContent() {
       shareFileCount: Number(searchParams.get('share_file_count') || '0'),
       shareText: searchParams.get('share_text')?.trim() || null,
       shareUrl: searchParams.get('share_url')?.trim() || null,
-      shareTitle: searchParams.get('share_title')?.trim() || null,
-    }),
+      shareTitle: searchParams.get('share_title')?.trim() || null }),
     [searchParams]
   );
 
@@ -253,24 +250,24 @@ function MainPageContent() {
         '구매/발주': '발주',
         '품목/자산': '자산',
         '분석/마감': '월마감',
-        // 레거시 한글 id → 워크센터 id 매핑
+        // 레거시 한글 id → 7대 워크센터 영문 id 매핑
         현황: 'status',
-        이력: 'io',
+        이력: 'inout',
         수요예측: 'analyze',
-        등록: 'item',
-        스캔: 'item',
-        발주: 'io',
-        재고실사: 'analyze',
-        이관: 'io',
-        납품확인서: 'io',
-        UDI: 'item',
-        자산: 'item',
-        거래처: 'io',
-        카테고리: 'item',
+        등록: 'inout',
+        스캔: 'master',
+        발주: 'order',
+        재고실사: 'audit',
+        이관: 'audit',
+        납품확인서: 'order',
+        UDI: 'udi',
+        자산: 'master',
+        거래처: 'master',
+        카테고리: 'master',
         AS반품: 'analyze',
         소모품통계: 'analyze',
         월마감: 'analyze',
-      };
+        내부서재고: 'status' };
 
       if (menuId === '재고관리' && subViewId && inventoryViewAliases[subViewId]) {
         return { menuId: '재고관리', subViewId: inventoryViewAliases[subViewId] };
@@ -294,8 +291,7 @@ function MainPageContent() {
         return {
           menuId: '인사관리',
           subViewId:
-            subViewId === '교육' || subViewId === '오프보딩' ? subViewId : '입퇴사·교육센터',
-        };
+            subViewId === '교육' || subViewId === '오프보딩' ? subViewId : '입퇴사·교육센터' };
       }
 
       if (
@@ -315,8 +311,7 @@ function MainPageContent() {
             subViewId === '의료기기점검' ||
             subViewId === '사고보고서'
               ? subViewId
-              : '자격·안전센터',
-        };
+              : '자격·안전센터' };
       }
 
       if (
@@ -328,8 +323,7 @@ function MainPageContent() {
           subViewId:
             subViewId === '문서보관함' || subViewId === '증명서' || subViewId === '서류제출'
               ? subViewId
-              : '문서센터',
-        };
+              : '문서센터' };
       }
 
       if (menuId === '관리자' && subViewId === '비품대여설정') {
@@ -400,11 +394,9 @@ function MainPageContent() {
             ? normalizeProfileUser({
                 ...staff,
                 ...nextUser,
-                permissions: nextUser.permissions || staff.permissions,
-              })
+                permissions: nextUser.permissions || staff.permissions })
             : staff
-        ),
-      }));
+        ) }));
     };
 
     window.addEventListener('erp-profile-updated', handleProfileUpdated as EventListener);
@@ -433,8 +425,7 @@ function MainPageContent() {
                   openMessage: params.get('open_msg')?.trim() || null,
                   openMenu: params.get('open_menu')?.trim() || null,
                   openSubView: params.get('open_subview')?.trim() || null,
-                  openPost: params.get('open_post')?.trim() || null,
-                };
+                  openPost: params.get('open_post')?.trim() || null };
               })()
             : null;
 
@@ -444,8 +435,7 @@ function MainPageContent() {
         try {
           const response = await fetch('/api/auth/session', {
             method: 'GET',
-            cache: 'no-store',
-          });
+            cache: 'no-store' });
           if (response.status === 401) {
             mustLogout = true;
           } else if (response.ok) {
@@ -540,8 +530,7 @@ function MainPageContent() {
           if (isLegacyOfficialDocumentAdminTarget(savedMenu, savedSubView)) {
             setInitialApprovalIntent({
               viewMode: '작성하기',
-              formType: '공문발송',
-            });
+              formType: '공문발송' });
           }
         }
 
@@ -736,8 +725,7 @@ function MainPageContent() {
       fileCount: navigationIntent.shareFileCount,
       text: navigationIntent.shareText,
       url: navigationIntent.shareUrl,
-      title: navigationIntent.shareTitle,
-    });
+      title: navigationIntent.shareTitle });
     clearNavigationQuery();
   }, [clearNavigationQuery, navigationIntent.shareFileCount, navigationIntent.shareId, navigationIntent.shareText, navigationIntent.shareTitle, navigationIntent.shareUrl]);
 
@@ -783,19 +771,16 @@ function MainPageContent() {
         setInitialApprovalIntent({
           viewMode: '작성하기',
           formType: openFormType,
-          extraData: openTargetStaffId ? { targetStaffId: openTargetStaffId } : undefined,
-        });
+          extraData: openTargetStaffId ? { targetStaffId: openTargetStaffId } : undefined });
       } else if (isLegacyOfficialDocumentAdminTarget(targetMenu, targetSubView ?? savedSubView)) {
         setInitialApprovalIntent({
           viewMode: '작성하기',
-          formType: '공문발송',
-        });
+          formType: '공문발송' });
       }
       if (openApprovalId) {
         setInitialApprovalIntent({
           approvalId: openApprovalId,
-          ...(resolvedSubView ? { viewMode: resolvedSubView } : {}),
-        });
+          ...(resolvedSubView ? { viewMode: resolvedSubView } : {}) });
       }
       if (openMyPageTab) {
         setMainMenu('내정보');
@@ -845,8 +830,7 @@ function MainPageContent() {
           .from('staff_members')
           .update({
             last_seen_at: new Date().toISOString(),
-            presence_status: status,
-          })
+            presence_status: status })
           .eq('id', user.id);
       } catch {
         // presence 업데이트 실패는 무시 (주요 기능과 무관)
@@ -1024,8 +1008,7 @@ function MainPageContent() {
     '복무 · 복지': '복무 · 복지',
     '문서 · 기타': '문서 · 기타',
     게시판: '게시판',
-    참고: '참고',
-  };
+    참고: '참고' };
 
   // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
   useEffect(() => {
@@ -1137,8 +1120,7 @@ function MainPageContent() {
   useGlobalShortcuts({
     user,
     setMainMenu: shortcutSetMainMenu,
-    setSubView: shortcutSetSubView,
-  });
+    setSubView: shortcutSetSubView });
 
   const handleRefresh = useCallback(() => {
     void fetchERPData(user);
@@ -1191,8 +1173,7 @@ function MainPageContent() {
       setSelectedCo: handleSelectedCoChange as (v: string | null) => void,
       companies: companies as unknown as { id: string; name: string; type: string }[],
       selectedCompanyId,
-      setSelectedCompanyId: handleSelectedCompanyIdChange as (v: string | null) => void,
-    }),
+      setSelectedCompanyId: handleSelectedCompanyIdChange as (v: string | null) => void }),
     [companies, handleSelectedCoChange, handleSelectedCompanyIdChange, selectedCo, selectedCompanyId],
   );
   const appDataContextValue = useMemo(

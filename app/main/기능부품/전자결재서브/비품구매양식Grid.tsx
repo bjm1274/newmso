@@ -8,15 +8,13 @@ import {
   getStockTone,
   sanitizeQuantity,
   type InventoryCatalogItem,
-  type SupplyRow,
-} from './supplies-helpers';
+  type SupplyRow } from './supplies-helpers';
 
 const STOCK_CHIP_CLASS: Record<ReturnType<typeof getStockTone>, string> = {
   empty: 'bg-[var(--muted)] text-[var(--toss-gray-3)]',
   danger: 'bg-red-500/10 text-red-600',
   warn: 'bg-amber-500/15 text-amber-700',
-  normal: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  normal: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 // 표시용 단위(EA/BOX 외 추가 단위는 화면 select에서만 노출, 저장은 normalize되어 EA/BOX로 환원).
 const DISPLAY_UNITS = ['EA', 'BOX', '박', '병', 'kg', 'L'] as const;
@@ -71,8 +69,7 @@ export default function SuppliesPurchaseGrid({
   updateItemField,
   updateDropdownPosition,
   handleSort,
-  removeItemAt,
-}: SuppliesGridProps) {
+  removeItemAt }: SuppliesGridProps) {
   const handleDropdownWheel = (index: number, event: WheelEvent<HTMLDivElement>) => {
     const dropdown = event.currentTarget;
     const deltaY = event.deltaY;
@@ -118,8 +115,7 @@ export default function SuppliesPurchaseGrid({
             ))}
           </select>
         </>
-      ),
-    },
+      ) },
     {
       id: 'name',
       label: '물품명',
@@ -198,8 +194,7 @@ export default function SuppliesPurchaseGrid({
               )
             : null}
         </div>
-      ),
-    },
+      ) },
     {
       id: 'currentStock',
       label: '현재 재고',
@@ -219,8 +214,7 @@ export default function SuppliesPurchaseGrid({
             {item.currentStock === null ? '—' : `${item.currentStock} ${item.unit}`}
           </div>
         );
-      },
-    },
+      } },
     {
       id: 'qty',
       label: '신청 수량',
@@ -280,8 +274,7 @@ export default function SuppliesPurchaseGrid({
             ))}
           </select>
         </div>
-      ),
-    },
+      ) },
     {
       id: 'purpose',
       label: '용도',
@@ -301,8 +294,7 @@ export default function SuppliesPurchaseGrid({
             placeholder="사용 용도를 입력하세요"
           />
         </>
-      ),
-    },
+      ) },
   ];
 
   return (

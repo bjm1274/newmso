@@ -12,8 +12,7 @@ import {
   ResignationRequestInfoPanel,
   ReportInfoPanel,
   RosterRequestInfoPanel,
-  EmployeeEvaluationPanel,
-} from './ApprovalMetaPanels';
+  EmployeeEvaluationPanel } from './ApprovalMetaPanels';
 
 type ApprovalRecord = Record<string, unknown>;
 type TemplateMeta = { slug?: string | null; name?: string | null };
@@ -73,8 +72,7 @@ export default function ApprovalDetailModal({
   canUserRecallItem,
   handleApproveAction,
   handleRejectAction,
-  handleRecallAction,
-}: ApprovalDetailModalProps) {
+  handleRecallAction }: ApprovalDetailModalProps) {
   const timelineStaffs = approvalLookupStaffs ?? approvalDirectoryStaffs;
   if (!item) return null;
 
@@ -141,8 +139,7 @@ export default function ApprovalDetailModal({
                         ? 'var(--danger)'
                         : detailStatus === '대기'
                         ? 'var(--warning)'
-                        : 'var(--toss-gray-4)',
-                  }}
+                        : 'var(--toss-gray-4)' }}
                 >
                   {detailStatus}
                 </span>

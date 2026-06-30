@@ -2,7 +2,7 @@
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   deriveBreakPlans,
   normalizeBreakPlans,
@@ -12,8 +12,7 @@ import {
   reindexBreakPlans,
   getBreakPlan,
   indexToBreakPlanLabel,
-  type BreakPlan,
-} from './근무형태관리-break-plans';
+  type BreakPlan } from './근무형태관리-break-plans';
 
 type Shift = {
   id: string;
@@ -119,8 +118,7 @@ function createWeeklySchedule(
       enabled: mode === 'all_days' || !day.weekend,
       start_time: start,
       end_time: end,
-      break_plan_id: 'A',
-    };
+      break_plan_id: 'A' };
     return acc;
   }, {} as WeeklyShiftSchedule);
 }
@@ -138,8 +136,7 @@ function normalizeWeeklySchedule(
       enabled: current?.enabled ?? defaults[day.key].enabled,
       start_time: cleanTime(current?.start_time, defaults[day.key].start_time),
       end_time: cleanTime(current?.end_time, defaults[day.key].end_time),
-      break_plan_id: current?.break_plan_id !== undefined ? current.break_plan_id : (current as any)?.apply_break === false ? null : 'A',
-    };
+      break_plan_id: current?.break_plan_id !== undefined ? current.break_plan_id : (current as any)?.apply_break === false ? null : 'A' };
     return acc;
   }, {} as WeeklyShiftSchedule);
 }
@@ -169,8 +166,7 @@ function syncScheduleToMode(
     const shouldEnable = mode === 'all_days' || !day.weekend;
     acc[day.key] = {
       ...current[day.key],
-      enabled: shouldEnable,
-    };
+      enabled: shouldEnable };
     return acc;
   }, {} as WeeklyShiftSchedule);
 }
@@ -183,8 +179,7 @@ function updateEnabledScheduleTimes(
   return WEEKDAY_OPTIONS.reduce((acc, day) => {
     acc[day.key] = {
       ...schedule[day.key],
-      [field]: schedule[day.key].enabled ? cleanTime(value, schedule[day.key][field]) : schedule[day.key][field],
-    };
+      [field]: schedule[day.key].enabled ? cleanTime(value, schedule[day.key][field]) : schedule[day.key][field] };
     return acc;
   }, {} as WeeklyShiftSchedule);
 }
@@ -193,8 +188,7 @@ function getPrimaryScheduleTimes(schedule?: WeeklyShiftSchedule | null, fallback
   const firstEnabled = WEEKDAY_OPTIONS.map((day) => schedule?.[day.key]).find((daySchedule) => daySchedule?.enabled);
   return {
     start_time: cleanTime(firstEnabled?.start_time, fallbackStart),
-    end_time: cleanTime(firstEnabled?.end_time, fallbackEnd),
-  };
+    end_time: cleanTime(firstEnabled?.end_time, fallbackEnd) };
 }
 
 function formatWeeklyScheduleSummary(schedule?: WeeklyShiftSchedule | null, shiftType?: string | null) {
@@ -223,8 +217,7 @@ function normalizeShiftContractMeta(meta?: ShiftContractMetaInput | null): Shift
     extra_contract_allowance: Math.max(0, Number(meta?.extra_contract_allowance) || 0),
     work_day_mode: meta?.work_day_mode === 'all_days' ? 'all_days' : 'weekdays',
     daily_schedules: meta?.daily_schedules || undefined,
-    break_plans: normalizeBreakPlans(meta?.break_plans),
-  };
+    break_plans: normalizeBreakPlans(meta?.break_plans) };
 }
 
 function hasShiftContractMeta(meta?: ShiftContractMetaInput | null) {
@@ -243,8 +236,7 @@ function parseShiftDescription(rawDescription?: string | null, fallbackWorkDayMo
   if (markerIndex === -1) {
     return {
       description: description.trim(),
-      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }),
-    };
+      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }) };
   }
 
   const baseDescription = description.slice(0, markerIndex).trimEnd();
@@ -256,14 +248,11 @@ function parseShiftDescription(rawDescription?: string | null, fallbackWorkDayMo
       description: baseDescription,
       meta: normalizeShiftContractMeta({
         ...parsedMeta,
-        work_day_mode: parsedMeta?.work_day_mode ?? fallbackWorkDayMode,
-      }),
-    };
+        work_day_mode: parsedMeta?.work_day_mode ?? fallbackWorkDayMode }) };
   } catch {
     return {
       description: description.trim(),
-      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }),
-    };
+      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }) };
   }
 }
 
@@ -289,8 +278,7 @@ function calculateWorkMinutes({
   start_time,
   end_time,
   break_start_time,
-  break_end_time,
-}: {
+  break_end_time }: {
   start_time?: string | null;
   end_time?: string | null;
   break_start_time?: string | null;
@@ -339,8 +327,7 @@ function calculateWeeklyWorkHours(shift: {
           start_time: schedule?.start_time,
           end_time: schedule?.end_time,
           break_start_time: plan?.start_time || null,
-          break_end_time: plan?.end_time || null,
-        });
+          break_end_time: plan?.end_time || null });
       }, 0);
       singleMins = totalMinutes / enabledDays.length;
     } else {
@@ -373,8 +360,7 @@ function calculateWeeklyWorkHours(shift: {
         start_time: schedule.start_time,
         end_time: schedule.end_time,
         break_start_time: plan?.start_time || null,
-        break_end_time: plan?.end_time || null,
-      });
+        break_end_time: plan?.end_time || null });
     }, 0);
     return Math.round((totalMinutes / 60) * 10) / 10;
   }
@@ -449,8 +435,7 @@ function getStoredWorkDayMode(shift: {
     workDayMode,
     weeklyWorkDays,
     isWeekendWork: storedDailySchedules ? hasWeekendWork(dailySchedules) : shift.is_weekend_work ?? (workDayMode === 'all_days'),
-    dailySchedules,
-  };
+    dailySchedules };
 }
 
 function applyWorkDayMode<T extends {
@@ -483,8 +468,7 @@ function applyWorkDayMode<T extends {
     work_day_mode: nextMode,
     weekly_work_days: countEnabledWorkDays(dailySchedules),
     is_weekend_work: hasWeekendWork(dailySchedules),
-    daily_schedules: dailySchedules,
-  };
+    daily_schedules: dailySchedules };
 }
 
 function formatWorkDayMode(mode: WorkDayMode) {
@@ -508,8 +492,7 @@ function buildShiftGroupKey(shift: Shift) {
     extra_contract_allowance: shift.extra_contract_allowance ?? 0,
     work_day_mode: shift.work_day_mode || resolveWorkDayMode(shift),
     daily_schedules: shift.daily_schedules || null,
-    break_plans: shift.break_plans || [],
-  });
+    break_plans: shift.break_plans || [] });
 }
 
 function groupWorkShifts(shifts: Shift[], selectedCo?: string): ShiftGroup[] {
@@ -531,16 +514,14 @@ function groupWorkShifts(shifts: Shift[], selectedCo?: string): ShiftGroup[] {
       ...shift,
       ids: [shift.id],
       companies: companyName ? [companyName] : [],
-      groupKey,
-    });
+      groupKey });
   });
 
   return Array.from(groups.values())
     .filter((group) => !selectedCo || selectedCo === '전체' || group.companies.includes(selectedCo))
     .map((group) => ({
       ...group,
-      companies: [...group.companies].sort((a, b) => a.localeCompare(b, 'ko')),
-    }));
+      companies: [...group.companies].sort((a, b) => a.localeCompare(b, 'ko')) }));
 }
 
 function createEmptyShiftState(selectedCo?: string): ShiftFormState {
@@ -563,8 +544,7 @@ function createEmptyShiftState(selectedCo?: string): ShiftFormState {
     additional_work_hours: 0,
     extra_contract_allowance: 0,
     work_day_mode: 'weekdays' as WorkDayMode,
-    break_plans: [] as BreakPlan[],
-  }, 'weekdays');
+    break_plans: [] as BreakPlan[] }, 'weekdays');
 }
 
 export default function ShiftManagement({ selectedCo }: Record<string, unknown>) {
@@ -588,7 +568,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   const fetchShifts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('work_shifts')
         .select('*')
         .eq('is_active', true)
@@ -604,8 +584,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
           end_time: endTime,
           weekly_work_days: s.weekly_work_days,
           is_weekend_work: s.is_weekend_work,
-          description: s.description,
-        });
+          description: s.description });
         const breakPlans = deriveBreakPlans(
           storedWorkDayMode.parsedDescription.meta.break_plans,
           s.break_start_time,
@@ -629,8 +608,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
           extra_contract_allowance: storedWorkDayMode.parsedDescription.meta.extra_contract_allowance,
           work_day_mode: storedWorkDayMode.workDayMode,
           daily_schedules: storedWorkDayMode.dailySchedules,
-          break_plans: breakPlans,
-        };
+          break_plans: breakPlans };
       });
       setShifts(list);
     } catch (err) {
@@ -648,7 +626,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('companies')
           .select('name')
           .eq('is_active', true)
@@ -717,8 +695,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
       extra_contract_allowance: newShift.extra_contract_allowance,
       work_day_mode: effectiveWorkDayMode,
       daily_schedules: dailySchedules,
-      break_plans: newShift.break_plans,
-    }) || null;
+      break_plans: newShift.break_plans }) || null;
 
     const buildPayloads = (companyName: string) => ({
       fullPayload: {
@@ -732,16 +709,13 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
         shift_type: newShift.shift_type || null,
         weekly_work_days: weeklyWorkDays,
         is_weekend_work: hasWeekendWork(dailySchedules),
-        is_shift: newShift.is_shift ?? false,
-      } as any,
+        is_shift: newShift.is_shift ?? false } as any,
       minPayload: {
         name: newShift.name,
         start_time: primarySchedule.start_time,
         end_time: primarySchedule.end_time,
         description,
-        company_name: companyName,
-      } as any,
-    });
+        company_name: companyName } as any });
 
     const persistCompanyShift = async (companyName: string, id?: string) => {
       const { fullPayload } = buildPayloads(companyName);
@@ -750,8 +724,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        credentials: 'same-origin',
-      });
+        credentials: 'same-origin' });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
@@ -764,8 +737,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
-        credentials: 'same-origin',
-      });
+        credentials: 'same-origin' });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
@@ -811,16 +783,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
       title: '근무 형태 삭제',
       description: `${group.name || '선택한 근무 형태'}를 삭제합니다.\n적용 사업체: ${group.companies.join(', ') || '-'}\n이미 연결된 이력과 근태 기준에 영향을 줄 수 있습니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
     try {
       const res = await fetch('/api/work-shifts/bulk-deactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: group.ids }),
-        credentials: 'same-origin',
-      });
+        credentials: 'same-origin' });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       fetchShifts();
@@ -887,8 +857,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                       extra_contract_allowance: shift.extra_contract_allowance ?? 0,
                       work_day_mode: workDayMode,
                       daily_schedules: dailySchedules,
-                      break_plans: shift.break_plans || [],
-                    });
+                      break_plans: shift.break_plans || [] });
                     setShowAddModal(true);
                   }}
                   className="px-2 py-1 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:opacity-90"
@@ -993,8 +962,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                       setNewShift((prev) => ({
                         ...prev,
                         start_time: value,
-                        daily_schedules: updateEnabledScheduleTimes(prev.daily_schedules, 'start_time', value),
-                      }));
+                        daily_schedules: updateEnabledScheduleTimes(prev.daily_schedules, 'start_time', value) }));
                     }}
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   />
@@ -1009,8 +977,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                       setNewShift((prev) => ({
                         ...prev,
                         end_time: value,
-                        daily_schedules: updateEnabledScheduleTimes(prev.daily_schedules, 'end_time', value),
-                      }));
+                        daily_schedules: updateEnabledScheduleTimes(prev.daily_schedules, 'end_time', value) }));
                     }}
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   />
@@ -1050,17 +1017,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                                       ...prev.daily_schedules[day.key], 
                                       enabled: checked,
                                       break_start_time: prev.break_start_time || '',
-                                      break_end_time: prev.break_end_time || '',
-                                    },
-                                  };
+                                      break_end_time: prev.break_end_time || '' } };
                                   const workDayMode = inferWorkDayModeFromSchedule(daily_schedules);
                                   return {
                                     ...prev,
                                     daily_schedules,
                                     work_day_mode: workDayMode,
                                     weekly_work_days: countEnabledWorkDays(daily_schedules),
-                                    is_weekend_work: hasWeekendWork(daily_schedules),
-                                  };
+                                    is_weekend_work: hasWeekendWork(daily_schedules) };
                                 });
                               }}
                               className="w-4 h-4 text-[var(--accent)]"
@@ -1078,9 +1042,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                                 ...prev,
                                 daily_schedules: {
                                   ...prev.daily_schedules,
-                                  [day.key]: { ...prev.daily_schedules[day.key], start_time: value },
-                                },
-                              }));
+                                  [day.key]: { ...prev.daily_schedules[day.key], start_time: value } } }));
                             }}
                             className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)]"
                             data-testid={`shift-day-${day.key}-start`}
@@ -1095,9 +1057,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                                 ...prev,
                                 daily_schedules: {
                                   ...prev.daily_schedules,
-                                  [day.key]: { ...prev.daily_schedules[day.key], end_time: value },
-                                },
-                              }));
+                                  [day.key]: { ...prev.daily_schedules[day.key], end_time: value } } }));
                             }}
                             className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)]"
                             data-testid={`shift-day-${day.key}-end`}
@@ -1111,9 +1071,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                                 ...prev,
                                 daily_schedules: {
                                   ...prev.daily_schedules,
-                                  [day.key]: { ...prev.daily_schedules[day.key], break_plan_id: value },
-                                },
-                              }));
+                                  [day.key]: { ...prev.daily_schedules[day.key], break_plan_id: value } } }));
                             }}
                             className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs text-center radius-toss disabled:opacity-40 text-[var(--foreground)] cursor-pointer"
                           >
@@ -1190,8 +1148,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
                         const index = newShift.break_plans.length;
                         setNewShift({
                           ...newShift,
-                          break_plans: [...newShift.break_plans, createBreakPlan(index, '12:30', '13:30')],
-                        });
+                          break_plans: [...newShift.break_plans, createBreakPlan(index, '12:30', '13:30')] });
                       }}
                       className="text-[10px] font-bold text-[var(--accent)] hover:underline"
                     >

@@ -4,8 +4,8 @@ import { getKoreanMonthString } from '@/lib/seoul-time';
 import { KOREAN_PUBLIC_HOLIDAY_DATES } from '@/lib/korean-public-holidays';
 import type { StaffMember } from '@/types';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { db } from '@/lib/db-client';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
@@ -18,15 +18,13 @@ import {
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
   normalizeWithholdingRatePercent,
-  type TaxInsuranceRates,
-} from '@/lib/use-tax-insurance-rates';
+  type TaxInsuranceRates } from '@/lib/use-tax-insurance-rates';
 import { buildPayrollVerificationReport } from '@/lib/payroll-governance';
 import {
   buildShiftBoundary,
   buildFallbackShiftBoundary,
   calculateEarlyLeaveMinutes,
-  buildDateWithTime,
-} from '../../마이페이지/출퇴근기록/checkin-utils';
+  buildDateWithTime } from '../../마이페이지/출퇴근기록/checkin-utils';
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
@@ -39,8 +37,7 @@ import type {
   SalaryAmountField,
   SalaryChangeHistoryRow,
   SalaryChangeProrationSummary,
-  SavedPayrollRecord,
-} from './급여정산-types';
+  SavedPayrollRecord } from './급여정산-types';
 import {
   PAYROLL_RECORD_OPTIONAL_COLUMNS,
   PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS,
@@ -51,8 +48,7 @@ import {
   normalizeTaxableAllowanceBreakdown,
   resolveSalaryAmountForSettlement,
   fetchSalaryChangeHistoryForMonth,
-  getEmploymentProratedBaseForMonth,
-} from './급여정산-utils';
+  getEmploymentProratedBaseForMonth } from './급여정산-utils';
 import { Step1TargetSelection } from './급여정산-Step1TargetSelection';
 import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
 import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
@@ -63,8 +59,7 @@ export default function SalarySettlement({
   staffs,
   selectedCo,
   onRefresh,
-  initialStep = 1,
-}: {
+  initialStep = 1 }: {
   staffs: StaffMember[];
   selectedCo: string;
   onRefresh?: () => void;
@@ -89,7 +84,7 @@ export default function SalarySettlement({
     let ok = true;
     (async () => {
       try {
-        const { data: lockRows } = await supabase
+        const { data: lockRows } = await db
           .from('payroll_locks')
           .select('company_name')
           .eq('year_month', yearMonth);
@@ -169,7 +164,7 @@ export default function SalarySettlement({
     (async () => {
       try {
         const scope = selectedCo && selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
-        const { data } = await supabase
+        const { data } = await db
           .from('company_payroll_policies')
           .select('company_name, rule_value')
           .eq('rule_label', '원천징수 비율')
@@ -190,8 +185,7 @@ export default function SalarySettlement({
     meal: taxFreeLimits.meal_limit,
     vehicle: taxFreeLimits.vehicle_limit,
     childcare: taxFreeLimits.childcare_limit,
-    research: taxFreeLimits.research_limit,
-  };
+    research: taxFreeLimits.research_limit };
 
   const filteredStaffs = staffs.filter((s: StaffMember) => {
     if (selectedCo !== '전체' && s.company !== selectedCo) return false;
@@ -233,7 +227,7 @@ export default function SalarySettlement({
             ...requiredColumns,
             ...PAYROLL_RECORD_LOAD_OPTIONAL_COLUMNS.filter((column) => !omittedColumns.has(column)),
           ].join(', ');
-          return supabase
+          return db
             .from('payroll_records')
             .select(selectColumns)
             .eq('year_month', yearMonth)
@@ -297,8 +291,7 @@ export default function SalarySettlement({
         yearMonth,
         salaryChanges: staffSalaryChanges,
         staff,
-        status: savedRecord?.status,
-      });
+        status: savedRecord?.status });
       if (result.summary) salaryChangeProration.push(result.summary);
       return result.amount;
     };
@@ -329,8 +322,7 @@ export default function SalarySettlement({
       childcare_allowance: Number(staff.childcare_allowance) || 0,
       research_allowance: Number(staff.research_allowance) || 0,
       other_taxfree: Number(staff.other_taxfree) || 0,
-      taxable_allowance_breakdown: getStaffTaxableAllowanceBreakdown(staff),
-    };
+      taxable_allowance_breakdown: getStaffTaxableAllowanceBreakdown(staff) };
     const calculatedHourlyRate = getRegularHourlyRate(staff, draftEntryForHourlyRate);
 
     // 자동 가산수당 금액 계산
@@ -366,8 +358,7 @@ export default function SalarySettlement({
         yearMonth,
         salaryChanges: staffSalaryChanges,
         staff,
-        status: savedRecord?.status,
-      });
+        status: savedRecord?.status });
       changeAwareBreakdown[field] = result.amount;
       if (result.summary) salaryChangeProration.push(result.summary);
     });
@@ -463,8 +454,7 @@ export default function SalarySettlement({
       auto_holiday_hours: autoHolidayHours,
       auto_night_pay: autoNightPay,
       auto_night_minutes: autoNightWorkMins,
-      calculated_hourly_rate: calculatedHourlyRate,
-    };
+      calculated_hourly_rate: calculatedHourlyRate };
   };
 
   const handleNextStep = async () => {
@@ -502,7 +492,7 @@ export default function SalarySettlement({
       // 회사 공휴일 조회
       let companyHolidaysList: any[] = [];
       try {
-        const { data: list } = await supabase
+        const { data: list } = await db
           .from('company_holidays')
           .select('holiday_date, company_name')
           .gte('holiday_date', startDate)
@@ -533,7 +523,7 @@ export default function SalarySettlement({
           .filter((d): d is string => Boolean(d)),
       ]);
 
-      const { data: attendances, error: attendanceError } = await supabase
+      const { data: attendances, error: attendanceError } = await db
         .from('attendances')
         .select('*')
         .in('staff_id', staffIds)
@@ -558,7 +548,7 @@ export default function SalarySettlement({
         // shift_assignments: 일별 배정 근무유형 (shift_id = 근태기록 기준 shift_id).
         // 다중 근무유형 전환 후에도 각 날짜별 shift_id는 shift_assignments에 유지되므로 로직 변경 불필요.
         // 추가 배정 근무유형은 staff_shift_assignments 테이블에서 관리.
-        const { data: shiftAssignments, error: shiftAssignmentsError } = await supabase
+        const { data: shiftAssignments, error: shiftAssignmentsError } = await db
           .from('shift_assignments')
           .select('staff_id, work_date, shift_id')
           .in('staff_id', staffIds)
@@ -572,7 +562,7 @@ export default function SalarySettlement({
 
           if (usedShiftIds.length > 0) {
             try {
-              const { data: workShifts, error: workShiftsError } = await supabase
+              const { data: workShifts, error: workShiftsError } = await db
                 .from('work_shifts')
                 .select('id, name, start_time, end_time, shift_type')
                 .in('id', usedShiftIds);
@@ -596,8 +586,7 @@ export default function SalarySettlement({
                       {
                         start_time: String(shift.start_time || ''),
                         end_time: String(shift.end_time || ''),
-                        shift_type: shift.shift_type ? String(shift.shift_type) : null,
-                      },
+                        shift_type: shift.shift_type ? String(shift.shift_type) : null },
                     ])
                 );
 
@@ -633,8 +622,7 @@ export default function SalarySettlement({
                       ? {
                           ...buildShiftBoundary(shiftInfo.start_time, shiftInfo.end_time),
                           shiftType: shiftInfo.shift_type ?? null,
-                          rosterAssigned: true,
-                        }
+                          rosterAssigned: true }
                       : buildFallbackShiftBoundary();
 
                     let lateMinutes: number | null = null;
@@ -663,8 +651,7 @@ export default function SalarySettlement({
                         staff_id: staffId,
                         work_date: workDate,
                         late_minutes: lateMinutes,
-                        early_leave_minutes: earlyLeaveMinutes,
-                      });
+                        early_leave_minutes: earlyLeaveMinutes });
                     }
 
                     // ─── 자동 수당(연장/휴일/야간) 적산 로직 ───
@@ -822,13 +809,13 @@ export default function SalarySettlement({
       }
 
       // ruleCompany is already declared above
-      const { data: rule, error: ruleError } = await supabase
+      const { data: rule, error: ruleError } = await db
         .from('attendance_deduction_rules')
         .select('*')
         .eq('company_name', ruleCompany)
         .maybeSingle();
       if (ruleError) throw ruleError;
-      const { data: fallbackRule, error: fallbackRuleError } = await supabase
+      const { data: fallbackRule, error: fallbackRuleError } = await db
         .from('attendance_deduction_rules')
         .select('*')
         .eq('company_name', '전체')
@@ -842,8 +829,7 @@ export default function SalarySettlement({
           `${row.staff_id}_${String(row.work_date || '').slice(0, 10)}`,
           {
             late_minutes: row.late_minutes ?? null,
-            early_leave_minutes: row.early_leave_minutes ?? null,
-          },
+            early_leave_minutes: row.early_leave_minutes ?? null },
         ])
       );
 
@@ -852,8 +838,7 @@ export default function SalarySettlement({
           .filter((a: any) => a.staff_id === s.id)
           .map((attendance: any) => ({
             ...attendance,
-            ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}),
-          }));
+            ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}) }));
         const { total, detail } = calculateAttendanceDeduction(
           // A-2: 중도입사·중도퇴사자는 분모(소정근로일수)가 부분월이므로
           // 분자도 일할 후 기본급으로 맞춰 결근차감 과대공제를 방지한다.
@@ -866,8 +851,7 @@ export default function SalarySettlement({
                 late_deduction_amount: r.late_deduction_amount,
                 early_leave_deduction_type: r.early_leave_deduction_type,
                 early_leave_deduction_amount: r.early_leave_deduction_amount,
-                absent_use_daily_rate: r.absent_use_daily_rate,
-              }
+                absent_use_daily_rate: r.absent_use_daily_rate }
             : undefined,
           { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
@@ -911,8 +895,7 @@ export default function SalarySettlement({
           Number(nextBreakdown.manual_extra_allowance || 0);
         return {
           ...prev,
-          [id]: { ...current, taxable_allowance_breakdown: nextBreakdown, extra_allowance: nextExtra },
-        };
+          [id]: { ...current, taxable_allowance_breakdown: nextBreakdown, extra_allowance: nextExtra } };
       }
 
       const nextEntry = { ...current, [field]: value } as SettlementEntry;
@@ -938,8 +921,7 @@ export default function SalarySettlement({
 
       return {
         ...prev,
-        [id]: nextEntry,
-      };
+        [id]: nextEntry };
     });
   };
 
@@ -956,8 +938,7 @@ export default function SalarySettlement({
         deduction: 0,
         deductionDetail: {},
         attendance_deduction: 0,
-        net: 0,
-      };
+        net: 0 };
     }
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
 
@@ -1024,8 +1005,7 @@ export default function SalarySettlement({
       withholdingRatePercent,
       applyNationalPension: resolvedIns.national,
       applyHealthInsurance: resolvedIns.health,
-      applyEmploymentInsurance: resolvedIns.employment,
-    });
+      applyEmploymentInsurance: resolvedIns.employment });
 
     const national_pension = deductions.national_pension;
     const health_insurance = deductions.health_insurance;
@@ -1036,16 +1016,13 @@ export default function SalarySettlement({
 
     const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const familyAdjustedIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount: 0,
-    });
+      qualifyingChildCount: 0 });
     const preRatioIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
       withholdingRatePercent: 100,
-      qualifyingChildCount,
-    });
+      qualifyingChildCount });
     const dependentTaxCredit = hasExactWithholdingTable
       ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12500;
@@ -1076,8 +1053,7 @@ export default function SalarySettlement({
       taxable_allowance_breakdown: data.taxable_allowance_breakdown,
       salary_change_proration: data.salary_change_proration || [],
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
-      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
-    };
+      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable };
 
     return {
       taxable: total_taxable,
@@ -1095,7 +1071,7 @@ export default function SalarySettlement({
     try {
       // E-1: 마감 잠금된 월은 임시저장·확정을 모두 차단한다(클라이언트 가드).
       // 잠금 스코프는 '전체' 또는 선택 회사. 조회 실패 시 막지 않음(fail-open).
-      const { data: lockRows, error: lockError } = await supabase
+      const { data: lockRows, error: lockError } = await db
         .from('payroll_locks')
         .select('year_month, company_name')
         .eq('year_month', yearMonth);
@@ -1143,8 +1119,7 @@ export default function SalarySettlement({
           auto_holiday_hours: Number(data?.auto_holiday_hours || 0),
           auto_night_pay: Number(data?.auto_night_pay || 0),
           auto_night_minutes: Number(data?.auto_night_minutes || 0),
-          calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0),
-        };
+          calculated_hourly_rate: Number(data?.calculated_hourly_rate || 0) };
         // calc.deductionDetail은 조기 반환 분기 때문에 `{전체}|{}` 유니온이므로 Record로 캐스트 후 읽는다.
         const dd = (calc?.deductionDetail ?? {}) as Record<string, unknown>;
 
@@ -1179,8 +1154,7 @@ export default function SalarySettlement({
           attendance_deduction_detail: data?.attendance_deduction_detail || {},
           advance_pay: advancePay,
           record_type: 'regular',
-          status: targetStatus,
-        };
+          status: targetStatus };
       });
 
       const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
@@ -1193,14 +1167,12 @@ export default function SalarySettlement({
           'employment_insurance',
           'income_tax',
           'local_tax',
-        ],
-      });
+        ] });
       if (payrollSaveError) throw payrollSaveError;
 
       setSavedRecordsByStaff((prev) => ({
         ...prev,
-        ...Object.fromEntries(records.map((record) => [String(record.staff_id), record as SavedPayrollRecord])),
-      }));
+        ...Object.fromEntries(records.map((record) => [String(record.staff_id), record as SavedPayrollRecord])) }));
       setSettlementData((prev) =>
         Object.fromEntries(
           Object.entries(prev).map(([staffId, value]) => [
@@ -1221,8 +1193,7 @@ export default function SalarySettlement({
         error: err,
         yearMonth,
         status: targetStatus,
-        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id),
-      });
+        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id) });
       toast(`정산 저장 중 오류가 발생했습니다. ${message}`, 'error');
       return null;
     } finally {
@@ -1276,8 +1247,7 @@ export default function SalarySettlement({
             deduction_detail: {
               ...(calc?.deductionDetail || {}),
               advance_pay_deduction: advancePay,
-              net_pay_before_advance: Math.round(Number(calc?.net || 0)),
-            },
+              net_pay_before_advance: Math.round(Number(calc?.net || 0)) },
             net_pay: getAdvanceAdjustedNet(Number(calc?.net || 0), advancePay),
             attendance_deduction: Math.round(Number(data.attendance_deduction) || 0),
             attendance_deduction_detail: data.attendance_deduction_detail || {},
@@ -1289,8 +1259,7 @@ export default function SalarySettlement({
 
       const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
         records: records as Record<string, unknown>[],
-        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS],
-      });
+        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS] });
       if (payrollSaveError) throw payrollSaveError;
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
@@ -1316,10 +1285,8 @@ export default function SalarySettlement({
                 total_deduction: record.total_deduction,
                 attendance_deduction: record.attendance_deduction,
                 advance_pay: record.advance_pay,
-                net_pay: record.net_pay,
-              };
-            }),
-          },
+                net_pay: record.net_pay };
+            }) },
           u.id,
           u.name
         );
@@ -1336,8 +1303,7 @@ export default function SalarySettlement({
         message,
         error: err,
         yearMonth,
-        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id),
-      });
+        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id) });
       toast(`정산 처리 중 오류가 발생했습니다. ${message}`, 'error');
     } finally {
       setLoading(false);
@@ -1395,10 +1361,8 @@ export default function SalarySettlement({
               total_deduction: record.total_deduction,
               attendance_deduction: record.attendance_deduction,
               advance_pay: record.advance_pay,
-              net_pay: record.net_pay,
-            };
-          }),
-        },
+              net_pay: record.net_pay };
+          }) },
         u.id,
         u.name,
       );
@@ -1432,12 +1396,10 @@ export default function SalarySettlement({
       applyTax: data?.apply_tax !== false,
       exactTaxConfigured: hasExactIncomeTaxBracket(taxInsuranceRates),
       bankName: String(staff.bank_name || ''),
-      bankAccount: String(staff.bank_account || ''),
-    };
+      bankAccount: String(staff.bank_account || '') };
   });
   const verificationReport = buildPayrollVerificationReport(verificationRows, {
-    requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax),
-  });
+    requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax) });
   const hasBlockingVerificationIssues = verificationReport.errorCount > 0;
 
   return (

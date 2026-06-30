@@ -13,22 +13,19 @@ const KPI_TONE_CLASS: Record<KpiTone, string> = {
   default: 'bg-[var(--card)] border-[var(--border)]',
   success: 'bg-[var(--success-light,#f0fdf4)] border-[var(--success,#16a34a)]/20',
   warning: 'bg-[var(--warning-light,#fffbeb)] border-[var(--warning,#d97706)]/20',
-  danger:  'bg-[var(--danger-light,#fff1f2)] border-[var(--danger,#e11d48)]/20',
-};
+  danger:  'bg-[var(--danger-light,#fff1f2)] border-[var(--danger,#e11d48)]/20' };
 
 const KPI_VALUE_CLASS: Record<KpiTone, string> = {
   default: 'text-[var(--foreground)]',
   success: 'text-[var(--success,#16a34a)]',
   warning: 'text-[var(--warning,#d97706)]',
-  danger:  'text-[var(--danger,#e11d48)]',
-};
+  danger:  'text-[var(--danger,#e11d48)]' };
 
 export function KpiCard({
   label,
   value,
   sub,
-  tone,
-}: {
+  tone }: {
   label: string;
   value: number;
   sub: string;

@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   resolveNotificationTarget,
-  toNotificationMetadataRecord,
-} from '@/lib/notification-metadata';
+  toNotificationMetadataRecord } from '@/lib/notification-metadata';
 import {
   flushPushRetryQueue,
   getPushConnectionStatus,
@@ -20,8 +19,7 @@ import {
   saveNotifSettings,
   sendNotification,
   type NotificationDeliveryLogEntry,
-  type PushConnectionStatus,
-} from './알림시스템';
+  type PushConnectionStatus } from './알림시스템';
 import {
   cleanupReadNotifications,
   deleteNotificationById,
@@ -31,8 +29,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   markNotificationsAsRead,
-  NOTIFICATION_LIST_UPDATED_EVENT,
-} from './알림시스템/notification-api';
+  NOTIFICATION_LIST_UPDATED_EVENT } from './알림시스템/notification-api';
 import { normalizeKeywordList } from './알림시스템/filter-helpers';
 import { timeAgo } from '@/lib/notification-utils';
 
@@ -108,22 +105,19 @@ const TYPE_TO_KIND: Record<string, 'chat' | 'approval' | 'hr' | 'stock' | 'etc'>
   인사: 'hr',
   inventory: 'stock',
   board: 'etc',
-  notification: 'etc',
-};
+  notification: 'etc' };
 const KIND_LABEL: Record<'chat' | 'approval' | 'hr' | 'stock' | 'etc', string> = {
   chat: '채팅',
   approval: '결재',
   hr: '인사',
   stock: '재고',
-  etc: '기타',
-};
+  etc: '기타' };
 const KIND_ICON: Record<'chat' | 'approval' | 'hr' | 'stock' | 'etc', string> = {
   chat: '💬',
   approval: '📋',
   hr: '👥',
   stock: '📦',
-  etc: '🔔',
-};
+  etc: '🔔' };
 
 const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border: string }> = {
   message:      { icon: '💬', bg: 'bg-blue-500/10 dark:bg-blue-950/30',    text: 'text-blue-600',   border: 'border-blue-300'   },
@@ -138,8 +132,7 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border:
   // 인사: 보라(violet 톤)
   인사:          { icon: '👥', bg: 'bg-violet-50 dark:bg-violet-950/30',     text: 'text-violet-600', border: 'border-violet-300' },
   education:    { icon: '📚', bg: 'bg-purple-500/10 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
-  notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' },
-};
+  notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' } };
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
 const getTypeCfg = (t: string) => TYPE_CFG[t] || DEFAULT_CFG;
 
@@ -302,8 +295,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
       await initNotificationService({
         staffId: userId,
         requestPermission:
-          currentStatus.permission !== 'granted' && currentStatus.permission !== 'denied',
-      });
+          currentStatus.permission !== 'granted' && currentStatus.permission !== 'denied' });
     } catch {
       setPushStatusError('푸시 재연결에 실패했습니다.');
     } finally {
@@ -357,9 +349,7 @@ function SettingsTab({ userId }: { userId?: string | null }) {
         tag: 'erp-push-popup-self-test',
         data: {
           type: 'notification',
-          source: 'push-popup-self-test',
-        },
-      });
+          source: 'push-popup-self-test' } });
       setPushTestResult('테스트 팝업을 보냈습니다. 화면 상단이 아니라 기기 알림 영역도 함께 확인해 주세요.');
     } catch {
       setPushTestResult('테스트 팝업 호출에 실패했습니다.');

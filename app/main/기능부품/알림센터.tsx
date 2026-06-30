@@ -16,14 +16,12 @@ import {
   Trash2,
   Users,
   Wallet,
-  type LucideIcon,
-} from 'lucide-react';
+  type LucideIcon } from 'lucide-react';
 import { sound } from '@/lib/sounds';
 import {
   NOTIFICATION_MENU_LABELS,
   resolveNotificationTarget,
-  toNotificationMetadataRecord,
-} from '@/lib/notification-metadata';
+  toNotificationMetadataRecord } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import { toNotificationText, timeAgo } from '@/lib/notification-utils';
 import {
@@ -34,8 +32,7 @@ import {
   fetchUnreadNotificationCount,
   markAllNotificationsAsRead,
   markNotificationAsRead,
-  NOTIFICATION_LIST_UPDATED_EVENT,
-} from './알림시스템/notification-api';
+  NOTIFICATION_LIST_UPDATED_EVENT } from './알림시스템/notification-api';
 import { SwipeableCard, type SwipeAction } from '@/app/components/SwipeableCard';
 import { useIsMobile } from '@/app/components/useIsMobile';
 
@@ -51,16 +48,14 @@ const TYPE_CFG: Record<string, { Icon: LucideIcon; color: string; label: string 
   hr: { Icon: Users, color: 'text-cyan-600', label: '인사' },
   인사: { Icon: Users, color: 'text-cyan-600', label: '인사' },
   education: { Icon: GraduationCap, color: 'text-purple-500', label: '교육' },
-  default: { Icon: Bell, color: 'text-[var(--toss-gray-4)]', label: '알림' },
-};
+  default: { Icon: Bell, color: 'text-[var(--toss-gray-4)]', label: '알림' } };
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
 
 
 export default function NotificationCenter({
   user,
-  onOpenMenu,
-}: {
+  onOpenMenu }: {
   user: any;
   onOpenMenu?: (menuId: string) => void;
 }) {
@@ -212,8 +207,7 @@ export default function NotificationCenter({
 
     setNotifications((prev) => prev.map((notification) => ({
       ...notification,
-      read_at: notification.read_at || readAt,
-    })));
+      read_at: notification.read_at || readAt })));
     setUnreadCount(0);
     emitNotificationReadEvent();
     sound.playSystem();
@@ -405,15 +399,13 @@ export default function NotificationCenter({
                           label: '읽음',
                           icon: <Check className="w-4 h-4" />,
                           tone: 'ok',
-                          onTrigger: () => { void markAsRead(notification.id); },
-                        }];
+                          onTrigger: () => { void markAsRead(notification.id); } }];
                         const rightActions: SwipeAction[] = [{
                           id: 'delete',
                           label: '삭제',
                           icon: <Trash2 className="w-4 h-4" />,
                           tone: 'danger',
-                          onTrigger: () => { void deleteNotification(notification.id); },
-                        }];
+                          onTrigger: () => { void deleteNotification(notification.id); } }];
                         return (
                           <SwipeableCard
                             key={notification.id}
@@ -500,8 +492,7 @@ export default function NotificationCenter({
                           label: '삭제',
                           icon: <Trash2 className="w-4 h-4" />,
                           tone: 'danger',
-                          onTrigger: () => { void deleteNotification(notification.id); },
-                        }];
+                          onTrigger: () => { void deleteNotification(notification.id); } }];
                         return (
                           <SwipeableCard
                             key={notification.id}

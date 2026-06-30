@@ -1,11 +1,10 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   REQUIRED_DOC_CATEGORIES,
-  validateDocUpload,
-} from '@/lib/document-submission-shared';
+  validateDocUpload } from '@/lib/document-submission-shared';
 import LicenseCESubmit from './면허보수교육제출';
 import { escapeHtml } from '@/lib/escape-html';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
@@ -57,12 +56,12 @@ export default function MyDocuments(props: MyDocumentsProps) {
         setIsLoading(true);
         try {
             const [docResult, contractResult] = await Promise.all([
-                supabase
+                db
                     .from('document_repository')
                     .select('*')
                     .eq('created_by', user.id)
                     .order('created_at', { ascending: false }),
-                supabase
+                db
                     .from('employment_contracts')
                     .select('id, contract_type, status, requested_at, signed_at, signature_data')
                     .eq('staff_id', user.id)
@@ -201,8 +200,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
 
             const uploadRes = await fetch('/api/approvals/upload', {
                 method: 'POST',
-                body: uploadForm,
-            });
+                body: uploadForm });
             if (!uploadRes.ok) {
                 const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
                 throw new Error(errJson.error || '파일 업로드에 실패했습니다.');
@@ -210,15 +208,14 @@ export default function MyDocuments(props: MyDocumentsProps) {
             const uploadData = (await uploadRes.json()) as { url: string };
             const fileUrl = uploadData.url;
 
-            const { error: dbError } = await supabase.from('document_repository').insert({
+            const { error: dbError } = await db.from('document_repository').insert({
                 created_by: user!.id,
                 category: docType,
                 title: `${user!.name} - ${docType}`,
                 company_name: user!.company || '전체',
                 file_url: fileUrl,
                 version: 1,
-                content: null,
-            });
+                content: null });
 
             if (dbError) throw dbError;
 

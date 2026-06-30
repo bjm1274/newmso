@@ -71,8 +71,7 @@ export function useActionDialog() {
         cancelText: options.cancelText,
         tone: options.tone,
         centerText: options.centerText,
-        largeText: options.largeText,
-      });
+        largeText: options.largeText });
     });
   }, []);
 
@@ -94,8 +93,7 @@ export function useActionDialog() {
         maxLength: options.maxLength,
         helperText: options.helperText,
         centerText: options.centerText,
-        largeText: options.largeText,
-      });
+        largeText: options.largeText });
     });
   }, []);
 
@@ -120,6 +118,5 @@ export function useActionDialog() {
   return {
     dialog,
     openConfirm,
-    openPrompt,
-  };
+    openPrompt };
 }

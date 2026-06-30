@@ -4,17 +4,17 @@
  * submitApprovalDraft — 모바일 결재 신규 기안 공통 상신 로직.
  * 여러 양식 폼(일반/연장근무/연차계획)이 동일한 approvals insert + doc_number + meta 패턴을 공유.
  *
- * 데이터 레이어는 @/lib/supabase = D1 re-export shim (D1 경로로 동작).
+ * 데이터 레이어는 @/lib/db = D1 re-export shim (D1 경로로 동작).
  * JM: 단일 책임(상신), JM3(throw on error), JM4(any 금지)
  */
 
-import { enqueueSupabaseMutation } from '@/lib/offline-queue-supabase';
+import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
 import type { ErpUser, StaffMember } from '@/types';
 import { generateMobileDocNumber } from './data-hooks';
 import type { ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 
 export type SubmitApprovalArgs = {
@@ -49,8 +49,7 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     approverLine,
     approverManual,
     attachments = [],
-    extraMeta = {},
-  } = args;
+    extraMeta = {} } = args;
 
   const senderName = String(user.name || '').trim() || '이름 없음';
   const senderDepartment = String(user.department || '').trim();
@@ -64,13 +63,12 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     companyId: user.company_id != null ? String(user.company_id) : null,
     departmentName: senderDepartment || null,
     userPermissions:
-      (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null,
-  });
+      (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
 
   // Fetch active staff in the company for cc_users
   let ccUsers: Array<{ id: string; name: string }> = [];
   try {
-    const { data: staffData } = await supabase
+    const { data: staffData } = await db
       .from('staff_members')
       .select('id, name, status, company, hire_date, resign_date')
       .eq('company', company);
@@ -79,8 +77,7 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
         .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
         .map((s: StaffMember) => ({
           id: String(s.id),
-          name: s.name || '이름 없음',
-        }));
+          name: s.name || '이름 없음' }));
     }
   } catch (err) {
     console.error('[mobile-approval] failed to fetch cc_users candidates', err);
@@ -98,15 +95,13 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
       name: a.name || '',
       position: a.position || null,
       department: a.department || null,
-      company: a.company || null,
-    })),
+      company: a.company || null })),
     approver_line_source: approverManual ? 'mobile_manual' : 'mobile_auto',
     revision: 1,
     source_approval_id: null,
     previous_doc_number: null,
     client_origin: 'mobile',
-    ...extraMeta,
-  };
+    ...extraMeta };
 
   const uploadedAttachments = attachments
     .filter((a) => a.state === 'done' && a.fileUrl)
@@ -115,8 +110,7 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
       url: a.fileUrl as string,
       mimeType: a.file.type || null,
       size: Number.isFinite(a.file.size) ? a.file.size : null,
-      uploadedAt: new Date().toISOString(),
-    }));
+      uploadedAt: new Date().toISOString() }));
   if (uploadedAttachments.length > 0) {
     meta.attachments = uploadedAttachments;
   }
@@ -140,10 +134,8 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
       actor_name: senderName,
       note: '모바일 최초 상신',
       current_approver_id: firstApproverId,
-      revision: 1,
-    }),
-    status: '대기',
-  };
+      revision: 1 }),
+    status: '대기' };
   if (docNumber) {
     row.doc_number = docNumber;
   }
@@ -151,11 +143,10 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     row.company_id = user.company_id;
   }
 
-  const { queued, error } = await enqueueSupabaseMutation({
+  const { queued, error } = await enqueueD1Mutation({
     kind: 'insert',
     table: 'approvals',
-    payload: row,
-  });
+    payload: row });
   if (error) throw new Error(error);
 
   const queuedAttachments = attachments.filter((a) => a.state === 'queued').length;

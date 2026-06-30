@@ -17,12 +17,10 @@ import {
   useMemo,
   useState,
   useCallback,
-  type ReactNode,
-} from 'react';
+  type ReactNode } from 'react';
 import {
   fetchPayrollWorkcenterData,
-  type PayrollWorkcenterData,
-} from './payroll-fetch';
+  type PayrollWorkcenterData } from './payroll-fetch';
 import { getPayrollPolicy } from './payroll-policy';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 
@@ -50,13 +48,11 @@ const EMPTY_DATA = (yearMonth: string, selectedCo: string): PayrollWorkcenterDat
   selectedCo,
   errors: [],
   isLocked: false,
-  payrollDay: 15,
-});
+  payrollDay: 15 });
 
 export function PayrollProvider({
   children,
-  selectedCo: propSelectedCo,
-}: {
+  selectedCo: propSelectedCo }: {
   children: ReactNode;
   selectedCo?: string;
 }) {

@@ -3,8 +3,7 @@ import {
   normalizeSessionUser,
   readSessionFromRequest,
   resolveLatestSessionUser,
-  type SessionUser,
-} from './server-session';
+  type SessionUser } from './server-session';
 
 export type SessionReadableRequest =
   | Request
@@ -28,8 +27,7 @@ export async function readAuthorizedExtraFeatureUser(
     return {
       user: null,
       status: 401,
-      error: 'Unauthorized',
-    };
+      error: 'Unauthorized' };
   }
 
   const sessionUser = normalizeSessionUser(session.user);
@@ -39,21 +37,18 @@ export async function readAuthorizedExtraFeatureUser(
     return {
       user: null,
       status: 403,
-      error: 'Forbidden',
-    };
+      error: 'Forbidden' };
   }
 
   if (!canAccessExtraFeature(latestUser, featureId)) {
     return {
       user: null,
       status: 403,
-      error: 'Forbidden',
-    };
+      error: 'Forbidden' };
   }
 
   return {
     user: latestUser,
     status: null,
-    error: null,
-  };
+    error: null };
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isAdminUser, isPrivilegedUser, hasPermission } from '@/lib/access-control';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 
@@ -61,8 +61,7 @@ function isMissingReopenColumnError(error: unknown) {
 export default function PayrollLockPanel({
   yearMonth,
   companyName,
-  onLockChange,
-}: {
+  onLockChange }: {
   yearMonth?: unknown;
   companyName?: unknown;
   onLockChange?: () => void;
@@ -81,7 +80,7 @@ export default function PayrollLockPanel({
   }, []);
 
   const loadLock = async () => {
-    const extendedResult = await supabase
+    const extendedResult = await db
       .from('payroll_locks')
       .select(EXTENDED_LOCK_SELECT)
       .eq('year_month', yearMonth)
@@ -98,7 +97,7 @@ export default function PayrollLockPanel({
       throw extendedResult.error;
     }
 
-    const fallbackResult = await supabase
+    const fallbackResult = await db
       .from('payroll_locks')
       .select(BASIC_LOCK_SELECT)
       .eq('year_month', yearMonth)
@@ -127,14 +126,13 @@ export default function PayrollLockPanel({
   const createLock = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('payroll_locks')
         .insert({
           year_month: yearMonth,
           company_name: companyScope,
           locked_by: viewer?.id || null,
-          memo: '급여 마감 잠금',
-        })
+          memo: '급여 마감 잠금' })
         .select(BASIC_LOCK_SELECT)
         .single();
       if (error) throw error;
@@ -159,7 +157,7 @@ export default function PayrollLockPanel({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('payroll_locks')
         .update({
           reopen_requested_at: new Date().toISOString(),
@@ -168,8 +166,7 @@ export default function PayrollLockPanel({
           reopen_request_status: 'pending',
           reopen_reviewed_at: null,
           reopen_reviewed_by: null,
-          reopen_review_comment: null,
-        })
+          reopen_review_comment: null })
         .eq('id', lockRow.id)
         .select(EXTENDED_LOCK_SELECT)
         .single();
@@ -197,21 +194,20 @@ export default function PayrollLockPanel({
     setLoading(true);
     try {
       if (approved) {
-        const { error } = await supabase.from('payroll_locks').delete().eq('id', lockRow.id);
+        const { error } = await db.from('payroll_locks').delete().eq('id', lockRow.id);
         if (error) throw error;
 
         setLockRow(null);
         setReviewComment('');
         toast('급여 마감 재오픈을 승인했습니다.', 'success');
       } else {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('payroll_locks')
           .update({
             reopen_request_status: 'rejected',
             reopen_reviewed_at: new Date().toISOString(),
             reopen_reviewed_by: viewer?.id || null,
-            reopen_review_comment: reviewComment.trim() || null,
-          })
+            reopen_review_comment: reviewComment.trim() || null })
           .eq('id', lockRow.id)
           .select(EXTENDED_LOCK_SELECT)
           .single();
@@ -234,7 +230,7 @@ export default function PayrollLockPanel({
     if (!lockRow) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from('payroll_locks').delete().eq('id', lockRow.id);
+      const { error } = await db.from('payroll_locks').delete().eq('id', lockRow.id);
       if (error) throw error;
 
       setLockRow(null);

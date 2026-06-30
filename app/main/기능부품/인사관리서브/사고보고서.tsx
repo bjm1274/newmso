@@ -4,7 +4,7 @@ import { toast } from '@/lib/toast';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 interface Props {
   staffs: any[];
@@ -60,8 +60,7 @@ const emptyForm = (): Report => ({
   preventive_measures: '',
   reporter_id: '',
   reporter_name: '',
-  status: STATUSES[0],
-});
+  status: STATUSES[0] });
 
 export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   const { dialog, openConfirm } = useActionDialog();
@@ -83,7 +82,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('incident_reports')
         .select('*')
         .order('created_at', { ascending: false });
@@ -91,8 +90,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
       setReports(
         (data || []).map((row: any) => ({
           ...row,
-          involved_persons: normalizeInvolvedPersons(row.involved_persons),
-        }))
+          involved_persons: normalizeInvolvedPersons(row.involved_persons) }))
       );
     } catch (error) {
       console.error('incident_reports fetch failed:', error);
@@ -122,8 +120,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
     setForm({
       ...emptyForm(),
       ...report,
-      involved_persons: Array.isArray(report.involved_persons) ? report.involved_persons : [],
-    });
+      involved_persons: Array.isArray(report.involved_persons) ? report.involved_persons : [] });
     setSelectedPersons(Array.isArray(report.involved_persons) ? report.involved_persons : []);
     setTab('작성');
   };
@@ -155,23 +152,21 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         preventive_measures: form.preventive_measures.trim(),
         reporter_id: form.reporter_id || user?.id || '',
         reporter_name: form.reporter_name || user?.name || user?.email || '',
-        status: form.status || STATUSES[0],
-      };
+        status: form.status || STATUSES[0] };
 
       if (editingReportId) {
-        const { error } = await supabase
+        const { error } = await db
           .from('incident_reports')
           .update(payload)
           .eq('id', editingReportId);
         if (error) throw error;
         toast('사고 보고서를 수정했습니다.', 'success');
       } else {
-        const { error } = await supabase.from('incident_reports').insert({
+        const { error } = await db.from('incident_reports').insert({
           ...payload,
           reporter_id: user?.id || '',
           reporter_name: user?.name || user?.email || '',
-          created_at: new Date().toISOString(),
-        });
+          created_at: new Date().toISOString() });
         if (error) throw error;
         toast('사고 보고서를 등록했습니다.', 'success');
       }
@@ -194,13 +189,12 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
       title: '사고 보고서 삭제',
       description: `${report.incident_date} 사고 보고서를 삭제합니다.\n삭제 후에는 복구할 수 없습니다.`,
       confirmText: '삭제',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     setDeletingId(report.id);
     try {
-      const { error } = await supabase.from('incident_reports').delete().eq('id', report.id);
+      const { error } = await db.from('incident_reports').delete().eq('id', report.id);
       if (error) throw error;
 
       setReports((prev) => prev.filter((item) => item.id !== report.id));
@@ -221,7 +215,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
-      const { error } = await supabase.from('incident_reports').update({ status }).eq('id', id);
+      const { error } = await db.from('incident_reports').update({ status }).eq('id', id);
       if (error) throw error;
       setReports((prev) => prev.map((report) => (report.id === id ? { ...report, status } : report)));
     } catch (error) {

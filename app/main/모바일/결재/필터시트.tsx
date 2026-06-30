@@ -27,8 +27,7 @@ export type ApprovalFilterState = {
 export const EMPTY_FILTER: ApprovalFilterState = {
   types: [],
   statuses: [],
-  period: 'all',
-};
+  period: 'all' };
 
 export function countActiveFilters(state: ApprovalFilterState): number {
   let n = 0;
@@ -91,8 +90,7 @@ export default function SApprovalFilterSheet({
   open,
   initial,
   onClose,
-  onApply,
-}: SApprovalFilterSheetProps) {
+  onApply }: SApprovalFilterSheetProps) {
   const [state, setState] = useState<ApprovalFilterState>(initial);
 
   // 열릴 때마다 외부 initial을 반영
@@ -107,8 +105,7 @@ export default function SApprovalFilterSheet({
       const has = prev.types.includes(slug);
       return {
         ...prev,
-        types: has ? prev.types.filter((t) => t !== slug) : [...prev.types, slug],
-      };
+        types: has ? prev.types.filter((t) => t !== slug) : [...prev.types, slug] };
     });
   };
 
@@ -117,8 +114,7 @@ export default function SApprovalFilterSheet({
       const has = prev.statuses.includes(id);
       return {
         ...prev,
-        statuses: has ? prev.statuses.filter((s) => s !== id) : [...prev.statuses, id],
-      };
+        statuses: has ? prev.statuses.filter((s) => s !== id) : [...prev.statuses, id] };
     });
   };
 
@@ -207,8 +203,7 @@ export default function SApprovalFilterSheet({
           gap: 8,
           padding: '10px 16px 14px',
           background: 'var(--m-card)',
-          borderTop: '1px solid var(--m-border)',
-        }}
+          borderTop: '1px solid var(--m-border)' }}
       >
         <button type="button" onClick={reset} style={actionStyle('ghost')} aria-label="필터 초기화">
           초기화
@@ -235,8 +230,7 @@ function SectionLabel({ id, children }: { id: string; children: React.ReactNode 
         color: 'var(--z-500)',
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
-        margin: '8px 0 8px',
-      }}
+        margin: '8px 0 8px' }}
     >
       {children}
     </div>
@@ -246,8 +240,7 @@ function SectionLabel({ id, children }: { id: string; children: React.ReactNode 
 const chipGridStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 6,
-};
+  gap: 6 };
 
 function chipStyle(on: boolean): CSSProperties {
   return {
@@ -260,8 +253,7 @@ function chipStyle(on: boolean): CSSProperties {
     color: on ? '#fff' : 'var(--z-700)',
     cursor: 'pointer',
     lineHeight: 1.2,
-    whiteSpace: 'nowrap',
-  };
+    whiteSpace: 'nowrap' };
 }
 
 function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
@@ -272,8 +264,7 @@ function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
     fontSize: 15,
     fontWeight: 800,
     cursor: 'pointer',
-    border: '1px solid var(--m-border)',
-  };
+    border: '1px solid var(--m-border)' };
   if (kind === 'primary') {
     return { ...base, background: 'var(--m-accent)', color: '#fff', border: '1px solid var(--m-accent)' };
   }

@@ -16,13 +16,11 @@ import {
   KpiRow,
   WorkcenterNotes,
   type FilterChip,
-  type KpiItem,
-} from './stock-workcenter-common';
+  type KpiItem } from './stock-workcenter-common';
 import {
   STATUS_SCOPE_LABEL,
   type StatusScope,
-  type StockStatusRow,
-} from './stock-types';
+  type StockStatusRow } from './stock-types';
 import { useStatusData, useEmptyMessage } from './stock-workcenter-data';
 import { DeptUsageTop5, StockStatusTable, UrgentAlertList } from './StatusSubViews';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
@@ -37,8 +35,7 @@ const SCOPE_TONE: Record<StatusScope, FilterChip<StatusScope>['tone']> = {
   my: 'muted',
   low: 'warn',
   zero: 'danger',
-  expire: 'warn',
-};
+  expire: 'warn' };
 
 // ─────────────────────────────────────────────────
 // 메인
@@ -71,8 +68,7 @@ export default function StatusWorkcenter() {
     isInventoryOpsUser,
     activeView: 'status',
     refreshCurrentInventory: refreshFn,
-    fetchLogs: fetchLogsFn,
-  });
+    fetchLogs: fetchLogsFn });
 
   const [highlightTarget, setHighlightTarget] = useState<string | null>(null);
   const highlightRef = useRef<string | null>(null);
@@ -110,29 +106,25 @@ export default function StatusWorkcenter() {
         label: '전체 품목',
         value: data.total.toLocaleString(),
         unit: '종',
-        sub: data.loading ? '불러오는 중…' : `등록된 inventory 기준`,
-      },
+        sub: data.loading ? '불러오는 중…' : `등록된 inventory 기준` },
       {
         label: '부족 품목',
         value: data.lowCount.toLocaleString(),
         unit: '건',
         sub: '최소재고 미만',
-        tone: 'warn',
-      },
+        tone: 'warn' },
       {
         label: '재고 0',
         value: data.zeroCount.toLocaleString(),
         unit: '건',
         sub: '긴급 보충 필요',
-        tone: 'danger',
-      },
+        tone: 'danger' },
       {
         label: '유효기간 임박',
         value: data.expireCount.toLocaleString(),
         unit: '건',
         sub: '90일 이내 만료',
-        tone: 'warn',
-      },
+        tone: 'warn' },
     ],
     [data.total, data.lowCount, data.zeroCount, data.expireCount, data.loading],
   );
@@ -148,8 +140,7 @@ export default function StatusWorkcenter() {
       my: myCount,
       low: data.lowCount,
       zero: data.zeroCount,
-      expire: data.expireCount,
-    }),
+      expire: data.expireCount }),
     [data, myCount],
   );
 
@@ -159,8 +150,7 @@ export default function StatusWorkcenter() {
         id: k,
         label: STATUS_SCOPE_LABEL[k],
         count: scopeCount[k],
-        tone: SCOPE_TONE[k],
-      })),
+        tone: SCOPE_TONE[k] })),
     [scopeCount],
   );
 

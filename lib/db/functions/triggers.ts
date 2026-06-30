@@ -43,8 +43,7 @@ export async function updateChatRoomLastMessage(
     .set({
       last_message: args.content,
       last_message_at: args.created_at,
-      last_message_preview: preview,
-    })
+      last_message_preview: preview })
     .where(eq(chat_rooms.id, args.room_id))
     .run();
 }
@@ -67,8 +66,7 @@ export async function refreshChatRoomLastMessage(
     .select({
       created_at: messages.created_at,
       content: messages.content,
-      file_name: messages.file_name,
-    })
+      file_name: messages.file_name })
     .from(messages)
     .where(and(
       eq(messages.room_id, roomId),
@@ -97,8 +95,7 @@ export async function refreshChatRoomLastMessage(
     .update(chat_rooms)
     .set({
       last_message_at: latest.created_at,
-      last_message_preview: preview,
-    })
+      last_message_preview: preview })
     .where(eq(chat_rooms.id, roomId))
     .run();
 }

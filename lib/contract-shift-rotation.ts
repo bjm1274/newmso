@@ -94,8 +94,7 @@ export function withWeeklyRotationShifts(orderedShifts: ShiftRecord[]) {
   if (orderedShifts.length === 0) return null;
   return {
     ...orderedShifts[0],
-    weekly_rotation_shifts: orderedShifts,
-  };
+    weekly_rotation_shifts: orderedShifts };
 }
 
 function toTime(value: unknown) {
@@ -143,8 +142,7 @@ export function buildShiftContractVariables(
       break_time_range: fallbackBreakRange,
       shift_schedule: fallbackSchedule,
       weekly_rotation_shift_schedule: fallbackSchedule,
-      work_schedule: fallbackSchedule,
-    };
+      work_schedule: fallbackSchedule };
   }
 
   const valuesFor = (key: string, fallback: string) =>
@@ -228,6 +226,5 @@ export function buildShiftContractVariables(
     break_time_range: formatSegmentValues(breakTimeRanges),
     shift_schedule: scheduleText,
     weekly_rotation_shift_schedule: scheduleText,
-    work_schedule: scheduleText,
-  };
+    work_schedule: scheduleText };
 }

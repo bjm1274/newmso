@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { buildPollQuestionContent, extractPollMetaFromQuestion } from './메신저유틸';
@@ -83,8 +83,7 @@ export function useChatWorkflowDrafts({
   selectedRoomId,
   effectiveChatUserId,
   user,
-  fetchData,
-}: UseChatWorkflowDraftsParams): UseChatWorkflowDraftsResult {
+  fetchData }: UseChatWorkflowDraftsParams): UseChatWorkflowDraftsResult {
   const [polls, setPolls] = useState<PollItem[]>([]);
   const [pollVotes, setPollVotes] = useState<Record<string, Record<number, number>>>({});
   const [showPollModal, setShowPollModal] = useState(false);
@@ -103,8 +102,7 @@ export function useChatWorkflowDrafts({
     endDate: '',
     reason: '',
     itemName: '',
-    quantity: 1,
-  });
+    quantity: 1 });
 
   const openPollModal = useCallback(() => {
     setShowPollModal(true);
@@ -145,12 +143,10 @@ export function useChatWorkflowDrafts({
           deadlineAt: pollDeadlineAt,
           prize: prizeMeta,
           isKickPoll,
-          kickTargetId: isKickPoll ? kickTargetId : undefined,
-        }),
-        options,
-      };
+          kickTargetId: isKickPoll ? kickTargetId : undefined }),
+        options };
 
-      const { data: poll, error } = await supabase
+      const { data: poll, error } = await db
         .from('polls')
         .insert([pollPayload])
         .select()
@@ -174,10 +170,8 @@ export function useChatWorkflowDrafts({
           deadlineAt: pollDeadlineAt,
           prize: prizeMeta,
           isKickPoll,
-          kickTargetId: isKickPoll ? kickTargetId : undefined,
-        }),
-        options,
-      };
+          kickTargetId: isKickPoll ? kickTargetId : undefined }),
+        options };
       setPolls((prev) => [...prev, optimisticPoll]);
     } finally {
       setPollQuestion('');
@@ -206,7 +200,7 @@ export function useChatWorkflowDrafts({
 
   const handleVote = useCallback(async (pollId: string, optionIndex: number) => {
     try {
-      const { data: previousVote } = await supabase
+      const { data: previousVote } = await db
         .from('poll_votes')
         .select('option_index')
         .eq('poll_id', pollId)
@@ -215,12 +209,11 @@ export function useChatWorkflowDrafts({
 
       const previousOptionIndex = previousVote?.option_index as number | null | undefined;
 
-      const { error } = await supabase.from('poll_votes').upsert(
+      const { error } = await db.from('poll_votes').upsert(
         {
           poll_id: pollId,
           user_id: effectiveChatUserId || user?.id,
-          option_index: optionIndex,
-        },
+          option_index: optionIndex },
         { onConflict: 'poll_id,user_id' },
       );
 
@@ -241,19 +234,19 @@ export function useChatWorkflowDrafts({
       if (poll) {
         const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question);
         if (isKickPoll && kickTargetId && poll.options[optionIndex] === '찬성') {
-          const { data: voteRows } = await supabase.from('poll_votes').select('user_id').eq('poll_id', pollId).eq('option_index', optionIndex);
+          const { data: voteRows } = await db.from('poll_votes').select('user_id').eq('poll_id', pollId).eq('option_index', optionIndex);
           const agreeCount = voteRows?.length || 0;
           
-          const { data: roomData } = await supabase.from('chat_rooms').select('members').eq('id', poll.room_id).single();
+          const { data: roomData } = await db.from('chat_rooms').select('members').eq('id', poll.room_id).single();
           if (roomData && Array.isArray(roomData.members)) {
             const members = roomData.members as string[];
             const threshold = Math.floor((members.length - 1) / 2) + 1; // 과반수 찬성
             if (agreeCount >= threshold && members.includes(kickTargetId)) {
               const nextMembers = members.filter((m) => m !== kickTargetId);
-              await supabase.from('chat_rooms').update({ members: nextMembers }).eq('id', poll.room_id);
+              await db.from('chat_rooms').update({ members: nextMembers }).eq('id', poll.room_id);
               
               const targetName = user?.name ? `${user.name} 외에 의해` : '투표에 의해';
-              await insertChatMessageWithFallback(supabase, {
+              await insertChatMessageWithFallback(db, {
                 room_id: String(poll.room_id),
                 sender_id: null,
                 content: `강퇴 투표가 과반수를 넘어 대상자가 강퇴되었습니다.`,
@@ -264,8 +257,7 @@ export function useChatWorkflowDrafts({
                 reply_to_id: null,
                 album_id: null,
                 album_index: null,
-                album_total: null,
-              });
+                album_total: null });
             }
           }
         }
@@ -295,7 +287,7 @@ export function useChatWorkflowDrafts({
     }
 
     try {
-      const { data: voteRows, error: voteError } = await supabase
+      const { data: voteRows, error: voteError } = await db
         .from('poll_votes')
         .select('user_id')
         .eq('poll_id', pollId);
@@ -316,7 +308,7 @@ export function useChatWorkflowDrafts({
       }
       const selectedIds = shuffled.slice(0, Math.min(prize.winnerCount, shuffled.length));
 
-      const { data: staffRows, error: staffError } = await supabase
+      const { data: staffRows, error: staffError } = await db
         .from('staff_members')
         .select('id, name')
         .in('id', selectedIds);
@@ -334,7 +326,7 @@ export function useChatWorkflowDrafts({
         { deadlineAt, prize, prizeWinners: winners },
       );
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('polls')
         .update({ question: newQuestion })
         .eq('id', pollId);
@@ -355,7 +347,7 @@ export function useChatWorkflowDrafts({
         const resultContent = `🎉 추첨 결과\n[${displayQuestion}]\n🎁 상품: ${prize.name}\n🏆 당첨: ${winnerNames}`;
 
         try {
-          await insertChatMessageWithFallback(supabase, {
+          await insertChatMessageWithFallback(db, {
             room_id: roomId,
             sender_id: senderId || null,
             content: resultContent,
@@ -366,8 +358,7 @@ export function useChatWorkflowDrafts({
             reply_to_id: null,
             album_id: null,
             album_index: null,
-            album_total: null,
-          });
+            album_total: null });
         } catch {
           toast('추첨 결과 메시지 게시에 실패했습니다.', 'warning');
         }
@@ -401,8 +392,7 @@ export function useChatWorkflowDrafts({
         endDate: '',
         reason: content.replace('/연차', '').trim(),
         itemName: '',
-        quantity: 1,
-      });
+        quantity: 1 });
       setShowSlashModal(true);
       return true;
     }
@@ -414,8 +404,7 @@ export function useChatWorkflowDrafts({
         endDate: '',
         reason: '',
         itemName: content.replace('/발주', '').trim(),
-        quantity: 1,
-      });
+        quantity: 1 });
       setShowSlashModal(true);
       return true;
     }
@@ -439,7 +428,7 @@ export function useChatWorkflowDrafts({
         '이 요청서는 채팅 명령어(/연차)로 자동 생성되었습니다.',
       ].filter(Boolean);
 
-      await supabase.from('approvals').insert([
+      await db.from('approvals').insert([
         {
           sender_id: effectiveChatUserId || user?.id,
           sender_name: user?.name,
@@ -447,8 +436,7 @@ export function useChatWorkflowDrafts({
           type: '연차/휴가',
           title,
           content: contentLines.join('\n'),
-          status: '대기',
-        },
+          status: '대기' },
       ]);
 
       toast('연차/휴가 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
@@ -487,7 +475,7 @@ export function useChatWorkflowDrafts({
         '이 요청서는 채팅 명령어(/발주)로 자동 생성되었습니다.',
       ].filter(Boolean);
 
-      await supabase.from('approvals').insert([
+      await db.from('approvals').insert([
         {
           sender_id: effectiveChatUserId || user?.id,
           sender_name: user?.name,
@@ -495,8 +483,7 @@ export function useChatWorkflowDrafts({
           type: '비품구매',
           title,
           content: contentLines.join('\n'),
-          status: '대기',
-        },
+          status: '대기' },
       ]);
 
       toast('비품구매 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
@@ -554,6 +541,5 @@ export function useChatWorkflowDrafts({
     handleSlashFormFieldChange,
     openSlashDraftFromText,
     handleSubmitAnnualLeaveDraft,
-    handleSubmitPurchaseDraft,
-  };
+    handleSubmitPurchaseDraft };
 }

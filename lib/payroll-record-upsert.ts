@@ -1,11 +1,10 @@
 import { sql } from 'drizzle-orm';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   payroll_records as payrollRecordsTable,
   getD1Binding,
   getD1Drizzle,
-  resolveDataBackend,
-} from '@/lib/db';
+  resolveDataBackend } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type SupabaseMutationResult<T = unknown> = {
@@ -20,8 +19,7 @@ export const PAYROLL_RECORD_LEGACY_CONFLICT_TARGET = 'staff_id,year_month';
 const PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR = {
   code: 'PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED',
   message:
-    'payroll_records.record_type and unique(staff_id,year_month,record_type) are required before saving interim or daily payroll records.',
-};
+    'payroll_records.record_type and unique(staff_id,year_month,record_type) are required before saving interim or daily payroll records.' };
 
 export function isPayrollStringTooLongError(error: unknown) {
   if (!error || typeof error !== 'object') return false;
@@ -83,7 +81,7 @@ const PAYROLL_JSONB_COLUMNS: ReadonlySet<string> = new Set([
   'settlement_reason',
 ]);
 
-// D1 컬럼이 아닌 키들 (supabase에만 존재) — D1 미러에서 제외
+// D1 컬럼이 아닌 키들 (db에만 존재) — D1 미러에서 제외
 const PAYROLL_D1_OMIT_COLUMNS: ReadonlySet<string> = new Set([
   'company_id',
   'company_name',
@@ -161,8 +159,7 @@ const PAYROLL_UPDATE_SET = {
   long_term_care: sql`excluded.long_term_care`,
   employment_insurance: sql`excluded.employment_insurance`,
   income_tax: sql`excluded.income_tax`,
-  local_tax: sql`excluded.local_tax`,
-} as const;
+  local_tax: sql`excluded.local_tax` } as const;
 
 async function runPayrollRecordUpsert(
   payload: PayrollRecordPayload,
@@ -170,9 +167,9 @@ async function runPayrollRecordUpsert(
   optionalColumns: readonly string[],
   cacheKey?: string,
 ): Promise<SupabaseMutationResult> {
-  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
   if (typeof window !== 'undefined') {
-    const { supabase: sb } = await import('@/lib/supabase');
+    const { db: sb } = await import('@/lib/db-client');
     const records = Array.isArray(payload) ? payload : [payload];
     if (records.length === 0) return { data: [], error: null };
     try {
@@ -180,8 +177,7 @@ async function runPayrollRecordUpsert(
         .from('payroll_records')
         .upsert(records as Record<string, unknown>[], {
           onConflict: conflictTarget,
-          ignoreDuplicates: false,
-        });
+          ignoreDuplicates: false });
       return { data, error };
     } catch (err) {
       return { data: null, error: err };
@@ -197,8 +193,7 @@ async function runPayrollRecordUpsert(
       ) {
         return {
           data: null,
-          error: PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR,
-        };
+          error: PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR };
       }
 
       const nextPayload = omitPayloadColumns(payload, omittedColumns);
@@ -207,7 +202,7 @@ async function runPayrollRecordUpsert(
           ? PAYROLL_RECORD_LEGACY_CONFLICT_TARGET
           : conflictTarget;
 
-      // D1 직접 upsert — supabase.from('payroll_records').upsert() 대체
+      // D1 직접 upsert — db.from('payroll_records').upsert() 대체
       const records = Array.isArray(nextPayload) ? nextPayload : [nextPayload];
       if (records.length === 0) {
         return { data: [], error: null };
@@ -222,8 +217,7 @@ async function runPayrollRecordUpsert(
           .values(normalized as never)
           .onConflictDoUpdate({
             target: targetCols,
-            set: PAYROLL_UPDATE_SET as never,
-          });
+            set: PAYROLL_UPDATE_SET as never });
         return { data: normalized, error: null };
       } catch (err) {
         return { data: null, error: err };
@@ -239,8 +233,7 @@ async function upsertPayrollPayloadWithFallback({
   optionalColumns,
   conflictTarget = PAYROLL_RECORD_TYPE_CONFLICT_TARGET,
   cacheKey,
-  retryWithoutColumnsOnStringTooLong = [],
-}: {
+  retryWithoutColumnsOnStringTooLong = [] }: {
   payload: PayrollRecordPayload;
   optionalColumns: readonly string[];
   conflictTarget?: string;
@@ -262,8 +255,7 @@ async function upsertPayrollPayloadWithFallback({
       if (hasNonRegularPayrollRecordType(attemptPayload)) {
         return {
           data: null,
-          error: PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR,
-        };
+          error: PAYROLL_RECORD_TYPE_MIGRATION_REQUIRED_ERROR };
       }
       result = await runPayrollRecordUpsert(
         attemptPayload,
@@ -287,8 +279,7 @@ export async function upsertPayrollRecordWithFallback({
   optionalColumns,
   conflictTarget = PAYROLL_RECORD_TYPE_CONFLICT_TARGET,
   cacheKey,
-  retryWithoutColumnsOnStringTooLong = [],
-}: {
+  retryWithoutColumnsOnStringTooLong = [] }: {
   record: Record<string, unknown>;
   optionalColumns: readonly string[];
   conflictTarget?: string;
@@ -300,16 +291,14 @@ export async function upsertPayrollRecordWithFallback({
     optionalColumns,
     conflictTarget,
     cacheKey,
-    retryWithoutColumnsOnStringTooLong,
-  });
+    retryWithoutColumnsOnStringTooLong });
 }
 
 export async function upsertPayrollRecordsWithFallback({
   records,
   optionalColumns,
   conflictTarget = PAYROLL_RECORD_TYPE_CONFLICT_TARGET,
-  cacheKey,
-}: {
+  cacheKey }: {
   records: Record<string, unknown>[];
   optionalColumns: readonly string[];
   conflictTarget?: string;
@@ -319,6 +308,5 @@ export async function upsertPayrollRecordsWithFallback({
     payload: records,
     optionalColumns,
     conflictTarget,
-    cacheKey,
-  });
+    cacheKey });
 }

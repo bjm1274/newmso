@@ -8,8 +8,7 @@ import {
   buildShortcutsKey,
   extractShortcutKeyFromEvent,
   loadShortcuts,
-  type ShortcutMap,
-} from './단축키설정';
+  type ShortcutMap } from './단축키설정';
 
 type GlobalShortcutsOptions = {
   user: { id?: unknown; auth_user_id?: unknown; employee_no?: unknown; name?: unknown } | null | undefined;

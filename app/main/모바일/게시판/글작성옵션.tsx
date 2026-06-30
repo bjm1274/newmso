@@ -33,8 +33,7 @@ export const EMPTY_POLL_DRAFT: PollDraft = {
   anonymous: false,
   prizeEnabled: false,
   prizeName: '',
-  prizeWinnerCount: 1,
-};
+  prizeWinnerCount: 1 };
 
 export type PostOptionsProps = {
   cat: BoardCatId;
@@ -63,8 +62,7 @@ export function PostOptions({
   onImportance,
   onAnonymous,
   onScheduled,
-  onPoll,
-}: PostOptionsProps) {
+  onPoll }: PostOptionsProps) {
   const setPoll = (patch: Partial<PollDraft>) => onPoll({ ...poll, ...patch });
   const setOption = (idx: number, value: string) => {
     const next = poll.options.slice();
@@ -100,15 +98,13 @@ export function PostOptions({
               style={{
                 width: 44, height: 24, borderRadius: 999,
                 background: pin ? 'var(--m-accent)' : 'var(--z-200)',
-                position: 'relative',
-              }}
+                position: 'relative' }}
             >
               <span style={{
                 position: 'absolute', top: 2, left: pin ? 22 : 2,
                 width: 20, height: 20, borderRadius: 999,
                 background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                transition: 'left .15s',
-              }} />
+                transition: 'left .15s' }} />
             </button>
           </div>
         )}
@@ -172,8 +168,7 @@ export function PostOptions({
                 style={{
                   width: '100%', padding: '8px 10px', fontSize: 13,
                   border: '1px solid var(--m-border)', borderRadius: 8,
-                  background: 'var(--m-bg)', color: 'var(--z-800)',
-                }}
+                  background: 'var(--m-bg)', color: 'var(--z-800)' }}
               />
             </div>
           </div>

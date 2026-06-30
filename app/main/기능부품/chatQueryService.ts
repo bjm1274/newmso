@@ -1,11 +1,10 @@
 'use client';
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   CHAT_ROOM_OPTIONAL_COLUMNS,
-  buildChatRoomSelect,
-} from '@/lib/chat-query-columns';
-import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+  buildChatRoomSelect } from '@/lib/chat-query-columns';
+import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ChatRoom } from '@/types';
 
 const CHAT_ROOMS_CACHE_KEY = 'newmso:chat-rooms:v1';
@@ -26,8 +25,7 @@ function normalizeChatRoomForClient(room: ChatRoom): ChatRoom {
   if (!Array.isArray(dynamicRoom.member_ids)) return room;
   return {
     ...room,
-    members: dynamicRoom.member_ids,
-  };
+    members: dynamicRoom.member_ids };
 }
 
 export function normalizeChatRoomsForClient(rooms: ChatRoom[]): ChatRoom[] {
@@ -52,7 +50,7 @@ function normalizeCachedChatRooms(value: unknown): ChatRoom[] {
 /**
  * chat_rooms 테이블 전체 조회.
  * useChatRealtimeBridge.ts (3곳) + 메신저메시지조회훅.ts (1곳)에서 동일하게 반복되던
- * `supabase.from('chat_rooms').select(CHAT_ROOM_SELECT)` + 캐스팅 패턴을 중앙화.
+ * `db.from('chat_rooms').select(CHAT_ROOM_SELECT)` + 캐스팅 패턴을 중앙화.
  */
 export async function fetchAllChatRooms(
   options: FetchAllChatRoomsOptions = {},
@@ -65,8 +63,7 @@ export async function fetchAllChatRooms(
   ) {
     return {
       data: [...chatRoomsFetchCache.data],
-      error: chatRoomsFetchCache.error,
-    };
+      error: chatRoomsFetchCache.error };
   }
 
   if (chatRoomsFetchInFlight && !options.force) {
@@ -76,7 +73,7 @@ export async function fetchAllChatRooms(
   const fetchPromise = (async () => {
     const result = await withMissingColumnsFallback<ChatRoom[]>(
       (omittedColumns) =>
-        supabase.from('chat_rooms').select(buildChatRoomSelect(omittedColumns)) as PromiseLike<{
+        db.from('chat_rooms').select(buildChatRoomSelect(omittedColumns)) as PromiseLike<{
           data: ChatRoom[] | null;
           error: unknown;
         }>,
@@ -85,17 +82,14 @@ export async function fetchAllChatRooms(
     );
     const nextResult = {
       data: normalizeChatRoomsForClient(result.data || []),
-      error: result.error ?? null,
-    };
+      error: result.error ?? null };
     chatRoomsFetchCache = {
       ...nextResult,
       data: [...nextResult.data],
-      fetchedAt: Date.now(),
-    };
+      fetchedAt: Date.now() };
     return {
       data: [...nextResult.data],
-      error: nextResult.error,
-    };
+      error: nextResult.error };
   })();
 
   chatRoomsFetchInFlight = fetchPromise;
@@ -123,8 +117,7 @@ export function writeCachedChatRooms(rooms: ChatRoom[]) {
   chatRoomsFetchCache = {
     data: [...normalizedRooms],
     error: null,
-    fetchedAt: Date.now(),
-  };
+    fetchedAt: Date.now() };
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(

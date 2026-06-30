@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import type { AbcGrade, ForecastRow, InspectRow, Tone } from './stock-types';
 import { asString, pickNumber, pickString, type Row } from './data-helpers';
 
@@ -27,8 +27,7 @@ function classifyAbc(
   const items = inventory
     .map((i) => ({
       name: pickString(i, ['name', 'item_name'], ''),
-      value: usageMap.get(pickString(i, ['name', 'item_name'], '')) ?? 0,
-    }))
+      value: usageMap.get(pickString(i, ['name', 'item_name'], '')) ?? 0 }))
     .filter((x) => x.name)
     .sort((a, b) => b.value - a.value);
 
@@ -51,20 +50,17 @@ function classifyAbc(
       head: `상위 ${A.length} 종`,
       contributionPct: 70,
       desc: '매출 기여 70% · 발주 1순위 · 안전재고 충분히 확보',
-      examples: A.slice(0, 3),
-    },
+      examples: A.slice(0, 3) },
     {
       grade: 'B',
       head: `${B.length} 종`,
       contributionPct: 20,
-      desc: '매출 기여 20% · 정기 점검 · 일반 안전재고',
-    },
+      desc: '매출 기여 20% · 정기 점검 · 일반 안전재고' },
     {
       grade: 'C',
       head: `${C.length} 종`,
       contributionPct: 10,
-      desc: '매출 기여 10% · 최소 관리 · 통합 발주',
-    },
+      desc: '매출 기여 10% · 최소 관리 · 통합 발주' },
   ];
 
   return { grades, counts: { A: A.length, B: B.length, C: C.length } };
@@ -120,8 +116,7 @@ function buildInspects(inventory: Row[]): InspectRow[] {
       done: v.done,
       diff: 0,
       who: '-',
-      tone: 'success' as Tone,
-    }))
+      tone: 'success' as Tone }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 }
@@ -149,8 +144,7 @@ const EMPTY: AnalyzeWorkcenterData = {
   abcC: 0,
   forecastMissCount: 0,
   loading: true,
-  error: null,
-};
+  error: null };
 
 export function useAnalyzeData(): AnalyzeWorkcenterData {
   const [state, setState] = useState<AnalyzeWorkcenterData>(EMPTY);
@@ -161,8 +155,8 @@ export function useAnalyzeData(): AnalyzeWorkcenterData {
     const load = async () => {
       try {
         const [invRes, logRes] = await Promise.all([
-          supabase.from('inventory').select('*').limit(500),
-          supabase
+          db.from('inventory').select('*').limit(500),
+          db
             .from('inventory_logs')
             .select('*')
             .order('created_at', { ascending: false })
@@ -194,8 +188,7 @@ export function useAnalyzeData(): AnalyzeWorkcenterData {
           abcC: counts.C,
           forecastMissCount,
           loading: false,
-          error: null,
-        });
+          error: null });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : '분석 데이터를 불러오지 못했습니다.';

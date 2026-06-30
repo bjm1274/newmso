@@ -15,8 +15,7 @@ import type {
   CalendarCellInfo,
   CalendarCellTone,
   CalendarRow,
-  CalendarSortState,
-} from './CalendarTable.types';
+  CalendarSortState } from './CalendarTable.types';
 
 // ---------------------------------------------------------------------------
 // 톤 → CSS
@@ -26,8 +25,7 @@ export const toneClass: Record<CalendarCellTone, string> = {
   ok: 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30',
   warn: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border-yellow-500/30',
   danger: 'bg-red-500/10 text-red-600 dark:text-red-300 border-red-500/30',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)] border-[var(--border)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)] border-[var(--border)]' };
 
 export const DAY_LABELS_SUN = ['일', '월', '화', '수', '목', '금', '토'];
 export const DAY_LABELS_MON = ['월', '화', '수', '목', '금', '토', '일'];
@@ -59,8 +57,7 @@ export function MonthGridView<R>({
   className,
   sortableRowHeader,
   sort,
-  onSortChange,
-}: MonthGridViewProps<R>) {
+  onSortChange }: MonthGridViewProps<R>) {
   const dayLabels = weekStartsOn === 1 ? DAY_LABELS_MON : DAY_LABELS_SUN;
   // 정렬 토글 헬퍼 (sortableRowHeader가 켜져 있고 onSortChange가 있을 때만 동작)
   const handleSortToggle = (key: CalendarSortState['key']) => {
@@ -156,8 +153,7 @@ export function StaffByDayView<R>({
   className,
   onCellPointerDown,
   onCellPointerEnter,
-  onCellPointerUp,
-}: StaffByDayViewProps<R>) {
+  onCellPointerUp }: StaffByDayViewProps<R>) {
   const isPaintable = Boolean(onCellPointerDown || onCellPointerEnter || onCellPointerUp);
   return (
     <div className={className}>

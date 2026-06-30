@@ -40,8 +40,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           'linear-gradient(135deg, rgba(235, 244, 255, 0.7) 0%, rgba(243, 231, 255, 0.7) 50%, rgba(255, 230, 240, 0.7) 100%)',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100%',
-      }}
+        minHeight: '100%' }}
     >
       <MobileHeader
         title="부서별 재고"
@@ -70,8 +69,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           display: 'flex',
           gap: 8,
           overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-        }}
+          WebkitOverflowScrolling: 'touch' }}
       >
         <button
           type="button"
@@ -87,8 +85,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
           onClick={() => setFilter('all')}
         >
           전체
@@ -101,8 +98,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
               padding: '1px 6px',
               fontSize: '10px',
               fontWeight: 700,
-              marginLeft: 2,
-            }}
+              marginLeft: 2 }}
           >
             {items.length}
           </span>
@@ -121,8 +117,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
           onClick={() => setFilter('short')}
         >
           부족
@@ -135,8 +130,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
               padding: '1px 6px',
               fontSize: '10px',
               fontWeight: 700,
-              marginLeft: 2,
-            }}
+              marginLeft: 2 }}
           >
             {shortCount}
           </span>
@@ -155,8 +149,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
           onClick={() => setFilter('warn')}
         >
           주의
@@ -169,8 +162,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
               padding: '1px 6px',
               fontSize: '10px',
               fontWeight: 700,
-              marginLeft: 2,
-            }}
+              marginLeft: 2 }}
           >
             {items.filter((i) => i.tone === 'warning').length}
           </span>
@@ -186,8 +178,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             padding: '6px 12px',
             fontSize: '13px',
             fontWeight: 600,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
           onClick={() => setFilter('med')}
         >
           의료소모품
@@ -203,8 +194,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             padding: '6px 12px',
             fontSize: '13px',
             fontWeight: 600,
-            transition: 'all 0.2s',
-          }}
+            transition: 'all 0.2s' }}
           onClick={() => setFilter('office')}
         >
           사무
@@ -223,8 +213,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
-          }}
+            gap: 12 }}
         >
           <MIcon name="info" size={18} color={isHQ ? '#007aff' : '#ff9500'} />
           <div
@@ -233,8 +222,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
               fontSize: 12.5,
               fontWeight: 600,
               color: isHQ ? '#005bc4' : '#b25900',
-              lineHeight: 1.4,
-            }}
+              lineHeight: 1.4 }}
           >
             {isHQ
               ? 'MSO 본사 — 자동 발주가 외부 거래처에 PO 발송됩니다'
@@ -253,8 +241,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
               WebkitBackdropFilter: 'blur(30px)',
               border: '1px solid rgba(255, 255, 255, 0.4)',
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.04)',
-              overflow: 'hidden',
-            }}
+              overflow: 'hidden' }}
           >
             {loading && (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
@@ -275,8 +262,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
                   alignItems: 'center',
                   padding: '14px 16px',
                   borderBottom: idx === filtered.length - 1 ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
-                  gap: 12,
-                }}
+                  gap: 12 }}
               >
                 <div
                   className={'ico-tile' + (it.tone ? ' tone-' + it.tone : '')}
@@ -297,8 +283,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
                         ? '#ff3b30'
                         : it.tone === 'warning'
                         ? '#ff9500'
-                        : '#8e8e93',
-                  }}
+                        : '#8e8e93' }}
                 >
                   <MIcon name="box" size={18} />
                 </div>
@@ -316,8 +301,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-end',
-                    gap: 4,
-                  }}
+                    gap: 4 }}
                 >
                   <div className="m-tnum" style={{ fontSize: 15, fontWeight: 700, color: '#1d1d1f' }}>
                     {it.stock}
@@ -326,8 +310,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
                         fontSize: 11,
                         color: '#86868b',
                         fontWeight: 600,
-                        marginLeft: 2,
-                      }}
+                        marginLeft: 2 }}
                     >
                       {it.unit}
                     </span>
@@ -350,8 +333,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.02)',
           display: 'flex',
           gap: 10,
-          padding: '12px 16px',
-        }}
+          padding: '12px 16px' }}
       >
         <MBtn block icon="upload" className="macos-squircle-sm">
           출고 요청

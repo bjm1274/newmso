@@ -10,7 +10,7 @@
 //      세션 user.id)
 //   3) D1 drizzle .returning() 으로 클라이언트 호환 row 반환
 //
-// Phase 8-E — service-role supabase 의존 제거. chat_rooms 쓰기는 D1을
+// Phase 8-E — service-role db 의존 제거. chat_rooms 쓰기는 D1을
 // primary 로 한다 (RLS 우회 자동). 외부 시그니처(createOrUpsertChatRoom)는
 // 변경 없음.
 // members/member_ids 는 jsonb → text(JSON.stringify) 변환.
@@ -23,8 +23,7 @@ import {
   getD1Binding,
   getD1Drizzle,
   resolveDataBackend,
-  sql,
-} from '@/lib/db';
+  sql } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
@@ -35,8 +34,7 @@ const PayloadSchema = z.object({
   type: z.string().min(1),
   members: z.array(z.string()).optional(),
   created_by: z.string().nullable().optional(),
-  is_announcement: z.boolean().optional(),
-});
+  is_announcement: z.boolean().optional() });
 
 type ChatRoomPayload = z.infer<typeof PayloadSchema>;
 
@@ -70,8 +68,7 @@ function buildD1Row(payload: ChatRoomPayload, currentUserId: string): ChatRoomIn
     members: JSON.stringify(payload.members ?? []),
     created_by: payload.created_by ?? currentUserId,
     is_announcement: payload.is_announcement ? 1 : 0,
-    created_at: new Date().toISOString(),
-  };
+    created_at: new Date().toISOString() };
 }
 
 // 클라이언트 호환을 위해 row의 jsonb-유사 필드(members/member_ids)를 parse 해서 반환.
@@ -96,8 +93,7 @@ function presentRoomRow(row: ChatRoomSelect): Record<string, unknown> {
     last_message: row.last_message ?? null,
     last_message_preview: row.last_message_preview ?? null,
     member_ids: parseJson(row.member_ids),
-    is_announcement: Boolean(row.is_announcement),
-  };
+    is_announcement: Boolean(row.is_announcement) };
 }
 
 export async function POST(request: Request) {
@@ -131,9 +127,7 @@ export async function POST(request: Request) {
             name: sql`excluded.name`,
             type: sql`excluded.type`,
             members: sql`excluded.members`,
-            is_announcement: sql`excluded.is_announcement`,
-          },
-        })
+            is_announcement: sql`excluded.is_announcement` } })
         .returning();
 
       const row = upserted[0];

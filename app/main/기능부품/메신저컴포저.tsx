@@ -11,8 +11,7 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
   type MutableRefObject,
-  type RefObject,
-} from 'react';
+  type RefObject } from 'react';
 import type { ChatMessage, StaffMember } from '@/types';
 import { getPendingAttachmentDisplayName } from './메신저첨부';
 import { buildMessengerImageAlt } from './메신저공통';
@@ -165,8 +164,7 @@ function MessengerComposerImpl({
   onSendMessage,
   onSelectMention,
   onOpenPollModal,
-  selectedRoomName,
-}: MessengerComposerProps, controlRef: React.ForwardedRef<MessengerComposerHandle>) {
+  selectedRoomName }: MessengerComposerProps, controlRef: React.ForwardedRef<MessengerComposerHandle>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const albumFileInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -193,8 +191,7 @@ function MessengerComposerImpl({
       setValue: (next: string) => {
         inputMsgRef.current = next;
         setInputMsg(next);
-      },
-    }),
+      } }),
     [inputMsgRef],
   );
 

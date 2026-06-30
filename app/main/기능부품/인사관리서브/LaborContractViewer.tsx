@@ -16,8 +16,7 @@ export default function LaborContractViewer({ doc, content, selectedCo }: Props)
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
-    day: 'numeric',
-  });
+    day: 'numeric' });
   const companyName = String(doc.company_name || selectedCo || '');
   const staffName = String(doc.title || '').split(' ')[0];
 

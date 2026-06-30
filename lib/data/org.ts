@@ -8,12 +8,11 @@
 
 import { eq } from 'drizzle-orm';
 import { fetcher, invalidateCache } from '@/lib/fetcher';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   getD1Binding,
   getD1Drizzle,
-  org_teams as orgTeamsTable,
-} from '@/lib/db';
+  org_teams as orgTeamsTable } from '@/lib/db';
 
 const ORG_TTL = 300_000; // 5분
 
@@ -26,7 +25,7 @@ export async function fetchCompanyOptions(): Promise<string[]> {
   return fetcher(
     'org:companies:options',
     async () => {
-      const { data: companyRows, error } = await supabase
+      const { data: companyRows, error } = await db
         .from('companies')
         .select('name, is_active')
         .eq('is_active', true)
@@ -38,7 +37,7 @@ export async function fetchCompanyOptions(): Promise<string[]> {
           .filter((name: any): name is string => Boolean(name));
       }
 
-      const { data: staffRows } = await supabase
+      const { data: staffRows } = await db
         .from('staff_members')
         .select('company');
       const names = Array.from(
@@ -71,7 +70,7 @@ export async function fetchOrgTeams(company: string): Promise<OrgTeam[]> {
   return fetcher(
     `org:teams:${company}`,
     async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from('org_teams')
         .select('*')
         .eq('company_name', company)
@@ -116,9 +115,9 @@ async function requireOrgD1() {
  */
 export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
     if (typeof window !== 'undefined') {
-      const { supabase: sb } = await import('@/lib/supabase');
+      const { db: sb } = await import('@/lib/db-client');
       const { error } = await sb.from('org_teams').insert({
         id: crypto.randomUUID(),
         company_name: input.company_name,
@@ -126,8 +125,7 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
         team_name: input.team_name,
         sort_order: input.sort_order,
         created_at: new Date().toISOString(),
-        applicable_shifts: input.applicable_shifts || null,
-      });
+        applicable_shifts: input.applicable_shifts || null });
       if (error) throw error;
       invalidateOrgTeams(input.company_name);
       return { error: null };
@@ -141,8 +139,7 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
       team_name: input.team_name,
       sort_order: input.sort_order,
       created_at: new Date().toISOString(),
-      applicable_shifts: input.applicable_shifts || null,
-    });
+      applicable_shifts: input.applicable_shifts || null });
     invalidateOrgTeams(input.company_name);
     return { error: null };
   } catch (err) {
@@ -156,9 +153,9 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
  */
 export async function deleteOrgTeam(id: string, company?: string): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
     if (typeof window !== 'undefined') {
-      const { supabase: sb } = await import('@/lib/supabase');
+      const { db: sb } = await import('@/lib/db-client');
       const { error } = await sb.from('org_teams').delete().eq('id', id);
       if (error) throw error;
       invalidateOrgTeams(company);
@@ -189,17 +186,16 @@ export type OrgTeamUpdateInput = {
  */
 export async function updateOrgTeam(input: OrgTeamUpdateInput): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat supabase 경유
+    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
     if (typeof window !== 'undefined') {
-      const { supabase: sb } = await import('@/lib/supabase');
+      const { db: sb } = await import('@/lib/db-client');
       const { error } = await sb
         .from('org_teams')
         .update({
           division: input.division,
           team_name: input.team_name,
           sort_order: input.sort_order,
-          applicable_shifts: input.applicable_shifts || null,
-        })
+          applicable_shifts: input.applicable_shifts || null })
         .eq('id', input.id);
       if (error) throw error;
       invalidateOrgTeams(input.company_name);
@@ -213,8 +209,7 @@ export async function updateOrgTeam(input: OrgTeamUpdateInput): Promise<{ error:
         division: input.division,
         team_name: input.team_name,
         sort_order: input.sort_order,
-        applicable_shifts: input.applicable_shifts || null,
-      })
+        applicable_shifts: input.applicable_shifts || null })
       .where(eq(orgTeamsTable.id, input.id));
     invalidateOrgTeams(input.company_name);
     return { error: null };

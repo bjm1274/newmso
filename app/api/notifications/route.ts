@@ -53,8 +53,7 @@ export async function GET(request: Request) {
       }
       return {
         ...row,
-        metadata: meta,
-      };
+        metadata: meta };
     });
 
     return new Response(JSON.stringify({ ok: true, data: rows }), { status: 200, headers: { 'Content-Type': 'application/json' } });

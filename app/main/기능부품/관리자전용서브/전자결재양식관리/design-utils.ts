@@ -21,8 +21,7 @@ export const DEFAULT_DESIGN: TemplateDesign = {
   subtitleXPercent: 9,
   subtitleYPercent: 31,
   signXPercent: 73,
-  signYPercent: 77,
-};
+  signYPercent: 77 };
 
 export const builtinTemplates: TemplateOption[] = [
   { slug: 'leave', name: '연차/휴가', summary: '휴가 일정과 인수인계 내용을 정리하는 기본양식' },
@@ -49,8 +48,7 @@ export const BUILTIN_TEMPLATE_DEFAULTS: Record<string, TemplateDesign> = {
   generic: { title: '증명서 발급 신청서', primaryColor: '#0369a1', borderColor: '#d0e5f0', sealLabel: '증명서 확인' },
   attendance_fix: { title: '출결 정정 신청서', primaryColor: '#be123c', borderColor: '#f1cfd7', sealLabel: '정정 확인' },
   resignation: { title: '사직서', primaryColor: '#475569', borderColor: '#e2e8f0', sealLabel: '퇴사 확인' },
-  payroll_slip: { title: '급여 명세서', primaryColor: '#163b70', borderColor: '#d8e1ee', sealLabel: '급여 직인' },
-};
+  payroll_slip: { title: '급여 명세서', primaryColor: '#163b70', borderColor: '#d8e1ee', sealLabel: '급여 직인' } };
 
 // 색상 유틸은 lib/color-utils로 통합(전자결재-utils와 중복 제거). 호환 위해 re-export.
 export { alphaColor } from '@/lib/color-utils';
@@ -84,8 +82,7 @@ export function createDefaultDesignMap(companyLabelOverride?: string) {
       companyLabel,
       backgroundLogoUrl: DEFAULT_LOGO_URL,
       backgroundLogoOpacity: preset.backgroundLogoOpacity ?? DEFAULT_DESIGN.backgroundLogoOpacity,
-      sealLabel: resolveSealLabelValue(preset.sealLabel, companyLabel),
-    };
+      sealLabel: resolveSealLabelValue(preset.sealLabel, companyLabel) };
 
     return acc;
   }, {});
@@ -102,8 +99,7 @@ export function mergeWithDefaultDesigns(
     const patch = typeof value === 'object' && value ? value : {};
     const merged = {
       ...(defaults[slug] || DEFAULT_DESIGN),
-      ...patch,
-    } as TemplateDesign;
+      ...patch } as TemplateDesign;
 
     const companyLabel = resolveCompanyLabelValue(
       merged.companyLabel,
@@ -121,8 +117,7 @@ export function mergeWithDefaultDesigns(
       sealLabel: resolveSealLabelValue(merged.sealLabel || defaults[slug]?.sealLabel, companyLabel),
       showBackgroundLogo: merged.showBackgroundLogo ?? true,
       showSeal: merged.showSeal ?? true,
-      showSignArea: merged.showSignArea ?? true,
-    };
+      showSignArea: merged.showSignArea ?? true };
   });
 
   return nextDesigns;
@@ -140,8 +135,7 @@ export function resolveCurrentDesign(
   const merged = {
     ...DEFAULT_DESIGN,
     ...(preset || {}),
-    ...(saved || {}),
-  };
+    ...(saved || {}) };
   const companyLabel = resolveCompanyLabelValue(
     merged.companyLabel,
     preset?.companyLabel || companyLabelOverride || DEFAULT_DESIGN.companyLabel || 'SY INC.',
@@ -160,6 +154,5 @@ export function resolveCurrentDesign(
     sealLabel: resolveSealLabelValue(merged.sealLabel || preset?.sealLabel, companyLabel),
     showBackgroundLogo: merged.showBackgroundLogo ?? true,
     showSeal: merged.showSeal ?? true,
-    showSignArea: merged.showSignArea ?? true,
-  } satisfies TemplateDesign;
+    showSignArea: merged.showSignArea ?? true } satisfies TemplateDesign;
 }

@@ -28,8 +28,7 @@ function MemberRow({ member, tone }: { member: ReadStatusMember; tone: 'read' | 
       style={{
         background: tone === 'read' ? 'var(--m-accent-soft)' : 'var(--m-warning-soft, var(--m-bg))',
         borderRadius: 10,
-        margin: '0 0 6px',
-      }}
+        margin: '0 0 6px' }}
     >
       <div>
         <div className="lbl">{member.name || '이름 없음'}</div>

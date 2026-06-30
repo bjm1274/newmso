@@ -3,7 +3,7 @@
 /**
  * 추가기능 모바일 — 공용 데이터 훅 모음.
  *
- * 16 모듈이 공유하는 supabase 쿼리·집계 로직.
+ * 16 모듈이 공유하는 db 쿼리·집계 로직.
  * 컴포넌트는 useXxx 훅만 import하고 화면 렌더만 책임진다.
  *
  *  - useOrgDepartments: staff_members → 부서 그룹핑
@@ -26,7 +26,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { getKoreanTodayString } from '@/lib/seoul-time';
@@ -94,7 +94,7 @@ export function useOrgDepartments(company: string | undefined) {
     void (async () => {
       setLoading(true);
       try {
-        let q = supabase
+        let q = db
           .from('staff_members')
           .select('id, name, company, department, position, role, status, photo_url')
           .order('name')
@@ -116,8 +116,7 @@ export function useOrgDepartments(company: string | undefined) {
             department: dept,
             position: s.position ?? s.role ?? '',
             status: s.status ?? '근무중',
-            photo_url: s.photo_url ?? null,
-          });
+            photo_url: s.photo_url ?? null });
           byDept.set(dept, prev);
         }
         const result = Array.from(byDept.entries())
@@ -165,7 +164,7 @@ export function useDeptInventory(opts: { company?: string; department?: string }
     void (async () => {
       setLoading(true);
       try {
-        let q = supabase
+        let q = db
           .from('inventory')
           .select('*')
           .order('name')
@@ -205,8 +204,7 @@ export function useDeptInventory(opts: { company?: string; department?: string }
             location: pickText(r, 'location', 'department', '부서', '보관위치') || '본사 자재',
             category: pickText(r, 'category', '분류') || '의료소모품',
             tone,
-            status,
-          };
+            status };
         });
         setItems(mapped);
       } catch (err) {
@@ -245,8 +243,7 @@ const STATE_LABEL: Record<WorkNowState, string> = {
   break: '휴게',
   outside: '외근',
   off: '휴가',
-  unknown: '-',
-};
+  unknown: '-' };
 
 function deriveState(rawStatus: string | null): WorkNowState {
   const s = (rawStatus ?? '').toString().trim();
@@ -266,7 +263,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
 
   const load = useCallback(async () => {
     try {
-      let q = supabase
+      let q = db
         .from('staff_members')
         .select('id, name, company, department, status')
         .order('name')
@@ -277,7 +274,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
       const active = ((staffData ?? []) as StaffMember[]).filter(isActiveStaff);
 
       const today = todayISO();
-      const { data: attData } = await supabase
+      const { data: attData } = await db
         .from('attendances')
         .select('*')
         .eq('work_date', today)
@@ -307,8 +304,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
             state,
             stateLabel: STATE_LABEL[state],
             location,
-            since,
-          };
+            since };
       });
       setMembers(list);
       setLastSync(new Date());
@@ -335,8 +331,7 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
     working: members.filter((m) => m.state === 'working').length,
     breakCount: members.filter((m) => m.state === 'break').length,
     outside: members.filter((m) => m.state === 'outside').length,
-    off: members.filter((m) => m.state === 'off').length,
-  }), [members]);
+    off: members.filter((m) => m.state === 'off').length }), [members]);
 
   return { members, loading, lastSync, kpi, refresh: load };
 }
@@ -369,7 +364,7 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
       // handover_notes 에는 회사 컬럼이 없다(정본 스키마). 회사 격리는
       // content 마커 파싱 방식으로만 가능하므로 여기서는 필터하지 않는다.
       void company;
-      const q = supabase
+      const q = db
         .from('handover_notes')
         .select('*')
         .order('created_at', { ascending: false })
@@ -392,8 +387,7 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
           created_at: pickText(r, 'created_at'),
           scope: scopeRaw === 'patient' ? 'patient' : 'general',
           patient_name: (pickText(r, 'patient_name') || null) as string | null,
-          room_number: (pickText(r, 'room_number') || null) as string | null,
-        };
+          room_number: (pickText(r, 'room_number') || null) as string | null };
       });
       setRows(mapped);
     } catch (err) {
@@ -447,7 +441,7 @@ export function useStaffEvaluations(opts: { company?: string; selfId?: string | 
         // evaluator_id·category·content·score). 회사 필터를 걸면 SQL 에러로
         // 전체 조회가 무음 실패하므로 필터하지 않는다.
         void company;
-        const q = supabase
+        const q = db
           .from('staff_evaluations')
           .select('*')
           .order('created_at', { ascending: false })
@@ -464,8 +458,7 @@ export function useStaffEvaluations(opts: { company?: string; selfId?: string | 
           target_department: pickText(r, 'target_department', 'department'),
           score: pickNumber(r, 'score', 'overall_score', 'total_score'),
           comment: pickText(r, 'content', 'comment', 'feedback', 'note'),
-          created_at: pickText(r, 'created_at'),
-        }));
+          created_at: pickText(r, 'created_at') }));
         setRows(list);
       } catch (err) {
         console.warn('[mobile-addon] eval load failed', err);
@@ -516,7 +509,7 @@ export function useDischargeReviews(opts: { selfId?: string | null }) {
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('discharge_reviews')
           .select('*')
           .order('created_at', { ascending: false })
@@ -536,8 +529,7 @@ export function useDischargeReviews(opts: { selfId?: string | null }) {
           reviewer_id: pickText(r, 'reviewer_id'),
           reviewer_name: pickText(r, 'reviewer_name'),
           created_at: pickText(r, 'created_at'),
-          ai_analysis: pickText(r, 'ai_analysis'),
-        }));
+          ai_analysis: pickText(r, 'ai_analysis') }));
         setRows(list);
       } catch (err) {
         console.warn('[mobile-addon] discharge load failed', err);
@@ -584,7 +576,7 @@ export function useMriSchedules(opts: { company?: string; date?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        let q = supabase
+        let q = db
           .from('board_posts')
           .select('*')
           .eq('board_type', 'MRI일정')
@@ -602,8 +594,7 @@ export function useMriSchedules(opts: { company?: string; date?: string }) {
           exam: pickText(r, 'exam_type', 'mri_type', 'surgery_name') || 'MRI',
           department: pickText(r, 'department', 'dept') || '영상의학',
           status: pickText(r, 'status') || '대기',
-          date: pickText(r, 'schedule_date', 'date') || targetDate,
-        }));
+          date: pickText(r, 'schedule_date', 'date') || targetDate }));
         setRows(list.filter((r) => !date || r.date === date));
       } catch (err) {
         console.warn('[mobile-addon] mri load failed', err);
@@ -646,7 +637,7 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
 
   const load = useCallback(async () => {
     try {
-      let q = supabase
+      let q = db
         .from('board_posts')
         .select('*')
         .in('board_type', ['업무공유', 'task_share'])
@@ -668,8 +659,7 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
           attachments: att,
           comments: pickNumber(r, 'comment_count', 'comments_count'),
           tag: pickText(r, 'tag', 'category') || '공유',
-          urgent: Boolean(r.is_urgent) || pickText(r, 'priority') === 'high',
-        };
+          urgent: Boolean(r.is_urgent) || pickText(r, 'priority') === 'high' };
       });
       setRows(mapped);
     } catch (err) {
@@ -703,7 +693,7 @@ export function useTaskGuides(opts: { company?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        let q = supabase
+        let q = db
           .from('board_posts')
           .select('*')
           .in('board_type', ['업무가이드', 'guide'])
@@ -725,8 +715,7 @@ export function useTaskGuides(opts: { company?: string }) {
           comments: pickNumber(r, 'comment_count'),
           tag: pickText(r, 'tag', 'category') || '가이드',
           urgent: false,
-          company: pickText(r, 'company') || '공통',
-        }));
+          company: pickText(r, 'company') || '공통' }));
         setRows(mapped);
       } catch (err) {
         console.warn('[mobile-addon] task guide load failed', err);
@@ -781,7 +770,7 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
 
   const load = useCallback(async () => {
     try {
-      let scheduleQuery = supabase
+      let scheduleQuery = db
         .from('board_posts')
         .select('*')
         .eq('board_type', '수술일정')
@@ -790,7 +779,7 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
       if (company) scheduleQuery = scheduleQuery.eq('company', company);
       const [{ data: scheduleData, error: schedErr }, { data: checkData }] = await Promise.all([
         scheduleQuery,
-        supabase
+        db
           .from('op_patient_checks')
           .select('*')
           .eq('schedule_date', date)
@@ -820,8 +809,7 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
             doctor: pickText(r, 'doctor_name', 'author_name') || '담당의',
             startTime: pickText(r, 'schedule_time', 'start_time') || '--:--',
             state: normalizeOpState(check ? pickText(check, 'status') : null),
-            checkId: check ? pickText(check, 'id') : null,
-          };
+            checkId: check ? pickText(check, 'id') : null };
         });
       if (!aliveRef.current) return;
       setCards(list);
@@ -859,16 +847,15 @@ export async function setOpCardState(
     status: nextState,
     updated_at: now,
     updated_by: user?.id ?? null,
-    updated_by_name: user?.name ?? null,
-  };
+    updated_by_name: user?.name ?? null };
   if (card.checkId) {
-    const { error } = await supabase
+    const { error } = await db
       .from('op_patient_checks')
       .update(payload)
       .eq('id', card.checkId);
     if (error) throw error;
   } else {
-    const { error } = await supabase
+    const { error } = await db
       .from('op_patient_checks')
       .insert([
         {
@@ -878,8 +865,7 @@ export async function setOpCardState(
           company_name: user?.company ?? '전체',
           created_by: user?.id ?? null,
           created_by_name: user?.name ?? null,
-          ...payload,
-        },
+          ...payload },
       ]);
     if (error) throw error;
   }
@@ -914,7 +900,7 @@ export function useDeposits(opts: { company?: string; date?: string }) {
         // 회사 필터는 생략한다(서버 격리는 별도 과제). 실제 입금 완료(deposited)
         // 건만 집계해 발행(issued)·취소(cancelled)가 합산되지 않도록 한다.
         void company;
-        const q = supabase
+        const q = db
           .from('virtual_account_deposits')
           .select('*')
           .eq('deposit_status', 'deposited')
@@ -931,8 +917,7 @@ export function useDeposits(opts: { company?: string; date?: string }) {
           method: pickText(r, 'method', 'transaction_label') || '계좌이체',
           time: pickText(r, 'deposited_at', 'created_at'),
           status: pickText(r, 'deposit_status') || 'deposited',
-          matched: pickText(r, 'match_status') === 'matched',
-        }));
+          matched: pickText(r, 'match_status') === 'matched' }));
         setRows(list);
       } catch (err) {
         console.warn('[mobile-addon] deposits load failed', err);
@@ -986,7 +971,7 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
         // 회사 격리는 company_id 기준이나 모바일은 회사 '이름'만 알아 client
         // 필터가 불가하므로 일자 기준으로만 조회한다.
         void company;
-        const { data: closureData, error } = await supabase
+        const { data: closureData, error } = await db
           .from('daily_closures')
           .select('*')
           .eq('date', date)
@@ -1009,7 +994,7 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
         // 마감 항목(진료비 입금 내역)을 closure_id 로 조회해 요약 리스트 구성
         let items: ClosingItem[] = [];
         try {
-          const { data: itemData } = await supabase
+          const { data: itemData } = await db
             .from('daily_closure_items')
             .select('*')
             .eq('closure_id', closureId)
@@ -1021,8 +1006,7 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
               pickText(r, 'memo', 'payment_method') ||
               '마감 항목',
             status: submitted ? '완료' : '대기',
-            tone: submitted ? 'success' : 'warning',
-          }));
+            tone: submitted ? 'success' : 'warning' }));
         } catch {
           items = [];
         }

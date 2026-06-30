@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   buildChatAttachmentObjectKey,
-  createChatAttachmentUploadPlan,
-} from '@/lib/object-storage';
+  createChatAttachmentUploadPlan } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 
 export const dynamic = 'force-dynamic';
@@ -49,8 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       signedUrl: r2Plan.signedUrl,
       fileName: rawFileName,
       url: r2Plan.url,
-      headers: r2Plan.headers,
-    });
+      headers: r2Plan.headers });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : '업로드 플랜 생성 중 오류가 발생했습니다.';

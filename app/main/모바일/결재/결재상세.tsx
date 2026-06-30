@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { normalizeApprovalAttachments } from '@/lib/approval-report-utils';
@@ -31,8 +31,7 @@ import {
   resolveCurrentApproverId,
   resolveLineIds,
   resolveCcUserIds,
-  type ApprovalRow,
-} from './data-hooks';
+  type ApprovalRow } from './data-hooks';
 import { buildApprovalPrintHtml } from '../../기능부품/전자결재서브/approval-print-utils';
 
 type DetailTab = 'form' | 'line' | 'comment';
@@ -96,8 +95,7 @@ function readHistory(row: ApprovalRow | null): CommentEntry[] {
         actor_name: obj.actor_name != null ? String(obj.actor_name) : null,
         action: action != null ? String(action) : null,
         note: typeof note === 'string' ? note : null,
-        at: obj.at != null ? String(obj.at) : null,
-      } as CommentEntry;
+        at: obj.at != null ? String(obj.at) : null } as CommentEntry;
     })
     .filter((entry): entry is CommentEntry => entry !== null);
 }
@@ -124,8 +122,7 @@ export default function SApprovalDetail({
   initialRow,
   approvalId,
   onBack,
-  onChanged,
-}: SApprovalDetailProps) {
+  onChanged }: SApprovalDetailProps) {
   const [tab, setTab] = useState<DetailTab>('form');
   const [row, setRow] = useState<ApprovalRow | null>(initialRow);
   const [busy, setBusy] = useState<'none' | 'approve' | 'reject' | 'recall'>('none');
@@ -160,7 +157,7 @@ export default function SApprovalDetail({
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('staff_members')
           .select('id, name, position, department, company')
           .in('id', lookupIds);
@@ -207,8 +204,7 @@ export default function SApprovalDetail({
         const payload = await postTransition({
           action,
           approvalIds: [String(row.id)],
-          reason: reason.trim() || null,
-        });
+          reason: reason.trim() || null });
         const result = payload.results?.[0];
         if (!result?.ok) {
           throw new Error(result?.error || '결재 처리 실패');
@@ -296,8 +292,7 @@ export default function SApprovalDetail({
               width: 30,
               height: 30,
               border: 'none',
-              cursor: 'pointer',
-            }}
+              cursor: 'pointer' }}
           >
             <MIcon name="moreV" size={15} color="var(--z-600)" />
           </button>
@@ -308,8 +303,7 @@ export default function SApprovalDetail({
         style={{
           padding: '10px 16px 0',
           background: 'transparent',
-          borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
-        }}
+          borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}
       >
         {/* 아크릴 세그먼트 탭바 */}
         <div
@@ -319,8 +313,7 @@ export default function SApprovalDetail({
           style={{
             display: 'flex',
             padding: 3,
-            gap: 2,
-          }}
+            gap: 2 }}
         >
           {([
             { id: 'form', label: '양식' },
@@ -347,8 +340,7 @@ export default function SApprovalDetail({
                   background: on ? '#fff' : 'transparent',
                   color: on ? 'var(--z-900)' : 'var(--z-600)',
                   boxShadow: on ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
-                  cursor: 'pointer',
-                }}
+                  cursor: 'pointer' }}
               >
                 {t.label}
               </button>
@@ -375,8 +367,7 @@ export default function SApprovalDetail({
         style={{
           borderTop: '1px solid rgba(255,255,255,0.4)',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.03)',
-          padding: '12px 16px 14px',
-        }}
+          padding: '12px 16px 14px' }}
       >
         {canApprove ? (
           <>
@@ -469,8 +460,7 @@ export default function SApprovalDetail({
               fontWeight: 600,
               lineHeight: 1.55,
               resize: 'none',
-              minHeight: 96,
-            }}
+              minHeight: 96 }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <MBtn
@@ -525,8 +515,7 @@ const resolveApprovalTemplateMeta = (item: Record<string, unknown>) => {
   const rawName = String(metaData?.form_name || '').trim();
   return {
     slug: rawSlug || rawType || 'generic',
-    name: rawName || rawType || '결재 문서',
-  };
+    name: rawName || rawType || '결재 문서' };
 };
 
 const resolveApprovalTemplateDesign = (item: Record<string, unknown>) => {
@@ -539,16 +528,14 @@ const resolveApprovalTemplateDesign = (item: Record<string, unknown>) => {
     title: template.name || '결재 문서',
     subtitle: `${template.name || '결재'} 승인 문서`,
     templateName: template.name || '결재 문서',
-    templateSlug: template.slug || 'generic',
-  };
+    templateSlug: template.slug || 'generic' };
 };
 
 function FormTab({
   row,
   title,
   formName,
-  staffMap,
-}: {
+  staffMap }: {
   row: ApprovalRow;
   title: string;
   formName: string;
@@ -560,8 +547,7 @@ function FormTab({
       item: row as any,
       approvalDirectoryStaffs: Object.values(staffMap),
       resolveApprovalTemplateDesign,
-      resolveApprovalTemplateMeta,
-    });
+      resolveApprovalTemplateMeta });
   }, [row, staffMap]);
 
   return (
@@ -589,8 +575,7 @@ function LineTab({
   lineIds,
   currentApproverId,
   staffMap,
-  staffId,
-}: {
+  staffId }: {
   row: ApprovalRow;
   lineIds: string[];
   currentApproverId: string | null;
@@ -617,8 +602,7 @@ function LineTab({
       step: '기안',
       state: '완료',
       tone: 'accent',
-      ts: shortTs(row.created_at),
-    });
+      ts: shortTs(row.created_at) });
   }
 
   const curIdx = lineIds.findIndex((id) => id === currentApproverId);
@@ -648,8 +632,7 @@ function LineTab({
       step: i === lineIds.length - 1 ? '최종 결재' : i === 0 ? '1차 검토' : `${i + 1}차 검토`,
       state,
       tone,
-      ts: '-',
-    });
+      ts: '-' });
   }
 
   return (
@@ -665,8 +648,7 @@ function LineTab({
           className="macos-glass macos-squircle"
           style={{
             overflow: 'hidden',
-            padding: 0,
-          }}
+            padding: 0 }}
         >
           <ol style={{ listStyle: 'none' }} aria-label="결재 진행 순서">
             {steps.map((l, i) => (
@@ -678,8 +660,7 @@ function LineTab({
                   gap: 12,
                   padding: '14px 16px',
                   borderBottom: i < steps.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                  position: 'relative',
-                }}
+                  position: 'relative' }}
               >
                 <div style={{ position: 'relative' }}>
                   <MAvatar tone={pickAvatarTone(l.id)} size="sm">
@@ -695,8 +676,7 @@ function LineTab({
                         bottom: -14,
                         width: 1,
                         background: 'rgba(0, 0, 0, 0.08)',
-                        transform: 'translateX(-50%)',
-                      }}
+                        transform: 'translateX(-50%)' }}
                     />
                   )}
                 </div>
@@ -729,8 +709,7 @@ function LineTab({
 
 function CommentTab({
   comments,
-  staffMap,
-}: {
+  staffMap }: {
   comments: CommentEntry[];
   staffMap: Record<string, StaffMember>;
 }) {
@@ -756,8 +735,7 @@ function CommentTab({
                 display: 'flex',
                 gap: 10,
                 marginBottom: 12,
-                padding: '12px 14px',
-              }}
+                padding: '12px 14px' }}
             >
               <MAvatar tone={tone} size="sm">
                 {(name || '?').charAt(0)}
@@ -783,8 +761,7 @@ function CommentTab({
                       lineHeight: 1.55,
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
-                      fontWeight: 600,
-                    }}
+                      fontWeight: 600 }}
                   >
                     {c.note}
                   </div>

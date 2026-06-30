@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 
@@ -25,8 +25,7 @@ interface SubmRow {
 const TONE_CLS: Record<SubmRow['tone'], string> = {
   warn: 'bg-amber-500/15 text-amber-700',
   danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-};
+  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -75,11 +74,11 @@ export default function DocsSubmSummary() {
       setErrMsg(null);
       try {
         const [staffRes, repoRes] = await Promise.all([
-          supabase
+          db
             .from('staff_members')
             .select('id, name, status, join_date, joined_at')
             .eq('status', '재직'),
-          supabase
+          db
             .from('document_repository')
             .select('created_by, category'),
         ]);
@@ -122,8 +121,7 @@ export default function DocsSubmSummary() {
                 doc: doc.label,
                 due: d < 0 ? `D+${Math.abs(d)}` : d === 0 ? 'D-Day' : `D-${d}`,
                 days: d,
-                tone: pickTone(d),
-              });
+                tone: pickTone(d) });
             }
           }
         }

@@ -1,7 +1,7 @@
 /**
  * 관리자 제외 전 직원 삭제
  * D1 binding 직접 사용 — RLS 없이 직접 SQL 실행 (service-role 우회 동등).
- * Phase 8-F: supabase 의존 제거. 모든 24개 의존 테이블이 D1 schema에 존재함을 확인.
+ * Phase 8-F: db 의존 제거. 모든 24개 의존 테이블이 D1 schema에 존재함을 확인.
  */
 import { NextResponse } from 'next/server';
 import { SQL } from 'drizzle-orm';
@@ -42,8 +42,7 @@ import {
   or,
   isNull,
   and,
-  inArray,
-} from '@/lib/db';
+  inArray } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 export const dynamic = 'force-dynamic';
@@ -79,8 +78,7 @@ function buildDeletions(db: ReturnType<typeof getD1Drizzle>): DepDeletion[] {
         if (chunk.length === 0) continue;
         await runner(chunk);
       }
-    },
-  });
+    } });
 
   return [
     // 전자결재
@@ -239,8 +237,7 @@ export async function POST(req: Request) {
     if (ids.length === 0) {
       return NextResponse.json({
         deleted: 0,
-        message: '삭제할 직원이 없습니다. (관리자만 있음)',
-      });
+        message: '삭제할 직원이 없습니다. (관리자만 있음)' });
     }
 
     // 종속 테이블 데이터 먼저 삭제 (외래키 제약조건 해소)
@@ -266,8 +263,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       deleted: ids.length,
-      message: '관리자 제외 전 직원이 삭제되었습니다.',
-    });
+      message: '관리자 제외 전 직원이 삭제되었습니다.' });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });

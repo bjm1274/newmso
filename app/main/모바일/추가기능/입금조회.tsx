@@ -62,8 +62,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
             display: 'flex',
             alignItems: 'center',
             gap: 10,
-            boxShadow: '0 4px 16px 0 rgba(245, 158, 11, 0.04)',
-          }}
+            boxShadow: '0 4px 16px 0 rgba(245, 158, 11, 0.04)' }}
         >
           <MIcon name="alertTri" size={18} color="rgba(217, 119, 6, 0.85)" />
           <div
@@ -71,8 +70,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
               flex: 1,
               fontSize: 12,
               fontWeight: 700,
-              color: 'rgba(217, 119, 6, 0.95)',
-            }}
+              color: 'rgba(217, 119, 6, 0.95)' }}
           >
             Chart 시스템으로 이관 예정 — 2026 Q4
           </div>
@@ -92,8 +90,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                   fontSize: 12,
                   color: 'var(--z-500)',
                   fontWeight: 800,
-                  letterSpacing: '0.08em',
-                }}
+                  letterSpacing: '0.08em' }}
               >
                 오늘 입금 합계
               </div>
@@ -104,8 +101,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                   fontWeight: 800,
                   color: '#007aff',
                   letterSpacing: '-0.035em',
-                  marginTop: 6,
-                }}
+                  marginTop: 6 }}
               >
                 ₩ {fmt(total)}
               </div>
@@ -128,8 +124,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                         height: `${Math.max(2, h.pct)}%`,
                         background: h.pct > 0 ? 'linear-gradient(to top, rgba(0, 122, 255, 0.85), rgba(0, 122, 255, 0.55))' : 'rgba(0, 122, 255, 0.1)',
                         borderRadius: '6px 6px 2px 2px',
-                        boxShadow: h.pct > 0 ? '0 2px 6px rgba(0, 122, 255, 0.2)' : 'none',
-                      }}
+                        boxShadow: h.pct > 0 ? '0 2px 6px rgba(0, 122, 255, 0.2)' : 'none' }}
                     />
                   ))}
                 </div>
@@ -139,8 +134,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                     marginTop: 8,
                     fontSize: 10,
                     color: 'var(--z-500)',
-                    fontWeight: 600,
-                  }}
+                    fontWeight: 600 }}
                 >
                   {['09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'].map((m) => (
                     <div key={m} style={{ flex: 1, textAlign: 'center' }}>
@@ -166,8 +160,7 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                       padding: '12px 16px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
+                      justifyContent: 'space-between' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
                       <div

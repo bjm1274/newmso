@@ -23,39 +23,32 @@ import { useMemo } from 'react';
 import { canAccessInventorySection, isMsoUser } from '@/lib/access-control';
 import {
   useStatusData,
-  type StatusWorkcenterData,
-} from '../../기능부품/재고관리워크센터/use-status-data';
+  type StatusWorkcenterData } from '../../기능부품/재고관리워크센터/use-status-data';
 import {
   useIOData,
-  type IOWorkcenterData,
-} from '../../기능부품/재고관리워크센터/use-io-data';
+  type IOWorkcenterData } from '../../기능부품/재고관리워크센터/use-io-data';
 import {
   useItemData,
-  type ItemWorkcenterData,
-} from '../../기능부품/재고관리워크센터/use-item-data';
+  type ItemWorkcenterData } from '../../기능부품/재고관리워크센터/use-item-data';
 import {
   useAnalyzeData,
-  type AnalyzeWorkcenterData,
-} from '../../기능부품/재고관리워크센터/use-analyze-data';
+  type AnalyzeWorkcenterData } from '../../기능부품/재고관리워크센터/use-analyze-data';
 import type {
   StockStatusRow,
-  Tone,
-} from '../../기능부품/재고관리워크센터/stock-types';
+  Tone } from '../../기능부품/재고관리워크센터/stock-types';
 
 export {
   useStatusData,
   useIOData,
   useItemData,
-  useAnalyzeData,
-};
+  useAnalyzeData };
 export type {
   StatusWorkcenterData,
   IOWorkcenterData,
   ItemWorkcenterData,
   AnalyzeWorkcenterData,
   StockStatusRow,
-  Tone,
-};
+  Tone };
 
 // ─── tone 매핑: 워크센터 Tone(warn) → 모바일 MChip(warning) ─────
 export type MTone = '' | 'accent' | 'success' | 'warning' | 'danger';

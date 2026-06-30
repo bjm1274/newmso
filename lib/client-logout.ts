@@ -46,8 +46,7 @@ async function deleteServerPushSubscription(endpoint: string): Promise<void> {
     await fetch('/api/notifications/push-subscription', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint }),
-    });
+      body: JSON.stringify({ endpoint }) });
   } catch (err) {
     logger.warn('[client-logout] 서버 푸시 구독 삭제 실패:', err);
   }

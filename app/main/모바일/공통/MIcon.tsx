@@ -73,8 +73,7 @@ const M_ICON_ALIAS: Record<string, string> = {
   heart: 'Heart',
   image: 'ImageIcon',
   reply: 'Reply',
-  copy: 'Copy',
-};
+  copy: 'Copy' };
 
 export type MIconProps = {
   name: string;

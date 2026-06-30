@@ -6,11 +6,11 @@
  * 기안자 본인의 연장근무 이력을 "조회" 버튼으로 attendances에서 불러와(overtime_minutes>0)
  * 그중 신청할 날짜를 선택 → 선택 내역을 기준으로 기안 상신.
  *
- * 데이터: @/lib/supabase = D1 shim. JM: 단일 책임, JM3(try/catch+toast), JM4(any 금지)
+ * 데이터: @/lib/db = D1 shim. JM: 단일 책임, JM3(try/catch+toast), JM4(any 금지)
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { ErpUser } from '@/types';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
@@ -43,8 +43,7 @@ export default function SApprovalOvertimeForm({
   formSlug,
   formName,
   onCancel,
-  onSubmitted,
-}: {
+  onSubmitted }: {
   user: ErpUser;
   formSlug: string;
   formName: string;
@@ -74,7 +73,7 @@ export default function SApprovalOvertimeForm({
       const start = new Date();
       start.setDate(start.getDate() - 120);
       const startStr = formatKoreanDateKey(start);
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('attendances')
         .select('work_date, overtime_minutes, check_in_at, check_out_at')
         .eq('staff_id', staffId)
@@ -86,8 +85,7 @@ export default function SApprovalOvertimeForm({
           date: String(r.work_date ?? ''),
           minutes: Number(r.overtime_minutes ?? 0),
           checkIn: (r.check_in_at as string) ?? null,
-          checkOut: (r.check_out_at as string) ?? null,
-        }))
+          checkOut: (r.check_out_at as string) ?? null }))
         .filter((r) => r.date && r.minutes > 0);
       setRecords(rows);
       setLoaded(true);
@@ -151,11 +149,8 @@ export default function SApprovalOvertimeForm({
             date: r.date,
             minutes: r.minutes,
             check_in: r.checkIn,
-            check_out: r.checkOut,
-          })),
-          overtime_total_minutes: totalMinutes,
-        },
-      });
+            check_out: r.checkOut })),
+          overtime_total_minutes: totalMinutes } });
       if (queued) {
         toast('오프라인 — 기안이 동기화 대기 중입니다.', 'warning');
       } else if (queuedAttachments > 0) {
@@ -203,8 +198,7 @@ export default function SApprovalOvertimeForm({
                 padding: '4px 8px',
                 cursor: 'pointer',
                 background: 'transparent',
-                border: 'none',
-              }}
+                border: 'none' }}
             >
               <span style={{ display: 'inline-flex' }}><MIcon name="refresh" size={14} /></span>
               {loading ? '조회 중...' : '조회'}
@@ -215,8 +209,7 @@ export default function SApprovalOvertimeForm({
             style={{
               overflow: 'hidden',
               margin: '0 16px',
-              padding: 0,
-            }}
+              padding: 0 }}
           >
             {!loaded ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
@@ -249,8 +242,7 @@ export default function SApprovalOvertimeForm({
                           cursor: 'pointer',
                           borderLeft: 'none',
                           borderRight: 'none',
-                          borderTop: 'none',
-                        }}
+                          borderTop: 'none' }}
                       >
                         <span
                           aria-hidden="true"
@@ -261,8 +253,7 @@ export default function SApprovalOvertimeForm({
                             border: isSel ? 'none' : '2px solid var(--z-300)',
                             background: isSel ? '#007AFF' : 'transparent',
                             display: 'grid',
-                            placeItems: 'center',
-                          }}
+                            placeItems: 'center' }}
                         >
                           {isSel && <MIcon name="check" size={14} color="#fff" />}
                         </span>

@@ -137,8 +137,7 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
     정규: 0,
     계약: 0,
     수습: 0,
-    기타: 0,
-  };
+    기타: 0 };
   for (const s of active) {
     const raw = String((s as Record<string, unknown>).employment_type ?? '').trim();
     if (raw.includes('정규')) employTypeCounts.정규 += 1;
@@ -162,31 +161,27 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
       label: '전체 인원',
       value: String(total),
       unit: '명',
-      sub: `${totalSubPrefix}${employSub}`,
-    },
+      sub: `${totalSubPrefix}${employSub}` },
     {
       key: 'new',
       label: '신규 입사 (3개월)',
       value: String(newcomers.length),
       unit: '명',
       sub: newSub || '없음',
-      tone: newcomers.length > 0 ? 'accent' : 'neutral',
-    },
+      tone: newcomers.length > 0 ? 'accent' : 'neutral' },
     {
       key: 'resign',
       label: '퇴사 예정 (60일)',
       value: String(upcoming.length),
       unit: '명',
       sub: upcoming.length === 0 ? '예정 없음' : `${upcoming[0]?.name ?? ''} 외`,
-      tone: upcoming.length > 0 ? 'warn' : 'neutral',
-    },
+      tone: upcoming.length > 0 ? 'warn' : 'neutral' },
     {
       key: 'tenure',
       label: '평균 근속',
       value: String(avgTenure),
       unit: '년',
-      sub: '재직자 기준',
-    },
+      sub: '재직자 기준' },
   ];
 }
 

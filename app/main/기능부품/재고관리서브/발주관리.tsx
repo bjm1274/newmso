@@ -3,14 +3,14 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 import {
   getItemMinQuantity,
   getItemName,
   getItemQuantity,
   getItemUnitPrice,
-  getRecommendedOrderQuantity,
-} from '@/app/main/inventory-utils';
+  getRecommendedOrderQuantity } from '@/app/main/inventory-utils';
+import { OrderStatusStepper } from './InventoryComponents';
 
 type OrderRecord = {
   id: string;
@@ -27,6 +27,19 @@ type OrderRecord = {
   sourceApprovalId?: string | null;
   sourceRequestIndex?: number | null;
 };
+
+function getStepperStatus(status: string, sourceType: 'purchase_order' | 'approval'): '요청' | '검토' | '결재' | '발주' | '입고' | '완료' {
+  const s = status.trim();
+  if (s === '완료' || s === '납품 완료') return '완료';
+  if (s === '배송' || s === '배송 중') return '입고';
+  if (s === '확정' || s === '승인' || s === '승인 완료') {
+    return '발주';
+  }
+  if (sourceType === 'approval') {
+    return '결재';
+  }
+  return '요청';
+}
 
 function buildSourceKey(sourceApprovalId?: string | null, sourceRequestIndex?: number | null) {
   if (!sourceApprovalId || !Number.isInteger(sourceRequestIndex)) return null;
@@ -49,8 +62,7 @@ function normalizePurchaseOrderRecord(order: any): OrderRecord {
     sourceApprovalId: items[0]?.source_supply_approval_id ? String(items[0].source_supply_approval_id) : null,
     sourceRequestIndex: Number.isInteger(Number(items[0]?.source_supply_request_index))
       ? Number(items[0].source_supply_request_index)
-      : null,
-  };
+      : null };
 }
 
 function calcDday(dateStr: string | null | undefined): { label: string; tone: string } | null {
@@ -84,8 +96,7 @@ function normalizeApprovalOrderRecord(approval: any): OrderRecord {
         qty: quantity,
         unit_price: unitPrice,
         source_supply_approval_id: meta?.source_supply_approval_id || null,
-        source_supply_request_index: meta?.source_supply_request_index ?? null,
-      },
+        source_supply_request_index: meta?.source_supply_request_index ?? null },
     ],
     status: String(approval?.status || '대기'),
     total_amount: Number(meta?.total_amount || quantity * unitPrice),
@@ -95,8 +106,7 @@ function normalizeApprovalOrderRecord(approval: any): OrderRecord {
     sourceApprovalId: meta?.source_supply_approval_id ? String(meta.source_supply_approval_id) : null,
     sourceRequestIndex: Number.isInteger(Number(meta?.source_supply_request_index))
       ? Number(meta.source_supply_request_index)
-      : null,
-  };
+      : null };
 }
 
 function getStatusTone(status: string, sourceType: OrderRecord['sourceType']) {
@@ -111,8 +121,7 @@ export default function PurchaseOrderManagement({
   inventory,
   suppliers,
   highlightedSource,
-  onConsumeHighlightedSource,
-}: Record<string, unknown>) {
+  onConsumeHighlightedSource }: Record<string, unknown>) {
   const { dialog, openConfirm } = useActionDialog();
   const [orderRecords, setOrderRecords] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -184,8 +193,8 @@ export default function PurchaseOrderManagement({
         { data: purchaseOrderRows, error: purchaseOrderError },
         { data: approvalRows, error: approvalError },
       ] = await Promise.all([
-        supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('approvals').select('*').eq('type', '비품구매').order('created_at', { ascending: false }),
+        db.from('purchase_orders').select('*').order('created_at', { ascending: false }),
+        db.from('approvals').select('*').eq('type', '비품구매').order('created_at', { ascending: false }),
       ]);
 
       if (purchaseOrderError) throw purchaseOrderError;
@@ -216,8 +225,7 @@ export default function PurchaseOrderManagement({
       title: '발주서 자동 생성',
       description: `${lowStockItems.length}개 항목에 대한 발주서를 자동으로 생성합니다.\n공급사별로 묶어 대기 발주로 등록됩니다.`,
       confirmText: '생성',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     setLoading(true);
@@ -236,8 +244,7 @@ export default function PurchaseOrderManagement({
             item_id: item.id,
             name: getItemName(item),
             qty: getRecommendedOrderQuantity(item),
-            unit_price: getItemUnitPrice(item),
-          });
+            unit_price: getItemUnitPrice(item) });
           return acc;
         },
         {},
@@ -250,7 +257,7 @@ export default function PurchaseOrderManagement({
           0,
         );
 
-        const { error } = await supabase.from('purchase_orders').insert([
+        const { error } = await db.from('purchase_orders').insert([
           {
             supplier_id: supplierId,
             supplier_name: supplierName,
@@ -258,8 +265,7 @@ export default function PurchaseOrderManagement({
             status: '대기',
             total_amount: totalAmount,
             created_by: (user as Record<string, unknown>).id,
-            notes: '자동 생성된 발주서 (안전재고 미달)',
-          },
+            notes: '자동 생성된 발주서 (안전재고 미달)' },
         ]);
 
         if (error) throw error;
@@ -280,11 +286,10 @@ export default function PurchaseOrderManagement({
       title: '발주서 확인 처리',
       description: `${order?.requestTitle || order?.supplier_name || '선택한 발주서'}를 승인 상태로 변경합니다.\n확인 처리 후 발주 진행 현황에 반영됩니다.`,
       confirmText: '확인 처리',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
     try {
-      const { error } = await supabase.from('purchase_orders').update({ status: '승인' }).eq('id', orderId);
+      const { error } = await db.from('purchase_orders').update({ status: '승인' }).eq('id', orderId);
       if (error) throw error;
       toast('발주서가 승인 처리되었습니다.', 'success');
       await fetchPurchaseOrders();
@@ -297,7 +302,7 @@ export default function PurchaseOrderManagement({
     if (!deliveryDateInput) { setEditingDeliveryDateId(null); return; }
     setSavingDeliveryDate(true);
     try {
-      const { error } = await supabase
+      const { error } = await db
         .from('purchase_orders')
         .update({ expected_delivery_date: deliveryDateInput })
         .eq('id', orderId);
@@ -451,6 +456,11 @@ export default function PurchaseOrderManagement({
                         </button>
                       )
                     )}
+                  </div>
+
+                  {/* 발주 단계 스테퍼 */}
+                  <div className="my-3 py-2 border-y border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 rounded-xl px-2.5">
+                    <OrderStatusStepper currentStatus={getStepperStatus(order.status, order.sourceType)} />
                   </div>
 
                   <div className="bg-[var(--muted)] p-3 rounded-[var(--radius-md)] mb-3">

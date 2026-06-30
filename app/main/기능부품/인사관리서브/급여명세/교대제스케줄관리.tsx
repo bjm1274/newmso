@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 export default function ShiftPatternManager({ selectedCo }: { selectedCo?: string }) {
   const [shifts, setShifts] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
-      let q = supabase.from('work_shifts').select('*').eq('is_active', true);
+      let q = db.from('work_shifts').select('*').eq('is_active', true);
       if (selectedCo && selectedCo !== '전체') q = q.eq('company_name', selectedCo);
       const { data } = await q;
       setShifts(data || []);

@@ -1,7 +1,7 @@
 // ============================================================
 // lib/inventory-stock-client.ts
 // 클라이언트 측 atomic_stock_update / atomic_stock_transfer RPC 래퍼.
-// Phase 2.13 — supabase.rpc(...) 직접 호출을 서버 라우트로 위임.
+// Phase 2.13 — db.rpc(...) 직접 호출을 서버 라우트로 위임.
 //
 // 응답 형식 (Supabase RPC의 raw data 그대로 반환)
 //   stock-update    → [{ prev_qty, next_qty }] (array of 1 row)
@@ -45,8 +45,7 @@ export async function callAtomicStockUpdate(payload: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{
     ok?: boolean;
     error?: string;
@@ -68,8 +67,7 @@ export async function callAtomicStockTransfer(payload: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    credentials: 'same-origin',
-  });
+    credentials: 'same-origin' });
   const data = await readJson<{
     ok?: boolean;
     error?: string;

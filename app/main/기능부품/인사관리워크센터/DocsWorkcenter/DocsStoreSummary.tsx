@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db-client';
 
 type CategoryKey = 'all' | 'contract' | 'evidence' | 'manual' | 'other';
 
@@ -55,12 +55,12 @@ export default function DocsStoreSummary() {
       setErrMsg(null);
       try {
         const [repoRes, staffRes] = await Promise.all([
-          supabase
+          db
             .from('document_repository')
             .select('id, title, category, created_at, created_by')
             .order('created_at', { ascending: false })
             .limit(50),
-          supabase
+          db
             .from('staff_members')
             .select('id, name'),
         ]);
@@ -90,8 +90,7 @@ export default function DocsStoreSummary() {
               from: formatDate(r.created_at),
               period: '영구',
               security: sec,
-              securityTone: sec === '대외비' ? 'warn' : 'success',
-            };
+              securityTone: sec === '대외비' ? 'warn' : 'success' };
           }),
         );
       } catch (error) {

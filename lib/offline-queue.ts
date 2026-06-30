@@ -25,8 +25,7 @@ import {
   storageReadQueue,
   storageWriteQueue,
   storageReadFailed,
-  storageWriteFailed,
-} from './offline-queue-storage';
+  storageWriteFailed } from './offline-queue-storage';
 
 // ─────────────────────────────────────────────────────────────
 // 상수
@@ -154,8 +153,7 @@ export class OfflineQueue {
       retryCount: 0,
       lastAttemptAt: 0,
       ...(input.groupId !== undefined ? { groupId: input.groupId } : {}),
-      ...(input.groupIndex !== undefined ? { groupIndex: input.groupIndex } : {}),
-    };
+      ...(input.groupIndex !== undefined ? { groupIndex: input.groupIndex } : {}) };
     this.items = [...this.items, action];
     void storageWriteQueue(this.items);
     this.emit();

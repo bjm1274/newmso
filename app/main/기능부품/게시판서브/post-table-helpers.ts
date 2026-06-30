@@ -13,15 +13,13 @@ export type ReadFilter = 'all' | 'unread' | 'favorite';
 export const READ_FILTER_LABELS: Record<ReadFilter, string> = {
   all: '전체',
   unread: '안 읽음',
-  favorite: '즐겨찾기',
-};
+  favorite: '즐겨찾기' };
 
 export const SORT_LABELS: Record<SortKey, string> = {
   recent: '최신순',
   views: '조회 많은 순',
   likes: '좋아요 많은 순',
-  comments: '댓글 많은 순',
-};
+  comments: '댓글 많은 순' };
 
 const FAVORITES_STORAGE_KEY = 'mso:board:favorites';
 

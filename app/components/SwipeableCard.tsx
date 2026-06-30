@@ -31,8 +31,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react';
+  type ReactNode } from 'react';
 import { haptics } from '@/app/lib/haptics';
 
 export type SwipeActionTone = 'normal' | 'danger' | 'ok';
@@ -81,8 +80,7 @@ function ActionPanel({
   open,
   width,
   itemWidth,
-  onTrigger,
-}: {
+  onTrigger }: {
   side: 'left' | 'right';
   actions: SwipeAction[];
   open: boolean;
@@ -122,8 +120,7 @@ export function SwipeableCard({
   threshold = 80,
   actionWidth = 80,
   onSwipeStart,
-  className,
-}: SwipeableCardProps) {
+  className }: SwipeableCardProps) {
   const cardIdRef = useRef<number>(0);
   if (cardIdRef.current === 0) cardIdRef.current = ++cardSeq;
 
@@ -212,8 +209,7 @@ export function SwipeableCard({
   const contentStyle: CSSProperties = {
     transform: `translate3d(${offset}px, 0, 0)`,
     transition,
-    touchAction: 'pan-y',
-  };
+    touchAction: 'pan-y' };
 
   return (
     <div

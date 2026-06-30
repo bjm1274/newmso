@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import type { StaffMember, InventoryItem } from '@/types';
-import { supabase, d1 } from '@/lib/supabase';
+import { db, d1 } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import {
@@ -17,8 +17,7 @@ import {
   requestInventoryReorder,
   reverseInventoryIssue,
   summarizeSupplyRequestWorkflow,
-  type SupplyRequestWorkflowItem,
-} from '@/app/main/inventory-utils';
+  type SupplyRequestWorkflowItem } from '@/app/main/inventory-utils';
 import type { ApprovalRecord, LinkedSupplyOrderTarget } from '@/app/main/기능부품/재고관리서브/types';
 
 function normalizeQueryError(error: unknown) {
@@ -43,8 +42,7 @@ export function useSupplyWorkflow({
   activeView,
   refreshCurrentInventory,
   fetchLogs,
-  onRefresh,
-}: {
+  onRefresh }: {
   user?: StaffMember;
   isInventoryOpsUser: boolean;
   activeView: string;
@@ -69,7 +67,7 @@ export function useSupplyWorkflow({
     try {
       const [{ data: approvalsData, error: approvalsError }, { data: supportInventoryRows, error: inventoryError }] =
         await Promise.all([
-          supabase
+          db
             .from('approvals')
             .select('*')
             .eq('type', '물품신청')
@@ -127,10 +125,9 @@ export function useSupplyWorkflow({
       source_department: INVENTORY_SUPPORT_DEPARTMENT,
       updated_at: new Date().toISOString(),
       items: nextItems,
-      summary,
-    };
+      summary };
     const nextMetaData = { ...(approval?.meta_data || {}), inventory_workflow: nextWorkflow };
-    const { error } = await supabase.from('approvals').update({ meta_data: nextMetaData }).eq('id', approval.id);
+    const { error } = await db.from('approvals').update({ meta_data: nextMetaData }).eq('id', approval.id);
     if (error) throw error;
     return nextWorkflow;
   }, []);
@@ -143,8 +140,7 @@ export function useSupplyWorkflow({
       title: '최종불출 처리',
       description: `${itemName} ${itemQty}개를 신청팀으로 불출 처리합니다.\n재고가 SY INC.에서 차감되고 신청팀으로 이동됩니다.`,
       confirmText: '불출 처리',
-      tone: 'accent',
-    });
+      tone: 'accent' });
     if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:issue`;
@@ -171,8 +167,7 @@ export function useSupplyWorkflow({
         toCompany: approval?.sender_company || INVENTORY_SUPPORT_COMPANY,
         toDept: cur.dept || '',
         reason: `전자결재 승인 물품신청 (${approval.title})`,
-        user, destinationCompanyId: approval?.company_id ?? null,
-      });
+        user, destinationCompanyId: approval?.company_id ?? null });
 
       const nextItems: SupplyRequestWorkflowItem[] = liveItems.map((i) =>
         Number(i.request_index) === Number(cur.request_index)
@@ -186,8 +181,7 @@ export function useSupplyWorkflow({
           user_id: approval.sender_id, type: 'inventory',
           title: `[불출 완료] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개가 ${cur.dept || '수령부서'}로 불출 처리되었습니다.`,
-          metadata: { approval_id: approval.id, request_index: cur.request_index },
-        }]);
+          metadata: { approval_id: approval.id, request_index: cur.request_index } }]);
       }
       await Promise.all([refreshCurrentInventory(), fetchLogs(), fetchPendingSupplyApprovals()]);
       onRefresh?.();
@@ -237,9 +231,7 @@ export function useSupplyWorkflow({
             source_supply_title: approval.title, source_requester_name: approval?.sender_name || null,
             source_requester_company: approval?.sender_company || null, source_requester_department: cur.dept || null,
             source_requested_quantity: cur.qty, source_shortage_quantity: reorderQty,
-            auto_created_item: isNewlyCreated,
-          },
-        });
+            auto_created_item: isNewlyCreated } });
         if (error) throw error;
         orderRequested = true;
         note = isNewlyCreated
@@ -259,8 +251,7 @@ export function useSupplyWorkflow({
           user_id: approval.sender_id, type: 'inventory',
           title: `[발주 진행] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개는 재고가 부족해 발주 절차로 전환되었습니다.`,
-          metadata: { approval_id: approval.id, request_index: cur.request_index },
-        }]);
+          metadata: { approval_id: approval.id, request_index: cur.request_index } }]);
       }
       await fetchPendingSupplyApprovals();
       toast(orderRequested ? '발주 요청을 등록했습니다. 발주 관리 탭에서 이어서 확인할 수 있습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.', 'success');
@@ -282,8 +273,7 @@ export function useSupplyWorkflow({
       title: '발주 처리 취소',
       description: '이 항목의 발주 처리 상태를 취소하고 다시 발주 필요 상태로 되돌립니다.',
       confirmText: '되돌리기',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:order-cancel`;
@@ -322,8 +312,7 @@ export function useSupplyWorkflow({
       title: '불출 처리 취소',
       description: '이 품목의 불출 처리를 취소하고 재고를 원복합니다.\nSY INC. 재고가 복원되고 수령팀 재고가 차감됩니다.',
       confirmText: '불출 취소',
-      tone: 'danger',
-    });
+      tone: 'danger' });
     if (!confirmed) return;
 
     const actionKey = `${approval.id}:${workflowItem.request_index}:issue-cancel`;
@@ -347,8 +336,7 @@ export function useSupplyWorkflow({
         itemName: cur.name,
         quantity: cur.qty,
         reason: `전자결재 물품신청 불출 취소 (${approval.title})`,
-        user,
-      });
+        user });
 
       const nextItems: SupplyRequestWorkflowItem[] = liveItems.map((i) =>
         Number(i.request_index) === Number(cur.request_index)
@@ -362,8 +350,7 @@ export function useSupplyWorkflow({
           user_id: approval.sender_id, type: 'inventory',
           title: `[불출 취소] ${cur.name}`,
           body: `${cur.name} ${cur.qty}개의 불출이 취소되었습니다. 재고가 원복되었습니다.`,
-          metadata: { approval_id: approval.id, request_index: cur.request_index },
-        }]);
+          metadata: { approval_id: approval.id, request_index: cur.request_index } }]);
       }
 
       await Promise.all([refreshCurrentInventory(), fetchLogs(), fetchPendingSupplyApprovals()]);
@@ -431,6 +418,5 @@ export function useSupplyWorkflow({
     handleSupplyOrder,
     handleSupplyOrderCancel,
     pendingSupplyApprovalSummary,
-    completedSupplyApprovalSummary,
-  };
+    completedSupplyApprovalSummary };
 }

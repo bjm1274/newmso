@@ -10,8 +10,7 @@ import type { ErpUser } from '@/types';
 import MFeatureScreen from '../공통/MFeatureScreen';
 
 const ExecDashboard = dynamic(() => import('../../기능부품/관리자워크센터/ExecDashboard'), {
-  ssr: false,
-});
+  ssr: false });
 
 export default function 경영대시({ user, onBack }: { user: ErpUser; onBack: () => void }) {
   const company = typeof user.company === 'string' ? user.company : undefined;
