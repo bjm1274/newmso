@@ -5,6 +5,7 @@
  * ─────────────────────────────────────────────────────────────*/
 
 .mso-mobile {
+  --m-sticky-foot-pb: 80px;
   --m-font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
   --m-mono: 'JetBrains Mono', ui-monospace, monospace;
 
@@ -353,7 +354,7 @@
 
 /* 스티키 푸터 */
 .mso-mobile .m-sticky-foot {
-  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom) + var(--m-sticky-foot-pb, 0px));
   background: var(--m-card);
   border-top: 1px solid var(--m-border);
   display: flex; gap: 8px;

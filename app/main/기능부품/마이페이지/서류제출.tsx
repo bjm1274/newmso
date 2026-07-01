@@ -495,11 +495,17 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
         tabbar?.classList.add('hidden');
         shell?.classList.remove('pb-[88px]');
         shell?.classList.add('pb-0');
+        if (shell instanceof HTMLElement) {
+            shell.style.setProperty('--m-sticky-foot-pb', '0px');
+        }
 
         return () => {
             tabbar?.classList.remove('hidden');
             shell?.classList.remove('pb-0');
             shell?.classList.add('pb-[88px]');
+            if (shell instanceof HTMLElement) {
+                shell.style.removeProperty('--m-sticky-foot-pb');
+            }
         };
     }, []);
 
