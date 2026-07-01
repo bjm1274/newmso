@@ -373,6 +373,22 @@ function CameraScanner({ doc, onCapture, onClose }: CameraScannerProps) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const tabbar = document.querySelector('.mobile-bottom-tabbar') || document.querySelector('.m-bottom-tab');
+        const shell = document.querySelector('.main-content-mobile-shell');
+
+        tabbar?.classList.add('hidden');
+        shell?.classList.remove('pb-[88px]');
+        shell?.classList.add('pb-0');
+
+        return () => {
+            tabbar?.classList.remove('hidden');
+            shell?.classList.remove('pb-0');
+            shell?.classList.add('pb-[88px]');
+        };
+    }, []);
+
+    useEffect(() => {
         async function startCamera() {
             try {
                 const s = await navigator.mediaDevices.getUserMedia({
