@@ -12,6 +12,9 @@ export interface StatutoryDeductionOptions {
   applyNationalPension?: boolean;
   applyHealthInsurance?: boolean;
   applyEmploymentInsurance?: boolean;
+  nationalPensionAmount?: number | null;
+  joinedAt?: string | null;
+  yearMonth?: string | null;
 }
 
 export interface StatutoryDeductionResult {
@@ -33,8 +36,22 @@ export function calcStatutoryDeductions(
   opts: StatutoryDeductionOptions = {}
 ): StatutoryDeductionResult {
   const applyInsurance = opts.applyInsurance !== false;
-  const applyNational = opts.applyNationalPension !== false && applyInsurance;
-  const applyHealth = opts.applyHealthInsurance !== false && applyInsurance;
+  
+  // 중도입사 여부 확인 (입사연월 === 정산연월 && 입사일 !== 1일)
+  let isMidMonthJoin = false;
+  if (opts.joinedAt && opts.yearMonth) {
+    const joinParts = opts.joinedAt.split('-');
+    if (joinParts.length >= 3) {
+      const joinYearMonth = `${joinParts[0]}-${joinParts[1]}`;
+      const joinDay = parseInt(joinParts[2], 10);
+      if (joinYearMonth === opts.yearMonth && joinDay !== 1) {
+        isMidMonthJoin = true;
+      }
+    }
+  }
+
+  const applyNational = !isMidMonthJoin && opts.applyNationalPension !== false && applyInsurance;
+  const applyHealth = !isMidMonthJoin && opts.applyHealthInsurance !== false && applyInsurance;
   const applyEmployment = opts.applyEmploymentInsurance !== false && applyInsurance;
   const applyTax = opts.applyTax !== false;
   const isDuruNuriActive = !!opts.isDuruNuriActive;
@@ -52,10 +69,15 @@ export function calcStatutoryDeductions(
 
   // 1. 국민연금 - 기준소득월액 상·하한 적용 (2025.7~2026.6: 상한 637만원, 하한 40만원)
   //    두루누리 80% 지원 적용 시 근로자 부담분 20%만 부과
+  //    고정 국민연금액이 있으면 고정액 사용
   if (applyNational) {
-    const npBase = Math.min(Math.max(taxableIncome, NP_INCOME_FLOOR), NP_INCOME_CEILING);
-    const full_national = Math.floor(npBase * rates.national_pension_rate);
-    national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
+    if (typeof opts.nationalPensionAmount === 'number' && opts.nationalPensionAmount >= 0) {
+      national_pension = opts.nationalPensionAmount;
+    } else {
+      const npBase = Math.min(Math.max(taxableIncome, NP_INCOME_FLOOR), NP_INCOME_CEILING);
+      const full_national = Math.floor(npBase * rates.national_pension_rate);
+      national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
+    }
   }
 
   // 2. 건강보험 및 장기요양보험 - 의료급여 수급자는 제외 (0원)

@@ -560,7 +560,10 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       withholdingRatePercent,
       applyNationalPension: resolvedIns.national,
       applyHealthInsurance: resolvedIns.health,
-      applyEmploymentInsurance: resolvedIns.employment });
+      applyEmploymentInsurance: resolvedIns.employment,
+      nationalPensionAmount: insuranceSettings.national_amount != null ? Number(insuranceSettings.national_amount) : null,
+      joinedAt: staff.joined_at || staff.join_date || null,
+      yearMonth: settlementDate.slice(0, 7) });
 
     const nationalPension = deductions.national_pension;
     const healthInsurance = deductions.health_insurance;

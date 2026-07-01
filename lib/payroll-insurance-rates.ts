@@ -74,13 +74,45 @@ export function getIndustrialAccidentInsuranceInfo(companyName?: unknown): Indus
     employeeRate: 0 };
 }
 
-export function calculateEmployeeInsuranceDeductions(taxableIncome: number, age: number = 30, _yearMonth?: string) {
+export function calculateEmployeeInsuranceDeductions(
+  taxableIncome: number,
+  age: number = 30,
+  yearMonth?: string | null,
+  nationalPensionAmount?: number | null,
+  joinedAt?: string | null
+) {
   const taxableBase = Math.max(0, Math.floor(Number(taxableIncome) || 0));
+  
+  // 중도입사 여부 확인 (입사연월 === 정산연월 && 입사일 !== 1일)
+  let isMidMonthJoin = false;
+  if (joinedAt && yearMonth) {
+    const joinParts = joinedAt.split('-');
+    if (joinParts.length >= 3) {
+      const joinYearMonth = `${joinParts[0]}-${joinParts[1]}`;
+      const joinDay = parseInt(joinParts[2], 10);
+      if (joinYearMonth === yearMonth && joinDay !== 1) {
+        isMidMonthJoin = true;
+      }
+    }
+  }
+
   const pensionBase = Math.min(Math.max(taxableBase, NP_INCOME_FLOOR), NP_INCOME_CEILING);
+  
   const nationalPension =
-    age >= 60 ? 0 : Math.floor(pensionBase * EMPLOYEE_INSURANCE_RATES_2026.nationalPension);
-  const healthInsurance = Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.healthInsurance);
-  const longTermCare = Math.floor(healthInsurance * LONG_TERM_CARE_HEALTH_RATIO_2026);
+    isMidMonthJoin || age >= 60
+      ? 0
+      : typeof nationalPensionAmount === 'number' && nationalPensionAmount >= 0
+      ? nationalPensionAmount
+      : Math.floor(pensionBase * EMPLOYEE_INSURANCE_RATES_2026.nationalPension);
+      
+  const healthInsurance = isMidMonthJoin
+    ? 0
+    : Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.healthInsurance);
+    
+  const longTermCare = isMidMonthJoin
+    ? 0
+    : Math.floor(healthInsurance * LONG_TERM_CARE_HEALTH_RATIO_2026);
+    
   const employmentInsurance = Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.employmentInsurance);
 
   return {

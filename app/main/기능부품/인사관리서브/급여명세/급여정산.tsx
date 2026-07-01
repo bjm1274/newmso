@@ -1005,7 +1005,10 @@ export default function SalarySettlement({
       withholdingRatePercent,
       applyNationalPension: resolvedIns.national,
       applyHealthInsurance: resolvedIns.health,
-      applyEmploymentInsurance: resolvedIns.employment });
+      applyEmploymentInsurance: resolvedIns.employment,
+      nationalPensionAmount: insSettings.national_amount != null ? Number(insSettings.national_amount) : null,
+      joinedAt: (staff?.joined_at || staff?.join_date || null) as string | null,
+      yearMonth: yearMonth });
 
     const national_pension = deductions.national_pension;
     const health_insurance = deductions.health_insurance;

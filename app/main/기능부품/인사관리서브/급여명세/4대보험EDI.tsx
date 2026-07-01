@@ -11,6 +11,7 @@ import {
 import { getPayrollStaffAge } from '@/lib/payroll-insurance-settings';
 import { db } from '@/lib/db-client';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
+import ExcelUploadModal from './ExcelUploadModal';
 
 type Row = {
   id: string;
@@ -58,6 +59,7 @@ export default function InsuranceEDI({
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   const selectedCompanyLabel = selectedCo || user?.company || '전체';
   const filteredStaffs = useMemo(
@@ -110,7 +112,9 @@ export default function InsuranceEDI({
             Number(staff.base_salary ?? staff.base ?? 0)
           );
           const age = getPayrollStaffAge(staff, new Date(`${yearMonth}-01`)) ?? 30;
-          const employeeInsurance = calculateEmployeeInsuranceDeductions(base, age);
+          const nationalAmount = (staff.permissions?.insurance as any)?.national_amount;
+          const joinedAt = staff.joined_at || staff.join_date;
+          const employeeInsurance = calculateEmployeeInsuranceDeductions(base, age, yearMonth, nationalAmount, joinedAt);
           const industrialAccident = calculateIndustrialAccidentInsurance(base, selectedCompanyLabel);
 
           return [
@@ -311,6 +315,12 @@ export default function InsuranceEDI({
           >
             CSV 다운로드
           </button>
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="rounded-[var(--radius-md)] border border-emerald-500 bg-emerald-50 hover:bg-emerald-100/30 px-4 py-2 text-sm font-bold text-emerald-600 shadow-sm transition-all"
+          >
+            고지서 업로드
+          </button>
         </div>
       </div>
 
@@ -366,6 +376,14 @@ export default function InsuranceEDI({
           emptyMessage={loading ? '불러오는 중입니다...' : '확정된 급여 데이터가 없습니다.'}
         />
       </div>
+      <ExcelUploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={() => {
+          window.location.reload();
+        }}
+        staffs={staffs}
+      />
     </div>
   );
 }

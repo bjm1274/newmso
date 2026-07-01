@@ -167,6 +167,7 @@ interface StaffInfo {
   isAlternateDayShift?: boolean;
   agreed_overtime_allowance?: number;
   agreed_night_allowance?: number;
+  permissions?: any;
 }
 
 export default function SalaryDetail({
@@ -241,12 +242,16 @@ export default function SalaryDetail({
   );
 
   const calc = useMemo(() => {
+    const nationalAmount = (staff as any)?.permissions?.insurance?.national_amount;
+    const joinedAt = staff?.join_date || staff?.joined_at || null;
+    const targetYearMonth = record?.year_month || getKoreanMonthString();
+
     if (record) {
       const totalTaxable = toNumber(record.total_taxable);
       const totalTaxfree = toNumber(record.total_taxfree);
       const detail = deductionDetail;
       const incomeTax = toNumber(detail.income_tax ?? record.income_tax);
-      const insuranceFallback = calculateEmployeeInsuranceDeductions(totalTaxable);
+      const insuranceFallback = calculateEmployeeInsuranceDeductions(totalTaxable, 30, targetYearMonth, nationalAmount, joinedAt);
 
       return {
         totalPayment: totalTaxable + totalTaxfree,
@@ -281,7 +286,7 @@ export default function SalaryDetail({
       toNumber(data.childcare_allowance) +
       toNumber(data.research_allowance) +
       toNumber(data.other_taxfree);
-    const insuranceFallback = calculateEmployeeInsuranceDeductions(taxable);
+    const insuranceFallback = calculateEmployeeInsuranceDeductions(taxable, 30, targetYearMonth, nationalAmount, joinedAt);
     const pension = insuranceFallback.nationalPension;
     const health = insuranceFallback.healthInsurance;
     const longTerm = insuranceFallback.longTermCare;

@@ -55,7 +55,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
     agreed_overtime_allowance: 0, agreed_night_allowance: 0,
-    ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
+    ins_national: true, ins_national_amount: 0, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
     allowance_hours: { ...EMPTY_ALLOWANCE_HOURS } };
@@ -331,6 +331,7 @@ export default function StaffFormModal({
         probation_months: getStaffProbationMonths(직원, 0),
         probation_percent: getStaffProbationPercent(직원, 90),
         ins_national: ins.national !== false,
+        ins_national_amount: ins.national_amount != null ? Number(ins.national_amount) : 0,
         ins_health: ins.health !== false,
         ins_employment: ins.employment !== false,
         ins_injury: ins.injury !== false,
@@ -1041,6 +1042,7 @@ export default function StaffFormModal({
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
           insurance: {
             national: 신규직원.ins_national,
+            national_amount: 신규직원.ins_national_amount ? Number(신규직원.ins_national_amount) : null,
             health: 신규직원.ins_health,
             employment: 신규직원.ins_employment,
             injury: 신규직원.ins_injury,
@@ -2075,6 +2077,32 @@ export default function StaffFormModal({
                       )}
                     </div>
                   </div>
+                  {신규직원.ins_national && (
+                    <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-[var(--radius-xl)] flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in">
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-red-900 flex items-center gap-2">
+                          📌 국민연금 고정 공제액 설정
+                        </h4>
+                        <p className="text-[10px] text-red-600">
+                          매월 공단 고지서상의 금액으로 고정해 공제하려면 금액을 입력하세요. 미입력 시 급여에 따라 자동 계산(요율 4.75%)됩니다.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={신규직원.ins_national_amount ? Number(신규직원.ins_national_amount).toLocaleString() : ''}
+                          onChange={e => {
+                            const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+                            신규직원설정({ ...신규직원, ins_national_amount: n });
+                          }}
+                          placeholder="고지 금액 입력"
+                          className="w-40 p-2 bg-[var(--card)] rounded-[var(--radius-md)] border border-red-500/20 outline-none font-bold text-xs text-right focus:ring-2 focus:ring-red-500/30"
+                        />
+                        <span className="text-xs font-bold text-red-900">원</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
