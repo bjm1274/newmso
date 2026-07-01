@@ -216,21 +216,27 @@ export default function ChatView({
   const [showSettings, setShowSettings] = useState(false);
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const tabbar = document.querySelector('.mobile-bottom-tabbar');
+    const tabbar = document.querySelector('.mobile-bottom-tabbar') || document.querySelector('.m-bottom-tab');
     const shell = document.querySelector('.main-content-mobile-shell');
 
     if (selectedRoomId) {
-      tabbar?.classList.add('hidden');
+      if (tabbar instanceof HTMLElement) {
+        tabbar.style.setProperty('display', 'none', 'important');
+      }
       shell?.classList.remove('pb-[88px]');
       shell?.classList.add('pb-0');
     } else {
-      tabbar?.classList.remove('hidden');
+      if (tabbar instanceof HTMLElement) {
+        tabbar.style.removeProperty('display');
+      }
       shell?.classList.remove('pb-0');
       shell?.classList.add('pb-[88px]');
     }
 
     return () => {
-      tabbar?.classList.remove('hidden');
+      if (tabbar instanceof HTMLElement) {
+        tabbar.style.removeProperty('display');
+      }
       shell?.classList.remove('pb-0');
       shell?.classList.add('pb-[88px]');
     };

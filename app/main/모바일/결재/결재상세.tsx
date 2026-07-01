@@ -134,7 +134,9 @@ export default function SApprovalDetail({
     const tabbar = document.querySelector('.mobile-bottom-tabbar') || document.querySelector('.m-bottom-tab');
     const shell = document.querySelector('.main-content-mobile-shell');
 
-    tabbar?.classList.add('hidden');
+    if (tabbar instanceof HTMLElement) {
+      tabbar.style.setProperty('display', 'none', 'important');
+    }
     shell?.classList.remove('pb-[88px]');
     shell?.classList.add('pb-0');
     if (shell instanceof HTMLElement) {
@@ -142,7 +144,9 @@ export default function SApprovalDetail({
     }
 
     return () => {
-      tabbar?.classList.remove('hidden');
+      if (tabbar instanceof HTMLElement) {
+        tabbar.style.removeProperty('display');
+      }
       shell?.classList.remove('pb-0');
       shell?.classList.add('pb-[88px]');
       if (shell instanceof HTMLElement) {
