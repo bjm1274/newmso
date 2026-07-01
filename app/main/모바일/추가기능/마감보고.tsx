@@ -267,7 +267,7 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
           borderTop: '1px solid rgba(0, 0, 0, 0.08)',
           background: 'rgba(255, 255, 255, 0.7)',
           backdropFilter: 'blur(20px)',
-          paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+          paddingBottom: 'calc(16px + env(safe-area-inset-bottom) + var(--m-sticky-foot-pb, 0px))' }}
       >
         <MBtn block icon="download">초안 보기</MBtn>
         <MBtn

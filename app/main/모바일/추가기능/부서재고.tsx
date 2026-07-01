@@ -333,7 +333,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.02)',
           display: 'flex',
           gap: 10,
-          padding: '12px 16px' }}
+          padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px) + var(--m-sticky-foot-pb, 0px))' }}
       >
         <MBtn block icon="upload" className="macos-squircle-sm">
           출고 요청

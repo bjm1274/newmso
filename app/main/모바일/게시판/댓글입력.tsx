@@ -35,7 +35,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
         borderTop: '1px solid rgba(0, 0, 0, 0.05)',
-        padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 12px))' }}
+        padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 12px) + var(--m-sticky-foot-pb, 0px))' }}
     >
       {replyTo && (
         <div
