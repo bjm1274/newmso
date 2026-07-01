@@ -196,6 +196,45 @@ export default function AnnualLeavePromotion({
         { onConflict: 'staff_id,target_year,step', ignoreDuplicates: true },
       );
 
+      // 3) 문서보관함(document_repository) 저장
+      const docTitle = `연차유급휴가 사용촉진 통보서 (${stageLabel}) - ${staff.name}`;
+      const docContent = `연차 유급휴가 사용촉진 통보서 (${stageLabel})
+
+성 명: ${staff.name}
+소 속: ${staff.department || '인사부'}
+직 급: ${staff.position || '사원'}
+미사용 연차: ${staff.remainingLeave} 일
+
+귀하의 ${targetYear}년도 발생 연차유급휴가 중 현재까지 사용하지 아니한 휴가는 총 ${staff.remainingLeave}일입니다.
+
+${step === 1 ?
+`이에 근로기준법 제61조 제1항에 의거하여, 회사는 귀하에게 미사용 연차유급휴가의 사용을 촉진하오니, 본 서면을 수령한 날로부터 10일 이내에 미사용 연차유급휴가에 대한 구체적인 사용계획서(계획 일자 지정)를 작성하여 전자결재 시스템을 통해 제출해 주시기 바랍니다.
+
+기한 내에 사용 계획을 제출하지 아니할 경우, 근로기준법 제61조 제2항에 의거하여 회사가 임의로 휴가 사용 시기를 지정하여 통보하게 되며, 이에 따른 휴가 미사용에 대하여는 수당이 지급되지 아니함을 알려드립니다.`
+:
+`회사는 근로기준법 제61조 제1항에 의거하여 귀하에게 미사용 연차유급휴가 사용을 촉진하였으나, 귀하는 기한 내에 사용계획서를 제출하지 아니하였습니다.
+
+이에 회사는 근로기준법 제61조 제2항에 따라 귀하의 미사용 연차유급휴가 총 ${staff.remainingLeave}일에 대하여 아래와 같이 사용 시기를 지정하여 통보합니다.
+
+귀하는 지정된 휴가일에 휴가를 사용하여야 하며, 지정된 휴가일에 출근하여 근로를 제공하더라도 회사는 수령거부 의사를 명확히 할 것이며 이에 따른 연차유급휴가 미사용 수당은 소멸됨을 재차 고지합니다.`}
+
+통보일자: ${new Date().toLocaleDateString('ko-KR')}
+MSO 주식회사 대표이사 (직인생략)`;
+
+      await db.from('document_repository').insert({
+        id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `doc-alp-${staff.id}-${targetYear}-${step}-${Date.now()}`,
+        title: docTitle,
+        category: '양식',
+        content: docContent,
+        company_name: selectedCo || '전체',
+        created_by: staff.id,
+        version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
       toast(`연차사용촉진 ${stageLabel} 통보가 발송되었습니다.`, 'success');
       fetchSubmittedPlans();
       fetchSentLogs();

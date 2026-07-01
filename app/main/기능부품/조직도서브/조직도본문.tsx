@@ -228,18 +228,36 @@ export default function MainContent({
     const checkNotifications = async () => {
       if (!user?.id) return;
 
-      const { data: staff } = await db
-        .from('staff_members')
-        .select('annual_leave_total, annual_leave_used')
-        .eq('id', user.id)
-        .single();
+      try {
+        const { data: staff } = await db
+          .from('staff_members')
+          .select('annual_leave_total, annual_leave_used')
+          .eq('id', user.id)
+          .single();
 
-      if (!staff) return;
+        if (!staff) return;
 
-      const remaining = (staff.annual_leave_total || 0) - (staff.annual_leave_used || 0);
-      const currentMonth = new Date().getMonth() + 1;
-      if (remaining > 0 && currentMonth >= 7) {
-        setAnnualLeaveNotice({ remaining, total: staff.annual_leave_total });
+        const { data: balanceData } = await db
+          .from('leave_balances')
+          .select('expired_days, compensated_days')
+          .eq('staff_id', user.id)
+          .eq('year', new Date().getFullYear())
+          .maybeSingle();
+
+        const expired = balanceData ? (Number(balanceData.expired_days) || 0) : 0;
+        const compensated = balanceData ? (Number(balanceData.compensated_days) || 0) : 0;
+
+        const remaining = Math.max(
+          0,
+          (Number(staff.annual_leave_total) || 0) - (Number(staff.annual_leave_used) || 0) - expired - compensated
+        );
+
+        const currentMonth = new Date().getMonth() + 1;
+        if (remaining > 0 && currentMonth >= 7) {
+          setAnnualLeaveNotice({ remaining, total: staff.annual_leave_total });
+        }
+      } catch (err) {
+        console.error('[checkNotifications] 연차 정보 조회 실패:', err);
       }
     };
 
