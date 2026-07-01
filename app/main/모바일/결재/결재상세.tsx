@@ -129,6 +129,22 @@ export default function SApprovalDetail({
   const [reason, setReason] = useState('');
   const [sheetAction, setSheetAction] = useState<'approve' | 'reject' | 'recall' | null>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tabbar = document.querySelector('.mobile-bottom-tabbar') || document.querySelector('.m-bottom-tab');
+    const shell = document.querySelector('.main-content-mobile-shell');
+
+    tabbar?.classList.add('hidden');
+    shell?.classList.remove('pb-[88px]');
+    shell?.classList.add('pb-0');
+
+    return () => {
+      tabbar?.classList.remove('hidden');
+      shell?.classList.remove('pb-0');
+      shell?.classList.add('pb-[88px]');
+    };
+  }, []);
+
   // 최초 마운트 시 상세 fetch (라인/comment 최신화)
   useEffect(() => {
     let cancelled = false;
