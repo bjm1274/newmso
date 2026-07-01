@@ -113,6 +113,8 @@
 .mso-mobile .m-scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  /* 모바일 바텀 탭바(높이 64px + 바디마진 16px = 80px) 가림을 예방하기 위한 글로벌 바텀 패딩 */
+  padding-bottom: 88px;
 }
 .mso-mobile .m-section { padding: 14px 16px 0; }
 .mso-mobile .m-section-h {
