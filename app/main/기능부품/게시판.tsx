@@ -2810,7 +2810,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                       disabled={!user?.id}
                       ariaLabel={replyParentId ? '답글 작성' : '댓글 작성'}
                       submitLabel="등록"
-                      withSpacer={false}
+                      withSpacer={true}
                     />
                   ) : (
                     <div className="flex gap-2">

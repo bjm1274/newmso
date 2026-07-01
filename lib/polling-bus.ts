@@ -117,9 +117,10 @@ if (typeof window !== 'undefined') {
         if (!isLeader) {
           for (const entry of channelRegistry.values()) {
             for (const tableFilter of entry.tables) {
-              const next = msg.tail[tableFilter.table] ?? null;
-              if (entry.lastSeen[tableFilter.table] === undefined) {
-                entry.lastSeen[tableFilter.table] = next;
+              const key = tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
+              const next = msg.tail[key] ?? null;
+              if (entry.lastSeen[key] === undefined) {
+                entry.lastSeen[key] = next;
               }
             }
           }
@@ -211,10 +212,11 @@ function triggerImmediateSync() {
 function processTailData(entry: ChannelEntry, tail: Record<string, string | null>) {
   const changed: TableFilter[] = [];
   for (const tableFilter of entry.tables) {
-    const next = tail[tableFilter.table] ?? null;
-    const prev = entry.lastSeen[tableFilter.table] ?? null;
+    const key = tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
+    const next = tail[key] ?? null;
+    const prev = entry.lastSeen[key] ?? null;
     if (next !== prev) {
-      entry.lastSeen[tableFilter.table] = next;
+      entry.lastSeen[key] = next;
       // 첫 polling/연결에는 prev가 undefined이므로 콜백 호출 안 함 (false positive 방지)
       if (prev !== null && prev !== undefined) {
         changed.push(tableFilter);
@@ -246,7 +248,11 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
   if (isSuspended()) return;
   entry.inFlight = true;
   try {
-    const tables = entry.tables.map((t) => t.table).join(',');
+    const tableSet = new Set<string>();
+    for (const t of entry.tables) {
+      tableSet.add(t.table + (t.filter ? `:${t.filter}` : ''));
+    }
+    const tables = Array.from(tableSet).join(',');
     const res = await fetch(`/api/realtime/tail?tables=${encodeURIComponent(tables)}`, {
       credentials: 'same-origin' });
     if (!res.ok) return;

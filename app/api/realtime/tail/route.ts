@@ -79,17 +79,43 @@ function userId(user: SessionUser | null | undefined): string | null {
 
 // D1에서 테이블의 최신 변경 timestamp 조회 — allowedTables whitelist 내에서만 호출됨.
 // 컬럼명은 TABLE_TIMESTAMP_COLUMN 매핑에서 우선 결정, 없으면 created_at.
+// tableSpec은 "tableName:filter" 또는 "tableName" 형태.
 async function fetchMaxCreatedAtD1(
   d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,
-  tableName: string,
+  tableSpec: string,
 ): Promise<string | null> {
+  const [tableName, filterPart] = tableSpec.split(':');
   const column = TABLE_TIMESTAMP_COLUMN[tableName] ?? 'created_at';
+  
+  let query = `SELECT "${column}" AS ts FROM "${tableName}"`;
+  const params: unknown[] = [];
+  
+  if (filterPart) {
+    // 형식: col=op.val (예: room_id=eq.123)
+    const [col, opAndVal] = filterPart.split('=');
+    if (col && opAndVal) {
+      const dotIdx = opAndVal.indexOf('.');
+      if (dotIdx !== -1) {
+        const op = opAndVal.substring(0, dotIdx);
+        const val = opAndVal.substring(dotIdx + 1);
+        
+        // SQL 인젝션 방지를 위한 컬럼명 및 연산자 검증
+        if (/^[a-zA-Z0-9_]+$/.test(col) && op === 'eq') {
+          query += ` WHERE "${col}" = ?`;
+          params.push(val);
+        }
+      }
+    }
+  }
+  
+  query += ` ORDER BY "${column}" DESC LIMIT 1`;
+
   try {
-    const result = await d1
-      .prepare(`SELECT "${column}" AS ts FROM "${tableName}" ORDER BY REPLACE("${column}", 'T', ' ') DESC LIMIT 1`)
-      .first<{ ts: string | null }>();
+    const statement = d1.prepare(query);
+    const result = await (params.length > 0 ? statement.bind(...params) : statement).first<{ ts: string | null }>();
     return result?.ts ?? null;
-  } catch {
+  } catch (err) {
+    console.error(`[fetchMaxCreatedAtD1] query failed: ${query}`, err);
     return null;
   }
 }
@@ -109,7 +135,11 @@ export async function GET(request: Request) {
       .filter(Boolean)
       .slice(0, MAX_TABLES_PER_REQUEST);
 
-    const tables = requested.filter((t) => ALLOWED_TABLES.has(t));
+    // tableSpec에서 tableName만 추출하여 ALLOWED_TABLES 화이트리스트 검사 수행
+    const tables = requested.filter((t) => {
+      const tableName = t.split(':')[0];
+      return ALLOWED_TABLES.has(tableName);
+    });
     if (tables.length === 0) {
       return NextResponse.json({ ok: true, tail: {} });
     }

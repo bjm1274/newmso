@@ -50,6 +50,18 @@ const eslintConfig = defineConfig([
       "prefer-const": "warn",
     },
   },
+  {
+    // 한국어 컴포넌트명이 적용된 파일들에서 react-hooks/rules-of-hooks 의사 에러(False Positive) 비활성화
+    files: [
+      "app/main/모바일/**/*.tsx",
+      "app/main/모바일/**/*.ts",
+      "app/main/기능부품/**/*.tsx",
+      "app/main/기능부품/**/*.ts"
+    ],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

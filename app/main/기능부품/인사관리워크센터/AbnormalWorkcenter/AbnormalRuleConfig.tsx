@@ -108,7 +108,7 @@ function AbnormalRuleConfigInner({ rules, canEdit, onSave }: Props) {
         ))}
       </fieldset>
 
-      <div className="sticky bottom-0 mt-3 flex items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--card)] pt-2">
+      <div className="sticky bottom-[var(--mobile-bottomtab-height,60px)] md:bottom-0 mt-3 flex items-center justify-end gap-2 border-t border-[var(--border)] bg-[var(--card)] pt-2">
         {feedback && (
           <span className="mr-auto text-[11px] font-medium text-[var(--toss-gray-4)]">
             {feedback}

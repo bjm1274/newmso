@@ -384,8 +384,17 @@ export async function deleteFromR2(bucket: string, objectKey: string): Promise<v
   const host = `${config.accountId}.r2.cloudflarestorage.com`;
   const credentialScope = `${dateStamp}/auto/s3/aws4_request`;
   const canonicalUri = `/${awsEncode(bucket)}/${encodeObjectKey(objectKey)}`;
-  const signedHeaders = 'host';
-  const canonicalHeaders = `host:${host}\n`;
+  
+  const headers = { host };
+  const normalizedHeaders = Object.fromEntries(
+    Object.entries(headers)
+      .map(([key, value]) => [key.toLowerCase(), String(value).trim()])
+  ) as Record<string, string>;
+  const signedHeaders = Object.keys(normalizedHeaders).join(';');
+  const canonicalHeaders = Object.entries(normalizedHeaders)
+    .map(([key, value]) => `${key}:${value.replace(/\s+/g, ' ')}`)
+    .join('\n');
+
   const canonicalQuery = buildCanonicalQueryString([
     ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
     ['X-Amz-Credential', `${config.accessKeyId}/${credentialScope}`],

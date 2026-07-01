@@ -153,9 +153,19 @@ function PopupManagerDesktop() {
 
     try {
       const finalUrl = await uploadSelectedFile();
+      const nowTime = new Date();
+      const hundredYearsLater = new Date(nowTime.getTime() + 100 * 365 * 24 * 60 * 60 * 1000);
+
       const { error } = await db
         .from('popups')
-        .insert([{ ...newPopup, title: newPopup.title.trim(), media_url: finalUrl, is_active: true }]);
+        .insert([{
+          ...newPopup,
+          title: newPopup.title.trim(),
+          media_url: finalUrl,
+          is_active: true,
+          start_at: nowTime.toISOString(),
+          end_at: hundredYearsLater.toISOString()
+        }]);
 
       if (error) {
         throw new Error(error.message || '팝업 저장에 실패했습니다.');

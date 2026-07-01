@@ -1190,6 +1190,7 @@ export const messages = sqliteTable("messages", {
 	index("idx_messages_room_unread_count").on(table.room_id, table.created_at),
 	index("idx_messages_room_created_id_desc").on(table.room_id, table.created_at, table.id),
 	index("idx_messages_room").on(table.room_id),
+	index("idx_messages_created_at").on(table.created_at),
 	foreignKey(() => ({
 			columns: [table.reply_to_id],
 			foreignColumns: [table.id],

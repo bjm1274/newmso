@@ -214,6 +214,27 @@ export default function ChatView({
   const [roomReadCursorMap, setRoomReadCursorMap] = useState<Record<string, string>>({});
   const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
   const [showSettings, setShowSettings] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tabbar = document.querySelector('.mobile-bottom-tabbar');
+    const shell = document.querySelector('.main-content-mobile-shell');
+
+    if (selectedRoomId) {
+      tabbar?.classList.add('hidden');
+      shell?.classList.remove('pb-[88px]');
+      shell?.classList.add('pb-0');
+    } else {
+      tabbar?.classList.remove('hidden');
+      shell?.classList.remove('pb-0');
+      shell?.classList.add('pb-[88px]');
+    }
+
+    return () => {
+      tabbar?.classList.remove('hidden');
+      shell?.classList.remove('pb-0');
+      shell?.classList.add('pb-[88px]');
+    };
+  }, [selectedRoomId]);
   const [showDrawer, setShowDrawer] = useState(false);
   const [noticeReminderBusy, setNoticeReminderBusy] = useState(false);
   const [mentionInboxItems, setMentionInboxItems] = useState<MessengerMentionInboxItem[]>([]);

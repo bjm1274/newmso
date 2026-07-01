@@ -396,7 +396,8 @@ export async function POST(request: Request) {
               await updateChatRoomLastMessage(db, {
                 room_id: roomId,
                 created_at: String(row.created_at ?? new Date().toISOString()),
-                content: row.content != null ? String(row.content) : null });
+                content: row.content != null ? String(row.content) : null,
+                file_name: row.file_name != null ? String(row.file_name) : null });
             }
           } catch (triggerErr) {
             console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);

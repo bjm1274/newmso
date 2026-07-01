@@ -213,7 +213,7 @@ export default function SApprovalOvertimeForm({
           >
             {!loaded ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
-                "조회"를 눌러 본인의 연장근무 이력을 불러오세요.
+                &quot;조회&quot;를 눌러 본인의 연장근무 이력을 불러오세요.
               </div>
             ) : records.length === 0 ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>

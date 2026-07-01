@@ -1661,7 +1661,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
       {/* 성공 토스트 오버레이 */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-zinc-950 text-white rounded-xl shadow-2xl text-[13px] font-bold animate-in slide-in-from-bottom-2 duration-200">
+        <div className="fixed bottom-[calc(var(--mobile-bottomtab-height,60px)+16px)] md:bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2.5 bg-zinc-950 text-white rounded-xl shadow-2xl text-[13px] font-bold animate-in slide-in-from-bottom-2 duration-200">
           <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
             <Check size={11} strokeWidth={3} />
           </span>

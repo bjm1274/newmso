@@ -1328,7 +1328,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
 
       {/* 자동 저장 메시지 (우하단 고정, 작성하기 뷰에서만) */}
       {viewMode === '작성하기' && autoSaveMsg && (
-        <div className="fixed bottom-8 right-6 z-[90] pointer-events-none animate-in fade-in duration-300">
+        <div className="fixed bottom-[calc(var(--mobile-bottomtab-height,60px)+16px)] md:bottom-8 right-6 z-[90] pointer-events-none animate-in fade-in duration-300">
           <span className="text-[11px] font-bold text-[var(--toss-gray-3)] bg-[var(--card)] border border-[var(--border)] px-3 py-2 rounded-[var(--radius-md)] shadow-sm">
             {autoSaveMsg}
           </span>

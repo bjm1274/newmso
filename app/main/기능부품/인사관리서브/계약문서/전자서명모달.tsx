@@ -61,6 +61,36 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const [company, setCompany] = useState<Record<string, unknown> | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
+    const sigContainerRef = useRef<HTMLDivElement>(null);
+    const receiptContainerRef = useRef<HTMLDivElement>(null);
+    const [sigWidth, setSigWidth] = useState(400);
+    const [sigHeight, setSigHeight] = useState(180);
+    const [receiptWidth, setReceiptWidth] = useState(400);
+    const [receiptHeight, setReceiptHeight] = useState(120);
+
+    useEffect(() => {
+        const updateSizes = () => {
+            if (sigContainerRef.current) {
+                // padding을 고려하여 크기 할당
+                setSigWidth(sigContainerRef.current.clientWidth - 16);
+                setSigHeight(sigContainerRef.current.clientHeight - 16);
+            }
+            if (receiptContainerRef.current) {
+                setReceiptWidth(receiptContainerRef.current.clientWidth - 16);
+                setReceiptHeight(receiptContainerRef.current.clientHeight - 16);
+            }
+        };
+
+        if (step === 4) {
+            const timer = setTimeout(updateSizes, 100);
+            window.addEventListener('resize', updateSizes);
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('resize', updateSizes);
+            };
+        }
+    }, [step]);
+
     const [localTemplateText, setLocalTemplateText] = useState<string>('');
     const [isTemplateLoading, setIsTemplateLoading] = useState(false);
     const hasTemplateOverride = templateText !== undefined;
@@ -680,11 +710,16 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         다시 쓰기
                                     </button>
                                 </div>
-                                <div data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                                <div ref={sigContainerRef} data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden h-[180px]">
                                     <SignatureCanvas
                                         ref={sigCanvas}
                                         penColor="#1e293b"
-                                        canvasProps={{ className: "w-full h-[180px] cursor-crosshair touch-none" }}
+                                        canvasProps={{
+                                            width: sigWidth,
+                                            height: sigHeight,
+                                            className: "w-full h-full cursor-crosshair",
+                                            style: { touchAction: 'none', display: 'block' }
+                                        }}
                                         onEnd={() => setIsSigEmpty(false)}
                                     />
                                     {isSigEmpty && (
@@ -703,11 +738,16 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         다시 쓰기
                                     </button>
                                 </div>
-                                <div data-testid="contract-receipt-canvas" className="bg-[var(--card)] border-2 border-emerald-400 rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                                <div ref={receiptContainerRef} data-testid="contract-receipt-canvas" className="bg-[var(--card)] border-2 border-emerald-400 rounded-2xl p-2 relative shadow-inner overflow-hidden h-[120px]">
                                     <SignatureCanvas
                                         ref={receiptCanvas}
                                         penColor="#1e293b"
-                                        canvasProps={{ className: "w-full h-[120px] cursor-crosshair touch-none" }}
+                                        canvasProps={{
+                                            width: receiptWidth,
+                                            height: receiptHeight,
+                                            className: "w-full h-full cursor-crosshair",
+                                            style: { touchAction: 'none', display: 'block' }
+                                        }}
                                         onEnd={() => setIsReceiptEmpty(false)}
                                     />
                                     {isReceiptEmpty && (

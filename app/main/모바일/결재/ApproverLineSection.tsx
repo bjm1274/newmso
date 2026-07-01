@@ -59,7 +59,7 @@ export default function ApproverLineSection({
                 color: 'var(--m-warning)',
                 lineHeight: 1.55 }}
             >
-              회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 "변경"으로 결재자를
+              회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 &quot;변경&quot;으로 결재자를
               직접 지정해 주세요.
             </div>
           ) : (

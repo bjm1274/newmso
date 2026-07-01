@@ -318,10 +318,8 @@ export default function ContractMain({
             position_allowance: salaryInfo.position_allowance || s?.position_allowance || 0,
             research_allowance: salaryInfo.research_allowance || s?.research_allowance || 0,
             other_taxfree: salaryInfo.other_taxfree || s?.other_taxfree || 0,
-            overtime_allowance: s?.overtime_allowance || 0,
-            night_work_allowance: s?.night_work_allowance || 0,
-            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance || s?.agreed_overtime_allowance || 0,
-            agreed_night_allowance: salaryInfo.agreed_night_allowance || s?.agreed_night_allowance || 0
+            overtime_allowance: salaryInfo.agreed_overtime_allowance || s?.agreed_overtime_allowance || s?.overtime_allowance || 0,
+            night_work_allowance: salaryInfo.agreed_night_allowance || s?.agreed_night_allowance || s?.night_work_allowance || 0
           }).eq('id', id);
         }));
       }

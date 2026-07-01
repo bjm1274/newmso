@@ -35,13 +35,17 @@ export async function updateChatRoomLastMessage(
     room_id: string;
     created_at: string;
     content?: string | null;
+    file_name?: string | null;
   },
 ): Promise<void> {
-  const preview = (args.content ?? '(파일)').slice(0, 80);
+  const contentText = (args.content && args.content.trim() !== '') ? args.content : null;
+  const fileNameText = (args.file_name && args.file_name.trim() !== '') ? args.file_name : null;
+  const previewSrc = contentText || fileNameText || '(파일)';
+  const preview = String(previewSrc).slice(0, 80);
   await db
     .update(chat_rooms)
     .set({
-      last_message: args.content,
+      last_message: contentText || fileNameText,
       last_message_at: args.created_at,
       last_message_preview: preview })
     .where(eq(chat_rooms.id, args.room_id))
