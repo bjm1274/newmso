@@ -95,7 +95,7 @@ async function upsertAttendanceCorrectionRows(
     .insert(attendanceCorrectionsTable)
     .values(d1Rows)
     .onConflictDoUpdate({
-      target: [attendanceCorrectionsTable.staff_id, attendanceCorrectionsTable.attendance_date],
+      target: [sql`staff_id`, sql`attendance_date`],
       set: {
         correction_type: sql`excluded.correction_type`,
         reason: sql`excluded.reason`,
@@ -398,7 +398,7 @@ export async function processFinalApprovalEffects(
                 status: leaveStatus.legacy,
                 created_at: new Date().toISOString() })
               .onConflictDoUpdate({
-                target: [attendanceTable.staff_id, attendanceTable.date],
+                target: [sql`staff_id`, sql`date`],
                 set: { status: sql`excluded.status` } });
 
             await leaveDb
@@ -413,7 +413,7 @@ export async function processFinalApprovalEffects(
                 work_hours_minutes: 0,
                 created_at: new Date().toISOString() })
               .onConflictDoUpdate({
-                target: [attendancesTable.staff_id, attendancesTable.work_date],
+                target: [sql`staff_id`, sql`work_date`],
                 set: {
                   status: sql`excluded.status`,
                   check_in_time: sql`excluded.check_in_time`,
@@ -493,7 +493,7 @@ export async function processFinalApprovalEffects(
             status: att,
             created_at: new Date().toISOString() })
           .onConflictDoUpdate({
-            target: [attendanceTable.staff_id, attendanceTable.date],
+            target: [sql`staff_id`, sql`date`],
             set: { status: sql`excluded.status` } });
 
         await fixDb
@@ -505,7 +505,7 @@ export async function processFinalApprovalEffects(
             status: atts,
             created_at: new Date().toISOString() })
           .onConflictDoUpdate({
-            target: [attendancesTable.staff_id, attendancesTable.work_date],
+            target: [sql`staff_id`, sql`work_date`],
             set: { status: sql`excluded.status` } });
       }
 
