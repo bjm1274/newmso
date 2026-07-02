@@ -6,27 +6,14 @@ const SRC = path.join(root, 'electron-app', 'app-icon2.png');
 
 async function run() {
   try {
-    // We only want the triangle part. The text "AllERP" is at the bottom.
-    // Let's first trim the whole image to find the bounding box of the non-transparent area.
+    // 텍스트를 자르지 않고, 전체 로고 영역의 투명 여백만 잘라내어 바운딩 박스를 추출합니다.
     const trimmed = await sharp(SRC).trim({ threshold: 10 }).toBuffer();
     const meta = await sharp(trimmed).metadata();
-    console.log('Trimmed full logo:', meta.width, 'x', meta.height);
-    
-    // Now, we assume the triangle is the top part. The text is at the bottom.
-    // We can extract just the top 70% or something.
-    // Actually, let's extract the top part. We'll cut off the bottom 30% of the trimmed image, then trim again.
-    const cropHeight = Math.floor(meta.height * 0.7);
-    const triangleOnly = await sharp(trimmed)
-      .extract({ left: 0, top: 0, width: meta.width, height: cropHeight })
-      .trim({ threshold: 10 })
-      .toBuffer();
-      
-    const triMeta = await sharp(triangleOnly).metadata();
-    console.log('Triangle only:', triMeta.width, 'x', triMeta.height);
+    console.log('Trimmed full logo with text:', meta.width, 'x', meta.height);
 
-    // Make a square for the favicon (0 margin)
+    // favicon을 만들기 위해 256x256 크기의 투명한 캔버스를 준비합니다.
     const size = 256;
-    const resized = await sharp(triangleOnly)
+    const resized = await sharp(trimmed)
       .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
       .toBuffer();
       
