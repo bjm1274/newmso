@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "MSO" },
   icons: {
-    icon: "/icon-512x512.png",
+    icon: "/favicon-tab.png",
     apple: "/apple-touch-icon.png" } };
 
 export default function RootLayout({
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/icon-512x512.png" type="image/png" />
+        <link rel="icon" href="/favicon-tab.png" type="image/png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link
           rel="preload"

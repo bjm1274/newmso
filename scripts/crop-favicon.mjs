@@ -33,9 +33,9 @@ async function run() {
     await sharp({ create: { width: size, height: size, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } } })
       .composite([{ input: resized, gravity: 'centre' }])
       .png()
-      .toFile(path.join(root, 'app', 'icon.png'));
+      .toFile(path.join(root, 'public', 'favicon-tab.png'));
       
-    console.log('Generated app/icon.png with only the triangle symbol!');
+    console.log('Generated public/favicon-tab.png with only the triangle symbol!');
   } catch (err) {
     console.error(err);
   }
