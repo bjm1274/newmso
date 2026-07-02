@@ -361,7 +361,7 @@ export default function MobileShell({
         />
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'absolute', inset: 0 }}>
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="m-screen" style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <오프라인실패배너 />
           <오프라인배너 />
           {route.tab === 'notif' && <알림탭 user={user} />}

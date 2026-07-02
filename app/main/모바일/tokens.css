@@ -111,6 +111,9 @@
   /* 헤더 없는 화면(내정보 홈/허브/채팅목록 등)도 상태바 영역 침범 방지 */
   padding-top: var(--m-safe-top);
 }
+.mso-mobile .m-screen .m-screen {
+  padding-top: 0;
+}
 .mso-mobile .m-scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
