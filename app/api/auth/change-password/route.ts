@@ -13,6 +13,11 @@ import {
   getD1Binding,
   getD1Drizzle,
   audit_logs as auditLogsTable } from '@/lib/db';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
+
+// Rate limit: 5분당 10회 per user
+const CHANGE_PW_RATE_LIMIT_MAX = 10;
+const CHANGE_PW_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: Request) {
   try {
@@ -20,6 +25,17 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ ok: false, error: '본인 확인을 위해 다시 로그인해 주세요.' }, { status: 401 });
     }
+
+    // Rate limit: 5분당 10회 per user
+    const rateKey = `change-password:${String(session.user.id)}`;
+    const rate = await checkRateLimit(rateKey, CHANGE_PW_RATE_LIMIT_MAX, CHANGE_PW_RATE_LIMIT_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { ok: false, error: '비밀번호 변경 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 300) } },
+      );
+    }
+    await recordFailedAttempt(rateKey, CHANGE_PW_RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const currentPassword = String(body?.currentPassword ?? '');
@@ -29,8 +45,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: '현재 비밀번호를 입력해 주세요.' }, { status: 400 });
     }
 
-    if (newPassword.trim().length < 4) {
-      return NextResponse.json({ ok: false, error: '새 비밀번호는 4자 이상 입력해 주세요.' }, { status: 400 });
+    if (newPassword.trim().length < 8) {
+      return NextResponse.json(
+        { ok: false, error: '새 비밀번호는 8자 이상 입력해 주세요.' },
+        { status: 400 },
+      );
+    }
+
+    const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;':",.<>?/`~])/;
+    if (!passwordComplexityRegex.test(newPassword)) {
+      return NextResponse.json(
+        { ok: false, error: '비밀번호는 대문자, 소문자, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.' },
+        { status: 400 },
+      );
     }
 
     if (currentPassword === newPassword) {

@@ -51,6 +51,7 @@ import {
 export type PolicyPattern =
   | 'PUBLIC'
   | 'AUTHENTICATED'
+  | 'ADMIN_ONLY'
   | 'SELF_ONLY'
   | 'ADMIN_OR_MANAGER'
   | 'MANAGE_COMPANY'
@@ -182,6 +183,17 @@ const PUBLIC_ALL = (table: string): TablePolicy => ({
   update: 'PUBLIC',
   delete: 'PUBLIC' });
 
+/**
+ * ADMIN_ONLY — admin/master 역할만 모든 op 허용.
+ * 급여·계약·감사로그 등 민감 데이터에 사용.
+ */
+const ADMIN_ONLY_ALL = (table: string): TablePolicy => ({
+  table,
+  select: 'ADMIN_ONLY',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY' });
+
 export const POLICY_REGISTRY: Registry = {
   // ── PUBLIC: FOR ALL USING (true) — 인증 무관 또는 to authenticated USING true
   // staff_members: 비권한 컬럼(프로필 자기수정·구성원 등록 등)은 PUBLIC 유지하되,
@@ -205,7 +217,7 @@ export const POLICY_REGISTRY: Registry = {
   system_configs: PUBLIC_ALL('system_configs'),
   work_shifts: PUBLIC_ALL('work_shifts'),
   contract_templates: PUBLIC_ALL('contract_templates'),
-  employment_contracts: PUBLIC_ALL('employment_contracts'),
+  employment_contracts: ADMIN_ONLY_ALL('employment_contracts'),
   staff_evaluations: PUBLIC_ALL('staff_evaluations'),
   staff_preferred_off: PUBLIC_ALL('staff_preferred_off'),
   monthly_off_quota: PUBLIC_ALL('monthly_off_quota'),
@@ -484,9 +496,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'job_categories',
   'job_category_required_trainings',
   'shift_assignments',
-  'onboarding_checklists',
   'personnel_appointments',
-  'salary_change_history',
   'reward_discipline',
 
   // attendance / leave aux
@@ -496,7 +506,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'unpaid_absence_records',
 
   // payroll aux
-  'payroll',
+
   'payroll_approval_logs',
   'payroll_approval_workflows',
   'payroll_bonus_items',
@@ -562,7 +572,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   //    ADDITIONAL_PUBLIC_TABLES 어디에도 없어 403이 발생하던 테이블.
   'annual_leave_promotion_logs', // 연차 이월/프로모션 로그
   'attendance_corrections',      // 출퇴근 정정 요청
-  'audit_logs',                  // 관리자 감사 로그
+
   'backup_restore_runs',         // 백업·복원 실행 기록
   'certificate_issuances',       // 증명서 발급 이력
   'org_teams',                   // 조직 팀 정보
@@ -579,7 +589,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   //    실테이블 신설과 함께 복구. 형제 테이블(board_*, inventory aux, 관리자 설정)과
   //    동일하게 PUBLIC_ALL(로그인 사용자 접근). PII(상담/계약/경조) 포함이나 기존
   //    컨벤션(staff_*, board_*가 PUBLIC_ALL)을 따라 앱 동작 유지 우선.
-  'op_consultations',            // 수술상담
+
   'congratulations_condolences', // 경조사관리
   'early_leave_records',         // 조기퇴근감지
   'generated_contracts',         // 계약서자동생성
@@ -626,6 +636,26 @@ for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 민감 테이블 — ADMIN_ONLY (admin/master 역할만 접근 허용)
+// 급여, 급여변경이력, 감사로그, 수술상담, 온보딩체크리스트,
+// 비밀번호재설정토큰 등 PII/보안 데이터.
+// ─────────────────────────────────────────────────────────────
+const ADMIN_ONLY_TABLES: string[] = [
+  'payroll',
+  'salary_change_history',
+  'audit_logs',
+  'op_consultations',
+  'onboarding_checklists',
+  'password_reset_tokens',
+];
+
+for (const tableName of ADMIN_ONLY_TABLES) {
+  if (!POLICY_REGISTRY[tableName]) {
+    POLICY_REGISTRY[tableName] = ADMIN_ONLY_ALL(tableName);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 패턴 평가
 // ─────────────────────────────────────────────────────────────
 function getField<T>(row: Record<string, unknown>, field: string): T | null {
@@ -642,6 +672,7 @@ async function evalPattern(
 ): Promise<boolean> {
   if (pattern === 'PUBLIC') return true;
   if (pattern === 'AUTHENTICATED') return erpStaffId(claims) !== null;
+  if (pattern === 'ADMIN_ONLY') return erpIsAdmin(claims);
   if (erpIsAdmin(claims)) return true;
 
   const staffField = cfg.staffIdField ?? 'staff_id';

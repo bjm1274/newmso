@@ -49,6 +49,10 @@
   /* iOS 노치/상태바(시계) 안전영역 — 비대응 기기는 0 */
   --m-safe-top: env(safe-area-inset-top, 0px);
 
+  --m-bubble-in-bg: rgba(255, 255, 255, 0.75);
+  --m-bubble-in-border: rgba(255, 255, 255, 0.3);
+  --m-reply-bg: rgba(0, 0, 0, 0.05);
+
   position: fixed;
   inset: 0;
   font-family: var(--m-font);
@@ -83,6 +87,10 @@
   --m-success-soft: rgba(16, 185, 129, 0.16);
   --m-warning-soft: rgba(245, 158, 11, 0.16);
   --m-danger-soft: rgba(239, 68, 68, 0.16);
+
+  --m-bubble-in-bg: rgba(30, 30, 32, 0.75);
+  --m-bubble-in-border: rgba(255, 255, 255, 0.08);
+  --m-reply-bg: rgba(255, 255, 255, 0.08);
 }
 
 /* 리셋 — .mso-mobile 내부만 */

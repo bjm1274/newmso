@@ -28,8 +28,13 @@ import {
 import type { ErpClaims } from '@/lib/db/auth/claims';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 import * as schema from '@/lib/db/schema';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
+
+// Rate limit: 분당 100회 per user
+const D1_MUTATE_RATE_LIMIT_MAX = 100;
+const D1_MUTATE_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -243,6 +248,19 @@ export async function POST(request: Request) {
     if (!userId(session?.user)) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Rate limit: 분당 100회 per user
+    const uid = userId(session?.user)!;
+    const rateKey = `d1-mutate:${uid}`;
+    const rate = await checkRateLimit(rateKey, D1_MUTATE_RATE_LIMIT_MAX, D1_MUTATE_RATE_LIMIT_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { ok: false, error: '요청이 너무 잦습니다.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
+      );
+    }
+    await recordFailedAttempt(rateKey, D1_MUTATE_RATE_LIMIT_WINDOW_MS);
+
     const body = await request.json().catch(() => null);
     const parsed = PayloadSchema.safeParse(body);
     if (!parsed.success) {

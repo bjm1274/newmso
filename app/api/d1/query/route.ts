@@ -35,8 +35,13 @@ import {
   assertFilterTreeValid,
   type FilterNode } from '@/lib/d1-compat/filter';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
+
+// Rate limit: 분당 200회 per user
+const D1_QUERY_RATE_LIMIT_MAX = 200;
+const D1_QUERY_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 // ─────────────────────────────────────────────────────────────
 // 허용 테이블 — POLICY_REGISTRY에 등록된 테이블만.
@@ -300,6 +305,18 @@ export async function POST(request: Request) {
     if (!userId(session?.user)) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Rate limit: 분당 200회 per user
+    const uid = userId(session?.user)!;
+    const rateKey = `d1-query:${uid}`;
+    const rate = await checkRateLimit(rateKey, D1_QUERY_RATE_LIMIT_MAX, D1_QUERY_RATE_LIMIT_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { ok: false, error: '요청이 너무 잦습니다.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
+      );
+    }
+    await recordFailedAttempt(rateKey, D1_QUERY_RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const parsed = PayloadSchema.safeParse(body);

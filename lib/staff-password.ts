@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -30,9 +31,14 @@ export async function verifyStoredPassword(storedPassword: string, inputPassword
       needsHashUpgrade: false };
   }
 
+  // Constant-time comparison for legacy plaintext passwords
+  const storedBuf = Buffer.from(storedPassword, 'utf-8');
+  const inputBuf = Buffer.from(inputPassword, 'utf-8');
+  const isMatch = storedBuf.length === inputBuf.length &&
+    crypto.timingSafeEqual(storedBuf, inputBuf);
   return {
-    ok: storedPassword === inputPassword,
-    needsHashUpgrade: storedPassword === inputPassword };
+    ok: isMatch,
+    needsHashUpgrade: isMatch };
 }
 
 // ----------------------------------------------------------------

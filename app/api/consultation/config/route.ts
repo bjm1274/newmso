@@ -11,11 +11,8 @@ export async function GET(request: NextRequest) {
     }
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: '서버에 API 키가 설정되지 않았습니다.' }, { status: 500 });
-    }
 
-    return NextResponse.json({ apiKey });
+    return NextResponse.json({ available: !!apiKey });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : '설정 조회 실패';
     return NextResponse.json({ error: msg }, { status: 500 });

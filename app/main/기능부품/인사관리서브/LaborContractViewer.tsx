@@ -1,5 +1,7 @@
 'use client';
 
+import { sanitizeHtml } from '@/lib/sanitize-html';
+
 /**
  * 문서보관함 > 근로계약서 전용 A4 뷰어
  * (법적 효력 유지를 위해 읽기 전용 표시)
@@ -26,7 +28,7 @@ export default function LaborContractViewer({ doc, content, selectedCo }: Props)
     return (
       <div className="bg-[var(--tab-bg)] p-4 md:p-5 rounded-[var(--radius-md)] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
         <div className="w-full max-w-[700px] bg-white shadow-sm p-8 border border-[var(--border)]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-          <div dangerouslySetInnerHTML={{ __html: cleanedText }} />
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(cleanedText) }} />
         </div>
       </div>
     );

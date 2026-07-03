@@ -10,35 +10,6 @@ import { SUPPORTED_MIME, LS_KEY } from './수술상담-types';
 import { formatDuration, groupByPatient, deriveKpi } from './수술상담-utils';
 import { KpiGrid, ResultPanel } from './수술상담-components';
 
-const ANALYSIS_PROMPT_CLIENT = `당신은 한국 의료기관의 수술 상담 내용을 분석하는 전문 의료 비서입니다.
-아래 음성 녹음은 의사와 환자(또는 보호자) 간의 수술 상담 대화입니다.
-
-다음 JSON 형식으로 정확하게 분석해 주세요. 해당 내용이 없으면 빈 배열([]) 또는 빈 문자열("")을 사용하세요.
-
-{
-  "transcript_summary": "전체 상담 내용 요약 (3-5문장)",
-  "chief_complaint": "주요 증상 및 주호소 (환자가 호소한 증상)",
-  "diagnosis": "진단명 또는 의심 진단 (언급된 경우)",
-  "surgery_plan": "수술 방법, 수술명, 수술 과정 설명 내용",
-  "risks_and_complications": ["합병증 및 위험사항 1", "합병증 및 위험사항 2"],
-  "patient_questions": ["환자/보호자 질문 1", "환자/보호자 질문 2"],
-  "doctor_answers": ["의사 답변/안내 1", "의사 답변/안내 2"],
-  "precautions": ["수술 전 주의사항 1", "수술 전 주의사항 2"],
-  "post_op_instructions": ["수술 후 주의사항 1", "수술 후 주의사항 2"],
-  "consent_required": ["동의 필요 항목 1", "동의 필요 항목 2"],
-  "medications": ["처방/복용 관련 안내 1"],
-  "next_schedule": "다음 예약 또는 일정 (날짜, 시간 포함)",
-  "special_notes": "기타 특이사항 또는 중요 메모",
-  "consultation_date": "상담 날짜 (언급된 경우, 없으면 빈 문자열)"
-}
-
-규칙:
-1. JSON만 출력하세요. 설명, 주석, 마크다운 코드블록 없이 순수 JSON만 출력.
-2. 한국어로 작성하세요.
-3. 의료 용어는 정확하게 기재하고, 모호한 내용은 따옴표로 인용하세요.
-4. 환자 이름, 주민번호 등 개인정보가 나와도 그대로 포함하세요.
-5. 음성이 불명확하거나 내용이 없는 항목은 빈 값으로 두세요.`;
-
 // ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   const { dialog, openConfirm } = useActionDialog();
@@ -215,7 +186,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
     if (file) handleFileSelect(file);
   };
 
-  // ─── 분석 실행 ──────────────────────────────────────────────────────────────
+  // ─── 분석 실행 (서버 프록시 경유) ───────────────────────────────────────────
   const analyze = useCallback(async (blob: Blob, filename: string, name: string, chartNo: string) => {
     setAnalyzing(true);
     setProgress(0);
@@ -228,43 +199,16 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
         mimeType = 'audio/mpeg';
       }
 
-      // 1. 서버로부터 API 키 조회
-      const configRes = await fetch('/api/consultation/config');
-      const configData = await configRes.json();
-      if (!configRes.ok) throw new Error(configData.error || 'API 키 조회 실패');
-      const apiKey = configData.apiKey;
+      // FormData 구성 — 서버 프록시로 전송
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+      formData.append('mimeType', mimeType);
+      formData.append('displayName', `consultation_${Date.now()}`);
 
-      // 2. 브라우저(한국 IP)에서 Google Files API 업로드 세션 직접 생성
-      const startUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
-      const startRes = await fetch(startUrl, {
-        method: 'POST',
-        headers: {
-          'X-Goog-Upload-Protocol': 'resumable',
-          'X-Goog-Upload-Command': 'start',
-          'X-Goog-Upload-Header-Content-Length': String(blob.size),
-          'X-Goog-Upload-Header-Content-Type': mimeType,
-          'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file: {
-            display_name: `consultation_${Date.now()}`
-          }
-        })
-      });
-
-      if (!startRes.ok) {
-        const errText = await startRes.text().catch(() => '');
-        throw new Error(`Google Files API 세션 생성 실패: ${startRes.statusText} (${errText})`);
-      }
-
-      const uploadUrl = startRes.headers.get('X-Goog-Upload-URL');
-      if (!uploadUrl) throw new Error('업로드 URL을 획득하지 못했습니다.');
-
-      // 3. 브라우저에서 Google Files API로 직접 데이터 스트리밍 업로드 (진행률 측정을 위해 XHR 사용)
-      const uploadData = await new Promise<any>((resolve, reject) => {
+      // XHR로 업로드 진행률 추적하면서 서버 프록시 호출
+      const responseData = await new Promise<{ ok: boolean; result?: any; error?: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl, true);
-        xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
-        xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+        xhr.open('POST', '/api/consultation/analyze', true);
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -274,67 +218,30 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
         };
 
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText));
-            } catch {
-              reject(new Error('업로드 응답 파싱 실패'));
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data);
+            } else {
+              reject(new Error(data.error || '서버 분석 요청 실패'));
             }
-          } else {
-            reject(new Error(`Google Files API 업로드 실패 (Status: ${xhr.status})`));
+          } catch {
+            reject(new Error('서버 응답 파싱 실패'));
           }
         };
 
-        xhr.onerror = () => reject(new Error('Google Files API 업로드 네트워크 오류'));
-        xhr.send(blob);
+        xhr.onerror = () => reject(new Error('서버 연결 오류'));
+        xhr.send(formData);
       });
 
-      const fileUri = uploadData.file.uri;
-
-      // 4. 브라우저에서 직접 Gemini API 호출하여 요약 분석 수행
-      const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const modelRes = await fetch(modelUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: ANALYSIS_PROMPT_CLIENT },
-              { fileData: { fileUri, mimeType } }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json'
-          }
-        })
-      });
-
-      if (!modelRes.ok) {
-        const errText = await modelRes.text().catch(() => '');
-        throw new Error(`Gemini 모델 분석 실패: ${modelRes.statusText} (${errText})`);
+      if (!responseData.ok || !responseData.result) {
+        throw new Error(responseData.error || '분석 결과를 받지 못했습니다.');
       }
 
-      const modelData = await modelRes.json();
-      const rawText = modelData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      // 5. JSON 결과 파싱 및 처리
-      let parsed: any;
-      try {
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
-      } catch {
-        parsed = { transcript_summary: rawText, special_notes: '자동 분석 결과를 JSON으로 파싱하지 못했습니다.' };
-      }
-
-      setResult(parsed);
+      setResult(responseData.result);
       setSourceLabel(filename);
-      saveRecord(filename, parsed, name, chartNo);
+      saveRecord(filename, responseData.result, name, chartNo);
       toast('상담 내용 분석이 완료되었습니다.', 'success');
-
-      // 6. 구글 서버 임시 파일 삭제 시도 (Background)
-      const deleteUrl = `https://generativelanguage.googleapis.com/v1beta/${uploadData.file.name}?key=${apiKey}`;
-      fetch(deleteUrl, { method: 'DELETE' }).catch(() => {});
 
     } catch (e: unknown) {
       const err = e as { message?: string };

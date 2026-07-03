@@ -253,18 +253,18 @@ export default function MessageBubble({
               style={{
                 padding: (imageMode || isEmoticonOrSticker) && !replyTarget ? 0 : '10px 14px',
                 borderRadius: 18,
-                background: (imageMode || isEmoticonOrSticker) && !replyTarget
+                background: ((imageMode || isEmoticonOrSticker) && !replyTarget
                   ? 'transparent'
                   : mine
                     ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
-                    : 'rgba(255, 255, 255, 0.75)',
+                    : 'var(--m-bubble-in-bg)') as React.CSSProperties['background'],
                 backdropFilter: !(imageMode || isEmoticonOrSticker) || replyTarget
                   ? mine
                     ? undefined
                     : 'blur(12px)'
                   : undefined,
                 color: mine && !((imageMode || isEmoticonOrSticker) && !replyTarget) ? '#fff' : 'var(--z-900)',
-                border: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 0 : '1px solid rgba(255, 255, 255, 0.3)',
+                border: (mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 'none' : '1px solid var(--m-bubble-in-border)') as React.CSSProperties['border'],
                 borderBottomRightRadius: mine ? 4 : 18,
                 borderBottomLeftRadius: mine ? 18 : 4,
                 fontSize: 14,
@@ -280,7 +280,7 @@ export default function MessageBubble({
             >
               {replyTarget && (
                 <div style={{
-                  background: mine ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                  background: (mine ? 'rgba(255, 255, 255, 0.15)' : 'var(--m-reply-bg)') as React.CSSProperties['background'],
                   borderRadius: 8,
                   padding: '6px 10px',
                   fontSize: 12,

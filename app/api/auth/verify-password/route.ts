@@ -8,6 +8,11 @@ import {
   selectStaffCredentialsByNameD1,
   type StaffCredentialRow,
   verifyStoredPassword } from '@/lib/staff-password';
+import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
+
+// Rate limit: 5분당 10회 per user
+const VERIFY_PW_RATE_LIMIT_MAX = 10;
+const VERIFY_PW_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
 function isUuidLike(value: string | null | undefined) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -23,6 +28,17 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ verified: false, error: '본인 확인을 위해 다시 로그인해 주세요.' }, { status: 401 });
     }
+
+    // Rate limit: 5분당 10회 per user
+    const rateKey = `verify-password:${String(session.user.id)}`;
+    const rate = await checkRateLimit(rateKey, VERIFY_PW_RATE_LIMIT_MAX, VERIFY_PW_RATE_LIMIT_WINDOW_MS);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { verified: false, error: '비밀번호 확인 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 300) } },
+      );
+    }
+    await recordFailedAttempt(rateKey, VERIFY_PW_RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const password = String(body?.password ?? '');
