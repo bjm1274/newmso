@@ -115,7 +115,7 @@ export async function GET(request: Request) {
           isClosed = true;
         });
 
-        const interval = 3000;
+        const interval = 5000;
         let keepAliveCounter = 0;
 
         while (!isClosed && !request.signal.aborted) {

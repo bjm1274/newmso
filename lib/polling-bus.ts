@@ -57,7 +57,7 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분
 let sseSource: EventSource | null = null;
 let sseErrorCount = 0;
 const MAX_SSE_ERRORS = 3;
-const useSSE = false;
+const useSSE = true;
 let sseSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Cross-Tab Leader Election & Self-Healing SSE
@@ -515,7 +515,7 @@ export function subscribeRealtime(
   callback: RealtimeCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = options?.pollIntervalMs ?? 5000;
+  const interval = options?.pollIntervalMs ?? 15000;
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.singleCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.singleCallbacks.delete(callback));
@@ -527,7 +527,7 @@ export function subscribeRealtimeBatched(
   callback: RealtimeBatchCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = options?.pollIntervalMs ?? 5000;
+  const interval = options?.pollIntervalMs ?? 15000;
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.batchCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.batchCallbacks.delete(callback));

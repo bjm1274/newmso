@@ -200,7 +200,7 @@ MSO 주식회사 대표이사 (직인생략)`;
         .values({
           id: crypto.randomUUID(),
           title: docTitle,
-          category: '양식',
+          category: '연차촉진',
           content: docContent,
           company_name: s.company || '전체',
           created_by: s.id,

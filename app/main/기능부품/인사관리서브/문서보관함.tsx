@@ -15,6 +15,7 @@ const CATEGORIES = [
   { id: '규정', label: '규정' },
   { id: '양식', label: '양식' },
   { id: '근로계약서', label: '근로계약서' },
+  { id: '연차촉진', label: '연차촉진' },
   { id: '기타', label: '기타' }
 ];
 
@@ -101,7 +102,15 @@ export default function DocumentRepository({
     }
   }, [linkedTarget?.name]);
 
-  const visibleDocs = docs.filter((d) => {
+  const visibleDocs = docs.map((d) => {
+    const isPromotion =
+      String(d.title || '').includes('연차유급휴가 사용촉진 통보서') ||
+      d.category === '연차촉진';
+    if (isPromotion) {
+      return { ...d, category: '연차촉진' };
+    }
+    return d;
+  }).filter((d) => {
     const docCompany = String(d.company_name || '전체').trim() || '전체';
     const scopeCompany = String(selectedCo || '전체').trim() || '전체';
     const matchCompany = scopeCompany === '전체' || docCompany === scopeCompany || docCompany === '전체';
@@ -117,6 +126,8 @@ export default function DocumentRepository({
     selected?.source_type === 'approval'
     || selected?.read_only
     || hasApprovalArchiveSignature(selected)
+    || selected?.category === '연차촉진'
+    || String(selected?.title || '').includes('연차유급휴가 사용촉진 통보서')
   );
 
   const handleSave = async () => {
@@ -334,7 +345,7 @@ export default function DocumentRepository({
                   <div key={cat.id} className="border-b border-[var(--muted)]">
                     <div className="px-4 py-2.5 bg-[var(--page-bg)] font-bold text-[var(--toss-gray-4)] text-xs flex items-center gap-2">
                       <span className="text-base">
-                        {cat.id === '규정' ? '📁' : cat.id === '양식' ? '📄' : cat.id === '근로계약서' ? '📋' : '📂'}
+                        {cat.id === '규정' ? '📁' : cat.id === '양식' ? '📄' : cat.id === '근로계약서' ? '📋' : cat.id === '연차촉진' ? '🌴' : '📂'}
                       </span>
                       {cat.label} ({folderDocs.length})
                     </div>
