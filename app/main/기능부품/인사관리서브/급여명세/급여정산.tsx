@@ -181,6 +181,29 @@ export default function SalarySettlement({
     return () => { ok = false; };
   }, [selectedCo]);
 
+  // 회사 급여기준의 '휴무일 대체휴무 지급' 설정을 정산 시 적용하기 위해 로드
+  const [companySubstituteHolidayPolicy, setCompanySubstituteHolidayPolicy] = useState<string>('미지급');
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      try {
+        const scope = selectedCo && selectedCo !== '전체' ? [selectedCo, '전체'] : ['전체'];
+        const { data } = await db
+          .from('company_payroll_policies')
+          .select('company_name, rule_value')
+          .eq('rule_label', '휴무일 대체휴무 지급')
+          .in('company_name', scope);
+        if (!ok) return;
+        const rows = Array.isArray(data) ? (data as { company_name?: string; rule_value?: string }[]) : [];
+        const chosen = rows.find((r) => r.company_name === selectedCo) || rows.find((r) => r.company_name === '전체');
+        setCompanySubstituteHolidayPolicy(chosen?.rule_value === '지급' ? '지급' : '미지급');
+      } catch {
+        if (ok) setCompanySubstituteHolidayPolicy('미지급');
+      }
+    })();
+    return () => { ok = false; };
+  }, [selectedCo]);
+
   const TAX_FREE_LIMITS = {
     meal: taxFreeLimits.meal_limit,
     vehicle: taxFreeLimits.vehicle_limit,
@@ -378,6 +401,9 @@ export default function SalarySettlement({
         staff,
         status: savedRecord?.status });
       changeAwareBreakdown[field] = result.amount;
+      if (field === 'holiday_work_allowance' && companySubstituteHolidayPolicy === '지급') {
+        changeAwareBreakdown[field] = 0;
+      }
       if (result.summary) salaryChangeProration.push(result.summary);
     });
 
@@ -943,7 +969,10 @@ export default function SalarySettlement({
       // 과세 수당 개별 항목 편집: taxable_allowance_breakdown 하위값 갱신 + extra_allowance(과세수당 합계) 재계산
       if (field.startsWith('taxable_allowance_breakdown.')) {
         const subField = field.slice('taxable_allowance_breakdown.'.length) as keyof TaxableAllowanceBreakdown;
-        const numericValue = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
+        let numericValue = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
+        if (subField === 'holiday_work_allowance' && companySubstituteHolidayPolicy === '지급') {
+          numericValue = 0;
+        }
         const nextBreakdown = { ...current.taxable_allowance_breakdown, [subField]: numericValue };
         const nextExtra =
           Number(nextBreakdown.position_allowance || 0) +

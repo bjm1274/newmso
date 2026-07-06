@@ -19,6 +19,7 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
+import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import {
   getAttendanceStatusMeta,
   isProblemAttendanceStatus,
@@ -160,6 +161,10 @@ export default function AttendanceBulkEditModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(initialSelectedIds ?? []),
   );
+  const [holidayCheckState, setHolidayCheckState] = useState<{
+    isOpen: boolean;
+    detectedHolidayRows: Array<{ staffId: string; staffName: string; date: string }>;
+  }>({ isOpen: false, detectedHolidayRows: [] });
 
   // 달력에서 다른 날짜를 고른 뒤 다시 열면 기준일을 그 날짜로 맞춘다.
   useEffect(() => {
@@ -250,28 +255,9 @@ export default function AttendanceBulkEditModal({
   const selectedCount = selectedIds.size;
   const canApply = !saving && selectedCount > 0;
 
-  const handleApply = async () => {
-    if (selectedCount === 0) {
-      toast('적용할 직원을 먼저 선택하세요.', 'warning');
-      return;
-    }
-    if (status === 'present') {
-      // present는 출퇴근 시간 포함, 진행 가능
-    }
-    // 지각/조퇴는 select 옵션에 없지만 만일을 대비
-    const blocked: string[] = ['late', 'early_leave'];
-    if (blocked.includes(status)) {
-      toast('지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
-      return;
-    }
-
+  const executeApply = async (substituteMode?: 'substitute' | 'allowance') => {
     const { start, end } = computeDateRange(rangeType, startDate, endDate);
     const dates = enumerateDates(start, end);
-    if (dates.length === 0) {
-      toast('적용할 날짜 범위가 없습니다.', 'warning');
-      return;
-    }
-
     const targetIds = Array.from(selectedIds);
     const isPresent = status === 'present';
 
@@ -282,21 +268,74 @@ export default function AttendanceBulkEditModal({
     try {
       // 직원 단위로 트랜잭션을 묶어 실패 격리 (JM3)
       for (const staffId of targetIds) {
-        const rows = dates.map((work_date) => ({
-          staff_id: staffId,
-          work_date,
-          status,
-          ...(isPresent
-            ? {
-                check_in_time: `${work_date}T09:00:00+09:00`,
-                check_out_time: `${work_date}T18:00:00+09:00` }
-            : {}) }));
+        const rows = dates.map((work_date) => {
+          const isSun = new Date(work_date).getDay() === 0;
+          const isPub = isKoreanPublicHoliday(work_date);
+          const isHolidayWork = isSun || isPub;
+
+          let notesVal = '';
+          if (isPresent && isHolidayWork && substituteMode) {
+            notesVal = substituteMode === 'substitute' ? '대체휴무 지급' : '휴일수당 지급';
+          }
+
+          return {
+            staff_id: staffId,
+            work_date,
+            status,
+            notes: notesVal,
+            ...(isPresent
+              ? {
+                  check_in_time: `${work_date}T09:00:00+09:00`,
+                  check_out_time: `${work_date}T18:00:00+09:00` }
+              : {})
+          };
+        });
+
         try {
           for (const row of rows) {
+            // 1. attendances 저장
             const { error } = await db
               .from('attendances')
               .upsert(row, { onConflict: 'staff_id,work_date' });
             if (error) throw error;
+
+            // 2. 대체휴무 지급 처리 (substituteMode가 'substitute'이고 공휴일 근무일 때)
+            const isSun = new Date(row.work_date).getDay() === 0;
+            const isPub = isKoreanPublicHoliday(row.work_date);
+            if (isPresent && (isSun || isPub) && substituteMode === 'substitute') {
+              const holidayName = isPub ? '공휴일' : '일요일';
+              const accrualId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+              });
+
+              await db.from('leave_accruals').insert({
+                id: accrualId,
+                staff_id: staffId,
+                kind: 'substitute',
+                period_key: row.work_date,
+                days: 1,
+                year: Number(row.work_date.slice(0, 4)) || new Date().getFullYear(),
+                source_date: row.work_date,
+                note: `${holidayName} 근무 대체휴무 +1일`,
+                created_at: new Date().toISOString()
+              });
+
+              // staff_members 의 annual_leave_total + 1
+              const { data: memberData } = await db
+                .from('staff_members')
+                .select('annual_leave_total')
+                .eq('id', staffId)
+                .single();
+              if (memberData) {
+                const currentTotal = Number(memberData.annual_leave_total) || 0;
+                await db
+                  .from('staff_members')
+                  .update({ annual_leave_total: currentTotal + 1 })
+                  .eq('id', staffId);
+              }
+            }
           }
           successCount += rows.length;
         } catch (innerErr) {
@@ -330,7 +369,55 @@ export default function AttendanceBulkEditModal({
       toast('일괄 수정 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
+      setHolidayCheckState({ isOpen: false, detectedHolidayRows: [] });
     }
+  };
+
+  const handleApply = async () => {
+    if (selectedCount === 0) {
+      toast('적용할 직원을 먼저 선택하세요.', 'warning');
+      return;
+    }
+    const blocked: string[] = ['late', 'early_leave'];
+    if (blocked.includes(status)) {
+      toast('지각/조퇴는 실제 출퇴근 기록 또는 개별 정정으로만 처리해주세요.', 'warning');
+      return;
+    }
+
+    const { start, end } = computeDateRange(rangeType, startDate, endDate);
+    const dates = enumerateDates(start, end);
+    if (dates.length === 0) {
+      toast('적용할 날짜 범위가 없습니다.', 'warning');
+      return;
+    }
+
+    const targetIds = Array.from(selectedIds);
+    const isPresent = status === 'present';
+
+    // 공휴일/일요일 출근 감지
+    if (isPresent) {
+      const holidayRows: Array<{ staffId: string; staffName: string; date: string }> = [];
+      for (const date of dates) {
+        const isSun = new Date(date).getDay() === 0;
+        const isPub = isKoreanPublicHoliday(date);
+        if (isSun || isPub) {
+          for (const staffId of targetIds) {
+            const staffName = staffs.find(s => s.id === staffId)?.name || staffId;
+            holidayRows.push({ staffId, staffName, date });
+          }
+        }
+      }
+
+      if (holidayRows.length > 0) {
+        setHolidayCheckState({
+          isOpen: true,
+          detectedHolidayRows: holidayRows
+        });
+        return;
+      }
+    }
+
+    await executeApply();
   };
 
   if (!open) return null;
@@ -576,6 +663,58 @@ export default function AttendanceBulkEditModal({
           </button>
         </div>
       </div>
+
+      {/* 공휴일 근무 대체휴무 / 휴일수당 선택 팝업 모달 */}
+      {holidayCheckState.isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="text-center space-y-2">
+              <span className="text-3xl">🗓️</span>
+              <h4 className="text-base font-bold text-foreground">공휴일/휴일 근무 감지</h4>
+              <p className="text-xs text-[var(--toss-gray-4)] leading-relaxed">
+                선택한 일정 중 일요일 또는 공휴일 근무가 감지되었습니다.
+                <br />
+                해당 근무자들에게 <strong>휴일수당</strong>을 지급하시겠습니까,
+                <br />
+                아니면 <strong>대체휴무(연차 +1일)</strong>로 적립해 주시겠습니까?
+              </p>
+            </div>
+
+            <div className="max-h-32 overflow-y-auto border border-[var(--border)] dark:border-zinc-800 rounded-xl p-3 bg-[var(--tab-bg)]/20 dark:bg-zinc-800/10 space-y-1.5 custom-scrollbar text-[11px] font-medium text-[var(--toss-gray-4)]">
+              {holidayCheckState.detectedHolidayRows.map((r, i) => (
+                <div key={i} className="flex justify-between">
+                  <span>{r.staffName}</span>
+                  <span className="font-bold text-foreground">{r.date}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => executeApply('allowance')}
+                className="px-4 py-3 bg-[var(--tab-bg)] border border-[var(--border)] text-foreground rounded-xl text-xs font-bold hover:bg-[var(--muted)]"
+              >
+                💵 휴일수당 지급
+              </button>
+              <button
+                type="button"
+                onClick={() => executeApply('substitute')}
+                className="px-4 py-3 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/10"
+              >
+                ✨ 대체휴무 지급 (+1일)
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHolidayCheckState({ isOpen: false, detectedHolidayRows: [] })}
+              className="w-full text-center text-[10.5px] font-semibold text-[var(--toss-gray-3)] hover:text-foreground pt-1"
+            >
+              선택 취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

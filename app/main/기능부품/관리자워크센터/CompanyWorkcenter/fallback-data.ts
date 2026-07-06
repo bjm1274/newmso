@@ -91,6 +91,7 @@ export const FALLBACK_PAY_RULES: RuleRow[] = [
   { label: '퇴직금', value: '1년 이상 근속 · 평균임금 30일분' },
   { label: '4대보험', value: '법정 요율 · 자동 적용' },
   { label: '원천징수 비율', value: '100%' },
+  { label: '휴무일 대체휴무 지급', value: '미지급' },
 ];
 
 export const FALLBACK_DOCS: DocRow[] = [

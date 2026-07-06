@@ -250,6 +250,16 @@ export default function CompanyPayrollTab() {
                           <option value="100">100%</option>
                           <option value="120">120%</option>
                         </select>
+                      ) : r.label === '휴무일 대체휴무 지급' ? (
+                        <select
+                          value={r.value === '지급' ? '지급' : '미지급'}
+                          onChange={(e) => handleRuleChange(idx, e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-[12px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 font-semibold"
+                          aria-label="휴무일 대체휴무 지급"
+                        >
+                          <option value="미지급">미지급 (휴일수당 지급)</option>
+                          <option value="지급">지급 (휴일수당 제외 및 대체휴무 부여)</option>
+                        </select>
                       ) : (
                         <input
                           type="text"
