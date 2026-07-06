@@ -255,6 +255,7 @@ export const board_post_reads = sqliteTable("board_post_reads", {
 (table) => [
 	index("idx_board_post_reads_user_id").on(table.user_id),
 	index("idx_board_post_reads_post_id").on(table.post_id),
+	index("idx_board_post_reads_created_at").on(table.created_at),
 ]);
 
 export const board_posts = sqliteTable("board_posts", {
@@ -1158,6 +1159,7 @@ export const message_reactions = sqliteTable("message_reactions", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_message_reactions_msg").on(table.message_id),
+	index("idx_message_reactions_created_at").on(table.created_at),
 ]);
 
 export const message_reads = sqliteTable("message_reads", {
@@ -1255,6 +1257,9 @@ export const notifications = sqliteTable("notifications", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_notifications_user_id").on(table.user_id),
+	index("idx_notifications_created_at").on(table.created_at),
+	index("idx_notifications_user_created").on(table.user_id, table.created_at),
+	index("idx_notifications_user_unread_created").on(table.user_id, table.read_at, table.created_at),
 ]);
 
 export const official_doc_log = sqliteTable("official_doc_log", {
@@ -1761,6 +1766,7 @@ export const room_read_cursors = sqliteTable("room_read_cursors", {
 	// [4차 전수조사 lib-10] (user_id, room_id) 유니크 — onConflictDoUpdate upsert의 충돌키.
 	// migration 0014에서 중복 제거 후 생성. 적용 전까지 코드의 onConflict는 동작하지 않음.
 	uniqueIndex("room_read_cursors_user_room_uq").on(table.user_id, table.room_id),
+	index("idx_room_read_cursors_last_read_at").on(table.last_read_at),
 ]);
 
 export const roster_approval_requests = sqliteTable("roster_approval_requests", {

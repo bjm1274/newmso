@@ -49,6 +49,7 @@ export function useChatAttachmentPreview() {
   const offsetRef = useRef({ x: 0, y: 0 });
   const dragRef = useRef<AttachmentDragState>(null);
   const pinchRef = useRef<PinchState>(null);
+  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const closePreview = useCallback(() => setPreview(null), []);
 
@@ -154,7 +155,14 @@ export function useChatAttachmentPreview() {
       }
     }
 
-    if (zoomRef.current <= 1) return;
+    if (zoomRef.current <= 1) {
+      // 줌 1x 상태에서 터치 단일 포인터 → 스와이프 내비게이션 감지 시작
+      if (event.pointerType === 'touch') {
+        swipeStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now() };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     dragRef.current = {
@@ -197,8 +205,26 @@ export function useChatAttachmentPreview() {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }
+      swipeStartRef.current = null;
       return;
     }
+
+    // 스와이프 내비게이션 감지 (줌 1x, 터치, 수평 60px 이상, 500ms 이내)
+    const swipeStart = swipeStartRef.current;
+    if (swipeStart && event.pointerType === 'touch' && zoomRef.current <= 1) {
+      swipeStartRef.current = null;
+      const diffX = event.clientX - swipeStart.x;
+      const diffY = event.clientY - swipeStart.y;
+      const elapsed = Date.now() - swipeStart.time;
+      if (Math.abs(diffX) > 60 && Math.abs(diffY) < 80 && elapsed < 500) {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        movePreview(diffX > 0 ? -1 : 1);
+        return;
+      }
+    }
+    swipeStartRef.current = null;
 
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -207,7 +233,7 @@ export function useChatAttachmentPreview() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-  }, []);
+  }, [movePreview]);
 
   const handleImageDoubleClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();

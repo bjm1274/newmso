@@ -36,6 +36,7 @@ export type BubbleListProps = {
   onReadDetail?: (message: ChatMessage) => void;
   onOpenThread?: (message: ChatMessage) => void;
   searchMessageId?: string | null;
+  onJumpToMessage?: (messageId: string) => void;
   pollData?: RoomPollsResult;
   pollVoting?: boolean;
   onVotePoll?: (pollId: string, optionIndex: number) => void;
@@ -61,6 +62,7 @@ export default function BubbleList({
   onReadDetail,
   onOpenThread,
   searchMessageId,
+  onJumpToMessage,
   pollData,
   pollVoting = false,
   onVotePoll }: BubbleListProps) {
@@ -163,6 +165,7 @@ export default function BubbleList({
             onOpenThread={onOpenThread}
             threadReplyCount={threadCounts[String(item.message.id)] || 0}
             searchMessageId={searchMessageId}
+            onJumpToMessage={onJumpToMessage}
           />
         );
       })}

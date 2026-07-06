@@ -107,10 +107,10 @@ function base64UrlToString(value: string) {
   return decoder.decode(base64UrlToBytes(value));
 }
 
-async function importSigningKey() {
+async function importSigningKeyWithSecret(secret: string) {
   return getCryptoApi().subtle.importKey(
     'raw',
-    encoder.encode(getSessionSecret()),
+    encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign', 'verify']
@@ -118,13 +118,13 @@ async function importSigningKey() {
 }
 
 async function signValue(value: string) {
-  const key = await importSigningKey();
+  const key = await importSigningKeyWithSecret(getSessionSecret());
   const signature = await getCryptoApi().subtle.sign('HMAC', key, encoder.encode(value));
   return bytesToBase64Url(new Uint8Array(signature));
 }
 
-async function verifySignature(value: string, signature: string) {
-  const key = await importSigningKey();
+async function verifySignatureWithSecret(value: string, signature: string, secret: string) {
+  const key = await importSigningKeyWithSecret(secret);
   return getCryptoApi().subtle.verify(
     'HMAC',
     key,
@@ -324,13 +324,13 @@ export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_
   return `${body}.${signature}`;
 }
 
-export async function verifySessionToken(token?: string | null) {
+export async function verifySessionTokenWithSecret(token: string | null | undefined, secret: string) {
   if (!token) return null;
 
   const [body, signature] = token.split('.');
   if (!body || !signature) return null;
 
-  const isValid = await verifySignature(body, signature);
+  const isValid = await verifySignatureWithSecret(body, signature, secret);
   if (!isValid) return null;
 
   try {
@@ -345,6 +345,10 @@ export async function verifySessionToken(token?: string | null) {
   } catch {
     return null;
   }
+}
+
+export async function verifySessionToken(token?: string | null) {
+  return verifySessionTokenWithSecret(token, getSessionSecret());
 }
 
 function parseCookieHeader(cookieHeader?: string | null) {

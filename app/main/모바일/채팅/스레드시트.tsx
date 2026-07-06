@@ -12,7 +12,8 @@
  * 제약: JM(단일 책임 + 500줄 이내), JM4(any 금지), JM6(button/aria).
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { db } from '@/lib/db-client';
 import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import MSheet from '../공통/MSheet';
@@ -142,13 +143,44 @@ export function ThreadSheet({
   onClose,
   onSendReply }: ThreadSheetProps) {
   const [draft, setDraft] = useState('');
+  const [replies, setReplies] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const replies = useMemo(() => {
-    if (!rootMessage) return [];
-    return messages
-      .filter((m) => String(m.reply_to_id || '') === String(rootMessage.id))
-      .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-  }, [messages, rootMessage]);
+  useEffect(() => {
+    if (!rootMessage?.id) {
+      setReplies([]);
+      return;
+    }
+
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await db
+          .from('messages')
+          .select('*')
+          .eq('reply_to_id', rootMessage.id)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: true });
+
+        if (!active) return;
+        if (error || !data) {
+          setReplies([]);
+          return;
+        }
+        setReplies(data);
+      } catch (err) {
+        console.error('[ThreadSheet] Failed to fetch replies:', err);
+        if (active) setReplies([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [rootMessage?.id, messages.length]);
 
   const participantCount = useMemo(() => {
     if (!rootMessage) return 0;
@@ -203,7 +235,11 @@ export function ThreadSheet({
               </span>
             </div>
 
-            {replies.length === 0 ? (
+            {loading ? (
+              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--z-400)', fontWeight: 500 }}>
+                답글을 불러오는 중...
+              </div>
+            ) : replies.length === 0 ? (
               <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--z-400)', fontWeight: 500 }}>
                 아직 답글이 없습니다. 첫 답글을 남겨보세요.
               </div>

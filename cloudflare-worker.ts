@@ -2,6 +2,17 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore generated at build time
 import { default as handler } from './.open-next/worker.js';
+import { verifySessionTokenWithSecret, SESSION_COOKIE_NAME } from './lib/server-session';
+
+function parseCookies(cookieHeader?: string | null): Record<string, string> {
+  if (!cookieHeader) return {};
+  return cookieHeader.split(';').reduce<Record<string, string>>((acc, part) => {
+    const [name, ...value] = part.trim().split('=');
+    if (!name) return acc;
+    acc[name] = decodeURIComponent(value.join('='));
+    return acc;
+  }, {});
+}
 
 type OpenNextHandler = {
   fetch: (request: Request, env: WorkerEnv, context: WorkerExecutionContext) => Promise<Response> | Response;
@@ -71,7 +82,43 @@ async function callCronRoute(
 
 const worker = {
   // OpenNext 가 생성한 fetch 핸들러로 위임 (this 바인딩 보존을 위해 래핑 호출).
-  fetch(request: Request, env: WorkerEnv, context: WorkerExecutionContext) {
+  async fetch(request: Request, env: WorkerEnv, context: WorkerExecutionContext) {
+    const url = new URL(request.url);
+    if (url.pathname === '/api/realtime/ws') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected Upgrade: websocket', { status: 426 });
+      }
+
+      const cookies = parseCookies(request.headers.get('Cookie'));
+      const token = cookies[SESSION_COOKIE_NAME];
+      const secret = String(env.SESSION_SECRET || 'dev-only-session-secret-change-this').trim();
+
+      const session = await verifySessionTokenWithSecret(token, secret);
+      if (!session || !session.user || !session.user.id) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+
+      const userId = String(session.user.id);
+      const userName = String(session.user.name || '알 수 없음');
+
+      const hub = env.REALTIME_HUB as any;
+      if (!hub) {
+        return new Response('REALTIME_HUB DurableObject binding not found', { status: 500 });
+      }
+
+      const doId = hub.idFromName('pchos-realtime-v1');
+      const stub = hub.get(doId);
+
+      const newHeaders = new Headers(request.headers);
+      newHeaders.set('x-realtime-user-id', userId);
+      newHeaders.set('x-realtime-user-name', userName);
+
+      const doRequest = new Request(request, {
+        headers: newHeaders,
+      });
+
+      return stub.fetch(doRequest);
+    }
     return openNextHandler.fetch(request, env, context);
   },
 
@@ -108,4 +155,5 @@ const worker = {
   },
 };
 
+export { RealtimeHub } from './lib/realtime/realtime-hub';
 export default worker;

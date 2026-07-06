@@ -221,6 +221,9 @@ type UseChatMessagesResult = {
   appendOptimistic: (msg: ChatMessage) => void;
   /** Optimistic UI: tempId를 가진 메시지를 서버 응답으로 교체 */
   replaceOptimistic: (tempId: string, real: ChatMessage) => void;
+  jumpToMessage: (messageId: string) => Promise<void>;
+  searchMessageId: string | null;
+  setSearchMessageId: (id: string | null) => void;
 };
 
 type RoomReadCursorRow = {
@@ -464,6 +467,70 @@ export function useChatMessagesForRoom(
     })();
   }, [roomId, userId, messages.length]);
 
+  const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
+
+  const jumpToMessage = useCallback(async (messageId: string) => {
+    const currentRoomId = roomIdRef.current;
+    if (!currentRoomId || !messageId) return;
+
+    try {
+      setLoading(true);
+      const { data: targetRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
+        ({ selectClause }) =>
+          db
+            .from('messages')
+            .select(selectClause)
+            .eq('id', messageId)
+            .limit(1) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
+      );
+      const targetMessage = Array.isArray(targetRows) ? targetRows[0] : null;
+      if (!targetMessage || !targetMessage.created_at) return;
+
+      const targetTime = targetMessage.created_at;
+
+      const { data: beforeRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
+        ({ selectClause }) =>
+          db
+            .from('messages')
+            .select(selectClause)
+            .eq('room_id', currentRoomId)
+            .eq('is_deleted', false)
+            .lte('created_at', targetTime)
+            .order('created_at', { ascending: false })
+            .limit(50) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
+      );
+
+      const { data: afterRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
+        ({ selectClause }) =>
+          db
+            .from('messages')
+            .select(selectClause)
+            .eq('room_id', currentRoomId)
+            .eq('is_deleted', false)
+            .gt('created_at', targetTime)
+            .order('created_at', { ascending: true })
+            .limit(50) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
+      );
+
+      const beforeList = Array.isArray(beforeRows) ? [...beforeRows].reverse() : [];
+      const afterList = Array.isArray(afterRows) ? afterRows : [];
+      const merged = [...beforeList, ...afterList];
+
+      const withReactions = await fetchAndMergeReactions(merged);
+      setMessages(withReactions);
+      setHasMore(beforeList.length >= 50);
+      oldestRef.current = withReactions.length > 0
+        ? (withReactions[0].created_at as string | null) || null
+        : null;
+
+      setSearchMessageId(messageId);
+    } catch (err) {
+      console.error('[jumpToMessage] Failed to jump:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchAndMergeReactions]);
+
   const appendOptimistic = useCallback((msg: ChatMessage) => {
     setMessages((prev) => {
       if (prev.some((m) => String(m.id) === String(msg.id))) return prev;
@@ -485,7 +552,19 @@ export function useChatMessagesForRoom(
     });
   }, []);
 
-  return { messages, loading, loadingOlder, hasMore, refresh, loadOlder, appendOptimistic, replaceOptimistic };
+  return {
+    messages,
+    loading,
+    loadingOlder,
+    hasMore,
+    refresh,
+    loadOlder,
+    appendOptimistic,
+    replaceOptimistic,
+    jumpToMessage,
+    searchMessageId,
+    setSearchMessageId
+  };
 }
 
 // ─────────────────────────────────────────────

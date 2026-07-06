@@ -265,10 +265,20 @@ export default function SalarySettlement({
     }
   };
 
-  const getSavedDeductionDetail = (savedRecord?: SavedPayrollRecord | null): Record<string, any> =>
-    savedRecord?.deduction_detail && typeof savedRecord.deduction_detail === 'object'
-      ? (savedRecord.deduction_detail as Record<string, any>)
-      : {};
+  const getSavedDeductionDetail = (savedRecord?: SavedPayrollRecord | null): Record<string, any> => {
+    if (!savedRecord?.deduction_detail) return {};
+    if (typeof savedRecord.deduction_detail === 'object') {
+      return savedRecord.deduction_detail as Record<string, any>;
+    }
+    if (typeof savedRecord.deduction_detail === 'string') {
+      try {
+        return JSON.parse(savedRecord.deduction_detail);
+      } catch (e) {
+        console.error('Failed to parse deduction_detail:', e);
+      }
+    }
+    return {};
+  };
 
   const buildSettlementEntry = (
     staff: StaffMember,
@@ -282,6 +292,18 @@ export default function SalarySettlement({
     const savedRecord = savedRecordsByStaff[String(staff.id)];
     const staffSalaryChanges = salaryChangeMap[String(staff.id)] || [];
     const savedDeductionDetail = getSavedDeductionDetail(savedRecord);
+    let resolvedAttendanceDeductionDetail: any = { ...attendanceDetail, original_deduction: attendanceDeduction };
+    if (savedRecord?.attendance_deduction_detail) {
+      if (typeof savedRecord.attendance_deduction_detail === 'object') {
+        resolvedAttendanceDeductionDetail = savedRecord.attendance_deduction_detail as any;
+      } else if (typeof savedRecord.attendance_deduction_detail === 'string') {
+        try {
+          resolvedAttendanceDeductionDetail = JSON.parse(savedRecord.attendance_deduction_detail);
+        } catch (e) {
+          console.error('Failed to parse attendance_deduction_detail:', e);
+        }
+      }
+    }
     const salaryChangeProration: SalaryChangeProrationSummary[] = [];
     const resolveAmount = (field: SalaryAmountField, savedValue: unknown, fallback: unknown) => {
       const result = resolveSalaryAmountForSettlement({
@@ -414,10 +436,7 @@ export default function SalarySettlement({
       apply_tax: (staff.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
       apply_insurance: hasAnyEmployeePayrollInsurance(getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth))),
       attendance_deduction: Number(savedRecord?.attendance_deduction ?? attendanceDeduction) || 0,
-      attendance_deduction_detail:
-        savedRecord?.attendance_deduction_detail && typeof savedRecord.attendance_deduction_detail === 'object'
-          ? savedRecord.attendance_deduction_detail
-          : { ...attendanceDetail, original_deduction: attendanceDeduction },
+      attendance_deduction_detail: resolvedAttendanceDeductionDetail,
       custom_deduction: Number(savedDeductionDetail.custom_deduction || 0) || 0,
       dependent_count:
         Number(
@@ -704,7 +723,8 @@ export default function SalarySettlement({
                           // holidayHours에 실근무시간 전체를 넣되 over8 식별자를 포함한다.
                           // → 가장 안전한 방법: holidayHours에 실근무시간 전체(소수 포함)를 넣는다.
                           //   buildSettlementEntry에서 min(8,x)*1.5 + max(0,x-8)*2.0 로 분기.
-                          staffAutoAllowances[staffId].holidayHours += actualWorkHours;
+                          // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 휴일근무 시간 합산 제거]
+                          // staffAutoAllowances[staffId].holidayHours += actualWorkHours;
                         }
                         // 휴일이면 overtimeMins에 추가하지 않음(중복 가산 방지 — C-11).
                       }
@@ -732,7 +752,8 @@ export default function SalarySettlement({
                             const otMins = Math.round((actualCheckOut.getTime() - scheduledEnd.getTime()) / 60000);
                             if (otMins >= 10) { // 10분 이상 지체 근로만 연장 인정
                               if (staffAutoAllowances[staffId]) {
-                                staffAutoAllowances[staffId].overtimeMins += otMins;
+                                // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 평일 연장시간 합산 제거]
+                                // staffAutoAllowances[staffId].overtimeMins += otMins;
                               }
                             }
                           }
@@ -775,7 +796,8 @@ export default function SalarySettlement({
                             }
                           }
 
-                          staffAutoAllowances[staffId].nightWorkMins += nightMins;
+                          // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 야간 시간 합산 제거]
+                          // staffAutoAllowances[staffId].nightWorkMins += nightMins;
                         }
                       }
                     }
@@ -807,6 +829,47 @@ export default function SalarySettlement({
       } catch {
         // shift_assignments is optional for divisor improvements.
       }
+
+      // ─── 승인된 전자결재(연장근무 신청) 반영 로직 추가 ───
+      try {
+        const { data: approvals, error: approvalsError } = await db
+          .from('approvals')
+          .select('id, sender_id, type, title, status, meta_data, created_at')
+          .eq('status', '승인')
+          .in('sender_id', staffIds);
+
+        if (approvalsError) {
+          console.error('Approvals query failed:', approvalsError);
+        } else if (approvals && Array.isArray(approvals)) {
+          approvals.forEach((app) => {
+            let meta: any = null;
+            try {
+              meta = typeof app.meta_data === 'string' ? JSON.parse(app.meta_data) : app.meta_data;
+            } catch (e) {
+              return;
+            }
+
+            if (meta?.form_slug === 'overtime' || app.type === '연장근무') {
+              const senderId = String(app.sender_id || '');
+              const items = Array.isArray(meta?.items) ? meta.items : [];
+
+              items.forEach((item: any) => {
+                const itemDate = item?.date;
+                // 해당 연장근무 신청일이 이번 정산 기간(startDate ~ endDate)에 들어가는지 확인
+                if (itemDate && itemDate >= startDate && itemDate <= endDate) {
+                  const mins = Number(item?.minutes || 0);
+                  if (mins > 0 && staffAutoAllowances[senderId]) {
+                    staffAutoAllowances[senderId].overtimeMins += mins;
+                  }
+                }
+              });
+            }
+          });
+        }
+      } catch (otApprovalErr) {
+        console.error('Failed to parse overtime approvals:', otApprovalErr);
+      }
+      // ─── 승인된 전자결재 반영 로직 끝 ───
 
       // ruleCompany is already declared above
       const { data: rule, error: ruleError } = await db

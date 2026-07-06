@@ -48,6 +48,7 @@ export type MessageBubbleProps = {
   threadReplyCount?: number;
   /** 검색을 통해 이동한 메시지인지 여부 (강조 및 스크롤용) */
   searchMessageId?: string | null;
+  onJumpToMessage?: (messageId: string) => void;
 };
 
 const IMAGE_KINDS = new Set(['image']);
@@ -93,7 +94,8 @@ export default function MessageBubble({
   onReadDetail,
   onOpenThread,
   threadReplyCount = 0,
-  searchMessageId }: MessageBubbleProps) {
+  searchMessageId,
+  onJumpToMessage }: MessageBubbleProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [swiping, setSwiping] = useState(false);
   const [highlighted, setHighlighted] = useState(false);
@@ -278,20 +280,38 @@ export default function MessageBubble({
                 flexShrink: 1,
                 boxShadow: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? undefined : '0 4px 12px rgba(0, 0, 0, 0.05)' }}
             >
-              {replyTarget && (
-                <div style={{
-                  background: (mine ? 'rgba(255, 255, 255, 0.15)' : 'var(--m-reply-bg)') as React.CSSProperties['background'],
-                  borderRadius: 8,
-                  padding: '6px 10px',
-                  fontSize: 12,
-                  borderLeft: `3px solid ${mine ? 'rgba(255, 255, 255, 0.8)' : '#007AFF'}`,
-                  color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
-                  marginBottom: 8 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : '#007AFF' }}>
-                    {replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장
+              {(replyTarget || message.reply_to_id) && (
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (message.reply_to_id) {
+                      onJumpToMessage?.(String(message.reply_to_id));
+                    }
+                  }}
+                  style={{
+                    background: (mine ? 'rgba(255, 255, 255, 0.15)' : 'var(--m-reply-bg)') as React.CSSProperties['background'],
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    borderLeft: `3px solid ${mine ? 'rgba(255, 255, 255, 0.8)' : '#007AFF'}`,
+                    color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
+                    marginBottom: 8,
+                    cursor: 'pointer' }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : '#007AFF', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {replyTarget ? (
+                      `${replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장`
+                    ) : (
+                      '이전 대화 답글'
+                    )}
+                    <span style={{ fontSize: 10, opacity: 0.7 }}>(원문 보기)</span>
                   </div>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9 }}>
-                    {typeof replyTarget.content === 'string' && replyTarget.content ? replyTarget.content : (replyTarget.file_name ? '첨부파일' : '(내용 없음)')}
+                    {replyTarget ? (
+                      typeof replyTarget.content === 'string' && replyTarget.content ? replyTarget.content : (replyTarget.file_name ? '첨부파일' : '(내용 없음)')
+                    ) : (
+                      '원문 메시지로 이동하려면 클릭하세요.'
+                    )}
                   </div>
                 </div>
               )}

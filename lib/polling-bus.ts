@@ -53,14 +53,15 @@ let lastActivityTime = typeof Date !== 'undefined' ? Date.now() : 0;
 let idleCheckTimer: ReturnType<typeof setInterval> | null = null;
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분
 
-// SSE 상태 관리
-let sseSource: EventSource | null = null;
-let sseErrorCount = 0;
-const MAX_SSE_ERRORS = 3;
-const useSSE = true;
+// WS 상태 관리
+let ws: WebSocket | null = null;
+let wsErrorCount = 0;
+let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let wsPingTimer: ReturnType<typeof setInterval> | null = null;
+let wsActive = false;
 let sseSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Cross-Tab Leader Election & Self-Healing SSE
+// Cross-Tab Leader Election
 const myTabId = typeof window !== 'undefined'
   ? (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID().substring(0, 8)
@@ -68,8 +69,6 @@ const myTabId = typeof window !== 'undefined'
   : 'server';
 const activeTabs = new Map<string, { lastSeen: number; tables: string[] }>();
 let isLeader = typeof window === 'undefined'; // Default to true on server, elected on client
-let sseActive = false;
-let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 const bc = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
   ? new BroadcastChannel('newmso-realtime-bus')
@@ -111,6 +110,12 @@ if (typeof window !== 'undefined') {
         if (!isLeader) {
           for (const entry of channelRegistry.values()) {
             processTailData(entry, msg.tail);
+          }
+        }
+      } else if (msg.type === 'change_ws') {
+        if (!isLeader) {
+          for (const entry of channelRegistry.values()) {
+            processTailDataWebSocket(entry, msg.channels);
           }
         }
       } else if (msg.type === 'initial') {
@@ -243,6 +248,35 @@ function processTailData(entry: ChannelEntry, tail: Record<string, string | null
   }
 }
 
+function processTailDataWebSocket(entry: ChannelEntry, changedChannels: string[]) {
+  const changed: TableFilter[] = [];
+  for (const tableFilter of entry.tables) {
+    const key = tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
+    if (changedChannels.includes(key) || changedChannels.includes(tableFilter.table)) {
+      changed.push(tableFilter);
+    }
+  }
+
+  if (changed.length === 0) return;
+  const payloads = changed.map((t) => ({ table: t.table }));
+  for (const cb of entry.singleCallbacks) {
+    try {
+      cb(payloads[payloads.length - 1]);
+    } catch (err) {
+      logger.warn('[polling-bus] single callback error', err);
+    }
+  }
+  if (entry.batchCallbacks.size > 0) {
+    for (const cb of entry.batchCallbacks) {
+      try {
+        cb(payloads);
+      } catch (err) {
+        logger.warn('[polling-bus] batch callback error', err);
+      }
+    }
+  }
+}
+
 async function pollOnce(entry: ChannelEntry): Promise<void> {
   if (entry.inFlight) return;
   if (isSuspended()) return;
@@ -275,176 +309,164 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
 function syncRealtimeConnections() {
   if (typeof window === 'undefined') return;
 
-  // SSE 동기화 예약 (디바운스 적용)
   if (sseSyncDebounceTimer) clearTimeout(sseSyncDebounceTimer);
   sseSyncDebounceTimer = setTimeout(() => {
-    syncSSEConnectionInternal();
+    syncWebSocketConnectionInternal();
   }, 100);
 
-  // 폴링 타이머 동기화
   syncPollingIntervalsInternal();
 }
 
-function syncSSEConnectionInternal() {
-  if (sseReconnectTimer) {
-    clearTimeout(sseReconnectTimer);
-    sseReconnectTimer = null;
+function syncWebSocketConnectionInternal() {
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = null;
   }
 
-  if (!useSSE || typeof window === 'undefined') {
-    if (sseSource) {
-      sseSource.close();
-      sseSource = null;
+  if (!isLeader || isSuspended()) {
+    if (ws) {
+      logger.debug(`[polling-bus] Closing WebSocket (isLeader: ${isLeader}, isSuspended: ${isSuspended()})`);
+      closeWebSocket();
     }
     return;
   }
 
-  // If not the leader, close EventSource connection
-  if (!isLeader) {
-    if (sseSource) {
-      logger.debug(`[polling-bus] Tab ${myTabId} (follower) closing EventSource connection`);
-      sseSource.close();
-      sseSource = null;
-    }
-    return;
-  }
-
-  // 중단 상태인 경우 SSE 닫기
-  if (isSuspended()) {
-    if (sseSource) {
-      logger.debug('[polling-bus] Suspended state: Closing EventSource connection');
-      sseSource.close();
-      sseSource = null;
-    }
-    return;
-  }
-
-  // 현재 구독된 고유 테이블 목록 추출 (본인 탭 + 타 탭)
-  const tables = new Set<string>();
+  const channels = new Set<string>();
   for (const entry of channelRegistry.values()) {
     for (const t of entry.tables) {
-      tables.add(t.table);
+      const canonicalKey = t.table + (t.filter ? `:${t.filter}` : '');
+      channels.add(canonicalKey);
     }
   }
   activeTabs.forEach((info) => {
-    info.tables.forEach((t) => tables.add(t));
+    info.tables.forEach((t) => channels.add(t));
   });
 
-  if (tables.size === 0) {
-    if (sseSource) {
-      sseSource.close();
-      sseSource = null;
+  if (channels.size === 0) {
+    if (ws) {
+      closeWebSocket();
     }
     return;
   }
 
-  const tableList = Array.from(tables).sort().join(',');
-  const targetUrl = `/api/realtime/stream?tables=${encodeURIComponent(tableList)}`;
+  const channelList = Array.from(channels).sort();
 
-  // 이미 연결되어 있고 대상 테이블 목록이 변경되지 않았으면 유지
-  if (sseSource) {
-    try {
-      const currentUrl = new URL(sseSource.url, window.location.href);
-      const currentTables = currentUrl.searchParams.get('tables');
-      if (currentTables === tableList) {
-        return;
-      }
-    } catch {
-      // ignore parsing error
-    }
-    logger.debug('[polling-bus] Subscribed tables changed, reconnecting EventSource');
-    sseSource.close();
-    sseSource = null;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'subscribe',
+      channels: channelList
+    }));
+    return;
+  }
+
+  if (ws && ws.readyState === WebSocket.CONNECTING) {
+    return;
   }
 
   try {
-    logger.debug(`[polling-bus] Connecting EventSource to ${targetUrl}`);
-    sseSource = new EventSource(targetUrl, { withCredentials: true });
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const targetUrl = `${protocol}//${window.location.host}/api/realtime/ws`;
+    logger.debug(`[polling-bus] Connecting WebSocket to ${targetUrl}`);
 
-    sseSource.addEventListener('initial', (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data) as { tail: Record<string, string | null> };
-        logger.debug('[polling-bus] SSE initial payload received:', payload);
-        // 채널들에 초기 상태 시드값 주입 (false positive 방지용)
-        for (const entry of channelRegistry.values()) {
-          for (const tableFilter of entry.tables) {
-            const next = payload.tail[tableFilter.table] ?? null;
-            if (entry.lastSeen[tableFilter.table] === undefined) {
-              entry.lastSeen[tableFilter.table] = next;
-            }
-          }
-        }
-        
-        // 타 탭으로 브로드캐스트
-        if (bc) {
-          bc.postMessage({ type: 'initial', tail: payload.tail });
-        }
-        
-        sseErrorCount = 0; // 에러 카운터 리셋
-        sseActive = true;
-        syncPollingIntervalsInternal();
-      } catch (err) {
-        logger.warn('[polling-bus] Failed to parse initial payload', err);
-      }
-    });
+    ws = new WebSocket(targetUrl);
 
-    sseSource.addEventListener('change', (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data) as { tail: Record<string, string | null> };
-        // 변경 감지된 테이블들에 대해 콜백 처리 호출
-        for (const entry of channelRegistry.values()) {
-          processTailData(entry, payload.tail);
-        }
-        
-        // 타 탭으로 브로드캐스트
-        if (bc) {
-          bc.postMessage({ type: 'change', tail: payload.tail });
-        }
-        
-        sseErrorCount = 0; // 에러 카운터 리셋
-        sseActive = true;
-      } catch (err) {
-        logger.warn('[polling-bus] Failed to parse change payload', err);
-      }
-    });
-
-    sseSource.onerror = (e) => {
-      logger.warn('[polling-bus] EventSource error occurred', e);
-      sseErrorCount++;
-      sseActive = false;
-      if (sseSource) {
-        sseSource.close();
-        sseSource = null;
-      }
-      
-      // 즉시 폴링 타이머 활성화 (백업)
+    ws.onopen = () => {
+      logger.debug('[polling-bus] WebSocket connected');
+      wsErrorCount = 0;
+      wsActive = true;
       syncPollingIntervalsInternal();
 
-      // 지수 백오프로 재연결 시도
-      const delay = Math.min(30000, 1000 * Math.pow(2, sseErrorCount));
-      logger.debug(`[polling-bus] Retrying EventSource in ${delay}ms`);
-      if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
-      sseReconnectTimer = setTimeout(() => {
-        syncRealtimeConnections();
-      }, delay);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'subscribe',
+          channels: channelList
+        }));
+      }
+
+      if (wsPingTimer) clearInterval(wsPingTimer);
+      wsPingTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping', at: Date.now() }));
+        }
+      }, 30000);
     };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'change') {
+          for (const entry of channelRegistry.values()) {
+            processTailDataWebSocket(entry, data.channels);
+          }
+          if (bc) {
+            bc.postMessage({ type: 'change_ws', channels: data.channels });
+          }
+        } else if (data.type === 'typing') {
+          // 타이핑 상태 변경 이벤트를 커스텀 이벤트나 콜백으로 브로드캐스트할 수 있게 custom event 발행
+          if (typeof window !== 'undefined') {
+            const ev = new CustomEvent('realtime-typing', { detail: data });
+            window.dispatchEvent(ev);
+          }
+        }
+      } catch (err) {
+        logger.warn('[polling-bus] Failed to parse WebSocket message', err);
+      }
+    };
+
+    ws.onclose = (event) => {
+      logger.debug(`[polling-bus] WebSocket closed: ${event.code} ${event.reason}`);
+      wsActive = false;
+      cleanupWebSocketState();
+      syncPollingIntervalsInternal();
+      
+      if (!isSuspended() && isLeader) {
+        wsErrorCount++;
+        const delay = Math.min(30000, 1000 * Math.pow(2, wsErrorCount));
+        logger.debug(`[polling-bus] Retrying WebSocket connection in ${delay}ms`);
+        wsReconnectTimer = setTimeout(() => {
+          syncRealtimeConnections();
+        }, delay);
+      }
+    };
+
+    ws.onerror = (err) => {
+      logger.warn('[polling-bus] WebSocket error occurred', err);
+    };
+
   } catch (err) {
-    logger.error('[polling-bus] EventSource initialization failed', err);
-    sseActive = false;
+    logger.error('[polling-bus] WebSocket initialization failed', err);
+    wsActive = false;
+    cleanupWebSocketState();
     syncPollingIntervalsInternal();
+  }
+}
+
+function closeWebSocket() {
+  if (ws) {
+    try {
+      ws.close();
+    } catch {}
+    ws = null;
+  }
+  wsActive = false;
+  cleanupWebSocketState();
+}
+
+function cleanupWebSocketState() {
+  if (wsPingTimer) {
+    clearInterval(wsPingTimer);
+    wsPingTimer = null;
   }
 }
 
 function syncPollingIntervalsInternal() {
   for (const entry of channelRegistry.values()) {
-    // 리더가 아니거나, SSE가 활성화되어 있거나, 화면/사용자가 비활성(Suspended)인 경우 폴링 타이머 중단
-    if (!isLeader || sseActive || isSuspended()) {
+    if (!isLeader || wsActive || isSuspended()) {
       if (entry.timer) {
         clearInterval(entry.timer);
         entry.timer = null;
       }
     } else {
-      // 일반 폴링 모드로 동작해야 함 (리더이고, SSE가 꺼져있을 때만)
       if (!entry.timer) {
         entry.timer = setInterval(() => void pollOnce(entry), entry.pollIntervalMs);
       }
@@ -479,11 +501,11 @@ function getOrCreateEntry(
 
   channelRegistry.set(channelKey, entry);
 
-  // SSE 연결 업데이트 또는 폴링 시작
+  // WS 연결 업데이트 또는 폴링 시작
   syncRealtimeConnections();
 
   // 최초 1회 즉시 호출하여 초기 데이터 baseline 획득
-  if (!useSSE && !isSuspended()) {
+  if (!wsActive && !isSuspended()) {
     void pollOnce(entry);
   }
 
@@ -515,7 +537,11 @@ export function subscribeRealtime(
   callback: RealtimeCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = options?.pollIntervalMs ?? 15000;
+  const isDev = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const minInterval = isDev ? 1000 : 30000;
+  const interval = Math.max(options?.pollIntervalMs ?? 15000, minInterval);
+
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.singleCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.singleCallbacks.delete(callback));
@@ -527,15 +553,33 @@ export function subscribeRealtimeBatched(
   callback: RealtimeBatchCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = options?.pollIntervalMs ?? 15000;
+  const isDev = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const minInterval = isDev ? 1000 : 30000;
+  const interval = Math.max(options?.pollIntervalMs ?? 15000, minInterval);
+
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.batchCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.batchCallbacks.delete(callback));
 }
 
-// 본인이 변경을 발생시켰을 때 즉시 동기화
 export function pokeChannel(channelKey: string): void {
   const entry = channelRegistry.get(channelKey);
-  if (!entry || entry.inFlight) return;
-  void pollOnce(entry);
+  if (!entry) return;
+
+  const changedChannels = [channelKey];
+  entry.tables.forEach(t => {
+    changedChannels.push(t.table);
+    changedChannels.push(t.table + (t.filter ? `:${t.filter}` : ''));
+  });
+  processTailDataWebSocket(entry, changedChannels);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'signal',
+      channels: Array.from(new Set(changedChannels))
+    }));
+  } else if (!entry.inFlight) {
+    void pollOnce(entry);
+  }
 }

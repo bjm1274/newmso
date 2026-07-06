@@ -54,7 +54,7 @@ function AttachmentFilePreview({ file, onRemove }: AttachmentFilePreviewProps) {
               type="button"
               onClick={onRemove}
               aria-label={`${displayName} 제거`}
-              className="absolute top-0.5 right-0.5 min-h-[20px] min-w-[20px] bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
+              className="absolute -top-1.5 -right-1.5 min-h-[28px] min-w-[28px] bg-black/60 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-red-600 transition-colors"
             >
               ✕
             </button>
@@ -77,7 +77,7 @@ function AttachmentFilePreview({ file, onRemove }: AttachmentFilePreviewProps) {
           type="button"
           onClick={onRemove}
           aria-label={`${displayName} 제거`}
-          className="min-h-[20px] min-w-[20px] flex items-center justify-center text-[var(--toss-gray-3)] hover:text-red-500 text-[11px] font-bold"
+          className="min-h-[28px] min-w-[28px] flex items-center justify-center text-[var(--toss-gray-3)] hover:text-red-500 text-[11px] font-bold"
         >
           ✕
         </button>
@@ -208,7 +208,7 @@ function MessengerComposerImpl({
   useEffect(() => {
     const composerEl = composerRef.current;
     if (!composerEl) return;
-    const maxHeight = isMobileChatViewport() ? 44 : 72;
+    const maxHeight = isMobileChatViewport() ? 72 : 72;
     composerEl.style.height = 'auto';
     composerEl.style.height = `${Math.min(maxHeight, composerEl.scrollHeight)}px`;
     composerEl.style.overflowY = composerEl.scrollHeight > maxHeight ? 'auto' : 'hidden';
@@ -350,7 +350,7 @@ function MessengerComposerImpl({
                 <button type="button"
                   onClick={() => onRemoveAlbumFile(index)}
                   aria-label={`앨범 미리보기 ${index + 1} 제거`}
-                  className="absolute top-0.5 right-0.5 min-h-[24px] min-w-[24px] bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] font-bold hover:bg-red-600 transition-colors"
+                  className="absolute -top-1.5 -right-1.5 min-h-[28px] min-w-[28px] bg-black/60 rounded-full flex items-center justify-center text-white text-[10px] font-bold hover:bg-red-600 transition-colors"
                 >
                   ✕
                 </button>

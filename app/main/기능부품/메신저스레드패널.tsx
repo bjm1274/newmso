@@ -41,8 +41,8 @@ export function ThreadPanel({
 
   return (
     <>
-      <div className="absolute inset-0 bg-black/10 z-40" aria-hidden="true" />
-      <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="absolute inset-0 bg-black/10 z-40 max-md:hidden" aria-hidden="true" />
+      <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-[var(--card)] md:border-l border-[var(--border)] shadow-sm z-50 flex flex-col animate-in slide-in-from-right duration-300">
         <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <div className="min-w-0 space-y-2">
             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">스레드</p>

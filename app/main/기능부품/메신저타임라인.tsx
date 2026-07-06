@@ -704,6 +704,15 @@ function MessengerTimelineComponent({
                               }
 
                               if (isMobile) {
+                                // 답글 프리뷰·링크·버튼 등 내부 인터랙티브 요소를 탭한 경우 컨텍스트 메뉴 열지 않음
+                                const targetEl = event.target as HTMLElement;
+                                if (
+                                  targetEl.closest('[data-testid^="chat-reply-preview-"]') ||
+                                  targetEl.closest('a') ||
+                                  targetEl.closest('button')
+                                ) {
+                                  return;
+                                }
                                 const customEvent = new MouseEvent('contextmenu', {
                                   bubbles: true,
                                   cancelable: true,
@@ -765,7 +774,7 @@ function MessengerTimelineComponent({
                                   ? 'bg-[var(--toss-blue-light)] border-[var(--accent)]/30 text-[var(--foreground)] shadow-sm'
                                   : 'bg-white/10 border-white/40 text-white/90'
                                 : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]';
-                              return parent ? (
+                              return (
                                 <div
                                   data-testid={`chat-reply-preview-${msg.id}`}
                                   className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${replyPreviewClass}`}
@@ -774,21 +783,27 @@ function MessengerTimelineComponent({
                                     onScrollToMessage(msg.reply_to_id!);
                                   }}
                                 >
-                                  <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
-                                  <span className="truncate block mt-0.5">
-                                    {renderWithInlineEmoticons(
-                                      getMessageDisplayText(
-                                        parent.content,
-                                        parent.file_name,
-                                        parent.file_url,
-                                        '첨부 파일'
-                                      ),
-                                      false,
-                                      ''
-                                    )}
-                                  </span>
+                                  {parent ? (
+                                    <>
+                                      <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
+                                      <span className="truncate block mt-0.5">
+                                        {renderWithInlineEmoticons(
+                                          getMessageDisplayText(
+                                            parent.content,
+                                            parent.file_name,
+                                            parent.file_url,
+                                            '첨부 파일'
+                                          ),
+                                          false,
+                                          ''
+                                        )}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="opacity-60 italic">이전 메시지 보기 ↑</span>
+                                  )}
                                 </div>
-                              ) : null;
+                              );
                             })()}
                             <div className={`leading-relaxed ${msg.content && !isDeletedMessage ? 'mb-0.5' : ''}`}>
                               {isDeletedMessage ? getDeletedMessagePreviewText() : renderMessageContent(msg.content || '', isMine, activeMessageHighlightQuery)}

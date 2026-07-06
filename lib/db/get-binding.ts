@@ -14,6 +14,7 @@ declare global {
   interface CloudflareEnv {
     DB?: D1Database;
     DATA_BACKEND?: string;
+    REALTIME_HUB?: any;
   }
 }
 

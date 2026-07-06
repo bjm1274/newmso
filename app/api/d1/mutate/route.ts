@@ -18,6 +18,107 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { sql, getTableColumns, type SQL } from 'drizzle-orm';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
+
+async function triggerMutationSignal(payload: Payload, allResults?: Record<string, unknown>[]) {
+  try {
+    const table = payload.table;
+    const channels = new Set<string>();
+
+    if (table === 'messages') {
+      channels.add('messages');
+      channels.add('chat_rooms');
+      
+      const rowIds = new Set<string>();
+      if (allResults) {
+        allResults.forEach(r => {
+          if (r.room_id) rowIds.add(String(r.room_id));
+        });
+      }
+      if (rowIds.size === 0 && payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.room_id) rowIds.add(String(v.room_id));
+        });
+      }
+      if (rowIds.size === 0 && payload.op === 'update') {
+        payload.where.forEach(w => {
+          if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
+        });
+        if (payload.set.room_id) rowIds.add(String(payload.set.room_id));
+      }
+      rowIds.forEach(rid => {
+        channels.add(`messages:room_id=eq.${rid}`);
+      });
+    } else if (table === 'chat_rooms') {
+      channels.add('chat_rooms');
+    } else if (table === 'room_read_cursors') {
+      channels.add('room_read_cursors');
+      channels.add('chat_rooms');
+      const rowIds = new Set<string>();
+      if (allResults) {
+        allResults.forEach(r => {
+          if (r.room_id) rowIds.add(String(r.room_id));
+        });
+      }
+      if (payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.room_id) rowIds.add(String(v.room_id));
+        });
+      }
+      if (payload.op === 'update') {
+        payload.where.forEach(w => {
+          if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
+        });
+        if (payload.set.room_id) rowIds.add(String(payload.set.room_id));
+      }
+      rowIds.forEach(rid => {
+        channels.add(`room_read_cursors:room_id=eq.${rid}`);
+      });
+    } else if (table === 'message_reactions') {
+      channels.add('message_reactions');
+      const rowIds = new Set<string>();
+      if (payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.room_id) rowIds.add(String(v.room_id));
+        });
+      }
+      rowIds.forEach(rid => {
+        channels.add(`messages:room_id=eq.${rid}`);
+      });
+    } else if (table === 'notifications') {
+      channels.add('notifications');
+      const userIds = new Set<string>();
+      if (payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.user_id) userIds.add(String(v.user_id));
+        });
+      }
+      userIds.forEach(uid => {
+        channels.add(`notifications:user_id=eq.${uid}`);
+      });
+    } else if (table === 'message_bookmarks') {
+      channels.add('message_bookmarks');
+    } else if (table === 'pinned_messages') {
+      channels.add('pinned_messages');
+    } else if (table === 'polls') {
+      channels.add('polls');
+    } else if (table === 'poll_votes') {
+      channels.add('poll_votes');
+    } else {
+      channels.add(table);
+    }
+
+    if (channels.size > 0) {
+      await emitRealtimeSignal({
+        channels: Array.from(channels),
+        source: `mutate-${payload.op}-${table}`,
+      });
+    }
+  } catch (err) {
+    console.error('[triggerMutationSignal] Failed to send realtime signal:', err);
+  }
+}
+
 import {
   getD1Binding,
   getD1Drizzle,
@@ -442,6 +543,7 @@ export async function POST(request: Request) {
       }
 
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
+      await triggerMutationSignal(payload, allResults);
       return NextResponse.json({ ok: true, data: deserializeRows(payload.table, allResults) });
     }
 
@@ -466,10 +568,12 @@ export async function POST(request: Request) {
       if (payload.returning && payload.returning.length > 0) {
         const result = await db.run(stmt);
         const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+        await triggerMutationSignal(payload, rows);
         // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
         return NextResponse.json({ ok: true, data: deserializeRows(payload.table, rows) });
       }
       await db.run(stmt);
+      await triggerMutationSignal(payload);
       return NextResponse.json({ ok: true });
     }
 
@@ -480,6 +584,7 @@ export async function POST(request: Request) {
       const whereParts = buildWhereSql(payload.where);
       const stmt = sql`DELETE FROM ${tableSql} WHERE ${sql.join(whereParts, sql` AND `)}`;
       await db.run(stmt);
+      await triggerMutationSignal(payload);
       return NextResponse.json({ ok: true });
     }
 

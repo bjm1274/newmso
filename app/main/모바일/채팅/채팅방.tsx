@@ -98,7 +98,20 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     loadOlder,
     refresh,
     appendOptimistic,
-    replaceOptimistic } = useChatMessagesForRoom(String(room.id), userId);
+    replaceOptimistic,
+    jumpToMessage,
+    searchMessageId: hookSearchMessageId } = useChatMessagesForRoom(String(room.id), userId);
+
+  const activeSearchMessageId = hookSearchMessageId || searchMessageId;
+
+  useEffect(() => {
+    if (searchMessageId) {
+      const alreadyLoaded = messages.some((m) => String(m.id) === String(searchMessageId));
+      if (!alreadyLoaded) {
+        void jumpToMessage(searchMessageId);
+      }
+    }
+  }, [searchMessageId, jumpToMessage, messages.length]);
 
   const title = getRoomTitle(room, staffs, userId);
   const headerTone = pickAvatarTone(String(room.id) + title);
@@ -901,7 +914,8 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
           staffs={staffs}
           readCounts={readCounts}
           isGroupChat={isGroup}
-          searchMessageId={searchMessageId}
+          searchMessageId={activeSearchMessageId}
+          onJumpToMessage={jumpToMessage}
           onToggleReaction={handleToggleReaction}
           onReply={(msg) => {
             setReplyTo(msg);
