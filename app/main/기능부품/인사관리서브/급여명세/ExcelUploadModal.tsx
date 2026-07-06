@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 
@@ -34,43 +35,13 @@ export default function ExcelUploadModal({
 
   if (!isOpen) return null;
 
-  // CSV 파서 (쌍따옴표 및 콤마 처리 포함)
-  const parseCSV = (text: string): string[][] => {
-    const lines = text.split(/\r?\n/);
-    const result: string[][] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const row: string[] = [];
-      let inQuotes = false;
-      let currentValue = '';
-
-      for (let j = 0; j < line.length; j++) {
-        const char = line[j];
-
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          row.push(currentValue.trim().replace(/^"|"$/g, ''));
-          currentValue = '';
-        } else {
-          currentValue += char;
-        }
-      }
-      row.push(currentValue.trim().replace(/^"|"$/g, ''));
-      result.push(row);
-    }
-    return result;
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.csv')) {
-      toast('CSV 파일(.csv)만 업로드할 수 있습니다.', 'warning');
+    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+      toast('CSV 또는 엑셀 파일(.csv, .xlsx, .xls)만 업로드할 수 있습니다.', 'warning');
       return;
     }
 
@@ -80,12 +51,30 @@ export default function ExcelUploadModal({
 
   const processFile = (selectedFile: File) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
+    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
 
+    reader.onload = (event) => {
       try {
-        const csvRows = parseCSV(text);
+        const buffer = event.target?.result as ArrayBuffer;
+        if (!buffer) return;
+
+        let workbook: XLSX.WorkBook;
+        if (ext === 'csv') {
+          // CSV는 인코딩(euc-kr 등) 호환성을 위해 TextDecoder로 인코딩한 문자열로 로드
+          const decoder = new TextDecoder('euc-kr');
+          const text = decoder.decode(new Uint8Array(buffer));
+          workbook = XLSX.read(text, { type: 'string' });
+        } else {
+          // .xlsx / .xls 는 array 바이너리로 직접 로드
+          const arr = new Uint8Array(buffer);
+          workbook = XLSX.read(arr, { type: 'array' });
+        }
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        // 2차원 배열 형태로 시트 데이터를 변환 (sheet_to_json)
+        const csvRows = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1, defval: '' });
+
         if (csvRows.length < 2) {
           toast('파일에 데이터가 충분하지 않습니다.', 'warning');
           return;
@@ -101,9 +90,9 @@ export default function ExcelUploadModal({
         const maxHeaderSearch = Math.min(5, csvRows.length);
         for (let i = 0; i < maxHeaderSearch; i++) {
           const row = csvRows[i];
-          const nIdx = row.findIndex(cell => /성명|이름|성\s*명|이\s*름|근로자\s*명/.test(cell));
-          const rIdx = row.findIndex(cell => /주민|생년|주민등록|생년월일/.test(cell));
-          const aIdx = row.findIndex(cell => /국민연금|연금|결정보험료|결정\s*보험료|보험료|산출보험료|근로자\s*부담|납부\s*금액|결정세액|결정\s*세액|국민연금결정세액/.test(cell));
+          const nIdx = row.findIndex(cell => /성명|이름|성\s*명|이\s*름|근로자\s*명/.test(String(cell || '')));
+          const rIdx = row.findIndex(cell => /주민|생년|주민등록|생년월일/.test(String(cell || '')));
+          const aIdx = row.findIndex(cell => /국민연금|연금|결정보험료|결정\s*보험료|보험료|산출보험료|근로자\s*부담|납부\s*금액|결정세액|결정\s*세액|국민연금결정세액/.test(String(cell || '')));
 
           if (nIdx !== -1 && (rIdx !== -1 || aIdx !== -1)) {
             headerRowIdx = i;
@@ -127,11 +116,11 @@ export default function ExcelUploadModal({
           const row = csvRows[i];
           if (row.length <= Math.max(nameIdx, residentIdx, amountIdx)) continue;
 
-          const rawName = row[nameIdx]?.replace(/\s+/g, '') || '';
+          const rawName = String(row[nameIdx] || '').replace(/\s+/g, '');
           if (!rawName) continue;
 
-          const rawResident = row[residentIdx]?.replace(/[^0-9]/g, '') || '';
-          const rawAmount = parseInt(row[amountIdx]?.replace(/[^0-9]/g, '') || '0', 10);
+          const rawResident = String(row[residentIdx] || '').replace(/[^0-9]/g, '');
+          const rawAmount = parseInt(String(row[amountIdx] || '').replace(/[^0-9]/g, '') || '0', 10);
 
           // 직원 매핑 시도
           const matched = staffs.filter((staff) => {
@@ -178,11 +167,11 @@ export default function ExcelUploadModal({
           toast(`파싱 완료: 총 ${rows.length}행 중 ${matchedCount}명이 매핑되었습니다.`, 'success');
         }
       } catch (err) {
-        console.error('CSV 파싱 에러:', err);
+        console.error('엑셀/CSV 파싱 에러:', err);
         toast('파일 파싱 중 에러가 발생했습니다.', 'error');
       }
     };
-    reader.readAsText(selectedFile, 'euc-kr'); // 공단 엑셀은 일반적으로 euc-kr 인코딩이 많음
+    reader.readAsArrayBuffer(selectedFile);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -193,8 +182,9 @@ export default function ExcelUploadModal({
     e.preventDefault();
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
-      if (!droppedFile.name.endsWith('.csv')) {
-        toast('CSV 파일만 허용됩니다.', 'warning');
+      const ext = droppedFile.name.split('.').pop()?.toLowerCase();
+      if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+        toast('CSV 또는 엑셀 파일만 허용됩니다.', 'warning');
         return;
       }
       setFile(droppedFile);
