@@ -166,11 +166,10 @@ export function Step2Settlement({
     const calculatedHourlyRate = getRegularHourlyRate(staff, draftEntryForHourlyRate);
 
     const autoOvertimePay = Math.round((autoOvertimeMins / 60) * calculatedHourlyRate * 1.5);
-    const holidayHours8    = Math.min(8, autoHolidayHours);
-    const holidayHoursOver8 = Math.max(0, autoHolidayHours - 8);
-    const autoHolidayPay  = Math.round(holidayHours8 * calculatedHourlyRate * 1.5 + holidayHoursOver8 * calculatedHourlyRate * 2.0);
-    const autoNightPay    = Math.round((autoNightWorkMins / 60) * calculatedHourlyRate * 0.5);
-    const recommendedOvertimePay = autoOvertimePay + autoNightPay;
+    // [휴일수당/야간수당 자동 계산 제외 요구사항에 따라 계산 0 처리]
+    const autoHolidayPay  = 0;
+    const autoNightPay    = 0;
+    const recommendedOvertimePay = autoOvertimePay;
 
     const changeAwareBreakdown: TaxableAllowanceBreakdown = { ...EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN };
     const taxableChangeFields: Array<Exclude<keyof TaxableAllowanceBreakdown, 'manual_extra_allowance'>> = [
@@ -182,8 +181,8 @@ export function Step2Settlement({
     ];
     taxableChangeFields.forEach((field) => {
       let fallbackVal = staffBreakdown[field];
-      if (field === 'holiday_work_allowance') {
-        fallbackVal = autoHolidayHours > 0 ? autoHolidayPay : 0;
+      if (field === 'holiday_work_allowance' || field === 'night_work_allowance') {
+        fallbackVal = 0;
       }
       const result = resolveSalaryAmountForSettlement({
         savedValue: undefined,
@@ -483,7 +482,8 @@ export function Step2Settlement({
                             (actualCheckOutDate.getTime() - actualCheckInDate.getTime()) / 60000 - 60
                           );
                           const actualWorkHours = actualWorkMins / 60;
-                          staffAutoAllowances[staffId].holidayHours += actualWorkHours;
+                          // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 휴일근무 시간 합산 제거]
+                          // staffAutoAllowances[staffId].holidayHours += actualWorkHours;
                         }
                       }
 
@@ -508,7 +508,8 @@ export function Step2Settlement({
                             const otMins = Math.round((actualCheckOut.getTime() - scheduledEnd.getTime()) / 60000);
                             if (otMins >= 10) {
                               if (staffAutoAllowances[staffId]) {
-                                staffAutoAllowances[staffId].overtimeMins += otMins;
+                                // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 평일 연장시간 합산 제거]
+                                // staffAutoAllowances[staffId].overtimeMins += otMins;
                               }
                             }
                           }
@@ -543,7 +544,8 @@ export function Step2Settlement({
                             }
                           }
 
-                          staffAutoAllowances[staffId].nightWorkMins += nightMins;
+                          // [비결재 연장근무 수당 자동반영 제외 요구사항에 따라 실제 출퇴근 기반 야간 시간 합산 제거]
+                          // staffAutoAllowances[staffId].nightWorkMins += nightMins;
                         }
                       }
                     }
@@ -570,6 +572,45 @@ export function Step2Settlement({
           }
         } catch (e) {
           console.warn('roster loader failed:', e);
+        }
+
+        // ─── 승인된 전자결재(연장근무 신청) 반영 로직 추가 ───
+        try {
+          const { data: approvals, error: approvalsError } = await db
+            .from('approvals')
+            .select('id, sender_id, type, title, status, meta_data, created_at')
+            .eq('status', '승인')
+            .in('sender_id', staffIds);
+
+          if (approvalsError) {
+            console.error('Approvals query failed:', approvalsError);
+          } else if (approvals && Array.isArray(approvals)) {
+            approvals.forEach((app) => {
+              let meta: any = null;
+              try {
+                meta = typeof app.meta_data === 'string' ? JSON.parse(app.meta_data) : app.meta_data;
+              } catch (e) {
+                return;
+              }
+
+              if (meta?.form_slug === 'overtime' || app.type === '연장근무') {
+                const senderId = String(app.sender_id || '');
+                const items = Array.isArray(meta?.items) ? meta.items : [];
+
+                items.forEach((item: any) => {
+                  const itemDate = item?.date;
+                  if (itemDate && itemDate >= startDate && itemDate <= endDate) {
+                    const mins = Number(item?.minutes || 0);
+                    if (mins > 0 && staffAutoAllowances[senderId]) {
+                      staffAutoAllowances[senderId].overtimeMins += mins;
+                    }
+                  }
+                });
+              }
+            });
+          }
+        } catch (otApprovalErr) {
+          console.error('Failed to parse overtime approvals:', otApprovalErr);
         }
 
         const { data: rule, error: ruleError } = await db

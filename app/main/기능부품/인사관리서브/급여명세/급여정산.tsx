@@ -350,15 +350,11 @@ export default function SalarySettlement({
     // 자동 가산수당 금액 계산
     // 평일 연장: 소정시간 초과분 × 1.5배 (근로기준법 §56①)
     const autoOvertimePay = Math.round((autoOvertimeMins / 60) * calculatedHourlyRate * 1.5);
-    // C-11: 휴일근로 8h 이내 1.5배, 8h 초과분 2.0배 (근로기준법 §56②)
-    const holidayHours8    = Math.min(8, autoHolidayHours);
-    const holidayHoursOver8 = Math.max(0, autoHolidayHours - 8);
-    const autoHolidayPay  = Math.round(holidayHours8 * calculatedHourlyRate * 1.5 + holidayHoursOver8 * calculatedHourlyRate * 2.0);
-    // C-10: 야간근로(22:00~06:00) 0.5배 가산 (근로기준법 §56③, 연장 여부 무관)
-    const autoNightPay    = Math.round((autoNightWorkMins / 60) * calculatedHourlyRate * 0.5);
-    // 휴일수당(autoHolidayPay)은 아래 recommendedOvertimePay(연장근로 실적 필드추천)에서 제외하며,
-    // 대신 holiday_work_allowance(휴일수당 필드)에 자동 세팅됩니다.
-    const recommendedOvertimePay = autoOvertimePay + autoNightPay;
+    // [휴일수당/야간수당 자동 계산 제외 요구사항에 따라 계산 0 처리]
+    const autoHolidayPay  = 0;
+    const autoNightPay    = 0;
+    // 추천 연장수당은 오직 전자결재로 승인된 평일 연장근무 수당만 반영합니다.
+    const recommendedOvertimePay = autoOvertimePay;
 
     const changeAwareBreakdown: TaxableAllowanceBreakdown = { ...EMPTY_TAXABLE_ALLOWANCE_BREAKDOWN };
     const taxableChangeFields: Array<Exclude<keyof TaxableAllowanceBreakdown, 'manual_extra_allowance'>> = [
@@ -370,8 +366,8 @@ export default function SalarySettlement({
     ];
     taxableChangeFields.forEach((field) => {
       let fallbackVal = staffBreakdown[field];
-      if (field === 'holiday_work_allowance') {
-        fallbackVal = autoHolidayHours > 0 ? autoHolidayPay : 0;
+      if (field === 'holiday_work_allowance' || field === 'night_work_allowance') {
+        fallbackVal = 0;
       }
       const result = resolveSalaryAmountForSettlement({
         savedValue: undefined,

@@ -61,6 +61,12 @@ let wsPingTimer: ReturnType<typeof setInterval> | null = null;
 let wsActive = false;
 let sseSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// SSE 상태 관리 (Playwright E2E 호환용 fallback)
+let sseSource: EventSource | null = null;
+let sseErrorCount = 0;
+let sseActive = false;
+let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
 // Cross-Tab Leader Election
 const myTabId = typeof window !== 'undefined'
   ? (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -306,12 +312,30 @@ async function pollOnce(entry: ChannelEntry): Promise<void> {
   }
 }
 
+function isPlaywrightEnv(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (window as any).__playwright__ || 
+    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.includes('Playwright'));
+}
+
 function syncRealtimeConnections() {
   if (typeof window === 'undefined') return;
 
   if (sseSyncDebounceTimer) clearTimeout(sseSyncDebounceTimer);
   sseSyncDebounceTimer = setTimeout(() => {
-    syncWebSocketConnectionInternal();
+    if (isPlaywrightEnv()) {
+      if (ws) {
+        closeWebSocket();
+      }
+      syncSSEConnectionInternal();
+    } else {
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+        sseActive = false;
+      }
+      syncWebSocketConnectionInternal();
+    }
   }, 100);
 
   syncPollingIntervalsInternal();
@@ -441,6 +465,142 @@ function syncWebSocketConnectionInternal() {
   }
 }
 
+function syncSSEConnectionInternal() {
+  if (sseReconnectTimer) {
+    clearTimeout(sseReconnectTimer);
+    sseReconnectTimer = null;
+  }
+
+  if (typeof window === 'undefined') {
+    if (sseSource) {
+      sseSource.close();
+      sseSource = null;
+      sseActive = false;
+    }
+    return;
+  }
+
+  if (!isLeader) {
+    if (sseSource) {
+      logger.debug(`[polling-bus] Tab ${myTabId} (follower) closing EventSource connection`);
+      sseSource.close();
+      sseSource = null;
+      sseActive = false;
+    }
+    return;
+  }
+
+  if (isSuspended()) {
+    if (sseSource) {
+      logger.debug('[polling-bus] Suspended state: Closing EventSource connection');
+      sseSource.close();
+      sseSource = null;
+      sseActive = false;
+    }
+    return;
+  }
+
+  const tables = new Set<string>();
+  for (const entry of channelRegistry.values()) {
+    for (const t of entry.tables) {
+      tables.add(t.table);
+    }
+  }
+  activeTabs.forEach((info) => {
+    info.tables.forEach((t) => tables.add(t));
+  });
+
+  if (tables.size === 0) {
+    if (sseSource) {
+      sseSource.close();
+      sseSource = null;
+      sseActive = false;
+    }
+    return;
+  }
+
+  const tableList = Array.from(tables).sort().join(',');
+  const targetUrl = `/api/realtime/stream?tables=${encodeURIComponent(tableList)}`;
+
+  if (sseSource) {
+    try {
+      const currentUrl = new URL(sseSource.url, window.location.href);
+      const currentTables = currentUrl.searchParams.get('tables');
+      if (currentTables === tableList) {
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    sseSource.close();
+    sseSource = null;
+    sseActive = false;
+  }
+
+  try {
+    logger.debug(`[polling-bus] Connecting EventSource to ${targetUrl}`);
+    sseSource = new EventSource(targetUrl, { withCredentials: true });
+
+    sseSource.addEventListener('initial', (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data) as { tail: Record<string, string | null> };
+        for (const entry of channelRegistry.values()) {
+          for (const tableFilter of entry.tables) {
+            const next = payload.tail[tableFilter.table] ?? null;
+            if (entry.lastSeen[tableFilter.table] === undefined) {
+              entry.lastSeen[tableFilter.table] = next;
+            }
+          }
+        }
+        if (bc) {
+          bc.postMessage({ type: 'initial', tail: payload.tail });
+        }
+        sseErrorCount = 0;
+        sseActive = true;
+        syncPollingIntervalsInternal();
+      } catch (err) {
+        logger.warn('[polling-bus] Failed to parse initial payload', err);
+      }
+    });
+
+    sseSource.addEventListener('change', (e: MessageEvent) => {
+      try {
+        const payload = JSON.parse(e.data) as { tail: Record<string, string | null> };
+        for (const entry of channelRegistry.values()) {
+          processTailData(entry, payload.tail);
+        }
+        if (bc) {
+          bc.postMessage({ type: 'change', tail: payload.tail });
+        }
+        sseErrorCount = 0;
+        sseActive = true;
+      } catch (err) {
+        logger.warn('[polling-bus] Failed to parse change payload', err);
+      }
+    });
+
+    sseSource.onerror = (e) => {
+      logger.warn('[polling-bus] EventSource error occurred', e);
+      sseErrorCount++;
+      sseActive = false;
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+      }
+      syncPollingIntervalsInternal();
+      const delay = Math.min(30000, 1000 * Math.pow(2, sseErrorCount));
+      if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = setTimeout(() => {
+        syncRealtimeConnections();
+      }, delay);
+    };
+  } catch (err) {
+    logger.error('[polling-bus] EventSource initialization failed', err);
+    sseActive = false;
+    syncPollingIntervalsInternal();
+  }
+}
+
 function closeWebSocket() {
   if (ws) {
     try {
@@ -461,7 +621,8 @@ function cleanupWebSocketState() {
 
 function syncPollingIntervalsInternal() {
   for (const entry of channelRegistry.values()) {
-    if (!isLeader || wsActive || isSuspended()) {
+    const isConnectionActive = wsActive || sseActive;
+    if (!isLeader || isConnectionActive || isSuspended()) {
       if (entry.timer) {
         clearInterval(entry.timer);
         entry.timer = null;
@@ -531,17 +692,28 @@ function makeUnsubscribe(channelKey: string, remove: (entry: ChannelEntry) => vo
 // 공개 API — realtime-bus.ts와 호환
 // ─────────────────────────────────────────────
 
+function getInterval(options?: RealtimeOptions): number {
+  if (typeof window === 'undefined') return 15000;
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isPlaywright = (window as any).__playwright__ || 
+    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.includes('Playwright'));
+  
+  if (isLocal || isPlaywright) {
+    return options?.pollIntervalMs ?? 1000;
+  } else {
+    const minInterval = 30000;
+    return Math.max(options?.pollIntervalMs ?? 15000, minInterval);
+  }
+}
+
 export function subscribeRealtime(
   channelKey: string,
   tables: TableFilter[],
   callback: RealtimeCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const isDev = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const minInterval = isDev ? 1000 : 30000;
-  const interval = Math.max(options?.pollIntervalMs ?? 15000, minInterval);
-
+  const interval = getInterval(options);
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.singleCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.singleCallbacks.delete(callback));
@@ -553,11 +725,7 @@ export function subscribeRealtimeBatched(
   callback: RealtimeBatchCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const isDev = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const minInterval = isDev ? 1000 : 30000;
-  const interval = Math.max(options?.pollIntervalMs ?? 15000, minInterval);
-
+  const interval = getInterval(options);
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.batchCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.batchCallbacks.delete(callback));

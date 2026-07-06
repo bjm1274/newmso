@@ -103,7 +103,7 @@ export default function ExcelUploadModal({
           const row = csvRows[i];
           const nIdx = row.findIndex(cell => /성명|이름|성\s*명|이\s*름|근로자\s*명/.test(cell));
           const rIdx = row.findIndex(cell => /주민|생년|주민등록|생년월일/.test(cell));
-          const aIdx = row.findIndex(cell => /국민연금|연금|결정보험료|결정\s*보험료|보험료|산출보험료|근로자\s*부담|납부\s*금액/.test(cell));
+          const aIdx = row.findIndex(cell => /국민연금|연금|결정보험료|결정\s*보험료|보험료|산출보험료|근로자\s*부담|납부\s*금액|결정세액|결정\s*세액|국민연금결정세액/.test(cell));
 
           if (nIdx !== -1 && (rIdx !== -1 || aIdx !== -1)) {
             headerRowIdx = i;
@@ -268,7 +268,7 @@ export default function ExcelUploadModal({
         {/* 헤더 */}
         <div className="px-6 py-4 border-b border-[var(--border)] flex justify-between items-center shrink-0">
           <h3 className="text-base font-extrabold text-[var(--foreground)] flex items-center gap-2">
-            📂 4대보험 고지 내역(CSV) 일괄 업로드
+            📂 국민연금 결정세액(EDI) 일괄 업로드
           </h3>
           <button onClick={onClose} className="p-2 hover:bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-full transition-all text-sm font-bold">닫기</button>
         </div>
@@ -285,10 +285,10 @@ export default function ExcelUploadModal({
             <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
             <span className="text-3xl">📤</span>
             <p className="text-xs font-bold text-[var(--foreground)]">
-              {file ? file.name : '4대보험 고지서 CSV 파일을 여기에 드래그하거나 클릭하여 업로드하세요.'}
+              {file ? file.name : '국민연금 결정세액 CSV 파일을 여기에 드래그하거나 클릭하여 업로드하세요.'}
             </p>
             <p className="text-[10px] text-[var(--toss-gray-4)]">
-              국민연금공단 등에서 내려받은 표준 산출내역서(CSV 형식)를 업로드해 주세요.
+              국민연금공단 등에서 내려받은 결정세액 산출내역서(CSV 형식)를 업로드해 주세요.
             </p>
           </div>
 
@@ -308,7 +308,7 @@ export default function ExcelUploadModal({
                     <tr>
                       <th className="p-2.5">고지서 성명</th>
                       <th className="p-2.5">생년월일</th>
-                      <th className="p-2.5 text-right">국민연금 고지액</th>
+                      <th className="p-2.5 text-right">국민연금 결정세액</th>
                       <th className="p-2.5">시스템 매핑 결과</th>
                     </tr>
                   </thead>
@@ -345,7 +345,7 @@ export default function ExcelUploadModal({
           {loading && (
             <div className="p-4 bg-emerald-50 rounded-[var(--radius-xl)] border border-emerald-100 space-y-2">
               <div className="flex justify-between items-center text-xs font-bold text-emerald-800">
-                <span>⚡ 직원 국민연금 공제액 일괄 업데이트 중...</span>
+                <span>⚡ 직원 국민연금 결정세액 일괄 업데이트 중...</span>
                 <span>{progress.current} / {progress.total} 명</span>
               </div>
               <div className="w-full bg-emerald-200/50 rounded-full h-2 overflow-hidden">

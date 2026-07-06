@@ -224,7 +224,7 @@ export default function InsuranceEDI({
       render: (row) => row.base.toLocaleString() },
     {
       key: 'nps',
-      label: '국민연금',
+      label: '국민연금(결정세액)',
       align: 'right',
       render: (row) => row.nps.toLocaleString() },
     {
@@ -319,7 +319,7 @@ export default function InsuranceEDI({
             onClick={() => setUploadModalOpen(true)}
             className="rounded-[var(--radius-md)] border border-emerald-500 bg-emerald-50 hover:bg-emerald-100/30 px-4 py-2 text-sm font-bold text-emerald-600 shadow-sm transition-all"
           >
-            고지서 업로드
+            결정세액 업로드
           </button>
         </div>
       </div>
@@ -351,7 +351,7 @@ export default function InsuranceEDI({
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
         {[
-          { label: '국민연금 합계', value: totalRow.nps, color: 'text-blue-600' },
+          { label: '국민연금(결정세액) 합계', value: totalRow.nps, color: 'text-blue-600' },
           { label: '건강보험 합계', value: totalRow.hi, color: 'text-green-600' },
           { label: '장기요양 합계', value: totalRow.lci, color: 'text-teal-600' },
           { label: '고용보험 합계', value: totalRow.ei, color: 'text-orange-600' },

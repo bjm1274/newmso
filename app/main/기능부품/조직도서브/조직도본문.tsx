@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { db } from '@/lib/db-client';
+import { toast } from '@/lib/toast';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 const prefetchedMainMenuModules = new Set<string>();
@@ -164,6 +165,7 @@ export default function MainContent({
   shareTarget,
   onConsumeShareTarget }: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -229,6 +231,30 @@ export default function MainContent({
       if (!user?.id) return;
 
       try {
+        const targetYear = new Date().getFullYear();
+
+        // 1. 이미 문서보관함에 연차촉진 문서가 저장되어 있는지 확인
+        const { data: existingDocs } = await db
+          .from('document_repository')
+          .select('id')
+          .eq('created_by', user.id)
+          .eq('category', '연차촉진')
+          .like('title', `%${targetYear}%`)
+          .limit(1);
+
+        if (existingDocs && existingDocs.length > 0) return;
+
+        // 2. 이미 연차촉진 로그가 등록되었는지 확인
+        const { data: existingLogs } = await db
+          .from('annual_leave_promotion_logs')
+          .select('id')
+          .eq('staff_id', user.id)
+          .eq('target_year', targetYear)
+          .eq('step', 1)
+          .limit(1);
+
+        if (existingLogs && existingLogs.length > 0) return;
+
         const { data: staff } = await db
           .from('staff_members')
           .select('annual_leave_total, annual_leave_used')
@@ -241,7 +267,7 @@ export default function MainContent({
           .from('leave_balances')
           .select('expired_days, compensated_days')
           .eq('staff_id', user.id)
-          .eq('year', new Date().getFullYear())
+          .eq('year', targetYear)
           .maybeSingle();
 
         const expired = balanceData ? (Number(balanceData.expired_days) || 0) : 0;
@@ -263,6 +289,95 @@ export default function MainContent({
 
     void checkNotifications();
   }, [user]);
+
+  const handleConfirmAnnualLeave = async () => {
+    if (!user?.id || !annualLeaveNotice || confirmingLeave) return;
+
+    setConfirmingLeave(true);
+    try {
+      const targetYear = new Date().getFullYear();
+
+      // 1) 직원 상세 정보 조회
+      const { data: staff, error: staffError } = await db
+        .from('staff_members')
+        .select('name, company, department, position')
+        .eq('id', user.id)
+        .single();
+
+      if (staffError || !staff) {
+        throw staffError || new Error('직원 정보를 찾을 수 없습니다.');
+      }
+
+      const remaining = annualLeaveNotice.remaining;
+      const stageLabel = '1차';
+      const docTitle = `연차유급휴가 사용촉진 통보서 (${stageLabel}) - ${staff.name}`;
+      const docContent = `연차 유급휴가 사용촉진 통보서 (${stageLabel})
+
+성 명: ${staff.name}
+소 속: ${staff.department || '인사부'}
+직 급: ${staff.position || '사원'}
+미사용 연차: ${remaining} 일
+
+귀하의 ${targetYear}년도 발생 연차유급휴가 중 현재까지 사용하지 아니한 휴가는 총 ${remaining}일입니다.
+
+이에 근로기준법 제61조 제1항에 의거하여, 회사는 귀하에게 미사용 연차유급휴가의 사용을 촉진하오니, 본 서면을 수령한 날로부터 10일 이내에 미사용 연차유급휴가에 대한 구체적인 사용계획서(계획 일자 지정)를 작성하여 전자결재 시스템을 통해 제출해 주시기 바랍니다.
+
+기한 내에 사용 계획을 제출하지 아니할 경우, 근로기준법 제61조 제2항에 의거하여 회사가 임의로 휴가 사용 시기를 지정하여 통보하게 되며, 이에 따른 휴가 미사용에 대하여는 수당이 지급되지 아니함을 알려드립니다.
+
+통보일자: ${new Date().toLocaleDateString('ko-KR')}
+MSO 주식회사 대표이사 (직인생략)`;
+
+      // 2) 문서보관함 저장
+      const docId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `doc-alp-${user.id}-${targetYear}-1-${Date.now()}`;
+
+      const { error: docError } = await db.from('document_repository').insert({
+        id: docId,
+        title: docTitle,
+        category: '연차촉진',
+        content: docContent,
+        company_name: staff.company || '전체',
+        created_by: user.id,
+        version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      if (docError) throw docError;
+
+      // 3) 연차촉진 로그 저장
+      const logId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `alp-${user.id}-${targetYear}-1`;
+
+      const expiryDateStr = `${targetYear}-12-31`;
+
+      await db.from('annual_leave_promotion_logs').insert({
+        id: logId,
+        staff_id: user.id,
+        company_name: staff.company,
+        target_year: targetYear,
+        step: 1,
+        stage: 1,
+        expiry_date: expiryDateStr,
+        notified_at: new Date().toISOString(),
+        sent_at: new Date().toISOString(),
+        remain_days: remaining,
+        remaining_days_at_notice: remaining,
+        meta: JSON.stringify({ action: 'promote', stage: 1, auto: false, userConfirmed: true }),
+        created_at: new Date().toISOString()
+      });
+
+      toast('연차 사용 촉진 문서가 문서보관함에 저장되었습니다.', 'success');
+      setAnnualLeaveNotice(null);
+    } catch (err) {
+      console.error('[handleConfirmAnnualLeave] 연차 촉진 확인 처리 실패:', err);
+      toast('처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+    } finally {
+      setConfirmingLeave(false);
+    }
+  };
 
   return (
     <div className="main-content-mobile-shell relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--page-bg)] pb-[88px] md:pb-0">
@@ -453,10 +568,11 @@ export default function MainContent({
             </div>
             <button
               type="button"
-              onClick={() => setAnnualLeaveNotice(null)}
-              className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+              onClick={handleConfirmAnnualLeave}
+              disabled={confirmingLeave}
+              className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-[13px] font-semibold text-white transition-all duration-150 hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
             >
-              확인했습니다
+              {confirmingLeave ? '확인 중...' : '확인했습니다'}
             </button>
           </div>
         </div>
