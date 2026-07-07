@@ -174,7 +174,7 @@ export default function MessageContextMenu({
           style={{
             paddingBottom: 'calc(24px + env(safe-area-inset-bottom))'
           }}
-          className={`fixed bottom-0 left-0 right-0 z-[var(--z-bottomsheet)] rounded-t-[24px] macos-glass border-x-0 border-b-0 border-t border-[rgba(255,255,255,0.35)] dark:border-[rgba(255,255,255,0.08)] p-4 text-[14px] transition-all duration-300 ease-out transform ${
+          className={`fixed bottom-0 left-0 right-0 z-[var(--z-bottomsheet)] rounded-t-[24px] bg-white dark:bg-[#1c1c1e] border-x-0 border-b-0 border-t border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] p-4 text-[14px] transition-all duration-300 ease-out transform ${
             ready ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
           }`}
         >
@@ -383,7 +383,7 @@ export default function MessageContextMenu({
           left: pos.left,
           top: pos.top,
         }}
-        className={`message-ctx-menu macos-glass fixed z-[100] min-w-[220px] rounded-[20px] p-2.5 text-[13px] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
+        className={`message-ctx-menu bg-white dark:bg-[#1c1c1e] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)] shadow-[0_8px_30px_rgba(0,0,0,0.12)] fixed z-[100] min-w-[220px] rounded-[20px] p-2.5 text-[13px] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
       >
         {/* Quick reactions row */}
         <div className="flex items-center gap-1 p-1">
