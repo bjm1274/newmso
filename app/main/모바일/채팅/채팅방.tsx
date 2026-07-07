@@ -24,7 +24,7 @@ import {
 import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
-import { pokeChannel } from '@/lib/realtime-bus';
+import { pokeChannel, subscribeRealtime, type TableFilter } from '@/lib/realtime-bus';
 import { logger } from '@/lib/logger';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -454,9 +454,24 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
 
   useEffect(() => {
     void refreshPolls();
-    const interval = setInterval(() => { void refreshPolls(); }, 3000);
-    return () => clearInterval(interval);
-  }, [refreshPolls]);
+
+    const channelKey = `mobile-chat-polls-${room.id}`;
+    const tables: TableFilter[] = [
+      { table: 'polls', filter: `room_id=eq.${room.id}` },
+      { table: 'poll_votes', filter: `room_id=eq.${room.id}` }
+    ];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        void refreshPolls();
+      },
+      { pollIntervalMs: 30000 } // fallback poll interval is 30s
+    );
+
+    return unsubscribe;
+  }, [room.id, refreshPolls]);
 
   const handleCreatePoll = useCallback(
     async (input: { question: string; options: string[]; deadlineAt: string }) => {

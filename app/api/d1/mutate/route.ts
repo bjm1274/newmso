@@ -102,8 +102,26 @@ async function triggerMutationSignal(payload: Payload, allResults?: Record<strin
       channels.add('pinned_messages');
     } else if (table === 'polls') {
       channels.add('polls');
+      const rowIds = new Set<string>();
+      if (payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.room_id) rowIds.add(String(v.room_id));
+        });
+      }
+      rowIds.forEach(rid => {
+        channels.add(`polls:room_id=eq.${rid}`);
+      });
     } else if (table === 'poll_votes') {
       channels.add('poll_votes');
+      const rowIds = new Set<string>();
+      if (payload.op === 'insert') {
+        payload.values.forEach(v => {
+          if (v.room_id) rowIds.add(String(v.room_id));
+        });
+      }
+      rowIds.forEach(rid => {
+        channels.add(`poll_votes:room_id=eq.${rid}`);
+      });
     } else {
       channels.add(table);
     }

@@ -751,3 +751,21 @@ export function pokeChannel(channelKey: string): void {
     void pollOnce(entry);
   }
 }
+
+export function sendTypingSignal(roomId: string, isTyping: boolean, userName?: string): void {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: isTyping ? 'typing:start' : 'typing:stop',
+      roomId
+    }));
+  } else {
+    // Fallback: WebSocket 연결이 활성화되지 않은 상태에서는 기존 HTTP API 호출
+    const method = isTyping ? 'POST' : 'DELETE';
+    const body = isTyping ? { room_id: roomId, user_name: userName } : { room_id: roomId };
+    void fetch('/api/chat/typing', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).catch(() => {});
+  }
+}

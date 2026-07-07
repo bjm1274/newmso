@@ -275,8 +275,22 @@ export function useMobileChatReadCounts(
     };
 
     void fetchCursors();
-    const interval = setInterval(fetchCursors, 3000);
-    return () => clearInterval(interval);
+
+    const channelKey = `mobile-chat-cursors-${roomId}`;
+    const tables: TableFilter[] = [
+      { table: 'room_read_cursors', filter: `room_id=eq.${roomId}` }
+    ];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        void fetchCursors();
+      },
+      { pollIntervalMs: 30000 } // fallback poll interval is 30s
+    );
+
+    return unsubscribe;
   }, [roomId, messages, memberIds]);
 
   return readCounts;

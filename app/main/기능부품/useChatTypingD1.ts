@@ -3,37 +3,18 @@
 /**
  * useChatTypingD1
  *
- * D1 polling 기반 typing 표시 훅.
- * - 입력 중: emitTyping(true) → POST /api/chat/typing (디바운스 3초)
- * - 입력 중단: emitTyping(false) → DELETE /api/chat/typing
- * - 방이 활성(selectedRoomId 존재)인 동안 5초마다 GET /api/chat/typing?room_id= 폴링
+ * D1 실시간 WebSocket 기반 typing 표시 훅.
+ * - 입력 중: emitTyping(true) → sendTypingSignal(true)
+ * - 입력 중단: emitTyping(false) → sendTypingSignal(false)
+ * - 방이 활성(selectedRoomId 존재)인 동안 window 'realtime-typing' 이벤트 구독 수신
  * - 자신의 userId 는 서버에서 자동 제외
  */
 
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { sendTypingSignal } from '@/lib/polling-bus';
 
-const POLL_INTERVAL_MS = 5000;
 const EMIT_DEBOUNCE_MS = 3000;
 const TYPING_CLEAR_MS = 1800;
-
-// 서버 응답 타입 (runtime 검증용)
-type TypingUser = {
-  user_id: string;
-  user_name: string;
-};
-
-function isTypingUserArray(value: unknown): value is TypingUser[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (item) =>
-        typeof item === 'object' &&
-        item !== null &&
-        typeof (item as Record<string, unknown>).user_id === 'string' &&
-        typeof (item as Record<string, unknown>).user_name === 'string',
-    )
-  );
-}
 
 type UseChatTypingD1Params = {
   selectedRoomId: string | null;
@@ -51,7 +32,6 @@ export function useChatTypingD1({
   typingClearRef }: UseChatTypingD1Params) {
   const lastEmitAtRef = useRef<number>(0);
   const lastEmittedTypingRef = useRef<boolean>(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
   const selectedRoomIdRef = useRef(selectedRoomId);
 
@@ -66,33 +46,6 @@ export function useChatTypingD1({
     };
   }, []);
 
-  // ── typing 상태 서버 전송 ────────────────────────────────────────────────
-
-  const sendTypingSet = useCallback(
-    async (roomId: string, name: string): Promise<void> => {
-      try {
-        await fetch('/api/chat/typing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ room_id: roomId, user_name: name }) });
-      } catch {
-        // 네트워크 오류는 무시 — typing 표시는 비필수 기능
-      }
-    },
-    [],
-  );
-
-  const sendTypingClear = useCallback(async (roomId: string): Promise<void> => {
-    try {
-      await fetch('/api/chat/typing', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId }) });
-    } catch {
-      // 무시
-    }
-  }, []);
-
   // ── 외부에서 호출하는 emit 함수 ─────────────────────────────────────────
 
   const emitTyping = useCallback(
@@ -105,7 +58,7 @@ export function useChatTypingD1({
         if (lastEmittedTypingRef.current) {
           lastEmittedTypingRef.current = false;
           lastEmitAtRef.current = 0;
-          void sendTypingClear(roomId);
+          sendTypingSignal(roomId, false);
         }
         return;
       }
@@ -116,9 +69,9 @@ export function useChatTypingD1({
 
       lastEmitAtRef.current = now;
       lastEmittedTypingRef.current = true;
-      void sendTypingSet(roomId, userName ?? '알수없음');
+      sendTypingSignal(roomId, true, userName ?? '알수없음');
     },
-    [effectiveChatUserId, sendTypingClear, sendTypingSet, userName],
+    [effectiveChatUserId, userName],
   );
 
   // ── handleComposerChange에서 사용하는 typing 트리거 ─────────────────────
@@ -147,78 +100,69 @@ export function useChatTypingD1({
     [emitTyping, typingClearRef],
   );
 
-  // ── 폴링: 방이 활성인 동안 5초마다 GET ──────────────────────────────────
+  // ── 실시간 WebSocket 타이핑 수신 (5초 폴링 제거) ────────────────────────
 
   useEffect(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-
     if (!selectedRoomId) {
       setTypingUsers({});
       return;
     }
 
-    const poll = async (): Promise<void> => {
+    const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+    const handleRealtimeTyping = (event: Event) => {
       if (!isMountedRef.current) return;
-      try {
-        const res = await fetch(
-          `/api/chat/typing?room_id=${encodeURIComponent(selectedRoomId)}`,
-          { cache: 'no-store' },
-        );
-        if (!res.ok || !isMountedRef.current) return;
+      const detail = (event as CustomEvent).detail;
+      if (!detail || String(detail.roomId) !== String(selectedRoomId)) return;
 
-        const data: unknown = await res.json();
-        if (
-          typeof data !== 'object' ||
-          data === null ||
-          !isTypingUserArray((data as Record<string, unknown>).users)
-        ) {
-          return;
-        }
+      const { userId, userName: targetName, typing } = detail;
 
-        const users = (data as { users: TypingUser[] }).users;
-        if (!isMountedRef.current) return;
-
-        setTypingUsers((prev) => {
-          const next: Record<string, string> = {};
-          users.forEach((u) => {
-            next[u.user_id] = u.user_name;
-          });
-          // 얕은 비교로 불필요한 리렌더 방지
-          const prevKeys = Object.keys(prev);
-          const nextKeys = Object.keys(next);
-          if (prevKeys.length !== nextKeys.length) return next;
-          for (const k of nextKeys) {
-            if (prev[k] !== next[k]) return next;
+      setTypingUsers((prev) => {
+        const next = { ...prev };
+        if (typing) {
+          next[userId] = targetName;
+          
+          // 이미 클리어 타이머가 돌아가는 경우 리셋
+          if (timeouts.has(userId)) {
+            clearTimeout(timeouts.get(userId)!);
           }
-          return prev;
-        });
-      } catch {
-        // 폴링 오류 무시
-      }
+          
+          // 타이핑 신호가 오고 5초 동안 추가 신호가 없으면 자동 클린업
+          const timer = setTimeout(() => {
+            setTypingUsers((current) => {
+              const copy = { ...current };
+              delete copy[userId];
+              return copy;
+            });
+            timeouts.delete(userId);
+          }, 5000);
+          
+          timeouts.set(userId, timer);
+        } else {
+          delete next[userId];
+          if (timeouts.has(userId)) {
+            clearTimeout(timeouts.get(userId)!);
+            timeouts.delete(userId);
+          }
+        }
+        return next;
+      });
     };
 
-    // 즉시 한 번 실행 후 인터벌 등록
-    void poll();
-    pollIntervalRef.current = setInterval(() => {
-      void poll();
-    }, POLL_INTERVAL_MS);
+    window.addEventListener('realtime-typing', handleRealtimeTyping);
 
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      window.removeEventListener('realtime-typing', handleRealtimeTyping);
+      timeouts.forEach((timer) => clearTimeout(timer));
+      timeouts.clear();
       setTypingUsers({});
       // 방 떠날 때 typing 상태 서버에서도 제거
       if (lastEmittedTypingRef.current && selectedRoomId) {
         lastEmittedTypingRef.current = false;
-        void sendTypingClear(selectedRoomId);
+        sendTypingSignal(selectedRoomId, false);
       }
     };
-  }, [selectedRoomId, sendTypingClear, setTypingUsers]);
+  }, [selectedRoomId, setTypingUsers]);
 
   return { emitTyping, handleTypingInput };
 }
