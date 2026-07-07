@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { subscribeRealtime, type TableFilter } from '@/lib/realtime-bus';
 import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
@@ -318,14 +319,24 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
   useEffect(() => {
     let alive = true;
     void load();
-    const timer = setInterval(() => {
-      if (alive && !document.hidden) void load();
-    }, pollMs);
+
+    const channelKey = `mobile-worknow-${company || 'all'}`;
+    const tables: TableFilter[] = [{ table: 'staff_members' }];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        if (alive) void load();
+      },
+      { pollIntervalMs: 60000 } // fallback poll interval is 60s
+    );
+
     return () => {
       alive = false;
-      clearInterval(timer);
+      unsubscribe();
     };
-  }, [load, pollMs]);
+  }, [load, company]);
 
   const kpi = useMemo(() => ({
     working: members.filter((m) => m.state === 'working').length,
@@ -400,14 +411,24 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
   useEffect(() => {
     let alive = true;
     void load();
-    const timer = setInterval(() => {
-      if (alive && !document.hidden) void load();
-    }, pollMs);
+
+    const channelKey = `mobile-handover-${company || 'all'}`;
+    const tables: TableFilter[] = [{ table: 'handover_notes' }];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        if (alive) void load();
+      },
+      { pollIntervalMs: 60000 } // fallback poll interval is 60s
+    );
+
     return () => {
       alive = false;
-      clearInterval(timer);
+      unsubscribe();
     };
-  }, [load, pollMs]);
+  }, [load, company]);
 
   return { rows, loading, refresh: load };
 }
@@ -672,14 +693,24 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
   useEffect(() => {
     let alive = true;
     void load();
-    const timer = setInterval(() => {
-      if (alive && !document.hidden) void load();
-    }, pollMs);
+
+    const channelKey = `mobile-taskshares-${company || 'all'}`;
+    const tables: TableFilter[] = [{ table: 'board_posts' }];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        if (alive) void load();
+      },
+      { pollIntervalMs: 60000 } // fallback poll interval is 60s
+    );
+
     return () => {
       alive = false;
-      clearInterval(timer);
+      unsubscribe();
     };
-  }, [load, pollMs]);
+  }, [load, company]);
 
   return { rows, loading, refresh: load };
 }
@@ -824,14 +855,27 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
   useEffect(() => {
     aliveRef.current = true;
     void load();
-    const timer = setInterval(() => {
-      if (aliveRef.current && !document.hidden) void load();
-    }, pollMs);
+
+    const channelKey = `mobile-opboard-${company || 'all'}-${date}`;
+    const tables: TableFilter[] = [
+      { table: 'board_posts' },
+      { table: 'op_patient_checks' }
+    ];
+
+    const unsubscribe = subscribeRealtime(
+      channelKey,
+      tables,
+      () => {
+        if (aliveRef.current) void load();
+      },
+      { pollIntervalMs: 60000 } // fallback poll interval is 60s
+    );
+
     return () => {
       aliveRef.current = false;
-      clearInterval(timer);
+      unsubscribe();
     };
-  }, [load, pollMs]);
+  }, [load, company, date]);
 
   return { cards, loading, lastSync, refresh: load };
 }

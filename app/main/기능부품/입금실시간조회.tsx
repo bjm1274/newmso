@@ -19,7 +19,7 @@ type DepositDraft = {
   match_status: string;
 };
 
-const POLLING_INTERVAL_MS = 15000;
+const POLLING_INTERVAL_MS = 30000;
 
 function formatCurrency(value: number | string | null | undefined) {
   return new Intl.NumberFormat('ko-KR').format(toAmountNumber(value));
