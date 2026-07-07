@@ -10,7 +10,8 @@
   "build": {
     "files": [
       "main.js",
-      "package.json"
+      "package.json",
+      "icon-new.png"
     ],
     "appId": "com.pchos.allerp",
     "productName": "AllERP",

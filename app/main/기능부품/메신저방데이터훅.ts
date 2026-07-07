@@ -176,8 +176,8 @@ export function useChatRoomDataSync({
       const mergedRooms = (rooms || []).map(dbRoom => {
         const localRoom = prev.find((p: ChatRoom) => p.id === dbRoom.id);
         if (localRoom && localRoom.last_message_at && dbRoom.last_message_at) {
-          const localTime = new Date(localRoom.last_message_at).getTime();
-          const dbTime = new Date(dbRoom.last_message_at).getTime();
+          const localTime = toChatDate(localRoom.last_message_at).getTime();
+          const dbTime = toChatDate(dbRoom.last_message_at).getTime();
           if (localTime > dbTime) {
             return {
               ...dbRoom,
@@ -222,7 +222,7 @@ export function useChatRoomDataSync({
       let latestMessage: ChatMessage | undefined;
       let latestMessageTime = Number.NEGATIVE_INFINITY;
       summarySourceMessages.forEach((message: ChatMessage) => {
-        const createdAt = new Date(message.created_at || 0).getTime();
+        const createdAt = toChatDate(message.created_at || 0).getTime();
         if (!Number.isFinite(createdAt)) return;
         if (createdAt >= latestMessageTime) {
           latestMessageTime = createdAt;
@@ -1274,8 +1274,8 @@ export function useChatRoomDataSync({
           .filter((room: ChatRoom) => getDirectRoomMembersKey(room) === selectedRoomKey)
           .sort(
             (left: ChatRoom, right: ChatRoom) =>
-              new Date(right.last_message_at || right.created_at || 0).getTime() -
-              new Date(left.last_message_at || left.created_at || 0).getTime(),
+              toChatDate(right.last_message_at || right.created_at || 0).getTime() -
+              toChatDate(left.last_message_at || left.created_at || 0).getTime(),
           )[0]
       : null;
     if (canonicalDirectRoom?.id && String(canonicalDirectRoom.id) !== roomIdForFetch) {
@@ -1326,7 +1326,7 @@ export function useChatRoomDataSync({
         });
         return [...enrichedMessages, ...localOnly].sort(
           (left: ChatMessage, right: ChatMessage) =>
-            new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime(),
+            toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
         );
       });
     }

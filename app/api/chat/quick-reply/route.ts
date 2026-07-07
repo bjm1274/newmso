@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     // 메시지 삽입 — D1에 직접 삽입
     const trimmedContent = content.trim().slice(0, 2000);
-    const messageCreatedAt = new Date().toISOString();
+    const messageCreatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const messageId = crypto.randomUUID();
     await db.insert(messagesTable).values({
       id: messageId,
