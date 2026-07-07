@@ -204,7 +204,7 @@ export function Step2Settlement({
     ];
     taxableChangeFields.forEach((field) => {
       let fallbackVal = staffBreakdown[field];
-      if (field === 'holiday_work_allowance' || field === 'night_work_allowance') {
+      if (field === 'holiday_work_allowance') {
         fallbackVal = 0;
       }
       const result = resolveSalaryAmountForSettlement({

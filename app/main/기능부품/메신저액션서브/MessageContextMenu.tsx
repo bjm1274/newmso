@@ -216,9 +216,9 @@ export default function MessageContextMenu({
                 onReply();
                 onClose();
               }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
             >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">↩</span>
+              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">💬</span>
               <span>답글로 전송</span>
             </button>
 
@@ -236,11 +236,11 @@ export default function MessageContextMenu({
                 }}
                 className={`flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] transition-colors ${
                   canEdit
-                    ? 'text-[var(--foreground)] active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]'
+                    ? 'text-[var(--foreground)] active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]'
                     : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
                 }`}
               >
-                <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✎</span>
+                <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✏️</span>
                 <span>메시지 수정</span>
               </button>
             )}
@@ -252,9 +252,9 @@ export default function MessageContextMenu({
                 onCopy();
                 onClose();
               }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
             >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">⧉</span>
+              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📋</span>
               <span>메시지 복사</span>
             </button>
 
@@ -265,9 +265,9 @@ export default function MessageContextMenu({
                 onForward();
                 onClose();
               }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
             >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✈</span>
+              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📤</span>
               <span>다른 대화로 전달</span>
             </button>
 
@@ -278,7 +278,7 @@ export default function MessageContextMenu({
                 onBookmark();
                 onClose();
               }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
             >
               <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">🔖</span>
               <span>북마크에 저장</span>
@@ -291,9 +291,9 @@ export default function MessageContextMenu({
                 onTask();
                 onClose();
               }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
             >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📋</span>
+              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✅</span>
               <span>할 일로 변환</span>
             </button>
 
@@ -308,7 +308,7 @@ export default function MessageContextMenu({
                       onOpenThread();
                       onClose();
                     }}
-                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
                   >
                     <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">💬</span>
                     <span>스레드 답글 {threadReplyCount && threadReplyCount > 0 ? `(${threadReplyCount})` : ''}</span>
@@ -322,7 +322,7 @@ export default function MessageContextMenu({
                       onReadDetail();
                       onClose();
                     }}
-                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.05)] dark:active:bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
                   >
                     <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">👀</span>
                     <span>읽음 확인</span>
@@ -345,11 +345,11 @@ export default function MessageContextMenu({
               }}
               className={`flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] transition-colors ${
                 canDelete
-                  ? 'text-[var(--danger)] active:bg-[rgba(239,68,68,0.08)] dark:active:bg-[rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.05)] dark:hover:bg-[rgba(239,68,68,0.1)]'
+                  ? 'text-[var(--danger)] active:bg-[rgba(239,68,68,0.12)] dark:active:bg-[rgba(239,68,68,0.22)] hover:bg-[rgba(239,68,68,0.08)] dark:hover:bg-[rgba(239,68,68,0.15)]'
                   : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
               }`}
             >
-              <span aria-hidden="true" className="text-[18px] text-[var(--danger)]">🗑</span>
+              <span aria-hidden="true" className="text-[18px] text-[var(--danger)]">🗑️</span>
               <span>메시지 삭제</span>
             </button>
           </div>
@@ -416,9 +416,9 @@ export default function MessageContextMenu({
             onReply();
             onClose();
           }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
         >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">↩</span>
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">💬</span>
           <span>답글로 전송</span>
           <kbd className="rounded-[4px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">R</kbd>
         </button>
@@ -436,11 +436,11 @@ export default function MessageContextMenu({
             }}
             className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] transition-colors ${
               canEdit
-                ? 'text-[var(--foreground)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]'
+                ? 'text-[var(--foreground)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]'
                 : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
             }`}
           >
-            <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✎</span>
+            <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✏️</span>
             <span>메시지 수정</span>
             <span />
           </button>
@@ -452,9 +452,9 @@ export default function MessageContextMenu({
             onCopy();
             onClose();
           }}
-          className="grid h-9 w-full grid-cols-[var(--touch-target-sm)_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
         >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">⧉</span>
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📋</span>
           <span>메시지 복사</span>
           <kbd className="rounded-[4px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-4)]">⌘C</kbd>
         </button>
@@ -465,9 +465,9 @@ export default function MessageContextMenu({
             onForward();
             onClose();
           }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
         >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✈</span>
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📤</span>
           <span>다른 대화로 전달</span>
           <span />
         </button>
@@ -478,7 +478,7 @@ export default function MessageContextMenu({
             onBookmark();
             onClose();
           }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
         >
           <span aria-hidden="true" className="text-[var(--toss-gray-4)]">🔖</span>
           <span>북마크에 저장</span>
@@ -491,9 +491,9 @@ export default function MessageContextMenu({
             onTask();
             onClose();
           }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
         >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📋</span>
+          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✅</span>
           <span>할 일로 변환</span>
           <span />
         </button>
@@ -509,7 +509,7 @@ export default function MessageContextMenu({
                   onOpenThread();
                   onClose();
                 }}
-                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
               >
                 <span aria-hidden="true" className="text-[var(--toss-gray-4)]">💬</span>
                 <span>스레드 답글 {threadReplyCount && threadReplyCount > 0 ? `(${threadReplyCount})` : ''}</span>
@@ -524,7 +524,7 @@ export default function MessageContextMenu({
                   onReadDetail();
                   onClose();
                 }}
-                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
               >
                 <span aria-hidden="true" className="text-[var(--toss-gray-4)]">👀</span>
                 <span>읽음 확인</span>
@@ -548,11 +548,11 @@ export default function MessageContextMenu({
           }}
           className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] transition-colors ${
             canDelete
-              ? 'text-[var(--danger)] hover:bg-[rgba(239,68,68,0.05)] dark:hover:bg-[rgba(239,68,68,0.1)]'
+              ? 'text-[var(--danger)] hover:bg-[rgba(239,68,68,0.08)] dark:hover:bg-[rgba(239,68,68,0.15)]'
               : 'cursor-not-allowed text-[var(--toss-gray-3)] opacity-50'
           }`}
         >
-          <span aria-hidden="true" className="text-[var(--danger)]">🗑</span>
+          <span aria-hidden="true" className="text-[var(--danger)]">🗑️</span>
           <span>메시지 삭제</span>
           <span />
         </button>

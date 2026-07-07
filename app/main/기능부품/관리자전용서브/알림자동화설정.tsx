@@ -288,7 +288,7 @@ MSO 주식회사 대표이사 (직인생략)`;
             ? crypto.randomUUID()
             : `doc-alp-${s.id}-${schedule.targetYear}-${stepToday}-${Date.now()}`,
           title: docTitle,
-          category: '연차촉진',
+          category: '기타',
           content: docContent,
           company_name: s.company || '전체',
           created_by: s.id,

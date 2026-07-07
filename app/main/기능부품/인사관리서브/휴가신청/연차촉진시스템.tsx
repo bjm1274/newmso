@@ -226,7 +226,7 @@ MSO 주식회사 대표이사 (직인생략)`;
           ? crypto.randomUUID()
           : `doc-alp-${staff.id}-${targetYear}-${step}-${Date.now()}`,
         title: docTitle,
-        category: '연차촉진',
+        category: '기타',
         content: docContent,
         company_name: selectedCo || '전체',
         created_by: staff.id,

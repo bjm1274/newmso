@@ -255,6 +255,9 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string) {
 
   const approvedAnnualLeaveDays = rows.reduce((sum, row) => {
     if (!isApprovedLeaveStatus(row?.status)) return sum;
+    // '연차(부여)'는 연차를 사용한 것이 아니라 신규 부여받은 것이므로 사용 합계에서 제외합니다.
+    if (row?.leave_type === '연차(부여)') return sum;
+
     // 1순위: DB에 이미 저장된 days 값이 유효한 수치라면 우선 사용
     const dbDays = row.days != null ? Number(row.days) : null;
     if (dbDays !== null && !Number.isNaN(dbDays)) {

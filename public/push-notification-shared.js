@@ -449,12 +449,20 @@ function erpBuildNotificationOptions(payload) {
   const isChatNotification = Boolean(
     payload.data && (payload.data.room_id || payload.data.type === 'message' || payload.data.type === 'mention')
   );
+  
+  const isMobile = erpIsMobileDevice();
+
   // 채팅 알림은 답장 버튼 포함 (Web Notification Actions API)
+  // PC 환경(데스크톱)에서는 텍스트 입력창(type: 'text')이 있으면 알림창 크기가 너무 커지므로 일반 버튼만 제공하여 크기를 축소합니다.
   const actions = isChatNotification
-    ? [
-        { action: 'reply', title: '답장', type: 'text', placeholder: '메시지 입력...' },
-        { action: 'open', title: '열기' },
-      ]
+    ? (isMobile
+        ? [
+            { action: 'reply', title: '답장', type: 'text', placeholder: '메시지 입력...' },
+            { action: 'open', title: '열기' },
+          ]
+        : [
+            { action: 'open', title: '열기' },
+          ])
     : [
         { action: 'open', title: '확인하기' },
         { action: 'close', title: '닫기' },
