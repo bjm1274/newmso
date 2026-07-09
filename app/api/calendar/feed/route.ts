@@ -31,11 +31,14 @@ export async function GET(request: NextRequest) {
 
     const staffName = staff?.name || '직원';
 
-    // 2. Get shift schedules (nurse_schedules)
-    const { data: schedules } = await db
+    // 2. Get shift schedules (nurse_schedules) — missing table yields empty feed, not 500
+    const { data: schedules, error: scheduleError } = await db
       .from('nurse_schedules')
       .select('year_month, day, shift_code')
       .eq('staff_id', staffId);
+    if (scheduleError) {
+      console.warn('[calendar/feed] nurse_schedules:', scheduleError.message || scheduleError);
+    }
 
     // 3. Generate ICS string
     let icsContent = [

@@ -15,10 +15,10 @@ import AttendanceDeductionSimulator from '../휴가신청/근태차감시뮬레�
 import AttendanceAnomalyPanel from '../휴가신청/근태이상탐지';
 import { MenuIcon } from '../../조직도서브/조직도측면창';
 import AttendanceBulkEditModal from './근태일괄수정모달';
-import NurseSchedule from '../간호근무표';
+import RosterWorkspace from '../../인사관리워크센터/AttendWorkcenter/RosterWorkspace';
 import AttendanceDashboardView from './근태대시보드뷰';
 import AttendanceCalendarView from './근태달력뷰';
-import AttendanceScheduleView from './근태근무표뷰';
+// AttendanceScheduleView — 레거시 월간 칩 UI, schedule 탭은 RosterWorkspace 로 통합
 import {
   ROSTER_CREATOR_POSITIONS,
   ROSTER_APPROVER_POSITIONS,
@@ -899,25 +899,30 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
   }, [attendanceData, approvedLeaves, filtered]);
 
 
-  if (showShiftWizard) {
+  // 근무표 생성 / 3교대 마법사 → 통합 RosterWorkspace (이중 메뉴 제거)
+  if (showShiftWizard || viewMode === 'schedule') {
     return (
       <div className="h-full flex flex-col bg-[var(--page-bg)] animate-in fade-in duration-300">
         <header className="px-4 py-3 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between shrink-0 shadow-sm z-10 sticky top-0">
-          <h3 className="text-sm font-bold text-foreground">3교대 마법사</h3>
-          <button
-            type="button"
-            title="근태관리로 돌아가기"
-            onClick={() => setShowShiftWizard(false)}
-            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-colors focus:outline-none"
-          >
-            ← 돌아가기
-          </button>
+          <div>
+            <h3 className="text-sm font-bold text-foreground">근무표 편성</h3>
+            <p className="text-[11px] text-[var(--toss-gray-4)]">
+              통합 편집기 · 자동편성 · AI 추천 (근무유형 칩 포함)
+            </p>
+          </div>
+          {showShiftWizard && (
+            <button
+              type="button"
+              title="돌아가기"
+              onClick={() => setShowShiftWizard(false)}
+              className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)] transition-colors focus:outline-none"
+            >
+              ← 돌아가기
+            </button>
+          )}
         </header>
-        <div className="flex-1 min-h-0 overflow-auto">
-          <NurseSchedule
-            staffs={staffs}
-            selectedCo={selectedCo}
-          />
+        <div className="flex-1 min-h-0 overflow-auto p-3">
+          <RosterWorkspace staffs={staffs as never} selectedCo={selectedCo} />
         </div>
       </div>
     );
@@ -1003,42 +1008,7 @@ export default function AttendanceMain({ staffs, selectedCo, user, onRefresh, in
           </div>
         )}
 
-        {viewMode === 'schedule' && (
-          <AttendanceScheduleView
-            selectedMonth={selectedMonth}
-            daysArray={daysArray}
-            teamList={teamList}
-            rosterTeam={rosterTeam}
-            setRosterTeam={setRosterTeam}
-            rosterFiltered={rosterFiltered}
-            toolboxShifts={toolboxShifts}
-            workShifts={workShifts}
-            shiftAssignments={shiftAssignments}
-            shiftLookup={shiftLookup}
-            setAssignment={setAssignment}
-            activeTool={activeTool}
-            setActiveTool={setActiveTool}
-            canCreateRoster={canCreateRoster}
-            canApproveRoster={canApproveRoster}
-            approvalStatus={approvalStatus}
-            approvalPending={approvalPending}
-            pendingApprovals={pendingApprovals}
-            pendingSwaps={pendingSwaps}
-            validateSchedule={validateSchedule}
-            setShowShiftWizard={setShowShiftWizard}
-            handleSubmitApproval={handleSubmitApproval}
-            handleApprove={handleApprove}
-            handleReject={handleReject}
-            handleApproveSwap={handleApproveSwap}
-            handleRejectSwap={handleRejectSwap}
-            handleSwapRequest={handleSwapRequest}
-            showSwapModal={showSwapModal}
-            setShowSwapModal={setShowSwapModal}
-            swapData={swapData}
-            setSwapData={setSwapData}
-            openPrompt={openPrompt}
-          />
-        )}
+        {/* schedule 탭은 상단 early-return 으로 RosterWorkspace 렌더 */}
 
         {viewMode === 'dashboard' && (
           <AttendanceDashboardView stats={stats} selectedMonth={selectedMonth} />

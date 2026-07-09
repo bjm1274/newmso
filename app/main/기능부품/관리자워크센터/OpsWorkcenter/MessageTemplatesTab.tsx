@@ -17,102 +17,102 @@ import MessageTemplateCard, {
   type MessageChannel,
   type MessageTemplate } from './MessageTemplateCard';
 
-// ─── fallback 12종 (상세 content 본문 추가) ──────────────────────────
+// ─── 기본 템플릿 12종 (D1 비어 있을 때 시드용 — 발송 횟수 0, 가짜 지표 없음) ──
 const FALLBACK_TEMPLATES: MessageTemplate[] = [
   {
     id: 'tmpl-attendance',
     name: '출퇴근 알림',
     channel: '푸시',
-    sendCount: 1840,
-    lastSentLabel: '오늘',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] #{name}님의 #{type} 등록이 완료되었습니다.\n• 일시: #{time}\n• 상태: #{status}\n오늘도 좋은 하루 보내세요!` },
   {
     id: 'tmpl-approval-req',
     name: '결재 요청 알림',
     channel: '카카오',
-    sendCount: 142,
-    lastSentLabel: '5/26',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 📄 신규 결재 요청\n#{name}님이 작성하신 '#{title}' 결재문서가 승인 요청되었습니다.\n결재 대기 목록에서 확인 후 승인해 주시기 바랍니다.` },
   {
     id: 'tmpl-approval-ok',
     name: '결재 승인 알림',
     channel: '카카오',
-    sendCount: 98,
-    lastSentLabel: '5/26',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 🎉 결재 최종 승인\n귀하가 요청하신 '#{title}' 결재문서가 승인 완료되었습니다.\n지금 전자결재 보관함에서 확인해 보세요.` },
   {
     id: 'tmpl-payroll',
     name: '급여 명세서',
     channel: '이메일',
-    sendCount: 27,
-    lastSentLabel: '5/25',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] ✉️ #{month}월 급여명세서 발행\n#{name}님의 #{month}월 급여명세서가 안전하게 발송되었습니다.\n상세 내역 확인 및 전자 서명을 기한 내에 진행해 주세요.` },
   {
     id: 'tmpl-annual-ok',
     name: '연차 승인',
     channel: '카카오',
-    sendCount: 64,
-    lastSentLabel: '5/24',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 🌴 연차 승인 안내\n#{name}님의 연차 휴가 신청이 승인되었습니다.\n• 일정: #{date}\n• 잔여연차: #{remain}일` },
   {
     id: 'tmpl-annual-notify',
     name: '연차 알림',
     channel: '푸시',
-    sendCount: 48,
-    lastSentLabel: '5/23',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 📅 연차 사용 촉진 안내\n근로기준법 제61조에 따라 잔여 연차 사용을 촉진합니다.\n• 잔여연차: #{remain}일\n만료 전까지 사용 계획을 등록해 주세요.` },
   {
     id: 'tmpl-dinner',
     name: '회식 안내',
     channel: '웍스',
-    sendCount: 12,
-    lastSentLabel: '5/20',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 🍺 전사 회식 안내\n이번 달 임직원 친목 도모를 위한 전사 회식을 안내합니다.\n• 일시: #{date} #{time}\n• 장소: #{location}\n참석 여부를 투표해 주세요!` },
   {
     id: 'tmpl-condolence',
     name: '경조사',
     channel: '카카오',
-    sendCount: 18,
-    lastSentLabel: '5/18',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[newMSO] 🙏 경조사 알림\n임직원 #{name}님의 #{event} 소식을 전해드립니다.\n• 일시: #{date}\n• 장소: #{location}\n따뜻한 위로와 축하를 보내주시기 바랍니다.` },
   {
     id: 'tmpl-emergency',
     name: '비상 호출',
     channel: 'SMS',
-    sendCount: 3,
-    lastSentLabel: '5/12',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `🚨 [newMSO 비상호출] 🚨\n현재 #{location} 구역에 응급 상황이 발생하였습니다.\n대기 중인 전 의료진은 즉시 해당 위치로 이동해 주시기 바랍니다.` },
   {
     id: 'tmpl-patient-arrive',
     name: '환자 도착',
     channel: '푸시',
-    sendCount: 412,
-    lastSentLabel: '오늘',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[병원 알림] 🏥 대기 환자 접수 완료\n#{name} 환자분이 접수되었습니다.\n• 대기번호: #{number}번\n진료 대기 현황판을 확인해 주세요.` },
   {
     id: 'tmpl-clinic-close',
     name: '진료 마감',
     channel: '슬랙',
-    sendCount: 31,
-    lastSentLabel: '5/26',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[병원 알림] ⏰ 금일 진료 마감 안내\n오늘 진료 일정이 모두 완료되어 접수를 마감합니다.\n인계 기록지 및 일일 보고 작성을 진행해 주시기 바랍니다.` },
   {
     id: 'tmpl-notice',
     name: '일반 공지',
     channel: '이메일',
-    sendCount: 86,
-    lastSentLabel: '5/26',
+    sendCount: 0,
+    lastSentLabel: undefined,
     status: '활성',
     content: `[공지사항] 📢 전체 임직원 공지\n#{title}\n\n상세 내용은 사내 게시판에서 확인하실 수 있습니다. 관련 부서원들은 숙지 바랍니다.` },
 ];
@@ -176,11 +176,12 @@ function saveLocalCustomTemplates(templates: MessageTemplate[]) {
 export default function MessageTemplatesTab() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<'supabase' | 'fallback'>('fallback');
+  /** d1 = 실데이터, seed = D1 비어 있어 기본 문구 시드, local = D1 실패 시 로컬 임시 */
+  const [source, setSource] = useState<'d1' | 'seed' | 'local'>('seed');
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
   const [previewingTemplate, setPreviewingTemplate] = useState<MessageTemplate | null>(null);
 
-  // 1. 초기 로드
+  // 1. 초기 로드 — D1 우선
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -192,32 +193,46 @@ export default function MessageTemplatesTab() {
 
         if (!alive) return;
 
-        if (error || !Array.isArray(data) || data.length === 0) {
-          // D1 또는 Supabase에 테이블이 없는 404/403 상황 -> localStorage + fallback 머지
+        if (error) {
+          // D1 오류 시에만 localStorage 폴백 (명시 라벨)
           const locals = getLocalCustomTemplates();
           const merged = FALLBACK_TEMPLATES.map((fb) => {
             const matched = locals.find((l) => l.id === fb.id);
             return matched ? { ...fb, ...matched } : fb;
           });
+          // 로컬에만 있는 커스텀 템플릿 추가
+          for (const l of locals) {
+            if (!merged.some((m) => m.id === l.id)) merged.push(l);
+          }
           setTemplates(merged);
-          setSource('fallback');
-        } else {
-          // 데이터가 실제 존재하는 경우
+          setSource('local');
+          return;
+        }
+
+        if (Array.isArray(data) && data.length > 0) {
           const parsed = data.map(toTemplate).filter((t): t is MessageTemplate => t !== null);
           if (parsed.length > 0) {
             setTemplates(parsed);
-            setSource('supabase');
+            setSource('d1');
+            return;
           }
         }
+
+        // D1 연결됨 + 비어 있음 → 기본 문구 시드(가짜 발송수 없음), 저장 시 D1 upsert
+        setTemplates(FALLBACK_TEMPLATES);
+        setSource('seed');
       } catch {
-        // 에러 시 로컬 보존
+        if (!alive) return;
         const locals = getLocalCustomTemplates();
         const merged = FALLBACK_TEMPLATES.map((fb) => {
           const matched = locals.find((l) => l.id === fb.id);
           return matched ? { ...fb, ...matched } : fb;
         });
+        for (const l of locals) {
+          if (!merged.some((m) => m.id === l.id)) merged.push(l);
+        }
         setTemplates(merged);
-        setSource('fallback');
+        setSource('local');
       } finally {
         if (alive) setLoading(false);
       }
@@ -232,7 +247,7 @@ export default function MessageTemplatesTab() {
     [templates],
   );
 
-  // 2. 편집 핸들러
+  // 2. 편집 핸들러 — D1 우선 upsert, 실패 시 로컬 임시
   const handleEditSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTemplate) return;
@@ -251,8 +266,7 @@ export default function MessageTemplatesTab() {
     );
     setTemplates(nextTemplates);
 
-    // D1 또는 Supabase가 없으므로 localStorage에 항상 동기화 저장
-    if (source === 'fallback') {
+    if (source === 'local') {
       const locals = getLocalCustomTemplates();
       const existingIdx = locals.findIndex((l) => l.id === editingTemplate.id);
       if (existingIdx >= 0) {
@@ -261,27 +275,41 @@ export default function MessageTemplatesTab() {
         locals.push(editingTemplate);
       }
       saveLocalCustomTemplates(locals);
-    } else {
-      // Supabase 테이블이 활성화되어 있을 때를 대비한 동기화
-      (async () => {
-        try {
-          await db
-            .from('message_templates')
-            .update({
-              name: editingTemplate.name,
-              channel: editingTemplate.channel,
-              status: editingTemplate.status,
-              content: editingTemplate.content,
-              updated_at: new Date().toISOString() })
-            .eq('id', editingTemplate.id);
-        } catch (err) {
-          console.error('Failed to sync updated template to DB:', err);
-        }
-      })();
+      toast('로컬 임시 저장되었습니다. (D1 미연결)', 'success');
+      setEditingTemplate(null);
+      return;
     }
 
-    toast('메시지 템플릿이 성공적으로 저장되었습니다.', 'success');
-    setEditingTemplate(null);
+    (async () => {
+      try {
+        const payload = {
+          id: editingTemplate.id,
+          name: editingTemplate.name,
+          channel: editingTemplate.channel,
+          status: editingTemplate.status,
+          content: editingTemplate.content ?? '',
+          send_count: editingTemplate.sendCount ?? 0,
+          last_sent_label: editingTemplate.lastSentLabel ?? null,
+          updated_at: new Date().toISOString() };
+        // upsert: seed 모드에서도 D1에 실저장
+        const { error } = await db.from('message_templates').upsert([payload]);
+        if (error) throw new Error(error.message);
+        setSource('d1');
+        toast('메시지 템플릿이 D1에 저장되었습니다.', 'success');
+      } catch (err) {
+        console.error('Failed to sync template to D1:', err);
+        // D1 쓰기 실패 → 로컬 임시 강등
+        const locals = getLocalCustomTemplates();
+        const existingIdx = locals.findIndex((l) => l.id === editingTemplate.id);
+        if (existingIdx >= 0) locals[existingIdx] = editingTemplate;
+        else locals.push(editingTemplate);
+        saveLocalCustomTemplates(locals);
+        setSource('local');
+        toast('D1 저장 실패 — 로컬 임시로 보존했습니다.', 'warning');
+      } finally {
+        setEditingTemplate(null);
+      }
+    })();
   };
 
   // 미리보기 렌더링을 위한 파라미터 변환 맵
@@ -315,7 +343,13 @@ export default function MessageTemplatesTab() {
           <b className="text-[var(--foreground)] tabular-nums">{totalSends.toLocaleString('ko-KR')}</b>회
         </p>
         <p className="text-[10.5px] text-[var(--toss-gray-3)]" aria-live="polite">
-          {loading ? '동기화 중…' : source === 'supabase' ? '실데이터 (D1)' : '샘플 데이터 (오프라인 보존)'}
+          {loading
+            ? '동기화 중…'
+            : source === 'd1'
+              ? '실데이터 (D1)'
+              : source === 'seed'
+                ? '기본 문구 (D1 비어 있음 · 저장 시 서버 반영)'
+                : '로컬 임시 (D1 미연결)'}
         </p>
       </div>
 

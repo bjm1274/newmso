@@ -20,10 +20,29 @@ export function triggerMobileChatPush(roomId: string, messageId: string): void {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       keepalive: true,
-      body: JSON.stringify({ roomId: room, messageId: message }) }).catch(() => {
-      // 트리거 실패는 무시 — 메시지 INSERT 시 적재된 chat_push_jobs 큐를 cron/flush가 회수한다.
-    });
+      body: JSON.stringify({ roomId: room, messageId: message }),
+    })
+      .then((res) => {
+        if (res.ok) return;
+        // 즉시 실패 시 큐 flush 폴백
+        return fetch('/api/notifications/chat-push-flush', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          keepalive: true,
+          body: JSON.stringify({ limit: 5 }),
+        });
+      })
+      .catch(() => {
+        void fetch('/api/notifications/chat-push-flush', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          keepalive: true,
+          body: JSON.stringify({ limit: 5 }),
+        }).catch(() => {});
+      });
   } catch {
-    // fetch 자체가 던지는 경우(드묾)도 큐 폴백에 의존.
+    // fetch 자체가 던지는 경우도 서버 enqueue + 5분 cron 이 회수.
   }
 }

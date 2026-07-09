@@ -39,7 +39,6 @@ import {
 import ContractGenWizard from './DocsWorkcenter/ContractGenWizard';
 import DocsContractSummary from './DocsWorkcenter/DocsContractSummary';
 import DocsGenSummary from './DocsWorkcenter/DocsGenSummary';
-import DocsStoreSummary from './DocsWorkcenter/DocsStoreSummary';
 import DocsSubmSummary from './DocsWorkcenter/DocsSubmSummary';
 import type { DocsTabId } from './DocsWorkcenter/types';
 
@@ -367,8 +366,8 @@ export default function DocsWorkcenter({
           </div>
         )}
         {tab === 'repository' && (
-          <div className="flex flex-col gap-3">
-            <DocsStoreSummary />
+          <div className="flex min-h-0 flex-col gap-2">
+            {/* DocsStoreSummary 중복 목록 제거 — 문서보관함 단일 UI로 통합 */}
             <WorkcenterEmbed label="문서보관함">
               <DocumentRepository
                 user={user}

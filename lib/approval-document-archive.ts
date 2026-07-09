@@ -7,6 +7,7 @@ import {
   document_repository as documentRepositoryTable,
   eq,
   desc } from '@/lib/db';
+import { resolveApprovalDocCategory } from '@/lib/document-repository-categories';
 
 type ApprovalArchiveSource = Record<string, unknown>;
 
@@ -119,24 +120,14 @@ function resolveApprovalDocNumber(item: ApprovalArchiveSource) {
 }
 
 function resolveApprovalCategory(item: ApprovalArchiveSource) {
-  const type = String(item.type || '').trim();
-  if (type.includes('계약')) return '근로계약서';
-  if (
-    type === '연차/휴가' ||
-    type === '연차계획서' ||
-    type === '연장근무' ||
-    type === '물품신청' ||
-    type === '수리요청' ||
-    type === '업무기안' ||
-    type === '업무협조' ||
-    type === '양식신청' ||
-    type === '출결정정' ||
-    type === '인사명령'
-  ) {
-    return '양식';
-  }
-  if (type === '보고서작성') return '보고서';
-  return '기타';
+  // 양식별 개별 분류 (물품신청·수리요청서·연차/휴가 …) + 시스템 문서(연차촉진 등)
+  const meta = safeParseMetaData(item.meta_data);
+  return resolveApprovalDocCategory({
+    type: String(item.type || '').trim() || null,
+    title: String(item.title || '').trim() || null,
+    formSlug: String(meta.form_slug || '').trim() || null,
+    formName: String(meta.form_name || '').trim() || null,
+  });
 }
 
 function buildApprovalArchiveContent(item: ApprovalArchiveSource) {

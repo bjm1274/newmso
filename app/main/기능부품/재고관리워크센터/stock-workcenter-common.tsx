@@ -66,8 +66,12 @@ export type KpiItem = {
 };
 
 export function KpiRow({ items }: { items: KpiItem[] }) {
+  const cols =
+    items.length >= 5
+      ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-5'
+      : 'grid-cols-2 md:grid-cols-4';
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className={`grid gap-2.5 ${cols}`}>
       {items.map((it) => (
         <KpiCard key={it.label} item={it} />
       ))}

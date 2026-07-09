@@ -10,7 +10,7 @@ export default defineConfig({
   },
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -20,7 +20,7 @@ export default defineConfig({
     command: process.env.CI
       ? 'npm run start -- --hostname 127.0.0.1 --port 3000'
       : 'npm run dev -- --webpack --hostname 127.0.0.1 --port 3000',
-    url: 'http://127.0.0.1:3000',
+    url: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000',
     reuseExistingServer: true,
     timeout: 120_000,
   },

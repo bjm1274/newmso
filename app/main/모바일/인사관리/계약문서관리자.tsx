@@ -34,7 +34,7 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
   const [repoFiles, setRepoFiles] = useState<any[]>([]);
   const [loadingRepo, setLoadingRepo] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [docCategory, setDocCategory] = useState('회사규정');
+  const [docCategory, setDocCategory] = useState('규정');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 4. 계약서 생성 상태
@@ -333,9 +333,12 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   fontWeight: 700,
                   background: 'white' }}
               >
-                <option value="회사규정">회사규정</option>
-                <option value="각종서식">각종서식</option>
-                <option value="인사발령서">인사발령서</option>
+                <option value="규정">규정</option>
+                <option value="양식">양식</option>
+                <option value="근로계약서">근로계약서</option>
+                <option value="연차촉진">연차촉진</option>
+                <option value="제출서류">제출서류</option>
+                <option value="기타">기타</option>
               </select>
               <MBtn
                 variant="primary"

@@ -929,7 +929,8 @@ export default function ChatView({
     );
     if (targetRoomIds.length === 0) return;
 
-    const resolvedReadAt = readAt || new Date().toISOString();
+    // 읽음 커서·알림 시각: SQL 포맷 우선 (D1 문자열 비교 정합)
+    const resolvedReadAt = readAt || new Date().toISOString().slice(0, 19).replace('T', ' ');
     await Promise.allSettled(
       targetRoomIds.map((targetRoomId) =>
         d1.from('notifications')
@@ -1123,9 +1124,11 @@ export default function ChatView({
 
   const triggerChatPush = useCallback(async (roomId: string, messageId: string) => {
     try {
+      // 1) 해당 메시지 즉시 푸시 (카톡급)
       const response = await fetch('/api/notifications/chat-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         keepalive: true,
         body: JSON.stringify({ roomId, messageId }) });
 
@@ -1133,8 +1136,25 @@ export default function ChatView({
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || `push trigger failed (${response.status})`);
       }
+
+      // 2) 백업: 큐에 남은 미발송 소량 flush (실패 무시, 비용 가드 limit 5)
+      void fetch('/api/notifications/chat-push-flush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        keepalive: true,
+        body: JSON.stringify({ limit: 5 }),
+      }).catch(() => {});
     } catch (error) {
       logger.error('chat push trigger failed', error);
+      // 실패 시에도 flush로 회수 시도
+      void fetch('/api/notifications/chat-push-flush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        keepalive: true,
+        body: JSON.stringify({ limit: 8 }),
+      }).catch(() => {});
     }
   }, []);
 
@@ -1494,7 +1514,7 @@ export default function ChatView({
       });
 
       if (!isOwnMessage && user?.id) {
-        const readAt = new Date().toISOString();
+        const readAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [roomId];
         void persistRoomReadCursors(targetRoomIds, readAt)
           .then(async (cursorWriteOk) => {

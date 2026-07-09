@@ -46,61 +46,42 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
   const [payrollLinkTab, setPayrollLinkTab] = useState<'sync'>('sync');
   const [taxReportingTab, setTaxReportingTab] = useState<'dashboard'>('dashboard');
 
-  // --- Dynamic New States ---
-  const [expenses, setExpenses] = useState([
-    { id: 'exp-1', date: '2026-06-20', name: '김철수 (외래간호)', desc: '의료 학회 참석 여비', category: '여비교통비', amount: 120000, state: '대기중' },
-    { id: 'exp-2', date: '2026-06-21', name: '이영희 (행정지원)', desc: '원내 데스크용 필기구 구매', category: '소모품비', amount: 45000, state: '승인완료' },
-    { id: 'exp-3', date: '2026-06-22', name: '박민수 (물리치료)', desc: '치료실 소형 비품 교체', category: '소모품비', amount: 89000, state: '반려' },
-  ]);
+  // --- Dynamic New States (D1 미연동 섹션은 빈 목록 + 데모 배너) ---
+  type ExpenseRow = { id: string; date: string; name: string; desc: string; category: string; amount: number; state: string };
+  type DisbRow = { id: string; date: string; vendor: string; desc: string; amount: number; state: string };
+  type PayrollSyncRow = { period: string; totalAmount: number; empCount: number; state: string; synced_at: string };
+  type TaxReportRow = { type: string; period: string; deadline: string; status: string; fileUrl: string };
+  type JournalRow = { id: string; date: string; desc: string; debitAcc: string; creditAcc: string; amount: number };
+  type FixedAssetRow = { id: string; name: string; category: string; date: string; cost: number; salvage: number; usefulLife: number; method: string };
+  type BankSyncRow = { id: string; type: string; name: string; num: string; state: string; updated_at: string; company_id?: string | null };
+  type ClosingTask = { id: number; text: string; done: boolean };
+  type ReconcileIssue = { id: number; vendor: string; date: string; ledgerAmt: number; taxInvoiceAmt: number; diff: number; reason: string };
+
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [newExpense, setNewExpense] = useState({ desc: '', category: '소모품비', amount: '' });
 
-  const [disbursements, setDisbursements] = useState([
-    { id: 'disb-1', date: '2026-06-25', vendor: '(주)나라메디칼', desc: '의료기기 리스료 납부 건', amount: 3500000, state: '결재완료' },
-    { id: 'disb-2', date: '2026-06-27', vendor: '(주)아산메디텍', desc: '의료 소모품 매입 대금 결제', amount: 1500000, state: '승인대기' },
-    { id: 'disb-3', date: '2026-06-30', vendor: '대성타워 임대인', desc: '7월 원내 임차료 지급 건', amount: 2000000, state: '기안중' },
-  ]);
+  const [disbursements, setDisbursements] = useState<DisbRow[]>([]);
   const [newDisb, setNewDisb] = useState({ vendor: '', desc: '', amount: '' });
 
-  const [payrollSyncs, setPayrollSyncs] = useState([
-    { period: '2026년 05월 급여', totalAmount: 48500000, empCount: 15, state: '전송완료', synced_at: '2026-05-25 10:12' },
-    { period: '2026년 06월 급여', totalAmount: 51200000, empCount: 16, state: '대기중', synced_at: '-' },
-  ]);
+  const [payrollSyncs, setPayrollSyncs] = useState<PayrollSyncRow[]>([]);
 
-  const [taxReports, setTaxReports] = useState([
-    { type: '원천세', period: '2026년 06월분', deadline: '2026-07-10', status: '작성중', fileUrl: '#' },
-    { type: '부가세', period: '2026년 1기 확정', deadline: '2026-07-25', status: '대기', fileUrl: '#' },
-    { type: '법인세', period: '2026년 중간예납', deadline: '2026-08-31', status: '대기', fileUrl: '#' },
-  ]);
+  const [taxReports, setTaxReports] = useState<TaxReportRow[]>([]);
 
   const [loading, setLoading] = useState(true);
+  /** D1 로드 실패 시 데모/오프라인 안내 */
+  const [demoMode, setDemoMode] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // --- Dynamic Data States ---
-  
-  // 1. Journal Entries (복식부기 분개장)
-  const [journalEntries, setJournalEntries] = useState([
-    { id: '1', date: '2026-06-18', desc: '의료 소모품 매입', debitAcc: '소모품비', creditAcc: '외상매입금', amount: 1500000 },
-    { id: '2', date: '2026-06-19', desc: '외래 진료 수입', debitAcc: '보통예금', creditAcc: '의료수입', amount: 4800000 },
-    { id: '3', date: '2026-06-20', desc: '사무실 임차료 지급', debitAcc: '지급임차료', creditAcc: '보통예금', amount: 2000000 },
-    { id: '4', date: '2026-06-20', desc: '법인 차량 주유비 결제', debitAcc: '차량유지비', creditAcc: '미지급금(카드)', amount: 85000 },
-  ]);
+  // --- Dynamic Data States (D1: journal_entries / fixed_assets / bank_accounts_sync) ---
+  const [journalEntries, setJournalEntries] = useState<JournalRow[]>([]);
   const [newEntry, setNewEntry] = useState({ desc: '', debitAcc: '소모품비', creditAcc: '보통예금', amount: '' });
 
-  // 2. Fixed Assets (고정자산 대장)
-  const [fixedAssets, setFixedAssets] = useState([
-    { id: '1', name: '초음파 진단 장비 (GE)', category: '의료기기', date: '2025-01-10', cost: 45000000, salvage: 4500000, usefulLife: 5, method: '정액법' },
-    { id: '2', name: '업무용 승합차 (카니발)', category: '차량운반구', date: '2025-05-15', cost: 32000000, salvage: 3200000, usefulLife: 5, method: '정률법' },
-    { id: '3', name: '원내 메인 서버 PC', category: '공구기구', date: '2026-02-01', cost: 6000000, salvage: 600000, usefulLife: 4, method: '정액법' },
-  ]);
+  const [fixedAssets, setFixedAssets] = useState<FixedAssetRow[]>([]);
   const [newAsset, setNewAsset] = useState({ name: '', category: '의료기기', date: '', cost: '', salvage: '', usefulLife: '5', method: '정액법' });
 
-  // 3. Bank Syncs (금융 연동 현황)
-  const [bankSyncs, setBankSyncs] = useState<any[]>([
-    { id: 'acc-1', type: '은행', name: '기업은행', num: '123-45678-01-011', state: '연동중', updated_at: '5분 전 동기화' },
-    { id: 'acc-2', type: '은행', name: '신한은행', num: '110-234-567890', state: '연동중', updated_at: '5분 전 동기화' },
-    { id: 'acc-3', type: '카드', name: '현대 법인카드', num: '4311-****-****-1234', state: '연동중', updated_at: '방금 전 동기화' }
-  ]);
+  const [bankSyncs, setBankSyncs] = useState<BankSyncRow[]>([]);
 
-  // 4. Tax Calendar (세무 일정)
+  // 세무 일정: 법정 일정 안내(거래 숫자가 아닌 참고 캘린더)
   const taxSchedules = [
     { date: '2026-07-10', title: '6월분 원천세 신고 및 납부', dday: 20, type: 'monthly', desc: '근로소득, 사업소득, 퇴직소득 원천징수분' },
     { date: '2026-07-25', title: '2026년 1기 부가가치세 확정 신고', dday: 35, type: 'quarterly', desc: '1월~6월 매출/매입 세금계산서 신고 및 납부' },
@@ -108,103 +89,100 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
     { date: '2026-09-10', title: '8월분 원천세 신고 및 납부', dday: 82, type: 'monthly', desc: '원천징수 의무이행 사항' }
   ];
 
-  // 5. Closing Month Tasks (월마감 결산 체크리스트)
-  const [closingTasks, setClosingTasks] = useState([
-    { id: 1, text: '신한은행/국민은행 통장 잔액 대사 완료', done: true },
-    { id: 2, text: '당월 매출 세금계산서 발행 및 매입 세금계산서 대조 완료', done: true },
+  const [closingTasks, setClosingTasks] = useState<ClosingTask[]>([
+    { id: 1, text: '은행 통장 잔액 대사 완료', done: false },
+    { id: 2, text: '당월 매출·매입 세금계산서 대조 완료', done: false },
     { id: 3, text: '급여대장 전표 입력 및 원천징수 금액 검증 완료', done: false },
     { id: 4, text: '고정자산 감가상각 전표 등록 완료', done: false },
     { id: 5, text: '선급비용 및 미지급비용 당월 배부 처리 완료', done: false },
   ]);
   const [isClosingProcess, setIsClosingProcess] = useState(false);
 
-  // 6. AP Reconciliation Discrepancies (매입 세금계산서 대사 불일치 내역)
-  const reconcileIssues = [
-    { id: 1, vendor: '(주)나라메디칼', date: '2026-06-10', ledgerAmt: 1200000, taxInvoiceAmt: 1500000, diff: 300000, reason: '단가 입력 오류 (세금계산서 금액이 맞음)' },
-    { id: 2, vendor: '삼우오피스', date: '2026-06-15', ledgerAmt: 550000, taxInvoiceAmt: 0, diff: -550000, reason: '공급업체 세금계산서 미발행 건' }
-  ];
+  // 매입 대사 불일치: D1 테이블 없음 → 빈 목록
+  const reconcileIssues: ReconcileIssue[] = [];
 
   // --- DB Data Loading ---
   useEffect(() => {
     let active = true;
     async function loadDbData() {
       setLoading(true);
+      setLoadError(null);
       try {
         const targetCompanyId = selectedCompanyId || user?.company_id || null;
 
-        // 1. Fetch journal entries scoped by company_id
+        // 1. journal_entries
         let entriesQuery = db.from('journal_entries').select('*');
         if (targetCompanyId) {
           entriesQuery = entriesQuery.eq('company_id', targetCompanyId);
         }
         const { data: entries, error: err1 } = await entriesQuery.order('date', { ascending: false });
 
-        if (active && entries && entries.length > 0) {
-          setJournalEntries(entries.map((e: any) => ({
-            id: e.id,
-            date: e.date,
-            desc: e.desc,
-            debitAcc: e.debit_acc,
-            creditAcc: e.credit_acc,
-            amount: e.amount
-          })));
-        } else if (active) {
-          // If no entries found in DB, use mock defaults
-          setJournalEntries([
-            { id: '1', date: '2026-06-18', desc: '의료 소모품 매입', debitAcc: '소모품비', creditAcc: '외상매입금', amount: 1500000 },
-            { id: '2', date: '2026-06-19', desc: '외래 진료 수입', debitAcc: '보통예금', creditAcc: '의료수입', amount: 4800000 },
-            { id: '3', date: '2026-06-20', desc: '사무실 임차료 지급', debitAcc: '지급임차료', creditAcc: '보통예금', amount: 2000000 },
-            { id: '4', date: '2026-06-20', desc: '법인 차량 주유비 결제', debitAcc: '차량유지비', creditAcc: '미지급금(카드)', amount: 85000 },
-          ]);
-        }
-
-        // 2. Fetch fixed assets scoped by company_id
+        // 2. fixed_assets
         let assetsQuery = db.from('fixed_assets').select('*');
         if (targetCompanyId) {
           assetsQuery = assetsQuery.eq('company_id', targetCompanyId);
         }
         const { data: assets, error: err2 } = await assetsQuery;
 
-        if (active && assets && assets.length > 0) {
-          setFixedAssets(assets.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            category: a.category,
-            date: a.date,
-            cost: a.cost,
-            salvage: a.salvage,
-            usefulLife: a.useful_life,
-            method: a.method
-          })));
-        } else if (active) {
-          setFixedAssets([
-            { id: '1', name: '초음파 진단 장비 (GE)', category: '의료기기', date: '2025-01-10', cost: 45000000, salvage: 4500000, usefulLife: 5, method: '정액법' },
-            { id: '2', name: '업무용 승합차 (카니발)', category: '차량운반구', date: '2025-05-15', cost: 32000000, salvage: 3200000, usefulLife: 5, method: '정률법' },
-            { id: '3', name: '원내 메인 서버 PC', category: '공구기구', date: '2026-02-01', cost: 6000000, salvage: 600000, usefulLife: 4, method: '정액법' },
-          ]);
-        }
-
-        // 3. Fetch bank accounts sync scoped by company_id
+        // 3. bank_accounts_sync
         let syncQuery = db.from('bank_accounts_sync').select('*');
         if (targetCompanyId) {
           syncQuery = syncQuery.eq('company_id', targetCompanyId);
         }
         const { data: syncData, error: err3 } = await syncQuery;
 
-        if (active && syncData && syncData.length > 0) {
-          setBankSyncs(syncData);
-        } else if (active) {
-          // Initialize defaults in D1 DB if empty
-          const defaults = [
-            { id: 'acc-1', company_id: targetCompanyId, type: '은행', name: '기업은행', num: '123-45678-01-011', state: '연동중', updated_at: new Date().toISOString() },
-            { id: 'acc-2', company_id: targetCompanyId, type: '은행', name: '신한은행', num: '110-234-567890', state: '연동중', updated_at: new Date().toISOString() },
-            { id: 'acc-3', company_id: targetCompanyId, type: '카드', name: '현대 법인카드', num: '4311-****-****-1234', state: '연동중', updated_at: new Date().toISOString() },
-          ];
-          await db.from('bank_accounts_sync').insert(defaults);
-          setBankSyncs(defaults);
+        if (!active) return;
+
+        const hadHardError = Boolean(err1 || err2 || err3);
+        setDemoMode(hadHardError);
+        if (hadHardError) {
+          setLoadError([err1?.message, err2?.message, err3?.message].filter(Boolean).join(' · ') || 'D1 로드 실패');
         }
+
+        setJournalEntries(
+          (entries ?? []).map((e: any) => ({
+            id: String(e.id),
+            date: e.date ?? '',
+            desc: e.desc ?? '',
+            debitAcc: e.debit_acc ?? '',
+            creditAcc: e.credit_acc ?? '',
+            amount: Number(e.amount) || 0,
+          })),
+        );
+
+        setFixedAssets(
+          (assets ?? []).map((a: any) => ({
+            id: String(a.id),
+            name: a.name ?? '',
+            category: a.category ?? '',
+            date: a.date ?? '',
+            cost: Number(a.cost) || 0,
+            salvage: Number(a.salvage) || 0,
+            usefulLife: Number(a.useful_life) || 0,
+            method: a.method ?? '정액법',
+          })),
+        );
+
+        setBankSyncs(
+          (syncData ?? []).map((b: any) => ({
+            id: String(b.id),
+            type: b.type ?? '',
+            name: b.name ?? '',
+            num: b.num ?? '',
+            state: b.state ?? '',
+            updated_at: b.updated_at ?? '',
+            company_id: b.company_id ?? null,
+          })),
+        );
       } catch (err) {
         console.error('Failed to load accounting DB data', err);
+        if (active) {
+          setDemoMode(true);
+          setLoadError(err instanceof Error ? err.message : 'D1 로드 실패');
+          setJournalEntries([]);
+          setFixedAssets([]);
+          setBankSyncs([]);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -319,6 +297,10 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
   };
 
   const handleSyncBanks = async () => {
+    if (bankSyncs.length === 0) {
+      toast('동기화할 금융 계좌가 없습니다. 데이터 없음', 'info');
+      return;
+    }
     try {
       const nowStr = new Date().toISOString();
       const updated = bankSyncs.map(b => ({ ...b, updated_at: nowStr }));
@@ -420,7 +402,33 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
 
       {/* ── 메인 본문 ── */}
       <div className="flex-1 overflow-auto p-5 relative bg-[var(--page-bg)]">
-        
+        {demoMode && (
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2.5 text-[11px] font-semibold text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <div className="font-bold">데모 모드 — D1 재무 테이블 로드 실패</div>
+              <div className="mt-0.5 opacity-90">
+                가짜 숫자는 표시하지 않습니다. {loadError ? `(${loadError})` : ''} 분개·고정자산·금융연동은 서버 연결 후 실데이터로 표시됩니다.
+              </div>
+            </div>
+          </div>
+        )}
+        {!demoMode && !loading && (
+          <div
+            role="status"
+            className="mb-3 flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[10.5px] font-semibold text-[var(--toss-gray-4)]"
+          >
+            <Info size={12} className="text-[var(--accent)]" />
+            분개·고정자산·금융연동: D1 실데이터 · 경비/지출결의/세무신고 등 일부 탭은 연동 준비 중(빈 목록)
+          </div>
+        )}
+        {loading && (
+          <div className="mb-4 text-center text-xs font-bold text-[var(--toss-gray-3)] py-2">재무 데이터 불러오는 중…</div>
+        )}
+
         {/* 1. 복식부기 (double-entry) */}
         {subView === 'double-entry' && (
           <div className="space-y-5">
@@ -492,15 +500,23 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border)] text-xs">
-                        {journalEntries.map(entry => (
-                          <tr key={entry.id} className="hover:bg-[var(--muted)]/40 transition-colors">
-                            <td className="p-3 font-medium text-[var(--toss-gray-4)]">{entry.date}</td>
-                            <td className="p-3 font-semibold text-[var(--foreground)]">{entry.desc}</td>
-                            <td className="p-3 text-emerald-600 font-bold">{entry.debitAcc}</td>
-                            <td className="p-3 text-blue-600 font-bold">{entry.creditAcc}</td>
-                            <td className="p-3 text-right font-black tabular-nums">{entry.amount.toLocaleString()}원</td>
+                        {journalEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                              데이터 없음 — 등록된 분개가 없습니다
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          journalEntries.map(entry => (
+                            <tr key={entry.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                              <td className="p-3 font-medium text-[var(--toss-gray-4)]">{entry.date}</td>
+                              <td className="p-3 font-semibold text-[var(--foreground)]">{entry.desc}</td>
+                              <td className="p-3 text-emerald-600 font-bold">{entry.debitAcc}</td>
+                              <td className="p-3 text-blue-600 font-bold">{entry.creditAcc}</td>
+                              <td className="p-3 text-right font-black tabular-nums">{entry.amount.toLocaleString()}원</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -601,7 +617,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
                   <h3 className="text-sm font-bold text-[var(--foreground)]">국세청 전송 전자세금계산서 현황</h3>
-                  <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">홈택스 연동 상태: 실시간 동기화 완료</span>
+                  <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">홈택스 연동 상태: 연동 준비 중</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -616,25 +632,11 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                      {[
-                        { type: '매출', date: '2026-06-10', co: '(주)아산메디텍', supply: 5000000, vat: 500000, status: '승인완료' },
-                        { type: '매입', date: '2026-06-12', co: '(주)나라메디칼', supply: 1500000, vat: 150000, status: '승인완료' },
-                        { type: '매출', date: '2026-06-15', co: '(주)연세헬스케어', supply: 3000000, vat: 300000, status: '승인완료' },
-                        { type: '매입', date: '2026-06-18', co: '삼우오피스', supply: 550000, vat: 55000, status: '대기중' },
-                      ].map((inv, idx) => (
-                        <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${inv.type === '매출' ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'}`}>{inv.type}</span>
-                          </td>
-                          <td className="p-3 text-[var(--toss-gray-4)]">{inv.date}</td>
-                          <td className="p-3 text-[var(--foreground)]">{inv.co}</td>
-                          <td className="p-3 text-right tabular-nums">{inv.supply.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-red-500 font-bold">{inv.vat.toLocaleString()}원</td>
-                          <td className="p-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${inv.status === '승인완료' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40'}`}>{inv.status}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                          데이터 없음 — 홈택스 세금계산서 연동 준비 중
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -644,28 +646,28 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             {vatTab === 'calculator' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
-                  <h3 className="text-sm font-bold text-[var(--foreground)]">부가세 분기별 모의 계산기 (예측치)</h3>
+                  <h3 className="text-sm font-bold text-[var(--foreground)]">부가세 분기별 모의 계산기</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-4 border border-[var(--border)] rounded-xl bg-[var(--muted)]/20 space-y-1">
                         <span className="text-xs text-[var(--toss-gray-3)] font-bold">매출 과세표준 (매출합계)</span>
-                        <p className="text-lg font-black text-orange-600">8,000,000원</p>
-                        <span className="text-[10px] text-[var(--toss-gray-4)]">매출 부가세(예수금): 800,000원</span>
+                        <p className="text-lg font-black text-[var(--toss-gray-3)]">데이터 없음</p>
+                        <span className="text-[10px] text-[var(--toss-gray-4)]">홈택스 매출 연동 준비 중</span>
                       </div>
                       <div className="p-4 border border-[var(--border)] rounded-xl bg-[var(--muted)]/20 space-y-1">
                         <span className="text-xs text-[var(--toss-gray-3)] font-bold">매입 세액공제 (매입합계)</span>
-                        <p className="text-lg font-black text-blue-600">2,050,000원</p>
-                        <span className="text-[10px] text-[var(--toss-gray-4)]">매입 부가세(대급금): 205,000원</span>
+                        <p className="text-lg font-black text-[var(--toss-gray-3)]">데이터 없음</p>
+                        <span className="text-[10px] text-[var(--toss-gray-4)]">홈택스 매입 연동 준비 중</span>
                       </div>
                     </div>
                     
                     <div className="border-t border-[var(--border)] pt-4 space-y-2">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-[var(--toss-gray-4)]">납부할 세액 (매출세액 - 매입세액)</span>
-                        <span className="text-lg font-black text-red-500">595,000원</span>
+                        <span className="text-lg font-black text-[var(--toss-gray-3)]">—</span>
                       </div>
                       <p className="text-[11px] text-[var(--toss-gray-3)] font-semibold leading-relaxed">
-                        * 본 모의계산은 가상 자료를 바탕으로 산출되었으며, 면세 의료수입은 부가세 과세대상에서 제외되어 있습니다.
+                        * 세금계산서·매출 소스가 연동되면 분기 부가세를 자동 산출합니다. 가짜 예측치는 표시하지 않습니다.
                       </p>
                     </div>
                   </div>
@@ -761,28 +763,16 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
 
             {closingTab === 'statements' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* 재무상태표 */}
+                {/* 재무상태표 — 분개·고정자산 기반 요약 (데이터 없으면 빈 상태) */}
                 <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                   <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]/30">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">재무상태표 (Balance Sheet)</h3>
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">2026년 6월 20일 현재 (단위: 원)</span>
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">분개·고정자산 집계 기준 (단위: 원)</span>
                   </div>
-                  <div className="p-4 space-y-4 text-xs font-semibold">
-                    <div className="space-y-1">
-                      <p className="font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">Ⅰ. 자산 총계: 185,000,000</p>
-                      <div className="pl-4 flex justify-between"><span>유동자산 (예금 등)</span><span>85,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>비유동자산 (의료장비 등)</span><span>100,000,000</span></div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">Ⅱ. 부채 총계: 65,000,000</p>
-                      <div className="pl-4 flex justify-between"><span>유동부채 (외상매입 등)</span><span>45,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>비유동부채 (장기차입 등)</span><span>20,000,000</span></div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">Ⅲ. 자본 총계: 120,000,000</p>
-                      <div className="pl-4 flex justify-between"><span>자본금</span><span>100,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>이익잉여금</span><span>20,000,000</span></div>
-                    </div>
+                  <div className="p-8 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                    {journalEntries.length === 0 && fixedAssets.length === 0
+                      ? '데이터 없음 — 재무상태표 집계 연동 준비 중'
+                      : `분개 ${journalEntries.length}건 · 고정자산 ${fixedAssets.length}건 등록됨. 정식 재무제표 집계 연동 준비 중.`}
                   </div>
                 </div>
 
@@ -790,31 +780,10 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                 <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                   <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]/30">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">손익계산서 (Income Statement)</h3>
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">2026년 6월 당월 (단위: 원)</span>
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">매출 소스 연동 준비 중</span>
                   </div>
-                  <div className="p-4 space-y-4 text-xs font-semibold">
-                    <div className="space-y-1">
-                      <p className="font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">Ⅰ. 매출액 (의료수입): 48,000,000</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">Ⅱ. 매출원가: 18,500,000</p>
-                      <div className="pl-4 flex justify-between"><span>의료 소모품비</span><span>15,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>기타재료비</span><span>3,500,000</span></div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between font-black text-[var(--foreground)] border-b border-[var(--border)] pb-1">
-                        <span>Ⅲ. 판매비와관리비: 12,300,000</span>
-                      </div>
-                      <div className="pl-4 flex justify-between"><span>급여</span><span>8,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>지급임차료</span><span>2,000,000</span></div>
-                      <div className="pl-4 flex justify-between"><span>차량유지비</span><span>2,300,000</span></div>
-                    </div>
-                    <div className="space-y-1 pt-2 border-t-2 border-[var(--border)]">
-                      <div className="flex justify-between font-black text-sm text-[var(--accent)]">
-                        <span>당기순이익 (Net Income)</span>
-                        <span>17,200,000</span>
-                      </div>
-                    </div>
+                  <div className="p-8 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                    데이터 없음 — 가짜 손익 숫자는 표시하지 않습니다
                   </div>
                 </div>
               </div>
@@ -834,14 +803,14 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             {cashFlowTab === 'status' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {[
-                  { title: '통장 잔액 합계', val: '85,420,000원', desc: '기업, 신한, 국민 3개 활성 계좌', icon: Building, color: 'text-emerald-500' },
-                  { title: '금월 매출 채권(AR)', val: '12,500,000원', desc: '회수 예정일: 6월 30일까지', icon: DollarSign, color: 'text-blue-500' },
-                  { title: '법인카드 이용액', val: '1,850,000원', desc: '결제일: 매월 25일 총 한도대비 5%', icon: CreditCard, color: 'text-purple-500' }
+                  { title: '통장 잔액 합계', val: '연동 준비 중', desc: bankSyncs.length > 0 ? `연동 계좌 ${bankSyncs.length}개` : '등록된 계좌 없음', icon: Building, color: 'text-emerald-500' },
+                  { title: '금월 매출 채권(AR)', val: '연동 준비 중', desc: '미수금 소스 연동 예정', icon: DollarSign, color: 'text-blue-500' },
+                  { title: '법인카드 이용액', val: '연동 준비 중', desc: '카드 내역 연동 예정', icon: CreditCard, color: 'text-purple-500' }
                 ].map((card, idx) => (
                   <div key={idx} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm flex items-center justify-between">
                     <div className="space-y-1">
                       <span className="text-xs text-[var(--toss-gray-3)] font-bold">{card.title}</span>
-                      <p className="text-xl font-black text-[var(--foreground)]">{card.val}</p>
+                      <p className="text-xl font-black text-[var(--toss-gray-3)]">{card.val}</p>
                       <span className="text-[10px] text-[var(--toss-gray-4)]">{card.desc}</span>
                     </div>
                     <div className={`p-3 rounded-xl bg-[var(--muted)]/50 ${card.color}`}>
@@ -855,39 +824,8 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
             {cashFlowTab === 'forecast' && (
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
                 <h3 className="text-sm font-bold text-[var(--foreground)]">향후 6개월간의 자금 수지 전망 (Cash Flow Projections)</h3>
-                <div className="space-y-4">
-                  <div className="flex h-36 items-end justify-between gap-3 pt-6 border-b border-[var(--border)]">
-                    {[
-                      { month: '6월', in: 85, out: 60 },
-                      { month: '7월', in: 92, out: 65 },
-                      { month: '8월', in: 78, out: 70 },
-                      { month: '9월', in: 95, out: 62 },
-                      { month: '10월', in: 110, out: 80 },
-                      { month: '11월', in: 105, out: 75 },
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                        <div className="w-full flex justify-center gap-1 items-end h-full">
-                          {/* Inflow Bar */}
-                          <div 
-                            style={{ height: `${item.in}%` }} 
-                            className="w-3 rounded-t-sm bg-blue-500 hover:opacity-85 transition-opacity" 
-                            title={`유입: ${item.in}백만원`}
-                          />
-                          {/* Outflow Bar */}
-                          <div 
-                            style={{ height: `${item.out}%` }} 
-                            className="w-3 rounded-t-sm bg-red-400 hover:opacity-85 transition-opacity" 
-                            title={`유출: ${item.out}백만원`}
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-[var(--toss-gray-4)]">{item.month}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-4 justify-center text-[10px] font-bold">
-                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-blue-500 rounded-xs" /><span>자금 유입 (Inflow)</span></div>
-                    <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-red-400 rounded-xs" /><span>자금 유출 (Outflow)</span></div>
-                  </div>
+                <div className="py-12 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                  데이터 없음 — 자금 예측 차트 연동 준비 중 (가짜 추세 미표시)
                 </div>
               </div>
             )}
@@ -902,21 +840,31 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {bankSyncs.map((sync, idx) => (
-                    <div key={idx} className="p-4 border border-[var(--border)] rounded-xl flex justify-between items-start">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)]">{sync.type}</span>
-                        <h4 className="text-xs font-black text-[var(--foreground)]">{sync.name}</h4>
-                        <p className="text-[10px] text-[var(--toss-gray-3)] font-mono">{sync.num}</p>
-                      </div>
-                      <div className="text-right space-y-1">
-                        <span className="inline-block text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full dark:bg-emerald-950/30">{sync.state}</span>
-                        <p className="text-[9px] text-[var(--toss-gray-3)] font-bold">
-                          {sync.updated_at.includes('동기화') ? sync.updated_at : `${new Date(sync.updated_at).toLocaleTimeString()} 동기화`}
-                        </p>
-                      </div>
+                  {bankSyncs.length === 0 ? (
+                    <div className="md:col-span-3 py-10 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                      데이터 없음 — 등록된 금융 연동 계좌가 없습니다
                     </div>
-                  ))}
+                  ) : (
+                    bankSyncs.map((sync, idx) => (
+                      <div key={sync.id || idx} className="p-4 border border-[var(--border)] rounded-xl flex justify-between items-start">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)]">{sync.type}</span>
+                          <h4 className="text-xs font-black text-[var(--foreground)]">{sync.name}</h4>
+                          <p className="text-[10px] text-[var(--toss-gray-3)] font-mono">{sync.num}</p>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <span className="inline-block text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full dark:bg-emerald-950/30">{sync.state}</span>
+                          <p className="text-[9px] text-[var(--toss-gray-3)] font-bold">
+                            {sync.updated_at
+                              ? (String(sync.updated_at).includes('동기화')
+                                  ? sync.updated_at
+                                  : `${new Date(sync.updated_at).toLocaleTimeString()} 동기화`)
+                              : '미동기화'}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -949,16 +897,24 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                      {assetDepreciation.map(asset => (
-                        <tr key={asset.id} className="hover:bg-[var(--muted)]/40 transition-colors">
-                          <td className="p-3 text-[var(--foreground)]">{asset.name}</td>
-                          <td className="p-3 text-[var(--toss-gray-4)]">{asset.method} ({asset.usefulLife}년)</td>
-                          <td className="p-3 text-right tabular-nums">{asset.cost.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-red-500 font-bold">{(Math.round(asset.deprPerYear / 12)).toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-[var(--toss-gray-4)]">{asset.accumulated.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-emerald-600 font-bold">{asset.bookValue.toLocaleString()}원</td>
+                      {assetDepreciation.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                            데이터 없음 — 등록된 고정자산이 없습니다
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        assetDepreciation.map(asset => (
+                          <tr key={asset.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                            <td className="p-3 text-[var(--foreground)]">{asset.name}</td>
+                            <td className="p-3 text-[var(--toss-gray-4)]">{asset.method} ({asset.usefulLife}년)</td>
+                            <td className="p-3 text-right tabular-nums">{asset.cost.toLocaleString()}원</td>
+                            <td className="p-3 text-right tabular-nums text-red-500 font-bold">{(Math.round(asset.deprPerYear / 12)).toLocaleString()}원</td>
+                            <td className="p-3 text-right tabular-nums text-[var(--toss-gray-4)]">{asset.accumulated.toLocaleString()}원</td>
+                            <td className="p-3 text-right tabular-nums text-emerald-600 font-bold">{asset.bookValue.toLocaleString()}원</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1031,15 +987,23 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                        {fixedAssets.map(asset => (
-                          <tr key={asset.id} className="hover:bg-[var(--muted)]/40 transition-colors">
-                            <td className="p-3 text-[var(--toss-gray-4)] font-mono">AST-00{asset.id}</td>
-                            <td className="p-3 text-[var(--foreground)]">{asset.category}</td>
-                            <td className="p-3 text-[var(--foreground)] font-bold">{asset.name}</td>
-                            <td className="p-3 text-[var(--toss-gray-4)]">{asset.date}</td>
-                            <td className="p-3 text-right tabular-nums">{asset.cost.toLocaleString()}원</td>
+                        {fixedAssets.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                              데이터 없음 — 등록된 고정자산이 없습니다
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          fixedAssets.map(asset => (
+                            <tr key={asset.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                              <td className="p-3 text-[var(--toss-gray-4)] font-mono">{String(asset.id).slice(0, 8)}</td>
+                              <td className="p-3 text-[var(--foreground)]">{asset.category}</td>
+                              <td className="p-3 text-[var(--foreground)] font-bold">{asset.name}</td>
+                              <td className="p-3 text-[var(--toss-gray-4)]">{asset.date}</td>
+                              <td className="p-3 text-right tabular-nums">{asset.cost.toLocaleString()}원</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1076,20 +1040,11 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                      {[
-                        { date: '2026-06-10', co: '(주)나라메디칼', item: '수술장용 주사기 외 12종', supply: 1200000, vat: 120000 },
-                        { date: '2026-06-12', co: '(주)아산메디텍', item: '외래용 거즈 및 드레싱 키트', supply: 2200000, vat: 220000 },
-                        { date: '2026-06-15', co: '삼우오피스', item: '원내 사무용 소모품 및 복사용지', supply: 550000, vat: 55000 },
-                      ].map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
-                          <td className="p-3 text-[var(--toss-gray-4)]">{item.date}</td>
-                          <td className="p-3 text-[var(--foreground)]">{item.co}</td>
-                          <td className="p-3 text-[var(--foreground)]">{item.item}</td>
-                          <td className="p-3 text-right tabular-nums">{item.supply.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-red-500">{item.vat.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums font-black">{(item.supply + item.vat).toLocaleString()}원</td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                          데이터 없음 — 매입원장 연동 준비 중
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1114,20 +1069,11 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                      {[
-                        { code: 'VND-001', name: '(주)나라메디칼', prev: 5000000, buy: 1320000, pay: 5000000, balance: 1320000 },
-                        { code: 'VND-002', name: '(주)아산메디텍', prev: 0, buy: 2420000, pay: 0, balance: 2420000 },
-                        { code: 'VND-003', name: '삼우오피스', prev: 350000, buy: 605000, pay: 350000, balance: 605000 },
-                      ].map((ap, idx) => (
-                        <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
-                          <td className="p-3 text-[var(--toss-gray-4)] font-mono">{ap.code}</td>
-                          <td className="p-3 text-[var(--foreground)] font-bold">{ap.name}</td>
-                          <td className="p-3 text-right tabular-nums">{ap.prev.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-red-500">+{ap.buy.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums text-blue-500">-{ap.pay.toLocaleString()}원</td>
-                          <td className="p-3 text-right tabular-nums font-black text-red-600 bg-red-50/20">{ap.balance.toLocaleString()}원</td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                          데이터 없음 — 매입채무 대장 연동 준비 중
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1142,24 +1088,30 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       <AlertCircle size={15} className="text-amber-500" />
                       <span>매입 세금계산서 대사 불일치 알림 (Reconciliation Discrepancies)</span>
                     </h3>
-                    <span className="text-[11px] font-bold text-red-500">불일치 2건 발생</span>
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">불일치 0건</span>
                   </div>
                   <div className="space-y-3">
-                    {reconcileIssues.map(issue => (
-                      <div key={issue.id} className="p-4 border border-red-100 bg-red-50/20 rounded-xl space-y-2 text-xs">
-                        <div className="flex justify-between items-center font-bold">
-                          <span className="text-[var(--foreground)]">{issue.vendor} ({issue.date})</span>
-                          <span className="text-red-500 font-mono">불일치 금액: {issue.diff.toLocaleString()}원</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-[11px] text-[var(--toss-gray-4)] font-semibold">
-                          <div>매입원장 기록액: {issue.ledgerAmt.toLocaleString()}원</div>
-                          <div>세금계산서 승인액: {issue.taxInvoiceAmt.toLocaleString()}원</div>
-                        </div>
-                        <div className="pt-2 border-t border-[var(--border)] text-[11px] text-amber-600 font-bold">
-                          원인 분석: {issue.reason}
-                        </div>
+                    {reconcileIssues.length === 0 ? (
+                      <div className="py-8 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                        데이터 없음 — 세금계산서 대사 연동 준비 중
                       </div>
-                    ))}
+                    ) : (
+                      reconcileIssues.map(issue => (
+                        <div key={issue.id} className="p-4 border border-red-100 bg-red-50/20 rounded-xl space-y-2 text-xs">
+                          <div className="flex justify-between items-center font-bold">
+                            <span className="text-[var(--foreground)]">{issue.vendor} ({issue.date})</span>
+                            <span className="text-red-500 font-mono">불일치 금액: {issue.diff.toLocaleString()}원</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-[11px] text-[var(--toss-gray-4)] font-semibold">
+                            <div>매입원장 기록액: {issue.ledgerAmt.toLocaleString()}원</div>
+                            <div>세금계산서 승인액: {issue.taxInvoiceAmt.toLocaleString()}원</div>
+                          </div>
+                          <div className="pt-2 border-t border-[var(--border)] text-[11px] text-amber-600 font-bold">
+                            원인 분석: {issue.reason}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -1195,31 +1147,39 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                          {expenses.map(exp => (
-                            <tr key={exp.id} className="hover:bg-[var(--muted)]/40 transition-colors">
-                              <td className="p-3 text-[var(--toss-gray-4)]">{exp.date}</td>
-                              <td className="p-3 text-[var(--foreground)]">{exp.name}</td>
-                              <td className="p-3 text-[var(--foreground)]">{exp.desc}</td>
-                              <td className="p-3 text-[var(--toss-gray-4)]">{exp.category}</td>
-                              <td className="p-3 text-right font-black tabular-nums">{exp.amount.toLocaleString()}원</td>
-                              <td className="p-3 text-center">
-                                {exp.state === '대기중' ? (
-                                  <div className="flex justify-center gap-1.5">
-                                    <button onClick={() => {
-                                      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '승인완료' } : e));
-                                      toast('경비 청구가 승인되었습니다.', 'success');
-                                    }} className="px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100 transition-all">승인</button>
-                                    <button onClick={() => {
-                                      setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '반려' } : e));
-                                      toast('경비 청구가 반려되었습니다.', 'error');
-                                    }} className="px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold hover:bg-red-100 transition-all">반려</button>
-                                  </div>
-                                ) : (
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${exp.state === '승인완료' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-red-50 text-red-600 dark:bg-red-950/40'}`}>{exp.state}</span>
-                                )}
+                          {expenses.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                                데이터 없음 — 경비 청구 서버 연동 준비 중 (세션 등록분만 표시)
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            expenses.map(exp => (
+                              <tr key={exp.id} className="hover:bg-[var(--muted)]/40 transition-colors">
+                                <td className="p-3 text-[var(--toss-gray-4)]">{exp.date}</td>
+                                <td className="p-3 text-[var(--foreground)]">{exp.name}</td>
+                                <td className="p-3 text-[var(--foreground)]">{exp.desc}</td>
+                                <td className="p-3 text-[var(--toss-gray-4)]">{exp.category}</td>
+                                <td className="p-3 text-right font-black tabular-nums">{exp.amount.toLocaleString()}원</td>
+                                <td className="p-3 text-center">
+                                  {exp.state === '대기중' ? (
+                                    <div className="flex justify-center gap-1.5">
+                                      <button onClick={() => {
+                                        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '승인완료' } : e));
+                                        toast('경비 청구가 승인되었습니다.', 'success');
+                                      }} className="px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100 transition-all">승인</button>
+                                      <button onClick={() => {
+                                        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '반려' } : e));
+                                        toast('경비 청구가 반려되었습니다.', 'error');
+                                      }} className="px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold hover:bg-red-100 transition-all">반려</button>
+                                    </div>
+                                  ) : (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${exp.state === '승인완료' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-red-50 text-red-600 dark:bg-red-950/40'}`}>{exp.state}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1230,19 +1190,23 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                   <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">내 법인카드 / 지출 청구 내역</h3>
                     <div className="space-y-3">
-                      {expenses.slice(1).map(exp => (
-                        <div key={exp.id} className="flex justify-between items-center p-3 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)]">{exp.category}</span>
-                            <h4 className="text-xs font-black text-[var(--foreground)]">{exp.desc}</h4>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] font-mono">{exp.date} | 법인 신한 1234</p>
+                      {expenses.length === 0 ? (
+                        <div className="py-8 text-center text-xs font-bold text-[var(--toss-gray-3)]">데이터 없음</div>
+                      ) : (
+                        expenses.map(exp => (
+                          <div key={exp.id} className="flex justify-between items-center p-3 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--toss-gray-4)]">{exp.category}</span>
+                              <h4 className="text-xs font-black text-[var(--foreground)]">{exp.desc}</h4>
+                              <p className="text-[10px] text-[var(--toss-gray-3)] font-mono">{exp.date}</p>
+                            </div>
+                            <div className="text-right space-y-1">
+                              <span className="inline-block text-xs font-black text-[var(--foreground)]">{exp.amount.toLocaleString()}원</span>
+                              <p className={`text-[10px] font-bold ${exp.state === '승인완료' ? 'text-emerald-500' : 'text-red-400'}`}>{exp.state}</p>
+                            </div>
                           </div>
-                          <div className="text-right space-y-1">
-                            <span className="inline-block text-xs font-black text-[var(--foreground)]">{exp.amount.toLocaleString()}원</span>
-                            <p className={`text-[10px] font-bold ${exp.state === '승인완료' ? 'text-emerald-500' : 'text-red-400'}`}>{exp.state}</p>
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -1321,6 +1285,13 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
+                          {disbursements.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                                데이터 없음 — 지출결의 서버 연동 준비 중 (세션 작성분만 표시)
+                              </td>
+                            </tr>
+                          ) : null}
                           {disbursements.map(disb => (
                             <tr key={disb.id} className="hover:bg-[var(--muted)]/40 transition-colors">
                               <td className="p-3 text-[var(--toss-gray-4)]">{disb.date}</td>
@@ -1387,31 +1358,36 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                   <div className="lg:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">인사 급여대장 연동 목록</h3>
                     <div className="space-y-3">
-                      {payrollSyncs.map((sync, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-3.5 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
-                          <div className="space-y-1">
-                            <h4 className="text-xs font-black text-[var(--foreground)]">{sync.period}</h4>
-                            <p className="text-[10px] text-[var(--toss-gray-4)] font-semibold">대상 직원 {sync.empCount}명 | 총 급여 {sync.totalAmount.toLocaleString()}원</p>
-                            {sync.state === '전송완료' && <p className="text-[9px] text-[var(--toss-gray-3)] font-mono">전송 시각: {sync.synced_at}</p>}
-                          </div>
-                          <div>
-                            {sync.state === '대기중' ? (
-                              <button onClick={() => {
-                                setPayrollSyncs(prev => prev.map(p => p.period === sync.period ? { ...p, state: '전송완료', synced_at: new Date().toISOString().replace('T', ' ').substring(0, 16) } : p));
-                                // Auto insert into journal entries
-                                const salaryRow = { id: 'sal-' + Date.now(), date: new Date().toISOString().split('T')[0], desc: `${sync.period} 회계 처리`, debitAcc: '급여', creditAcc: '보통예금', amount: sync.totalAmount };
-                                setJournalEntries(prev => [salaryRow, ...prev]);
-                                toast('급여 전표 분개가 성공적으로 자동 발행되었습니다.', 'success');
-                              }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-hover)] transition-all">
-                                <ArrowLeftRight size={12} />
-                                <span>회계 전표 전송</span>
-                              </button>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black">전송완료</span>
-                            )}
-                          </div>
+                      {payrollSyncs.length === 0 ? (
+                        <div className="py-10 text-center text-xs font-bold text-[var(--toss-gray-3)]">
+                          데이터 없음 — 급여대장 회계 전송 연동 준비 중
                         </div>
-                      ))}
+                      ) : (
+                        payrollSyncs.map((sync, idx) => (
+                          <div key={idx} className="flex justify-between items-center p-3.5 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)]/20 transition-all">
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-black text-[var(--foreground)]">{sync.period}</h4>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] font-semibold">대상 직원 {sync.empCount}명 | 총 급여 {sync.totalAmount.toLocaleString()}원</p>
+                              {sync.state === '전송완료' && <p className="text-[9px] text-[var(--toss-gray-3)] font-mono">전송 시각: {sync.synced_at}</p>}
+                            </div>
+                            <div>
+                              {sync.state === '대기중' ? (
+                                <button onClick={() => {
+                                  setPayrollSyncs(prev => prev.map(p => p.period === sync.period ? { ...p, state: '전송완료', synced_at: new Date().toISOString().replace('T', ' ').substring(0, 16) } : p));
+                                  const salaryRow = { id: 'sal-' + Date.now(), date: new Date().toISOString().split('T')[0], desc: `${sync.period} 회계 처리`, debitAcc: '급여', creditAcc: '보통예금', amount: sync.totalAmount };
+                                  setJournalEntries(prev => [salaryRow, ...prev]);
+                                  toast('급여 전표 분개가 성공적으로 자동 발행되었습니다.', 'success');
+                                }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-hover)] transition-all">
+                                  <ArrowLeftRight size={12} />
+                                  <span>회계 전표 전송</span>
+                                </button>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-black">전송완료</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -1456,25 +1432,33 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border)] text-xs font-semibold">
-                        {taxReports.map((report, idx) => (
-                          <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
-                            <td className="p-3 text-[var(--foreground)] font-bold">{report.type}</td>
-                            <td className="p-3 text-[var(--foreground)]">{report.period}</td>
-                            <td className="p-3 text-red-500 font-bold">{report.deadline}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${report.status === '완료' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{report.status}</span>
-                            </td>
-                            <td className="p-3 text-center">
-                              <button onClick={() => {
-                                setTaxReports(prev => prev.map((r, i) => i === idx ? { ...r, status: '완료' } : r));
-                                toast(`${report.type} 홈택스 파일(.txt)이 다운로드 되었습니다.`, 'success');
-                              }} className="flex mx-auto items-center gap-1 px-2.5 py-1 rounded bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] hover:bg-[var(--border)] text-[10px] font-bold transition-all">
-                                <Download size={11} />
-                                <span>파일 생성 (.txt)</span>
-                              </button>
+                        {taxReports.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-[var(--toss-gray-3)] font-bold">
+                              데이터 없음 — 세무신고 대시보드 연동 준비 중
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          taxReports.map((report, idx) => (
+                            <tr key={idx} className="hover:bg-[var(--muted)]/40 transition-colors">
+                              <td className="p-3 text-[var(--foreground)] font-bold">{report.type}</td>
+                              <td className="p-3 text-[var(--foreground)]">{report.period}</td>
+                              <td className="p-3 text-red-500 font-bold">{report.deadline}</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${report.status === '완료' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{report.status}</span>
+                              </td>
+                              <td className="p-3 text-center">
+                                <button onClick={() => {
+                                  setTaxReports(prev => prev.map((r, i) => i === idx ? { ...r, status: '완료' } : r));
+                                  toast(`${report.type} 홈택스 파일(.txt)이 다운로드 되었습니다.`, 'success');
+                                }} className="flex mx-auto items-center gap-1 px-2.5 py-1 rounded bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] hover:bg-[var(--border)] text-[10px] font-bold transition-all">
+                                  <Download size={11} />
+                                  <span>파일 생성 (.txt)</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>

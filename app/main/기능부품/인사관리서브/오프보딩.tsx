@@ -12,7 +12,6 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
   isMissingColumnError,
-  withMissingColumnFallback,
   withMissingColumnsFallback } from '@/lib/db-compat';
 import { patchChatRoom } from '@/lib/chat-write-service';
 import {
@@ -67,19 +66,12 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
     cleanupWarnings.push({ target: 'push_subscriptions.staff_id', error: pushByStaffResult.error });
   }
 
-  const notificationsResult = await withMissingColumnFallback(
-    () =>
-      d1.from('notifications')
-        .update({ read_at: readAt })
-        .eq('user_id', staffId)
-        .is('read_at', null),
-    () =>
-      d1.from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', staffId)
-        .eq('is_read', false),
-    'read_at',
-  );
+  // 정본 컬럼은 read_at 만 존재 (is_read 레거시 폴백 제거 — D1 스키마 정합)
+  const notificationsResult = await d1
+    .from('notifications')
+    .update({ read_at: readAt })
+    .eq('user_id', staffId)
+    .is('read_at', null);
 
   if (notificationsResult.error) {
     cleanupWarnings.push({ target: 'notifications', error: notificationsResult.error });

@@ -75,20 +75,24 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
     const handleBorrow = async () => {
         if (!scanResult) return;
         try {
-            // Mocking the borrow logistics: deduct 1 from stock and log it
-            const newStock = (Number(scanResult.quantity ?? scanResult.stock ?? 0)) - 1;
-            if (newStock < 0) return toast('이미 대여중이거나 재고가 없습니다.', 'warning');
-
-            await db.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', scanResult.id);
-            await db.from('inventory_logs').insert([{
-                item_id: scanResult.id,
-                inventory_id: scanResult.id,
+            const { postStockMovement } = await import('@/lib/inventory-stock-client');
+            const res = await postStockMovement({
+                itemId: String(scanResult.id),
+                mode: 'delta',
+                delta: -1,
                 type: '대여',
-                change_type: '자산 대여',
-                quantity: 1,
-                actor_name: _user.name,
-                company: scanResult.company
-            }]);
+                changeType: '자산 대여',
+                notes: 'QR 대여',
+                company: (scanResult.company as string) || null,
+            });
+            if (!res.ok) {
+                if (res.code === 'INSUFFICIENT_STOCK') {
+                    toast('이미 대여중이거나 재고가 없습니다.', 'warning');
+                } else {
+                    toast(res.error || '대여 실패', 'error');
+                }
+                return;
+            }
 
             toast(`[${scanResult.item_name as string}] 대여 처리가 완료되었습니다.`, 'success');
             setScanResult(null);
@@ -101,17 +105,20 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
 
     const handleReturn = async (item: AssetItem) => {
         try {
-            const newStock = (Number(item.quantity ?? item.stock ?? 0)) + 1;
-            await db.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
-            await db.from('inventory_logs').insert([{
-                item_id: item.id,
-                inventory_id: item.id,
+            const { postStockMovement } = await import('@/lib/inventory-stock-client');
+            const res = await postStockMovement({
+                itemId: String(item.id),
+                mode: 'delta',
+                delta: 1,
                 type: '반납',
-                change_type: '자산 반납',
-                quantity: 1,
-                actor_name: _user.name,
-                company: item.company
-            }]);
+                changeType: '자산 반납',
+                notes: 'QR 반납',
+                company: (typeof item.company === 'string' ? item.company : String(item.company || '')) || null,
+            });
+            if (!res.ok) {
+                toast(res.error || '반납 실패', 'error');
+                return;
+            }
 
             toast(`[${item.item_name}] 반납 처리가 완료되었습니다.`, 'success');
             _fetchInventory?.();

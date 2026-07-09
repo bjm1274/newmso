@@ -12,6 +12,9 @@
  * 윈도우 리셋:
  *   다음 접근 시 window_start + windowMs < now 이면 카운트를 초기화한다.
  *   별도 정리 잡 없이 자연 리셋되는 슬라이딩-타임스탬프 방식.
+ *
+ * API 총량 제한: consumeRateLimit (check+increment 단일 SQL, TOCTOU 없음)
+ * 로그인 실패 제한: checkRateLimit(읽기) + recordFailedAttempt(원자 upsert)
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
@@ -40,12 +43,61 @@ async function fetchRow(d1: D1Database, key: string): Promise<RateLimitRow | nul
   return result ?? null;
 }
 
+async function resolveD1(): Promise<D1Database | undefined> {
+  try {
+    return await getD1Binding();
+  } catch (err) {
+    console.warn('[rate-limit] D1 binding 획득 실패, 레이트리밋 건너뜀:', err);
+    return undefined;
+  }
+}
+
+/**
+ * 원자적 upsert + RETURNING.
+ * - 신규 키: count=1, window_start=now
+ * - 같은 윈도우: count = count + 1
+ * - 만료된 윈도우: count=1, window_start=now
+ */
+async function upsertAndReturn(
+  d1: D1Database,
+  key: string,
+  windowMs: number,
+): Promise<{ count: number; window_start: string } | null> {
+  const now = Date.now();
+  const nowStr = String(now);
+  const nowTs = new Date(now).toISOString();
+
+  const result = await d1
+    .prepare(
+      `INSERT INTO rate_limit_attempts (key, count, window_start, updated_at)
+       VALUES (?, 1, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE
+           WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
+             THEN 1
+           ELSE rate_limit_attempts.count + 1
+         END,
+         window_start = CASE
+           WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
+             THEN ?
+           ELSE rate_limit_attempts.window_start
+         END,
+         updated_at = ?
+       RETURNING count, window_start`,
+    )
+    .bind(key, nowStr, nowTs, windowMs, now, windowMs, now, nowStr, nowTs)
+    .first<{ count: number; window_start: string }>();
+
+  return result ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * 주어진 키의 요청이 허용되는지 확인한다.
+ * 주어진 키의 요청이 허용되는지 확인한다 (읽기 전용 — 카운트 증가 없음).
+ * 로그인 잠금 등 "실패 시에만 증가" 패턴용. 총량 제한은 consumeRateLimit 사용.
  *
  * @param key         식별 키 (예: loginId, ip:userId 등)
  * @param maxAttempts 윈도우 내 최대 허용 시도 횟수
@@ -57,14 +109,7 @@ export async function checkRateLimit(
   maxAttempts: number,
   windowMs: number,
 ): Promise<{ allowed: boolean; retryAfterSec?: number }> {
-  let d1: D1Database | undefined;
-  try {
-    d1 = await getD1Binding();
-  } catch (err) {
-    console.warn('[rate-limit] D1 binding 획득 실패, 레이트리밋 건너뜀:', err);
-    return { allowed: true };
-  }
-
+  const d1 = await resolveD1();
   if (!d1) {
     // 로컬 dev 환경 — 레이트리밋 비활성
     return { allowed: true };
@@ -95,52 +140,57 @@ export async function checkRateLimit(
 }
 
 /**
- * 실패한 시도를 기록한다.
+ * check + increment를 단일 SQL(RETURNING)로 원자 처리한다.
+ * API 총량 제한(query/mutate/upload 등)에 사용 — TOCTOU 없음.
+ *
+ * 증가 후 count > maxAttempts 이면 거부(초과분도 카운트에 포함).
+ */
+export async function consumeRateLimit(
+  key: string,
+  maxAttempts: number,
+  windowMs: number,
+): Promise<{ allowed: boolean; retryAfterSec?: number; count?: number }> {
+  const d1 = await resolveD1();
+  if (!d1) {
+    return { allowed: true };
+  }
+
+  try {
+    const now = Date.now();
+    const row = await upsertAndReturn(d1, key, windowMs);
+    if (!row) {
+      // RETURNING 실패 시 허용(가용성 우선) — 다음 요청에서 재시도
+      return { allowed: true };
+    }
+
+    const count = Number(row.count) || 0;
+    const windowStart = parseInt(String(row.window_start), 10);
+    if (count > maxAttempts) {
+      const retryAfterSec = Number.isFinite(windowStart)
+        ? Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000))
+        : 60;
+      return { allowed: false, retryAfterSec, count };
+    }
+    return { allowed: true, count };
+  } catch (err) {
+    console.error('[rate-limit] consumeRateLimit D1 오류, 레이트리밋 건너뜀:', err);
+    return { allowed: true };
+  }
+}
+
+/**
+ * 실패한 시도를 기록한다 (원자적 upsert).
+ * 로그인 등 "실패 시에만 +1" 패턴용. 총량 제한은 consumeRateLimit 사용.
  *
  * @param key      식별 키
  * @param windowMs 윈도우 크기 (ms). 첫 실패 시점부터 windowMs 후에 리셋된다.
  */
 export async function recordFailedAttempt(key: string, windowMs: number): Promise<void> {
-  let d1: D1Database | undefined;
-  try {
-    d1 = await getD1Binding();
-  } catch (err) {
-    console.warn('[rate-limit] D1 binding 획득 실패, 실패 기록 건너뜀:', err);
-    return;
-  }
-
+  const d1 = await resolveD1();
   if (!d1) return;
 
   try {
-    const now = Date.now();
-
-    const nowStr = String(now);
-    const nowTs = new Date(now).toISOString();
-
-    // TOCTOU 제거: SELECT 후 분기 INSERT/UPDATE 대신 단일 원자적 upsert.
-    // - 신규 키: count=1, window_start=now
-    // - 같은 윈도우(window_start + windowMs > now): count = count + 1
-    // - 만료된 윈도우(window_start + windowMs <= now): count=1로 리셋, window_start=now
-    //   윈도우 만료 판정은 기존 window_start(TEXT, epoch ms)를 정수로 캐스팅해 비교한다.
-    await d1
-      .prepare(
-        `INSERT INTO rate_limit_attempts (key, count, window_start, updated_at)
-         VALUES (?, 1, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET
-           count = CASE
-             WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
-               THEN 1
-             ELSE rate_limit_attempts.count + 1
-           END,
-           window_start = CASE
-             WHEN CAST(rate_limit_attempts.window_start AS INTEGER) + ? <= ?
-               THEN ?
-             ELSE rate_limit_attempts.window_start
-           END,
-           updated_at = ?`,
-      )
-      .bind(key, nowStr, nowTs, windowMs, now, windowMs, now, nowStr, nowTs)
-      .run();
+    await upsertAndReturn(d1, key, windowMs);
   } catch (err) {
     console.error('[rate-limit] recordFailedAttempt D1 오류:', err);
   }
@@ -150,14 +200,7 @@ export async function recordFailedAttempt(key: string, windowMs: number): Promis
  * 성공 시 해당 키의 시도 기록을 초기화한다.
  */
 export async function resetAttempts(key: string): Promise<void> {
-  let d1: D1Database | undefined;
-  try {
-    d1 = await getD1Binding();
-  } catch (err) {
-    console.warn('[rate-limit] D1 binding 획득 실패, 리셋 건너뜀:', err);
-    return;
-  }
-
+  const d1 = await resolveD1();
   if (!d1) return;
 
   try {

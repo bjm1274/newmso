@@ -3,7 +3,8 @@ import { d1Client } from '@/lib/db-client';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/db-compat';
 import {
   callAtomicStockUpdate,
-  callAtomicStockTransfer } from '@/lib/inventory-stock-client';
+  callAtomicStockTransfer,
+  postStockMovement } from '@/lib/inventory-stock-client';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -546,6 +547,11 @@ type ProcessInventoryIssueParams = {
   destinationCompanyId?: string | null;
 };
 
+/**
+ * 물품 불출/이관 — 클라이언트 직접 quantity·로그 조작 금지.
+ * - 동일 위치: stock-post(출고/불출)
+ * - 이관: stock-transfer (destId 또는 newDest, 이력·로그 서버 batch)
+ */
 export async function processInventoryIssue({
   sourceItem,
   inventoryRows = [],
@@ -569,280 +575,134 @@ export async function processInventoryIssue({
     throw new Error('INSUFFICIENT_STOCK');
   }
 
-  let sourceNextQty = sourceCurrentQty - transferQuantity;
   const isSameLocation =
-    normalizeInventoryText(sourceCompany) === normalizeInventoryText(destinationCompany) &&
-    normalizeInventoryText(sourceDept) === normalizeInventoryText(destinationDept);
+    !destinationCompany ||
+    (normalizeInventoryText(sourceCompany) === normalizeInventoryText(destinationCompany) &&
+      normalizeInventoryText(sourceDept) === normalizeInventoryText(destinationDept));
 
   const sourceNotes = `to ${destinationCompany}${destinationDept ? ` ${destinationDept}` : ''}${reason ? ` (${reason})` : ''}`;
   const destinationNotes = `${sourceCompany}${sourceDept ? ` ${sourceDept}` : ''} -> ${destinationCompany}${destinationDept ? ` ${destinationDept}` : ''}${reason ? ` (${reason})` : ''}`;
 
-  let destinationInventoryId: string | null = null;
-  let destinationPrevQty = 0;
-  let destinationNextQty = 0;
-  let sourcePrevQty = sourceCurrentQty;
-
-  if (!isSameLocation && destinationCompany) {
-    let destinationItem = findDestinationInventoryItem(inventoryRows, sourceItem, destinationCompany, destinationDept);
-
-    if (!destinationItem) {
-      const { data: remoteRows } = await db
-        .from('inventory')
-        .select('id, item_name, quantity, stock, company, department, category, spec, min_quantity')
-        .eq('company', destinationCompany)
-        .eq('item_name', getItemName(sourceItem))
-        .returns<any[]>();
-
-      destinationItem = findDestinationInventoryItem(remoteRows || [], sourceItem, destinationCompany, destinationDept);
-    }
-
-    if (destinationItem) {
-      // 원자적 이관 RPC 시도 (출발지 차감 + 목적지 증가를 단일 트랜잭션으로)
-      const transferResp = await callAtomicStockTransfer({
-        sourceId: String(sourceItem.id ?? ''),
-        destId: String(destinationItem.id ?? ''),
-        quantity: transferQuantity });
-      const transferResult = transferResp.ok ? transferResp.data : null;
-      const transferRpcError = transferResp.ok ? null : { message: transferResp.error };
-
-      if (transferRpcError) {
-        if (String(transferRpcError.message).includes('INSUFFICIENT_STOCK')) {
-          throw new Error('INSUFFICIENT_STOCK');
-        }
-        // RPC 미등록 시 fallback (순차 업데이트)
-        const { error: sourceUpdateError } = await db
-          .from('inventory')
-          .update({ quantity: sourceNextQty, stock: sourceNextQty })
-          .eq('id', sourceItem.id);
-        if (sourceUpdateError) throw sourceUpdateError;
-
-        destinationPrevQty = getItemQuantity(destinationItem);
-        destinationNextQty = destinationPrevQty + transferQuantity;
-
-        const { error: destinationUpdateError } = await db
-          .from('inventory')
-          .update({ quantity: destinationNextQty, stock: destinationNextQty })
-          .eq('id', destinationItem.id);
-
-        if (destinationUpdateError) {
-          // 롤백: 출발지 원상 복구
-          await db.from('inventory')
-            .update({ quantity: sourceCurrentQty, stock: sourceCurrentQty })
-            .eq('id', sourceItem.id);
-          throw destinationUpdateError;
-        }
-      } else {
-        const row = Array.isArray(transferResult) ? transferResult[0] : transferResult;
-        const hasTransferRow =
-          row != null &&
-          (row?.src_prev != null ||
-            row?.src_next != null ||
-            row?.dst_prev != null ||
-            row?.dst_next != null);
-
-        if (!hasTransferRow) {
-          const { error: sourceUpdateError } = await db
-            .from('inventory')
-            .update({ quantity: sourceNextQty, stock: sourceNextQty })
-            .eq('id', sourceItem.id);
-          if (sourceUpdateError) throw sourceUpdateError;
-
-          destinationPrevQty = getItemQuantity(destinationItem);
-          destinationNextQty = destinationPrevQty + transferQuantity;
-
-          const { error: destinationUpdateError } = await db
-            .from('inventory')
-            .update({ quantity: destinationNextQty, stock: destinationNextQty })
-            .eq('id', destinationItem.id);
-
-          if (destinationUpdateError) {
-            await db
-              .from('inventory')
-              .update({ quantity: sourceCurrentQty, stock: sourceCurrentQty })
-              .eq('id', sourceItem.id);
-            throw destinationUpdateError;
-          }
-        } else {
-          sourcePrevQty = row?.src_prev ?? sourceCurrentQty;
-          sourceNextQty = row?.src_next ?? sourceNextQty;
-          destinationPrevQty = row?.dst_prev ?? 0;
-          destinationNextQty = row?.dst_next ?? transferQuantity;
-        }
-      }
-
-      destinationInventoryId = String(destinationItem.id);
-    } else {
-      // 목적지에 품목이 없는 경우 - 출발지만 원자적 차감
-      const srcResp = await callAtomicStockUpdate({
-        itemId: String(sourceItem.id ?? ''),
-        delta: -transferQuantity,
-        minAllowed: 0 });
-      const srcResult = srcResp.ok ? srcResp.data : null;
-      const srcRpcError = srcResp.ok ? null : { message: srcResp.error };
-      if (srcRpcError) {
-        if (String(srcRpcError.message).includes('INSUFFICIENT_STOCK')) {
-          throw new Error('INSUFFICIENT_STOCK');
-        }
-        // fallback
-        const { error: sourceUpdateError } = await db
-          .from('inventory')
-          .update({ quantity: sourceNextQty, stock: sourceNextQty })
-          .eq('id', sourceItem.id);
-        if (sourceUpdateError) throw sourceUpdateError;
-      } else {
-        const row = Array.isArray(srcResult) ? srcResult[0] : srcResult;
-        if (row == null || (row?.prev_qty == null && row?.next_qty == null)) {
-          const { error: sourceUpdateError } = await db
-            .from('inventory')
-            .update({ quantity: sourceNextQty, stock: sourceNextQty })
-            .eq('id', sourceItem.id);
-          if (sourceUpdateError) throw sourceUpdateError;
-        } else {
-          sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
-          sourceNextQty = row?.next_qty ?? sourceNextQty;
-        }
-      }
-      const baseDestinationPayload: Record<string, unknown> = {
-        item_name: getItemName(sourceItem),
-        category: sourceItem?.category || null,
-        quantity: transferQuantity,
-        stock: transferQuantity,
-        min_quantity: sourceItem?.min_quantity ?? sourceItem?.min_stock ?? 0,
-        unit_price: sourceItem?.unit_price ?? sourceItem?.price ?? 0,
-        expiry_date: sourceItem?.expiry_date || null,
-        lot_number: sourceItem?.lot_number || null,
-        is_udi: Boolean(sourceItem?.is_udi),
-        company: destinationCompany,
-        department: destinationDept || '',
-        location: sourceItem?.location || null };
-
-      if (sourceItem?.spec) baseDestinationPayload.spec = sourceItem.spec;
-      if (sourceItem?.insurance_code) baseDestinationPayload.insurance_code = sourceItem.insurance_code;
-      if (sourceItem?.udi_code) baseDestinationPayload.udi_code = sourceItem.udi_code;
-      if (sourceItem?.supplier_name) baseDestinationPayload.supplier_name = sourceItem.supplier_name;
-      if (sourceItem?.supplier) baseDestinationPayload.supplier = sourceItem.supplier;
-
-      const { data: insertedDestination, error: destinationInsertError } =
-        await withMissingColumnsFallback<LooseRecord>(
-          (omittedColumns) => {
-            const destinationPayload: Record<string, unknown> = { ...baseDestinationPayload };
-
-            if (destinationCompanyId && !omittedColumns.has('company_id')) {
-              destinationPayload.company_id = destinationCompanyId;
-            }
-
-            if (omittedColumns.has('department')) {
-              delete destinationPayload.department;
-            }
-
-            return db
-                .from('inventory')
-                .insert([destinationPayload])
-                .select(INVENTORY_SELECT_COLUMNS)
-                .single() as PromiseLike<SupabaseCompatResult<LooseRecord>>;
-          },
-          ['company_id', 'department'],
-        );
-
-      if (destinationInsertError) {
-        throw destinationInsertError;
-      }
-
-      destinationInventoryId = insertedDestination?.id ? String(insertedDestination.id) : null;
-      destinationPrevQty = 0;
-      destinationNextQty = transferQuantity;
-    }
-  } else {
-    // isSameLocation이거나 목적지 미지정: 출발지만 원자적 차감
-    const srcOnlyResp = await callAtomicStockUpdate({
-      itemId: String(sourceItem.id ?? ''),
+  // 동일 위치·목적지 미지정: 출고(불출) 전표만
+  if (isSameLocation) {
+    const postResp = await postStockMovement({
+      itemId: String(sourceItem.id),
+      mode: 'delta',
       delta: -transferQuantity,
-      minAllowed: 0 });
-    const srcOnlyResult = srcOnlyResp.ok ? srcOnlyResp.data : null;
-    const srcOnlyError = srcOnlyResp.ok ? null : { message: srcOnlyResp.error };
-    if (srcOnlyError) {
-      if (String(srcOnlyError.message).includes('INSUFFICIENT_STOCK')) {
+      type: '출고',
+      changeType: '불출',
+      notes: sourceNotes,
+      company: sourceCompany,
+      department: sourceDept,
+      minAllowed: 0,
+    });
+    if (!postResp.ok) {
+      if (
+        postResp.code === 'INSUFFICIENT_STOCK' ||
+        String(postResp.error || '').includes('INSUFFICIENT_STOCK')
+      ) {
         throw new Error('INSUFFICIENT_STOCK');
       }
-      // fallback
-      const { error: fbErr } = await db.from('inventory')
-        .update({ quantity: sourceNextQty, stock: sourceNextQty })
-        .eq('id', sourceItem.id);
-      if (fbErr) throw fbErr;
-    } else {
-      const row = Array.isArray(srcOnlyResult) ? srcOnlyResult[0] : srcOnlyResult;
-      if (row == null || (row?.prev_qty == null && row?.next_qty == null)) {
-        const { error: fbErr } = await db
-          .from('inventory')
-          .update({ quantity: sourceNextQty, stock: sourceNextQty })
-          .eq('id', sourceItem.id);
-        if (fbErr) throw fbErr;
-      } else {
-        sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
-        sourceNextQty = row?.next_qty ?? sourceNextQty;
-      }
+      throw new Error(postResp.error || 'STOCK_POST_FAILED');
     }
+    return {
+      sourceNextQty: postResp.data?.next_qty ?? sourceCurrentQty - transferQuantity,
+      destinationInventoryId: null as string | null,
+      destinationNextQty: 0,
+      isSameLocation: true,
+    };
   }
 
-  if (!isSameLocation && destinationCompany) {
-    const { error: transferError } = await db.from('inventory_transfers').insert([
-      {
-        item_id: sourceItem.id,
-        item_name: getItemName(sourceItem),
+  // 이관: 목적지 기존 품목 탐색 → stock-transfer
+  let destinationItem = findDestinationInventoryItem(
+    inventoryRows,
+    sourceItem,
+    destinationCompany,
+    destinationDept,
+  );
+
+  if (!destinationItem) {
+    const { data: remoteRows } = await db
+      .from('inventory')
+      .select('id, item_name, quantity, stock, company, department, category, spec, min_quantity, lot_number')
+      .eq('company', destinationCompany)
+      .eq('item_name', getItemName(sourceItem))
+      .returns<any[]>();
+
+    destinationItem = findDestinationInventoryItem(
+      remoteRows || [],
+      sourceItem,
+      destinationCompany,
+      destinationDept,
+    );
+  }
+
+  const meta = {
+    item_name: getItemName(sourceItem),
+    from_company: sourceCompany,
+    from_department: sourceDept,
+    to_company: destinationCompany,
+    to_department: destinationDept,
+    reason: reason || '',
+    source_notes: sourceNotes,
+    dest_notes: destinationNotes,
+  };
+
+  const transferResp = destinationItem
+    ? await callAtomicStockTransfer({
+        sourceId: String(sourceItem.id),
+        destId: String(destinationItem.id),
         quantity: transferQuantity,
-        from_company: sourceCompany,
-        from_department: sourceDept,
-        to_company: destinationCompany,
-        to_department: destinationDept,
-        reason: reason || '',
-        transferred_by: user?.name,
-        transferred_by_id: user?.id,
-        status: '완료' },
-    ]);
+        meta,
+      })
+    : await callAtomicStockTransfer({
+        sourceId: String(sourceItem.id),
+        newDest: {
+          item_name: getItemName(sourceItem),
+          category: (sourceItem?.category as string) || null,
+          min_quantity: Number(sourceItem?.min_quantity ?? sourceItem?.min_stock ?? 0) || 0,
+          unit_price: Number(sourceItem?.unit_price ?? sourceItem?.price ?? 0) || 0,
+          expiry_date: (sourceItem?.expiry_date as string) || null,
+          lot_number: (sourceItem?.lot_number as string) || null,
+          is_udi: Boolean(sourceItem?.is_udi),
+          company: destinationCompany,
+          company_id: destinationCompanyId || null,
+          department: destinationDept || '',
+          location: (sourceItem?.location as string) || null,
+          spec: (sourceItem?.spec as string) || null,
+          insurance_code: (sourceItem?.insurance_code as string) || null,
+          udi_code: (sourceItem?.udi_code as string) || null,
+          supplier_name: (sourceItem?.supplier_name as string) || null,
+          supplier: (sourceItem?.supplier as string) || null,
+        },
+        quantity: transferQuantity,
+        meta,
+      });
 
-    if (transferError) {
-      throw transferError;
+  if (!transferResp.ok) {
+    if (
+      transferResp.code === 'INSUFFICIENT_STOCK' ||
+      String(transferResp.error || '').includes('INSUFFICIENT_STOCK')
+    ) {
+      throw new Error('INSUFFICIENT_STOCK');
     }
+    throw new Error(transferResp.error || 'STOCK_TRANSFER_FAILED');
   }
 
-  const logRows: Array<Record<string, unknown>> = [
-    {
-      item_id: sourceItem.id,
-      inventory_id: sourceItem.id,
-      type: '이관',
-      change_type: isSameLocation ? '불출' : '이관출고',
-      quantity: transferQuantity,
-      prev_quantity: sourcePrevQty,
-      next_quantity: sourceNextQty,
-      actor_name: user?.name,
-      company: sourceCompany,
-      notes: sourceNotes },
-  ];
-
-  if (destinationInventoryId && !isSameLocation) {
-    logRows.push({
-      item_id: destinationInventoryId,
-      inventory_id: destinationInventoryId,
-      type: '이관',
-      change_type: '이관입고',
-      quantity: transferQuantity,
-      prev_quantity: destinationPrevQty,
-      next_quantity: destinationNextQty,
-      actor_name: user?.name,
-      company: destinationCompany,
-      notes: destinationNotes });
-  }
-
-  const { error: logError } = await db.from('inventory_logs').insert(logRows);
-  if (logError) {
-    throw logError;
-  }
+  const row = transferResp.data;
+  const destinationInventoryId =
+    row?.destId != null
+      ? String(row.destId)
+      : destinationItem
+        ? String(destinationItem.id)
+        : null;
 
   return {
-    sourceNextQty,
+    sourceNextQty: row?.src_next ?? sourceCurrentQty - transferQuantity,
     destinationInventoryId,
-    destinationNextQty,
-    isSameLocation };
+    destinationNextQty: row?.dst_next ?? transferQuantity,
+    isSameLocation: false,
+  };
 }
 
 type ReverseInventoryIssueParams = {
@@ -857,7 +717,9 @@ type ReverseInventoryIssueParams = {
 
 /**
  * 불출 처리를 취소한다.
- * SY INC. 재고 증가 + 수령팀 재고 감소 + 취소 로그 기록.
+ * - 수령처 재고가 있으면: stock-transfer (수령처 → 원본)
+ * - 없으면: stock-post 로 원본만 복원(반납/불출취소)
+ * 클라이언트 직접 quantity·로그 조작 금지.
  */
 export async function reverseInventoryIssue({
   sourceItemId,
@@ -868,59 +730,70 @@ export async function reverseInventoryIssue({
   reason,
   user }: ReverseInventoryIssueParams) {
   const reverseQty = Math.max(1, Number(quantity) || 0);
+  const notes = `불출 취소: ${destinationCompany} ${destinationDept} → ${INVENTORY_SUPPORT_COMPANY} ${INVENTORY_SUPPORT_DEPARTMENT} (${reason || '운영자 취소'})`;
 
-  // 1) SY INC. 재고 복원 (증가)
-  const reverseResp = await callAtomicStockUpdate({
-    itemId: sourceItemId,
-    delta: reverseQty,
-    minAllowed: 0 });
-  const srcErr = reverseResp.ok ? null : { message: reverseResp.error };
-  if (srcErr) {
-    // RPC 미등록 fallback
-    const { data: srcRow } = await db
+  // 수령처 품목 탐색
+  let destItem: LooseRecord | null = null;
+  if (destinationCompany) {
+    const { data: destRows } = await db
       .from('inventory')
-      .select('quantity, stock')
-      .eq('id', sourceItemId)
-      .single()
-      .returns<any>();
-    const curQty = Number(srcRow?.quantity ?? srcRow?.stock ?? 0);
-    const { error } = await db.from('inventory').update({ quantity: curQty + reverseQty, stock: curQty + reverseQty }).eq('id', sourceItemId);
-    if (error) throw error;
+      .select('id, quantity, stock, item_name, department, company')
+      .eq('company', destinationCompany)
+      .eq('item_name', itemName)
+      .returns<any[]>();
+
+    destItem =
+      (destRows || []).find(
+        (r: LooseRecord) =>
+          String(r.department || '').trim() === destinationDept.trim() ||
+          (!destinationDept && !String(r.department || '').trim()),
+      ) ||
+      (destRows || [])[0] ||
+      null;
   }
 
-  // 2) 수령팀 재고 차감 (감소)
-  const { data: destRows } = await db
-    .from('inventory')
-    .select('id, quantity, stock, item_name')
-    .eq('company', destinationCompany)
-    .eq('item_name', itemName)
-    .returns<any[]>();
-
-  const destItem = (destRows || []).find((r: LooseRecord) =>
-    String(r.department || '').trim() === destinationDept.trim() ||
-    (!destinationDept && !String(r.department || '').trim()),
-  ) || (destRows || [])[0];
-
-  if (destItem) {
-    const destCurQty = Number(destItem.quantity ?? destItem.stock ?? 0);
-    const destNextQty = Math.max(0, destCurQty - reverseQty);
-    const { error } = await db.from('inventory').update({ quantity: destNextQty, stock: destNextQty }).eq('id', destItem.id);
-    if (error) throw error;
-  }
-
-  // 3) 취소 로그 기록
-  const logRows: Array<Record<string, unknown>> = [
-    {
-      item_id: sourceItemId,
-      inventory_id: sourceItemId,
-      type: '이관',
-      change_type: '불출취소',
+  if (destItem?.id) {
+    const transferResp = await callAtomicStockTransfer({
+      sourceId: String(destItem.id),
+      destId: String(sourceItemId),
       quantity: reverseQty,
-      actor_name: user?.name,
-      company: INVENTORY_SUPPORT_COMPANY,
-      notes: `불출 취소: ${destinationCompany} ${destinationDept} → ${INVENTORY_SUPPORT_COMPANY} ${INVENTORY_SUPPORT_DEPARTMENT} (${reason || '운영자 취소'})` },
-  ];
-  await db.from('inventory_logs').insert(logRows);
+      meta: {
+        item_name: itemName,
+        from_company: destinationCompany,
+        from_department: destinationDept,
+        to_company: INVENTORY_SUPPORT_COMPANY,
+        to_department: INVENTORY_SUPPORT_DEPARTMENT,
+        reason: reason || '불출 취소',
+        source_notes: notes,
+        dest_notes: notes,
+      },
+    });
+    if (!transferResp.ok) {
+      if (
+        transferResp.code === 'INSUFFICIENT_STOCK' ||
+        String(transferResp.error || '').includes('INSUFFICIENT_STOCK')
+      ) {
+        throw new Error('INSUFFICIENT_STOCK');
+      }
+      throw new Error(transferResp.error || 'REVERSE_TRANSFER_FAILED');
+    }
+    return;
+  }
+
+  // 수령처 재고 없음: 원본(경영지원) 수량만 복원
+  const postResp = await postStockMovement({
+    itemId: String(sourceItemId),
+    mode: 'delta',
+    delta: reverseQty,
+    type: '반납',
+    changeType: '불출취소',
+    notes,
+    company: INVENTORY_SUPPORT_COMPANY,
+    department: INVENTORY_SUPPORT_DEPARTMENT,
+  });
+  if (!postResp.ok) {
+    throw new Error(postResp.error || 'REVERSE_POST_FAILED');
+  }
 }
 
 type RequestInventoryReorderParams = {

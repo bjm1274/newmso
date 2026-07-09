@@ -241,7 +241,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
       console.error('[mobile-approval] approvals insert failed', err);
       const message = err instanceof Error ? err.message : '결재 상신 실패';
       toast(
-        `결재 상신 실패: ${message}\n연차 기록은 저장되었습니다. PC에서 결재선을 지정해 재상신해 주세요.`,
+        `결재 상신 실패: ${message}\n연차 기록은 저장되었습니다. 전자결재 > 기안함에서 결재선을 확인한 뒤 다시 상신해 주세요.`,
         'error'
       );
       // leave_requests는 이미 저장됨 — 폼 상태 유지 (사용자가 PC 안내 후 닫기 선택)

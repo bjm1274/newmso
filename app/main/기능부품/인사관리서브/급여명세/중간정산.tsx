@@ -690,6 +690,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         bonus: calc.bonus,
         total_taxable: calc.totalTaxable,
         total_taxfree: calc.totalTaxfree,
+        gross_pay: calc.totalTaxable + calc.totalTaxfree,
         total_deduction: calc.deduction,
         // R-2: 공제 항목을 top-level 컬럼에도 저장 (모바일 명세서·EDI가 deduction_detail 대신 읽음)
         national_pension: calc.deductionDetail.national_pension,
@@ -722,6 +723,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           'childcare_allowance',
           'research_allowance',
           'other_taxfree',
+          'gross_pay',
           'national_pension',
           'health_insurance',
           'long_term_care',

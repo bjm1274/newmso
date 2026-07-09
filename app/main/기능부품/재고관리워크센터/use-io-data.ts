@@ -26,16 +26,18 @@ function normalizeMoveKind(v: unknown): StockMoveRow['kind'] {
   return '출고';
 }
 
-function mapMoveRow(r: Row): StockMoveRow {
+function mapMoveRow(r: Row, itemNameById?: Map<string, string>): StockMoveRow {
   const kind = normalizeMoveKind(r['change_type'] ?? r['type']);
+  const itemId = pickString(r, ['item_id', 'inventory_id'], '');
+  const joinedName = itemId && itemNameById?.get(itemId);
   return {
     time: toTimeString(r['created_at']),
     kind,
-    item: pickString(r, ['item_name', 'name', 'product_name'], '(미상)'),
-    qty: pickNumber(r, ['amount', 'qty', 'quantity']),
+    item: joinedName || pickString(r, ['item_name', 'name', 'product_name'], itemId || '(미상)'),
+    qty: pickNumber(r, ['quantity', 'amount', 'qty']),
     unit: pickString(r, ['unit'], 'EA'),
-    from: pickString(r, ['from_location', 'source', 'from_dept'], '-'),
-    to: pickString(r, ['to_location', 'destination', 'to_dept', 'department'], '-'),
+    from: pickString(r, ['from_location', 'source', 'from_dept', 'notes'], '-'),
+    to: pickString(r, ['to_location', 'destination', 'to_dept', 'department', 'location'], '-'),
     who: pickString(r, ['actor_name', 'worker_name', 'user_name'], '-'),
     tone: MOVE_KIND_TONE[kind] };
 }
@@ -126,7 +128,7 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
         const todayKey = getKoreanTodayString();
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
-        const [logsRes, ordersRes, suppliersRes] = await Promise.all([
+        const [logsRes, ordersRes, suppliersRes, invRes] = await Promise.all([
           db
             .from('inventory_logs')
             .select('*')
@@ -139,12 +141,20 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
             .order('created_at', { ascending: false })
             .limit(50),
           db.from('suppliers').select('*').order('name').limit(30),
+          db.from('inventory').select('id, item_name, name').limit(2000),
         ]);
 
         if (cancelled) return;
 
+        const nameMap = new Map<string, string>();
+        for (const row of (Array.isArray(invRes.data) ? invRes.data : []) as Row[]) {
+          const id = pickString(row, ['id'], '');
+          const nm = pickString(row, ['item_name', 'name'], '');
+          if (id && nm) nameMap.set(id, nm);
+        }
+
         const logRows: Row[] = Array.isArray(logsRes.data) ? (logsRes.data as Row[]) : [];
-        const moves = logRows.map(mapMoveRow);
+        const moves = logRows.map((r) => mapMoveRow(r, nameMap));
 
         const orderRows: Row[] = Array.isArray(ordersRes.data) ? (ordersRes.data as Row[]) : [];
         const orders = orderRows.map(mapOrderRow);

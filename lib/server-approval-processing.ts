@@ -23,15 +23,21 @@ import {
   getD1Binding,
   getD1Drizzle } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+import {
+  isFinalApprovalEffectsDone,
+  normalizeLeaveAttendanceStatus,
+  resolveAttendanceCorrectionStatusPair } from '@/lib/server-approval-processing-helpers';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 //
 // 본 파일은 결재 처리(승인 효과 반영) 헬퍼로 7+1개 dual-write 지점을 가졌으나,
 // Phase 8-C 부터는 D1 binding 을 직접 사용해 INSERT/UPSERT 한다.
 //
-// TODO(phase 8-D 이후): 본 파일은 500줄 초과 상태로 type 별 헬퍼 함수
+// 순수 헬퍼(normalizeLeaveAttendanceStatus / resolveAttendanceCorrectionStatusPair /
+// isFinalApprovalEffectsDone)는 server-approval-processing-helpers.ts 로 분리됨.
+// TODO(phase 8-D 이후): type 별 비동기 핸들러
 // (handlePersonnelOrder / handleLeaveAttendance / handleAttendanceFix /
-//  handleCertificateIssue) 로 분리 권장.
+//  handleCertificateIssue) 로 추가 분리 권장.
 async function requireD1ForApprovalProcessing(label: string) {
   const d1 = await getD1Binding();
   if (!d1) {
@@ -51,24 +57,14 @@ type ApprovalFinalizeResult = {
   supplySummary?: ReturnType<typeof summarizeSupplyRequestWorkflow> | null;
 };
 
-function normalizeLeaveAttendanceStatus(leaveTypeValue: unknown) {
-  const normalized = String(leaveTypeValue || '').trim().toLowerCase();
-  if (normalized.includes('병가')) {
-    return { legacy: '병가', modern: 'sick_leave' };
-  }
-  if (normalized.includes('반차') || normalized.includes('0.5')) {
-    return { legacy: '반차휴가', modern: 'half_leave' };
-  }
-  return { legacy: '연차휴가', modern: 'annual_leave' };
-}
-
-function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {
-  const statusMap: Record<string, { att: string; atts: string }> = {
-    정상반영: { att: '정상', atts: 'present' },
-    지각처리: { att: '지각', atts: 'late' },
-    결근처리: { att: '결근', atts: 'absent' } };
-
-  return statusMap[correctionTypeValue] || statusMap['정상반영'];
+/** 이미 후처리 완료된 경우의 공통 성공 응답 (side effect 없음). */
+function alreadyProcessedResult(processedAt: string | null): ApprovalFinalizeResult {
+  return {
+    alreadyProcessed: true,
+    processedAt,
+    steps: [],
+    warnings: [],
+    supplySummary: null };
 }
 
 async function upsertAttendanceCorrectionRows(
@@ -209,18 +205,11 @@ export async function processFinalApprovalEffects(
   actorId?: string | null,
 ) : Promise<ApprovalFinalizeResult> {
   const metaData = item.meta_data as Record<string, unknown> | null | undefined;
-  const lifecycle =
-    metaData?.server_processing && typeof metaData.server_processing === 'object'
-      ? (metaData.server_processing as Record<string, unknown>)
-      : null;
 
-  if (String(lifecycle?.status || '') === 'completed' && lifecycle?.processed_at) {
-    return {
-      alreadyProcessed: true,
-      processedAt: String(lifecycle.processed_at),
-      steps: [],
-      warnings: [],
-      supplySummary: null };
+  // 멱등: 이미 server_processing 완료(completed / completed_with_warnings)면 side effect 재실행 금지
+  const prior = isFinalApprovalEffectsDone(metaData);
+  if (prior.done) {
+    return alreadyProcessedResult(prior.processedAt);
   }
 
   const startedAt = new Date().toISOString();

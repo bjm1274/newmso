@@ -9,7 +9,7 @@
  *  - io: 오늘 입출고 KPI + 최근 거래 리스트
  *  - order: 자동 발주 권장 배너 + 발주 카드 리스트
  *  - vendor: 거래처 카드 리스트 (이름·카테고리·발주건수)
- *  - doc: 거래명세서 리스트 (mock — purchase_orders의 supplier_name 사용)
+ *  - doc: 거래명세서 리스트 (purchase_orders 실데이터 — 확정/완료/납품 완료)
  *  - history: 최근 30일 이력 (inventory_logs 더 길게)
  *
  * 데이터: useIOData() — inventory_logs, purchase_orders, suppliers
@@ -362,9 +362,20 @@ function DocPane({
   data }: {
   data: ReturnType<typeof useIOData>;
 }) {
-  // 발주 중 '확정/완료' 상태만 명세서로 간주
+  // 발주 실데이터: 확정·배송·완료·납품 완료를 명세서로 표시
   const docs = useMemo(
-    () => data.orders.filter((o) => o.status === '확정' || o.status === '납품 완료'),
+    () =>
+      data.orders.filter((o) => {
+        const s = String(o.status || '').trim();
+        return (
+          s === '확정' ||
+          s === '승인' ||
+          s === '배송' ||
+          s === '배송 중' ||
+          s === '완료' ||
+          s === '납품 완료'
+        );
+      }),
     [data.orders],
   );
 

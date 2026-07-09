@@ -164,12 +164,34 @@ function describeDoc(d: MyDocRow): string {
 }
 
 function handleOpenDoc(d: MyDocRow) {
-  if (!d.file_url) {
-    toast('이 문서는 PC에서만 열 수 있습니다.', 'warning');
+  // file_url · storage_path · url 등 후보 키 순회 (PC/DB 스키마 혼재 대응)
+  const raw = d as MyDocRow & {
+    storage_path?: string | null;
+    url?: string | null;
+    object_key?: string | null;
+  };
+  const candidates = [d.file_url, raw.url, raw.storage_path, raw.object_key]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean);
+
+  if (candidates.length === 0) {
+    toast(
+      '첨부 파일 경로가 없습니다. 인사 담당자에게 재업로드를 요청하거나 PC 문서보관함에서 확인하세요.',
+      'warning',
+    );
     return;
   }
+
+  const href = candidates[0];
   try {
-    window.open(d.file_url, '_blank', 'noopener,noreferrer');
+    // 상대 경로면 origin 붙임
+    const absolute =
+      href.startsWith('http://') || href.startsWith('https://') || href.startsWith('blob:')
+        ? href
+        : href.startsWith('/')
+          ? `${window.location.origin}${href}`
+          : href;
+    window.open(absolute, '_blank', 'noopener,noreferrer');
   } catch (err) {
     console.error('[mobile-hr] open doc failed', err);
     toast('문서 열기에 실패했습니다.', 'error');

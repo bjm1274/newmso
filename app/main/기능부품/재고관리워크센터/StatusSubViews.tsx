@@ -144,41 +144,62 @@ export function StockStatusTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="data-table compact w-full text-[12px]">
-            <thead>
+            <thead className="sticky top-0 z-[1] bg-[var(--card)] shadow-[0_1px_0_var(--border)]">
               <tr>
                 <th scope="col" className="text-left">품목</th>
-                <th scope="col" className="text-left">카테고리</th>
+                <th scope="col" className="text-left hidden sm:table-cell">카테고리</th>
                 <th scope="col" className="text-left">위치</th>
-                <th scope="col" className="text-center">재고</th>
-                <th scope="col" className="text-center">최소</th>
-                <th scope="col" className="text-left">유효기간</th>
+                <th scope="col" className="text-right">재고</th>
+                <th scope="col" className="text-center hidden md:table-cell">최소</th>
+                <th scope="col" className="text-left hidden lg:table-cell">유효기간</th>
                 <th scope="col" className="text-left">상태</th>
-                <th scope="col" className="w-20" />
+                <th scope="col" className="w-16" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
-                <tr key={`${r.name}-${r.loc}-${i}`}>
-                  <td className="font-bold">{r.name}</td>
-                  <td className="text-[var(--toss-gray-4)]">{r.cat}</td>
-                  <td className="text-[var(--toss-gray-4)]">{r.loc}</td>
+                <tr
+                  key={`${r.name}-${r.loc}-${i}`}
+                  className={
+                    r.stock === 0
+                      ? 'bg-[var(--danger-light)]/30'
+                      : r.stock < r.min
+                        ? 'bg-[var(--warning-light)]/25'
+                        : undefined
+                  }
+                >
+                  <td className="max-w-[220px]">
+                    <div className="truncate font-bold" title={r.name}>
+                      {r.name}
+                    </div>
+                    <div className="truncate text-[10px] text-[var(--toss-gray-3)] sm:hidden">
+                      {r.cat}
+                    </div>
+                  </td>
+                  <td className="hidden text-[var(--toss-gray-4)] sm:table-cell">{r.cat}</td>
+                  <td className="max-w-[100px] truncate text-[var(--toss-gray-4)]">{r.loc}</td>
                   <td
-                    className="text-center font-extrabold tabular-nums"
+                    className="text-right font-extrabold tabular-nums"
                     style={{
                       color:
                         r.stock === 0
                           ? 'var(--danger)'
                           : r.stock < r.min
                             ? 'var(--warning)'
-                            : 'var(--foreground)' }}
+                            : 'var(--foreground)',
+                    }}
                   >
                     {r.stock}
                     <span className="ml-0.5 text-[10px] font-bold text-[var(--toss-gray-4)]">
                       {r.unit}
                     </span>
                   </td>
-                  <td className="text-center text-[var(--toss-gray-4)] tabular-nums">{r.min}</td>
-                  <td className="text-[var(--toss-gray-4)] tabular-nums">{r.expire}</td>
+                  <td className="hidden text-center tabular-nums text-[var(--toss-gray-4)] md:table-cell">
+                    {r.min}
+                  </td>
+                  <td className="hidden tabular-nums text-[var(--toss-gray-4)] lg:table-cell">
+                    {r.expire}
+                  </td>
                   <td>
                     <StockChip tone={r.tone}>{r.status}</StockChip>
                   </td>

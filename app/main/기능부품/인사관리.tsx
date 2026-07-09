@@ -75,6 +75,10 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   '근무표 자동편성': 'attend',
   간호근무표: 'attend',
   교대근무: 'attend',
+  근무표생성: 'attend',
+  '근무표 생성': 'attend',
+  근무표편성: 'attend',
+  '근무표 편성': 'attend',
   // 연차·휴가
   '연차/휴가': 'leave',
   연차소멸알림: 'leave',

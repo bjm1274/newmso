@@ -1,6 +1,7 @@
 'use client';
 
 import { buildChatMessageSelect, CHAT_MESSAGE_OPTIONAL_COLUMNS } from '@/lib/chat-query-columns';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ChatRoom } from '@/types';
 import {
@@ -74,7 +75,9 @@ export async function fetchUnreadCountsForRoomIds(
     const filterTerms = chunk.map((roomId) => {
       const cursor = params.cursorMap[roomId];
       if (cursor) {
-        return `and(room_id.eq.${roomId},created_at.gt."${cursor}")`;
+        // ISO/SQL 혼재 시 문자열 비교(created_at > last_read_at)가 깨지므로 SQL 포맷으로 통일
+        const normalizedCursor = toUtcSqlTimestamp(cursor);
+        return `and(room_id.eq.${roomId},created_at.gt."${normalizedCursor}")`;
       } else {
         return `room_id.eq.${roomId}`;
       }

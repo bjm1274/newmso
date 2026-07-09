@@ -490,6 +490,49 @@ export async function dispatchChatPushForMessage(params: {
   messageId: string;
   expectedSenderId?: string;
 }) {
+  // ── 멱등: 이미 처리된 job 은 즉시 스킵 (클라이언트+서버 동시 트리거 이중 푸시 방지) ──
+  try {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const existing = await db
+        .select({
+          processed_at: chatPushJobsTable.processed_at,
+          processing_started_at: chatPushJobsTable.processing_started_at,
+        })
+        .from(chatPushJobsTable)
+        .where(eq(chatPushJobsTable.message_id, params.messageId))
+        .limit(1);
+      const row = existing[0];
+      if (row?.processed_at) {
+        return {
+          sent: 0,
+          failed: 0,
+          targets: 0,
+          notificationsCreated: 0,
+          pushDisabled: false,
+          reason: 'already-processed',
+        } satisfies ChatPushDispatchResult;
+      }
+      // 다른 워커가 2분 이내 처리 중이면 스킵 (stale 락은 cron 이 회수)
+      if (row?.processing_started_at) {
+        const started = Date.parse(String(row.processing_started_at));
+        if (Number.isFinite(started) && Date.now() - started < 90_000) {
+          return {
+            sent: 0,
+            failed: 0,
+            targets: 0,
+            notificationsCreated: 0,
+            pushDisabled: false,
+            reason: 'in-flight',
+          } satisfies ChatPushDispatchResult;
+        }
+      }
+    }
+  } catch {
+    // 조회 실패 시 기존 경로로 진행
+  }
+
   // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
   const [, fetchResult, mutedIdsEarly] = await Promise.all([
     updateChatPushJobByMessageId(params.messageId, {
@@ -557,8 +600,20 @@ export async function dispatchChatPushForMessage(params: {
     const d1 = await getD1Binding();
     if (d1) {
       const db = getD1Drizzle(d1);
-      const staffRows = await db.select({ id: staffMembersTable.id }).from(staffMembersTable);
-      members = staffRows.map((row) => String(row.id || '').trim()).filter(Boolean);
+      // 비용 가드: 전 직원 무제한 스캔 금지 — 재직자 위주 + 상한 800
+      // (공지방 1건 푸시가 수천 FCM/WebPush 를 쏘면 $5 플랜·예외 로그 폭주)
+      const staffRows = await db
+        .select({ id: staffMembersTable.id, status: staffMembersTable.status })
+        .from(staffMembersTable)
+        .limit(800);
+      members = staffRows
+        .filter((row) => {
+          const st = String(row.status || '').trim();
+          if (!st) return true;
+          return !/퇴직|퇴사|resign|inactive|leave_of_absence/i.test(st);
+        })
+        .map((row) => String(row.id || '').trim())
+        .filter(Boolean);
     }
   }
   if (members.length === 0) {

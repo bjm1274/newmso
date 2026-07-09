@@ -10,6 +10,10 @@ import {
   getItemQuantity,
   getItemUnitPrice,
   getRecommendedOrderQuantity } from '@/app/main/inventory-utils';
+import {
+  formatStockApiError,
+  inspectPurchaseOrder,
+  receivePurchaseOrder } from '@/lib/inventory-stock-client';
 import { OrderStatusStepper } from './InventoryComponents';
 
 type OrderRecord = {
@@ -22,11 +26,43 @@ type OrderRecord = {
   total_amount: number;
   notes: string | null;
   expected_delivery_date?: string | null;
+  received_qty?: number;
+  inspection_status?: string | null;
+  inspected_at?: string | null;
+  inspected_by_name?: string | null;
   requestTitle?: string | null;
   requesterName?: string | null;
   sourceApprovalId?: string | null;
   sourceRequestIndex?: number | null;
 };
+
+/** 발주입고(GRN) 가능 상태 */
+function canReceivePurchaseOrder(status: string): boolean {
+  const s = status.trim();
+  return (
+    s === '승인' ||
+    s === '확정' ||
+    s === '배송' ||
+    s === '배송 중' ||
+    s === '승인 완료'
+  );
+}
+
+function lineOrderedQty(item: any): number {
+  return Math.max(0, Math.trunc(Number(item?.qty ?? item?.quantity ?? 0) || 0));
+}
+
+function lineReceivedQty(item: any): number {
+  return Math.max(0, Math.trunc(Number(item?.received_qty ?? item?.receivedQty ?? 0) || 0));
+}
+
+function lineRemainingQty(item: any): number {
+  return Math.max(0, lineOrderedQty(item) - lineReceivedQty(item));
+}
+
+function orderRemainingQty(order: OrderRecord): number {
+  return (order.items || []).reduce((sum: number, it: any) => sum + lineRemainingQty(it), 0);
+}
 
 function getStepperStatus(status: string, sourceType: 'purchase_order' | 'approval'): '요청' | '검토' | '결재' | '발주' | '입고' | '완료' {
   const s = status.trim();
@@ -46,8 +82,21 @@ function buildSourceKey(sourceApprovalId?: string | null, sourceRequestIndex?: n
   return `${sourceApprovalId}:${sourceRequestIndex}`;
 }
 
+function parseOrderItems(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function normalizePurchaseOrderRecord(order: any): OrderRecord {
-  const items = Array.isArray(order?.items) ? order.items : [];
+  const items = parseOrderItems(order?.items);
 
   return {
     id: String(order?.id || ''),
@@ -59,6 +108,10 @@ function normalizePurchaseOrderRecord(order: any): OrderRecord {
     total_amount: Number(order?.total_amount || 0),
     notes: typeof order?.notes === 'string' ? order.notes : null,
     expected_delivery_date: typeof order?.expected_delivery_date === 'string' ? order.expected_delivery_date : null,
+    received_qty: Number(order?.received_qty || 0) || 0,
+    inspection_status: order?.inspection_status ? String(order.inspection_status) : null,
+    inspected_at: typeof order?.inspected_at === 'string' ? order.inspected_at : null,
+    inspected_by_name: typeof order?.inspected_by_name === 'string' ? order.inspected_by_name : null,
     sourceApprovalId: items[0]?.source_supply_approval_id ? String(items[0].source_supply_approval_id) : null,
     sourceRequestIndex: Number.isInteger(Number(items[0]?.source_supply_request_index))
       ? Number(items[0].source_supply_request_index)
@@ -130,6 +183,18 @@ export default function PurchaseOrderManagement({
   const [editingDeliveryDateId, setEditingDeliveryDateId] = useState<string | null>(null);
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
   const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
+  const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
+  /** 부분 입고 편집 중 발주 id */
+  const [receiveDraftOrderId, setReceiveDraftOrderId] = useState<string | null>(null);
+  /** 라인별 이번 입고 수량 (index → qty) */
+  const [receiveDraftQtys, setReceiveDraftQtys] = useState<Record<number, number>>({});
+  /** 입고 이력 펼침 */
+  const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
+  const [historyByOrder, setHistoryByOrder] = useState<
+    Record<string, Array<{ at: string; qty: number; actor: string; notes: string; item: string }>>
+  >({});
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [inspectingId, setInspectingId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchPurchaseOrders();
@@ -320,6 +385,191 @@ export default function PurchaseOrderManagement({
     }
   };
 
+  /** 부분 입고 패널 열기 — 라인별 기본 수량은 잔여(발주−누적입고) */
+  const openReceiveDraft = (orderId: string) => {
+    const order = orderRecords.find((item) => item.id === orderId);
+    if (!order || order.sourceType !== 'purchase_order') return;
+    if (!canReceivePurchaseOrder(order.status)) {
+      toast('승인·확정 이후 발주만 입고할 수 있습니다.', 'error');
+      return;
+    }
+    if (orderRemainingQty(order) <= 0) {
+      toast('모든 라인이 입고 완료되었습니다.', 'success');
+      return;
+    }
+    const defaults: Record<number, number> = {};
+    (order.items || []).forEach((item: any, idx: number) => {
+      defaults[idx] = lineRemainingQty(item);
+    });
+    setReceiveDraftOrderId(orderId);
+    setReceiveDraftQtys(defaults);
+  };
+
+  const closeReceiveDraft = () => {
+    setReceiveDraftOrderId(null);
+    setReceiveDraftQtys({});
+  };
+
+  const loadReceiveHistory = async (orderId: string) => {
+    if (historyOpenId === orderId) {
+      setHistoryOpenId(null);
+      return;
+    }
+    setHistoryOpenId(orderId);
+    if (historyByOrder[orderId]) return;
+    setHistoryLoadingId(orderId);
+    try {
+      const { data, error } = await db
+        .from('inventory_logs')
+        .select('quantity,actor_name,notes,created_at,change_type,type,item_id,inventory_id')
+        .eq('purchase_order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (error) throw error;
+      const rows = (Array.isArray(data) ? data : []).map((r: any) => {
+        const notes = String(r?.notes || '');
+        const nameMatch = notes.match(/·\s*(.+?)(?:\s*\(|$)/);
+        return {
+          at: String(r?.created_at || ''),
+          qty: Number(r?.quantity || 0) || 0,
+          actor: String(r?.actor_name || '—'),
+          notes,
+          item: nameMatch?.[1]?.trim() || String(r?.change_type || r?.type || '발주입고'),
+        };
+      });
+      setHistoryByOrder((prev) => ({ ...prev, [orderId]: rows }));
+    } catch (e) {
+      console.error(e);
+      toast('입고 이력을 불러오지 못했습니다.', 'error');
+    } finally {
+      setHistoryLoadingId(null);
+    }
+  };
+
+  const handleInspectPurchaseOrder = async (
+    orderId: string,
+    result: '합격' | '불합격',
+  ) => {
+    const order = orderRecords.find((o) => o.id === orderId);
+    if (!order || order.sourceType !== 'purchase_order') return;
+    if (orderRemainingQty(order) > 0) {
+      toast('전량 입고 후 검수할 수 있습니다. (부분 입고 상태)', 'warning');
+      return;
+    }
+    const confirmed = await openConfirm({
+      title: `입고 검수 — ${result}`,
+      description:
+        result === '합격'
+          ? '입고 수량을 검수 합격 처리합니다.'
+          : '검수 불합격 시 입고 수량만큼 반품 출고로 재고를 원복합니다.',
+      confirmText: result,
+      tone: result === '합격' ? 'accent' : 'danger',
+    });
+    if (!confirmed) return;
+    setInspectingId(orderId);
+    try {
+      const res = await inspectPurchaseOrder({
+        purchaseOrderId: orderId,
+        result,
+        reverseOnFail: result === '불합격',
+      });
+      if (!res.ok) {
+        throw new Error(formatStockApiError(res.error, res.code));
+      }
+      const reversed = res.data?.reversed?.length ?? 0;
+      const reverseErrors = res.data?.reverseErrors?.length ?? 0;
+      if (result === '불합격' && reverseErrors > 0) {
+        toast(
+          `검수 불합격 처리됨. 반품 ${reversed}건 성공, ${reverseErrors}건 실패(재고 부족 등).`,
+          'warning',
+        );
+      } else if (result === '불합격' && reversed > 0) {
+        toast(`검수 불합격 · 입고분 ${reversed}건 반품 처리되었습니다.`, 'success');
+      } else {
+        toast(`검수 ${result} 처리되었습니다.`, 'success');
+      }
+      await fetchPurchaseOrders();
+    } catch (e) {
+      console.error(e);
+      toast((e as Error)?.message || '검수 처리에 실패했습니다.', 'error');
+    } finally {
+      setInspectingId(null);
+    }
+  };
+
+  /** 승인/확정 발주 부분·전량 입고(GRN) → quantity SSOT + 발주입고 로그 */
+  const handleReceivePurchaseOrder = async (orderId: string) => {
+    const order = orderRecords.find((item) => item.id === orderId);
+    if (!order || order.sourceType !== 'purchase_order') return;
+    if (!canReceivePurchaseOrder(order.status)) {
+      toast('승인·확정 이후 발주만 입고할 수 있습니다.', 'error');
+      return;
+    }
+
+    const lines = (order.items || [])
+      .map((item: any, idx: number) => {
+        const itemName = String(item?.name || item?.item_name || '').trim();
+        const remaining = lineRemainingQty(item);
+        const draftQty =
+          receiveDraftOrderId === orderId && receiveDraftQtys[idx] != null
+            ? Math.max(0, Math.trunc(Number(receiveDraftQtys[idx]) || 0))
+            : remaining;
+        const qty = Math.min(draftQty, remaining);
+        if (!itemName || qty <= 0) return null;
+        return {
+          itemName,
+          qty,
+          unitPrice: Number(item?.unit_price ?? item?.price ?? 0) || undefined,
+          inventoryItemId: item?.item_id || item?.inventory_id || undefined,
+        };
+      })
+      .filter(Boolean) as Array<{
+      itemName: string;
+      qty: number;
+      unitPrice?: number;
+      inventoryItemId?: string;
+    }>;
+
+    if (lines.length === 0) {
+      toast('입고 수량이 0인 품목만 있습니다. 잔여 수량을 입력하세요.', 'error');
+      return;
+    }
+
+    const totalQty = lines.reduce((sum, l) => sum + l.qty, 0);
+    const confirmed = await openConfirm({
+      title: '발주 입고 처리',
+      description: `${order.supplier_name || '발주서'} · ${lines.length}품목 · 총 ${totalQty}개 입고합니다.\n라인별 누적 입고가 기록되고 전량 완료 시 납품 완료로 전환됩니다.`,
+      confirmText: '입고 처리',
+      tone: 'accent',
+    });
+    if (!confirmed) return;
+
+    setReceivingOrderId(orderId);
+    try {
+      const result = await receivePurchaseOrder({
+        purchaseOrderId: orderId,
+        lines,
+      });
+      if (!result.ok) {
+        throw new Error(formatStockApiError(result.error, result.code));
+      }
+      const doneLabel = result.data?.allComplete
+        ? ' · 전량 입고 완료'
+        : '';
+      toast(
+        `입고 완료: ${result.data?.received?.length ?? lines.length}품목 · ${totalQty}개${doneLabel}`,
+        'success',
+      );
+      closeReceiveDraft();
+      await fetchPurchaseOrders();
+    } catch (err) {
+      console.error('발주 입고 실패:', err);
+      toast((err as Error)?.message || '발주 입고에 실패했습니다.', 'error');
+    } finally {
+      setReceivingOrderId(null);
+    }
+  };
+
   const pendingOrderCount = orderRecords.filter((order) => order.status !== '승인').length;
   const linkedOrderCount = orderRecords.filter((order) => order.sourceType === 'approval').length;
   const totalPendingAmount = orderRecords
@@ -446,15 +696,46 @@ export default function PurchaseOrderManagement({
                         {order.status === '승인' ? '전자결재 승인 완료' : '전자결재 승인 대기'}
                       </div>
                     ) : (
-                      order.status === '대기' && (
-                        <button
-                          onClick={() => handleApprovePurchaseOrder(order.id)}
-                          data-testid={`purchase-order-approve-${order.id}`}
-                          className="w-full md:w-auto py-2 px-4 bg-green-600 text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm hover:scale-[0.98] transition-all"
-                        >
-                          발주 확인
-                        </button>
-                      )
+                      <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                        {order.status === '대기' && (
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePurchaseOrder(order.id)}
+                            data-testid={`purchase-order-approve-${order.id}`}
+                            className="w-full md:w-auto py-2 px-4 bg-green-600 text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm hover:scale-[0.98] transition-all"
+                          >
+                            발주 확인
+                          </button>
+                        )}
+                        {canReceivePurchaseOrder(order.status) &&
+                          orderRemainingQty(order) > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              receiveDraftOrderId === order.id
+                                ? closeReceiveDraft()
+                                : openReceiveDraft(order.id)
+                            }
+                            disabled={receivingOrderId === order.id}
+                            data-testid={`purchase-order-receive-${order.id}`}
+                            className="w-full md:w-auto py-2 px-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50"
+                          >
+                            {receiveDraftOrderId === order.id
+                              ? '입고 닫기'
+                              : Number(order.received_qty || 0) > 0
+                                ? `추가 입고 (잔여 ${orderRemainingQty(order)})`
+                                : '입고 처리'}
+                          </button>
+                        )}
+                        {order.sourceType === 'purchase_order' &&
+                          orderRemainingQty(order) <= 0 &&
+                          (order.items || []).length > 0 &&
+                          Number(order.received_qty || 0) > 0 && (
+                          <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">
+                            전량 입고 완료
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -465,20 +746,54 @@ export default function PurchaseOrderManagement({
 
                   <div className="bg-[var(--muted)] p-3 rounded-[var(--radius-md)] mb-3">
                     <div className="space-y-2">
-                      {(order.items || []).map((item: any, idx: number) => (
-                        <div
-                          key={`${order.id}-${idx}`}
-                          className="flex justify-between gap-4 text-xs font-bold text-[var(--toss-gray-4)]"
-                        >
-                          <span className="min-w-0 truncate">{item.name || '품목'}</span>
-                          <span className="shrink-0">
-                            {item.qty}개
-                            {Number(item.unit_price || 0) > 0
-                              ? ` / ${Number(item.unit_price || 0).toLocaleString('ko-KR')}원`
-                              : ''}
-                          </span>
-                        </div>
-                      ))}
+                      {(order.items || []).map((item: any, idx: number) => {
+                        const ordered = lineOrderedQty(item);
+                        const received = lineReceivedQty(item);
+                        const remaining = lineRemainingQty(item);
+                        const isDraft = receiveDraftOrderId === order.id;
+                        return (
+                          <div
+                            key={`${order.id}-${idx}`}
+                            className="flex justify-between items-center gap-4 text-xs font-bold text-[var(--toss-gray-4)]"
+                          >
+                            <span className="min-w-0 truncate">{item.name || item.item_name || '품목'}</span>
+                            {isDraft ? (
+                              <label className="flex items-center gap-1.5 shrink-0 font-semibold text-[var(--foreground)]">
+                                <span className="text-[10px] text-[var(--toss-gray-3)] tabular-nums">
+                                  발주 {ordered} · 입고 {received} · 잔여 {remaining}
+                                </span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={remaining || undefined}
+                                  step={1}
+                                  value={receiveDraftQtys[idx] ?? remaining}
+                                  onChange={(e) => {
+                                    const n = Math.max(0, Math.trunc(Number(e.target.value) || 0));
+                                    setReceiveDraftQtys((prev) => ({
+                                      ...prev,
+                                      [idx]: remaining > 0 ? Math.min(n, remaining) : 0,
+                                    }));
+                                  }}
+                                  data-testid={`purchase-order-receive-qty-${order.id}-${idx}`}
+                                  className="w-16 border border-[var(--border)] rounded-[var(--radius-md)] px-1.5 py-1 text-right text-[11px] bg-[var(--card)] tabular-nums"
+                                  aria-label={`${item.name || '품목'} 이번 입고 수량`}
+                                />
+                                <span className="text-[10px]">개</span>
+                              </label>
+                            ) : (
+                              <span className="shrink-0 tabular-nums">
+                                {ordered}개
+                                {received > 0 ? ` · 입고 ${received}` : ''}
+                                {remaining > 0 && received > 0 ? ` · 잔여 ${remaining}` : ''}
+                                {Number(item.unit_price || 0) > 0
+                                  ? ` / ${Number(item.unit_price || 0).toLocaleString('ko-KR')}원`
+                                  : ''}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="mt-3 pt-3 border-t border-[var(--border)] flex justify-between items-center">
                       <span className="text-xs font-semibold text-[var(--foreground)]">총 발주액</span>
@@ -486,6 +801,103 @@ export default function PurchaseOrderManagement({
                         {Number(order.total_amount || 0).toLocaleString('ko-KR')}원
                       </span>
                     </div>
+                    {receiveDraftOrderId === order.id && (
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={closeReceiveDraft}
+                          className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--card)]"
+                        >
+                          취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReceivePurchaseOrder(order.id)}
+                          disabled={receivingOrderId === order.id}
+                          data-testid={`purchase-order-receive-confirm-${order.id}`}
+                          className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-[var(--accent)] text-white disabled:opacity-50"
+                        >
+                          {receivingOrderId === order.id ? '입고 중…' : '이 수량으로 입고'}
+                        </button>
+                      </div>
+                    )}
+                    {order.sourceType === 'purchase_order' &&
+                      Number(order.received_qty || 0) > 0 && (
+                      <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-2">
+                        <div className="flex flex-wrap gap-2 items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => void loadReceiveHistory(order.id)}
+                            data-testid={`purchase-order-history-${order.id}`}
+                            className="text-[11px] font-bold text-[var(--accent)] hover:underline"
+                          >
+                            {historyOpenId === order.id ? '입고 이력 접기' : '입고 이력 보기'}
+                          </button>
+                          <div className="flex flex-wrap gap-1.5">
+                            {orderRemainingQty(order) <= 0 && (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={inspectingId === order.id}
+                                  onClick={() => void handleInspectPurchaseOrder(order.id, '합격')}
+                                  data-testid={`purchase-order-inspect-pass-${order.id}`}
+                                  className="px-2 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-emerald-600 text-white disabled:opacity-50"
+                                >
+                                  검수 합격
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={inspectingId === order.id}
+                                  onClick={() => void handleInspectPurchaseOrder(order.id, '불합격')}
+                                  data-testid={`purchase-order-inspect-fail-${order.id}`}
+                                  className="px-2 py-1 rounded-[var(--radius-md)] text-[10px] font-bold border border-red-200 text-red-600 disabled:opacity-50"
+                                >
+                                  검수 불합격
+                                </button>
+                              </>
+                            )}
+                            {order.inspection_status && (
+                              <span className="px-2 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-[var(--card)] border border-[var(--border)]">
+                                검수: {order.inspection_status}
+                                {order.inspected_by_name ? ` · ${order.inspected_by_name}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {historyOpenId === order.id && (
+                          <div
+                            className="rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] p-2 max-h-40 overflow-y-auto"
+                            data-testid={`purchase-order-history-panel-${order.id}`}
+                          >
+                            {historyLoadingId === order.id ? (
+                              <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">불러오는 중…</p>
+                            ) : (historyByOrder[order.id] || []).length === 0 ? (
+                              <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">
+                                입고 로그가 없습니다.
+                              </p>
+                            ) : (
+                              <ul className="space-y-1.5">
+                                {(historyByOrder[order.id] || []).map((h, i) => (
+                                  <li
+                                    key={`${order.id}-h-${i}`}
+                                    className="flex justify-between gap-2 text-[11px] text-[var(--toss-gray-4)]"
+                                  >
+                                    <span className="min-w-0 truncate">
+                                      <span className="font-bold text-[var(--foreground)]">{h.item}</span>
+                                      {' · '}
+                                      {h.qty}개 · {h.actor}
+                                    </span>
+                                    <span className="shrink-0 tabular-nums text-[10px]">
+                                      {h.at ? new Date(h.at).toLocaleString('ko-KR') : ''}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 입고 예정일 / D-day */}

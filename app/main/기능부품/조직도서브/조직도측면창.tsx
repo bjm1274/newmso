@@ -101,7 +101,7 @@ const MAIN_MENUS: {
   { id: '인사관리', LucideIcon: Briefcase, label: '인사관리', testId: 'sidebar-menu-hr' },
   { id: '재고관리', LucideIcon: Package, label: '재고관리', testId: 'sidebar-menu-inventory' },
   { id: '관리자', LucideIcon: Shield, label: '관리자', testId: 'sidebar-menu-admin' },
-  { id: '재무회계', LucideIcon: Landmark, label: '재무회계', testId: 'sidebar-menu-finance' },
+  { id: '재무회계', LucideIcon: Landmark, label: '재무회계 (PC 전용)', testId: 'sidebar-menu-finance' },
 ];
 
 const ICON_PATHS: Record<string, React.ReactNode> = {

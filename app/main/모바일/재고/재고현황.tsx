@@ -20,7 +20,7 @@
  * JM6: chip-bar button + aria-current, 푸터 버튼 aria-label
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -45,6 +45,16 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
   const data = useStatusData(company);
   const { rows, loading, error, lowCount, zeroCount } = data;
   const [cat, setCat] = useState<StockCatFilter>('all');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen) {
+      // 검색 패널 열릴 때 포커스
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    }
+  }, [searchOpen]);
 
   // 카테고리 분류 + 카운트
   const cats = useMemo(() => {
@@ -59,19 +69,39 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
       .slice(0, 5);
   }, [rows]);
 
-  // 필터된 행
+  // 필터된 행 (칩 + 검색어)
   const filtered = useMemo(() => {
-    if (cat === 'all') return rows;
-    if (cat === 'shortage') return rows.filter((r) => r.tone === 'danger');
-    if (cat === 'warn') return rows.filter((r) => r.tone === 'warn');
-    return rows.filter((r) => r.cat === cat);
-  }, [rows, cat]);
+    let list = rows;
+    if (cat === 'shortage') list = list.filter((r) => r.tone === 'danger');
+    else if (cat === 'warn') list = list.filter((r) => r.tone === 'warn');
+    else if (cat !== 'all') list = list.filter((r) => r.cat === cat);
+
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((r) => {
+        const hay = `${r.name} ${r.cat} ${r.loc} ${r.unit}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    return list;
+  }, [rows, cat, query]);
 
   // 부족 1순위 (알람 카드)
   const shortageTop = useMemo(() => {
     const list = rows.filter((r) => r.tone === 'danger' || r.tone === 'warn');
     return { count: list.length, first: list[0] ?? null };
   }, [rows]);
+
+  const handleQrLookup = useCallback(() => {
+    // 카메라 QR은 P0 범위 외 — 코드 수동 입력으로 동일 검색 경로 제공
+    const code = window.prompt('품목명·위치·카테고리 코드로 검색합니다.\n(카메라 QR 스캔은 추후 연동)');
+    if (code == null) return;
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setQuery(trimmed);
+    setSearchOpen(true);
+    setCat('all');
+  }, []);
 
   const subText = `${company ?? '전체'} · ${rows.length}개 품목`;
 
@@ -83,15 +113,69 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
         back={onBack}
         actions={
           <>
-            <button type="button" aria-label="검색" disabled title="준비 중">
+            <button
+              type="button"
+              aria-label="검색"
+              aria-pressed={searchOpen}
+              onClick={() => setSearchOpen((v) => !v)}
+            >
               <MIcon name="search" size={20} />
             </button>
-            <button type="button" aria-label="QR 스캔" disabled title="준비 중">
+            <button type="button" aria-label="QR 코드 검색" onClick={handleQrLookup}>
               <MIcon name="qr" size={20} />
             </button>
           </>
         }
       />
+
+      {searchOpen && (
+        <div
+          style={{
+            padding: '8px 16px 4px',
+            background: 'var(--m-card)',
+            borderBottom: '1px solid var(--m-border)' }}
+        >
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="품목명 · 카테고리 · 위치 검색"
+              aria-label="재고 검색"
+              style={{
+                flex: 1,
+                height: 40,
+                borderRadius: 'var(--m-radius-md)',
+                border: '1px solid var(--m-border)',
+                padding: '0 12px',
+                fontSize: 14,
+                fontWeight: 600,
+                background: 'var(--z-50, #fafafa)',
+                color: 'var(--z-900)' }}
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="검색어 지우기"
+                onClick={() => setQuery('')}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: 'var(--m-accent)',
+                  padding: '8px 4px' }}
+              >
+                지우기
+              </button>
+            )}
+          </div>
+          {query.trim() && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--z-500)', marginTop: 6 }}>
+              검색 결과 {filtered.length}건
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 카테고리 칩바 */}
       <div className="m-chip-bar" role="tablist" aria-label="재고 카테고리">
@@ -203,7 +287,9 @@ export default function 재고현황({ company, onBack, onPlaceOrder, onGoInout 
               color: 'var(--z-500)',
               fontSize: 13 }}
           >
-            해당 분류의 품목이 없습니다.
+            {query.trim()
+              ? `‘${query.trim()}’ 검색 결과가 없습니다.`
+              : '해당 분류의 품목이 없습니다.'}
           </div>
         )}
 

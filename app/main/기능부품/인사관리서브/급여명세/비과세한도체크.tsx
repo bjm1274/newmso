@@ -2,7 +2,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { db } from '@/lib/db-client';
-import { TAX_FREE_LEGAL_LIMITS, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
+import {
+  TAX_FREE_LEGAL_LIMITS,
+  NIGHT_DUTY_TAX_FREE_LIMIT,
+  OVERSEAS_WORK_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 interface StaffRecord {
@@ -34,17 +37,14 @@ interface TaxFreeRow {
 
 type TaxFreeItemKey = keyof TaxFreeKey;
 
-// 비과세 한도 SSOT: 정본 lib/tax-free-limits 의 법정 한도를 사용한다.
-// childcare(출산·보육수당)는 2024년 개정으로 월 20만원이며 정본 TAX_FREE_LEGAL_LIMITS.childcare가
-// 커버한다 (과거 10만원 하드코딩 → SSOT 200,000으로 정정, N-5).
-// night(야간근로수당 24만원)·overseas(국외근로소득 100만원)는 정본 미커버 항목이라 값 유지.
+// 비과세 한도 SSOT: 정본 lib/tax-free-limits 의 법정 한도만 사용 (숫자 리터럴 금지)
 const TAX_FREE_LIMITS: Record<TaxFreeItemKey, { label: string; limit: number }> = {
   meal: { label: '식대', limit: TAX_FREE_LEGAL_LIMITS.meal.limit },
   car: { label: '자가운전보조금', limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit },
   research: { label: '연구활동비', limit: TAX_FREE_LEGAL_LIMITS.research.limit },
   childcare: { label: '출산·보육수당', limit: TAX_FREE_LEGAL_LIMITS.childcare.limit },
-  night: { label: '야간근로수당(생산직)', limit: NIGHT_DUTY_TAX_FREE_LIMIT },
-  overseas: { label: '국외근로소득(비파견)', limit: 1000000 } };
+  night: { label: TAX_FREE_LEGAL_LIMITS.night.name, limit: NIGHT_DUTY_TAX_FREE_LIMIT },
+  overseas: { label: TAX_FREE_LEGAL_LIMITS.overseas.name, limit: OVERSEAS_WORK_TAX_FREE_LIMIT } };
 
 const TAX_FREE_KEYS = Object.keys(TAX_FREE_LIMITS) as TaxFreeItemKey[];
 

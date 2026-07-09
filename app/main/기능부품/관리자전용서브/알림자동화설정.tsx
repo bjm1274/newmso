@@ -288,7 +288,8 @@ MSO 주식회사 대표이사 (직인생략)`;
             ? crypto.randomUUID()
             : `doc-alp-${s.id}-${schedule.targetYear}-${stepToday}-${Date.now()}`,
           title: docTitle,
-          category: '기타',
+          // 정식 분류 — '기타' 저장 시 연차촉진 폴더에서 누락됨
+          category: '연차촉진',
           content: docContent,
           company_name: s.company || '전체',
           created_by: s.id,

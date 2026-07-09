@@ -66,6 +66,31 @@ export function resolveWorkcenterId(id?: string | null): WorkcenterId | null {
   return null;
 }
 
+/** 근무표 관련 별칭 → 근태 워크센터 schedule 탭 */
+export function resolveAttendInitialTab(
+  initialMenu?: string | null,
+): 'dashboard' | 'schedule' | 'calendar' | 'abnormal' {
+  const raw = String(initialMenu || '').trim();
+  if (
+    raw === '간호근무표' ||
+    raw === '근무표자동편성' ||
+    raw === '근무표 자동편성' ||
+    raw === '근무표생성' ||
+    raw === '근무표 생성' ||
+    raw === '근무표편성' ||
+    raw === '근무표 편성' ||
+    raw === '교대근무' ||
+    raw === 'schedule'
+  ) {
+    return 'schedule';
+  }
+  if (raw === 'abnormal' || raw.includes('근태이상') || raw.includes('지각')) {
+    return 'abnormal';
+  }
+  if (raw === 'calendar' || raw === '근태달력') return 'calendar';
+  return 'dashboard';
+}
+
 interface HrWorkcenterRouterProps {
   workcenterId: WorkcenterId;
   staffs?: StaffMember[];
@@ -121,6 +146,7 @@ export default function HrWorkcenterRouter({
             selectedCo={selectedCo}
             user={user}
             onRefresh={onRefresh}
+            initialTab={resolveAttendInitialTab(initialMenu)}
           />
         );
       case 'leave':

@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     if (err instanceof StockError) {
       const statusMap: Record<string, number> = {
         INSUFFICIENT_STOCK: 409,
+        EXPIRED_STOCK: 409,
         ITEM_NOT_FOUND: 404 };
       const status = statusMap[err.code] ?? 500;
       return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });

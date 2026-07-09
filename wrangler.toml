@@ -35,14 +35,14 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY = "BMf4VkZmz6KBu1gqZSPypXMmYurULhlG31-m0F-GO-dH9fkB
 # Daily full backup (KST 00:00 = UTC 15:00) using D1 (no Supabase egress)
 [triggers]
 crons = [
+  "*/5 * * * *",  # /api/cron/chat-push-dispatch — 5분마다 미발송 큐 회수 (카톡급 폴백, $5 한도 내)
   "0 15 * * *",   # /api/cron/backup
   "0 17 * * *",   # /api/cron/chat-retention
-  "0 23 * * *",   # /api/cron/chat-push-dispatch
   "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
   "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements,
                   #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday,
                   #            payroll-notice (급여일 리마인더 — 내부에서 day===payrollDay만 발송)
-  "0 4 * * *",    # KST 13:00 — 임시 재발송 (temp resend)
+  "0 4 * * *",    # KST 13:00 — 구 temp/resend 슬롯 (worker 맵 빈 배열 = no-op)
 ]
 
 # Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)

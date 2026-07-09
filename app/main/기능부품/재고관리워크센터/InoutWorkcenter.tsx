@@ -217,59 +217,65 @@ function InoutRegistrationOverlay({
 
     setLoading(true);
     try {
-      const currentStock = Number(matchedItem.stock ?? 0);
-      let nextStock = currentStock;
+      const { postStockMovement } = await import('@/lib/inventory-stock-client');
+      const currentStock = Number(matchedItem.quantity ?? matchedItem.stock ?? 0) || 0;
+      const locNote =
+        mode === '입고'
+          ? fromLoc
+            ? `from:${fromLoc}`
+            : ''
+          : mode === '출고' || mode === '반품'
+            ? toLoc
+              ? `to:${toLoc}`
+              : ''
+            : '';
+      const noteParts = [notes.trim(), locNote].filter(Boolean);
 
-      if (mode === '입고') {
-        nextStock = currentStock + qty;
-      } else if (mode === '출고' || mode === '반품') {
-        if (currentStock < qty) {
+      const payload =
+        mode === '조정'
+          ? {
+              itemId: String(matchedItem.id),
+              mode: 'absolute' as const,
+              absoluteQty: qty,
+              type: '조정' as const,
+              notes: noteParts.join(' · ') || '수동 조정',
+              company: matchedItem.company ?? user?.company ?? null,
+              department: matchedItem.department ?? user?.department ?? null,
+              location: matchedItem.location ?? matchedItem.loc ?? null,
+            }
+          : {
+              itemId: String(matchedItem.id),
+              mode: 'delta' as const,
+              delta: mode === '입고' ? qty : -qty,
+              type: (mode === '반품' ? '반품' : mode === '입고' ? '입고' : '출고') as
+                | '입고'
+                | '출고'
+                | '반품',
+              notes: noteParts.join(' · ') || `${mode} 등록`,
+              company: matchedItem.company ?? user?.company ?? null,
+              department: matchedItem.department ?? user?.department ?? null,
+              location: matchedItem.location ?? matchedItem.loc ?? null,
+            };
+
+      const result = await postStockMovement(payload);
+      if (!result.ok) {
+        const { formatStockApiError } = await import('@/lib/inventory-stock-client');
+        if (result.code === 'INSUFFICIENT_STOCK') {
           toast(`출고 가능 재고가 부족합니다. (현재: ${currentStock}개)`, 'warning');
-          setLoading(false);
-          return;
+        } else {
+          toast(formatStockApiError(result.error, result.code), 'error');
         }
-        nextStock = currentStock - qty;
-      } else if (mode === '조정') {
-        nextStock = qty;
+        return;
       }
 
-      // 1. inventory 수량 갱신
-      const { error: invErr } = await db
-        .from('inventory')
-        .update({ stock: nextStock })
-        .eq('id', matchedItem.id);
-
-      if (invErr) throw invErr;
-
-      // 2. inventory_logs 기록 추가
-      const logKind = mode;
-      const actorName = user?.name || '시스템';
-      const source = mode === '입고' ? fromLoc || '공급처' : String(matchedItem.loc || '메인창고');
-      const destination =
-        mode === '출고' || mode === '반품' ? toLoc || '출고처' : String(matchedItem.loc || '메인창고');
-
-      const { error: logErr } = await db.from('inventory_logs').insert([
-        {
-          item_name: matchedItem.name || matchedItem.item_name,
-          change_type: logKind,
-          amount: qty,
-          unit: matchedItem.unit || 'EA',
-          from_location: source,
-          to_location: destination,
-          actor_name: actorName,
-          notes: notes || `${logKind} 등록` }
-      ]);
-
-      if (logErr) throw logErr;
-
       toast(
-        `${matchedItem.name || matchedItem.item_name} 품목의 ${mode} 처리가 완료되었습니다.`,
+        `${matchedItem.name || matchedItem.item_name} ${mode} 완료 (재고 ${result.data?.prev_qty ?? currentStock} → ${result.data?.next_qty ?? '—'})`,
         'success',
       );
       onSuccess();
     } catch (err) {
       console.error(err);
-      toast('데이터 저장에 실패했습니다. DB 제약을 확인해주세요.', 'error');
+      toast('데이터 저장에 실패했습니다. 네트워크·권한을 확인해주세요.', 'error');
     } finally {
       setLoading(false);
     }

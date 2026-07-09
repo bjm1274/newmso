@@ -17,6 +17,8 @@
 import { useCallback, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { canAccessMainMenu } from '@/lib/access-control';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { useExecOverview } from '@/app/main/기능부품/관리자워크센터/useExecOverview';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MListRow from '../공통/MListRow';
@@ -115,6 +117,18 @@ function Hub({
   onOpen: (view: Exclude<AdminView, 'hub'>) => void;
 }) {
   const company = typeof user.company === 'string' ? user.company : '';
+  const { data } = useAppData();
+  const staffs = data.staffs ?? [];
+  const overview = useExecOverview(staffs);
+  const totalLabor = overview.corpRows.reduce((s, r) => s + r.laborCost, 0);
+
+  const heroPrimary = overview.loading
+    ? '불러오는 중…'
+    : `결재 대기 ${overview.pendingApprovalCount}건 · 재직 ${overview.activeStaffCount}명`;
+  const heroSecondary = overview.loading
+    ? '실데이터 집계 중'
+    : `이번 달 인건비 ${Math.round(totalLabor).toLocaleString('ko-KR')}원 · 매출 연동 준비 중`;
+
   return (
     <div className="m-screen">
       <MobileHeader
@@ -122,22 +136,36 @@ function Hub({
         eyebrow="운영"
         back={onBack}
         actions={
-          <button type="button" aria-label="알림" disabled title="준비 중">
-            <MIcon name="bell" size={20} />
+          <button
+            type="button"
+            aria-label="경영 대시보드 열기"
+            onClick={() => onOpen('exec')}
+            title="경영 대시보드"
+          >
+            <MIcon name="layers" size={20} />
           </button>
         }
       />
       <div className="m-scroll">
-        <div className="m-admin-hero">
+        <button
+          type="button"
+          className="m-admin-hero"
+          onClick={() => onOpen('exec')}
+          aria-label="경영 대시보드로 이동"
+          style={{
+            width: '100%',
+            textAlign: 'left',
+            border: 'none',
+            cursor: 'pointer',
+            appearance: 'none' }}
+        >
           <div className="cap">{company || ''} 통합 관리</div>
-          <div className="lbl">경영 현황</div>
-          <div className="big m-tnum" style={{ fontSize: 16, fontWeight: 700 }}>
-            데이터 준비 중
+          <div className="lbl">경영 현황 (읽기 전용 KPI)</div>
+          <div className="big m-tnum" style={{ fontSize: 15, fontWeight: 700 }}>
+            {heroPrimary}
           </div>
-          <div className="delta">
-            매출 연동 예정
-          </div>
-        </div>
+          <div className="delta">{heroSecondary}</div>
+        </button>
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">관리자 메뉴</div>

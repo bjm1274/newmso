@@ -182,7 +182,8 @@ export default function MobileShell({
       const encryptedContractText = await encryptContract(contractText);
       const { error: insertDocError } = await db.from('document_repository').insert({
         title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
-        category: '계약서',
+        // 문서보관함 정식 분류 SSOT — '계약서' 별칭은 폴더 매칭 실패 원인
+        category: '근로계약서',
         content: encryptedContractText,
         company_name: (user?.company as string) || '전체',
         created_by: currentUserId,

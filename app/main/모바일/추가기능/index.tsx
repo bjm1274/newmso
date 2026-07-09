@@ -42,6 +42,7 @@ import MRI일정 from './MRI일정';
 import 업무공유목록 from './업무공유목록';
 import 업무공유상세 from './업무공유상세';
 import 업무가이드 from './업무가이드';
+import 공유캘린더 from './공유캘린더';
 import type { OpCheckCard } from './data-hooks';
 
 type View =
@@ -63,7 +64,8 @@ type View =
   | { kind: 'mri' }
   | { kind: 'share-list' }
   | { kind: 'share-detail'; id: string }
-  | { kind: 'guide' };
+  | { kind: 'guide' }
+  | { kind: 'calendar' };
 
 const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
   org: { kind: 'org' },
@@ -80,7 +82,9 @@ const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
   webfax: { kind: 'webfax' },
   mri: { kind: 'mri' },
   share: { kind: 'share-list' },
-  guide: { kind: 'guide' } };
+  guide: { kind: 'guide' },
+  calendar: { kind: 'calendar' },
+};
 
 export type 추가기능Props = {
   user: ErpUser;
@@ -194,6 +198,9 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       break;
     case 'guide':
       contentElement = <업무가이드 user={user} onBack={goBackOrHub} />;
+      break;
+    case 'calendar':
+      contentElement = <공유캘린더 onBack={goBackOrHub} />;
       break;
     default:
       contentElement = null;

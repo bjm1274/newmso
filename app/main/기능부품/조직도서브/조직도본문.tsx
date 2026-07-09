@@ -335,7 +335,8 @@ MSO 주식회사 대표이사 (직인생략)`;
       const { error: docError } = await db.from('document_repository').insert({
         id: docId,
         title: docTitle,
-        category: '기타',
+        // 정식 분류 — '기타' 저장 시 연차촉진 폴더에서 누락됨
+        category: '연차촉진',
         content: docContent,
         company_name: staff.company || '전체',
         created_by: user.id,

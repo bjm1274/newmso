@@ -147,7 +147,7 @@ import {
 import type { ErpClaims } from '@/lib/db/auth/claims';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 import * as schema from '@/lib/db/schema';
-import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -159,10 +159,8 @@ const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_ROWS_PER_INSERT = 100;
 
-// disciplinary_committees 테이블 + unique index 자동 생성을 isolate당 1회만
-// 실행하도록 가드. 매 요청 DDL은 불필요한 부하 — 첫 요청에서만 프로비저닝한다.
-// (완전 제거는 마이그레이션 의존이라 위험 → 가드만 적용.)
-let provisioned = false;
+// DDL(CREATE TABLE / INDEX / ALTER)은 핫패스에서 실행하지 않는다.
+// disciplinary_committees·employment_contracts 스키마는 lib/db/migrations 로 적용됨.
 
 // RETURNING 컬럼 — 일반 컬럼명 또는 '*'(전체 컬럼). db .select('*') 호환.
 const ReturningColSchema = z.string().refine((c) => c === '*' || COLUMN_RE.test(c), {
@@ -368,17 +366,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Rate limit: 분당 100회 per user
+    // Rate limit: 분당 100회 per user (check+increment 원자적)
     const uid = userId(session?.user)!;
     const rateKey = `d1-mutate:${uid}`;
-    const rate = await checkRateLimit(rateKey, D1_MUTATE_RATE_LIMIT_MAX, D1_MUTATE_RATE_LIMIT_WINDOW_MS);
+    const rate = await consumeRateLimit(rateKey, D1_MUTATE_RATE_LIMIT_MAX, D1_MUTATE_RATE_LIMIT_WINDOW_MS);
     if (!rate.allowed) {
       return NextResponse.json(
         { ok: false, error: '요청이 너무 잦습니다.' },
         { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
       );
     }
-    await recordFailedAttempt(rateKey, D1_MUTATE_RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const parsed = PayloadSchema.safeParse(body);
@@ -398,38 +395,6 @@ export async function POST(request: Request) {
     const d1 = await getD1Binding();
     if (!d1) {
       return NextResponse.json({ ok: false, error: 'D1 binding not available' }, { status: 500 });
-    }
-
-    // DDD (Disciplinary Table Auto-provisioning & Unique Index)
-    // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
-    if (!provisioned) {
-      try {
-        await d1.exec('CREATE TABLE IF NOT EXISTS "disciplinary_committees" ("id" text PRIMARY KEY NOT NULL, "company" text, "title" text NOT NULL, "meeting_date" text, "target_staff_id" text NOT NULL, "target_staff_name" text NOT NULL, "status" text DEFAULT \'대기\', "reason" text NOT NULL, "result_type" text, "result_details" text, "committee_members" text, "created_at" text DEFAULT (CURRENT_TIMESTAMP));');
-      } catch (err) {
-        console.error('Failed to auto-provision disciplinary_committees table:', err);
-      }
-
-      try {
-        await d1.exec(`
-          CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
-        `);
-      } catch (err) {
-        console.warn('Failed to create unique index on employment_contracts (duplicates might exist):', err);
-      }
-
-      try {
-        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `receipt_signature_data` text;");
-      } catch (e) {
-        // Ignore if column already exists
-      }
-
-      try {
-        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `privacy_consent` integer;");
-      } catch (e) {
-        // Ignore if column already exists
-      }
-
-      provisioned = true;
     }
 
     const db = getD1Drizzle(d1);
@@ -556,6 +521,16 @@ export async function POST(request: Request) {
             );
           } catch (enqueueErr) {
             console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
+          }
+
+          // (3) 카톡급 즉시 발송 — 클라이언트 chat-push 트리거 실패/앱 백그라운드여도 서버가 바로 처리.
+          // 비용 가드: 이번 INSERT 건수와 10건 중 작은 값만 즉시 처리. 나머지는 5분 cron/flush.
+          try {
+            const { processPendingChatPushJobs } = await import('@/lib/chat-push-dispatch');
+            const immediateLimit = Math.min(Math.max(bgResults.length, 1), 10);
+            await processPendingChatPushJobs(immediateLimit);
+          } catch (dispatchErr) {
+            console.error('[d1/mutate] 즉시 chat-push 디스패치 실패 (non-fatal, cron 회수):', dispatchErr);
           }
         })();
       }

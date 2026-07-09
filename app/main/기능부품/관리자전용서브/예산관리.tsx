@@ -5,6 +5,8 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import { db } from '@/lib/db-client';
 import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
+import { STORAGE_KEYS } from '@/lib/storage-keys';
+import { readLocalStorage, writeLocalStorage } from '@/lib/storage-utils';
 
 // recharts는 번들 사이즈가 크므로 동적 로드
 const BudgetBarChart = dynamic(() => import('./charts/BudgetBarChart'), {
@@ -49,6 +51,8 @@ export default function BudgetManagement(props: { staffs: any[] }) {
 
 function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   const [activeTab, setActiveTab] = useState<'설정' | '집행현황'>('설정');
+  /** d1 = 서버 실데이터, local = D1 실패 시 브라우저 임시 저장 */
+  const [dataSource, setDataSource] = useState<'d1' | 'local' | 'loading'>('loading');
 
   // 예산 설정 상태
   const [settings, setSettings] = useState<BudgetSetting[]>([]);
@@ -82,33 +86,55 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      // MSO 설계상 회사 격리 불필요 — 전사 조회(필터 없음).
-      const [{ data: settingRows }, { data: execRows }] = await Promise.all([
-        db.from('budget_settings').select('*'),
-        db.from('budget_executions').select('*'),
-      ]);
-      if (!alive) return;
-      setSettings(
-        ((settingRows as any[]) ?? []).map(r => ({
-          id: String(r.id),
-          dept: r.dept ?? '',
-          year: Number(r.year),
-          month: Number(r.month),
-          item: r.item as BudgetItem,
-          amount: Number(r.amount) || 0,
-          createdAt: r.created_at ?? '' })),
-      );
-      setExecutions(
-        ((execRows as any[]) ?? []).map(r => ({
-          id: String(r.id),
-          dept: r.dept ?? '',
-          item: r.item as BudgetItem,
-          amount: Number(r.amount) || 0,
-          // DB 컬럼 exec_date → UI 모델 date 로 매핑
-          date: r.exec_date ?? '',
-          memo: r.memo ?? '',
-          createdAt: r.created_at ?? '' })),
-      );
+      try {
+        // MSO 설계상 회사 격리 불필요 — 전사 조회(필터 없음). migration 0015.
+        const [settingRes, execRes] = await Promise.all([
+          db.from('budget_settings').select('*'),
+          db.from('budget_executions').select('*'),
+        ]);
+        if (!alive) return;
+
+        const settingErr = settingRes.error;
+        const execErr = execRes.error;
+        if (settingErr || execErr) {
+          // D1 실패 → 로컬 임시 폴백 (명시 라벨)
+          const localSettings = readLocalStorage<BudgetSetting[]>(STORAGE_KEYS.BUDGET_SETTINGS, []);
+          const localExecs = readLocalStorage<BudgetExecution[]>(STORAGE_KEYS.BUDGET_EXECUTIONS, []);
+          setSettings(localSettings);
+          setExecutions(localExecs);
+          setDataSource('local');
+          return;
+        }
+
+        setSettings(
+          ((settingRes.data as any[]) ?? []).map(r => ({
+            id: String(r.id),
+            dept: r.dept ?? '',
+            year: Number(r.year),
+            month: Number(r.month),
+            item: r.item as BudgetItem,
+            amount: Number(r.amount) || 0,
+            createdAt: r.created_at ?? '' })),
+        );
+        setExecutions(
+          ((execRes.data as any[]) ?? []).map(r => ({
+            id: String(r.id),
+            dept: r.dept ?? '',
+            item: r.item as BudgetItem,
+            amount: Number(r.amount) || 0,
+            date: r.exec_date ?? '',
+            memo: r.memo ?? '',
+            createdAt: r.created_at ?? '' })),
+        );
+        setDataSource('d1');
+      } catch {
+        if (!alive) return;
+        const localSettings = readLocalStorage<BudgetSetting[]>(STORAGE_KEYS.BUDGET_SETTINGS, []);
+        const localExecs = readLocalStorage<BudgetExecution[]>(STORAGE_KEYS.BUDGET_EXECUTIONS, []);
+        setSettings(localSettings);
+        setExecutions(localExecs);
+        setDataSource('local');
+      }
     })();
     return () => {
       alive = false;
@@ -126,21 +152,41 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       item: settingForm.item,
       amount: Number(settingForm.amount),
       createdAt: new Date().toISOString() };
-    setSettings(prev => [...prev, newItem]);
+    setSettings(prev => {
+      const next = [...prev, newItem];
+      if (dataSource === 'local') writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, next);
+      return next;
+    });
     setSettingForm(f => ({ ...f, amount: '', dept: '' }));
-    await db.from('budget_settings').insert({
-      id: newItem.id,
-      company: null,
-      dept: newItem.dept,
-      year: newItem.year,
-      month: newItem.month,
-      item: newItem.item,
-      amount: newItem.amount });
+    if (dataSource === 'd1') {
+      const { error } = await db.from('budget_settings').insert({
+        id: newItem.id,
+        company: null,
+        dept: newItem.dept,
+        year: newItem.year,
+        month: newItem.month,
+        item: newItem.item,
+        amount: newItem.amount });
+      if (error) {
+        // D1 쓰기 실패 시 로컬로 강등
+        setDataSource('local');
+        setSettings(prev => {
+          writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, prev);
+          return prev;
+        });
+      }
+    }
   };
 
   const handleDeleteSetting = async (id: string) => {
-    setSettings(prev => prev.filter(s => s.id !== id));
-    await db.from('budget_settings').delete().eq('id', id);
+    setSettings(prev => {
+      const next = prev.filter(s => s.id !== id);
+      if (dataSource === 'local') writeLocalStorage(STORAGE_KEYS.BUDGET_SETTINGS, next);
+      return next;
+    });
+    if (dataSource === 'd1') {
+      await db.from('budget_settings').delete().eq('id', id);
+    }
   };
 
   const handleAddExecution = async () => {
@@ -154,23 +200,41 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
       date: execForm.date,
       memo: execForm.memo,
       createdAt: new Date().toISOString() };
-    setExecutions(prev => [...prev, newExec]);
+    setExecutions(prev => {
+      const next = [...prev, newExec];
+      if (dataSource === 'local') writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, next);
+      return next;
+    });
     setExecForm(f => ({ ...f, amount: '', memo: '' }));
     setShowExecForm(false);
-    await db.from('budget_executions').insert({
-      id: newExec.id,
-      company: null,
-      dept: newExec.dept,
-      item: newExec.item,
-      amount: newExec.amount,
-      // UI 모델 date → DB 컬럼 exec_date 로 매핑
-      exec_date: newExec.date,
-      memo: newExec.memo });
+    if (dataSource === 'd1') {
+      const { error } = await db.from('budget_executions').insert({
+        id: newExec.id,
+        company: null,
+        dept: newExec.dept,
+        item: newExec.item,
+        amount: newExec.amount,
+        exec_date: newExec.date,
+        memo: newExec.memo });
+      if (error) {
+        setDataSource('local');
+        setExecutions(prev => {
+          writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, prev);
+          return prev;
+        });
+      }
+    }
   };
 
   const handleDeleteExecution = async (id: string) => {
-    setExecutions(prev => prev.filter(e => e.id !== id));
-    await db.from('budget_executions').delete().eq('id', id);
+    setExecutions(prev => {
+      const next = prev.filter(e => e.id !== id);
+      if (dataSource === 'local') writeLocalStorage(STORAGE_KEYS.BUDGET_EXECUTIONS, next);
+      return next;
+    });
+    if (dataSource === 'd1') {
+      await db.from('budget_executions').delete().eq('id', id);
+    }
   };
 
   // 집행 현황 차트 데이터 생성
@@ -216,6 +280,22 @@ function BudgetManagementDesktop({ staffs = [] }: { staffs: any[] }) {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
+      {dataSource === 'local' && (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-[var(--radius-md)] border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-amber-200/80 text-amber-900 text-[10px] dark:bg-amber-800 dark:text-amber-100">
+            로컬 임시
+          </span>
+          D1 예산 테이블 연결 실패 — 브라우저 임시 저장을 사용 중입니다. 서버 복구 후 데이터가 동기화되지 않을 수 있습니다.
+        </div>
+      )}
+      {dataSource === 'd1' && (
+        <div className="text-[10.5px] font-semibold text-[var(--toss-gray-4)] px-0.5">
+          데이터 소스: D1 (budget_settings / budget_executions)
+        </div>
+      )}
       {/* 액션 */}
       {activeTab === '집행현황' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--card)] p-3 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm">

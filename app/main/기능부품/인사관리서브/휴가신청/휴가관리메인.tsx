@@ -383,9 +383,15 @@ export default function LeaveManagement({
     setLoading(true);
     try {
       const now = new Date();
+      // N+1 순차 루프 제거: 직원별 update/sync를 동시성 제한(5)으로 배치 처리
+      const CONCURRENCY = 5;
+      type GrantJob = { staffId: string; total: number };
+      const jobs: GrantJob[] = [];
       for (const s of staffList) {
         const joinDate = (s as Record<string, unknown>).joined_at || (s as Record<string, unknown>).join_date;
         if (!joinDate) continue;
+        const staffId = String((s as Record<string, unknown>).id ?? '');
+        if (!staffId) continue;
         const join = new Date(joinDate as string);
         const years = (now.getTime() - join.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
 
@@ -400,16 +406,36 @@ export default function LeaveManagement({
           if (years >= 1) total = Math.min(25, 15 + Math.floor((years - 1) / 2));
           else total = Math.min(11, Math.floor((now.getTime() - join.getTime()) / (30 * 24 * 60 * 60 * 1000)));
         }
-
-        await db.from('staff_members').update({ annual_leave_total: total }).eq('id', (s as Record<string, unknown>).id);
-        fetch('/api/admin/annual-leave/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ staffId: String((s as Record<string, unknown>).id) }) }).catch((err) => {
-          console.error('[runAnnualLeaveAutoGrant] 연차 동기화 API 실패:', err);
-        });
+        jobs.push({ staffId, total });
       }
-      toast('연차 자동 부여가 완료되었습니다.', 'success');
+
+      let failCount = 0;
+      for (let i = 0; i < jobs.length; i += CONCURRENCY) {
+        const chunk = jobs.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          chunk.map(async ({ staffId, total }) => {
+            const { error } = await db
+              .from('staff_members')
+              .update({ annual_leave_total: total })
+              .eq('id', staffId);
+            if (error) throw new Error(error.message || `update failed: ${staffId}`);
+            // sync는 실패해도 메인 부여를 막지 않음
+            fetch('/api/admin/annual-leave/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ staffId }) }).catch((err) => {
+              console.error('[runAnnualLeaveAutoGrant] 연차 동기화 API 실패:', err);
+            });
+          }),
+        );
+        failCount += results.filter((r) => r.status === 'rejected').length;
+      }
+
+      if (failCount > 0) {
+        toast(`연차 자동 부여 완료 (실패 ${failCount}/${jobs.length}명)`, 'warning');
+      } else {
+        toast('연차 자동 부여가 완료되었습니다.', 'success');
+      }
       if (onRefresh) (onRefresh as () => void)();
     } catch (e) {
       toast('처리 중 오류가 발생했습니다.', 'error');

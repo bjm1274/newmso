@@ -411,20 +411,145 @@ function InspectPanel({
 // ─────────────────────────────────────────────────
 
 function ClosePanel() {
-  const { history, steps, currentMonthClosed, loading, error } = useClosingData();
+  const {
+    history,
+    steps,
+    stepsDone,
+    currentMonthClosed,
+    currentMonth,
+    loading,
+    error,
+    refresh,
+  } = useClosingData();
+  const { user } = useAppData();
+  const [busy, setBusy] = useState(false);
   const now = new Date();
   const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+  const company = String(user?.company || 'SY INC.').trim() || 'SY INC.';
+
+  const runClosing = async (
+    action: 'lock' | 'unlock' | 'advance_step' | 'reset_steps',
+  ) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { setInventoryClosing, formatStockApiError } = await import(
+        '@/lib/inventory-stock-client'
+      );
+      const res = await setInventoryClosing({
+        action,
+        company,
+        closingMonth: currentMonth || undefined,
+      });
+      if (!res.ok) {
+        const { toast } = await import('@/lib/toast');
+        toast(formatStockApiError(res.error, res.code), 'error');
+        return;
+      }
+      const { toast } = await import('@/lib/toast');
+      if (action === 'lock') {
+        toast(
+          `${monthLabel} 월마감 잠금 완료 · ${res.data?.item_count ?? 0}종 · 평가 ${
+            res.data?.total_value != null
+              ? `₩${Math.round(res.data.total_value).toLocaleString('ko-KR')}`
+              : '-'
+          }`,
+          'success',
+        );
+      } else if (action === 'unlock') {
+        toast(`${monthLabel} 월마감 잠금 해제 — 입출고 가능`, 'success');
+      } else if (action === 'advance_step') {
+        toast(`마감 단계 ${res.data?.steps_done ?? stepsDone + 1}/5 완료`, 'success');
+      } else {
+        toast('마감 단계를 초기화했습니다.', 'info');
+      }
+      refresh();
+    } catch (e) {
+      console.error(e);
+      const { toast } = await import('@/lib/toast');
+      toast('월마감 처리 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <StockDarkBanner
         kicker="MONTHLY CLOSING"
         title={`${monthLabel} 마감 ${currentMonthClosed ? '완료' : '진행'}`}
-        desc="실사 → 입출고 확정 → 차이 조정 → 평가 → 보고서"
+        desc="실사 → 입출고 확정 → 차이 조정 → 평가 → 보고서 · 잠금 시 재고 수량 변경 차단"
       >
         <span className="rounded-[var(--radius-sm)] bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white">
           {currentMonthClosed ? '마감 완료' : '진행 중'}
         </span>
       </StockDarkBanner>
+
+      <section className="app-card flex flex-col gap-2 p-3" aria-label="월마감 잠금 제어">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-[12px] font-bold">월마감 잠금</h3>
+            <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">
+              {company} · {currentMonth || monthLabel}
+              {currentMonthClosed
+                ? ' — 잠금 상태 (입출고·이관 차단)'
+                : ' — 열린 상태 (입출고 가능)'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!currentMonthClosed && stepsDone < 5 && (
+              <button
+                type="button"
+                disabled={busy || loading}
+                data-testid="inventory-closing-advance"
+                onClick={() => void runClosing('advance_step')}
+                className="rounded-[var(--radius-md)] border border-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] disabled:opacity-50"
+              >
+                {busy ? '처리 중…' : `다음 단계 (${stepsDone}/5 → ${Math.min(5, stepsDone + 1)})`}
+              </button>
+            )}
+            {!currentMonthClosed ? (
+              <button
+                type="button"
+                disabled={busy || loading}
+                data-testid="inventory-closing-lock"
+                onClick={() => void runClosing('lock')}
+                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-50"
+              >
+                {busy ? '처리 중…' : '이번 달 마감 잠금'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy || loading}
+                data-testid="inventory-closing-unlock"
+                onClick={() => void runClosing('unlock')}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] disabled:opacity-50"
+              >
+                {busy ? '처리 중…' : '잠금 해제'}
+              </button>
+            )}
+            {!currentMonthClosed && stepsDone > 0 && (
+              <button
+                type="button"
+                disabled={busy || loading}
+                onClick={() => void runClosing('reset_steps')}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] disabled:opacity-50"
+              >
+                단계 초기화
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={busy || loading}
+              onClick={() => refresh()}
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)]"
+            >
+              새로고침
+            </button>
+          </div>
+        </div>
+      </section>
 
       <section
         className="rounded-[var(--radius-lg)] p-4"

@@ -33,22 +33,27 @@ const openNextHandler = handler as OpenNextHandler;
 // wrangler.toml [triggers] crons 와 정확히 일치해야 한다.
 // license-expiry-check 는 별도 cron 이 아니라 push-subscription-cleanup 끝에 통합 실행됨.
 const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
+  // 5분 폴백 — 전송 직후 서버 즉시 디스패치가 실패해도 최대 ~5분 내 회수.
+  // 월 호출 ≈ 12*24*30 = 8.6k (Workers 10M 한도의 0.1% 미만).
+  '*/5 * * * *': ['/api/cron/chat-push-dispatch'],
   '0 15 * * *': ['/api/cron/backup'],
   '0 17 * * *': ['/api/cron/chat-retention'],
-  '0 23 * * *': ['/api/cron/chat-push-dispatch'],
   '0 3 * * *': ['/api/cron/push-subscription-cleanup'],
   '0 0 * * *': [
     '/api/cron/unread-notification-repush',
     '/api/cron/leave-notice-announcements',
     '/api/cron/birthday-announcements',
     // 연차 자동화 (KST 09:00 매일):
-    '/api/cron/annual-leave-accrual',     // 1년미만 월 만근 +1 / 만N년 연차 자동부여
-    '/api/cron/annual-leave-promotion',   // 1차·2차 연차사용촉진 자동 발송
-    '/api/cron/annual-leave-expiry',      // 촉진 2회 완료 후 미사용 연차 자동소멸 (★기존 미등록 버그 수정)
-    '/api/cron/substitute-holiday',       // 공휴일 근무 → 대체휴무 자동지급
-    '/api/cron/payroll-notice'            // 급여일(payrollDay) 도래 시 HR/관리자에게 급여명세서 발송 확인 리마인더
+    '/api/cron/annual-leave-accrual',
+    '/api/cron/annual-leave-promotion',
+    '/api/cron/annual-leave-expiry',
+    '/api/cron/substitute-holiday',
+    '/api/cron/payroll-notice',
   ],
-  '0 4 * * *': ['/api/temp/resend'],      // KST 13:00 — 임시 재발송
+  // 구 /api/temp/resend · 일 1회 chat-push 슬롯 정리
+  '0 4 * * *': [],
+  // 레거시 wrangler 슬롯이 남아 있어도 no-op (배포 전 구 트리거 호환)
+  '0 23 * * *': [],
 };
 
 async function callCronRoute(

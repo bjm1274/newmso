@@ -10,10 +10,12 @@ import { db } from '@/lib/db-client';
 import type { StockStatusRow, Tone } from './stock-types';
 import { pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
+/** quantity 우선 SSOT (stock·current_quantity 는 레거시 fallback) */
 function mapStatusRow(r: Row): StockStatusRow {
   const name = pickString(r, ['name', 'item_name'], '(미명칭)');
   const cat = pickString(r, ['category', 'category_name'], '미분류');
   const loc = pickString(r, ['location', 'department', 'company'], '미정');
+  // SSOT: inventory.quantity 가 유일한 진실원
   const stock = pickNumber(r, ['quantity', 'stock', 'current_quantity']);
   const min = pickNumber(r, ['min_quantity', 'min_stock', 'minimum_quantity']);
   const unit = pickString(r, ['unit'], 'EA');
@@ -49,6 +51,8 @@ function mapStatusRow(r: Row): StockStatusRow {
 export type StatusWorkcenterData = {
   rows: StockStatusRow[];
   total: number;
+  /** 전체 재고 수량 합 (quantity SSOT) */
+  totalQty: number;
   lowCount: number;
   zeroCount: number;
   expireCount: number;
@@ -61,6 +65,7 @@ export type StatusWorkcenterData = {
 const EMPTY: StatusWorkcenterData = {
   rows: [],
   total: 0,
+  totalQty: 0,
   lowCount: 0,
   zeroCount: 0,
   expireCount: 0,
@@ -103,6 +108,8 @@ export function useStatusData(
         const lowCount = mapped.filter((r) => r.status === '부족').length;
         const expireCount = mapped.filter((r) => r.status === '유효기간').length;
         const myCount = userCompany ? mapped.filter((r) => r.loc === userCompany).length : 0;
+        // quantity SSOT 합계 (맵핑된 stock = quantity 우선)
+        const totalQty = mapped.reduce((sum, r) => sum + (Number(r.stock) || 0), 0);
 
         const logRows: Row[] = Array.isArray(logs.data) ? (logs.data as Row[]) : [];
         const deptMap = new Map<string, number>();
@@ -119,6 +126,7 @@ export function useStatusData(
         setState({
           rows: mapped,
           total: mapped.length,
+          totalQty,
           lowCount,
           zeroCount,
           expireCount,

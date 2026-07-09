@@ -59,8 +59,9 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
             ? new Date(balance.expiry_date)
             : new Date(now.getFullYear(), 11, 31);
           const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 3600 * 1000));
-          // staff_members 정본 컬럼은 base_salary (base 컬럼 없음)
-          const dailyWage = Number(staff.base_salary || 2_000_000) / 30;
+          // staff_members 정본 컬럼은 base_salary — 미입력 시 0 (임의 200만원 추정 금지)
+          const baseSalary = Number(staff.base_salary) || 0;
+          const dailyWage = baseSalary > 0 ? baseSalary / 30 : 0;
 
           return {
             staff,

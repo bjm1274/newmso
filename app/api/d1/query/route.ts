@@ -35,7 +35,7 @@ import {
   assertFilterTreeValid,
   type FilterNode } from '@/lib/d1-compat/filter';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
-import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,10 +52,8 @@ const ALLOWED_TABLES = new Set(Object.keys(POLICY_REGISTRY));
 const COLUMN_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const MAX_LIMIT = 1000;
 
-// disciplinary_committees 테이블 + unique index 자동 생성을 isolate당 1회만
-// 실행하도록 가드. 매 요청 DDL은 불필요한 부하 — 첫 요청에서만 프로비저닝한다.
-// (완전 제거는 마이그레이션 의존이라 위험 → 가드만 적용.)
-let provisioned = false;
+// DDL(CREATE TABLE / INDEX / ALTER)은 핫패스에서 실행하지 않는다.
+// disciplinary_committees·employment_contracts 스키마는 lib/db/migrations 로 적용됨.
 
 const WhereSchema = z.object({
   field: z.string().regex(COLUMN_RE),
@@ -67,17 +65,22 @@ const OrderSchema = z.object({
   ascending: z.boolean().optional(),
   nullsFirst: z.boolean().optional() });
 
-const PayloadSchema = z.object({
-  table: z.string(),
-  columns: z.array(z.string().regex(COLUMN_RE)).optional(),
-  where: z.array(WhereSchema).max(20).optional(),
-  orFilters: z.array(FilterNodeSchema).max(10).optional(),
-  order: z.array(OrderSchema).max(5).optional(),
-  limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
-  range: z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }).optional(),
-  single: z.boolean().optional(),
-  maybeSingle: z.boolean().optional(),
-  count: z.boolean().optional() });
+const PayloadSchema = z
+  .object({
+    table: z.string(),
+    columns: z.array(z.string().regex(COLUMN_RE)).optional(),
+    where: z.array(WhereSchema).max(20).optional(),
+    orFilters: z.array(FilterNodeSchema).max(10).optional(),
+    order: z.array(OrderSchema).max(5).optional(),
+    limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
+    range: z
+      .object({ from: z.number().int().min(0), to: z.number().int().min(0) })
+      .refine((r) => r.to >= r.from, { message: 'range.to must be >= range.from' })
+      .optional(),
+    single: z.boolean().optional(),
+    maybeSingle: z.boolean().optional(),
+    count: z.boolean().optional() })
+  // limit + range 동시 지정 시 range 우선(buildSelectSql). 상호배제 강제하지 않음.
 
 type Payload = z.infer<typeof PayloadSchema>;
 
@@ -306,17 +309,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Rate limit: 분당 200회 per user
+    // Rate limit: 분당 200회 per user (check+increment 원자적)
     const uid = userId(session?.user)!;
     const rateKey = `d1-query:${uid}`;
-    const rate = await checkRateLimit(rateKey, D1_QUERY_RATE_LIMIT_MAX, D1_QUERY_RATE_LIMIT_WINDOW_MS);
+    const rate = await consumeRateLimit(rateKey, D1_QUERY_RATE_LIMIT_MAX, D1_QUERY_RATE_LIMIT_WINDOW_MS);
     if (!rate.allowed) {
       return NextResponse.json(
         { ok: false, error: '요청이 너무 잦습니다.' },
         { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
       );
     }
-    await recordFailedAttempt(rateKey, D1_QUERY_RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const parsed = PayloadSchema.safeParse(body);
@@ -343,49 +345,50 @@ export async function POST(request: Request) {
       );
     }
 
-    // DDD (Disciplinary Table Auto-provisioning & Unique Index)
-    // isolate당 1회만 실행 — provisioned 플래그로 매 요청 DDL을 방지.
-    if (!provisioned) {
-      try {
-        await d1.exec('CREATE TABLE IF NOT EXISTS "disciplinary_committees" ("id" text PRIMARY KEY NOT NULL, "company" text, "title" text NOT NULL, "meeting_date" text, "target_staff_id" text NOT NULL, "target_staff_name" text NOT NULL, "status" text DEFAULT \'대기\', "reason" text NOT NULL, "result_type" text, "result_details" text, "committee_members" text, "created_at" text DEFAULT (CURRENT_TIMESTAMP));');
-      } catch (err) {
-        console.error('Failed to auto-provision disciplinary_committees table:', err);
-      }
-
-      try {
-        await d1.exec(`
-          CREATE UNIQUE INDEX IF NOT EXISTS \`idx_contracts_staff_contract_type\` ON \`employment_contracts\` (\`staff_id\`, \`contract_type\`);
-        `);
-      } catch (err) {
-        console.warn('Failed to create unique index on employment_contracts (duplicates might exist):', err);
-      }
-
-      try {
-        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `receipt_signature_data` text;");
-      } catch (e) {
-        // Ignore if column already exists
-      }
-
-      try {
-        await d1.exec("ALTER TABLE `employment_contracts` ADD COLUMN `privacy_consent` integer;");
-      } catch (e) {
-        // Ignore if column already exists
-      }
-
-      provisioned = true;
-    }
-
     const db = getD1Drizzle(d1);
     const claims = buildClaimsFromSession(session?.user);
 
     if (payload.count) {
-      // 정책 인식 카운트: 단순 COUNT(*)는 filterByPolicy를 우회해 사용자가 볼 수
-      // 없는 타 회사·타인 row까지 집계된다. row를 읽어 정책 필터를 적용한 뒤 개수를
-      // 센다. 정책 평가에 필요한 컬럼이 누락되지 않도록 전체 컬럼을 읽고, limit/range는
-      // 무시한다(전체 집계가 목적).
-      // 정책 필터 count는 최대 MAX_LIMIT행까지 근사한다. limit/range를 undefined로
-      // 비우면 정책 평가를 위해 테이블 전 행을 메모리로 적재하게 되어 위험하므로,
-      // MAX_LIMIT 상한을 적용한다(range는 제거해 처음부터 MAX_LIMIT행을 읽는다).
+      // count: limit/range 무시(전체 집계). PUBLIC/AUTHENTICATED/ADMIN 은
+      // SQL COUNT(*) 한 번으로 처리해 전 행 메모리 로드(DoS)를 피한다.
+      // 행 단위 정책(STAFF_IN_SCOPE 등)만 MAX_LIMIT 캡으로 근사 집계.
+      const policy = POLICY_REGISTRY[payload.table];
+      const selectPattern = policy?.select;
+      const whereParts = [
+        ...buildWhereSql(payload.where),
+        ...buildOrFilterParts(payload.orFilters),
+      ];
+      const whereSql =
+        whereParts.length > 0
+          ? sql` WHERE ${sql.join(whereParts, sql` AND `)}`
+          : sql.raw('');
+      const tableSql = sql.identifier(payload.table);
+
+      const canSqlCount =
+        selectPattern === 'PUBLIC' ||
+        selectPattern === 'AUTHENTICATED' ||
+        selectPattern === 'ADMIN_ONLY' ||
+        claims.erp_is_admin === true;
+
+      if (canSqlCount) {
+        if (selectPattern === 'AUTHENTICATED' && !claims.erp_staff_id && !claims.erp_is_admin) {
+          return NextResponse.json({ ok: true, count: 0 });
+        }
+        if (selectPattern === 'ADMIN_ONLY' && !claims.erp_is_admin) {
+          return NextResponse.json({ ok: true, count: 0 });
+        }
+        if (!policy && !claims.erp_is_admin) {
+          return NextResponse.json({ ok: true, count: 0 });
+        }
+        const countResult = await db.run(
+          sql`SELECT COUNT(*) AS cnt FROM ${tableSql}${whereSql}`,
+        );
+        const cntRows = ((countResult as { results?: Array<{ cnt?: number | string }> }).results ?? []);
+        const cnt = Number(cntRows[0]?.cnt ?? 0);
+        return NextResponse.json({ ok: true, count: Number.isFinite(cnt) ? cnt : 0 });
+      }
+
+      // 행 단위 정책: MAX_LIMIT 상한으로 메모리 적재 후 filterByPolicy
       const countPayload: Payload = {
         ...payload,
         columns: undefined,

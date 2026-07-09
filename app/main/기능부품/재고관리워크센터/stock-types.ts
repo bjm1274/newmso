@@ -73,8 +73,10 @@ export const STOCK_WORKCENTER_META: Record<StockWorkcenterId, StockWorkcenterMet
 };
 
 // 기존 한글 id(현황·등록·발주·자산·월마감 등) → 7대 워크센터 id 매핑
+// 사이드바 4 워크센터(io/item)는 재고관리통합에서 별도 셸로 처리하되,
+// getStockWorkcenter 등 하위 라우터 호환을 위해 여기도 폴백 매핑을 둔다.
 export const LEGACY_TO_WORKCENTER: Record<string, StockWorkcenterId> = {
-  // 정식
+  // 정식 7대
   status: 'status',
   inout: 'inout',
   order: 'order',
@@ -82,6 +84,9 @@ export const LEGACY_TO_WORKCENTER: Record<string, StockWorkcenterId> = {
   udi: 'udi',
   master: 'master',
   analyze: 'analyze',
+  // 사이드바 4 워크센터 (결정 #44) → 대표 7대 폴백
+  io: 'inout',
+  item: 'master',
   // 기존 한글 한 글자/짧은 키
   현황: 'status',
   내부서재고: 'status',

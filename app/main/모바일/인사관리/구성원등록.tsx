@@ -11,7 +11,7 @@
  *   Step 3: 4대보험 및 권한 (국민·건강·고용·산재·두루누리 기간·복지수급·권한 등급)
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
@@ -29,6 +29,29 @@ import {
   MSegRow,
   MStepDots,
   useFieldIdPrefix } from './form-helpers';
+
+async function uploadProfilePhoto(file: File, staffId: string): Promise<boolean> {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('staffId', staffId);
+    const res = await fetch('/api/staff/profile-photo/upload', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => null)) as { error?: string } | null;
+      toast(j?.error || '사진 업로드에 실패했습니다.', 'error');
+      return false;
+    }
+    toast('프로필 사진이 저장되었습니다.', 'success');
+    return true;
+  } catch {
+    toast('사진 업로드 중 오류가 발생했습니다.', 'error');
+    return false;
+  }
+}
 
 export type SFormMemberProps = {
   /** 등록 완료 후 콜백 (새 직원 id 전달). 미전달 시 onBack 호출. */
@@ -107,6 +130,9 @@ function normalizeResidentNo(value: string | null | undefined) {
 
 export default function 구성원등록({ onBack, onCreated, user, company, editStaffId }: SFormMemberProps) {
   const [step, setStep] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [shifts, setShifts] = useState<any[]>([]);
 
@@ -486,6 +512,10 @@ export default function 구성원등록({ onBack, onCreated, user, company, edit
       ? (data as { id: string }[])[0]
       : (data as { id: string } | null);
     const newId = String(row?.id ?? editStaffId ?? '');
+    // 신규 등록 후 대기 중이던 프로필 사진 업로드
+    if (!editStaffId && photoFile && newId) {
+      void uploadProfilePhoto(photoFile, String(newId));
+    }
     if (onCreated && newId) onCreated(newId);
     else onBack();
   };
@@ -531,7 +561,22 @@ export default function 구성원등록({ onBack, onCreated, user, company, edit
         </div>
       )}
       <div className="m-scroll" aria-busy={submitting}>
-        {step === 0 && <Step0 form={form} update={update} fieldId={fieldId} />}
+        {step === 0 && (
+          <Step0
+            form={form}
+            update={update}
+            fieldId={fieldId}
+            photoPreview={photoPreview}
+            photoInputRef={photoInputRef}
+            editStaffId={editStaffId}
+            onPickPhoto={(f) => {
+              setPhotoFile(f);
+              setPhotoPreview(URL.createObjectURL(f));
+              if (editStaffId) void uploadProfilePhoto(f, String(editStaffId));
+              else toast('저장 완료 후 사진이 업로드됩니다. (신규 등록)', 'info');
+            }}
+          />
+        )}
         {step === 1 && <Step1 form={form} update={update} fieldId={fieldId} shifts={shifts} />}
         {step === 2 && <Step2 form={form} update={update} fieldId={fieldId} reverseCalc={reverseCalculateSplit()} />}
         {step === 3 && <Step3 form={form} update={update} fieldId={fieldId} />}
@@ -578,10 +623,19 @@ export default function 구성원등록({ onBack, onCreated, user, company, edit
 function Step0({
   form,
   update,
-  fieldId }: {
+  fieldId,
+  photoPreview,
+  photoInputRef,
+  editStaffId,
+  onPickPhoto,
+}: {
   form: FormState;
   update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
   fieldId: (k: string) => string;
+  photoPreview: string | null;
+  photoInputRef: React.RefObject<HTMLInputElement | null>;
+  editStaffId?: string | null;
+  onPickPhoto: (f: File) => void;
 }) {
   return (
     <>
@@ -602,17 +656,39 @@ function Step0({
             background: 'var(--z-100)',
             display: 'grid',
             placeItems: 'center',
-            color: 'var(--z-400)' }}
+            color: 'var(--z-400)',
+            overflow: 'hidden',
+            backgroundImage: photoPreview ? `url(${photoPreview})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
           aria-hidden="true"
         >
-          <MIcon name="user" size={28} />
+          {!photoPreview && <MIcon name="user" size={28} />}
         </div>
         <div style={{ flex: 1 }}>
-          <MBtn icon="plus" onClick={() => toast('사진 첨부는 PC에서 지원됩니다.', 'info')}>
-            사진 추가
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              if (f.size > 4 * 1024 * 1024) {
+                toast('사진은 4MB 이하로 선택해 주세요.', 'warning');
+                return;
+              }
+              onPickPhoto(f);
+            }}
+          />
+          <MBtn icon="plus" onClick={() => photoInputRef.current?.click()}>
+            {photoPreview ? '사진 변경' : '사진 추가'}
           </MBtn>
           <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 6, fontWeight: 600 }}>
-            선택사항 · 최대 4MB
+            선택사항 · 최대 4MB · 앨범/카메라
+            {editStaffId ? ' · 즉시 업로드' : ' · 등록 후 업로드'}
           </div>
         </div>
       </div>

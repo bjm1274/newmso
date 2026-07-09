@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
+import {
+  isFinalApprovalEffectsDone,
+  isFinalizedApprovalStatus } from '@/lib/server-approval-processing-helpers';
 import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 import { normalizeApprovalLineIds as normalizeApprovalLineIdsShared } from '@/lib/approval-shared';
 import {
@@ -94,7 +97,8 @@ export async function POST(request: Request) {
     if (!approval) {
       return NextResponse.json({ ok: false, error: 'Approval not found' }, { status: 404 });
     }
-    if (String(approval.status || '').trim() !== '승인') {
+    // 최종 확정(승인/완료) 전 호출은 거부
+    if (!isFinalizedApprovalStatus(approval.status)) {
       return NextResponse.json({ ok: false, error: 'Approval is not finalized yet' }, { status: 409 });
     }
 
@@ -117,6 +121,18 @@ export async function POST(request: Request) {
 
     if (!canAccess) {
       return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 멱등: 권한 확인 후, 이미 후처리 완료 마커가 있으면 side effect 없이 성공 반환
+    const prior = isFinalApprovalEffectsDone(metaData);
+    if (prior.done) {
+      return NextResponse.json({
+        ok: true,
+        alreadyProcessed: true,
+        processedAt: prior.processedAt,
+        steps: [],
+        warnings: [],
+        supplySummary: null });
     }
 
     const result = await processFinalApprovalEffects(

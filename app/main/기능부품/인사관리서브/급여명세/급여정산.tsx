@@ -1230,6 +1230,7 @@ export default function SalarySettlement({
           total_taxable: Math.round(Number(calc?.taxable || 0)),
           total_taxfree: Math.round(Number(calc?.taxfree || 0)),
           total_deduction: Math.round(Number(calc?.deduction || 0)),
+          gross_pay: Math.round(Number(calc?.total || 0)),
           // R-2: 4대보험·소득세 공제를 top-level 컬럼에도 저장한다.
           // 모바일 급여명세서·내정보·워크센터 4대보험 요약·EDI는 deduction_detail JSON이 아니라
           // 이 컬럼들을 읽으므로, 미저장 시 직원 명세서에 공제가 전부 0원으로 표시되는 문제를 해소.
@@ -1258,6 +1259,7 @@ export default function SalarySettlement({
           'employment_insurance',
           'income_tax',
           'local_tax',
+          'gross_pay',
         ] });
       if (payrollSaveError) throw payrollSaveError;
 
@@ -1323,10 +1325,10 @@ export default function SalarySettlement({
             staff_id: s.id,
             year_month: yearMonth,
             base_salary: Math.round(Number(data.base_salary) || 0),
-          meal_allowance: Math.round(Number(data.meal_allowance) || 0),
-          night_duty_allowance: Math.round(Number(data.night_duty_allowance) || 0),
-          vehicle_allowance: Math.round(Number(data.vehicle_allowance) || 0),
-          childcare_allowance: Math.round(Number(data.childcare_allowance) || 0),
+            meal_allowance: Math.round(Number(data.meal_allowance) || 0),
+            night_duty_allowance: Math.round(Number(data.night_duty_allowance) || 0),
+            vehicle_allowance: Math.round(Number(data.vehicle_allowance) || 0),
+            childcare_allowance: Math.round(Number(data.childcare_allowance) || 0),
             research_allowance: Math.round(Number(data.research_allowance) || 0),
             other_taxfree: Math.round(Number(data.other_taxfree) || 0),
             extra_allowance: Math.round(Number(data.extra_allowance) || 0),
@@ -1335,6 +1337,7 @@ export default function SalarySettlement({
             total_taxable: Math.round(Number(calc?.taxable || 0)),
             total_taxfree: Math.round(Number(calc?.taxfree || 0)),
             total_deduction: Math.round(Number(calc?.deduction || 0)),
+            gross_pay: Math.round(Number(calc?.total || 0)),
             deduction_detail: {
               ...(calc?.deductionDetail || {}),
               advance_pay_deduction: advancePay,
@@ -1343,14 +1346,14 @@ export default function SalarySettlement({
             attendance_deduction: Math.round(Number(data.attendance_deduction) || 0),
             attendance_deduction_detail: data.attendance_deduction_detail || {},
             advance_pay: advancePay,
-          record_type: 'regular',
-          status: '확정'
-        };
-      });
+            record_type: 'regular',
+            status: '확정'
+          };
+        });
 
-      const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
-        records: records as Record<string, unknown>[],
-        optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS] });
+        const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
+          records: records as Record<string, unknown>[],
+          optionalColumns: [...PAYROLL_RECORD_OPTIONAL_COLUMNS, 'gross_pay'] });
       if (payrollSaveError) throw payrollSaveError;
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USER) || '{}'); } catch { return {}; } })() : {};
       try {
@@ -1420,6 +1423,68 @@ export default function SalarySettlement({
     if (hasBlockingVerificationIssues) {
       toast(`검산 리포트에 오류 ${verificationReport.errorCount}건이 있어 확정할 수 없습니다.`, 'error');
       return;
+    }
+
+    // 전월 대비 1% 이상 오차 확인 로직
+    try {
+      const getPrevYearMonth = (ym: string) => {
+        const [yStr, mStr] = ym.split('-');
+        let y = parseInt(yStr, 10);
+        let m = parseInt(mStr, 10);
+        m -= 1;
+        if (m === 0) {
+          m = 12;
+          y -= 1;
+        }
+        return `${y}-${String(m).padStart(2, '0')}`;
+      };
+      const prevYM = getPrevYearMonth(yearMonth);
+      const staffIds = selectedStaffs.map((s: StaffMember) => s.id);
+      
+      const { data: prevRecords, error: prevError } = await db
+        .from('payroll_records')
+        .select('staff_id, net_pay')
+        .eq('year_month', prevYM)
+        .eq('record_type', 'regular')
+        .in('staff_id', staffIds);
+
+      if (!prevError && prevRecords && prevRecords.length > 0) {
+        const prevNetMap = new Map(prevRecords.map((r: any) => [String(r.staff_id), Number(r.net_pay || 0)]));
+        const alertStaffs: string[] = [];
+
+        for (const staff of selectedStaffs) {
+          const staffId = String(staff.id);
+          const data = settlementData[staffId];
+          const calc = calculateSalary(staffId);
+          const advancePay = Math.round(Number(data?.advance_pay || 0));
+          const netPay = getAdvanceAdjustedNet(Number(calc?.net || 0), advancePay);
+          
+          const prevNetRaw = prevNetMap.get(staffId);
+          if (prevNetRaw !== undefined && prevNetRaw !== null) {
+            const prevNet = Number(prevNetRaw);
+            if (prevNet === 0) {
+              if (netPay !== 0) {
+                alertStaffs.push(`- ${staff.name}: 전월 ₩0 → 금월 ₩${netPay.toLocaleString()}`);
+              }
+            } else {
+              const diff = Math.abs(netPay - prevNet);
+              const pct = (diff / prevNet) * 100;
+              if (pct >= 1) {
+                alertStaffs.push(`- ${staff.name}: 전월 ₩${prevNet.toLocaleString()} → 금월 ₩${netPay.toLocaleString()} (${pct.toFixed(2)}% 변동)`);
+              }
+            }
+          }
+        }
+
+        if (alertStaffs.length > 0) {
+          const confirmMsg = `[전월 대비 급여 오차 발생 경고]\n\n다음 직원의 이번 달 실지급액이 전월 대비 1% 이상 변동되었습니다:\n\n${alertStaffs.join('\n')}\n\n계속 진행하시겠습니까?`;
+          if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) {
+            return;
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.error('prev month payroll check failed:', checkErr);
     }
 
     const savedRecords = await persistSettlement('확정');

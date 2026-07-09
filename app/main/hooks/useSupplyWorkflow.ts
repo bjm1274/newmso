@@ -188,7 +188,14 @@ export function useSupplyWorkflow({
       toast('불출 처리가 완료되었습니다.', 'success');
     } catch (error: unknown) {
       console.error('물품신청 불출 처리 실패:', error);
-      toast((error as Error)?.message || '불출 처리 중 오류가 발생했습니다.', 'error');
+      const raw = (error as Error)?.message || '';
+      const msg =
+        raw === 'INSUFFICIENT_STOCK'
+          ? '재고가 부족하여 불출할 수 없습니다.'
+          : raw.includes('INVENTORY_PERIOD_LOCKED')
+            ? '해당 월 재고가 마감되어 불출할 수 없습니다.'
+            : raw || '불출 처리 중 오류가 발생했습니다.';
+      toast(msg, 'error');
     } finally {
       setWorkflowActionKey(null);
     }
@@ -358,7 +365,14 @@ export function useSupplyWorkflow({
       toast('불출을 취소하고 재고를 원복했습니다.', 'success');
     } catch (error: unknown) {
       console.error('물품신청 불출 취소 실패:', error);
-      toast((error as Error)?.message || '불출 취소 중 오류가 발생했습니다.', 'error');
+      const raw = (error as Error)?.message || '';
+      const msg =
+        raw === 'INSUFFICIENT_STOCK'
+          ? '수령처 재고가 부족하여 불출을 취소할 수 없습니다. 이미 소모된 경우 수동 조정하세요.'
+          : raw.includes('INVENTORY_PERIOD_LOCKED')
+            ? '해당 월 재고가 마감되어 불출을 취소할 수 없습니다.'
+            : raw || '불출 취소 중 오류가 발생했습니다.';
+      toast(msg, 'error');
     } finally {
       setWorkflowActionKey(null);
     }

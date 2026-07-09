@@ -250,24 +250,30 @@ function MainPageContent() {
         '구매/발주': '발주',
         '품목/자산': '자산',
         '분석/마감': '월마감',
-        // 레거시 한글 id → 7대 워크센터 영문 id 매핑
+        // 레거시 한글 id → 사이드바 4 / 7대 워크센터 영문 id 매핑
         현황: 'status',
-        이력: 'inout',
+        이력: 'io',
         수요예측: 'analyze',
-        등록: 'inout',
-        스캔: 'master',
-        발주: 'order',
-        재고실사: 'audit',
+        등록: 'io',
+        스캔: 'item',
+        발주: 'io',
+        재고실사: 'analyze',
         이관: 'audit',
-        납품확인서: 'order',
-        UDI: 'udi',
-        자산: 'master',
-        거래처: 'master',
-        카테고리: 'master',
+        납품확인서: 'io',
+        UDI: 'item',
+        자산: 'item',
+        거래처: 'item',
+        카테고리: 'item',
         AS반품: 'analyze',
         소모품통계: 'analyze',
         월마감: 'analyze',
-        내부서재고: 'status' };
+        내부서재고: 'status',
+        // 구 7대 영문 id → 사이드바 4 워크센터
+        inout: 'io',
+        order: 'io',
+        master: 'item',
+        udi: 'item',
+      };
 
       if (menuId === '재고관리' && subViewId && inventoryViewAliases[subViewId]) {
         return { menuId: '재고관리', subViewId: inventoryViewAliases[subViewId] };

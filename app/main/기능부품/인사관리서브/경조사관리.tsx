@@ -205,16 +205,29 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
             company: staff.company,
             department: (staff.department as string) || '',
             status: '지급완료' };
-        const { data, error } = await db.from('congratulations_condolences').insert([newRec]).select();
-        if (error) {
-            toast('경조사 기록 저장 실패: ' + (error.message || ''), 'error');
-            return;
+        try {
+            const { data, error } = await db.from('congratulations_condolences').insert([newRec]).select();
+            // INSERT 실패 시 가짜 UUID로 로컬 위장 저장하지 않음 — 실제 오류만 표시
+            if (error) {
+                toast('경조사 기록 저장 실패: ' + (error.message || '알 수 없는 오류'), 'error');
+                return;
+            }
+            const saved = Array.isArray(data) ? data[0] : null;
+            if (!saved || typeof saved !== 'object') {
+                toast('경조사 기록 저장 실패: 서버 응답이 비어 있습니다.', 'error');
+                return;
+            }
+            setRecords([saved as CongratRecord, ...records]);
+            setShowForm(false);
+            setForm(INITIAL_FORM);
+            toast('경조사 기록이 등록되었습니다.', 'success');
+        } catch (err) {
+            console.error('[경조사관리] insert failed:', err);
+            toast(
+                '경조사 기록 저장 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'),
+                'error',
+            );
         }
-        if (data) {
-            setRecords([data[0] as CongratRecord, ...records]);
-        }
-        setShowForm(false);
-        setForm(INITIAL_FORM);
     };
 
     const totalAmount = useMemo(() => filteredRecords.filter(r => r.status === '지급완료').reduce((sum, r) => sum + (r.amount || 0), 0), [filteredRecords]);

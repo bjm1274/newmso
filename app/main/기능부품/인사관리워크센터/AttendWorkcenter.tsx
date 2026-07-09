@@ -1,57 +1,35 @@
 'use client';
 
 /**
- * 근태 워크센터 (attend) — 새 디자인 재작성
+ * 근태 워크센터 (attend)
  *
- * 구조 (지시서 §1-2, §1-4):
- *   - 4 KPI 행 (정상 출근 / 지각 / 결근 / 휴가 중)
- *   - 탭 (대시보드 / 근무표 편성 / 달력)
- *   - 근무표 편성 탭: 다크 배너 (AI 자동 편성 · 3교대 마법사 · 이전달 복제 진입점)
- *
- * 분할 (JM 500줄):
- *   - data.ts                 — KPI / 밴드 / 날짜 헬퍼
- *   - AttendDashboard.tsx     — 대시보드 탭
- *   - RosterGrid.tsx          — 14일 근무표 그리드 + 셀 토글
- *   - AttendCalendar.tsx      — 월간 달력 탭
- *
- * 무거운 워크플로(AI 자동 편성, 3교대 마법사, 이전달 복제, 일별 상세)는
- * 기존 `근태관리메인.tsx`(schedule/calendar view)로 진입한다 — JM3 행동 보존.
- *
- * JM4: any 금지, AttendTabId union
+ * 탭: 대시보드 / 근무표 편성 / 달력 / 근태이상
+ * 근무표 편성 = RosterWorkspace (월·칩·자동·AI 통합, 레거시 임베드 없음)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import {
-  WorkcenterBackButton,
   WorkcenterEmbed,
   WorkcenterKpiRow,
   WorkcenterShell,
   WorkcenterTabBar,
   type WorkcenterKpi,
-  type WorkcenterTab } from './workcenter-common';
+  type WorkcenterTab,
+} from './workcenter-common';
 import { isActive } from './MemberWorkcenter/data';
 import {
   computeAttendKpis,
   getTodayIso,
-  type AttendanceRow } from './AttendWorkcenter/data';
+  type AttendanceRow,
+} from './AttendWorkcenter/data';
 import AttendDashboard from './AttendWorkcenter/AttendDashboard';
-import RosterGrid from './AttendWorkcenter/RosterGrid';
+import RosterWorkspace from './AttendWorkcenter/RosterWorkspace';
 import AttendCalendar from './AttendWorkcenter/AttendCalendar';
 import AbnormalWorkcenter from './AbnormalWorkcenter';
 
-const AttendanceMain = dynamic(() => import('../인사관리서브/근태기록/근태관리메인'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center py-16">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-    </div>
-  ) });
-
 type AttendTabId = 'dashboard' | 'schedule' | 'calendar' | 'abnormal';
-type AttendanceMainView = 'calendar' | 'dashboard' | 'schedule' | 'leave' | 'issues';
 
 const ATTEND_TABS: WorkcenterTab<AttendTabId>[] = [
   { id: 'dashboard', label: '대시보드' },
@@ -73,9 +51,9 @@ export default function AttendWorkcenter({
   selectedCo,
   user = null,
   onRefresh,
-  initialTab = 'dashboard' }: AttendWorkcenterProps) {
+  initialTab = 'dashboard',
+}: AttendWorkcenterProps) {
   const [tab, setTab] = useState<AttendTabId>(initialTab);
-  const [legacyView, setLegacyView] = useState<AttendanceMainView | null>(null);
   const [todayRows, setTodayRows] = useState<AttendanceRow[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -87,7 +65,6 @@ export default function AttendWorkcenter({
     });
   }, [staffs, selectedCo]);
 
-  // 워크센터 KPI 단일 fetch (대시보드 컴포넌트와 별도)
   const fetchToday = useCallback(async () => {
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -119,36 +96,19 @@ export default function AttendWorkcenter({
     return () => abortRef.current?.abort();
   }, [fetchToday]);
 
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
   const kpis = useMemo<WorkcenterKpi[]>(
-    () => computeAttendKpis({ staffs: scopedStaffs, rows: todayRows, today: getTodayIso() }),
+    () =>
+      computeAttendKpis({
+        staffs: scopedStaffs,
+        rows: todayRows,
+        today: getTodayIso(),
+      }),
     [scopedStaffs, todayRows],
   );
-
-  if (legacyView) {
-    return (
-      <WorkcenterShell>
-        <div className="app-card flex min-h-0 flex-1 flex-col overflow-hidden">
-          <header className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2 md:px-4 md:py-2.5">
-            <h3 className="text-[13px] font-bold text-[var(--foreground)]">
-              {legacyView === 'schedule' ? '근무표 편성 도구' : legacyView === 'calendar' ? '근태 달력 상세' : '근태 상세'}
-            </h3>
-            <WorkcenterBackButton onClick={() => setLegacyView(null)} />
-          </header>
-          <div className="min-h-0 flex-1 overflow-auto">
-            <WorkcenterEmbed label="근태 상세">
-              <AttendanceMain
-                staffs={staffs as unknown as never}
-                selectedCo={selectedCo || '전체'}
-                user={user}
-                onRefresh={onRefresh}
-                initialView={legacyView}
-              />
-            </WorkcenterEmbed>
-          </div>
-        </div>
-      </WorkcenterShell>
-    );
-  }
 
   return (
     <WorkcenterShell
@@ -167,27 +127,23 @@ export default function AttendWorkcenter({
       <div className="min-h-0 flex-1">
         {tab === 'dashboard' && (
           <WorkcenterEmbed label="대시보드">
-            <AttendDashboard staffs={staffs} selectedCo={selectedCo} rowsOverride={todayRows} />
+            <AttendDashboard
+              staffs={staffs}
+              selectedCo={selectedCo}
+              rowsOverride={todayRows}
+            />
           </WorkcenterEmbed>
         )}
 
         {tab === 'schedule' && (
           <WorkcenterEmbed label="근무표 편성">
-            <RosterGrid
-              staffs={staffs}
-              selectedCo={selectedCo}
-              onOpenLegacyPlanner={() => setLegacyView('schedule')}
-            />
+            <RosterWorkspace staffs={staffs} selectedCo={selectedCo} />
           </WorkcenterEmbed>
         )}
 
         {tab === 'calendar' && (
           <WorkcenterEmbed label="달력">
-            <AttendCalendar
-              staffs={staffs}
-              selectedCo={selectedCo}
-              onOpenLegacyCalendar={() => setLegacyView('calendar')}
-            />
+            <AttendCalendar staffs={staffs} selectedCo={selectedCo} />
           </WorkcenterEmbed>
         )}
 

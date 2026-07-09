@@ -6,7 +6,12 @@ import AnnualLeaveDocumentModal from './AnnualLeaveDocumentModal';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { db, d1 } from '@/lib/db-client';
 import {
-  getStaffPromotionSchedule } from '@/lib/annual-leave-promotion';
+  buildPromotionSentKey,
+  clampLeaveRemaining,
+  getStaffPromotionSchedule,
+  resolveDuePromotionStage,
+  resolveHireDateFromStaff,
+} from '@/lib/annual-leave-promotion';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -19,6 +24,9 @@ type StaffLite = {
   annual_leave_total?: number;
   annual_leave_used?: number;
   join_date?: string | null;
+  joined_at?: string | null;
+  hire_date?: string | null;
+  status?: string | null;
 };
 
 type PromotionStage = 1 | 2;
@@ -35,9 +43,6 @@ type PromotionTarget = StaffLite & {
 
 // 이미 통보된 (staff_id, stage, expiry_date) 조합
 type SentKey = string; // `${staffId}|${stage}|${expiryDate}`
-
-// ─── 촉진 윈도우 상수 (일) ────────────────────────────────────────────────────
-const PROMOTION_WINDOW_DAYS = 10;
 
 // ─── 컴포넌트 ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +64,7 @@ export default function AnnualLeavePromotion({
     const { data } = await db
       .from('approvals')
       .select('sender_id, status, type')
-      .eq('type', '연차계획서')
+      .or('type.eq.연차계획서,type.eq.연차사용계획서')
       .neq('status', '반려');
     if (data) setSubmittedPlans(data);
   }, []);
@@ -68,11 +73,21 @@ export default function AnnualLeavePromotion({
   const fetchSentLogs = useCallback(async () => {
     const { data } = await db
       .from('annual_leave_promotion_logs')
-      .select('staff_id, stage, expiry_date');
+      .select('staff_id, stage, step, expiry_date');
     if (data) {
-      const keys = new Set<SentKey>(
-        data.map((row: any) => `${row.staff_id}|${row.stage}|${row.expiry_date}`),
-      );
+      const keys = new Set<SentKey>();
+      for (const row of data as Array<{
+        staff_id?: string;
+        stage?: number | null;
+        step?: number | null;
+        expiry_date?: string | null;
+      }>) {
+        const st = Number(row.stage ?? row.step);
+        const exp = String(row.expiry_date || '').slice(0, 10);
+        if ((st === 1 || st === 2) && exp) {
+          keys.add(buildPromotionSentKey(String(row.staff_id), st as 1 | 2, exp));
+        }
+      }
       setSentKeys(keys);
     }
   }, []);
@@ -84,14 +99,22 @@ export default function AnnualLeavePromotion({
 
   useEffect(() => {
     const today = new Date();
-    const windowMs = PROMOTION_WINDOW_DAYS * 86_400_000;
+    const todayKey = formatKoreanDateKey(today);
 
     const targets: PromotionTarget[] = staffs
       .filter((s) => selectedCo === '전체' || s.company === selectedCo)
+      .filter((s) => {
+        const st = String(s.status || '재직');
+        return st === '재직' || st === '' || st === 'active';
+      })
+      .filter((s) => {
+        const n = String(s.name || '');
+        return !n.startsWith('TEST_') && !/팀\d+$/.test(n);
+      })
       .map((s) => {
-        const totalLeave = s.annual_leave_total ?? 15;
-        const usedLeave = s.annual_leave_used ?? 0;
-        const remainingLeave = Math.max(0, totalLeave - usedLeave);
+        const totalLeave = Math.max(0, Number(s.annual_leave_total) || 0);
+        const usedLeave = Math.max(0, Number(s.annual_leave_used) || 0);
+        const remainingLeave = clampLeaveRemaining(s.annual_leave_total, s.annual_leave_used);
 
         const hasPlan = submittedPlans.some((p) => String(p.sender_id) === String(s.id));
 
@@ -103,37 +126,46 @@ export default function AnnualLeavePromotion({
           return makeTarget(s, totalLeave, usedLeave, remainingLeave, '계획 제출 완료', false, null, null);
         }
 
-        // 입사일 기반 촉진 스케줄 계산
-        const hireDate = s.join_date;
+        const hireDate = resolveHireDateFromStaff(s);
         const schedule = getStaffPromotionSchedule(hireDate, today);
-        if (!schedule) {
+        if (!schedule || !hireDate) {
           return makeTarget(s, totalLeave, usedLeave, remainingLeave, '정상', false, null, null);
         }
 
         const expiryDateStr = formatKoreanDateKey(schedule.expiryDate);
-        const step1Ms = schedule.step1Date.getTime();
-        const step2Ms = schedule.step2Date.getTime();
-        const nowMs = today.getTime();
+        const step1Key = formatKoreanDateKey(schedule.step1Date);
+        const step2Key = formatKoreanDateKey(schedule.step2Date);
+        const hasStage1 = sentKeys.has(buildPromotionSentKey(s.id, 1, expiryDateStr));
+        const hasStage2 = sentKeys.has(buildPromotionSentKey(s.id, 2, expiryDateStr));
 
-        // 2차 우선 (더 긴급)
-        if (nowMs >= step2Ms && nowMs <= step2Ms + windowMs) {
+        const due = resolveDuePromotionStage({
+          todayKey,
+          step1Key,
+          step2Key,
+          expiryKey: expiryDateStr,
+          hasStage1,
+          hasStage2,
+        });
+
+        if (due === 2) {
           return makeTarget(s, totalLeave, usedLeave, remainingLeave, '2차 촉진 대상', true, 2, expiryDateStr);
         }
-        if (nowMs >= step1Ms && nowMs <= step1Ms + windowMs) {
+        if (due === 1) {
           return makeTarget(s, totalLeave, usedLeave, remainingLeave, '1차 촉진 대상', true, 1, expiryDateStr);
         }
 
-        return makeTarget(s, totalLeave, usedLeave, remainingLeave, '정상', false, null, null);
+        return makeTarget(s, totalLeave, usedLeave, remainingLeave, '정상', false, null, expiryDateStr);
       });
 
     setPromotionTargets(targets);
-  }, [staffs, selectedCo, submittedPlans]);
+  }, [staffs, selectedCo, submittedPlans, sentKeys]);
 
   // 이미 통보된 항목인지 확인
   const isAlreadySent = (staff: PromotionTarget): boolean => {
     if (!staff.promotionStage || !staff.expiryDateStr) return false;
-    const key: SentKey = `${staff.id}|${staff.promotionStage}|${staff.expiryDateStr}`;
-    return sentKeys.has(key);
+    return sentKeys.has(
+      buildPromotionSentKey(staff.id, staff.promotionStage, staff.expiryDateStr),
+    );
   };
 
   const handleSendPromotion = async (staff: PromotionTarget) => {
@@ -165,6 +197,7 @@ export default function AnnualLeavePromotion({
               stage: staff.promotionStage,
               remaining: staff.remainingLeave,
               expiry_date: staff.expiryDateStr,
+              auto: false,
               link: '/main/전자결재?view=작성하기&type=연차계획서' } },
         ])
         .select('id')
@@ -174,11 +207,11 @@ export default function AnnualLeavePromotion({
 
       // 촉진 로그 INSERT.
       // 정본 스키마: target_year(integer, NOT NULL), step(integer, NOT NULL), id(text PK, NOT NULL).
-      // 누락 시 NOT NULL 제약 위반으로 INSERT 실패하므로 반드시 채운다.
       const targetYear = staff.expiryDateStr
         ? Number(staff.expiryDateStr.slice(0, 4))
         : new Date().getFullYear();
       const step = staff.promotionStage ?? 1;
+      const nowIso = new Date().toISOString();
       await db.from('annual_leave_promotion_logs').upsert(
         {
           id:
@@ -186,13 +219,18 @@ export default function AnnualLeavePromotion({
               ? crypto.randomUUID()
               : `alp-${staff.id}-${targetYear}-${step}`,
           staff_id: staff.id,
+          company_name: staff.company || selectedCo || null,
           target_year: targetYear,
           step,
-          stage: staff.promotionStage,
+          stage: step,
           expiry_date: staff.expiryDateStr,
-          notified_at: new Date().toISOString(),
+          notified_at: nowIso,
+          sent_at: nowIso,
+          remain_days: staff.remainingLeave,
           remaining_days_at_notice: staff.remainingLeave,
-          notification_id: notifData?.id ?? null },
+          notification_id: notifData?.id ?? null,
+          meta: JSON.stringify({ action: 'promote', stage: step, auto: false, userConfirmed: true }),
+          created_at: nowIso },
         { onConflict: 'staff_id,target_year,step', ignoreDuplicates: true },
       );
 
@@ -226,7 +264,8 @@ MSO 주식회사 대표이사 (직인생략)`;
           ? crypto.randomUUID()
           : `doc-alp-${staff.id}-${targetYear}-${step}-${Date.now()}`,
         title: docTitle,
-        category: '기타',
+        // 정식 분류 — '기타' 저장 시 연차촉진 폴더에서 누락됨
+        category: '연차촉진',
         content: docContent,
         company_name: selectedCo || '전체',
         created_by: staff.id,

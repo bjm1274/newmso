@@ -7,7 +7,7 @@
  *
  * 구성:
  *  - FormHeader (취소 / 자산 등록 / 저장)
- *  - QR 스캔 hero (실제 카메라 X — 패턴만, 한 번 누르면 mock UDI 채움)
+ *  - QR/UDI: 카메라 스캔 또는 수동 입력 (코드 붙여넣기)
  *  - 자산명 · 태그 · 카테고리 · 위치 · 구입일 · 공급사 · 보증 만료
  *
  * 데이터: 자산도 `inventory` 테이블에 insert (PC는 자산을 별도 테이블 분리하지 않고
@@ -64,10 +64,7 @@ const INITIAL: FormState = {
   vendor: '',
   warranty: '' };
 
-const MOCK_SCAN = {
-  name: 'C-Arm OEC 9900 Elite',
-  tag: 'AST-0049',
-  udi: '(01)08806525301229(17)271231' };
+
 
 // YYYY.MM.DD → ISO date(YYYY-MM-DD) 변환. 빈 값/형식 불일치 시 null.
 function toISODate(raw: string): string | null {
@@ -113,13 +110,25 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
   };
 
   const handleScan = () => {
-    // QR 패턴 시연 — 실제 카메라 호출 X (P0). UDI는 별도 state로 보관.
-    setScannedUdi(MOCK_SCAN.udi);
+    // 카메라 바코드 스캐너 연동 전: 수동 입력으로 동일 경로 제공 (mock 데이터 제거)
+    const code = window.prompt(
+      'UDI / QR / 자산 태그 코드를 입력하거나 붙여넣으세요.',
+      scannedUdi || '',
+    );
+    if (code == null) return;
+    const trimmed = code.trim();
+    if (!trimmed) {
+      toast('코드를 입력해 주세요.', 'warning');
+      return;
+    }
+    setScannedUdi(trimmed);
     setV((prev) => ({
       ...prev,
       scan: true,
-      name: prev.name || MOCK_SCAN.name,
-      tag: prev.tag || MOCK_SCAN.tag }));
+      // 태그 비어 있으면 코드 일부를 태그 후보로
+      tag: prev.tag || trimmed.slice(0, 24),
+    }));
+    toast('코드가 반영되었습니다. 자산명·위치를 확인 후 저장하세요.', 'success');
   };
 
   const handleSave = async () => {
@@ -263,7 +272,7 @@ export default function 자산등록({ user, onBack }: 자산등록Props) {
                       marginTop: 1,
                       fontFamily: 'var(--m-mono)' }}
                   >
-                    {scannedUdi ?? MOCK_SCAN.udi}
+                    {scannedUdi || '코드 미입력'}
                   </div>
                 </div>
                 <button

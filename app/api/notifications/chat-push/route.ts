@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
-import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 
 export const dynamic = 'force-dynamic';
 
 // 채팅 푸시 트리거 — 메시지 1건당 1회 호출이 정상.
-// 사용자당 1분 내 최대 60회(초당 1회)까지만 허용해 폭주만 차단한다.
-const RATE_LIMIT_MAX = 60;
+// 사용자당 1분 내 최대 90회 — 병원 업무 채팅 폭주만 차단, 정상 대화는 통과.
+const RATE_LIMIT_MAX = 90;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 export async function POST(request: NextRequest) {
@@ -19,14 +19,13 @@ export async function POST(request: NextRequest) {
     }
 
     const rateKey = `chat-push:${String(session.user.id)}`;
-    const rate = await checkRateLimit(rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    const rate = await consumeRateLimit(rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
     if (!rate.allowed) {
       return NextResponse.json(
         { error: '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.' },
         { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec ?? 60) } },
       );
     }
-    await recordFailedAttempt(rateKey, RATE_LIMIT_WINDOW_MS);
 
     const body = await request.json().catch(() => null);
     const roomId = String(body?.roomId || body?.room_id || '').trim();

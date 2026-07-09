@@ -15,11 +15,21 @@ export type RoomReadCursorWriteResult = {
  * UTC 형식으로 정규화한다. messages.created_at(D1 기본값)과 형식을 맞춰야
  * 안 읽음 집계의 문자열 비교(created_at > last_read_at)가 올바르게 동작한다.
  * ISO("...Z") 입력은 UTC 기준으로 변환한다.
+ *
+ * 클라·서버 공용 — unread SQL 필터·API 쓰기 경로에서 반드시 사용.
  */
-function toUtcSqlTimestamp(value?: string | null): string {
+export function toUtcSqlTimestamp(value?: string | null): string {
   const raw = String(value || '').trim();
+  if (!raw) {
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
+  // 이미 SQL 포맷 (초 단위)
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
-  const parsed = raw ? new Date(raw) : new Date();
+  // 소수 초가 붙은 SQL 유사 포맷
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$/.test(raw)) {
+    return raw.slice(0, 19);
+  }
+  const parsed = new Date(raw);
   const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   return base.toISOString().slice(0, 19).replace('T', ' ');
 }

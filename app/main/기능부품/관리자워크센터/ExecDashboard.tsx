@@ -63,15 +63,15 @@ const TABS: { id: ExecTabId; label: string }[] = [
   { id: 'custom', label: '커스텀 대시보드' },
 ];
 
-// ─── 개요 탭 (G2: 실연동 가능 항목만 실데이터, 나머지는 '집계 준비중') ──
-const READY_LABEL = '집계 준비중';
+// ─── 개요 탭 (G2: 실연동 가능 항목만 실데이터, 나머지는 '연동 준비 중') ──
+const READY_LABEL = '연동 준비 중';
 
 /** 원 → 백만원(M) 표기 */
 function toMillionStr(won: number): string {
   return (Math.round((won / 1_000_000) * 10) / 10).toLocaleString('ko-KR');
 }
 
-/** 집계 준비중 카드: 매출 의존 지표는 가짜 숫자 대신 준비중으로 표기 */
+/** 연동 준비 중 카드: 매출 의존 지표는 가짜 숫자 대신 준비중으로 표기 */
 function PendingCard({ title, note }: { title: string; note: string }) {
   return (
     <div className="app-card px-3 py-2.5">

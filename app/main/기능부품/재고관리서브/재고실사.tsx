@@ -93,19 +93,21 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
       });
       const discrepancyList = entered.filter(item => item.actualQuantity !== item.expected);
 
-      // 차이 있는 품목만 DB 업데이트
+      // 차이 있는 품목만 SSOT API로 절대 수량 조정
+      const { postStockMovement } = await import('@/lib/inventory-stock-client');
       for (const item of discrepancyList) {
-        await db.from('inventory').update({ quantity: item.actualQuantity, stock: item.actualQuantity }).eq('id', item.id);
-        await db.from('inventory_logs').insert([{
-          item_id: item.id,
-          inventory_id: item.id,
+        const res = await postStockMovement({
+          itemId: String(item.id),
+          mode: 'absolute',
+          absoluteQty: item.actualQuantity,
           type: '실사조정',
-          change_type: '실사조정',
-          quantity: Math.abs(item.actualQuantity - item.expected),
-          prev_quantity: item.expected,
-          next_quantity: item.actualQuantity,
-          actor_name: user?.name,
-          company: item.company }]);
+          notes: `실사: 장부 ${item.expected} → 실물 ${item.actualQuantity}`,
+          company: item.company ?? user?.company ?? null,
+        });
+        if (!res.ok) {
+          const { formatStockApiError } = await import('@/lib/inventory-stock-client');
+          throw new Error(formatStockApiError(res.error, res.code) || '실사 조정 실패');
+        }
       }
 
       // 실사 기록 저장

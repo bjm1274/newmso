@@ -144,6 +144,7 @@ export default function ProductRegistration({
     setLoading(true);
     try {
       const buildSubmissionData = (omittedColumns: ReadonlySet<string>) => {
+        // 수량은 0으로 등록 후 stock-post 기초재고 전표로 반영 (이력 SSOT)
         const submissionData: Record<string, any> = {
           ...productForm,
           item_name: productForm.item_name.trim(),
@@ -154,7 +155,8 @@ export default function ProductRegistration({
           lot_number: productForm.lot_number || null,
           serial_number: productForm.serial_number || null,
           insurance_code: productForm.insurance_code || null,
-          stock: productForm.quantity || 0 };
+          quantity: 0,
+          stock: 0 };
 
         if (omittedColumns.has('department')) {
           delete submissionData.department;
@@ -181,6 +183,31 @@ export default function ProductRegistration({
 
       if (!insertedData || (Array.isArray(insertedData) && insertedData.length === 0)) {
         throw new Error('등록에 실패했습니다. inventory 테이블 권한을 확인해주세요.');
+      }
+
+      const newId = Array.isArray(insertedData)
+        ? (insertedData[0] as { id?: string })?.id
+        : (insertedData as { id?: string })?.id;
+      const initialQty = Math.max(0, Number(productForm.quantity) || 0);
+      if (newId && initialQty > 0) {
+        try {
+          const { postStockMovement } = await import('@/lib/inventory-stock-client');
+          const res = await postStockMovement({
+            itemId: String(newId),
+            mode: 'delta',
+            delta: initialQty,
+            type: '기초재고',
+            notes: '품목 등록 시 기초재고',
+            unitPrice: Number(productForm.unit_price) || null,
+            company: String(productForm.company || user?.company || '').trim() || null,
+            department: String(productForm.department || user?.department || '').trim() || null,
+          });
+          if (!res.ok) {
+            console.warn('[물품등록] 기초재고 전표 실패:', res.error);
+          }
+        } catch (e) {
+          console.warn('[물품등록] 기초재고 전표 예외:', e);
+        }
       }
 
       toast(`${productForm.item_name.trim()} 등록이 완료되었습니다.`, 'success');

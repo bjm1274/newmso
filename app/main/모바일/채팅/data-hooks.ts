@@ -466,7 +466,8 @@ export function useChatMessagesForRoom(
     if (lastMsg && String(lastMsg.sender_id) === String(userId)) {
       return; // 본인이 보낸 마지막 메시지이면 커서 업데이트 스킵 (과거값 가드)
     }
-    const lastReadAt = new Date().toISOString();
+    // SQL 포맷으로 전송 (서버도 정규화하지만, 클라·DB 혼재 방지)
+    const lastReadAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
     void (async () => {
       try {
         await fetch('/api/chat/read-cursors', {

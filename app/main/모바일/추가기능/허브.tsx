@@ -29,7 +29,8 @@ export type AddonModuleKey =
   | 'webfax'
   | 'mri'
   | 'share'
-  | 'guide';
+  | 'guide'
+  | 'calendar';
 
 /** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 일치) */
 const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
@@ -47,7 +48,9 @@ const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
   discharge: { bg: 'linear-gradient(135deg, #8A8A8F, #5C5C60)', icon: 'fileText' },
   mri:       { bg: 'linear-gradient(135deg, #00C7BE, #00968F)', icon: 'calendar' },
   share:     { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'fileText' },
-  guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' } };
+  guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' },
+  calendar:  { bg: 'linear-gradient(135deg, #5856D6, #AF52DE)', icon: 'calendar' },
+};
 
 type QuickItem = {
   id: AddonModuleKey;
@@ -74,15 +77,23 @@ const GROUPS: QuickGroup[] = [
       { id: 'org',       label: '조직도' },
       { id: 'worknow',   label: '근무현황' },
       { id: 'inventory', label: '부서별재고' },
+      { id: 'calendar',  label: '공유캘린더' },
       { id: 'parking',   label: '주차관제' },
     ] },
   {
-    title: '정산·문서',
+    title: '일정·문서',
+    items: [
+      { id: 'mri',     label: 'MRI일정' },
+      { id: 'share',   label: '업무공유' },
+      { id: 'guide',   label: '업무가이드' },
+      { id: 'eval',    label: '직원평가' },
+    ] },
+  {
+    title: '정산·외부',
     items: [
       { id: 'deposit', label: '입금조회' },
       { id: 'closing', label: '마감보고' },
-      { id: 'eval',     label: '직원평가' },
-      { id: 'webfax',   label: '웹팩스' },
+      { id: 'webfax',  label: '웹팩스' },
     ] },
 ];
 

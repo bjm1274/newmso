@@ -14,7 +14,8 @@
 //   - quantity가 NULL이면 stock으로 fallback, 둘 다 NULL이면 0
 // ============================================================
 
-import { sql, eq, inArray } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import type { D1Client } from '../client-d1';
 import { inventory, inventory_logs } from '../schema';
 
@@ -28,7 +29,8 @@ export class StockError extends Error {
     | 'ITEM_NOT_FOUND'
     | 'SOURCE_NOT_FOUND'
     | 'DEST_NOT_FOUND'
-    | 'INSUFFICIENT_STOCK',
+    | 'INSUFFICIENT_STOCK'
+    | 'EXPIRED_STOCK',
     message?: string,
   ) {
     super(message ?? code);
@@ -112,15 +114,12 @@ export function syncInventoryNameStock<T extends {
 }
 
 /**
- * 재고 차감 + 로그 INSERT.
+ * 재고 차감 + 로그 INSERT (단일 D1 batch / all-or-nothing).
  *
- * D1은 인터랙티브 트랜잭션 미지원 → UPDATE(가드 포함)+로그 INSERT 순차,
- * 로그 실패는 재고차감을 되돌리지 않음.
- *
- *   (a) UPDATE ... RETURNING 으로 가드(WHERE) 포함 원자적 차감
- *   (b) 0행이면 별도 SELECT로 행 존재 여부 조회해 StockError throw
- *       (이 read는 차감이 일어나지 않은 경로라 원자성 불필요)
- *   (c) 차감 성공 시 로그 INSERT 후 반환
+ * stock-transfer 와 동일 패턴:
+ *   (a) SELECT 로 현재 수량 조회·검증
+ *   (b) UPDATE(차감) + INSERT(로그) 를 db.batch() 로 원자 커밋
+ *       — 중간 실패 시 재고만 줄고 로그가 없는 상태를 방지
  */
 export async function atomicStockConsumeWithLog(
   db: D1Client,
@@ -134,51 +133,48 @@ export async function atomicStockConsumeWithLog(
     notes: string | null;
   }
 ): Promise<StockUpdateResult> {
-  const updated = await db
-    .update(inventory)
-    .set({
-      quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}`,
-      stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${consumeAmount}` })
-    .where(
-      sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) >= ${consumeAmount}`,
-    )
-    .returning({
-      next_qty: inventory.quantity });
+  const qtyExpr = sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)`;
+  const found = await db
+    .select({ prev: qtyExpr })
+    .from(inventory)
+    .where(eq(inventory.id, itemId))
+    .limit(1);
 
-  if (updated.length === 0) {
-    const found = await db
-      .select({ prev: sql<number>`COALESCE(${inventory.quantity}, ${inventory.stock}, 0)` })
-      .from(inventory)
-      .where(eq(inventory.id, itemId));
-    if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
-    const prev = Number(found[0].prev ?? 0);
+  if (found.length === 0) throw new StockError('ITEM_NOT_FOUND');
+
+  const prev = Number(found[0].prev ?? 0);
+  if (prev < consumeAmount) {
     throw new StockError(
       'INSUFFICIENT_STOCK',
-      `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`
+      `INSUFFICIENT_STOCK: prev=${prev}, delta=-${consumeAmount}`,
     );
   }
 
-  const next = Number(updated[0].next_qty ?? 0);
-  const prev = next + consumeAmount;
+  const next = prev - consumeAmount;
   const logId = crypto.randomUUID();
 
-  await db
-    .insert(inventory_logs)
-    .values({
-      id: logId,
-      item_id: itemId,
-      inventory_id: itemId,
-      type: '소모',
-      change_type: '사용',
-      quantity: consumeAmount,
-      prev_quantity: prev,
-      next_quantity: next,
-      actor_name: logRow.actor_name,
-      company: logRow.company,
-      company_id: logRow.company_id ?? null,
-      department: logRow.department,
-      notes: logRow.notes });
+  const updateOp = db
+    .update(inventory)
+    .set({ quantity: next, stock: next })
+    .where(eq(inventory.id, itemId));
+
+  const insertOp = db.insert(inventory_logs).values({
+    id: logId,
+    item_id: itemId,
+    inventory_id: itemId,
+    type: '소모',
+    change_type: '사용',
+    quantity: consumeAmount,
+    prev_quantity: prev,
+    next_quantity: next,
+    actor_name: logRow.actor_name,
+    company: logRow.company,
+    company_id: logRow.company_id ?? null,
+    department: logRow.department,
+    notes: logRow.notes,
+  });
+
+  await db.batch([updateOp, insertOp] as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
   return { prev_qty: prev, next_qty: next };
 }
-

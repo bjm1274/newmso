@@ -16,7 +16,83 @@ export type PromotionSchedule = {
   daysUntilExpiry: number;
 };
 
+/** 0=대상 아님, 1=1차, 2=2차 */
+export type DuePromotionStage = 0 | 1 | 2;
+
 const MS_PER_DAY = 86_400_000;
+
+/**
+ * 잔여 연차 안전 계산.
+ * used 가 음수(데이터 오류)여도 잔여를 부풀리지 않는다.
+ */
+export function clampLeaveRemaining(
+  total: number | null | undefined,
+  used: number | null | undefined,
+): number {
+  const t = Math.max(0, Number(total) || 0);
+  const u = Math.max(0, Number(used) || 0);
+  return Math.max(0, Math.round((t - u) * 100) / 100);
+}
+
+/** 멱등 키: staffId|stage|expiryYYYY-MM-DD */
+export function buildPromotionSentKey(
+  staffId: string,
+  stage: 1 | 2 | number,
+  expiryDate: string | null | undefined,
+): string {
+  return `${String(staffId)}|${Number(stage)}|${String(expiryDate || '').slice(0, 10)}`;
+}
+
+/**
+ * 오늘(KST YYYY-MM-DD) 기준으로 발송해야 할 촉진 차수.
+ *
+ * - 만료일 이후: 발송 안 함
+ * - 1차일 도래 후 미발송이면 1차 (당일 누락 소급)
+ * - 2차일 도래 후 미발송이면 2차
+ * - 1차가 아직이면 2차보다 1차를 우선 (적법 촉진 순서)
+ */
+export function resolveDuePromotionStage(params: {
+  todayKey: string;
+  step1Key: string;
+  step2Key: string;
+  expiryKey: string;
+  hasStage1: boolean;
+  hasStage2: boolean;
+  step1Enabled?: boolean;
+  step2Enabled?: boolean;
+}): DuePromotionStage {
+  const {
+    todayKey,
+    step1Key,
+    step2Key,
+    expiryKey,
+    hasStage1,
+    hasStage2,
+  } = params;
+  const step1Enabled = params.step1Enabled !== false;
+  const step2Enabled = params.step2Enabled !== false;
+
+  if (!todayKey || !expiryKey || todayKey > expiryKey) return 0;
+
+  if (step1Enabled && step1Key && todayKey >= step1Key && !hasStage1) {
+    return 1;
+  }
+  if (step2Enabled && step2Key && todayKey >= step2Key && !hasStage2) {
+    return 2;
+  }
+  return 0;
+}
+
+export function resolveHireDateFromStaff(staff: {
+  hire_date?: string | null;
+  join_date?: string | null;
+  joined_at?: string | null;
+}): string | null {
+  const raw = staff.hire_date || staff.join_date || staff.joined_at;
+  if (!raw) return null;
+  const key = String(raw).trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
 
 /**
  * 입사일 기준 연차 만료일 계산
@@ -85,24 +161,47 @@ export function getStaffPromotionSchedule(
 }
 
 /**
- * 오늘 촉진이 필요한 직원 필터링
+ * 오늘(또는 referenceDate) 기준 촉진이 필요한 직원 필터링.
+ * 당일 일치뿐 아니라 누락 소급(도래 후 미발송)까지 포함한다.
+ * sentKeys: `${staffId}|${stage}|${expiryYYYY-MM-DD}`
  */
 export function filterStaffsNeedingPromotion(
-  staffs: Array<{ id: string; join_date?: string; joined_at?: string; hire_date?: string }>,
+  staffs: Array<{
+    id: string;
+    join_date?: string | null;
+    joined_at?: string | null;
+    hire_date?: string | null;
+    annual_leave_total?: number | null;
+    annual_leave_used?: number | null;
+  }>,
   step: 1 | 2,
   today: Date = new Date(),
-): Array<{ staffId: string; schedule: PromotionSchedule }> {
+  sentKeys: Set<string> = new Set(),
+): Array<{ staffId: string; schedule: PromotionSchedule; stage: 1 | 2 }> {
   const todayStr = formatDateKey(today);
-  const results: Array<{ staffId: string; schedule: PromotionSchedule }> = [];
+  const results: Array<{ staffId: string; schedule: PromotionSchedule; stage: 1 | 2 }> = [];
 
   for (const staff of staffs) {
-    const hireDate = staff.hire_date || staff.join_date || staff.joined_at;
+    if (clampLeaveRemaining(staff.annual_leave_total, staff.annual_leave_used) <= 0) continue;
+    const hireDate = resolveHireDateFromStaff(staff);
     const schedule = getStaffPromotionSchedule(hireDate, today);
     if (!schedule) continue;
 
-    const targetDate = step === 1 ? schedule.step1Date : schedule.step2Date;
-    if (formatDateKey(targetDate) === todayStr) {
-      results.push({ staffId: staff.id, schedule });
+    const expiryKey = formatDateKey(schedule.expiryDate);
+    const step1Key = formatDateKey(schedule.step1Date);
+    const step2Key = formatDateKey(schedule.step2Date);
+    const hasStage1 = sentKeys.has(buildPromotionSentKey(staff.id, 1, expiryKey));
+    const hasStage2 = sentKeys.has(buildPromotionSentKey(staff.id, 2, expiryKey));
+    const due = resolveDuePromotionStage({
+      todayKey: todayStr,
+      step1Key,
+      step2Key,
+      expiryKey,
+      hasStage1,
+      hasStage2,
+    });
+    if (due === step) {
+      results.push({ staffId: staff.id, schedule, stage: due });
     }
   }
 

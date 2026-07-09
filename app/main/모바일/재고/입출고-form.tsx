@@ -1,86 +1,117 @@
 'use client';
 
 /**
- * IORecordForm + KpiCard — 입출고.tsx에서 분리된 서브 컴포넌트.
- * JM: ~120줄
+ * 입출고 폼 — 재고 SSOT (stock-post API)
+ * 품목 선택 → 수량 → 서버에서 quantity+stock+logs 원자 처리
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
-import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
+import { db } from '@/lib/db-client';
+import { formatStockApiError, postStockMovement } from '@/lib/inventory-stock-client';
 import {
   MFormHeader,
   MField,
   MInput,
   MSegRow,
-  useFieldIdPrefix } from '../인사관리/form-helpers';
+  useFieldIdPrefix,
+} from '../인사관리/form-helpers';
 import type { StockMutateUser } from './data-hooks';
 
 type IOKind = '입고' | '출고';
 
-type IOFormState = {
-  kind: IOKind;
-  item: string;
-  qty: string;
-  reason: string;
+type InvItem = {
+  id: string;
+  name?: string | null;
+  item_name?: string | null;
+  quantity?: number | null;
+  stock?: number | null;
+  company?: string | null;
+  department?: string | null;
+  location?: string | null;
+  unit_price?: number | null;
 };
-
-const IO_FORM_INITIAL: IOFormState = { kind: '입고', item: '', qty: '', reason: '' };
 
 export function IORecordForm({
   user,
-  onClose }: {
+  onClose,
+}: {
   user: StockMutateUser | null;
   onClose: () => void;
 }) {
-  const [v, setV] = useState<IOFormState>(IO_FORM_INITIAL);
+  const [kind, setKind] = useState<IOKind>('입고');
+  const [itemId, setItemId] = useState('');
+  const [qty, setQty] = useState('');
+  const [reason, setReason] = useState('');
+  const [items, setItems] = useState<InvItem[]>([]);
   const [saving, setSaving] = useState(false);
   const fid = useFieldIdPrefix('io');
 
-  const set = <K extends keyof IOFormState>(k: K, val: IOFormState[K]) =>
-    setV((prev) => ({ ...prev, [k]: val }));
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const u = user as unknown as Record<string, unknown> | null;
+      const company = typeof u?.company === 'string' ? u.company : null;
+      let q = db.from('inventory').select('id, name, item_name, quantity, stock, company, department, location, unit_price').order('item_name').limit(500);
+      if (company) q = q.eq('company', company);
+      const { data } = await q;
+      if (!cancelled && data) setItems(data as InvItem[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const selected = useMemo(
+    () => items.find((i) => String(i.id) === String(itemId)) || null,
+    [items, itemId],
+  );
+  const onHand = selected
+    ? Number(selected.quantity ?? selected.stock ?? 0) || 0
+    : 0;
 
   const handleSave = async () => {
     if (saving) return;
-    const item = v.item.trim();
-    if (!item) { toast('품목명을 입력해 주세요.', 'error'); return; }
-    const qty = Number(v.qty);
-    if (!Number.isFinite(qty) || qty <= 0) { toast('수량은 1 이상이어야 합니다.', 'error'); return; }
+    if (!selected) {
+      toast('품목을 선택해 주세요.', 'error');
+      return;
+    }
+    const n = Number(qty);
+    if (!Number.isFinite(n) || n <= 0) {
+      toast('수량은 1 이상이어야 합니다.', 'error');
+      return;
+    }
+    if (kind === '출고' && onHand < n) {
+      toast(`재고 부족 (현재 ${onHand}개)`, 'error');
+      return;
+    }
 
-    // StockMutateUser에 id/company/name 없으므로 unknown 경유로 안전하게 읽기
     const u = user as unknown as Record<string, unknown>;
-    const actorName =
-      typeof u?.name === 'string'
-        ? u.name
-        : typeof u?.staff_name === 'string'
-          ? (u.staff_name as string)
-          : null;
-    const reason = v.reason.trim();
-
     setSaving(true);
     try {
-      // 정본 입출고 이력 테이블은 inventory_logs.
-      // (inventory_transactions 테이블/transaction_type·staff_id·reason 컬럼은 정본에 없음)
-      // 자유입력 품목명은 inventory_id 연결이 없으므로 notes에 품목명/사유를 기록한다.
-      const payload: Record<string, unknown> = {
-        type: v.kind,
-        change_type: v.kind,
-        quantity: qty,
-        actor_name: actorName,
-        actor_id: typeof u?.id === 'string' ? u.id : null,
-        company: typeof u?.company === 'string' ? u.company : null,
-        notes: reason ? `${item} / ${reason}` : item,
-        created_at: new Date().toISOString() };
-
-      const { queued, error } = await enqueueD1Mutation({
-        kind: 'insert',
-        table: 'inventory_logs',
-        payload,
-        retryable: true });
-
-      if (error) { toast(`저장 실패: ${error}`, 'error'); return; }
-      if (queued) { toast('오프라인 — 입출고 기록 대기 중', 'info'); onClose(); return; }
-      toast(`${v.kind} 기록이 저장되었습니다.`, 'success');
+      const result = await postStockMovement({
+        itemId: String(selected.id),
+        mode: 'delta',
+        delta: kind === '입고' ? Math.trunc(n) : -Math.trunc(n),
+        type: kind,
+        notes: reason.trim() || `${kind} (모바일)`,
+        company:
+          selected.company ||
+          (typeof u?.company === 'string' ? u.company : null),
+        department:
+          selected.department ||
+          (typeof u?.department === 'string' ? u.department : null),
+        location: selected.location ?? null,
+        unitPrice: selected.unit_price != null ? Number(selected.unit_price) : null,
+      });
+      if (!result.ok) {
+        toast(formatStockApiError(result.error, result.code), 'error');
+        return;
+      }
+      toast(
+        `${kind} 완료 · 재고 ${result.data?.prev_qty} → ${result.data?.next_qty}`,
+        'success',
+      );
       onClose();
     } finally {
       setSaving(false);
@@ -92,8 +123,10 @@ export function IORecordForm({
       <MFormHeader
         title="입출고 기록"
         onCancel={onClose}
-        onSave={() => { void handleSave(); }}
-        saveDisabled={!v.item.trim() || saving}
+        onSave={() => {
+          void handleSave();
+        }}
+        saveDisabled={!itemId || saving}
         saveLabel={saving ? '저장 중…' : '저장'}
       />
       <div className="m-scroll">
@@ -101,38 +134,52 @@ export function IORecordForm({
           <MField label="유형">
             <MSegRow
               ariaLabel="입출고 유형"
-              value={v.kind}
-              onPick={(k) => set('kind', k as IOKind)}
+              value={kind}
+              onPick={(k) => setKind(k as IOKind)}
               options={[
                 { id: '입고', label: '입고' },
                 { id: '출고', label: '출고' },
               ]}
             />
           </MField>
-          <MField label="품목명" required htmlFor={fid('item')}>
-            <MInput
+          <MField label="품목" required htmlFor={fid('item')}>
+            <select
               id={fid('item')}
-              value={v.item}
-              onChange={(val) => set('item', val)}
-              placeholder="예: 카테터 18Ga"
-              autoFocus
-            />
+              value={itemId}
+              onChange={(e) => setItemId(e.target.value)}
+              className="w-full h-11 px-3 rounded-lg border border-[var(--border)] bg-[var(--card)] text-sm font-semibold"
+            >
+              <option value="">품목 선택…</option>
+              {items.map((it) => {
+                const label = it.item_name || it.name || it.id;
+                const q = Number(it.quantity ?? it.stock ?? 0) || 0;
+                return (
+                  <option key={it.id} value={it.id}>
+                    {label} (재고 {q})
+                  </option>
+                );
+              })}
+            </select>
+            {selected && (
+              <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                현재 재고 <strong>{onHand}</strong> · {selected.department || selected.company || ''}
+              </p>
+            )}
           </MField>
           <MField label="수량" required htmlFor={fid('qty')}>
             <MInput
               id={fid('qty')}
-              value={v.qty}
-              onChange={(val) => set('qty', val)}
+              value={qty}
+              onChange={(val) => setQty(val)}
               placeholder="예: 10"
-              kind="numeric"
             />
           </MField>
-          <MField label="사유" htmlFor={fid('reason')}>
+          <MField label="사유/비고" htmlFor={fid('reason')}>
             <MInput
               id={fid('reason')}
-              value={v.reason}
-              onChange={(val) => set('reason', val)}
-              placeholder="예: 수술실 긴급 출고"
+              value={reason}
+              onChange={(val) => setReason(val)}
+              placeholder="선택"
             />
           </MField>
         </div>
@@ -144,38 +191,17 @@ export function IORecordForm({
 export function KpiCard({
   label,
   value,
-  unit,
-  tone }: {
+  sub,
+}: {
   label: string;
-  value: number;
-  unit: string;
-  tone: 'accent' | 'success' | 'warning' | 'danger';
+  value: string | number;
+  sub?: string;
 }) {
-  const color =
-    tone === 'accent'
-      ? 'var(--m-accent)'
-      : tone === 'success'
-        ? 'var(--m-success)'
-        : tone === 'warning'
-          ? 'var(--m-warning)'
-          : 'var(--m-danger)';
   return (
-    <div className="m-card" style={{ padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>{label}</div>
-      <div
-        className="m-tnum"
-        style={{
-          fontSize: 22,
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          marginTop: 4,
-          color }}
-      >
-        {value}
-        <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700, marginLeft: 3 }}>
-          {unit}
-        </span>
-      </div>
+    <div className="m-card p-3">
+      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">{label}</p>
+      <p className="text-lg font-black text-[var(--foreground)]">{value}</p>
+      {sub ? <p className="text-[10px] text-[var(--toss-gray-3)]">{sub}</p> : null}
     </div>
   );
 }
