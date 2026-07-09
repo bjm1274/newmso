@@ -20,6 +20,8 @@ interface Props {
   loading?: boolean;
   onPick: (row: LeaveStaffRow) => void;
   onDoubleClick: (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
+  /** 상세 보기 (더블클릭 대체 버튼) */
+  onOpenDetail?: (row: LeaveStaffRow) => void;
 }
 
 function statusBadge(row: LeaveStaffRow) {
@@ -44,13 +46,15 @@ interface RowProps {
   active: boolean;
   onPick: (row: LeaveStaffRow) => void;
   onDoubleClick: (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
+  onOpenDetail?: (row: LeaveStaffRow) => void;
 }
 
-const TableRow = memo(function TableRow({ row, active, onPick, onDoubleClick }: RowProps) {
+const TableRow = memo(function TableRow({ row, active, onPick, onDoubleClick, onOpenDetail }: RowProps) {
   const remainColor = row.remaining <= 3
     ? 'text-[#DC2626]'
     : 'text-[var(--accent)]';
   const name = row.staff.name ?? '직원';
+  const overuse = row.used > row.total + 0.01;
   return (
     <tr
       onClick={() => onPick(row)}
@@ -75,20 +79,37 @@ const TableRow = memo(function TableRow({ row, active, onPick, onDoubleClick }: 
       <td className="px-3 py-2 text-center text-[12px] tnum text-[var(--foreground)]">
         {row.total}
       </td>
-      <td className="px-3 py-2 text-center text-[12px] tnum text-[var(--toss-gray-4)]">
+      <td className={`px-3 py-2 text-center text-[12px] tnum ${overuse ? 'font-bold text-rose-600' : 'text-[var(--toss-gray-4)]'}`}>
         {row.used}
       </td>
       <td className={`px-3 py-2 text-center text-[12px] tnum font-bold ${remainColor}`}>
         {row.remaining}
       </td>
       <td className="px-3 py-2">
-        {statusBadge(row)}
+        <div className="flex flex-wrap items-center gap-1">
+          {overuse && <span className="badge badge-red">사용&gt;부여</span>}
+          {statusBadge(row)}
+        </div>
+      </td>
+      <td className="px-2 py-2 text-right">
+        {onOpenDetail && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetail(row);
+            }}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] px-2 py-1 text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10"
+          >
+            상세
+          </button>
+        )}
       </td>
     </tr>
   );
 });
 
-function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick, onDoubleClick }: Props) {
+function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick, onDoubleClick, onOpenDetail }: Props) {
   const [query, setQuery] = useState('');
 
   const filteredRows = useMemo(() => {
@@ -146,12 +167,13 @@ function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick, onDoub
               <th className="px-3 py-2 text-center">사용</th>
               <th className="px-3 py-2 text-center">잔여</th>
               <th className="px-3 py-2">상태</th>
+              <th className="px-2 py-2 text-right"> </th>
             </tr>
           </thead>
           <tbody>
             {filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-[var(--toss-gray-4)] font-medium">
+                <td colSpan={7} className="py-8 text-center text-[var(--toss-gray-4)] font-medium">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -163,6 +185,7 @@ function LeaveBalanceTableInner({ rows, selectedStaffId, loading, onPick, onDoub
                   active={selectedStaffId === String(row.staff.id)}
                   onPick={onPick}
                   onDoubleClick={onDoubleClick}
+                  onOpenDetail={onOpenDetail}
                 />
               ))
             )}

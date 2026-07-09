@@ -238,10 +238,31 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
   return newId;
 }
 
-export async function syncAnnualLeaveUsedForStaff(staffId: string) {
+export type SyncAnnualLeaveUsedOptions = {
+  /** 지정 시 해당 연도 사용분만 합산 (leave_balances 정합용) */
+  year?: number;
+  /**
+   * true면 staff_members.annual_leave_used 도 갱신.
+   * 기본 false — 직원 명단/필드 보호 (잔액은 leave_balances 로 관리)
+   */
+  writeStaffMembers?: boolean;
+};
+
+/**
+ * 승인된 연차 사용일수 집계.
+ * - year 미지정: 전 기간 합 (레거시)
+ * - year 지정: 해당 연도에 걸친 사용분만 (잔액 테이블 SSOT)
+ * - writeStaffMembers 기본 false → staff_members 미갱신
+ */
+export async function syncAnnualLeaveUsedForStaff(
+  staffId: string,
+  options?: SyncAnnualLeaveUsedOptions,
+) {
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (syncAnnualLeaveUsedForStaff)');
   const db = getD1Drizzle(d1);
+  const year = options?.year;
+  const writeStaff = options?.writeStaffMembers === true;
 
   const rows = await db
     .select({
@@ -255,24 +276,47 @@ export async function syncAnnualLeaveUsedForStaff(staffId: string) {
 
   const approvedAnnualLeaveDays = rows.reduce((sum, row) => {
     if (!isApprovedLeaveStatus(row?.status)) return sum;
-    // '연차(부여)'는 연차를 사용한 것이 아니라 신규 부여받은 것이므로 사용 합계에서 제외합니다.
+    // '연차(부여)'는 사용이 아니라 신규 부여
     if (row?.leave_type === '연차(부여)') return sum;
 
-    // 1순위: DB에 이미 저장된 days 값이 유효한 수치라면 우선 사용
-    const dbDays = row.days != null ? Number(row.days) : null;
-    if (dbDays !== null && !Number.isNaN(dbDays)) {
-      return sum + dbDays;
+    const isHalf = getLeaveUnit(row?.leave_type) === 0.5;
+    if (!isHalf && !isAnnualLeaveType(row?.leave_type)) return sum;
+
+    if (year != null) {
+      const clipped = clipDateRangeToYear(
+        row?.start_date as string,
+        row?.end_date as string,
+        year,
+      );
+      if (!clipped) return sum;
+      if (isHalf) return sum + 0.5;
+      const startY = String(row?.start_date || '').slice(0, 4);
+      const endY = String(row?.end_date || row?.start_date || '').slice(0, 4);
+      const dbDays = row.days != null ? Number(row.days) : null;
+      if (startY === String(year) && endY === String(year) && dbDays != null && !Number.isNaN(dbDays)) {
+        return sum + dbDays;
+      }
+      return (
+        sum +
+        calculateLeaveDays(
+          formatKoreanDateKey(clipped.start),
+          formatKoreanDateKey(clipped.end),
+        )
+      );
     }
-    const unit = getLeaveUnit(row?.leave_type);
-    if (unit === 0.5) return sum + 0.5;
-    if (!isAnnualLeaveType(row?.leave_type)) return sum;
+
+    if (isHalf) return sum + 0.5;
+    const dbDays = row.days != null ? Number(row.days) : null;
+    if (dbDays !== null && !Number.isNaN(dbDays)) return sum + dbDays;
     return sum + calculateLeaveDays(row?.start_date, row?.end_date);
   }, 0);
 
-  await db
-    .update(staffMembersTable)
-    .set({ annual_leave_used: approvedAnnualLeaveDays })
-    .where(eq(staffMembersTable.id, staffId));
+  if (writeStaff) {
+    await db
+      .update(staffMembersTable)
+      .set({ annual_leave_used: approvedAnnualLeaveDays })
+      .where(eq(staffMembersTable.id, staffId));
+  }
 
   return approvedAnnualLeaveDays;
 }

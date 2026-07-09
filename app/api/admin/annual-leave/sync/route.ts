@@ -17,11 +17,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'staffId가 필요합니다.' }, { status: 400 });
     }
 
-    // 서버 측에서 D1 바인딩이 보장된 환경이므로 안전하게 동기화 및 잔액 계산 실행
-    await syncAnnualLeaveUsedForStaff(staffId);
-    await recalculateLeaveBalance(staffId);
+    // leave_balances 재계산 — staff_members 명단/사용 필드는 쓰지 않음
+    const year = new Date().getFullYear();
+    await syncAnnualLeaveUsedForStaff(staffId, { year, writeStaffMembers: false });
+    await recalculateLeaveBalance(staffId, year);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, year, staffMembersUntouched: true });
   } catch (err: any) {
     console.error('[annual-leave/sync] 실패:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });

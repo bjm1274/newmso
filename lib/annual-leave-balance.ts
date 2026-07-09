@@ -1,6 +1,11 @@
 /**
  * leave_balances 테이블 재계산 유틸
  * 승인/취소/반려/수동부여 이벤트 발생 시 호출하여 정합성 유지
+ *
+ * SSOT:
+ * - 발생: leave_accruals (1년 미만=월차 합, 1년+=최신 annual:N 일수)
+ * - 사용: leave_requests 당해 연도 승인 연차 (staff_members 미갱신)
+ * - 잔액: leave_balances 만 UPSERT (직원 명단 테이블 미수정)
  */
 
 import { z } from 'zod';
@@ -13,13 +18,12 @@ import {
   staff_members as staffMembersTable,
   companies as companiesTable,
   leave_balances as leaveBalancesTable,
+  leave_accruals as leaveAccrualsTable,
   eq,
   and } from '@/lib/db';
 
-// ─── 입력 검증 스키마 ─────────────────────────────────────────────────────────
-
 const RecalcInputSchema = z.object({
-  staffId: z.string().uuid('staffId는 유효한 UUID여야 합니다'),
+  staffId: z.string().min(1, 'staffId가 필요합니다'),
   year: z.number().int().min(2000).max(2100).optional(),
   expiredOverride: z.number().min(0).optional(),
   compensatedOverride: z.number().min(0).optional() });
@@ -28,8 +32,6 @@ export type RecalcOverrides = {
   expiredDays?: number;
   compensatedDays?: number;
 };
-
-// ─── DB 조회 결과 타입 ────────────────────────────────────────────────────────
 
 type StaffRow = {
   id: string;
@@ -41,41 +43,73 @@ type StaffRow = {
   company_id: string | null;
 };
 
-// ─── 내부 헬퍼 ───────────────────────────────────────────────────────────────
-
 function resolveHireDate(staff: StaffRow): string | null {
   return staff.hire_date ?? staff.join_date ?? staff.joined_at ?? null;
 }
 
-/**
- * 회계연도 기준 만료일: 다음 회계연도 시작일 전날
- * 예) fiscal_year_start_month=1 → YYYY-12-31
- */
 function fiscalYearExpiryDate(refYear: number, fiscalStartMonth: number): Date {
-  // 다음 회계연도 시작일 전날
   const nextFiscalStart = new Date(refYear + 1, fiscalStartMonth - 1, 1);
-  const expiry = new Date(nextFiscalStart.getTime() - 86_400_000);
-  return expiry;
+  return new Date(nextFiscalStart.getTime() - 86_400_000);
 }
 
-// ─── 공개 API ─────────────────────────────────────────────────────────────────
+/**
+ * leave_accruals 기준 발생 일수
+ * - annual 원장이 있으면 최신 N년차(annual:N) 1건 days
+ * - 없으면 monthly 합 (1년 미만 월차)
+ * - 원장 없고 staff.total 만 있으면 fallback
+ */
+export async function resolveGrantedDaysFromAccruals(
+  staffId: string,
+  fallbackTotal: number,
+): Promise<{ totalDays: number; source: 'annual' | 'monthly' | 'staff_fallback' | 'zero' }> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[annual-leave-balance] D1 binding not available');
+  const db = getD1Drizzle(d1);
+
+  const rows = await db
+    .select({
+      kind: leaveAccrualsTable.kind,
+      period_key: leaveAccrualsTable.period_key,
+      days: leaveAccrualsTable.days,
+    })
+    .from(leaveAccrualsTable)
+    .where(eq(leaveAccrualsTable.staff_id, staffId));
+
+  const annuals = rows
+    .filter((r) => r.kind === 'annual')
+    .map((r) => ({
+      n: Number(String(r.period_key || '').replace('annual:', '')) || 0,
+      days: Number(r.days) || 0,
+    }))
+    .filter((r) => r.n >= 1)
+    .sort((a, b) => b.n - a.n);
+
+  if (annuals.length > 0) {
+    return { totalDays: annuals[0]!.days, source: 'annual' };
+  }
+
+  const monthlySum = rows
+    .filter((r) => r.kind === 'monthly')
+    .reduce((s, r) => s + (Number(r.days) || 0), 0);
+  if (monthlySum > 0) {
+    return { totalDays: monthlySum, source: 'monthly' };
+  }
+
+  if (fallbackTotal > 0) {
+    return { totalDays: fallbackTotal, source: 'staff_fallback' };
+  }
+  return { totalDays: 0, source: 'zero' };
+}
 
 /**
  * 특정 직원의 leave_balances를 재계산하여 UPSERT
- *
- * 호출 시점:
- * - 휴가 승인/반려/취소
- * - 연차 수동부여 후
- * - 연차 소멸 크론 처리 후
- *
- * JM2: 렌더링 중 절대 호출 금지 — 이벤트 핸들러에서만 호출할 것
+ * staff_members 의 total/used 는 읽기 fallback 만 사용하고 쓰지 않음.
  */
 export async function recalculateLeaveBalance(
   staffId: string,
   year?: number,
   overrides?: RecalcOverrides,
 ): Promise<void> {
-  // 입력 검증 (JM4)
   const parsed = RecalcInputSchema.safeParse({
     staffId,
     year,
@@ -93,7 +127,6 @@ export async function recalculateLeaveBalance(
   if (!d1) throw new Error('[annual-leave-balance] D1 binding not available (recalculateLeaveBalance)');
   const db = getD1Drizzle(d1);
 
-  // 1. 직원 정보 조회
   const staffRows = await db
     .select({
       id: staffMembersTable.id,
@@ -119,7 +152,6 @@ export async function recalculateLeaveBalance(
     hire_date: staffRow.hire_date ?? null,
     company_id: staffRow.company_id ?? null };
 
-  // 2. 회사 정책 조회
   let leavePolicy: 'entry_date' | 'fiscal_year' = 'entry_date';
   let fiscalStartMonth = 1;
   if (staff.company_id) {
@@ -139,17 +171,25 @@ export async function recalculateLeaveBalance(
     }
   }
 
-  // 3. 사용일수 동기화
+  // 사용: 당해 연도만, staff_members 미기록
   let usedDays: number;
   try {
-    usedDays = await syncAnnualLeaveUsedForStaff(staffId);
+    usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
+      year: targetYear,
+      writeStaffMembers: false,
+    });
   } catch (syncErr) {
     console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
     usedDays = Number(staff.annual_leave_used) || 0;
   }
 
-  // 4-5. 발생일수·만료일 계산
-  const totalDays = Number(staff.annual_leave_total) || 0;
+  // 발생: 원장 우선
+  const granted = await resolveGrantedDaysFromAccruals(
+    staffId,
+    Number(staff.annual_leave_total) || 0,
+  );
+  const totalDays = granted.totalDays;
+
   let expiryDate: Date;
   const hireDate = resolveHireDate(staff);
   if (leavePolicy === 'fiscal_year') {
@@ -161,7 +201,6 @@ export async function recalculateLeaveBalance(
   }
   const expiryDateStr = formatKoreanDateKey(expiryDate);
 
-  // 6. 기존 leave_balances 조회 (staff_id + year — D1은 unique index 없으므로 limit(1))
   const existingRows = await db
     .select({
       id: leaveBalancesTable.id,
@@ -186,10 +225,8 @@ export async function recalculateLeaveBalance(
       ? Number(overrides.compensatedDays)
       : Number(existingRow?.compensated_days) || 0;
 
-  // 7. 잔여일수 계산
   const remainingDays = Math.max(0, totalDays - usedDays - expiredDays - compensatedDays);
 
-  // 8. D1 upsert: 기존 행 있으면 UPDATE, 없으면 INSERT
   if (existingRow?.id) {
     await db
       .update(leaveBalancesTable)

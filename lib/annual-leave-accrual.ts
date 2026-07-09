@@ -255,13 +255,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
               sourceDate: todayKey,
               note: `만 ${n}년차 연차 ${days}일 자동부여` });
             if (ok) {
-              if (n === maxYears) {
-                // 신규 연차연도 또는 가장 최근의 연도만 셋팅
-                await db
-                  .update(staffMembersTable)
-                  .set({ annual_leave_total: days, annual_leave_used: 0 })
-                  .where(eq(staffMembersTable.id, s.id));
-              }
+              // staff_members 명단/잔여 필드는 건드리지 않음 — leave_accruals 원장 + leave_balances 재계산만
               await recalculateLeaveBalance(s.id, targetYear);
               result.granted.push({
                 staffId: s.id,
@@ -334,11 +328,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
       }
 
       if (monthlyGranted > 0) {
-        const current = Number(s.annual_leave_total) || 0;
-        await db
-          .update(staffMembersTable)
-          .set({ annual_leave_total: current + monthlyGranted })
-          .where(eq(staffMembersTable.id, s.id));
+        // staff_members.annual_leave_total 누적 갱신 제거 — 잔액은 leave_balances SSOT
         await recalculateLeaveBalance(s.id, targetYear);
       } else {
         result.skipped += 1;

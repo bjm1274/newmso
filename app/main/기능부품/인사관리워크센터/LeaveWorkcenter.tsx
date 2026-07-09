@@ -83,21 +83,33 @@ export default function LeaveWorkcenter({
   const [detailTab, setDetailTab] = useState<'usage' | 'grant'>('usage');
   const [accrualList, setAccrualList] = useState<any[]>([]);
   const [accrualLoading, setAccrualLoading] = useState(false);
+  const [mainTab, setMainTab] = useState<'balance' | 'calendar' | 'expiry' | 'diagnose'>('balance');
+  const [diagnose, setDiagnose] = useState<Record<string, unknown> | null>(null);
+  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
+  const [rebalancing, setRebalancing] = useState(false);
 
-  const handleDoubleClick = useCallback(async (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => {
+  const openStaffDetail = useCallback(async (row: LeaveStaffRow, event?: React.MouseEvent | null) => {
     setDoubleClickedStaff(row);
     setDetailTab('usage');
     setAccrualList([]);
     setAccrualLoading(true);
+    setPicked(row);
 
     const popupWidth = 675;
     const popupHeight = 525;
-    const x = Math.max(10, Math.min(event.clientX, window.innerWidth - popupWidth - 10));
-    const y = Math.max(10, Math.min(event.clientY, window.innerHeight - popupHeight - 10));
-    setPopupPosition({ x, y });
+    if (event) {
+      const x = Math.max(10, Math.min(event.clientX, window.innerWidth - popupWidth - 10));
+      const y = Math.max(10, Math.min(event.clientY, window.innerHeight - popupHeight - 10));
+      setPopupPosition({ x, y });
+    } else {
+      setPopupPosition({
+        x: Math.max(10, (window.innerWidth - popupWidth) / 2),
+        y: Math.max(10, (window.innerHeight - popupHeight) / 2),
+      });
+    }
 
     try {
-      // 상세 내역을 열 때 원격 D1의 잔여일수 및 발생량 실시간 동기화 처리
+      // leave_balances 만 재계산 (staff_members 미수정)
       await fetch('/api/admin/annual-leave/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,6 +141,55 @@ export default function LeaveWorkcenter({
       setAccrualLoading(false);
     }
   }, []);
+
+  const handleDoubleClick = useCallback(
+    (row: LeaveStaffRow, event: React.MouseEvent<HTMLTableRowElement>) => {
+      void openStaffDetail(row, event);
+    },
+    [openStaffDetail],
+  );
+
+  const loadDiagnose = useCallback(async () => {
+    setDiagnoseLoading(true);
+    try {
+      const res = await fetch('/api/admin/annual-leave/diagnose');
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || '진단 실패');
+      setDiagnose(json);
+    } catch (e) {
+      console.error(e);
+      toast('연차 진단 로드 실패', 'error');
+      setDiagnose(null);
+    } finally {
+      setDiagnoseLoading(false);
+    }
+  }, []);
+
+  const rebalanceAll = useCallback(async () => {
+    setRebalancing(true);
+    try {
+      const res = await fetch('/api/admin/annual-leave/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allActive: true }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || '재계산 실패');
+      toast(
+        `잔액 재계산 완료 ${json.processed}명` +
+          (json.failed ? ` · 실패 ${json.failed}` : '') +
+          ' (직원 명단 미변경)',
+        'success',
+      );
+      setReloadKey((k) => k + 1);
+      await loadDiagnose();
+    } catch (e) {
+      console.error(e);
+      toast('잔액 재계산 실패', 'error');
+    } finally {
+      setRebalancing(false);
+    }
+  }, [loadDiagnose]);
 
   const handleStatusUpdate = async (id: string, status: '승인' | '반려') => {
     setActioningId(id);
@@ -441,6 +502,109 @@ export default function LeaveWorkcenter({
         </div>
       )}
 
+      <div className="rounded-[var(--radius-md)] border border-blue-200 bg-blue-50/80 px-3 py-2 text-[11px] leading-relaxed text-blue-900">
+        <strong>발생 규칙:</strong> 1년 미만 = 월 만근 시 +1일(최대 11일) · 1년 이상 = 입사 응당일마다 15일+가산(최대 25일).
+        화면 잔액은 <strong>발생 원장·당해 사용</strong> 기준으로 재계산하며, 직원 명단 DB는 수정하지 않습니다.
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="연차 휴가 구역">
+        {(
+          [
+            { id: 'balance' as const, label: '잔여 현황' },
+            { id: 'calendar' as const, label: '캘린더' },
+            { id: 'expiry' as const, label: '소멸·촉진' },
+            { id: 'diagnose' as const, label: '정합 진단' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={mainTab === t.id}
+            onClick={() => {
+              setMainTab(t.id);
+              if (t.id === 'diagnose') void loadDiagnose();
+            }}
+            className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${
+              mainTab === t.id
+                ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
+                : 'border-[var(--border)] text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === 'diagnose' && (
+        <WorkcenterSection
+          title="연차 정합 진단 (읽기 전용 + 잔액만 재계산)"
+          rightSlot={
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void loadDiagnose()}
+                disabled={diagnoseLoading}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[11px] font-bold"
+              >
+                {diagnoseLoading ? '조회 중…' : '다시 조회'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void rebalanceAll()}
+                disabled={rebalancing}
+                className="rounded-[var(--radius-md)] bg-[var(--accent)] px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-50"
+              >
+                {rebalancing ? '재계산 중…' : '잔액 일괄 재계산'}
+              </button>
+            </div>
+          }
+        >
+          {!diagnose ? (
+            <p className="py-6 text-center text-[12px] text-[var(--toss-gray-4)]">
+              {diagnoseLoading ? '진단 중…' : '조회를 눌러 주세요.'}
+            </p>
+          ) : (
+            <div className="space-y-3 text-[12px]">
+              <div className="flex flex-wrap gap-3">
+                {Object.entries((diagnose.summary as Record<string, number>) || {}).map(([k, v]) => (
+                  <span key={k} className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[11px] font-bold">
+                    {k}: {String(v)}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-[var(--toss-gray-4)]">{String(diagnose.note || '')}</p>
+              <DiagnoseTable
+                title="사용 > 부여 (used&gt;total)"
+                rows={(diagnose.overuse as Array<Record<string, unknown>>) || []}
+                cols={['name', 'department', 'company', 'total_days', 'used_days', 'excess']}
+              />
+              <DiagnoseTable
+                title="total ↔ 발생원장 괴리 (상위)"
+                rows={(diagnose.totalAccrualGaps as Array<Record<string, unknown>>) || []}
+                cols={['name', 'department', 'staffTotal', 'accrualSum', 'grantedForBalance', 'gap']}
+              />
+              <DiagnoseTable
+                title="발생 원장 없음"
+                rows={(diagnose.noAccrual as Array<Record<string, unknown>>) || []}
+                cols={['name', 'department', 'company']}
+              />
+            </div>
+          )}
+        </WorkcenterSection>
+      )}
+
+      {mainTab === 'calendar' && (
+        <WorkcenterSection title="휴가 캘린더">
+          <LeaveCalendar entries={calendarEntries} />
+        </WorkcenterSection>
+      )}
+
+      {mainTab === 'expiry' && (
+        <LeaveExpiryBoard items={data.expiryItems} onSuggestUse={handleSuggestUse} />
+      )}
+
+      {mainTab === 'balance' && (
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-3">
           <WorkcenterSection
@@ -479,6 +643,7 @@ export default function LeaveWorkcenter({
               loading={loading}
               onPick={handlePick}
               onDoubleClick={handleDoubleClick}
+              onOpenDetail={(row) => void openStaffDetail(row)}
             />
           </WorkcenterSection>
 
@@ -582,18 +747,7 @@ export default function LeaveWorkcenter({
           onSubmitted={handleSubmitted}
         />
       </div>
-
-      <LeaveCalendar entries={calendarEntries} />
-
-      <WorkcenterSection
-        title={`소멸 예정 알림 · ${data.expiryItems.length}명`}
-      >
-        <LeaveExpiryBoard
-          items={data.expiryItems}
-          loading={loading}
-          onSuggestUse={handleSuggestUse}
-        />
-      </WorkcenterSection>
+      )}
 
       {suggest.open && suggest.item && (
         <div
@@ -999,6 +1153,54 @@ export default function LeaveWorkcenter({
         </>
       )}
     </WorkcenterShell>
+    </div>
+  );
+}
+
+function DiagnoseTable({
+  title,
+  rows,
+  cols,
+}: {
+  title: string;
+  rows: Array<Record<string, unknown>>;
+  cols: string[];
+}) {
+  if (!rows.length) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+        <p className="text-[12px] font-bold text-[var(--foreground)]">{title}</p>
+        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">해당 없음</p>
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
+      <div className="border-b border-[var(--border)] bg-[var(--muted)]/40 px-3 py-2 text-[12px] font-bold">
+        {title} ({rows.length})
+      </div>
+      <table className="w-full text-left text-[11px]">
+        <thead>
+          <tr className="border-b border-[var(--border)] text-[var(--toss-gray-4)]">
+            {cols.map((c) => (
+              <th key={c} className="px-2 py-1.5 font-bold">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-[var(--border)] last:border-0">
+              {cols.map((c) => (
+                <td key={c} className="px-2 py-1.5 font-medium text-[var(--foreground)]">
+                  {String(r[c] ?? '-')}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
