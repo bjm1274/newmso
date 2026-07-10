@@ -4,6 +4,7 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -808,6 +809,20 @@ export async function dispatchChatPushForMessage(params: {
                       metadata: JSON.stringify(row.metadata) } })
               ),
             );
+            // D1 직접 insert 는 /api/d1/mutate 를 거치지 않으므로 DO 시그널을 따로 쏜다.
+            // 없으면 WS 활성 시 폴링이 꺼진 클라이언트에서 토스트·배지·채팅 리스트가 갱신되지 않는다.
+            const signalChannels = new Set<string>(['notifications', 'messages', 'chat_rooms']);
+            notificationRows.forEach((row) => {
+              const uid = String(row.user_id || '').trim();
+              if (uid) signalChannels.add(`notifications:user_id=eq.${uid}`);
+            });
+            if (params.roomId) {
+              signalChannels.add(`messages:room_id=eq.${params.roomId}`);
+            }
+            void emitRealtimeSignal({
+              channels: Array.from(signalChannels),
+              source: 'chat-push-dispatch-notification-insert',
+            }).catch(() => {});
           } catch (err) {
             console.error('chat notification D1 insert failed', err);
           }

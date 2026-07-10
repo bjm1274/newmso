@@ -7,6 +7,7 @@ import {
   or } from './db';
 import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
 import { sql, eq } from 'drizzle-orm';
+import { emitRealtimeSignal } from './realtime/server-signal';
 
 const recentAdminAlertDispatches = new Map<string, number>();
 
@@ -396,6 +397,16 @@ export async function insertNotificationsOrThrow(
   // RETURNING 으로 insert 결과를 그대로 반환 (기존 .select() 와 호환)
   try {
     const inserted = await db.insert(notificationsTable).values(values).returning();
+    // D1 직접 insert 는 mutate route 시그널을 타지 않음 → 클라이언트 알림/배지 실시간 갱신용
+    const channels = new Set<string>(['notifications']);
+    rows.forEach((row) => {
+      const uid = String(row.user_id || '').trim();
+      if (uid) channels.add(`notifications:user_id=eq.${uid}`);
+    });
+    void emitRealtimeSignal({
+      channels: Array.from(channels),
+      source: 'insertNotificationsOrThrow',
+    }).catch(() => {});
     return inserted;
   } catch (err) {
     console.error('insertNotificationsOrThrow: D1 insert failed', err);

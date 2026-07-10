@@ -10,8 +10,15 @@ type BindPageRefreshOptions = {
   onVisibilityChange?: boolean;
 };
 
+function isElectronShell() {
+  if (typeof navigator === 'undefined') return false;
+  return /Electron/i.test(navigator.userAgent || '');
+}
+
 function shouldSkipRefresh(skipWhenHidden = true) {
   if (!skipWhenHidden) return false;
+  // Electron 트레이 숨김 상태에서도 fallback 폴링·배지 동기화 유지
+  if (isElectronShell()) return false;
   if (typeof document === 'undefined') return false;
   return document.visibilityState === 'hidden';
 }

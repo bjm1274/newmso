@@ -364,7 +364,11 @@ export function useChatRealtimeSubscriptions({
     syncChannelRef.current = channel;
     channel.onmessage = (event) => {
       const payload = event.data;
-      if (!payload?.roomId) return;
+      if (!payload?.roomId && payload?.action !== 'rooms-refresh') return;
+      if (payload.action === 'rooms-refresh') {
+        void fetchDataLatestRef.current?.({ force: true });
+        return;
+      }
       const roomId = String(payload.roomId);
       const isSelectedConversation = isRoomInSelectedConversation(roomId, chatRoomsRef.current);
       if (payload.action === 'message-read' && isSelectedConversation) {
@@ -399,6 +403,13 @@ export function useChatRealtimeSubscriptions({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const handleRoomsRefresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ action?: string }>).detail;
+      if (detail?.action !== 'rooms-refresh') return;
+      void fetchDataLatestRef.current?.({ force: true });
+    };
+    window.addEventListener('erp-chat-sync', handleRoomsRefresh as EventListener);
+
     const handleChatNotification = (event: Event) => {
       const detail = (event as CustomEvent<{
         room_id?: string;
@@ -456,6 +467,7 @@ export function useChatRealtimeSubscriptions({
     window.addEventListener('erp-chat-notification', handleChatNotification as EventListener);
     return () => {
       window.removeEventListener('erp-chat-notification', handleChatNotification as EventListener);
+      window.removeEventListener('erp-chat-sync', handleRoomsRefresh as EventListener);
     };
   }, [chatRoomsRef, setChatRooms, sortChatRoomsWithNoticeFirst]);
 

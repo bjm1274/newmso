@@ -724,7 +724,40 @@ export function sendNotification(title: string, options?: NotificationOptions) {
   }
 
   try {
-    new Notification(title, options);
+    const notification = new Notification(title, {
+      icon: '/icon-192x192.png',
+      badge: '/badge-72x72.png',
+      ...options });
+    // Electron/PC: 알림 클릭 시 창 포커스 + 채팅방 이동 신호
+    notification.onclick = () => {
+      try {
+        window.focus();
+        const data = (options?.data || {}) as Record<string, unknown>;
+        const roomId = String(data.room_id || '').trim();
+        const messageId = String(data.message_id || data.id || '').trim();
+        if (roomId) {
+          window.dispatchEvent(
+            new CustomEvent('erp-chat-notification', {
+              detail: {
+                title,
+                body: String(options?.body || ''),
+                type: 'message',
+                room_id: roomId,
+                message_id: messageId || undefined,
+                data,
+                open_on_click: true },
+            }),
+          );
+        }
+      } catch {
+        // ignore
+      }
+      try {
+        notification.close();
+      } catch {
+        // ignore
+      }
+    };
     recordPushDebug({
       source: 'app',
       stage: 'show-success',
@@ -1753,12 +1786,17 @@ export default function NotificationSystem({
 
   // 백그라운드 복귀 시 놓친 알림 재조회 + 다른 컴포넌트(GlobalBell·인박스) refresh 트리거
   useEffect(() => {
+    const isElectronApp =
+      typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent || '');
     const onVis = () => {
       if (document.visibilityState === 'hidden') { lastHiddenRef.current = Date.now(); return; }
       if (!effectiveUserId || Date.now() - lastHiddenRef.current < 2000) return;
-      const since = new Date(Date.now() - 90 * 1000).toISOString();
+      // Electron: 트레이에서 오래 있다가 열어도 최근 미읽음은 채팅 리스트/토스트에 반영
+      const lookbackMs = isElectronApp ? 15 * 60 * 1000 : 90 * 1000;
+      const toastWindowMs = isElectronApp ? 60 * 1000 : 10_000;
+      const since = new Date(Date.now() - lookbackMs).toISOString();
       const resumeNow = Date.now();
-      fetch('/api/notifications?limit=20')
+      fetch('/api/notifications?limit=40')
         .then(res => {
           if (!res.ok) throw new Error();
           return res.json();
@@ -1766,18 +1804,29 @@ export default function NotificationSystem({
         .then(
           (json) => {
             const rows = json.data || [];
+            let hasStaleChatUnread = false;
             rows.forEach((row: Record<string, unknown>) => {
               if (String(row.created_at || '') >= since && !row.read_at) {
                 const createdAt = new Date(String(row.created_at || '')).getTime();
-                if (resumeNow - createdAt < 10_000) {
+                if (resumeNow - createdAt < toastWindowMs) {
                   emitIncomingNotification(row);
+                } else if (row.type === 'message' || row.type === 'mention') {
+                  // 오래된 건은 건별 +1 하면 배지가 부풀려지므로 토스트 없이 리스트 재동기화만
+                  hasStaleChatUnread = true;
                 }
               }
             });
             void syncBadge();
-            // 다른 알림 컴포넌트도 즉시 갱신되도록 broadcast 트리거
+            // 다른 알림 컴포넌트·메신저 방목록도 즉시 갱신
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('erp-notification-refresh-request'));
+              if (hasStaleChatUnread) {
+                window.dispatchEvent(
+                  new CustomEvent('erp-chat-sync', {
+                    detail: { action: 'rooms-refresh', roomId: '__all__' },
+                  }),
+                );
+              }
             }
           },
           () => { /* 복귀 재조회 실패는 다음 visibility/polling에서 보강 */ }

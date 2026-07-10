@@ -51,7 +51,13 @@ let activityListenersInstalled = false;
 let isIdle = false;
 let lastActivityTime = typeof Date !== 'undefined' ? Date.now() : 0;
 let idleCheckTimer: ReturnType<typeof setInterval> | null = null;
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5분 (브라우저 탭 전용)
+
+/** Electron PC 클라이언트 — 트레이로 숨겨도 프로세스/창이 살아 있음 */
+function isElectronShell(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Electron/i.test(navigator.userAgent || '');
+}
 
 // WS 상태 관리
 let ws: WebSocket | null = null;
@@ -163,7 +169,14 @@ function isHidden(): boolean {
   return document.visibilityState === 'hidden';
 }
 
+/**
+ * 실시간 연결 일시 중단 여부.
+ * - 일반 브라우저: 탭 hidden / 5분 idle 시 중단 (D1·Workers 비용 절감)
+ * - Electron(AllERP PC): X로 닫아 트레이에만 있어도 알림·채팅 배지가 와야 하므로
+ *   hidden/idle 로 끊지 않는다. (main.js 가 close → hide 트레이 유지)
+ */
 function isSuspended(): boolean {
+  if (isElectronShell()) return false;
   return isHidden() || isIdle;
 }
 
@@ -701,10 +714,17 @@ function getInterval(options?: RealtimeOptions): number {
   
   if (isLocal || isPlaywright) {
     return options?.pollIntervalMs ?? 1000;
-  } else {
-    const minInterval = 30000;
-    return Math.max(options?.pollIntervalMs ?? 15000, minInterval);
   }
+
+  // Electron PC 클라이언트: WS 끊김 시 폴링 폴백을 빠르게 (채팅 배지/알림)
+  if (isElectronShell()) {
+    const requested = options?.pollIntervalMs ?? 5000;
+    return Math.max(requested, 3000);
+  }
+
+  // 일반 브라우저: D1 비용 보호용 하한 30초 (WS 활성 시 폴링 자체는 꺼짐)
+  const minInterval = 30000;
+  return Math.max(options?.pollIntervalMs ?? 15000, minInterval);
 }
 
 export function subscribeRealtime(
