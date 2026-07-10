@@ -1,9 +1,21 @@
-const { app, BrowserWindow, Tray, Menu, shell, powerSaveBlocker } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  shell,
+  powerSaveBlocker,
+  ipcMain,
+  Notification,
+} = require('electron');
 const path = require('path');
 
 let mainWindow;
 let tray;
 let powerSaveBlockerId = null;
+
+/** @type {Map<string, import('electron').Notification>} */
+const activeNotificationsByTag = new Map();
 
 function showMainWindow() {
   if (!mainWindow) return;
@@ -12,17 +24,22 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+function getAppIconPath() {
+  return path.join(__dirname, 'icon-new.png');
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    icon: path.join(__dirname, 'icon-new.png'),
+    icon: getAppIconPath(),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       // 트레이 숨김 상태에서도 채팅 폴링·WebSocket·알림 타이머가 멈추지 않도록
-      backgroundThrottling: false
-    }
+      backgroundThrottling: false,
+    },
   });
 
   // 메뉴바 숨김 (필요 시 Alt 눌러서 표시 가능하게 설정, 혹은 완전히 null)
@@ -65,13 +82,80 @@ function createWindow() {
   });
 }
 
+function registerDesktopNotificationIpc() {
+  ipcMain.handle('allerp:show-notification', (_event, payload = {}) => {
+    try {
+      if (!Notification.isSupported()) {
+        return { ok: false, reason: 'unsupported' };
+      }
+
+      const title = String(payload.title || 'AllERP').trim() || 'AllERP';
+      const body = String(payload.body || '').trim();
+      const tag = String(payload.tag || '').trim();
+      const data =
+        payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+          ? payload.data
+          : {};
+
+      // 같은 tag 알림은 교체 (카카오톡/웹 푸시 tag 동작과 유사)
+      if (tag && activeNotificationsByTag.has(tag)) {
+        try {
+          activeNotificationsByTag.get(tag)?.close();
+        } catch {
+          // ignore
+        }
+        activeNotificationsByTag.delete(tag);
+      }
+
+      const notification = new Notification({
+        title,
+        body,
+        icon: getAppIconPath(),
+        silent: false,
+        timeoutType: 'default',
+      });
+
+      notification.on('click', () => {
+        showMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('allerp:notification-click', {
+            title,
+            body,
+            tag,
+            data,
+          });
+        }
+      });
+
+      notification.on('close', () => {
+        if (tag && activeNotificationsByTag.get(tag) === notification) {
+          activeNotificationsByTag.delete(tag);
+        }
+      });
+
+      if (tag) {
+        activeNotificationsByTag.set(tag, notification);
+      }
+
+      notification.show();
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'error',
+        error: String(err && err.message ? err.message : err || ''),
+      };
+    }
+  });
+}
+
 // Single Instance Lock (중복 실행 방지)
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
-    // 사용자가 두 번째 인스턴스를 실행하려고 하면 
+  app.on('second-instance', () => {
+    // 사용자가 두 번째 인스턴스를 실행하려고 하면
     // 기존 창을 포커스(숨겨져있다면 다시 표시)
     if (mainWindow) {
       if (!mainWindow.isVisible()) mainWindow.show();
@@ -81,7 +165,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // 윈도우 알림 등록 (앱 ID 지정 - 알림 클릭 시 동작을 위해 필요)
+    // 윈도우 알림 등록 (앱 ID 지정 - 알림이 "AllERP"로 표시되고 클릭 동작이 올바르게 연결됨)
     if (process.platform === 'win32') {
       app.setAppUserModelId('com.pchos.allerp');
     }
@@ -95,10 +179,12 @@ if (!gotTheLock) {
       // ignore
     }
 
+    registerDesktopNotificationIpc();
+
     // 권한 요청 핸들러 설정 (마이크, 알림, 클립보드 등)
     const { session } = require('electron');
     const fs = require('fs');
-    const logPath = 'd:\\newmso\\electron-app\\permission-log.txt';
+    const logPath = path.join(__dirname, 'permission-log.txt');
 
     function writeLog(msg) {
       try {
@@ -110,7 +196,7 @@ if (!gotTheLock) {
     }
 
     writeLog('Electron whenReady triggered');
-    
+
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       try {
         const url = webContents.getURL();
@@ -121,7 +207,11 @@ if (!gotTheLock) {
         }
         const origin = new URL(url).origin;
         writeLog(`Origin: "${origin}"`);
-        if (origin.includes('pchos.kr') || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        if (
+          origin.includes('pchos.kr') ||
+          origin.startsWith('http://localhost:') ||
+          origin.startsWith('http://127.0.0.1:')
+        ) {
           const matched = [
             'media',
             'audioCapture',
@@ -130,9 +220,9 @@ if (!gotTheLock) {
             'camera',
             'notifications',
             'clipboard-read',
-            'clipboard-sanitized-write'
+            'clipboard-sanitized-write',
           ].includes(permission);
-          
+
           if (matched) {
             writeLog(`Granted permission: "${permission}"`);
             return callback(true);
@@ -149,44 +239,57 @@ if (!gotTheLock) {
       callback(false);
     });
 
-    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-      try {
-        writeLog(`Checking permission: "${permission}" for Origin: "${requestingOrigin}", details: ${JSON.stringify(details || {})}`);
-        if (!requestingOrigin) {
-          writeLog('Denied check: empty requestingOrigin');
-          return false;
-        }
-        const origin = new URL(requestingOrigin).origin;
-        if (origin.includes('pchos.kr') || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-          const matched = [
-            'media',
-            'audioCapture',
-            'videoCapture',
-            'microphone',
-            'camera',
-            'notifications',
-            'clipboard-read',
-            'clipboard-sanitized-write'
-          ].includes(permission);
-
-          if (matched) {
-            writeLog(`Granted check: "${permission}"`);
-            return true;
+    session.defaultSession.setPermissionCheckHandler(
+      (webContents, permission, requestingOrigin, details) => {
+        try {
+          writeLog(
+            `Checking permission: "${permission}" for Origin: "${requestingOrigin}", details: ${JSON.stringify(details || {})}`
+          );
+          if (!requestingOrigin) {
+            writeLog('Denied check: empty requestingOrigin');
+            return false;
           }
+          const origin = new URL(requestingOrigin).origin;
+          if (
+            origin.includes('pchos.kr') ||
+            origin.startsWith('http://localhost:') ||
+            origin.startsWith('http://127.0.0.1:')
+          ) {
+            const matched = [
+              'media',
+              'audioCapture',
+              'videoCapture',
+              'microphone',
+              'camera',
+              'notifications',
+              'clipboard-read',
+              'clipboard-sanitized-write',
+            ].includes(permission);
+
+            if (matched) {
+              writeLog(`Granted check: "${permission}"`);
+              return true;
+            }
+          }
+        } catch (err) {
+          writeLog(`Permission check error: ${err.message}`);
+          console.error('Permission check error:', err);
         }
-      } catch (err) {
-        writeLog(`Permission check error: ${err.message}`);
-        console.error('Permission check error:', err);
+        return false;
       }
-      return false;
-    });
+    );
 
     createWindow();
 
     // 트레이 아이콘 설정
-    tray = new Tray(path.join(__dirname, 'icon-new.png'));
+    tray = new Tray(getAppIconPath());
     const contextMenu = Menu.buildFromTemplate([
-      { label: 'AllERP 열기', click: () => { showMainWindow(); } },
+      {
+        label: 'AllERP 열기',
+        click: () => {
+          showMainWindow();
+        },
+      },
       { type: 'separator' },
       {
         label: '종료',
@@ -204,10 +307,10 @@ if (!gotTheLock) {
         },
       },
     ]);
-    
+
     tray.setToolTip('AllERP (백그라운드 알림 수신 중)');
     tray.setContextMenu(contextMenu);
-    
+
     // 트레이 아이콘 클릭 시 메인 창 표시
     tray.on('click', () => {
       showMainWindow();
@@ -215,7 +318,7 @@ if (!gotTheLock) {
     tray.on('double-click', () => {
       showMainWindow();
     });
-    
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
       else showMainWindow();

@@ -20,11 +20,18 @@ function isPushDeepLinkMessage(value: unknown): value is PushDeepLinkMessage {
 export default function PwaBootstrap() {
   const router = useRouter();
 
-  // 서비스워커 등록
+  // 서비스워커 등록 (Chrome/브라우저 PWA 전용 — Electron 설치형은 네이티브 알림 사용)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!window.isSecureContext) return;
     if (!('serviceWorker' in navigator)) return;
+    // Electron: 웹푸시/SW 알림 경로를 타면 "Google Chrome" 스타일 토스트가 섞일 수 있음
+    if (
+      /Electron/i.test(navigator.userAgent || '') ||
+      Boolean((window as Window & { allerpDesktop?: { isElectron?: boolean } }).allerpDesktop?.isElectron)
+    ) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -76,6 +83,12 @@ export default function PwaBootstrap() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
+    if (
+      /Electron/i.test(navigator.userAgent || '') ||
+      Boolean((window as Window & { allerpDesktop?: { isElectron?: boolean } }).allerpDesktop?.isElectron)
+    ) {
+      return;
+    }
 
     const handler = (event: MessageEvent) => {
       if (!isPushDeepLinkMessage(event.data)) return;

@@ -158,12 +158,29 @@ export async function getPushConnectionStatus(staffId?: string): Promise<PushCon
 
   const hasNotificationApi = typeof Notification !== 'undefined';
   const hasServiceWorkerApi = 'serviceWorker' in navigator;
-  const supported = hasNotificationApi && hasServiceWorkerApi;
   const secureContext = Boolean(window.isSecureContext);
   const platform = getPushClientPlatform();
   const appleMobile = isAppleMobileDevice();
   const permission: NotificationPermission | 'unsupported' =
     hasNotificationApi ? Notification.permission : 'unsupported';
+
+  // Electron 설치형: 웹푸시 구독 없이 네이티브 알림이 "연결됨" 상태
+  if (isElectronDesktopApp()) {
+    const hasBridge = Boolean(getAllerpDesktopBridge());
+    const permissionOk = permission === 'granted' || hasBridge;
+    return {
+      supported: hasNotificationApi || hasBridge,
+      secureContext,
+      permission,
+      active: permissionOk,
+      hasSubscription: false,
+      requiresGesture: hasNotificationApi && permission === 'default',
+      standalone: true,
+      platform: 'electron',
+      appleMobile: false };
+  }
+
+  const supported = hasNotificationApi && hasServiceWorkerApi;
 
   let hasSubscription = false;
   if (hasServiceWorkerApi && typeof navigator.serviceWorker.getRegistration === 'function') {
@@ -247,11 +264,116 @@ function canRequestPushPermissionFromGesture() {
 
 function getPushClientPlatform() {
   if (typeof navigator === 'undefined') return 'unknown';
+  if (isElectronDesktopApp()) return 'electron';
   if (isAppleMobileDevice()) {
     return isStandaloneWebApp() ? 'ios-webapp' : 'ios-browser';
   }
   if (/android/i.test(navigator.userAgent || '')) return 'android';
   return 'web';
+}
+
+/** Electron 설치형 클라이언트 여부 (Chrome 브라우저와 분리) */
+function isElectronDesktopApp() {
+  if (typeof window !== 'undefined') {
+    const bridge = (window as Window & { allerpDesktop?: { isElectron?: boolean } }).allerpDesktop;
+    if (bridge?.isElectron) return true;
+  }
+  if (typeof navigator === 'undefined') return false;
+  return /Electron/i.test(navigator.userAgent || '');
+}
+
+type AllerpDesktopNotificationPayload = {
+  title: string;
+  body?: string;
+  tag?: string;
+  data?: Record<string, unknown>;
+};
+
+type AllerpDesktopBridge = {
+  isElectron: boolean;
+  showNotification: (
+    payload: AllerpDesktopNotificationPayload
+  ) => Promise<{ ok?: boolean; reason?: string; error?: string } | void>;
+  onNotificationClick?: (
+    callback: (payload: {
+      title?: string;
+      body?: string;
+      tag?: string;
+      data?: Record<string, unknown>;
+    }) => void
+  ) => () => void;
+};
+
+function getAllerpDesktopBridge(): AllerpDesktopBridge | null {
+  if (typeof window === 'undefined') return null;
+  const bridge = (window as Window & { allerpDesktop?: AllerpDesktopBridge }).allerpDesktop;
+  if (!bridge || !bridge.isElectron || typeof bridge.showNotification !== 'function') return null;
+  return bridge;
+}
+
+/**
+ * Electron 설치형: 웹푸시(Chrome 스타일) 구독을 만들지 않는다.
+ * - 알림은 메인 프로세스 네이티브 Notification → 앱 이름 "AllERP" 로 표시
+ * - 기존 Electron 프로필에 남아 있는 웹푸시 구독은 해제·서버 삭제
+ */
+async function initElectronNativeNotificationMode(staffId?: string, requestPermission = false) {
+  recordPushDebug({
+    source: 'app',
+    stage: 'electron-native-mode',
+    message: 'Electron 설치형: 웹푸시 대신 AllERP 네이티브 알림 모드를 사용합니다.',
+    detail: {
+      permission:
+        typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+      requestPermission,
+      hasBridge: Boolean(getAllerpDesktopBridge()) } });
+
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    if (requestPermission || !requiresUserGestureForPushPermission()) {
+      try {
+        const permission = await Notification.requestPermission();
+        recordPushDebug({
+          source: 'app',
+          stage: 'permission-result',
+          message: `Electron 알림 권한 결과: ${permission}`,
+          detail: { permission } });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Electron Chromium 프로필에 웹푸시 구독이 남아 있으면 Chrome 스타일 토스트가 섞일 수 있음 → 정리
+  try {
+    if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistration === 'function') {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const sub = registration?.pushManager
+        ? await registration.pushManager.getSubscription()
+        : null;
+      if (sub) {
+        const endpoint = sub.endpoint;
+        try {
+          await sub.unsubscribe();
+        } catch {
+          // ignore
+        }
+        try {
+          await deletePushSubscriptionOnServer(endpoint);
+        } catch {
+          // ignore
+        }
+        recordPushDebug({
+          source: 'app',
+          stage: 'electron-push-unsubscribed',
+          message: 'Electron에서 웹푸시 구독을 해제했습니다 (AllERP 네이티브 알림만 사용).',
+          detail: { endpoint } });
+      }
+    }
+  } catch {
+    // ignore cleanup failures
+  }
+
+  // 웹푸시 active 플래그는 끔 — 서버 웹푸시는 Chrome/모바일 구독만 대상
+  setPushSubscriptionActiveState(staffId, false);
 }
 
 async function cleanupLegacyMessagingServiceWorkers() {
@@ -462,8 +584,17 @@ export async function initNotificationService(options?: InitNotificationServiceO
 
   const runInit = async () => {
   if (typeof window === 'undefined') return;
-  if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+  if (!('Notification' in window)) return;
   if (!window.isSecureContext) return;
+
+  // Chrome/브라우저: 웹푸시 → "Google Chrome" 스타일
+  // Electron 설치형: 웹푸시 스킵 → 메인 프로세스 "AllERP" 네이티브 알림
+  if (isElectronDesktopApp()) {
+    await initElectronNativeNotificationMode(staffId, requestPermission);
+    return;
+  }
+
+  if (!('serviceWorker' in navigator)) return;
   recordPushDebug({
     source: 'app',
     stage: 'init-start',
@@ -678,8 +809,87 @@ export async function initNotificationService(options?: InitNotificationServiceO
   await initPromise;
 }
 
+function dispatchDesktopNotificationClick(
+  title: string,
+  body: string,
+  data: Record<string, unknown>
+) {
+  try {
+    window.focus();
+  } catch {
+    // ignore
+  }
+  const roomId = String(data.room_id || '').trim();
+  const messageId = String(data.message_id || data.id || '').trim();
+  if (!roomId) return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent('erp-chat-notification', {
+        detail: {
+          title,
+          body,
+          type: String(data.type || 'message'),
+          room_id: roomId,
+          message_id: messageId || undefined,
+          data,
+          open_on_click: true },
+      })
+    );
+  } catch {
+    // ignore
+  }
+}
+
 export function sendNotification(title: string, options?: NotificationOptions) {
   if (typeof window === 'undefined') return;
+
+  const tag = String(options?.tag || 'erp-noti');
+  const body = String(options?.body || '');
+  const data =
+    options?.data && typeof options.data === 'object' && !Array.isArray(options.data)
+      ? (options.data as Record<string, unknown>)
+      : {};
+
+  // Electron 설치형: 메인 프로세스 네이티브 알림 → Windows 토스트 앱 이름 "AllERP"
+  const desktopBridge = getAllerpDesktopBridge();
+  if (desktopBridge) {
+    void desktopBridge
+      .showNotification({ title, body, tag, data })
+      .then((result) => {
+        if (result && result.ok === false) {
+          recordPushDebug({
+            source: 'app',
+            stage: 'show-error',
+            message: 'Electron 네이티브 알림 표시에 실패했습니다.',
+            detail: {
+              title,
+              tag,
+              reason: result.reason || null,
+              error: result.error || null } });
+          // 브리지 실패 시 HTML5 Notification 폴백
+          showHtmlNotificationFallback(title, options);
+          return;
+        }
+        recordPushDebug({
+          source: 'app',
+          stage: 'show-success',
+          message: 'Electron AllERP 네이티브 알림 표시를 요청했습니다.',
+          detail: { title, tag } });
+      })
+      .catch((error) => {
+        recordPushDebug({
+          source: 'app',
+          stage: 'show-error',
+          message: 'Electron 네이티브 알림 IPC 호출이 실패했습니다.',
+          detail: {
+            title,
+            error: String((error as { message?: string } | null)?.message || error || '') } });
+        showHtmlNotificationFallback(title, options);
+      });
+    return;
+  }
+
+  if (typeof Notification === 'undefined') return;
   if (Notification.permission !== 'granted') {
     recordPushDebug({
       source: 'app',
@@ -691,9 +901,8 @@ export function sendNotification(title: string, options?: NotificationOptions) {
     return;
   }
 
-  const isElectronApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
-
-  if ('serviceWorker' in navigator && !isElectronApp) {
+  // Chrome/브라우저: 서비스워커 showNotification → "Google Chrome" 스타일
+  if ('serviceWorker' in navigator && !isElectronDesktopApp()) {
     navigator.serviceWorker.ready
       .then((reg) =>
         reg.showNotification(title, {
@@ -723,6 +932,22 @@ export function sendNotification(title: string, options?: NotificationOptions) {
     return;
   }
 
+  showHtmlNotificationFallback(title, options);
+}
+
+function showHtmlNotificationFallback(title: string, options?: NotificationOptions) {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'granted') {
+    recordPushDebug({
+      source: 'app',
+      stage: 'show-skipped',
+      message: '알림 권한이 없어 시스템 팝업을 띄우지 못했습니다.',
+      detail: {
+        permission: Notification.permission,
+        title } });
+    return;
+  }
+
   try {
     const notification = new Notification(title, {
       icon: '/icon-192x192.png',
@@ -730,28 +955,11 @@ export function sendNotification(title: string, options?: NotificationOptions) {
       ...options });
     // Electron/PC: 알림 클릭 시 창 포커스 + 채팅방 이동 신호
     notification.onclick = () => {
-      try {
-        window.focus();
-        const data = (options?.data || {}) as Record<string, unknown>;
-        const roomId = String(data.room_id || '').trim();
-        const messageId = String(data.message_id || data.id || '').trim();
-        if (roomId) {
-          window.dispatchEvent(
-            new CustomEvent('erp-chat-notification', {
-              detail: {
-                title,
-                body: String(options?.body || ''),
-                type: 'message',
-                room_id: roomId,
-                message_id: messageId || undefined,
-                data,
-                open_on_click: true },
-            }),
-          );
-        }
-      } catch {
-        // ignore
-      }
+      const data =
+        options?.data && typeof options.data === 'object' && !Array.isArray(options.data)
+          ? (options.data as Record<string, unknown>)
+          : {};
+      dispatchDesktopNotificationClick(title, String(options?.body || ''), data);
       try {
         notification.close();
       } catch {
@@ -1846,6 +2054,24 @@ export default function NotificationSystem({
       window.removeEventListener('erp-notification-read', handleNotificationRead);
     };
   }, [syncBadge]);
+
+  // Electron 네이티브 알림 클릭 → 창 포커스 + 채팅 deep link
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const bridge = getAllerpDesktopBridge();
+    if (!bridge?.onNotificationClick) return;
+    return bridge.onNotificationClick((payload) => {
+      const data =
+        payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+          ? payload.data
+          : {};
+      dispatchDesktopNotificationClick(
+        String(payload?.title || ''),
+        String(payload?.body || ''),
+        data
+      );
+    });
+  }, []);
 
   // 탭/앱 복귀 시 뱃지 재동기화 — 다른 기기나 탭에서 읽은 경우 반영
   useEffect(() => {
