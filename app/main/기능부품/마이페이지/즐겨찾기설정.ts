@@ -30,7 +30,7 @@ export type MypageTabId =
   | 'records' | 'records_certificates' | 'records_salary'
   | 'documents' | 'notifications';
 
-export type MainMenuId = '내정보' | '조직도' | '추가기능' | '채팅' | '게시판' | '전자결재' | '인사관리' | '재고관리' | '관리자' | '재무회계';
+export type MainMenuId = '내정보' | '조직도' | '추가기능' | '채팅' | '게시판' | '공유캘린더' | '전자결재' | '인사관리' | '재고관리' | '관리자' | '재무회계';
 
 export type FavoriteEntry =
   | { id: string; kind: 'mypage'; tab: MypageTabId; label: string; icon: string }
@@ -57,6 +57,7 @@ export const MAIN_MENU_PRESETS: { mainMenu: MainMenuId; label: string; icon: str
   { mainMenu: '추가기능', label: '추가기능', icon: 'Plus' },
   { mainMenu: '채팅', label: '채팅', icon: 'MessageSquare' },
   { mainMenu: '게시판', label: '게시판', icon: 'ClipboardList' },
+  { mainMenu: '공유캘린더', label: '공유캘린더', icon: 'Calendar' },
   { mainMenu: '전자결재', label: '전자결재', icon: 'FileCheck' },
   { mainMenu: '인사관리', label: '인사관리(전체)', icon: 'Users' },
   { mainMenu: '재고관리', label: '재고관리(전체)', icon: 'Package' },
@@ -161,6 +162,7 @@ const MAIN_MENU_ICON_FALLBACK: Record<MainMenuId, string> = {
   추가기능: 'Plus',
   채팅: 'MessageSquare',
   게시판: 'ClipboardList',
+  공유캘린더: 'Calendar',
   전자결재: 'FileCheck',
   인사관리: 'Users',
   재고관리: 'Package',

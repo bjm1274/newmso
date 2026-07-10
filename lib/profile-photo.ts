@@ -153,6 +153,8 @@ export function normalizeProfileUser<T>(source: T): T {
   // 1. 기본 제공 기능
   if (normalizedPermissions.menu_채팅 === undefined) normalizedPermissions.menu_채팅 = true;
   if (normalizedPermissions.menu_내정보 === undefined) normalizedPermissions.menu_내정보 = true;
+  // 공유캘린더는 사이드바에 이미 노출되던 메뉴 — 권한 키 도입 시 기존 사용자 차단 방지
+  if (normalizedPermissions.menu_공유캘린더 === undefined) normalizedPermissions.menu_공유캘린더 = true;
   if (normalizedPermissions.chat_접근 === undefined) normalizedPermissions.chat_접근 = true;
   if (normalizedPermissions.chat_방생성 === undefined) normalizedPermissions.chat_방생성 = true;
   if (normalizedPermissions.chat_파일첨부 === undefined) normalizedPermissions.chat_파일첨부 = true;

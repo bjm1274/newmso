@@ -15,6 +15,7 @@ export type MainMenuId =
   | '추가기능'
   | '채팅'
   | '게시판'
+  | '공유캘린더'
   | '전자결재'
   | '인사관리'
   | '재고관리'
@@ -42,6 +43,7 @@ const VOLATILE_USER_FIELDS = new Set([
 ]);
 
 const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
+  Gemini비서: 'extra_Gemini비서',
   조직도: 'extra_조직도',
   부서별재고: 'extra_부서별재고',
   근무현황: 'extra_근무현황',
@@ -87,6 +89,7 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   교대근무: 'hr_교대근무',
   근무표생성: 'hr_근무표생성',
   '연차/휴가': 'hr_연차휴가',
+  '연차·휴가': 'hr_연차휴가',
   급여: 'hr_급여',
   건강검진: 'hr_건강검진',
   경조사: 'hr_경조사',
@@ -96,7 +99,15 @@ const HR_PERMISSION_KEYS: Record<string, string> = {
   계약: 'hr_계약',
   문서보관함: 'hr_문서보관함',
   증명서: 'hr_증명서',
-  서류제출: 'hr_서류제출' };
+  서류제출: 'hr_서류제출',
+  // 인사 워크센터 영문 id (인사관리.tsx HR_MENUS)
+  member: 'hr_구성원',
+  attend: 'hr_근태',
+  leave: 'hr_연차휴가',
+  payroll: 'hr_급여',
+  welfare: 'hr_경조사',
+  docs: 'hr_계약',
+  abnormal: 'hr_근태' };
 
 const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   현황: 'inventory_현황',
@@ -160,7 +171,30 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   문서양식: 'admin_문서양식',
   급여이상치: 'admin_급여이상치',
   공문서대장: 'admin_공문서대장',
-  비품대여설정: 'admin_비품대여설정' };
+  비품대여설정: 'admin_비품대여설정',
+  // 관리자 사이드바 영문 워크센터 id (admin-menu-config ADMIN_SIDEBAR_ITEMS)
+  exec: 'admin_경영분석',
+  company: 'admin_회사관리',
+  roles: 'admin_직원권한',
+  ops: 'admin_운영설정',
+  forms: 'admin_문서양식',
+  audit: 'admin_감사센터',
+  // 사이드바 표시 라벨 호환
+  '경영 대시보드': 'admin_경영분석',
+  '회사 관리': 'admin_회사관리',
+  '권한 관리': 'admin_직원권한',
+  '운영 설정': 'admin_운영설정',
+  '결재 양식': 'admin_문서양식',
+  '감사·백업': 'admin_감사센터' };
+
+/** 관리자 영문 워크센터 → 한글 섹션 id (권한 판정/콘텐츠 진입 공통) */
+const ADMIN_WORKCENTER_TO_SECTION: Record<string, string> = {
+  exec: '경영분석',
+  company: '회사관리',
+  roles: '직원권한',
+  ops: '운영설정',
+  forms: '문서양식',
+  audit: '감사센터' };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   // board 권한을 하나라도 가지면 게시판 메뉴 노출 (결정: board read = 메뉴 노출)
@@ -393,21 +427,23 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
       ? resolveExplicitMenuAccess('menu_추가기능')
       : menuId === '게시판'
         ? resolveExplicitMenuAccess('menu_게시판')
-        : menuId === '전자결재'
-          ? resolveExplicitMenuAccess('menu_전자결재')
-          : menuId === '인사관리'
-            ? resolveExplicitMenuAccess('menu_인사관리')
-            : menuId === '재고관리'
-              ? resolveExplicitMenuAccess('menu_재고관리')
-              : menuId === '관리자'
-                ? resolveExplicitMenuAccess('menu_관리자')
-                : menuId === '채팅'
-                  ? resolveExplicitMenuAccess('menu_채팅')
-                  : menuId === '내정보'
-                    ? resolveExplicitMenuAccess('menu_내정보')
-                    : menuId === '재무회계'
-                      ? resolveExplicitMenuAccess('menu_재무회계')
-                      : null;
+        : menuId === '공유캘린더'
+          ? resolveExplicitMenuAccess('menu_공유캘린더')
+          : menuId === '전자결재'
+            ? resolveExplicitMenuAccess('menu_전자결재')
+            : menuId === '인사관리'
+              ? resolveExplicitMenuAccess('menu_인사관리')
+              : menuId === '재고관리'
+                ? resolveExplicitMenuAccess('menu_재고관리')
+                : menuId === '관리자'
+                  ? resolveExplicitMenuAccess('menu_관리자')
+                  : menuId === '채팅'
+                    ? resolveExplicitMenuAccess('menu_채팅')
+                    : menuId === '내정보'
+                      ? resolveExplicitMenuAccess('menu_내정보')
+                      : menuId === '재무회계'
+                        ? resolveExplicitMenuAccess('menu_재무회계')
+                        : null;
   if (explicitMenuAccess !== null) {
     return explicitMenuAccess;
   }
@@ -423,6 +459,8 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
       return isPrivilegedUser(user) || hasPermission(user, 'menu_추가기능');
     case '게시판':
       return isPrivilegedUser(user) || hasPermission(user, 'menu_게시판');
+    case '공유캘린더':
+      return isPrivilegedUser(user) || hasPermission(user, 'menu_공유캘린더');
     case '전자결재':
       return isPrivilegedUser(user) || hasPermission(user, 'menu_전자결재');
     case '인사관리':
@@ -518,6 +556,19 @@ export function canAccessHrSection(
       canAccessHrSection(user, 'hr_서류제출')
     );
   }
+  // 워크센터 합집합 — 세부 키 중 하나라도 있으면 워크센터 진입 허용
+  const HR_WORKCENTER_UNIONS: Record<string, string[]> = {
+    member: ['hr_구성원', 'hr_구성원_열람', 'hr_구성원_관리', 'hr_직원등록', 'hr_인사발령', 'hr_포상징계', 'hr_교육', 'hr_오프보딩'],
+    attend: ['hr_근태', 'hr_근태_열람', 'hr_근태_수정', 'hr_근무표생성', 'hr_교대근무'],
+    leave: ['hr_연차휴가', 'hr_근태', 'hr_근태_열람'],
+    payroll: ['hr_급여', 'hr_급여_승인'],
+    welfare: ['hr_경조사', 'hr_건강검진', 'hr_면허자격증', 'hr_의료기기점검', 'hr_사고보고서'],
+    docs: ['hr_계약', 'hr_문서보관함', 'hr_증명서', 'hr_서류제출'],
+    abnormal: ['hr_근태', 'hr_근태_열람', 'hr_근태_수정'] };
+  const hrGroup = HR_WORKCENTER_UNIONS[sectionIdOrPermissionKey];
+  if (hrGroup) {
+    return hrGroup.some((key) => canAccessDetailedSection(user, '인사관리', key, HR_PERMISSION_KEYS));
+  }
   return canAccessDetailedSection(user, '인사관리', sectionIdOrPermissionKey, HR_PERMISSION_KEYS);
 }
 
@@ -549,7 +600,11 @@ export function canAccessAdminSection(
   user: UserLike | null | undefined,
   sectionIdOrPermissionKey: string
 ): boolean {
-  if (sectionIdOrPermissionKey === '운영설정') {
+  // 사이드바 영문 id → 한글 섹션으로 정규화 (page.tsx 필터 / 콘텐츠 진입 공통)
+  const sectionId =
+    ADMIN_WORKCENTER_TO_SECTION[sectionIdOrPermissionKey] || sectionIdOrPermissionKey;
+
+  if (sectionId === '운영설정' || sectionId === 'ops') {
     return (
       canAccessDetailedSection(user, '관리자', '알림자동화', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '수술검사템플릿', ADMIN_PERMISSION_KEYS) ||
@@ -557,14 +612,16 @@ export function canAccessAdminSection(
     );
   }
 
-  if (sectionIdOrPermissionKey === '감사센터') {
+  if (sectionId === '감사센터' || sectionId === 'audit') {
     return (
       canAccessDetailedSection(user, '관리자', '감사센터', ADMIN_PERMISSION_KEYS) ||
-      canAccessDetailedSection(user, '관리자', '급여이상치', ADMIN_PERMISSION_KEYS)
+      canAccessDetailedSection(user, '관리자', '급여이상치', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '데이터백업', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '데이터초기화', ADMIN_PERMISSION_KEYS)
     );
   }
 
-  return canAccessDetailedSection(user, '관리자', sectionIdOrPermissionKey, ADMIN_PERMISSION_KEYS);
+  return canAccessDetailedSection(user, '관리자', sectionId, ADMIN_PERMISSION_KEYS);
 }
 
 export function canAccessExtraFeature(
@@ -577,6 +634,13 @@ export function canAccessExtraFeature(
   const permissionKey = resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS);
 
   if (permissionKey === 'extra_마감보고' && isAdminUser(user)) {
+    return true;
+  }
+
+  // Gemini: 추가기능 접근 가능 시 기본 허용, 명시 false 만 차단
+  if (permissionKey === 'extra_Gemini비서') {
+    const explicitGemini = getExplicitPermissionState(user, 'extra_Gemini비서');
+    if (explicitGemini !== null) return explicitGemini;
     return true;
   }
 
@@ -594,7 +658,10 @@ export function canAccessExtraFeature(
     return isAdminUser(user);
   }
 
-  return hasPermission(user, permissionKey);
+  // 일반 추가기능: 명시 true/false 우선, 관리자 또는 부여된 세부 키
+  const explicit = getExplicitPermissionState(user, permissionKey);
+  if (explicit !== null) return explicit;
+  return isAdminUser(user) || hasPermission(user, permissionKey);
 }
 
 export function hasUserPayloadChanged(currentUser: any, nextUser: any): boolean {
