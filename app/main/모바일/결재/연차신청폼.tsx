@@ -179,33 +179,10 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     try {
       const title = buildLeaveTitle(senderName, kind, start, end);
 
-      // Fetch active staff in the company for cc_users
-      let ccUsers: Array<{ id: string; name: string }> = [];
-      try {
-        const { data: staffData } = await db
-          .from('staff_members')
-          .select('id, name, status, company, hire_date, resign_date')
-          .eq('company', senderCompany);
-        if (staffData) {
-          ccUsers = (staffData as StaffMember[])
-            .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
-            .map((s: StaffMember) => ({
-              id: String(s.id),
-              name: s.name || '이름 없음' }));
-        }
-      } catch (err) {
-        console.error('[mobile-approval] failed to fetch cc_users candidates', err);
-      }
-
-      // 수동 지정 참조자를 자동 CC에 병합 (id 기준 dedup) — 자동 CC를 깨지 않음
-      if (manualCcUsers.length > 0) {
-        const byId = new Map<string, { id: string; name: string }>();
-        for (const c of ccUsers) byId.set(c.id, c);
-        for (const c of manualCcUsers) {
-          if (c.id) byId.set(c.id, { id: c.id, name: c.name || '이름 없음' });
-        }
-        ccUsers = Array.from(byId.values());
-      }
+      // PC 패리티: 전사 자동 CC 금지 — 수동 지정 참조자만
+      const ccUsers: Array<{ id: string; name: string }> = manualCcUsers
+        .filter((c) => c.id)
+        .map((c) => ({ id: c.id, name: c.name || '이름 없음' }));
 
       const delegate = leaveDelegateOptions.find((staff) => String(staff.id) === delegateId);
 
@@ -477,7 +454,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
           >
             {manualCcUsers.length === 0 ? (
               <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
-                연차 신청은 행정팀과 회사 직원에게 기본 참조됩니다. 추가로 참조할 직원을 지정할 수 있어요.
+                연차 신청은 행정팀에 기본 참조됩니다. 필요 시 참조 직원을 추가로 지정할 수 있어요.
               </div>
             ) : (
               <ul style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px' }} aria-label="추가 참조자 목록">

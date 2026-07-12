@@ -538,7 +538,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           </button>
         }
       />
-      <div className="m-scroll" style={{ paddingBottom: 24 }}>
+      <div className="m-scroll">
         {/* hero */}
         <div style={{ padding: '24px 20px 8px', textAlign: 'center' }}>
           <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 700 }}>{formatTodayLong(now)}</div>

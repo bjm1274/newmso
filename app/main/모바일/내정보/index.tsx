@@ -45,15 +45,19 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
       />
     );
   } else if (sub === 'leave') {
-    contentElement = <연차 user={user} onBack={onBack} />;
+    contentElement = <연차 user={user} onBack={onBack} onSwitchTab={onSwitchTab} />;
   } else if (sub === 'records') {
     contentElement = (
-      <PayrollAndCertificatesHub
-        user={user}
-        activeView={recordsView}
-        onBack={onBack}
-        onChangeView={setRecordsView}
-      />
+      <div className="m-screen">
+        <div className="m-scroll" style={{ padding: '0 0 0' }}>
+          <PayrollAndCertificatesHub
+            user={user}
+            activeView={recordsView}
+            onBack={onBack}
+            onChangeView={setRecordsView}
+          />
+        </div>
+      </div>
     );
   } else if (sub === 'edit') {
     contentElement = <정보수정 user={user} onBack={onBack} />;

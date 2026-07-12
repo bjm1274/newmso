@@ -51,7 +51,8 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
           .filter((s) => String(s.id) !== staffId)
           .filter((s) => s.company === company || s.company === 'SY INC.')
           .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
-        const picks = candidates.map(toApproverPick);
+        // 자동 결재선은 1~3명 (직급 위계 상위 우선)
+        const picks = candidates.map(toApproverPick).slice(0, 3);
         setApproverDefaults(picks);
         if (!approverManual) {
           setApproverLine(picks);

@@ -224,49 +224,6 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
   const [pwLoading, setPwLoading] = useState(false);
   const pwLoadingRef = useRef(false);
 
-  const handleBioAuth = useCallback(async () => {
-    if (typeof window === 'undefined') return;
-    
-    // 1. 브라우저 지원 여부 확인
-    if (!window.PublicKeyCredential) {
-      toast('이 기기/브라우저는 생체인증을 지원하지 않습니다.', 'warning');
-      return;
-    }
-
-    try {
-      // 로컬 개발 환경이나 브라우저 기능 수준 체크
-      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-      if (!isAvailable) {
-        toast('등록된 생체 정보가 없거나 기기가 지원하지 않습니다. 비밀번호를 이용해 주세요.', 'warning');
-        return;
-      }
-
-      // 실제 디바이스에서 지문/FaceID 인증창을 모사하여 띄우기 위해
-      // navigator.credentials.get 호출을 흉내 내거나 실제 호출을 유도
-      // (로컬 브라우저 윈도우 헬로/TouchID 작동)
-      // 아래는 모션 팝업 연동 성공 완료 처리
-      toast('생체 인증이 완료되었습니다.', 'success');
-      
-      const target = pwGate;
-      setPwGate(null);
-      setPw('');
-      setPwErr(false);
-      if (target) onSub(target);
-    } catch (e) {
-      toast('생체인증에 실패했거나 취소되었습니다.', 'error');
-    }
-  }, [pwGate, onSub]);
-
-  // 비밀번호 확인 모달이 열리면 자동으로 생체인증 실행
-  useEffect(() => {
-    if (pwGate === 'records') {
-      const t = setTimeout(() => {
-        void handleBioAuth();
-      }, 400);
-      return () => clearTimeout(t);
-    }
-  }, [pwGate, handleBioAuth]);
-
   const handlePwConfirm = useCallback(async () => {
     if (pw.length < 4) {
       setPwErr(true);
@@ -341,7 +298,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
 
   return (
     <div className="m-screen">
-      <div className="m-scroll" style={{ paddingBottom: 24 }}>
+      <div className="m-scroll">
         {/* ── 배경 그래디언트 구체 (macOS Glassmorphism 극대화) ── */}
         <div style={{ position: 'relative', overflow: 'hidden', width: '100%' }}>
           <div
@@ -898,12 +855,12 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
         <div
           className="msm-pw-scrim on"
           style={{
-            position: 'absolute',
+            position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.45)',
             display: 'grid',
             placeItems: 'center',
-            zIndex: 50 }}
+            zIndex: 1200 }}
           role="dialog"
           aria-modal="true"
           aria-label="보안 확인"
@@ -940,32 +897,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               <br />비밀번호를 입력해 주세요.
             </div>
 
-            {/* 생체인증 빠른 진입 버튼 */}
-            <div style={{ marginTop: 14, textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={() => { void handleBioAuth(); }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '8px 16px',
-                  borderRadius: 12,
-                  background: 'rgba(29, 78, 216, 0.05)',
-                  color: 'var(--m-accent)',
-                  border: '1px solid rgba(29, 78, 216, 0.1)',
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  width: '100%',
-                  justifyContent: 'center' }}
-              >
-                <MIcon name="shield" size={16} />
-                생체 인식(FaceID/지문)으로 확인
-              </button>
-            </div>
-
-            {/* 비밀번호 입력 */}
+            {/* 비밀번호 입력 — WebAuthn 서버 등록 전까지 비밀번호 전용 */}
             <div style={{ marginTop: 18 }}>
               <input
                 type="password"
@@ -1042,7 +974,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 300,
+            zIndex: 1200,
             background: 'rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'flex-end',

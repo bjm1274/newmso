@@ -116,30 +116,43 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
     }
   };
 
-  // 계약서 인쇄 생성
+  // 계약서 인쇄 생성 — 미구현: 가짜 성공 금지
   const handleGenerateContract = () => {
     if (!selectedStaffId) {
       toast('직원을 선택하세요.', 'warning');
       return;
     }
-    toast(`${contractType} 수기 인쇄용 PDF 생성이 완료되었습니다.`, 'success');
+    toast('모바일 PDF 생성은 준비 중입니다. PC 계약 관리에서 인쇄해 주세요.', 'info');
   };
 
-  // 문서보관함 파일 업로드
+  // 문서보관함 파일 업로드 — R2 실업로드 후 DB 저장
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
     try {
-      // document_repository 에 파일 등록
-      const fileUrl = 'https://r2.pchos.kr/demo/' + encodeURIComponent(file.name);
+      const uploadForm = new FormData();
+      uploadForm.append('file', file);
+      const uploadRes = await fetch('/api/approvals/upload', {
+        method: 'POST',
+        body: uploadForm });
+      if (!uploadRes.ok) {
+        const errJson = (await uploadRes.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errJson.error || '파일 업로드에 실패했습니다.');
+      }
+      const uploadData = (await uploadRes.json()) as { url?: string };
+      const fileUrl = typeof uploadData.url === 'string' ? uploadData.url : '';
+      if (!fileUrl) throw new Error('업로드 응답에서 파일 주소를 확인할 수 없습니다.');
+
       const payload = {
         title: file.name,
         category: docCategory,
         file_url: fileUrl,
         file_size: file.size,
-        created_by: user.id || 'admin',
+        created_by: user.id || null,
+        company_name: typeof user.company === 'string' ? user.company : '전체',
+        version: 1,
         created_at: new Date().toISOString() };
 
       const { error } = await db.from('document_repository').insert([payload]);
@@ -147,10 +160,11 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
 
       toast('문서가 업로드되었습니다.', 'success');
       setReloadKey((k) => k + 1);
-    } catch (e) {
-      toast('업로드에 실패했습니다.', 'error');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '업로드에 실패했습니다.', 'error');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 

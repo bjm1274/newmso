@@ -575,7 +575,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     };
 
     return (
-        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[1200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-[var(--card)] w-full h-[100dvh] md:h-auto md:max-h-[90vh] max-w-2xl md:border-2 md:border-[var(--border)] md:radius-toss-xl shadow-sm overflow-hidden flex flex-col">
 
                 <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">

@@ -59,7 +59,7 @@ function MobileCertificateBase({ user, onBack }: 증명서Props) {
   return (
     <div className="m-screen">
       <MobileHeader title="증명서" back={onBack} />
-      <div className="m-scroll" style={{ paddingBottom: 24 }}>
+      <div className="m-scroll">
         {/* 발급 가능 서류 */}
         <div className="m-section">
           <div className="m-section-h">

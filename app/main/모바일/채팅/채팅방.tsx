@@ -75,6 +75,8 @@ import { triggerMobileChatPush } from './푸시트리거';
 export type SChatRoomProps = {
   user: ErpUser;
   room: ChatRoom;
+  /** false면 members 폴백([]) 상태 — 나가기/멤버변경 차단 */
+  membersReady?: boolean;
   onBack: () => void;
   /** Quick Switch — 채팅목록에서 패스스루. JM2: 중복 fetch 금지 */
   recentRooms?: MobileChatRoom[];
@@ -85,11 +87,12 @@ export type SChatRoomProps = {
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
-export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoom, onOpenBoardPost, searchMessageId }: SChatRoomProps) {
+export default function SChatRoom({ user, room, membersReady = true, onBack, recentRooms, onSwitchRoom, onOpenBoardPost, searchMessageId }: SChatRoomProps) {
   const userId = typeof user.id === 'string' ? user.id : null;
   const userName = typeof user.name === 'string' ? user.name : '';
   const company = typeof user.company === 'string' ? user.company : null;
   const staffs = useChatStaffDirectory(company);
+  // 키보드 상승: tokens .m-chat-composer + MobileShell --m-kb-offset
   const {
     messages,
     loading,
@@ -99,6 +102,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     refresh,
     appendOptimistic,
     replaceOptimistic,
+    removeOptimistic,
     jumpToMessage,
     searchMessageId: hookSearchMessageId } = useChatMessagesForRoom(String(room.id), userId);
 
@@ -204,6 +208,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       toast('로그인 정보를 찾을 수 없습니다.', 'error');
       return;
     }
+    // members 폴백([]) 상태에서 patch 하면 전 멤버 삭제 위험
+    if (!membersReady || memberIds.length === 0) {
+      toast('멤버 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+      return;
+    }
     setLeaving(true);
     try {
       const newMembers = memberIds.filter((id) => String(id) !== String(userId));
@@ -227,7 +236,7 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
     } finally {
       setLeaving(false);
     }
-  }, [canLeaveRoom, leaving, memberIds, onBack, room.id, userId, userName]);
+  }, [canLeaveRoom, leaving, memberIds, membersReady, onBack, room.id, userId, userName]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -331,12 +340,18 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
       replyToId: savedReplyTo ? String(savedReplyTo.id) : null });
     if (!result.ok) {
       toast(result.error, 'error');
-      // 실패 시 임시 메시지는 다음 refresh에서 제거됨
+      removeOptimistic(optimisticId);
+      // 입력·답장 대상 복구
+      if (composerInputRef.current) {
+        composerInputRef.current.value = text;
+      }
+      setHasText(true);
+      if (savedReplyTo) setReplyTo(savedReplyTo);
       return;
     }
     // 성공: temp → 실제 메시지로 교체
     replaceOptimistic(optimisticId, result.message);
-  }, [room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic]);
+  }, [room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic, removeOptimistic]);
 
 
 
@@ -648,11 +663,12 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         content: text });
       if (!result.ok) {
         toast(result.error, 'error');
+        removeOptimistic(optimisticId);
         return;
       }
       replaceOptimistic(optimisticId, result.message);
     },
-    [room.id, userId, userName, appendOptimistic, replaceOptimistic],
+    [room.id, userId, userName, appendOptimistic, replaceOptimistic, removeOptimistic],
   );
 
   const handleToggleBookmark = useCallback(async (message: ChatMessage) => {
@@ -960,10 +976,11 @@ export default function SChatRoom({ user, room, onBack, recentRooms, onSwitchRoo
         open={emojiOpen}
         onClose={() => setEmojiOpen(false)}
         onSelect={insertEmojiAtCaret}
+        bottomOffset={78}
       />
 
       <div
-        className="macos-glass"
+        className="macos-glass m-chat-composer"
         style={{
           background: 'rgba(255, 255, 255, 0.65)',
           backdropFilter: 'blur(20px)',

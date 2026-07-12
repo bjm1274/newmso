@@ -24,13 +24,14 @@ export type 채팅Props = {
   user: ErpUser;
   onBack?: () => void;
   rooms?: MobileChatRoom[];
+  roomsLoading?: boolean;
   refreshRooms?: () => Promise<void>;
   onActiveRoomChange?: (roomId: string | null) => void;
   resetToken?: number;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
 };
 
-function MobileChat({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
+function MobileChat({ user, rooms: propsRooms, roomsLoading: propsRoomsLoading, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
@@ -41,6 +42,7 @@ function MobileChat({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, 
   // 부모(MobileShell)와 상태 공유 — 부모가 준 값이 있으면 그것을 쓰고 없으면 로컬에서 조회
   const localHook = useChatRoomsForMobile(propsRooms ? null : userId, propsRooms ? null : selectedRoomId);
   const rooms = propsRooms ?? localHook.rooms;
+  const roomsLoading = propsRoomsLoading ?? localHook.loading;
   const refreshRooms = propsRefreshRooms ?? localHook.refresh;
 
   // 활성 방 변경 시 부모 컴포넌트에 통지
@@ -111,10 +113,12 @@ function MobileChat({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, 
   } else if (view === 'room' && selectedRoomId) {
     const roomForRender: ChatRoom = selectedRoom ??
       ({ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom);
+    const membersReady = Array.isArray(roomForRender.members) && roomForRender.members.length > 0;
     contentElement = (
       <SChatRoom
         user={user}
         room={roomForRender}
+        membersReady={membersReady || Boolean(selectedRoom)}
         onBack={backToList}
         recentRooms={rooms}
         onSwitchRoom={openRoom}
@@ -127,6 +131,7 @@ function MobileChat({ user, rooms: propsRooms, refreshRooms: propsRefreshRooms, 
       <SChatList
         user={user}
         rooms={rooms}
+        roomsLoading={roomsLoading}
         onOpen={openRoom}
         onNew={openNew}
         onRefresh={refreshRooms}

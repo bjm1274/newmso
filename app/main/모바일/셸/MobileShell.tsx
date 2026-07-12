@@ -32,7 +32,9 @@ import { useChatRoomsForMobile } from '../채팅/data-hooks';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
+import { canAccessMainMenu } from '@/lib/access-control';
 import { sendAdminNotifications } from '@/lib/notification-utils';
+import { useVisualViewportOffset } from '@/app/hooks/useVisualViewportOffset';
 import ContractSignatureModal from '@/app/main/기능부품/인사관리서브/계약문서/전자서명모달';
 import {
   countUnreadNotifications,
@@ -214,7 +216,7 @@ export default function MobileShell({
 
   const userId = typeof user.id === 'string' ? user.id : null;
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const { rooms, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
+  const { rooms, loading: roomsLoading, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
   const totalUnread = rooms.reduce((sum, r) => sum + (r.unread_count || 0), 0);
   const [notificationUnread, setNotificationUnread] = useState(0);
 
@@ -322,10 +324,6 @@ export default function MobileShell({
   }, []);
 
   const switchTab = (tab: MTab, sub?: string) => {
-    if (tab === 'chat' && route.tab === 'chat') {
-      setChatResetToken((prev) => prev + 1);
-    }
-    setRoute({ tab, sub } as any);
     const menuMap: Record<MTab, string> = {
       notif: '알림',
       mypage: '내정보',
@@ -338,6 +336,15 @@ export default function MobileShell({
       admin: '관리자'
     };
     const targetMenu = menuMap[tab];
+    // 바텀탭과 동일 권한 게이트
+    if (targetMenu && !canAccessMainMenu(user, targetMenu)) {
+      toast('해당 메뉴에 접근할 권한이 없습니다.', 'warning');
+      return;
+    }
+    if (tab === 'chat' && route.tab === 'chat') {
+      setChatResetToken((prev) => prev + 1);
+    }
+    setRoute({ tab, sub } as any);
     if (targetMenu && setMainMenu) {
       setMainMenu(targetMenu);
     }
@@ -349,10 +356,16 @@ export default function MobileShell({
 
   const goMypage = () => switchTab('mypage');
 
+  // 소프트 키보드 높이 → sticky foot 전역 상승 (tokens --m-kb-offset)
+  const kbOffset = useVisualViewportOffset();
   const containerClass = 'mso-mobile' + (dark ? ' dark' : '');
 
   return (
-    <div className={containerClass} data-testid="main-shell">
+    <div
+      className={containerClass}
+      data-testid="main-shell"
+      style={{ ['--m-kb-offset' as string]: `${kbOffset}px` }}
+    >
       {pendingContract && showSignaturePad && (
         <ContractSignatureModal
           contract={pendingContract}
@@ -386,6 +399,7 @@ export default function MobileShell({
             <채팅
               user={user}
               rooms={rooms}
+              roomsLoading={roomsLoading}
               refreshRooms={refreshRooms}
               onActiveRoomChange={setActiveRoomId}
               resetToken={chatResetToken}
@@ -424,7 +438,12 @@ export default function MobileShell({
           )}
         </div>
         {!activeRoomId && (
-          <MobileBottomTab active={route.tab} onChange={switchTab} badges={{ chat: totalUnread, notif: notificationUnread }} />
+          <MobileBottomTab
+            active={route.tab}
+            onChange={switchTab}
+            user={user}
+            badges={{ chat: totalUnread, notif: notificationUnread }}
+          />
         )}
       </div>
     </div>

@@ -222,10 +222,18 @@ export default function SApprovalDetail({
         return;
       }
       setBusy(action);
-      // 낙관적 업데이트
+      // 낙관적 업데이트: 승인 시 status를 '대기'로 다시 세팅하면 no-op.
+      // 중간 승인 → 내 차례 해제, 최종 승인 → '승인', 반려 → '반려'
       const prevRow = row;
-      const optimisticStatus = action === 'approve' ? '대기' : '반려';
-      setRow({ ...row, status: optimisticStatus });
+      if (action === 'reject') {
+        setRow({ ...row, status: '반려' });
+      } else {
+        setRow({
+          ...row,
+          // 처리 중에는 본인 승인 버튼 비활성 (current_approver 해제)
+          current_approver_id: null,
+        } as typeof row);
+      }
       try {
         const payload = await postTransition({
           action,
@@ -237,6 +245,10 @@ export default function SApprovalDetail({
         }
         if (action === 'approve') {
           toast(result.finalApproval ? '최종 승인되었습니다.' : '승인되어 다음 결재자에게 전달되었습니다.', 'success');
+          // 최종이면 즉시 칩 반영 (재조회 전 깜빡임 방지)
+          if (result.finalApproval) {
+            setRow((prev) => (prev ? { ...prev, status: '승인' } : prev));
+          }
         } else {
           toast('반려 처리했습니다.', 'success');
         }
@@ -393,7 +405,8 @@ export default function SApprovalDetail({
         style={{
           borderTop: '1px solid rgba(255,255,255,0.4)',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.03)',
-          padding: '12px 16px 14px' }}
+          // safe-area / sticky-foot-pb 는 tokens .m-sticky-foot 패딩 유지 (덮어쓰지 않음)
+        }}
       >
         {canApprove ? (
           <>

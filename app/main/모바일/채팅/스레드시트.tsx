@@ -18,6 +18,7 @@ import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
+import { isImeComposing } from '../공통/useKeyboardLift';
 import {
   formatBubbleTimestamp,
   type StaffDirectoryEntry } from './data-hooks';
@@ -274,6 +275,7 @@ export function ThreadSheet({
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
+                  if (isImeComposing(e)) return;
                   e.preventDefault();
                   handleSend();
                 }

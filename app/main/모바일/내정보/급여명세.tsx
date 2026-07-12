@@ -21,7 +21,7 @@ function 급여명세Base({ user, onBack }: 급여명세Props) {
   return (
     <div className="m-screen">
       <MobileHeader title="급여명세" back={onBack} />
-      <div className="m-scroll" style={{ padding: '16px', paddingBottom: 24 }}>
+      <div className="m-scroll" style={{ padding: '16px 16px 0' }}>
         <SalarySlipContainer user={user} />
       </div>
     </div>

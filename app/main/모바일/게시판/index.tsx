@@ -21,8 +21,7 @@ import SFormPost from './글작성';
 import {
   type BoardCatId,
   type BoardListPost,
-  BOARD_CATS,
-  boardTypeToCat,
+  resolveBoardSubView,
   useBoardDetail,
   useBoardPosts } from './data-hooks';
 import { useMyLikes } from './좋아요훅';
@@ -46,25 +45,17 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
 
   const [view, setView] = useState<View>(() => {
     if (initialPostId) return 'detail';
-    if (subView) return 'list';
-    return 'home';
+    const resolved = resolveBoardSubView(subView);
+    return resolved.openList ? 'list' : 'home';
   });
-  const [cat, setCat] = useState<BoardCatId>(() => {
-    if (subView) {
-      const isCatId = BOARD_CATS.some((c) => c.id === subView);
-      return isCatId ? (subView as BoardCatId) : boardTypeToCat(subView);
-    }
-    return 'all';
-  });
+  const [cat, setCat] = useState<BoardCatId>(() => resolveBoardSubView(subView).cat);
 
-  // Synchronize category and view when global subView changes
+  // Synchronize category and view when global subView changes (ignore '전체'/타 메뉴)
   useEffect(() => {
-    if (subView) {
-      const isCatId = BOARD_CATS.some((c) => c.id === subView);
-      setCat(isCatId ? (subView as BoardCatId) : boardTypeToCat(subView));
-      if (!initialPostId) {
-        setView('list');
-      }
+    const resolved = resolveBoardSubView(subView);
+    setCat(resolved.cat);
+    if (!initialPostId && resolved.openList) {
+      setView('list');
     }
   }, [subView, initialPostId]);
   const [postId, setPostId] = useState<string | null>(initialPostId || null);
@@ -85,8 +76,13 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
 
-  const { posts: fetched, loading, refetch } = useBoardPosts(userId, userCompany);
+  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(userId, userCompany);
   const posts = overridePosts ?? fetched;
+
+  const refetch = useCallback(async () => {
+    setOverridePosts(null);
+    await refetchPosts();
+  }, [refetchPosts]);
 
   const { likeSet, setLikeSet } = useMyLikes(userId);
 

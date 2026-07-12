@@ -91,7 +91,7 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
             .from('todos')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', staffId)
-            .eq('completed', false),
+            .eq('is_complete', 0),
         ]);
         if (cancelled) return;
         setCounts({

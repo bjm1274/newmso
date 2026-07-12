@@ -41,7 +41,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
   return (
     <div className="m-screen" style={{ background: 'linear-gradient(135deg, rgba(240, 244, 255, 0.6) 0%, rgba(228, 235, 250, 0.6) 50%, rgba(245, 240, 255, 0.6) 100%)' }}>
       <MobileHeader title="웹팩스" sub="외부 시스템 연동" back={onBack} />
-      <div className="m-scroll" style={{ background: 'transparent', padding: '16px 16px 24px' }}>
+      <div className="m-scroll" style={{ background: 'transparent', padding: '16px 16px 0' }}>
         <div className="macos-glass macos-squircle" style={{ padding: '32px 20px', textAlign: 'center', marginBottom: 20 }}>
           <div
             aria-hidden="true"

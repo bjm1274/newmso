@@ -56,11 +56,14 @@ export default function 결재({ user, sub }: 결재Props) {
   const [composeForm, setComposeForm] = useState<{ slug: string; name: string } | null>(null);
 
   useEffect(() => {
-    if (sub === 'compose:annual_plan') {
+    if (sub === 'compose:leave' || sub === 'compose:연차') {
+      setComposeForm({ slug: 'leave', name: '연차/휴가 신청' });
+      setView('compose');
+    } else if (sub === 'compose:annual_plan') {
       setComposeForm({ slug: 'annual_plan', name: '연차계획서' });
       setView('compose');
     } else if (sub === 'compose:leave_promotion_notice') {
-      setComposeForm({ slug: 'leave_promotion_notice', name: '연차촉진동의서' });
+      setComposeForm({ slug: 'leave_promotion_notice', name: '연차촉진통보서' });
       setView('compose');
     } else if (sub && sub.startsWith('detail:')) {
       const id = sub.split(':')[1];

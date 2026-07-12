@@ -10,12 +10,11 @@
 
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { appendApprovalHistory } from '@/lib/approval-workflow';
-import type { ErpUser, StaffMember } from '@/types';
+import type { ErpUser } from '@/types';
 import { generateMobileDocNumber } from './data-hooks';
 import type { ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
 import { db } from '@/lib/db-client';
-import { isActiveStaff } from '@/lib/active-staff';
 
 export type SubmitApprovalArgs = {
   user: ErpUser;
@@ -65,23 +64,10 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     userPermissions:
       (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
 
-  // Fetch active staff in the company for cc_users
-  let ccUsers: Array<{ id: string; name: string }> = [];
-  try {
-    const { data: staffData } = await db
-      .from('staff_members')
-      .select('id, name, status, company, hire_date, resign_date')
-      .eq('company', company);
-    if (staffData) {
-      ccUsers = (staffData as StaffMember[])
-        .filter((s: StaffMember) => isActiveStaff(s) && String(s.id) !== staffId)
-        .map((s: StaffMember) => ({
-          id: String(s.id),
-          name: s.name || '이름 없음' }));
-    }
-  } catch (err) {
-    console.error('[mobile-approval] failed to fetch cc_users candidates', err);
-  }
+  // PC 패리티: 전사 자동 CC 금지 (필요 시 호출 측 extraMeta.cc_users 로 전달)
+  const ccUsers: Array<{ id: string; name: string }> = Array.isArray(extraMeta.cc_users)
+    ? (extraMeta.cc_users as Array<{ id: string; name: string }>)
+    : [];
 
   const meta: Record<string, unknown> = {
     form_slug: formSlug,

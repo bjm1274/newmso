@@ -135,12 +135,14 @@ export default function EmojiPicker({
         position: 'fixed',
         left: 12,
         right: 12,
-        bottom: bottomOffset,
-        zIndex: 60,
+        // 키보드 오프셋은 MobileShell --m-kb-offset (상속)
+        bottom: `calc(${bottomOffset}px + var(--m-kb-offset, 0px))`,
+        zIndex: 1200,
         padding: 10,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 385 }}
+        maxHeight: 385,
+        transition: 'bottom 0.12s ease-out' }}
     >
       {/* 🔍 검색 바 */}
       <div style={{ position: 'relative', marginBottom: 8 }}>

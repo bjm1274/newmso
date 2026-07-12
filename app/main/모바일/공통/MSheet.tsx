@@ -34,7 +34,7 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
       aria-modal="true"
       aria-label={title || '시트'}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1500,
+        position: 'fixed', inset: 0, zIndex: 1500, /* above floating tab (999) */
         display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
     >
       <div
@@ -64,7 +64,14 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
             {title}
           </div>
         )}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch' }}
+        >
           {children}
         </div>
       </div>

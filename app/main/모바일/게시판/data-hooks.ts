@@ -64,9 +64,26 @@ const LIST_BOARD_TYPES = BOARD_CATS
   .map((cat) => cat.boardType)
   .filter((v): v is string => Boolean(v));
 
+/** board_type → cat. 미매칭(전역 subView '전체' 등)은 'all' — free로 강제하지 않음 */
 export function boardTypeToCat(boardType: string | null | undefined): BoardCatId {
-  const cat = BOARD_CATS.find((c) => c.boardType === boardType);
-  return cat ? cat.id : 'free';
+  if (!boardType || boardType === '전체' || boardType === 'all') return 'all';
+  const cat = BOARD_CATS.find((c) => c.boardType === boardType || c.id === boardType);
+  return cat ? cat.id : 'all';
+}
+
+/** 게시판 전용으로 인정할 subView 값인지 (전역 '전체'/타 메뉴 sub 제외) */
+export function resolveBoardSubView(subView: string | null | undefined): {
+  cat: BoardCatId;
+  openList: boolean;
+} {
+  if (!subView || subView === '전체' || subView === 'all') {
+    return { cat: 'all', openList: false };
+  }
+  const isCatId = BOARD_CATS.some((c) => c.id === subView);
+  if (isCatId) return { cat: subView as BoardCatId, openList: true };
+  const cat = BOARD_CATS.find((c) => c.boardType === subView);
+  if (cat) return { cat: cat.id, openList: true };
+  return { cat: 'all', openList: false };
 }
 
 // ─────────────────────────────────────────────
@@ -93,7 +110,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await withMissingColumnsFallback<BoardPost[]>(
+      const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
           const q = db
             .from('board_posts')
@@ -106,12 +123,22 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
             )
             .in('board_type', LIST_BOARD_TYPES)
             .order('created_at', { ascending: false })
-            .limit(100);
+            .limit(200);
           const result = await q;
           return result as unknown as { data: BoardPost[] | null; error: unknown };
         },
         [...BOARD_POST_OPTIONAL_COLUMNS],
       );
+
+      if (error) {
+        const msg =
+          typeof error === 'object' && error && 'message' in error
+            ? String((error as { message?: string }).message)
+            : '게시판 조회 실패';
+        toast(msg, 'error');
+        setPosts([]);
+        return;
+      }
 
       const rawList = Array.isArray(data) ? data.map((p) => normalizeBoardPost(p)) : [];
       // 예약 발행 — 미래 시점의 글은 본인 글이 아니면 숨김 (PC와 동일 정책)

@@ -27,11 +27,13 @@ function syncLabel(date: Date): string {
 }
 
 export default function 근무현황({ user, onBack }: { user: ErpUser; onBack: () => void }) {
+  // MSO 교차 회사 가시성: 기본 전체 스태프 표시
   const company = '전체';
   const { members, kpi, loading, lastSync, refresh } = useWorkNow({ company, pollMs: 30000 });
   const [filter, setFilter] = useState<Filter>('all');
 
   const filtered = useMemo(() => {
+    // 미출근(unknown)은 전체 목록에만 표시 — 근무중 필터에서 제외
     if (filter === 'work') return members.filter((m) => m.state === 'working');
     if (filter === 'break') return members.filter((m) => m.state === 'break' || m.state === 'outside');
     if (filter === 'off') return members.filter((m) => m.state === 'off');

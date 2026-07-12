@@ -123,10 +123,20 @@
   padding-top: 0;
 }
 .mso-mobile .m-scroll {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
+  flex: 1;
+  min-height: 0; /* flex 자식이 콘텐츠 높이로 팽창해 스크롤이 죽지 않도록 */
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   /* 모바일 바텀 탭바(높이 64px + 바디마진 16px = 80px) 가림을 예방하기 위한 글로벌 바텀 패딩 */
   padding-bottom: 88px;
+}
+/* 플로팅 탭 위 오버레이/모달 — 탭(z=999)보다 항상 위 */
+.mso-mobile {
+  --m-z-tab: 999;
+  --m-z-overlay: 1200;
+  --m-z-sheet: 1500;
 }
 .mso-mobile .m-section { padding: 14px 16px 0; }
 .mso-mobile .m-section-h {
@@ -363,13 +373,22 @@
 .mso-mobile .m-divider { height: 1px; background: var(--m-border); margin: 8px 0; }
 .mso-mobile .m-section-gap { height: 14px; }
 
-/* 스티키 푸터 */
+/* 스티키 푸터 — --m-kb-offset 은 MobileShell이 visualViewport로 갱신 */
 .mso-mobile .m-sticky-foot {
   padding: 10px 16px calc(16px + env(safe-area-inset-bottom) + var(--m-sticky-foot-pb, 0px));
   background: var(--m-card);
   border-top: 1px solid var(--m-border);
   display: flex; gap: 8px;
   flex-shrink: 0;
+  transform: translateY(calc(-1 * var(--m-kb-offset, 0px)));
+  transition: transform 0.12s ease-out;
+  will-change: transform;
+}
+/* 채팅 컴포저 (m-sticky-foot 아님) — 동일 키보드 오프셋 */
+.mso-mobile .m-chat-composer {
+  transform: translateY(calc(-1 * var(--m-kb-offset, 0px)));
+  transition: transform 0.12s ease-out;
+  will-change: transform;
 }
 
 /* 빠른액션 그리드 셀 */

@@ -181,7 +181,7 @@ export default function 복지관리자({ staffs, type, initialData, onClose, on
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+      className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/40"
       onClick={onClose}
     >
       <div

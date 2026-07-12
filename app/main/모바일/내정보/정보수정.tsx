@@ -239,7 +239,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
   return (
     <div className="m-screen">
       <MobileHeader title="정보 수정" back={onBack} />
-      <div className="m-scroll" style={{ paddingBottom: 24 }}>
+      <div className="m-scroll">
         {/* 아바타 */}
         <div
           style={{

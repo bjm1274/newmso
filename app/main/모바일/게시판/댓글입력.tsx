@@ -8,6 +8,7 @@
 
 import { forwardRef } from 'react';
 import MIcon from '../공통/MIcon';
+import { isImeComposing } from '../공통/useKeyboardLift';
 import type { BoardComment } from './data-hooks';
 
 export type CommentComposerProps = {
@@ -24,6 +25,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
   { draft, sending, replyTo, currentUserName, onDraftChange, onSubmit, onReplyCancel },
   ref,
 ) {
+  // 키보드 상승은 MobileShell --m-kb-offset + tokens .m-sticky-foot 전역 처리
   return (
     <div
       className="m-sticky-foot macos-glass"
@@ -94,6 +96,7 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
+              if (isImeComposing(e)) return;
               e.preventDefault();
               onSubmit();
             }

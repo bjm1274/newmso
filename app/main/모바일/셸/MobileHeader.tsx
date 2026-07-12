@@ -16,7 +16,11 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
     <div
       className="m-header macos-glass"
       style={{
-        padding: '16px 20px 12px',
+        /* tokens .m-header safe-top 보정 유지 — 인라인 top만 덮어쓰지 않음 */
+        paddingTop: 'calc(16px + var(--m-safe-top, env(safe-area-inset-top, 0px)))',
+        paddingRight: 20,
+        paddingBottom: 12,
+        paddingLeft: 20,
         display: 'flex',
         alignItems: 'center',
         gap: 12,

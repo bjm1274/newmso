@@ -14,6 +14,7 @@ import { memo } from 'react';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
+import type { MTab } from '../셸/m-routes';
 import { useMyLeave, type MyLeaveHistory } from './data-hooks';
 
 const STATUS_STYLE: Record<MyLeaveHistory['status'], { bg: string; color: string }> = {
@@ -24,16 +25,17 @@ const STATUS_STYLE: Record<MyLeaveHistory['status'], { bg: string; color: string
 export type 연차Props = {
   user: ErpUser;
   onBack: () => void;
+  onSwitchTab?: (tab: MTab, sub?: string) => void;
 };
 
-function MobileLeaveBase({ user, onBack }: 연차Props) {
+function MobileLeaveBase({ user, onBack, onSwitchTab }: 연차Props) {
   const staffId = typeof user?.id === 'string' ? user.id : null;
   const { remaining, total, used, usageRate, history, loading } = useMyLeave(staffId);
   const currentYear = new Date().getFullYear();
   return (
     <div className="m-screen">
       <MobileHeader title="연차" back={onBack} />
-      <div className="m-scroll" style={{ paddingBottom: 24 }}>
+      <div className="m-scroll">
         {/* Hero — 잔여 연차 */}
         <div
           className="msm-hero"
@@ -66,12 +68,17 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
           </div>
         </div>
 
-        {/* 연차 신청 버튼 */}
+        {/* 연차 신청 버튼 → 전자결재 연차 폼 */}
         <div style={{ padding: '16px 16px 0' }}>
           <button
             type="button"
             className="msm-btn-lg accent"
             aria-label="연차 신청"
+            onClick={() => {
+              if (onSwitchTab) {
+                onSwitchTab('approval', 'compose:leave');
+              }
+            }}
             style={{
               width: '100%',
               height: 52,
@@ -84,7 +91,8 @@ function MobileLeaveBase({ user, onBack }: 연차Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8 }}
+              gap: 8,
+              cursor: 'pointer' }}
           >
             <MIcon name="plus" size={18} />
             연차 신청

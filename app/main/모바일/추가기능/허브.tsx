@@ -170,7 +170,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
       </div>
 
       {/* 모듈 그리드 */}
-      <div className="m-scroll" style={{ background: 'transparent', padding: '8px 16px 24px' }}>
+      <div className="m-scroll" style={{ background: 'transparent', padding: '8px 16px 0' }}>
         {GROUPS.map((group) => (
           <div key={group.title} style={{ marginTop: 16 }}>
             <div style={{ padding: '4px 6px 10px', fontSize: 13, fontWeight: 800, color: 'var(--z-600)', letterSpacing: '-0.015em' }}>

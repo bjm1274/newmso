@@ -9,7 +9,9 @@
  * JM6: 모든 탭 button 시맨틱 + aria-current
  */
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
+import type { ErpUser } from '@/types';
+import { canAccessMainMenu } from '@/lib/access-control';
 import type { MTab } from './m-routes';
 
 /* ─── PC 사이드바와 동일한 SVG path ────────────────────────── */
@@ -83,21 +85,22 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
     </>
   ) };
 
-const TABS: { id: MTab; label: string }[] = [
-  { id: 'notif',    label: '알림' },
-  { id: 'mypage',   label: '내정보' },
-  { id: 'addon',    label: '추가기능' },
-  { id: 'chat',     label: '채팅' },
-  { id: 'board',    label: '게시판' },
-  { id: 'approval', label: '전자결재' },
-  { id: 'hr',       label: '인사관리' },
-  { id: 'stock',    label: '재고관리' },
-  { id: 'admin',    label: '관리자' },
+const TABS: { id: MTab; label: string; menuId: string }[] = [
+  { id: 'notif',    label: '알림',   menuId: '알림' },
+  { id: 'mypage',   label: '내정보', menuId: '내정보' },
+  { id: 'addon',    label: '추가기능', menuId: '추가기능' },
+  { id: 'chat',     label: '채팅',   menuId: '채팅' },
+  { id: 'board',    label: '게시판', menuId: '게시판' },
+  { id: 'approval', label: '전자결재', menuId: '전자결재' },
+  { id: 'hr',       label: '인사관리', menuId: '인사관리' },
+  { id: 'stock',    label: '재고관리', menuId: '재고관리' },
+  { id: 'admin',    label: '관리자', menuId: '관리자' },
 ];
 
 export type MobileBottomTabProps = {
   active: MTab;
   onChange: (tab: MTab) => void;
+  user?: ErpUser | null;
   badges?: Partial<Record<MTab, number>>;
   dots?: Partial<Record<MTab, boolean>>;
 };
@@ -105,8 +108,14 @@ export type MobileBottomTabProps = {
 function MobileBottomTabBase({
   active,
   onChange,
+  user,
   badges,
   dots }: MobileBottomTabProps) {
+  const visibleTabs = useMemo(() => {
+    if (!user) return TABS;
+    return TABS.filter((t) => canAccessMainMenu(user, t.menuId));
+  }, [user]);
+
   return (
     <nav
       className="m-bottom-tab macos-glass"
@@ -114,7 +123,7 @@ function MobileBottomTabBase({
       data-testid="mobile-tabbar"
       style={{
         position: 'fixed',
-        bottom: '16px',
+        bottom: 'max(16px, env(safe-area-inset-bottom, 0px))',
         left: '16px',
         right: '16px',
         height: '64px',
@@ -138,7 +147,7 @@ function MobileBottomTabBase({
         }
       `}</style>
 
-      {TABS.map((t) => {
+      {visibleTabs.map((t) => {
         const on = t.id === active;
         const badgeCount = badges?.[t.id];
         const showDot = dots?.[t.id] ?? false;

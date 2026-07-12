@@ -116,7 +116,7 @@ function BoardHomeView({
           <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--foreground)', letterSpacing: '-0.02em', marginTop: 1 }}>게시판</div>
         </div>
       </div>
-      <div className="m-scroll" style={{ background: 'transparent', padding: '12px 0 24px' }}>
+      <div className="m-scroll" style={{ background: 'transparent', padding: '12px 0 0' }}>
         <div style={{ padding: '4px 20px 10px', fontSize: 12, fontWeight: 800, color: 'var(--z-500)', letterSpacing: '-0.01em' }}>
           카테고리
         </div>

@@ -1742,13 +1742,21 @@ select:not(.no-style) {
     min-height: var(--touch-target);
   }
 
-  /* 모든 인터랙티브 요소에 44px 강제 — WCAG 2.5.5 */
+  /* 모든 인터랙티브 요소에 44px 강제 — WCAG 2.5.5
+   * 모바일 전용 셸(.mso-mobile)은 칩바/세그 32px 등 밀도 레이아웃이 있어 제외 */
   button,
   a[role="button"],
   [role="button"],
   .icon-btn,
   .tab-item {
     min-height: var(--touch-target);
+  }
+  .mso-mobile button,
+  .mso-mobile a[role="button"],
+  .mso-mobile [role="button"],
+  .mso-mobile .icon-btn,
+  .mso-mobile .tab-item {
+    min-height: unset;
   }
 
   /* 페이지 좌우 안전 여백 */

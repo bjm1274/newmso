@@ -221,6 +221,8 @@ type UseChatMessagesResult = {
   appendOptimistic: (msg: ChatMessage) => void;
   /** Optimistic UI: tempId를 가진 메시지를 서버 응답으로 교체 */
   replaceOptimistic: (tempId: string, real: ChatMessage) => void;
+  /** Optimistic UI: 전송 실패 시 temp 메시지 제거 */
+  removeOptimistic: (tempId: string) => void;
   jumpToMessage: (messageId: string) => Promise<void>;
   searchMessageId: string | null;
   setSearchMessageId: (id: string | null) => void;
@@ -567,6 +569,10 @@ export function useChatMessagesForRoom(
     });
   }, []);
 
+  const removeOptimistic = useCallback((tempId: string) => {
+    setMessages((prev) => prev.filter((m) => String(m.id) !== String(tempId)));
+  }, []);
+
   return {
     messages,
     loading,
@@ -576,6 +582,7 @@ export function useChatMessagesForRoom(
     loadOlder,
     appendOptimistic,
     replaceOptimistic,
+    removeOptimistic,
     jumpToMessage,
     searchMessageId,
     setSearchMessageId

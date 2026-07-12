@@ -329,7 +329,7 @@ function EvalWriteForm({
         </div>
       </div>
 
-      <div className="m-scroll" style={{ padding: '16px 16px 24px', background: 'transparent' }}>
+      <div className="m-scroll" style={{ padding: '16px 16px 0', background: 'transparent' }}>
         <div
           className="macos-glass macos-squircle"
           style={{

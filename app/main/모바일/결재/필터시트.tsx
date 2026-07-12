@@ -37,19 +37,24 @@ export function countActiveFilters(state: ApprovalFilterState): number {
   return n;
 }
 
+/** approvals.type 실제 저장값과 1:1 (작성하기 폼 name / typeName) */
 const TYPE_OPTIONS: ReadonlyArray<string> = [
   '연차/휴가',
   '연차계획서',
-  '연장근무',
-  '물품신청',
+  '연장근무 신청',
+  '출결정정',
+  '연차촉진통보서',
+  '물품구매 신청',
   '수리요청서',
-  '보고서작성',
+  '사직서',
+  '퇴직 서약서',
+  '수습직원평가서',
+  '급여인상평가서',
   '업무기안',
   '업무협조',
   '공문발송',
+  '보고서작성',
   '증명서발급',
-  '출결정정',
-  '연차촉진통보서',
 ];
 
 const STATUS_OPTIONS: ReadonlyArray<{ id: string; label: string }> = [

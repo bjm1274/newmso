@@ -553,6 +553,8 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
               onChange={(event) => setNewTask(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
+                  // IME 조합 중 Enter는 할 일 등록하지 않음
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                   event.preventDefault();
                   void handleAddTask();
                 }

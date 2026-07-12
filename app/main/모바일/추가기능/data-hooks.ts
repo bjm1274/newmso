@@ -244,16 +244,46 @@ const STATE_LABEL: Record<WorkNowState, string> = {
   break: '휴게',
   outside: '외근',
   off: '휴가',
-  unknown: '-' };
+  unknown: '미출근' };
 
-function deriveState(rawStatus: string | null): WorkNowState {
-  const s = (rawStatus ?? '').toString().trim();
-  if (!s) return 'unknown';
-  if (['근무중', '재실', 'working', 'in'].includes(s)) return 'working';
-  if (['휴게', '식사', 'break'].includes(s)) return 'break';
-  if (['외근', '외출', 'outside', 'out'].includes(s)) return 'outside';
+/** 실시간 상태: current_status 우선, 그다음 status 문자열. present/late는 일 근태 라벨일 뿐 working 아님 */
+function deriveRealtimeState(
+  currentStatus: string | null,
+  status: string | null,
+): WorkNowState {
+  const cur = (currentStatus ?? '').toString().trim().toLowerCase();
+  if (cur) {
+    if (['break', 'lunch', '휴게', '식사'].includes(cur)) return 'break';
+    if (['field', 'outside', '외근', '외출', 'out'].includes(cur)) return 'outside';
+    if (['leave', 'off', '휴가', '연차'].includes(cur)) return 'off';
+    if (['working', 'in', '근무중', '재실'].includes(cur)) return 'working';
+  }
+  const s = (status ?? '').toString().trim();
+  if (['휴게', '식사', 'break', 'lunch'].includes(s)) return 'break';
+  if (['외근', '외출', 'outside', 'out', 'field'].includes(s)) return 'outside';
   if (['휴가', '연차', 'off', 'leave'].includes(s)) return 'off';
+  if (['근무중', '재실', 'working', 'in'].includes(s)) return 'working';
+  // present/late/early_leave 등은 일 근태 — 실시간 상태는 체크인 유무로 판정
   return 'unknown';
+}
+
+function formatSinceLabel(raw: string): string {
+  if (!raw || raw === '-') return '-';
+  try {
+    const d = new Date(raw);
+    if (Number.isFinite(d.getTime())) {
+      return d.toLocaleTimeString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+  } catch {
+    /* fall through */
+  }
+  if (raw.length >= 16) return raw.slice(11, 16);
+  return raw;
 }
 
 export function useWorkNow(opts: { company?: string; pollMs?: number }) {
@@ -275,15 +305,43 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
       const active = ((staffData ?? []) as StaffMember[]).filter(isActiveStaff);
 
       const today = todayISO();
-      const { data: attData } = await db
-        .from('attendances')
-        .select('*')
-        .eq('work_date', today)
-        .limit(500);
+      // PC 근무현황과 동일: attendance + attendances 병합
+      const [attendanceRes, attendancesRes] = await Promise.all([
+        db
+          .from('attendance')
+          .select('staff_id, date, check_in, check_out, status, current_status, location')
+          .eq('date', today)
+          .limit(500),
+        db
+          .from('attendances')
+          .select('staff_id, work_date, check_in_time, check_out_time, status, current_status, location')
+          .eq('work_date', today)
+          .limit(500),
+      ]);
+
       const byStaff = new Map<string, Record<string, unknown>>();
-      for (const row of (attData ?? []) as Record<string, unknown>[]) {
+      for (const row of (attendanceRes.data ?? []) as Record<string, unknown>[]) {
         const key = pickText(row, 'staff_id', 'user_id');
-        if (key) byStaff.set(key, row);
+        if (key) byStaff.set(key, { ...row });
+      }
+      for (const row of (attendancesRes.data ?? []) as Record<string, unknown>[]) {
+        const key = pickText(row, 'staff_id', 'user_id');
+        if (!key) continue;
+        const existing = byStaff.get(key) ?? {};
+        byStaff.set(key, {
+          ...existing,
+          ...row,
+          check_in: existing.check_in ?? row.check_in_time ?? null,
+          check_out: existing.check_out ?? row.check_out_time ?? null,
+          check_in_time: row.check_in_time ?? existing.check_in_time ?? existing.check_in ?? null,
+          check_out_time: row.check_out_time ?? existing.check_out_time ?? existing.check_out ?? null,
+          current_status:
+            row.current_status !== undefined && row.current_status !== null
+              ? row.current_status
+              : existing.current_status ?? null,
+          status: row.status ?? existing.status ?? null,
+          location: pickText(row as Record<string, unknown>, 'location') || pickText(existing, 'location') || '',
+        });
       }
 
       const list: WorkNowMember[] = active.map((s) => {
@@ -292,20 +350,37 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
         let location = s.department ?? '본사';
         let since = '-';
         if (att) {
-          state = deriveState(pickText(att, 'status', '상태'));
+          const checkIn = pickText(att, 'check_in', 'check_in_time', 'started_at', 'checkin_at');
+          const checkOut = pickText(att, 'check_out', 'check_out_time', 'checkout_at');
+          const hasIn = Boolean(checkIn);
+          const hasOut = Boolean(checkOut);
+          // PC: 체크인 있고 체크아웃 없을 때만 근무 중 후보
+          if (!hasIn) {
+            state = 'unknown';
+          } else if (hasOut) {
+            state = 'unknown'; // 퇴근
+          } else {
+            const derived = deriveRealtimeState(
+              pickText(att, 'current_status') || null,
+              pickText(att, 'status', '상태') || null,
+            );
+            state = derived === 'unknown' ? 'working' : derived;
+          }
           location = pickText(att, 'location', '위치') || location;
-          since = pickText(att, 'check_in_time', 'started_at', 'checkin_at') || '-';
-          if (since.length >= 16) since = since.slice(11, 16);
+          since = formatSinceLabel(checkIn || '-');
         }
-        if (state === 'unknown') state = 'working';
-          return {
-            id: s.id,
-            name: s.name ?? '',
-            department: company && company !== '전체' ? (s.department ?? '미지정') : `[${(s.company ?? '미지정').trim()}] ${(s.department ?? '미지정').trim()}`,
-            state,
-            stateLabel: STATE_LABEL[state],
-            location,
-            since };
+        // 미출근/퇴근은 unknown 유지 — 전원 working 강제 금지
+        return {
+          id: s.id,
+          name: s.name ?? '',
+          department:
+            company && company !== '전체'
+              ? (s.department ?? '미지정')
+              : `[${(s.company ?? '미지정').trim()}] ${(s.department ?? '미지정').trim()}`,
+          state,
+          stateLabel: STATE_LABEL[state],
+          location,
+          since };
       });
       setMembers(list);
       setLastSync(new Date());
@@ -321,7 +396,11 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
     void load();
 
     const channelKey = `mobile-worknow-${company || 'all'}`;
-    const tables: TableFilter[] = [{ table: 'staff_members' }];
+    const tables: TableFilter[] = [
+      { table: 'staff_members' },
+      { table: 'attendance' },
+      { table: 'attendances' },
+    ];
 
     const unsubscribe = subscribeRealtime(
       channelKey,
@@ -329,14 +408,14 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
       () => {
         if (alive) void load();
       },
-      { pollIntervalMs: 60000 } // fallback poll interval is 60s
+      { pollIntervalMs: pollMs },
     );
 
     return () => {
       alive = false;
       unsubscribe();
     };
-  }, [load, company]);
+  }, [load, company, pollMs]);
 
   const kpi = useMemo(() => ({
     working: members.filter((m) => m.state === 'working').length,
@@ -661,7 +740,8 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
       let q = db
         .from('board_posts')
         .select('*')
-        .in('board_type', ['업무공유', 'task_share'])
+        // PC/게시판 정본: 업무가이드. 레거시 업무공유·task_share 도 포함
+        .in('board_type', ['업무가이드', '업무공유', 'task_share', 'guide'])
         .order('created_at', { ascending: false })
         .limit(50);
       if (company) q = q.eq('company', company);

@@ -38,13 +38,15 @@ export type SChatListProps = {
   user: ErpUser;
   /** JM2: 부모에서 fetch한 rooms — 중복 fetch 금지 */
   rooms: MobileChatRoom[];
+  /** 부모 useChatRoomsForMobile.loading — rooms.length===0 과 구분 */
+  roomsLoading?: boolean;
   onOpen: (roomId: string, searchMessageId?: string) => void;
   onNew: () => void;
   /** PTR 콜백 — 부모 refresh 함수 전달 */
   onRefresh: () => Promise<void>;
 };
 
-export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SChatListProps) {
+export default function SChatList({ user, rooms, roomsLoading = false, onOpen, onNew, onRefresh }: SChatListProps) {
   const [tab, setTab] = useState<ChatListTab>('chat');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
@@ -107,7 +109,7 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
   // 방 제목·마지막 메시지뿐 아니라 대화 "내용"까지 검색 (PC 전역검색과 동일한 ilike 방식)
   const { hits: messageHits, loading: messageSearchLoading } = useChatMessageSearch(roomIds, searchQuery);
 
-  const loading = rooms.length === 0; // 부모가 loading 상태를 따로 노출하지 않으므로 대략 처리
+  const loading = roomsLoading;
 
   const { containerRef: scrollContainerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh,
@@ -319,6 +321,9 @@ export default function SChatList({ user, rooms, onOpen, onNew, onRefresh }: SCh
                   })}
                 </div>
               </>
+            )}
+            {loading && rooms.length === 0 && (
+              <EmptyState label="채팅방 목록을 불러오는 중…" />
             )}
             {!loading && filtered.length === 0 && messageHits.length === 0 && !messageSearchLoading && (
               <EmptyState

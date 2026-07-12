@@ -230,7 +230,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/40"
           onClick={() => setShowCreateModal(false)}
         >
           <div
@@ -387,7 +387,7 @@ export default function 징계탭({ staffs, company, user }: DisciplinaryTabProp
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          className="fixed inset-0 z-[1200] flex items-end justify-center bg-black/40"
           onClick={() => setShowDetailModal(false)}
         >
           <div

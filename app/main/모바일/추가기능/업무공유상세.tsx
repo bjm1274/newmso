@@ -17,6 +17,7 @@ import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MAvatar from '../공통/MAvatar';
+import { isImeComposing } from '../공통/useKeyboardLift';
 import { pickText, pickTone } from './data-hooks';
 
 type Comment = {
@@ -281,6 +282,7 @@ function MobileTaskShareDetail({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
+                if (isImeComposing(e)) return;
                 e.preventDefault();
                 void submitComment();
               }

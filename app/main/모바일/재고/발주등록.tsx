@@ -21,12 +21,14 @@
  * JM6: 수량 +/- 버튼 aria-label, 입력 label htmlFor
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
+import { db } from '@/lib/db-client';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
 import MAvatar from '../공통/MAvatar';
+import MSheet from '../공통/MSheet';
 import {
   MFormHeader,
   MField,
@@ -61,16 +63,15 @@ function toISODate(raw: string): string | null {
 }
 
 export type OrderItem = {
+  id: string | null;
   n: string;
   q: number;
   p: number;
   u: string;
 };
 
-const DEFAULT_ITEMS: ReadonlyArray<OrderItem> = [
-  { n: '1회용 주사기 5cc', q: 500, p: 248, u: '개' },
-  { n: '멸균거즈 4x4', q: 50, p: 680, u: '팩' },
-];
+type CatalogRow = { id: string; name: string; unit: string; price: number; stock: number };
+type SupplierRow = { id: string; name: string };
 
 export type 발주등록Props = {
   user: (StockMutateUser & { id?: string | null; name?: string | null; company?: string | null }) | null;
@@ -78,13 +79,22 @@ export type 발주등록Props = {
 };
 
 export default function 발주등록({ user, onBack }: 발주등록Props) {
-  const [vendor, setVendor] = useState('동인의료');
-  const [items, setItems] = useState<OrderItem[]>(() => [...DEFAULT_ITEMS]);
-  const [deliveryDate, setDeliveryDate] = useState('2026.05.30');
-  const [address, setAddress] = useState('서울 강남구 테헤란로 234, 5층');
+  const [vendor, setVendor] = useState('');
+  const [items, setItems] = useState<OrderItem[]>([]);
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [address, setAddress] = useState('');
   const [memo, setMemo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogRow[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [itemSheetOpen, setItemSheetOpen] = useState(false);
+  const [vendorSheetOpen, setVendorSheetOpen] = useState(false);
+  const [itemQuery, setItemQuery] = useState('');
+  const [vendorQuery, setVendorQuery] = useState('');
+  const [customVendor, setCustomVendor] = useState('');
   const fid = useFieldIdPrefix('order');
+  const company = typeof user?.company === 'string' ? user.company.trim() : '';
 
   const total = useMemo(
     () => items.reduce((s, it) => s + it.q * it.p, 0),
@@ -93,12 +103,84 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
 
   const allowOrder = canPlaceOrder(user);
 
+  const loadPickers = useCallback(async () => {
+    setCatalogLoading(true);
+    try {
+      let invQ = db
+        .from('inventory')
+        .select('id, name, unit, quantity, unit_price, price, company')
+        .order('name')
+        .limit(300);
+      if (company && company !== '전체') invQ = invQ.eq('company', company);
+      const [invRes, supRes] = await Promise.all([
+        invQ,
+        db.from('suppliers').select('id, name, company').order('name').limit(100),
+      ]);
+      const invRows = Array.isArray(invRes.data) ? invRes.data : [];
+      setCatalog(
+        invRows.map((r: Record<string, unknown>) => ({
+          id: String(r.id ?? ''),
+          name: String(r.name ?? '').trim() || '(미명칭)',
+          unit: String(r.unit ?? '개').trim() || '개',
+          price: Number(r.unit_price ?? r.price ?? 0) || 0,
+          stock: Number(r.quantity ?? 0) || 0,
+        })),
+      );
+      let supRows = Array.isArray(supRes.data) ? (supRes.data as Record<string, unknown>[]) : [];
+      if (company && company !== '전체') {
+        supRows = supRows.filter((s) => {
+          const c = String(s.company ?? '').trim();
+          return !c || c === company || c === '전체';
+        });
+      }
+      setSuppliers(
+        supRows.map((s) => ({
+          id: String(s.id ?? ''),
+          name: String(s.name ?? '').trim() || '거래처',
+        })),
+      );
+    } catch (err) {
+      console.warn('[mobile-order] catalog load failed', err);
+      toast('품목/거래처 목록을 불러오지 못했습니다.', 'warning');
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [company]);
+
+  useEffect(() => {
+    void loadPickers();
+  }, [loadPickers]);
+
+  const filteredCatalog = useMemo(() => {
+    const q = itemQuery.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter((c) => c.name.toLowerCase().includes(q));
+  }, [catalog, itemQuery]);
+
+  const filteredSuppliers = useMemo(() => {
+    const q = vendorQuery.trim().toLowerCase();
+    if (!q) return suppliers;
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [suppliers, vendorQuery]);
+
   const updateQ = (i: number, raw: string | number) => {
     const next = typeof raw === 'number' ? raw : parseInt(String(raw), 10) || 0;
     setItems((prev) => prev.map((it, j) => (j === i ? { ...it, q: Math.max(0, next) } : it)));
   };
   const removeItem = (i: number) => {
     setItems((prev) => prev.filter((_, j) => j !== i));
+  };
+  const addCatalogItem = (row: CatalogRow) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((it) => it.id && it.id === row.id);
+      if (idx >= 0) {
+        return prev.map((it, i) => (i === idx ? { ...it, q: it.q + 1 } : it));
+      }
+      return [...prev, { id: row.id || null, n: row.name, q: 1, p: row.price, u: row.unit }];
+    });
+    setItemSheetOpen(false);
+    setItemQuery('');
+    toast(`${row.name} 추가`, 'success');
   };
 
   const handleSave = async () => {
@@ -134,7 +216,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
     setSaving(true);
     try {
       const orderItems: PurchaseOrderItem[] = items.map((it) => ({
-        item_id: null, // 모바일 발주는 카탈로그 미연결 — 후속
+        item_id: it.id,
         name: it.n,
         qty: it.q,
         unit_price: it.p }));
@@ -196,18 +278,22 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
           <MField label="거래처" required>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
               <MAvatar tone="cyan" size="sm">
-                {vendor.charAt(0)}
+                {(vendor || '거').charAt(0)}
               </MAvatar>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{vendor}</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{vendor || '거래처 미선택'}</div>
                 <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
-                  의료소모품 · 평균 배송 2일
+                  등록 거래처 목록에서 선택
                 </div>
               </div>
               <button
                 type="button"
                 aria-label="거래처 변경"
-                onClick={() => setVendor((v) => (v === '동인의료' ? '한솔메디칼' : '동인의료'))}
+                onClick={() => {
+                  setVendorQuery('');
+                  setCustomVendor(vendor);
+                  setVendorSheetOpen(true);
+                }}
                 style={{ color: 'var(--m-accent)', fontSize: 12, fontWeight: 700 }}
               >
                 변경
@@ -237,6 +323,10 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
           <button
             type="button"
             aria-label="품목 추가"
+            onClick={() => {
+              setItemQuery('');
+              setItemSheetOpen(true);
+            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -257,6 +347,14 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
             flexDirection: 'column',
             gap: 10 }}
         >
+          {items.length === 0 && (
+            <div
+              className="m-card"
+              style={{ padding: 20, textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 600 }}
+            >
+              품목이 없습니다. 「품목 추가」로 등록하세요.
+            </div>
+          )}
           {items.map((it, i) => (
             <div key={`${it.n}-${i}`} className="m-card" style={{ padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -436,6 +534,132 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
           </div>
         )}
       </div>
+
+      {/* 품목 카탈로그 시트 */}
+      <MSheet open={itemSheetOpen} onClose={() => setItemSheetOpen(false)} title="품목 선택">
+        <div style={{ padding: '0 16px 20px' }}>
+          <input
+            type="search"
+            value={itemQuery}
+            onChange={(e) => setItemQuery(e.target.value)}
+            placeholder="품목명 검색"
+            aria-label="품목 검색"
+            style={{
+              width: '100%',
+              height: 40,
+              padding: '0 12px',
+              borderRadius: 10,
+              border: '1px solid var(--m-border)',
+              background: 'var(--m-bg)',
+              fontSize: 14,
+              fontWeight: 600,
+              marginBottom: 12 }}
+          />
+          {catalogLoading && (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>불러오는 중…</div>
+          )}
+          {!catalogLoading && filteredCatalog.length === 0 && (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
+              등록된 품목이 없습니다.
+            </div>
+          )}
+          {filteredCatalog.map((row) => (
+            <button
+              key={row.id || row.name}
+              type="button"
+              onClick={() => addCatalogItem(row)}
+              className="m-list-row"
+              style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '12px 4px' }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{row.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
+                  재고 {row.stock}{row.unit} · 단가 ₩{formatAmount(row.price)}
+                </div>
+              </div>
+              <MIcon name="plus" size={16} color="var(--m-accent)" />
+            </button>
+          ))}
+        </div>
+      </MSheet>
+
+      {/* 거래처 시트 */}
+      <MSheet open={vendorSheetOpen} onClose={() => setVendorSheetOpen(false)} title="거래처 선택">
+        <div style={{ padding: '0 16px 20px' }}>
+          <input
+            type="search"
+            value={vendorQuery}
+            onChange={(e) => setVendorQuery(e.target.value)}
+            placeholder="거래처 검색"
+            aria-label="거래처 검색"
+            style={{
+              width: '100%',
+              height: 40,
+              padding: '0 12px',
+              borderRadius: 10,
+              border: '1px solid var(--m-border)',
+              background: 'var(--m-bg)',
+              fontSize: 14,
+              fontWeight: 600,
+              marginBottom: 12 }}
+          />
+          {filteredSuppliers.map((s) => (
+            <button
+              key={s.id || s.name}
+              type="button"
+              onClick={() => {
+                setVendor(s.name);
+                setVendorSheetOpen(false);
+              }}
+              className="m-list-row"
+              style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '12px 4px' }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{s.name}</div>
+            </button>
+          ))}
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--m-border)', paddingTop: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--z-500)', marginBottom: 8 }}>직접 입력</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={customVendor}
+                onChange={(e) => setCustomVendor(e.target.value)}
+                placeholder="거래처명"
+                style={{
+                  flex: 1,
+                  height: 40,
+                  padding: '0 12px',
+                  borderRadius: 10,
+                  border: '1px solid var(--m-border)',
+                  background: 'var(--m-bg)',
+                  fontSize: 14,
+                  fontWeight: 600 }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const v = customVendor.trim();
+                  if (!v) {
+                    toast('거래처명을 입력하세요.', 'warning');
+                    return;
+                  }
+                  setVendor(v);
+                  setVendorSheetOpen(false);
+                }}
+                style={{
+                  padding: '0 14px',
+                  borderRadius: 10,
+                  background: 'var(--m-accent)',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: 13,
+                  border: 'none' }}
+              >
+                적용
+              </button>
+            </div>
+          </div>
+        </div>
+      </MSheet>
     </div>
   );
 }
