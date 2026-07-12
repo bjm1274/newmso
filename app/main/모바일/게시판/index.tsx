@@ -43,19 +43,19 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   const userCompany = typeof user.company === 'string' ? user.company : null;
   const userCompanyId = typeof user.company_id === 'string' ? user.company_id : null;
 
+  // 메인은 항상 게시글 리스트(전체 또는 카테고리). 카테고리 홈은 비사용.
   const [view, setView] = useState<View>(() => {
     if (initialPostId) return 'detail';
-    const resolved = resolveBoardSubView(subView);
-    return resolved.openList ? 'list' : 'home';
+    return 'list';
   });
   const [cat, setCat] = useState<BoardCatId>(() => resolveBoardSubView(subView).cat);
 
-  // Synchronize category and view when global subView changes (ignore '전체'/타 메뉴)
+  // Synchronize category when global subView changes
   useEffect(() => {
     const resolved = resolveBoardSubView(subView);
     setCat(resolved.cat);
-    if (!initialPostId && resolved.openList) {
-      setView('list');
+    if (!initialPostId) {
+      setView((v) => (v === 'detail' || v === 'write' ? v : 'list'));
     }
   }, [subView, initialPostId]);
   const [postId, setPostId] = useState<string | null>(initialPostId || null);
@@ -127,14 +127,10 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
     [fetched, refetch],
   );
 
-  const handleBackToHome = useCallback(() => {
-    setView('home');
-    setCat('all');
-  }, []);
-
   const handleBackToList = useCallback(() => {
     setView('list');
     setPostId(null);
+    setCat((c) => c || 'all');
   }, []);
 
   const handleCreated = useCallback(
@@ -226,11 +222,11 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         onCat={setCat}
         onOpen={handleOpen}
         onWrite={handleWrite}
-        onBack={view === 'list' ? handleBackToHome : onBack}
+        onBack={onBack}
         userId={userId}
         onStarChanged={handleStarChanged}
         onRefresh={refetch}
-        showHome={view === 'home'}
+        showHome={false}
         onOpenCategory={handleOpenCategory}
         company={userCompany ?? ''}
       />

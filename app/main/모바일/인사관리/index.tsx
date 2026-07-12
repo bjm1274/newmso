@@ -199,7 +199,8 @@ function Hub({
   // Query all staff to:
   // 1. Gather all unique companies in the database
   // 2. Compute accurate stats locally
-  const { staffs: allStaffs, loading } = useStaffList({ includeResigned: true });
+  // limit 높게: 회사 목록·KPI 집계 누락 방지
+  const { staffs: allStaffs, loading } = useStaffList({ includeResigned: true, limit: 1000 });
   const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
 
   // Filter staff by currently selected company
@@ -295,12 +296,33 @@ function Hub({
         }
       />
       <div className="m-scroll">
+        {/* 회사 선택 — button 전역 리셋(background:transparent) 대비 인라인 보강 */}
         <button
           type="button"
           className="m-company-sel"
           onClick={() => setIsCompanySheetOpen(true)}
+          aria-label="회사 선택"
+          style={{
+            margin: '12px 16px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '13px 14px',
+            background: 'var(--m-card)',
+            border: '1px solid var(--m-border)',
+            borderRadius: 'var(--m-radius-md)',
+            fontSize: 14,
+            fontWeight: 700,
+            color: 'var(--z-800)',
+            width: 'calc(100% - 32px)',
+            textAlign: 'left',
+            boxSizing: 'border-box',
+            cursor: 'pointer' }}
         >
-          <span className="nm">{company || '전체'}</span>
+          <span className="nm" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {company || '전체'}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--z-500)' }}>회사 변경</span>
           <MIcon name="chevD" size={18} className="chev" />
         </button>
 

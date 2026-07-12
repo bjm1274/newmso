@@ -71,19 +71,24 @@ export function boardTypeToCat(boardType: string | null | undefined): BoardCatId
   return cat ? cat.id : 'all';
 }
 
-/** 게시판 전용으로 인정할 subView 값인지 (전역 '전체'/타 메뉴 sub 제외) */
+/**
+ * 게시판 subView 해석.
+ * - '전체'/빈값/타 메뉴 잔여값 → 전체 리스트 (리스트가 메인)
+ * - 보드 id/board_type → 해당 카테고리 리스트
+ */
 export function resolveBoardSubView(subView: string | null | undefined): {
   cat: BoardCatId;
   openList: boolean;
 } {
+  // 메인 진입: 항상 리스트(전체). 카테고리 홈은 쓰지 않음.
   if (!subView || subView === '전체' || subView === 'all') {
-    return { cat: 'all', openList: false };
+    return { cat: 'all', openList: true };
   }
   const isCatId = BOARD_CATS.some((c) => c.id === subView);
   if (isCatId) return { cat: subView as BoardCatId, openList: true };
   const cat = BOARD_CATS.find((c) => c.boardType === subView);
   if (cat) return { cat: cat.id, openList: true };
-  return { cat: 'all', openList: false };
+  return { cat: 'all', openList: true };
 }
 
 // ─────────────────────────────────────────────
