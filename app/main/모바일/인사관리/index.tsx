@@ -89,7 +89,7 @@ const HR_MENU: HrMenu[] = [
   { id: 'attend', label: '근태', sub: '대시보드 · 근무표 · 3교대 · 근태이상', icon: 'clock', tone: 'success' },
   { id: 'leave', label: '연차 · 휴가', sub: '잔여 · 신청 내역 · 소멸 알림 · 계획서', icon: 'calendar', tone: 'accent' },
   { id: 'abnormal', label: '근태이상', sub: '이상 근태 검토 · 조치', icon: 'alertTri', tone: 'warning' },
-  { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning', badge: '정산 중', badgeTone: 'warning' },
+  { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning' },
   { id: 'welfare', label: '복지', sub: '경조사 · 건강검진 · 면허/자격 · 의료기기', icon: 'badge', tone: 'accent' },
   { id: 'docs', label: '계약 · 문서', sub: '계약 · 자동생성 · 증명서 · 서류 제출', icon: 'fileText', tone: '' },
   // 오프보딩·문서보관함은 PC와 동일하게 권한 보유자에게만 노출(퇴사 처리·회사 문서 열람).

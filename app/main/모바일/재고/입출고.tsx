@@ -39,6 +39,7 @@ export type IOTab = 'io' | 'order' | 'vendor' | 'doc' | 'history';
 
 export type 입출고Props = {
   user: StockMutateUser | null;
+  company?: string;
   onBack: () => void;
   onPlaceOrder: () => void;
 };
@@ -51,10 +52,10 @@ const TABS: ReadonlyArray<{ id: IOTab; label: string }> = [
   { id: 'history', label: '이력' },
 ];
 
-export default function 입출고({ user, onBack, onPlaceOrder }: 입출고Props) {
+export default function 입출고({ user, company, onBack, onPlaceOrder }: 입출고Props) {
   const [tab, setTab] = useState<IOTab>('io');
   const [showForm, setShowForm] = useState(false);
-  const data = useIOData();
+  const data = useIOData(company);
   const allowOrder = canPlaceOrder(user);
 
   if (showForm) {

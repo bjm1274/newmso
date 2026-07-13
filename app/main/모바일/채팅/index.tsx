@@ -17,6 +17,7 @@ import SChatRoom from './채팅방';
 import SFormChat from './새대화';
 import { useChatRoomsForMobile, type MobileChatRoom } from './data-hooks';
 import { useSheetHistory } from '@/app/hooks/useSheetHistory';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 type ChatView = 'list' | 'room' | 'new';
 
@@ -51,7 +52,9 @@ function MobileChat({
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
 
-  const userId = typeof user.id === 'string' ? user.id : null;
+  const userId =
+    useResolvedStaffId(user as Record<string, unknown>) ||
+    (typeof user.id === 'string' ? user.id : null);
 
   // 부모(MobileShell)와 상태 공유 — 부모가 준 값이 있으면 그것을 쓰고 없으면 로컬에서 조회
   const localHook = useChatRoomsForMobile(propsRooms ? null : userId, propsRooms ? null : selectedRoomId);

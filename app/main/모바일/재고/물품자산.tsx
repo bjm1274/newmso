@@ -33,17 +33,19 @@ import {
 export type ItemTab = 'items' | 'cat' | 'asset' | 'udi';
 
 export type 물품자산Props = {
+  company?: string;
   onBack: () => void;
   onOpenItemForm: () => void;
   onOpenAssetForm: () => void;
 };
 
 export default function 물품자산({
+  company,
   onBack,
   onOpenItemForm,
   onOpenAssetForm }: 물품자산Props) {
   const [tab, setTab] = useState<ItemTab>('items');
-  const data = useItemData();
+  const data = useItemData(company);
 
   return (
     <div className="m-screen">

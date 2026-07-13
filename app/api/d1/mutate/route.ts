@@ -557,16 +557,60 @@ export async function POST(request: Request) {
       );
       const whereParts = buildWhereSql(payload.where);
       const returningSql = buildReturningSql(payload.returning);
+      // 메시지 soft-delete 시 room_id 확보 — returning 없으면 where eq id로 선조회
+      let messageRoomIdsForRefresh: string[] = [];
+      if (payload.table === 'messages') {
+        const touchesDelete =
+          Object.prototype.hasOwnProperty.call(payload.set, 'is_deleted') ||
+          Object.prototype.hasOwnProperty.call(payload.set, 'content');
+        if (touchesDelete) {
+          try {
+            const idCond = payload.where.find((w) => w.field === 'id' && w.op === 'eq');
+            const roomCond = payload.where.find((w) => w.field === 'room_id' && w.op === 'eq');
+            if (roomCond?.value) {
+              messageRoomIdsForRefresh = [String(roomCond.value)];
+            } else if (idCond?.value) {
+              const pre = await db.run(
+                sql`SELECT room_id FROM messages WHERE id = ${normalizeBindValue(idCond.value)} LIMIT 1`,
+              );
+              const preRows = ((pre as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+              const rid = preRows[0]?.room_id;
+              if (rid) messageRoomIdsForRefresh = [String(rid)];
+            }
+          } catch (e) {
+            console.error('[d1/mutate] messages room_id prelookup failed:', e);
+          }
+        }
+      }
       const stmt = sql`UPDATE ${tableSql} SET ${setSql} WHERE ${sql.join(whereParts, sql` AND `)}${returningSql}`;
+      let updatedRows: Record<string, unknown>[] = [];
       if (payload.returning && payload.returning.length > 0) {
         const result = await db.run(stmt);
-        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-        await triggerMutationSignal(payload, rows);
-        // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
-        return NextResponse.json({ ok: true, data: deserializeRows(payload.table, rows) });
+        updatedRows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+        await triggerMutationSignal(payload, updatedRows);
+      } else {
+        await db.run(stmt);
+        await triggerMutationSignal(payload);
       }
-      await db.run(stmt);
-      await triggerMutationSignal(payload);
+      // 메시지 삭제/수정 후 chat_rooms.last_message_preview 재계산 (목록에 삭제 전 내용 남는 버그 수정)
+      if (payload.table === 'messages') {
+        try {
+          const { refreshChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+          const roomIds = new Set<string>(messageRoomIdsForRefresh);
+          for (const r of updatedRows) {
+            const rid = r.room_id != null ? String(r.room_id) : '';
+            if (rid) roomIds.add(rid);
+          }
+          for (const roomId of roomIds) {
+            await refreshChatRoomLastMessage(db, roomId);
+          }
+        } catch (refreshErr) {
+          console.error('[d1/mutate] refreshChatRoomLastMessage failed (non-fatal):', refreshErr);
+        }
+      }
+      if (payload.returning && payload.returning.length > 0) {
+        return NextResponse.json({ ok: true, data: deserializeRows(payload.table, updatedRows) });
+      }
       return NextResponse.json({ ok: true });
     }
 

@@ -71,6 +71,7 @@ import { AddMemberSheet } from './멤버관리시트';
 import { PollComposerSheet, PollCard } from './투표';
 import { MessageEditSheet } from './수정시트';
 import { triggerMobileChatPush } from './푸시트리거';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type SChatRoomProps = {
   user: ErpUser;
@@ -88,7 +89,7 @@ export type SChatRoomProps = {
 const SCROLL_TOP_THRESHOLD_PX = 80;
 
 export default function SChatRoom({ user, room, membersReady = true, onBack, recentRooms, onSwitchRoom, onOpenBoardPost, searchMessageId }: SChatRoomProps) {
-  const userId = typeof user.id === 'string' ? user.id : null;
+  const userId = useResolvedStaffId(user as Record<string, unknown>);
   const userName = typeof user.name === 'string' ? user.name : '';
   const company = typeof user.company === 'string' ? user.company : null;
   const staffs = useChatStaffDirectory(company);
@@ -727,19 +728,57 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
   const handleDeleteMessage = useCallback(async (message: ChatMessage) => {
     try {
-      // PC 메신저액션훅과 동일하게 표준 messages 테이블을 사용한다.
-      // (기존 'chat_messages'는 읽기 경로(messages)와 다른 비표준 테이블이라 삭제가 반영되지 않던 버그)
+      // 표준 messages soft-delete. d1/mutate UPDATE 후 refreshChatRoomLastMessage 로
+      // chat_rooms.last_message_preview 를 재계산한다 (삭제 전 파일 경로가 목록에 남는 버그 수정).
+      const roomId = String(message.room_id || room.id || '');
       const { error } = await db
         .from('messages')
         .update({ is_deleted: true, content: '삭제된 메시지입니다.' })
         .eq('id', message.id);
       if (error) throw error;
+      // 목록 미리보기 즉시 정합 — 서버 refresh 와 병행해 폴링 전 깜빡임 방지
+      if (roomId) {
+        try {
+          // 최신 non-deleted 메시지로 preview 재구성 (클라이언트 폴백)
+          const { data: latestRows } = await db
+            .from('messages')
+            .select('content, file_name, file_url, created_at, is_deleted')
+            .eq('room_id', roomId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+          const latest = (Array.isArray(latestRows) ? latestRows : []).find(
+            (r) => !r.is_deleted || r.is_deleted === 0 || r.is_deleted === false,
+          ) as { content?: string; file_name?: string; file_url?: string; created_at?: string } | undefined;
+          let preview = '대화 시작';
+          if (latest) {
+            const c = String(latest.content || '').trim();
+            if (c && c !== '삭제된 메시지입니다.') preview = c.slice(0, 80);
+            else if (latest.file_name) preview = String(latest.file_name).slice(0, 80);
+            else if (latest.file_url) preview = '파일';
+            else preview = '메시지';
+          } else {
+            // 전부 삭제된 경우
+            preview = '삭제된 메시지입니다.';
+          }
+          await db
+            .from('chat_rooms')
+            .update({
+              last_message: preview,
+              last_message_preview: preview,
+              last_message_at: latest?.created_at || new Date().toISOString(),
+            })
+            .eq('id', roomId);
+        } catch {
+          /* non-fatal — 서버 mutate refresh 가 회수 */
+        }
+      }
       toast('메시지가 삭제되었습니다.', 'success');
       void refresh();
+      pokeChannel('mobile-chat-rooms-list');
     } catch (err) {
       toast('메시지 삭제 중 오류가 발생했습니다.', 'error');
     }
-  }, [refresh]);
+  }, [refresh, room.id]);
 
   const handleForwardSelectRoom = useCallback(async (targetRoom: MobileChatRoom) => {
     if (!forwardMessage || !userId) return;

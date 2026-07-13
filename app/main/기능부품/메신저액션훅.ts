@@ -220,7 +220,9 @@ export function useChatMessageActions({
     );
     syncRoomSummaryFromMessages(message.room_id || selectedRoomId, nextMessagesSnapshot);
 
-    await db.from('messages').update({ is_deleted: true }).eq('id', message.id);
+    await db.from('messages').update({ is_deleted: true, content: '삭제된 메시지입니다.' }).eq('id', message.id);
+    // chat_rooms.last_message_preview 재계산은 d1/mutate UPDATE 훅에서 refreshChatRoomLastMessage 처리.
+    // 로컬 요약은 위에서 이미 반영 — 다른 방 전환 후에도 DB 폴링 시 삭제 전 내용이 다시 뜨지 않음.
 
     try {
       await db.from('audit_logs').insert([

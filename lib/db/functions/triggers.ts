@@ -81,23 +81,36 @@ export async function refreshChatRoomLastMessage(
 
   const latest = rows[0];
   if (!latest) {
+    // 전부 삭제됐거나 메시지가 없으면 미리보기를 '삭제된 메시지'로 남기지 않고 비움
+    // (삭제만 남은 방은 빈 미리보기가 자연스러움)
     await db
       .update(chat_rooms)
-      .set({ last_message_at: null, last_message_preview: null })
+      .set({
+        last_message: null,
+        last_message_at: null,
+        last_message_preview: null })
       .where(eq(chat_rooms.id, roomId))
       .run();
     return;
   }
 
-  const previewSrc =
+  let previewSrc =
     (latest.content && latest.content.trim() !== '' && latest.content) ||
     (latest.file_name && latest.file_name.trim() !== '' && latest.file_name) ||
     '(file)';
+  // file:// 로컬 경로는 목록에 노출하지 않음
+  if (String(previewSrc).startsWith('file://') || String(previewSrc).startsWith('blob:')) {
+    previewSrc = latest.file_name || '파일';
+  }
+  if (String(previewSrc).trim() === '삭제된 메시지입니다.') {
+    previewSrc = '삭제된 메시지입니다.';
+  }
   const preview = String(previewSrc).slice(0, 80);
 
   await db
     .update(chat_rooms)
     .set({
+      last_message: preview,
       last_message_at: latest.created_at,
       last_message_preview: preview })
     .where(eq(chat_rooms.id, roomId))

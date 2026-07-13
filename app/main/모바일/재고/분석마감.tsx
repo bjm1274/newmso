@@ -51,7 +51,7 @@ const TABS: ReadonlyArray<{ id: AnalyzeTab; label: string }> = [
 
 export default function 분석마감({ company, onBack }: 분석마감Props) {
   const [tab, setTab] = useState<AnalyzeTab>('abc');
-  const data = useAnalyzeData();
+  const data = useAnalyzeData(company);
 
   const now = new Date();
   const ym = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}`;

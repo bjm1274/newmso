@@ -554,10 +554,18 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
   const title = getRoomTitle(room, staffs, userId);
   const kind = getRoomKind(room);
   const tone = pickAvatarTone(String(room.id) + title);
-  const lastMsg =
+  const rawPreview =
     (typeof room.last_message_preview === 'string' && room.last_message_preview) ||
     (typeof room.last_message === 'string' && room.last_message) ||
     '';
+  // file:// 로컬 경로·삭제 전 잔존 미리보기 정리
+  const lastMsg = (() => {
+    const t = String(rawPreview).trim();
+    if (!t) return '';
+    if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
+    if (t.startsWith('file://') || t.startsWith('blob:')) return '파일';
+    return t;
+  })();
   const ts = formatChatTimestamp(room.last_message_at || room.created_at);
   const unread = room.unread_count || 0;
   const memberCount = Array.isArray(room.members) ? room.members.length : 0;

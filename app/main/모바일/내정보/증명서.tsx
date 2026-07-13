@@ -16,6 +16,7 @@ import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { useMyRecentCerts } from './data-hooks';
 import { issueAndPrintMyCert } from './cert-issue';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 type CertDoc = {
   id: string;
@@ -41,7 +42,7 @@ export type 증명서Props = {
 };
 
 function MobileCertificateBase({ user, onBack }: 증명서Props) {
-  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const [reloadToken, setReloadToken] = useState(0);
   const [issuingId, setIssuingId] = useState<string | null>(null);
   const { rows: recentCerts, loading } = useMyRecentCerts(staffId, reloadToken);

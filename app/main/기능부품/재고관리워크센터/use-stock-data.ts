@@ -275,10 +275,11 @@ const IO_EMPTY: IOWorkcenterData = {
   loading: true,
   error: null };
 
-export function useIOData(): IOWorkcenterData & { refresh: () => void } {
+export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<IOWorkcenterData>(IO_EMPTY);
   const [reloadKey, setReloadKey] = useState(0);
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -289,20 +290,25 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
         const todayKey = getKoreanTodayString();
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
-        const [logsRes, ordersRes, suppliersRes] = await Promise.all([
-          db
-            .from('inventory_logs')
-            .select('*')
-            .gte('created_at', todayKey)
-            .order('created_at', { ascending: false })
-            .limit(50),
-          db
-            .from('purchase_orders')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(50),
-          db.from('suppliers').select('*').order('name').limit(30),
-        ]);
+        let logsQ = db
+          .from('inventory_logs')
+          .select('*')
+          .gte('created_at', todayKey)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        let ordersQ = db
+          .from('purchase_orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        let suppliersQ = db.from('suppliers').select('*').order('name').limit(30);
+        if (companyFilter) {
+          logsQ = logsQ.eq('company', companyFilter);
+          ordersQ = ordersQ.eq('company', companyFilter);
+          suppliersQ = suppliersQ.eq('company', companyFilter);
+        }
+
+        const [logsRes, ordersRes, suppliersRes] = await Promise.all([logsQ, ordersQ, suppliersQ]);
 
         if (cancelled) return;
 
@@ -374,7 +380,7 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, companyFilter]);
 
   useEffect(() => {
     const unsub = subscribeRealtime(
@@ -474,22 +480,25 @@ const ITEM_EMPTY: ItemWorkcenterData = {
   loading: true,
   error: null };
 
-export function useItemData(): ItemWorkcenterData & { refresh: () => void } {
+export function useItemData(userCompany?: string): ItemWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<ItemWorkcenterData>(ITEM_EMPTY);
   const [reloadKey, setReloadKey] = useState(0);
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
+        let invQ = db
+          .from('inventory')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (companyFilter) invQ = invQ.eq('company', companyFilter);
         const [invRes, catRes] = await Promise.all([
-          db
-            .from('inventory')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(200),
+          invQ,
           db.from('inventory_categories').select('*').order('name').limit(100),
         ]);
 
@@ -533,7 +542,7 @@ export function useItemData(): ItemWorkcenterData & { refresh: () => void } {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, companyFilter]);
 
   useEffect(() => {
     const unsub = subscribeRealtime(
@@ -688,24 +697,28 @@ const ANALYZE_EMPTY: AnalyzeWorkcenterData = {
   loading: true,
   error: null };
 
-export function useAnalyzeData(): AnalyzeWorkcenterData & { refresh: () => void } {
+export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<AnalyzeWorkcenterData>(ANALYZE_EMPTY);
   const [reloadKey, setReloadKey] = useState(0);
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
-        const [invRes, logRes] = await Promise.all([
-          db.from('inventory').select('*').limit(500),
-          db
-            .from('inventory_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1000),
-        ]);
+        let invQ = db.from('inventory').select('*').limit(500);
+        let logQ = db
+          .from('inventory_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1000);
+        if (companyFilter) {
+          invQ = invQ.eq('company', companyFilter);
+          logQ = logQ.eq('company', companyFilter);
+        }
+        const [invRes, logRes] = await Promise.all([invQ, logQ]);
 
         if (cancelled) return;
 
@@ -744,7 +757,7 @@ export function useAnalyzeData(): AnalyzeWorkcenterData & { refresh: () => void 
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, companyFilter]);
 
   useEffect(() => {
     const unsub = subscribeRealtime(

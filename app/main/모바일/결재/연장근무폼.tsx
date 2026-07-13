@@ -74,19 +74,35 @@ export default function SApprovalOvertimeForm({
       const start = new Date();
       start.setDate(start.getDate() - 120);
       const startStr = formatKoreanDateKey(start);
+      // 스키마 정합: attendances 는 check_in_time/check_out_time (at 아님). overtime_minutes 컬럼 없음 → 시간 차로 계산.
       const { data, error } = await db
         .from('attendances')
-        .select('work_date, overtime_minutes, check_in_at, check_out_at')
+        .select('work_date, check_in_time, check_out_time, overtime_minutes')
         .eq('staff_id', staffId)
         .gte('work_date', startStr)
         .order('work_date', { ascending: false });
       if (error) throw error;
       const rows: OvertimeRow[] = ((data ?? []) as Record<string, unknown>[])
-        .map((r) => ({
-          date: String(r.work_date ?? ''),
-          minutes: Number(r.overtime_minutes ?? 0),
-          checkIn: (r.check_in_at as string) ?? null,
-          checkOut: (r.check_out_at as string) ?? null }))
+        .map((r) => {
+          const checkIn = (r.check_in_time as string) ?? null;
+          const checkOut = (r.check_out_time as string) ?? null;
+          let minutes = Number(r.overtime_minutes ?? 0);
+          if ((!minutes || Number.isNaN(minutes)) && checkIn && checkOut) {
+            const inMs = new Date(checkIn).getTime();
+            const outMs = new Date(checkOut).getTime();
+            if (Number.isFinite(inMs) && Number.isFinite(outMs) && outMs > inMs) {
+              // 표준 근무 8시간(480분) 초과분을 연장으로 간주
+              const worked = Math.round((outMs - inMs) / 60000);
+              minutes = Math.max(0, worked - 480);
+            }
+          }
+          return {
+            date: String(r.work_date ?? ''),
+            minutes: Number.isFinite(minutes) ? minutes : 0,
+            checkIn,
+            checkOut,
+          };
+        })
         .filter((r) => r.date && r.minutes > 0);
       setRecords(rows);
       setLoaded(true);

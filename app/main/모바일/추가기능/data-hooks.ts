@@ -1019,18 +1019,26 @@ export function useDeposits(opts: { company?: string; date?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        // 정본 컬럼은 company_id(이름 아님)이며 회사 격리는 서버 /api 경유가
-        // 정석이다. 모바일은 회사 '이름'만 알아 client-side id 필터가 불가하므로
-        // 회사 필터는 생략한다(서버 격리는 별도 과제). 실제 입금 완료(deposited)
-        // 건만 집계해 발행(issued)·취소(cancelled)가 합산되지 않도록 한다.
-        void company;
-        const q = db
+        // company 이름 → companies.id 로 해석 후 company_id 필터
+        let companyId: string | null = null;
+        if (company && company !== '전체') {
+          const { data: coRow } = await db
+            .from('companies')
+            .select('id')
+            .eq('name', company)
+            .maybeSingle();
+          companyId = coRow && typeof (coRow as { id?: string }).id === 'string'
+            ? String((coRow as { id: string }).id)
+            : null;
+        }
+        let q = db
           .from('virtual_account_deposits')
           .select('*')
           .eq('deposit_status', 'deposited')
           .gte('created_at', `${date}T00:00:00`)
           .order('created_at', { ascending: false })
           .limit(50);
+        if (companyId) q = q.eq('company_id', companyId);
         const { data, error } = await q;
         if (error) throw error;
         if (cancelled) return;
@@ -1089,18 +1097,26 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        // 정본 모델: daily_closures(회사·일자별 마감 1건) ← daily_closure_items·
-        // daily_checks(closure_id 링크). 과거 코드는 존재하지 않는
-        // daily_checks.date/company/title/checked 를 조회해 항상 무음 실패했다.
-        // 회사 격리는 company_id 기준이나 모바일은 회사 '이름'만 알아 client
-        // 필터가 불가하므로 일자 기준으로만 조회한다.
-        void company;
-        const { data: closureData, error } = await db
+        // 정본 모델: daily_closures(회사·일자별 마감 1건)
+        let companyId: string | null = null;
+        if (company && company !== '전체') {
+          const { data: coRow } = await db
+            .from('companies')
+            .select('id')
+            .eq('name', company)
+            .maybeSingle();
+          companyId = coRow && typeof (coRow as { id?: string }).id === 'string'
+            ? String((coRow as { id: string }).id)
+            : null;
+        }
+        let closureQ = db
           .from('daily_closures')
           .select('*')
           .eq('date', date)
           .order('created_at', { ascending: false })
           .limit(1);
+        if (companyId) closureQ = closureQ.eq('company_id', companyId);
+        const { data: closureData, error } = await closureQ;
         if (error) throw error;
         if (cancelled) return;
 

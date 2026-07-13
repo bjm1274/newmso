@@ -97,6 +97,7 @@ export default function 재고관리({ user, onBack }: 재고관리Props) {
       return (
         <입출고
           user={user}
+          company={company}
           onBack={goHub}
           onPlaceOrder={() => openForm('form-order', 'io')}
         />
@@ -104,6 +105,7 @@ export default function 재고관리({ user, onBack }: 재고관리Props) {
     case 'item':
       return (
         <물품자산
+          company={company}
           onBack={goHub}
           onOpenItemForm={() => openForm('form-item', 'item')}
           onOpenAssetForm={() => openForm('form-asset', 'item')}
