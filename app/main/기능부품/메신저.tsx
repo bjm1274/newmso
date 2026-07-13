@@ -1953,7 +1953,42 @@ export default function ChatView({
         void fetchAllChatRooms({ force: true }).then((result) => {
           if (result.error || !result.data) return;
           const accessible = result.data.filter((room) => isRoomAccessibleToCurrentUser(room));
-          setChatRooms(sortChatRoomsWithNoticeFirst(accessible));
+          // 폴링이 방 목록을 덮을 때: 현재 메모리 상의 더 최신 last_message_at 은 유지
+          // (삭제 직후 로컬 미리보기가 옛 file:// 로 되돌아가는 버그 방지)
+          setChatRooms((prev) => {
+            const prevById = new Map(prev.map((r) => [String(r.id), r]));
+            const merged = accessible.map((room) => {
+              const old = prevById.get(String(room.id));
+              if (!old) return room;
+              const oldAt = new Date(String(old.last_message_at || 0).replace(' ', 'T')).getTime();
+              const newAt = new Date(String(room.last_message_at || 0).replace(' ', 'T')).getTime();
+              // 로컬이 삭제 문구/파일 정제로 더 깨끗하고 시각이 같거나 더 최근이면 로컬 preview 우선
+              const oldPreview = String(old.last_message_preview || old.last_message || '');
+              const newPreview = String(room.last_message_preview || room.last_message || '');
+              const newIsDirty =
+                /^file:\/\//i.test(newPreview) ||
+                /^blob:/i.test(newPreview) ||
+                /^[A-Za-z]:[\\/]/.test(newPreview);
+              if (newIsDirty && oldPreview && !/^file:\/\//i.test(oldPreview)) {
+                return {
+                  ...room,
+                  last_message: old.last_message,
+                  last_message_preview: old.last_message_preview,
+                  last_message_at: old.last_message_at || room.last_message_at,
+                };
+              }
+              if (Number.isFinite(oldAt) && Number.isFinite(newAt) && oldAt > newAt) {
+                return {
+                  ...room,
+                  last_message: old.last_message,
+                  last_message_preview: old.last_message_preview,
+                  last_message_at: old.last_message_at,
+                };
+              }
+              return room;
+            });
+            return sortChatRoomsWithNoticeFirst(merged);
+          });
         });
       },
       { pollIntervalMs: 5000 },

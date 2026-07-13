@@ -6,7 +6,12 @@ import { POLL_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage, ChatRoom } from '@/types';
 import { fetchUnreadCountsForRoomIds } from './메신저데이터유틸';
 import { fetchAllChatRooms } from './chatQueryService';
-import { getDeletedMessagePreviewText, getMessageDisplayText } from './메신저첨부';
+import {
+  getDeletedMessagePreviewText,
+  getMessageDisplayText,
+  isChatMessageDeleted,
+  sanitizeChatRoomPreview,
+} from './메신저첨부';
 import {
   compareStaffMembers,
   getConversationRoomIdsByRoomId,
@@ -219,37 +224,54 @@ export function useChatRoomDataSync({
       );
       const summarySourceMessages = roomScopedMessages.length > 0 ? roomScopedMessages : sourceMessages;
 
-      let latestMessage: ChatMessage | undefined;
-      let latestMessageTime = Number.NEGATIVE_INFINITY;
+      // 최신 non-deleted 메시지를 미리보기로 사용 (삭제된 파일 경로가 남는 버그 방지)
+      let latestActive: ChatMessage | undefined;
+      let latestActiveTime = Number.NEGATIVE_INFINITY;
+      let latestAny: ChatMessage | undefined;
+      let latestAnyTime = Number.NEGATIVE_INFINITY;
       summarySourceMessages.forEach((message: ChatMessage) => {
         const createdAt = toChatDate(message.created_at || 0).getTime();
         if (!Number.isFinite(createdAt)) return;
-        if (createdAt >= latestMessageTime) {
-          latestMessageTime = createdAt;
-          latestMessage = message;
+        if (createdAt >= latestAnyTime) {
+          latestAnyTime = createdAt;
+          latestAny = message;
+        }
+        if (isChatMessageDeleted(message)) return;
+        if (createdAt >= latestActiveTime) {
+          latestActiveTime = createdAt;
+          latestActive = message;
         }
       });
 
-      if (!latestMessage) {
+      if (latestActive) {
+        const previewText =
+          sanitizeChatRoomPreview(
+            getMessageDisplayText(
+              latestActive.content,
+              latestActive.file_name,
+              latestActive.file_url,
+              '',
+            ),
+          ) || null;
         return {
-          last_message: null,
-          last_message_preview: null,
-          last_message_at: null };
+          last_message: previewText,
+          last_message_preview: previewText,
+          last_message_at: latestActive.created_at || null };
       }
 
-      const previewText = latestMessage.is_deleted
-        ? getDeletedMessagePreviewText()
-        : getMessageDisplayText(
-            latestMessage.content,
-            latestMessage.file_name,
-            latestMessage.file_url,
-            '',
-          ) || null;
+      // 전부 삭제된 경우
+      if (latestAny && isChatMessageDeleted(latestAny)) {
+        const deleted = getDeletedMessagePreviewText();
+        return {
+          last_message: deleted,
+          last_message_preview: deleted,
+          last_message_at: latestAny.created_at || null };
+      }
 
       return {
-        last_message: previewText,
-        last_message_preview: previewText,
-        last_message_at: latestMessage.created_at || null };
+        last_message: null,
+        last_message_preview: null,
+        last_message_at: null };
     },
     [],
   );

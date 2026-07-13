@@ -218,11 +218,27 @@ export function useChatMessageActions({
           : candidate
       )
     );
+    // 로컬: 삭제 제외한 최신 메시지로 미리보기 (file:// 잔존 방지)
     syncRoomSummaryFromMessages(message.room_id || selectedRoomId, nextMessagesSnapshot);
 
     await db.from('messages').update({ is_deleted: true, content: '삭제된 메시지입니다.' }).eq('id', message.id);
-    // chat_rooms.last_message_preview 재계산은 d1/mutate UPDATE 훅에서 refreshChatRoomLastMessage 처리.
-    // 로컬 요약은 위에서 이미 반영 — 다른 방 전환 후에도 DB 폴링 시 삭제 전 내용이 다시 뜨지 않음.
+
+    // DB chat_rooms + fetch 캐시 즉시 정합 (폴링이 옛 미리보기로 덮어쓰는 버그 수정)
+    const roomIdForPreview = String(message.room_id || selectedRoomId || '').trim();
+    if (roomIdForPreview) {
+      try {
+        const { recomputeChatRoomLastMessageClient } = await import(
+          '@/lib/chat-room-last-message'
+        );
+        const result = await recomputeChatRoomLastMessageClient(roomIdForPreview);
+        // 로컬 사이드바를 재계산 결과로 한 번 더 맞춤
+        if (result) {
+          syncRoomSummaryFromMessages(roomIdForPreview, nextMessagesSnapshot);
+        }
+      } catch (e) {
+        console.error('[messenger] recompute room preview after delete failed', e);
+      }
+    }
 
     try {
       await db.from('audit_logs').insert([

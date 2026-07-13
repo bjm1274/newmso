@@ -728,48 +728,21 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
   const handleDeleteMessage = useCallback(async (message: ChatMessage) => {
     try {
-      // 표준 messages soft-delete. d1/mutate UPDATE 후 refreshChatRoomLastMessage 로
-      // chat_rooms.last_message_preview 를 재계산한다 (삭제 전 파일 경로가 목록에 남는 버그 수정).
       const roomId = String(message.room_id || room.id || '');
       const { error } = await db
         .from('messages')
         .update({ is_deleted: true, content: '삭제된 메시지입니다.' })
         .eq('id', message.id);
       if (error) throw error;
-      // 목록 미리보기 즉시 정합 — 서버 refresh 와 병행해 폴링 전 깜빡임 방지
+      // 목록 미리보기: 최신 non-deleted 로 재계산 (file:// 잔존 버그 수정)
       if (roomId) {
         try {
-          // 최신 non-deleted 메시지로 preview 재구성 (클라이언트 폴백)
-          const { data: latestRows } = await db
-            .from('messages')
-            .select('content, file_name, file_url, created_at, is_deleted')
-            .eq('room_id', roomId)
-            .order('created_at', { ascending: false })
-            .limit(20);
-          const latest = (Array.isArray(latestRows) ? latestRows : []).find(
-            (r) => !r.is_deleted || r.is_deleted === 0 || r.is_deleted === false,
-          ) as { content?: string; file_name?: string; file_url?: string; created_at?: string } | undefined;
-          let preview = '대화 시작';
-          if (latest) {
-            const c = String(latest.content || '').trim();
-            if (c && c !== '삭제된 메시지입니다.') preview = c.slice(0, 80);
-            else if (latest.file_name) preview = String(latest.file_name).slice(0, 80);
-            else if (latest.file_url) preview = '파일';
-            else preview = '메시지';
-          } else {
-            // 전부 삭제된 경우
-            preview = '삭제된 메시지입니다.';
-          }
-          await db
-            .from('chat_rooms')
-            .update({
-              last_message: preview,
-              last_message_preview: preview,
-              last_message_at: latest?.created_at || new Date().toISOString(),
-            })
-            .eq('id', roomId);
-        } catch {
-          /* non-fatal — 서버 mutate refresh 가 회수 */
+          const { recomputeChatRoomLastMessageClient } = await import(
+            '@/lib/chat-room-last-message'
+          );
+          await recomputeChatRoomLastMessageClient(roomId);
+        } catch (e) {
+          console.error('[mobile-chat] recompute preview failed', e);
         }
       }
       toast('메시지가 삭제되었습니다.', 'success');

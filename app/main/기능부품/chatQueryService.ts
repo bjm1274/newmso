@@ -19,12 +19,30 @@ type FetchAllChatRoomsOptions = {
 let chatRoomsFetchInFlight: Promise<ChatRoomsFetchResult> | null = null;
 let chatRoomsFetchCache: { data: ChatRoom[]; error: unknown; fetchedAt: number } | null = null;
 
+function sanitizePreviewField(raw: unknown): string | null {
+  const t = String(raw ?? '').trim();
+  if (!t) return null;
+  if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
+  if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) return '파일';
+  if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {
+    return '파일';
+  }
+  return t;
+}
+
 function normalizeChatRoomForClient(room: ChatRoom): ChatRoom {
   const dynamicRoom = room as ChatRoom & { members?: unknown; member_ids?: unknown };
-  if (Array.isArray(dynamicRoom.members)) return room;
-  if (!Array.isArray(dynamicRoom.member_ids)) return room;
-  return {
+  const preview = sanitizePreviewField(dynamicRoom.last_message_preview);
+  const last = sanitizePreviewField(dynamicRoom.last_message);
+  const withPreview: ChatRoom = {
     ...room,
+    last_message_preview: preview ?? (last as string | null),
+    last_message: last ?? (preview as string | null),
+  };
+  if (Array.isArray(dynamicRoom.members)) return withPreview;
+  if (!Array.isArray(dynamicRoom.member_ids)) return withPreview;
+  return {
+    ...withPreview,
     members: dynamicRoom.member_ids };
 }
 
@@ -33,6 +51,12 @@ export function normalizeChatRoomsForClient(rooms: ChatRoom[]): ChatRoom[] {
   return rooms
     .filter((room): room is ChatRoom => Boolean(room?.id))
     .map(normalizeChatRoomForClient);
+}
+
+/** 삭제 후 즉시 목록 재조회 시 stale TTL 캐시 무력화 */
+export function invalidateChatRoomsFetchCache() {
+  chatRoomsFetchCache = null;
+  chatRoomsFetchInFlight = null;
 }
 
 function normalizeCachedChatRooms(value: unknown): ChatRoom[] {

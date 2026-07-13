@@ -266,6 +266,11 @@ export function getMessageDisplayText(
   fallback: unknown = '',
 ): string {
   const rawContent = stripHiddenMessageMetaBlocks(content);
+  // soft-delete 후 content 가 이 문구로 바뀌어도 file_url 이 남아 있으면
+  // 아래에서 파일명으로 덮어쓰지 않도록 먼저 처리
+  if (rawContent === '삭제된 메시지입니다.' || rawContent.startsWith('삭제된 메시지')) {
+    return getDeletedMessagePreviewText();
+  }
   if (rawContent) return rawContent;
   if (String(fileName || '').trim() || String(fileUrl || '').trim()) {
     return getAttachmentDisplayName(fileName, fileUrl);
@@ -275,6 +280,37 @@ export function getMessageDisplayText(
 
 export function getDeletedMessagePreviewText() {
   return '삭제된 메시지입니다.';
+}
+
+/**
+ * 채팅방 목록 미리보기 정규화.
+ * - file:// · blob: · 로컬 경로 노출 금지
+ * - soft-delete 문구 통일
+ */
+export function sanitizeChatRoomPreview(raw: unknown): string {
+  const t = String(raw ?? '').trim();
+  if (!t) return '';
+  if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) {
+    return getDeletedMessagePreviewText();
+  }
+  if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) {
+    return '파일';
+  }
+  // content 가 비고 file_url 이 통째로 들어간 경우
+  if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {
+    return '파일';
+  }
+  return t;
+}
+
+export function isChatMessageDeleted(message: {
+  is_deleted?: unknown;
+  content?: unknown;
+}): boolean {
+  const d = message?.is_deleted;
+  if (d === true || d === 1 || d === '1') return true;
+  const c = String(message?.content ?? '').trim();
+  return c === '삭제된 메시지입니다.' || c.startsWith('삭제된 메시지');
 }
 
 export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {

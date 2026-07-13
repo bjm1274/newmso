@@ -558,12 +558,15 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
     (typeof room.last_message_preview === 'string' && room.last_message_preview) ||
     (typeof room.last_message === 'string' && room.last_message) ||
     '';
-  // file:// 로컬 경로·삭제 전 잔존 미리보기 정리
+  // file:// · 삭제 전 잔존 미리보기 정리 (PC getRoomPreviewText 와 동일 규칙)
   const lastMsg = (() => {
     const t = String(rawPreview).trim();
     if (!t) return '';
     if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
-    if (t.startsWith('file://') || t.startsWith('blob:')) return '파일';
+    if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) return '파일';
+    if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {
+      return '파일';
+    }
     return t;
   })();
   const ts = formatChatTimestamp(room.last_message_at || room.created_at);

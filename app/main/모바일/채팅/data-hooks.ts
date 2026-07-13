@@ -170,7 +170,29 @@ export function useChatRoomsForMobile(
       const merged: MobileChatRoom[] = sorted.map((room) => ({
         ...room,
         unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms) }));
-      setRooms(merged);
+      // 폴링이 삭제 직전 file:// 미리보기로 덮어쓰지 않도록, dirty preview 는 기존 로컬 값 유지
+      setRooms((prev) => {
+        const prevById = new Map(prev.map((r) => [String(r.id), r]));
+        return merged.map((room) => {
+          const old = prevById.get(String(room.id));
+          if (!old) return room;
+          const newPreview = String(room.last_message_preview || room.last_message || '');
+          const oldPreview = String(old.last_message_preview || old.last_message || '');
+          const newIsDirty =
+            /^file:\/\//i.test(newPreview) ||
+            /^blob:/i.test(newPreview) ||
+            /^[A-Za-z]:[\\/]/.test(newPreview);
+          if (newIsDirty && oldPreview && !/^file:\/\//i.test(oldPreview) && !/^[A-Za-z]:[\\/]/.test(oldPreview)) {
+            return {
+              ...room,
+              last_message: old.last_message,
+              last_message_preview: old.last_message_preview,
+              last_message_at: old.last_message_at || room.last_message_at,
+            };
+          }
+          return room;
+        });
+      });
     } catch {
       setRooms([]);
     } finally {
