@@ -1969,11 +1969,15 @@ export default function ChatView({
                 /^file:\/\//i.test(newPreview) ||
                 /^blob:/i.test(newPreview) ||
                 /^[A-Za-z]:[\\/]/.test(newPreview);
-              if (newIsDirty && oldPreview && !/^file:\/\//i.test(oldPreview)) {
+              const oldIsDeleted =
+                oldPreview === '삭제된 메시지입니다.' || oldPreview.startsWith('삭제된 메시지');
+              if (newIsDirty && oldPreview && (!/^file:\/\//i.test(oldPreview) || oldIsDeleted)) {
                 return {
                   ...room,
-                  last_message: old.last_message,
-                  last_message_preview: old.last_message_preview,
+                  last_message: oldIsDeleted ? '삭제된 메시지입니다.' : old.last_message,
+                  last_message_preview: oldIsDeleted
+                    ? '삭제된 메시지입니다.'
+                    : old.last_message_preview,
                   last_message_at: old.last_message_at || room.last_message_at,
                 };
               }

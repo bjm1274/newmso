@@ -170,7 +170,8 @@ export function useChatRoomsForMobile(
       const merged: MobileChatRoom[] = sorted.map((room) => ({
         ...room,
         unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms) }));
-      // 폴링이 삭제 직전 file:// 미리보기로 덮어쓰지 않도록, dirty preview 는 기존 로컬 값 유지
+      // 폴링이 file:// 로 덮어쓰면 로컬 정리값 유지.
+      // 로컬이 「삭제된 메시지입니다.」이면 그것도 폴링 dirty 값보다 우선.
       setRooms((prev) => {
         const prevById = new Map(prev.map((r) => [String(r.id), r]));
         return merged.map((room) => {
@@ -182,11 +183,21 @@ export function useChatRoomsForMobile(
             /^file:\/\//i.test(newPreview) ||
             /^blob:/i.test(newPreview) ||
             /^[A-Za-z]:[\\/]/.test(newPreview);
-          if (newIsDirty && oldPreview && !/^file:\/\//i.test(oldPreview) && !/^[A-Za-z]:[\\/]/.test(oldPreview)) {
+          const oldIsDeleted =
+            oldPreview === '삭제된 메시지입니다.' || oldPreview.startsWith('삭제된 메시지');
+          if (newIsDirty && oldPreview && (!/^file:\/\//i.test(oldPreview) || oldIsDeleted)) {
             return {
               ...room,
               last_message: old.last_message,
               last_message_preview: old.last_message_preview,
+              last_message_at: old.last_message_at || room.last_message_at,
+            };
+          }
+          if (oldIsDeleted && newIsDirty) {
+            return {
+              ...room,
+              last_message: '삭제된 메시지입니다.',
+              last_message_preview: '삭제된 메시지입니다.',
               last_message_at: old.last_message_at || room.last_message_at,
             };
           }

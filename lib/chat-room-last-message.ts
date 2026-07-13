@@ -48,27 +48,28 @@ export async function recomputeChatRoomLastMessageClient(
   }
 
   const list = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
-  const latest = list.find((r) => {
-    if (isDeletedFlag(r.is_deleted)) return false;
-    const c = String(r.content ?? '').trim();
-    if (c === '삭제된 메시지입니다.' || c.startsWith('삭제된 메시지')) return false;
-    return true;
-  });
+  // 시간 내림차순 limit 50 — 첫 건이 최신
+  const latestAny = list[0];
 
   let preview: string | null = null;
   let at: string | null = null;
 
-  if (latest) {
-    const c = String(latest.content ?? '').trim();
-    if (c) preview = sanitizePreview(c);
-    else if (latest.file_name) preview = sanitizePreview(String(latest.file_name));
-    else if (latest.file_url) preview = '파일';
-    else preview = '메시지';
-    at = typeof latest.created_at === 'string' ? latest.created_at : null;
-  } else if (list.some((r) => isDeletedFlag(r.is_deleted) || String(r.content ?? '').includes('삭제된 메시지'))) {
-    // 전부 삭제 — 빈 미리보기(삭제 문구를 계속 보여 혼란을 주지 않음)
-    preview = null;
-    at = null;
+  if (latestAny) {
+    at = typeof latestAny.created_at === 'string' ? latestAny.created_at : null;
+    const deleted =
+      isDeletedFlag(latestAny.is_deleted) ||
+      String(latestAny.content ?? '').trim() === '삭제된 메시지입니다.' ||
+      String(latestAny.content ?? '').trim().startsWith('삭제된 메시지');
+    if (deleted) {
+      // 최신 메시지가 삭제됨 → 목록에 반드시 삭제 문구 표시
+      preview = '삭제된 메시지입니다.';
+    } else {
+      const c = String(latestAny.content ?? '').trim();
+      if (c) preview = sanitizePreview(c);
+      else if (latestAny.file_name) preview = sanitizePreview(String(latestAny.file_name));
+      else if (latestAny.file_url) preview = '파일';
+      else preview = '메시지';
+    }
   }
 
   await db

@@ -224,9 +224,7 @@ export function useChatRoomDataSync({
       );
       const summarySourceMessages = roomScopedMessages.length > 0 ? roomScopedMessages : sourceMessages;
 
-      // 최신 non-deleted 메시지를 미리보기로 사용 (삭제된 파일 경로가 남는 버그 방지)
-      let latestActive: ChatMessage | undefined;
-      let latestActiveTime = Number.NEGATIVE_INFINITY;
+      // 최신 메시지 기준 — 삭제됐으면 목록에 「삭제된 메시지입니다.」
       let latestAny: ChatMessage | undefined;
       let latestAnyTime = Number.NEGATIVE_INFINITY;
       summarySourceMessages.forEach((message: ChatMessage) => {
@@ -236,31 +234,16 @@ export function useChatRoomDataSync({
           latestAnyTime = createdAt;
           latestAny = message;
         }
-        if (isChatMessageDeleted(message)) return;
-        if (createdAt >= latestActiveTime) {
-          latestActiveTime = createdAt;
-          latestActive = message;
-        }
       });
 
-      if (latestActive) {
-        const previewText =
-          sanitizeChatRoomPreview(
-            getMessageDisplayText(
-              latestActive.content,
-              latestActive.file_name,
-              latestActive.file_url,
-              '',
-            ),
-          ) || null;
+      if (!latestAny) {
         return {
-          last_message: previewText,
-          last_message_preview: previewText,
-          last_message_at: latestActive.created_at || null };
+          last_message: null,
+          last_message_preview: null,
+          last_message_at: null };
       }
 
-      // 전부 삭제된 경우
-      if (latestAny && isChatMessageDeleted(latestAny)) {
+      if (isChatMessageDeleted(latestAny)) {
         const deleted = getDeletedMessagePreviewText();
         return {
           last_message: deleted,
@@ -268,10 +251,19 @@ export function useChatRoomDataSync({
           last_message_at: latestAny.created_at || null };
       }
 
+      const previewText =
+        sanitizeChatRoomPreview(
+          getMessageDisplayText(
+            latestAny.content,
+            latestAny.file_name,
+            latestAny.file_url,
+            '',
+          ),
+        ) || null;
       return {
-        last_message: null,
-        last_message_preview: null,
-        last_message_at: null };
+        last_message: previewText,
+        last_message_preview: previewText,
+        last_message_at: latestAny.created_at || null };
     },
     [],
   );

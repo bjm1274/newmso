@@ -65,24 +65,20 @@ export async function refreshChatRoomLastMessage(
   db: D1Client,
   roomId: string,
 ): Promise<void> {
-  // 최신 non-deleted 메시지 1건
+  // 최신 메시지 1건 (삭제 포함) — 최신이 삭제면 목록에 「삭제된 메시지입니다.」
   const rows = await db
     .select({
       created_at: messages.created_at,
       content: messages.content,
-      file_name: messages.file_name })
+      file_name: messages.file_name,
+      is_deleted: messages.is_deleted })
     .from(messages)
-    .where(and(
-      eq(messages.room_id, roomId),
-      or(eq(messages.is_deleted, 0), sql`${messages.is_deleted} IS NULL`),
-    ))
+    .where(eq(messages.room_id, roomId))
     .orderBy(desc(messages.created_at), desc(messages.id))
     .limit(1);
 
   const latest = rows[0];
   if (!latest) {
-    // 전부 삭제됐거나 메시지가 없으면 미리보기를 '삭제된 메시지'로 남기지 않고 비움
-    // (삭제만 남은 방은 빈 미리보기가 자연스러움)
     await db
       .update(chat_rooms)
       .set({
@@ -94,18 +90,26 @@ export async function refreshChatRoomLastMessage(
     return;
   }
 
-  let previewSrc =
-    (latest.content && latest.content.trim() !== '' && latest.content) ||
-    (latest.file_name && latest.file_name.trim() !== '' && latest.file_name) ||
-    '(file)';
-  // file:// 로컬 경로는 목록에 노출하지 않음
-  if (String(previewSrc).startsWith('file://') || String(previewSrc).startsWith('blob:')) {
-    previewSrc = latest.file_name || '파일';
+  const deleted =
+    latest.is_deleted === 1 ||
+    latest.is_deleted === true ||
+    (typeof latest.content === 'string' &&
+      (latest.content.trim() === '삭제된 메시지입니다.' ||
+        latest.content.trim().startsWith('삭제된 메시지')));
+
+  let preview: string;
+  if (deleted) {
+    preview = '삭제된 메시지입니다.';
+  } else {
+    let previewSrc =
+      (latest.content && latest.content.trim() !== '' && latest.content) ||
+      (latest.file_name && latest.file_name.trim() !== '' && latest.file_name) ||
+      '(file)';
+    if (String(previewSrc).startsWith('file://') || String(previewSrc).startsWith('blob:')) {
+      previewSrc = latest.file_name || '파일';
+    }
+    preview = String(previewSrc).slice(0, 80);
   }
-  if (String(previewSrc).trim() === '삭제된 메시지입니다.') {
-    previewSrc = '삭제된 메시지입니다.';
-  }
-  const preview = String(previewSrc).slice(0, 80);
 
   await db
     .update(chat_rooms)
