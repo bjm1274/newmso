@@ -150,7 +150,7 @@ export function useItemData(userCompany?: string): ItemWorkcenterData {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [companyFilter]);
 
   return state;
 }
