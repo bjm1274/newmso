@@ -36,7 +36,6 @@ export type BoardCatId =
   | 'event'
   | 'op'
   | 'mri'
-  | 'suggest'
   | 'share';
 
 export type BoardCatDef = {
@@ -47,7 +46,7 @@ export type BoardCatDef = {
   tone?: 'accent' | 'success' | 'warning' | 'danger' | '';
 };
 
-/** PC BOARD_IDS 와 동일 (익명소리함 제거) */
+/** PC BOARD_IDS 와 동일 (익명소리함·직원제안함 제거) */
 export const BOARD_CATS: BoardCatDef[] = [
   { id: 'all',     label: '전체',     tone: '' },
   { id: 'notice',  label: '공지',     boardType: '공지사항', tone: 'accent' },
@@ -55,13 +54,15 @@ export const BOARD_CATS: BoardCatDef[] = [
   { id: 'event',   label: '경조사',   boardType: '경조사', tone: 'warning' },
   { id: 'op',      label: '수술일정', boardType: '수술일정', tone: 'success' },
   { id: 'mri',     label: 'MRI일정',  boardType: 'MRI일정', tone: 'success' },
-  { id: 'suggest', label: '제안함',   boardType: '직원제안함', tone: 'accent' },
   { id: 'share',   label: '업무공유', boardType: '업무가이드', tone: 'warning' },
 ];
 
 const LIST_BOARD_TYPES = BOARD_CATS
   .map((cat) => cat.boardType)
   .filter((v): v is string => Boolean(v));
+
+/** 목록에서 제외 (폐지 보드) */
+const REMOVED_BOARD_TYPES = new Set(['익명소리함', '직원제안함']);
 
 /** board_type → cat. 미매칭(전역 subView '전체' 등)은 'all' — free로 강제하지 않음 */
 export function boardTypeToCat(boardType: string | null | undefined): BoardCatId {
@@ -81,6 +82,16 @@ export function resolveBoardSubView(subView: string | null | undefined): {
 } {
   // 메인 진입: 항상 리스트(전체). 카테고리 홈은 쓰지 않음.
   if (!subView || subView === '전체' || subView === 'all') {
+    return { cat: 'all', openList: true };
+  }
+  // 폐지 보드·레거시 id → 전체로 폴백
+  if (
+    subView === 'suggest' ||
+    subView === 'anon' ||
+    subView === '직원제안함' ||
+    subView === '익명소리함' ||
+    subView === '제안함'
+  ) {
     return { cat: 'all', openList: true };
   }
   const isCatId = BOARD_CATS.some((c) => c.id === subView);
@@ -108,8 +119,9 @@ export type UseBoardPostsResult = {
 };
 
 /**
- * @param boardTypeFilter - 특정 board_type 이면 PC와 같이 해당 보드만 limit 500 조회.
- *   null/undefined 이면 활성 보드 타입 전체 (limit 500, 혼합 풀 200 절단 방지).
+ * 게시글 목록 조회.
+ * - 특정 board_type: PC와 동일 eq + limit 1000
+ * - 전체(all): 활성 보드 타입별 병렬 조회 후 병합 (혼합 limit 절단으로 글 누락 방지)
  */
 export function useBoardPosts(
   userId: string | null,
@@ -122,42 +134,67 @@ export function useBoardPosts(
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
-        async (omittedColumns) => {
-          let q = db
-            .from('board_posts')
-            .select(
-              buildSelectColumns(
-                BOARD_POST_REQUIRED_SELECT_COLUMNS,
-                BOARD_POST_OPTIONAL_COLUMNS,
-                omittedColumns,
-              ),
-            )
-            .order('created_at', { ascending: false })
-            .limit(500);
-          // PC: 보드별 eq + limit 500. 모바일 전체 혼합 limit 200이면 보드별 글이 잘림.
-          if (boardTypeFilter && LIST_BOARD_TYPES.includes(boardTypeFilter)) {
-            q = q.eq('board_type', boardTypeFilter);
-          } else {
-            q = q.in('board_type', LIST_BOARD_TYPES);
-          }
-          const result = await q;
-          return result as unknown as { data: BoardPost[] | null; error: unknown };
-        },
-        [...BOARD_POST_OPTIONAL_COLUMNS],
-      );
+      const selectCols = (omittedColumns: string[]) =>
+        buildSelectColumns(
+          BOARD_POST_REQUIRED_SELECT_COLUMNS,
+          BOARD_POST_OPTIONAL_COLUMNS,
+          omittedColumns,
+        );
 
-      if (error) {
-        const msg =
-          typeof error === 'object' && error && 'message' in error
-            ? String((error as { message?: string }).message)
-            : '게시판 조회 실패';
-        toast(msg, 'error');
-        setPosts([]);
-        return;
+      const fetchOneType = async (boardType: string | null): Promise<BoardPost[]> => {
+        const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
+          async (omittedColumns) => {
+            let q = db
+              .from('board_posts')
+              .select(selectCols(omittedColumns))
+              .order('created_at', { ascending: false })
+              .limit(1000);
+            if (boardType) {
+              q = q.eq('board_type', boardType);
+            }
+            const result = await q;
+            return result as unknown as { data: BoardPost[] | null; error: unknown };
+          },
+          [...BOARD_POST_OPTIONAL_COLUMNS],
+        );
+        if (error) {
+          throw error instanceof Error
+            ? error
+            : new Error(
+                typeof error === 'object' && error && 'message' in error
+                  ? String((error as { message?: string }).message)
+                  : '게시판 조회 실패',
+              );
+        }
+        return Array.isArray(data) ? data.map((p) => normalizeBoardPost(p)) : [];
+      };
+
+      let rawList: BoardPost[] = [];
+      if (boardTypeFilter && LIST_BOARD_TYPES.includes(boardTypeFilter)) {
+        // 단일 보드 — PC limit 500보다 여유 있게
+        rawList = await fetchOneType(boardTypeFilter);
+      } else {
+        // 전체: 보드별 병렬 조회 후 병합 (한 번에 .in+limit 하면 특정 보드 글이 잘림)
+        const batches = await Promise.all(LIST_BOARD_TYPES.map((t) => fetchOneType(t)));
+        const byId = new Map<string, BoardPost>();
+        for (const batch of batches) {
+          for (const p of batch) {
+            const id = String(p.id ?? '');
+            if (id) byId.set(id, p);
+          }
+        }
+        rawList = Array.from(byId.values()).sort((a, b) => {
+          const ta = new Date(String(a.created_at ?? 0)).getTime();
+          const tb = new Date(String(b.created_at ?? 0)).getTime();
+          return tb - ta;
+        });
       }
 
-      const rawList = Array.isArray(data) ? data.map((p) => normalizeBoardPost(p)) : [];
+      // 폐지 보드 제외
+      rawList = rawList.filter(
+        (p) => !REMOVED_BOARD_TYPES.has(String(p.board_type ?? '').trim()),
+      );
+
       // 예약 발행 — 미래 시점의 글은 본인 글이 아니면 숨김 (PC와 동일 정책)
       const nowMs = Date.now();
       const list = rawList.filter((p) => {
@@ -165,41 +202,39 @@ export function useBoardPosts(
         if (!sched) return true;
         const t = new Date(sched).getTime();
         if (!Number.isFinite(t) || t <= nowMs) return true;
-        // 본인 글이거나 명시적 author_id가 같으면 노출
         return userId && String(p.author_id ?? '') === String(userId);
       });
 
-      // 댓글 개수 일괄 조회 (post_id별)
+      // 댓글 개수 일괄 조회 (post_id별) — 청크 분할 (IN 한도)
       const ids = list.map((p) => String(p.id)).filter(Boolean);
       let commentCounts: Record<string, number> = {};
-      if (ids.length > 0) {
+      const CHUNK = 200;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
         const { data: commentRows } = await db
           .from('board_post_comments')
           .select('post_id')
-          .in('post_id', ids);
+          .in('post_id', chunk);
         if (Array.isArray(commentRows)) {
-          commentCounts = (commentRows as { post_id: string }[]).reduce<Record<string, number>>(
-            (acc, row) => {
-              const key = String(row.post_id);
-              acc[key] = (acc[key] || 0) + 1;
-              return acc;
-            },
-            {},
-          );
+          for (const row of commentRows as { post_id: string }[]) {
+            const key = String(row.post_id);
+            commentCounts[key] = (commentCounts[key] || 0) + 1;
+          }
         }
       }
 
-      // 즐겨찾기 — 서버 board_post_stars 우선 + LS 폴백 (별표훅.loadStarSet)
       const starSet = await loadStarSet(userId);
 
       const enriched: BoardListPost[] = list.map((p) => ({
         ...(p as BoardListPost),
         comment_count: commentCounts[String(p.id)] || 0,
-        starred: starSet.has(String(p.id)) }));
+        starred: starSet.has(String(p.id)),
+      }));
 
       setPosts(enriched);
     } catch (err) {
       toast(`게시판 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
+      setPosts([]);
     } finally {
       setLoading(false);
     }

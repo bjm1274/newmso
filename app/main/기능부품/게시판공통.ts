@@ -1,7 +1,11 @@
 export { NOTICE_ROOM_ID } from '@/lib/constants';
 export const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
-export const BOARD_IDS = ['공지사항', '자유게시판', '경조사', '수술일정', 'MRI일정', '직원제안함', '업무가이드'];
+/** 활성 게시판 id (폐지: 익명소리함, 직원제안함) */
+export const BOARD_IDS = ['공지사항', '자유게시판', '경조사', '수술일정', 'MRI일정', '업무가이드'];
+
+/** 목록·메뉴에서 제외하는 폐지 보드 */
+export const REMOVED_BOARD_TYPES = ['익명소리함', '직원제안함'] as const;
 export const BOARD_POST_OPTIONAL_COLUMNS = [
   'board_id',
   'updated_at',

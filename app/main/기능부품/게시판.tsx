@@ -1925,7 +1925,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                         </div>
                       </div>
                     ) : (
-                      // ─── [일반 게시판 (자유게시판, 직원제안함 등)] ───
+                      // ─── [일반 게시판 (자유게시판 등)] ───
                       <div className="space-y-4">
                         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
                           <div className="mb-3 flex items-center justify-between gap-2">
