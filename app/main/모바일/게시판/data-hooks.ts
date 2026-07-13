@@ -134,19 +134,18 @@ export function useBoardPosts(
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const selectCols = (omittedColumns: string[]) =>
-        buildSelectColumns(
-          BOARD_POST_REQUIRED_SELECT_COLUMNS,
-          BOARD_POST_OPTIONAL_COLUMNS,
-          omittedColumns,
-        );
-
       const fetchOneType = async (boardType: string | null): Promise<BoardPost[]> => {
         const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns) => {
             let q = db
               .from('board_posts')
-              .select(selectCols(omittedColumns))
+              .select(
+                buildSelectColumns(
+                  BOARD_POST_REQUIRED_SELECT_COLUMNS,
+                  BOARD_POST_OPTIONAL_COLUMNS,
+                  omittedColumns,
+                ),
+              )
               .order('created_at', { ascending: false })
               .limit(1000);
             if (boardType) {
