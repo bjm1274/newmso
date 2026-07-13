@@ -389,6 +389,7 @@ function SBoardBase({
       >
         {BOARD_CATS.filter((c) => c.id !== 'all').map((c) => {
           const active = cat === c.id;
+          const count = countByCat(posts, c.id);
           return (
             <button
               key={c.id}
@@ -409,19 +410,26 @@ function SBoardBase({
                 alignItems: 'center',
                 gap: 4,
                 whiteSpace: 'nowrap',
-                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
+                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
+                // 카운트 자리 고정 — 숫자 바뀔 때 칩 폭 점프 완화
+                minWidth: 56,
+                justifyContent: 'center',
+                fontVariantNumeric: 'tabular-nums' }}
             >
               {c.label}
               <span
                 style={{
                   fontSize: 10,
                   fontWeight: 800,
-                  opacity: 0.8,
+                  opacity: loading && posts.length === 0 ? 0.35 : 0.8,
                   background: active ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.05)',
                   padding: '1px 5px',
-                  borderRadius: 4 }}
+                  borderRadius: 4,
+                  minWidth: 18,
+                  textAlign: 'center',
+                  fontVariantNumeric: 'tabular-nums' }}
               >
-                {countByCat(posts, c.id)}
+                {loading && posts.length === 0 ? '…' : count}
               </span>
             </button>
           );

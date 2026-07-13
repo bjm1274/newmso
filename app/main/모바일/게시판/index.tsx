@@ -19,7 +19,6 @@ import SBoard from './게시판목록';
 import SBoardDetail from './게시판상세';
 import SFormPost from './글작성';
 import {
-  BOARD_CATS,
   type BoardCatId,
   type BoardListPost,
   resolveBoardSubView,
@@ -51,11 +50,10 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   });
   const [cat, setCat] = useState<BoardCatId>(() => resolveBoardSubView(subView).cat);
 
-  // Synchronize category when global subView changes
+  // Synchronize category when global subView changes (재조회 없음 — 칩 숫자 유지)
   useEffect(() => {
     const resolved = resolveBoardSubView(subView);
     setCat(resolved.cat);
-    setOverridePosts(null); // 카테고리 전환 시 낙관적 목록 폐기 → 새 boardType 조회 반영
     if (!initialPostId) {
       setView((v) => (v === 'detail' || v === 'write' ? v : 'list'));
     }
@@ -92,16 +90,8 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
 
-  // 카테고리별 조회(PC limit 500) — 전체 혼합 200건 절단으로 글이 안 보이던 문제 방지
-  const boardTypeFilter = useMemo(() => {
-    if (cat === 'all') return null;
-    return BOARD_CATS.find((c) => c.id === cat)?.boardType ?? null;
-  }, [cat]);
-  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(
-    userId,
-    userCompany,
-    boardTypeFilter,
-  );
+  // 항상 전체 보드 로드 → 칩 카운트 안정. 카테고리 전환은 클라이언트 필터.
+  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(userId, userCompany);
   const posts = overridePosts ?? fetched;
 
   const refetch = useCallback(async () => {
@@ -119,7 +109,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
 
   const handleOpenCategory = useCallback((catId: BoardCatId) => {
     setCat(catId);
-    setOverridePosts(null);
+    // override 유지 불필요 — 카테고리 전환은 서버 재조회 없이 필터만
     setView('list');
   }, []);
 
@@ -245,10 +235,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         posts={posts}
         loading={loading}
         cat={cat}
-        onCat={(c) => {
-          setCat(c);
-          setOverridePosts(null);
-        }}
+        onCat={setCat}
         onOpen={handleOpen}
         onWrite={handleWrite}
         onBack={onBack}

@@ -119,25 +119,36 @@ export type UseBoardPostsResult = {
 };
 
 /**
- * 게시글 목록 조회.
- * - 특정 board_type: PC와 동일 eq + limit 1000
- * - 전체(all): 활성 보드 타입별 병렬 조회 후 병합 (혼합 limit 절단으로 글 누락 방지)
+ * 모듈 캐시 — 게시판 탭 언마운트 후에도 칩 카운트·목록이 0으로 깜빡이지 않게 유지.
+ * 카테고리 전환은 클라이언트 필터만 하고, 항상 전체 보드를 병렬 조회한다.
+ */
+let boardPostsCache: { userId: string | null; posts: BoardListPost[] } | null = null;
+let boardPostsInflight: Promise<BoardListPost[]> | null = null;
+
+/**
+ * 게시글 목록 조회 (활성 보드 타입별 병렬 + 병합).
+ * boardTypeFilter 는 더 이상 서버 필터에 쓰지 않음 — 칩 카운트가 전부 0으로 떨어지는 원인.
  */
 export function useBoardPosts(
   userId: string | null,
   company?: string | null,
-  boardTypeFilter?: string | null,
+  _boardTypeFilter?: string | null,
 ): UseBoardPostsResult {
-  const [posts, setPosts] = useState<BoardListPost[]>([]);
-  const [loading, setLoading] = useState(false);
+  const cached =
+    boardPostsCache && boardPostsCache.userId === userId ? boardPostsCache.posts : null;
+  const [posts, setPosts] = useState<BoardListPost[]>(() => cached ?? []);
+  const [loading, setLoading] = useState(() => !cached);
 
   const fetchPosts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const fetchOneType = async (boardType: string | null): Promise<BoardPost[]> => {
+    // 캐시가 있으면 소프트 리프레시 — loading 깜빡임 없이 배경 갱신
+    const hasCache = Boolean(boardPostsCache && boardPostsCache.userId === userId && boardPostsCache.posts.length > 0);
+    if (!hasCache) setLoading(true);
+
+    const run = async (): Promise<BoardListPost[]> => {
+      const fetchOneType = async (boardType: string): Promise<BoardPost[]> => {
         const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns) => {
-            let q = db
+            const q = db
               .from('board_posts')
               .select(
                 buildSelectColumns(
@@ -146,11 +157,9 @@ export function useBoardPosts(
                   omittedColumns,
                 ),
               )
+              .eq('board_type', boardType)
               .order('created_at', { ascending: false })
               .limit(1000);
-            if (boardType) {
-              q = q.eq('board_type', boardType);
-            }
             const result = await q;
             return result as unknown as { data: BoardPost[] | null; error: unknown };
           },
@@ -168,33 +177,24 @@ export function useBoardPosts(
         return Array.isArray(data) ? data.map((p) => normalizeBoardPost(p)) : [];
       };
 
-      let rawList: BoardPost[] = [];
-      if (boardTypeFilter && LIST_BOARD_TYPES.includes(boardTypeFilter)) {
-        // 단일 보드 — PC limit 500보다 여유 있게
-        rawList = await fetchOneType(boardTypeFilter);
-      } else {
-        // 전체: 보드별 병렬 조회 후 병합 (한 번에 .in+limit 하면 특정 보드 글이 잘림)
-        const batches = await Promise.all(LIST_BOARD_TYPES.map((t) => fetchOneType(t)));
-        const byId = new Map<string, BoardPost>();
-        for (const batch of batches) {
-          for (const p of batch) {
-            const id = String(p.id ?? '');
-            if (id) byId.set(id, p);
-          }
+      const batches = await Promise.all(LIST_BOARD_TYPES.map((t) => fetchOneType(t)));
+      const byId = new Map<string, BoardPost>();
+      for (const batch of batches) {
+        for (const p of batch) {
+          const id = String(p.id ?? '');
+          if (id) byId.set(id, p);
         }
-        rawList = Array.from(byId.values()).sort((a, b) => {
-          const ta = new Date(String(a.created_at ?? 0)).getTime();
-          const tb = new Date(String(b.created_at ?? 0)).getTime();
-          return tb - ta;
-        });
       }
+      let rawList = Array.from(byId.values()).sort((a, b) => {
+        const ta = new Date(String(a.created_at ?? 0)).getTime();
+        const tb = new Date(String(b.created_at ?? 0)).getTime();
+        return tb - ta;
+      });
 
-      // 폐지 보드 제외
       rawList = rawList.filter(
         (p) => !REMOVED_BOARD_TYPES.has(String(p.board_type ?? '').trim()),
       );
 
-      // 예약 발행 — 미래 시점의 글은 본인 글이 아니면 숨김 (PC와 동일 정책)
       const nowMs = Date.now();
       const list = rawList.filter((p) => {
         const sched = (p as { scheduled_publish_at?: string | null }).scheduled_publish_at;
@@ -204,9 +204,8 @@ export function useBoardPosts(
         return userId && String(p.author_id ?? '') === String(userId);
       });
 
-      // 댓글 개수 일괄 조회 (post_id별) — 청크 분할 (IN 한도)
       const ids = list.map((p) => String(p.id)).filter(Boolean);
-      let commentCounts: Record<string, number> = {};
+      const commentCounts: Record<string, number> = {};
       const CHUNK = 200;
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
@@ -223,21 +222,33 @@ export function useBoardPosts(
       }
 
       const starSet = await loadStarSet(userId);
-
-      const enriched: BoardListPost[] = list.map((p) => ({
+      return list.map((p) => ({
         ...(p as BoardListPost),
         comment_count: commentCounts[String(p.id)] || 0,
         starred: starSet.has(String(p.id)),
       }));
+    };
 
+    try {
+      // 동일 user 동시 요청 합치기
+      if (!boardPostsInflight) {
+        boardPostsInflight = run().finally(() => {
+          boardPostsInflight = null;
+        });
+      }
+      const enriched = await boardPostsInflight;
+      boardPostsCache = { userId, posts: enriched };
       setPosts(enriched);
     } catch (err) {
       toast(`게시판 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
-      setPosts([]);
+      // 캐시가 있으면 빈 목록으로 지우지 않음 (숫자 깜빡임 방지)
+      if (!boardPostsCache || boardPostsCache.userId !== userId) {
+        setPosts([]);
+      }
     } finally {
       setLoading(false);
     }
-  }, [userId, company, boardTypeFilter]);
+  }, [userId, company]);
 
   useEffect(() => {
     void fetchPosts();
