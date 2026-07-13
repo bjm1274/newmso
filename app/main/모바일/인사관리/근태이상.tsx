@@ -32,6 +32,7 @@ import {
 import AbnormalDailyCard, { type DailyRowStatus } from './근태이상카드';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type SHrAbnormalTab = 'mine' | 'team';
 
@@ -44,7 +45,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
   const [tab, setTab] = useState<SHrAbnormalTab>('mine');
   const cursor = useMemo(() => new Date(), []);
   const monthKey = useDerivedMonthKey(cursor);
-  const staffId = typeof user.id === 'string' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company : undefined;
   const { rows } = useMyAttendanceMonth(staffId, monthKey);
   const mine = useMemo(() => deriveAbnormalRows(rows), [rows]);

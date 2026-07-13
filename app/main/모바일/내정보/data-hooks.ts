@@ -111,11 +111,8 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
   return counts;
 }
 
-// ─── 연차: 잔여/사용내역 (PC 연차휴가내역과 동일 소스) ───
-import {
-  calculateApprovedAnnualLeaveUsage,
-  calculateLeaveDays,
-  isAnnualLeaveType } from '@/lib/annual-leave-ledger';
+// ─── 연차: 잔여/사용내역 — lib/annual-leave-summary SSOT ───
+import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
 
 export type MyLeaveHistory = {
   id: string;
@@ -134,89 +131,23 @@ export type MyLeave = {
   loading: boolean;
 };
 
-type LeaveRequestRow = {
-  id?: unknown;
-  leave_type?: unknown;
-  start_date?: unknown;
-  end_date?: unknown;
-  status?: unknown;
-};
-
-function normalizeLeaveStatus(raw: unknown): MyLeaveHistory['status'] {
-  const s = String(raw ?? '').trim();
-  if (s === '승인' || s === 'approved') return '승인';
-  if (s === '반려' || s === 'rejected') return '반려';
-  return '대기';
-}
-
+/** @deprecated use useAnnualLeaveSummary — 호환 래퍼 */
 export function useMyLeave(staffId: string | null | undefined): MyLeave {
-  const [state, setState] = useState<MyLeave>({
-    total: 0, used: 0, remaining: 0, usageRate: 0, history: [], loading: true });
-
-  useEffect(() => {
-    if (!staffId) { setState((p) => ({ ...p, loading: false })); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const currentYear = new Date().getFullYear();
-        const [staffRes, leaveRes, balanceRes] = await Promise.all([
-          db
-            .from('staff_members')
-            .select('annual_leave_total, annual_leave_used')
-            .eq('id', staffId)
-            .maybeSingle(),
-          db
-            .from('leave_requests')
-            .select('id, leave_type, start_date, end_date, status')
-            .eq('staff_id', staffId)
-            .order('start_date', { ascending: false })
-            .limit(50),
-          db
-            .from('leave_balances')
-            .select('expired_days, compensated_days')
-            .eq('staff_id', staffId)
-            .eq('year', currentYear)
-            .maybeSingle(),
-        ]);
-        if (cancelled) return;
-
-        const staff = (staffRes.data ?? {}) as { annual_leave_total?: number | null; annual_leave_used?: number | null };
-        const balance = (balanceRes.data ?? {}) as { expired_days?: number | null; compensated_days?: number | null };
-        const rows = Array.isArray(leaveRes.data) ? (leaveRes.data as LeaveRequestRow[]) : [];
-
-        const total = Number(staff.annual_leave_total ?? 0);
-        const used = Math.max(
-          Number(staff.annual_leave_used ?? 0),
-          calculateApprovedAnnualLeaveUsage(rows as Record<string, unknown>[], currentYear),
-        );
-        const expired = Number(balance?.expired_days ?? 0);
-        const compensated = Number(balance?.compensated_days ?? 0);
-        const remaining = Math.max(0, total - used - expired - compensated);
-        const usageRate = total > 0 ? Math.round((used / total) * 100) : 0;
-
-        const history: MyLeaveHistory[] = rows
-          .filter((r) => isAnnualLeaveType(String(r.leave_type ?? '')))
-          .map((r) => {
-            const start = String(r.start_date ?? '').slice(0, 10);
-            const end = String(r.end_date ?? '').slice(0, 10);
-            const d = calculateLeaveDays(start, end);
-            return {
-              id: String(r.id ?? `${start}-${end}`),
-              type: String(r.leave_type ?? '연차'),
-              days: `${d}일`,
-              date: start === end ? start.replace(/-/g, '.') : `${start.replace(/-/g, '.')} ~ ${end.slice(5).replace(/-/g, '.')}`,
-              status: normalizeLeaveStatus(r.status) };
-          });
-
-        setState({ total, used, remaining, usageRate, history, loading: false });
-      } catch {
-        if (!cancelled) setState((p) => ({ ...p, loading: false }));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [staffId]);
-
-  return state;
+  const s = useAnnualLeaveSummary(staffId);
+  return {
+    total: s.total,
+    used: s.used,
+    remaining: s.remaining,
+    usageRate: s.usageRate,
+    history: s.history.map((h) => ({
+      id: h.id,
+      type: h.leave_type,
+      days: h.daysLabel,
+      date: h.dateLabel,
+      status: h.status,
+    })),
+    loading: s.loading,
+  };
 }
 
 // ─── 증명서: 최근 발급 내역 (certificate_issuances) ───
@@ -267,30 +198,18 @@ export type LeaveBalance = {
   remaining_days: number;
 };
 
+/** @deprecated use useAnnualLeaveSummary — 호환 래퍼 (15일 폴백 없음) */
 export function useLeaveBalance(staffId: string | null | undefined) {
-  const [data, setData] = useState<LeaveBalance | null>(null);
-
-  const fetcher = useCallback(async () => {
-    if (!staffId) return;
-    const currentYear = new Date().getFullYear();
-    try {
-      const { data: row, error } = await db
-        .from('leave_balances')
-        .select('total_days, used_days, expired_days, compensated_days, remaining_days')
-        .eq('staff_id', staffId)
-        .eq('year', currentYear)
-        .maybeSingle();
-      if (error) return;
-      setData(row as LeaveBalance | null);
-    } catch {
-      // silent
-    }
-  }, [staffId]);
-
-  useEffect(() => {
-    void fetcher();
-  }, [fetcher]);
-
-  return { data, refetch: fetcher };
+  const s = useAnnualLeaveSummary(staffId);
+  const data: LeaveBalance | null = s.loading
+    ? null
+    : {
+        total_days: s.total,
+        used_days: s.used,
+        expired_days: s.expired,
+        compensated_days: s.compensated,
+        remaining_days: s.remaining,
+      };
+  return { data, refetch: s.reload };
 }
 

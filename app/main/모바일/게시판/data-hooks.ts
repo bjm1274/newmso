@@ -33,7 +33,6 @@ export type BoardCatId =
   | 'all'
   | 'notice'
   | 'free'
-  | 'anon'
   | 'event'
   | 'op'
   | 'mri'
@@ -48,11 +47,11 @@ export type BoardCatDef = {
   tone?: 'accent' | 'success' | 'warning' | 'danger' | '';
 };
 
+/** PC BOARD_IDS 와 동일 (익명소리함 제거) */
 export const BOARD_CATS: BoardCatDef[] = [
   { id: 'all',     label: '전체',     tone: '' },
   { id: 'notice',  label: '공지',     boardType: '공지사항', tone: 'accent' },
   { id: 'free',    label: '자유',     boardType: '자유게시판', tone: '' },
-  { id: 'anon',    label: '익명',     boardType: '익명소리함', tone: 'danger' },
   { id: 'event',   label: '경조사',   boardType: '경조사', tone: 'warning' },
   { id: 'op',      label: '수술일정', boardType: '수술일정', tone: 'success' },
   { id: 'mri',     label: 'MRI일정',  boardType: 'MRI일정', tone: 'success' },
@@ -108,7 +107,15 @@ export type UseBoardPostsResult = {
   refetch: () => Promise<void>;
 };
 
-export function useBoardPosts(userId: string | null, company?: string | null): UseBoardPostsResult {
+/**
+ * @param boardTypeFilter - 특정 board_type 이면 PC와 같이 해당 보드만 limit 500 조회.
+ *   null/undefined 이면 활성 보드 타입 전체 (limit 500, 혼합 풀 200 절단 방지).
+ */
+export function useBoardPosts(
+  userId: string | null,
+  company?: string | null,
+  boardTypeFilter?: string | null,
+): UseBoardPostsResult {
   const [posts, setPosts] = useState<BoardListPost[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -117,7 +124,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
     try {
       const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
-          const q = db
+          let q = db
             .from('board_posts')
             .select(
               buildSelectColumns(
@@ -126,9 +133,14 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
                 omittedColumns,
               ),
             )
-            .in('board_type', LIST_BOARD_TYPES)
             .order('created_at', { ascending: false })
-            .limit(200);
+            .limit(500);
+          // PC: 보드별 eq + limit 500. 모바일 전체 혼합 limit 200이면 보드별 글이 잘림.
+          if (boardTypeFilter && LIST_BOARD_TYPES.includes(boardTypeFilter)) {
+            q = q.eq('board_type', boardTypeFilter);
+          } else {
+            q = q.in('board_type', LIST_BOARD_TYPES);
+          }
           const result = await q;
           return result as unknown as { data: BoardPost[] | null; error: unknown };
         },
@@ -191,7 +203,7 @@ export function useBoardPosts(userId: string | null, company?: string | null): U
     } finally {
       setLoading(false);
     }
-  }, [userId, company]);
+  }, [userId, company, boardTypeFilter]);
 
   useEffect(() => {
     void fetchPosts();
@@ -409,9 +421,9 @@ function toIsoOrNull(value: string | null | undefined): string | null {
   return d.toISOString();
 }
 
-/** 익명소리함 — 작성 시 항상 익명 (PC: useAnonymous = activeBoard === '익명소리함' || isAnonymous) */
-export function isVoiceBoardType(boardType: string | null | undefined): boolean {
-  return String(boardType ?? '') === '익명소리함';
+/** @deprecated 익명소리함 보드 폐지 — 항상 false */
+export function isVoiceBoardType(_boardType?: string | null): boolean {
+  return false;
 }
 
 export async function createBoardPost(input: CreateBoardPostInput): Promise<BoardPost | null> {
@@ -429,8 +441,8 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     user } = input;
   const cat = BOARD_CATS.find((c) => c.id === catId);
   const boardType = cat?.boardType ?? '자유게시판';
-  // PC와 동일: 익명소리함은 무조건 익명
-  const useAnonymous = isVoiceBoardType(boardType) || anonymous;
+  // 자유게시판 등에서 사용자가 선택한 익명 옵션만 반영 (익명소리함 보드 폐지)
+  const useAnonymous = Boolean(anonymous);
   if (!user?.id) {
     toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
     return null;
@@ -495,7 +507,7 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     board_type: boardType,
     title: finalTitle,
     content: finalContent,
-    // JM5: 익명일 때 author_id 비식별 (PC와 동일 — 익명소리함 포함)
+    // JM5: 익명일 때 author_id 비식별
     author_id: useAnonymous ? null : user.id,
     author_name: useAnonymous ? '익명' : (user.name ?? '익명'),
     company: useAnonymous ? null : (user.company ?? null),

@@ -159,7 +159,7 @@ function Hub({
       />
       <div className="m-scroll">
         <div className="m-company-sel">
-          <span className="nm">{company || '박철홍정형외과'}</span>
+          <span className="nm">{company || '회사 미지정'}</span>
           <MIcon name="chevD" size={18} className="chev" />
         </div>
         <div

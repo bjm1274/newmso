@@ -19,6 +19,7 @@ import SBoard from './게시판목록';
 import SBoardDetail from './게시판상세';
 import SFormPost from './글작성';
 import {
+  BOARD_CATS,
   type BoardCatId,
   type BoardListPost,
   resolveBoardSubView,
@@ -54,6 +55,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   useEffect(() => {
     const resolved = resolveBoardSubView(subView);
     setCat(resolved.cat);
+    setOverridePosts(null); // 카테고리 전환 시 낙관적 목록 폐기 → 새 boardType 조회 반영
     if (!initialPostId) {
       setView((v) => (v === 'detail' || v === 'write' ? v : 'list'));
     }
@@ -69,6 +71,20 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
     }
   }, [initialPostId, onConsumePostId]);
 
+  // 알림 딥링크: 알림탭이 sessionStorage에 저장한 postId 오픈
+  useEffect(() => {
+    try {
+      const id = sessionStorage.getItem('mso_open_board_post');
+      if (id) {
+        sessionStorage.removeItem('mso_open_board_post');
+        setPostId(id);
+        setView('detail');
+      }
+    } catch {
+      /* sessionStorage 불가 환경 무시 */
+    }
+  }, []);
+
   const [overridePosts, setOverridePosts] = useState<BoardListPost[] | null>(null);
   // 수정 모드 대상 게시글 (write 뷰에서 editPost로 전달)
   const [editPost, setEditPost] = useState<BoardListPost | null>(null);
@@ -76,7 +92,16 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
 
-  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(userId, userCompany);
+  // 카테고리별 조회(PC limit 500) — 전체 혼합 200건 절단으로 글이 안 보이던 문제 방지
+  const boardTypeFilter = useMemo(() => {
+    if (cat === 'all') return null;
+    return BOARD_CATS.find((c) => c.id === cat)?.boardType ?? null;
+  }, [cat]);
+  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(
+    userId,
+    userCompany,
+    boardTypeFilter,
+  );
   const posts = overridePosts ?? fetched;
 
   const refetch = useCallback(async () => {
@@ -94,6 +119,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
 
   const handleOpenCategory = useCallback((catId: BoardCatId) => {
     setCat(catId);
+    setOverridePosts(null);
     setView('list');
   }, []);
 
@@ -219,7 +245,10 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         posts={posts}
         loading={loading}
         cat={cat}
-        onCat={setCat}
+        onCat={(c) => {
+          setCat(c);
+          setOverridePosts(null);
+        }}
         onOpen={handleOpen}
         onWrite={handleWrite}
         onBack={onBack}

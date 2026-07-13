@@ -23,6 +23,7 @@ import {
   markNotificationAsRead,
   NOTIFICATION_LIST_UPDATED_EVENT,
   type NotificationRecord } from '@/app/main/기능부품/알림시스템/notification-api';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import MIcon from '../공통/MIcon';
 
 /** 알림 항목 타입 */
@@ -102,7 +103,7 @@ export type 알림탭Props = {
 };
 
 function MobileNotificationTabBase({ user }: 알림탭Props) {
-  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const { setMainMenu, setSubView } = useNavigation();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,10 +154,29 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
     switch (target.kind) {
       case 'chat':
         setMainMenu('채팅');
+        if (target.roomId) {
+          setSubView(
+            `room:${target.roomId}${target.messageId ? ':' + target.messageId : ''}`,
+          );
+        }
         break;
       case 'approval':
         setMainMenu('전자결재');
-        if (target.approvalView) setSubView(target.approvalView);
+        if (target.approvalId) {
+          setSubView(`detail:${target.approvalId}`);
+        } else if (target.approvalView) {
+          // map Korean PC views to mobile inbox if needed
+          const v = String(target.approvalView);
+          setSubView(
+            v === '결재함' || v === 'inbox'
+              ? 'inbox'
+              : v.startsWith('detail:')
+                ? v
+                : 'inbox',
+          );
+        } else {
+          setSubView('inbox');
+        }
         break;
       case 'inventory':
         setMainMenu('재고관리');
@@ -164,6 +184,9 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
       case 'board':
         setMainMenu('게시판');
         if (target.boardType) setSubView(target.boardType);
+        if (target.postId && typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('mso_open_board_post', String(target.postId));
+        }
         break;
       case 'menu':
         setMainMenu(target.menu);

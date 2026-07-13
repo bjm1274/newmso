@@ -21,6 +21,7 @@ import { useApproverLine } from './useApproverLine';
 import ApproverLineSection from './ApproverLineSection';
 import AttachmentPicker, { type AttachmentEntry } from './AttachmentPicker';
 import { submitApprovalDraft } from './기안상신';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 type OvertimeRow = {
   date: string;
@@ -50,7 +51,7 @@ export default function SApprovalOvertimeForm({
   onCancel: () => void;
   onSubmitted: () => void;
 }) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company.trim() : '';
 
   const [records, setRecords] = useState<OvertimeRow[]>([]);

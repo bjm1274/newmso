@@ -268,7 +268,9 @@ function buildMonthly(history: LeaveHistoryRow[], year: number): number[] {
     const start = new Date(r.start_date);
     if (Number.isNaN(start.getTime())) continue;
     if (start.getFullYear() !== year) continue;
-    arr[start.getMonth()] += 1;
+    // 반차 등 실제 일수 반영 (요청 건당 +1 금지)
+    const days = typeof r.days === 'number' && Number.isFinite(r.days) ? r.days : 1;
+    arr[start.getMonth()] += days;
   }
   return arr;
 }

@@ -25,6 +25,7 @@ import {
   useApprovalList,
   useClassifiedApprovals,
   type ApprovalRow } from './data-hooks';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type ApprovalView = 'inbox' | 'docs' | 'sent' | 'ref' | 'write' | 'compose' | 'detail';
 
@@ -47,7 +48,7 @@ function dedupeById(list: ApprovalRow[]): ApprovalRow[] {
 }
 
 export default function 결재({ user, sub }: 결재Props) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const staffName = typeof user.name === 'string' ? user.name : null;
   const company = typeof user.company === 'string' ? user.company : null;
 

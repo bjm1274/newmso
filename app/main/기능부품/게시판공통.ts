@@ -1,7 +1,7 @@
 export { NOTICE_ROOM_ID } from '@/lib/constants';
 export const BOARD_AUTO_CHAT_TYPES = new Set(['공지사항', '경조사']);
 
-export const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함', '업무가이드'];
+export const BOARD_IDS = ['공지사항', '자유게시판', '경조사', '수술일정', 'MRI일정', '직원제안함', '업무가이드'];
 export const BOARD_POST_OPTIONAL_COLUMNS = [
   'board_id',
   'updated_at',

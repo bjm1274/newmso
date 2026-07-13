@@ -8,9 +8,9 @@ import type { BoardPost } from '@/types';
 
 // ─── 익명 읽음 상태 판별 ───────────────────────────────────────────────────────
 
-/** 익명 게시판·익명소리함 게시글은 읽음 상태를 추적하지 않음 */
+/** 익명 작성 게시글은 읽음 상태를 추적하지 않음 (익명소리함 보드 폐지) */
 export const isAnonymousReadStatusPost = (post: BoardPost | null | undefined): boolean =>
-  Boolean(post?.is_anonymous) || String(post?.board_type || '') === '익명소리함';
+  Boolean(post?.is_anonymous);
 
 // ─── 수술/MRI 신체 부위 목록 ─────────────────────────────────────────────────
 

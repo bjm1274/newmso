@@ -16,7 +16,7 @@ import { ALLOWED_DISTANCE_M, WORKPLACE_LOCATION } from '@/lib/location';
 import { calculateDistance } from '@/lib/geo';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
-import { formatLocalDateKey } from '@/lib/use-local-date-key';
+import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { getOfflineQueue } from '@/lib/offline-queue';
 import MobileHeader from '../셸/MobileHeader';
@@ -87,7 +87,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   const fetchTodayLog = useCallback(async () => {
     if (!staffId) { setTodayLog(null); setStaleLog(null); return; }
     try {
-      const today = formatLocalDateKey(new Date());
+      const today = getKoreanTodayString();
       let activeLog: OpenLog | null = null;
       let staleLogCandidate: OpenLog | null = null;
 
@@ -103,10 +103,8 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
 
         activeLog = (todayData?.[0] as OpenLog) ?? null;
 
-        // 2. 야간 근무자 구제 로직을 위해 어제 기록(stale log) 찾기
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayKey = formatLocalDateKey(yesterday);
+        // 2. 야간 근무자 구제 로직을 위해 어제 기록(stale log) 찾기 (KST 기준)
+        const yesterdayKey = formatKoreanDateKey(new Date(Date.now() - 86400000));
 
         const { data: staleData } = await db
           .from('attendance')
@@ -122,7 +120,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         const cand = staleData?.[0] as OpenLog | undefined;
         if (cand && cand.date !== today) {
           const checkedOutToday = cand.check_out
-            ? formatLocalDateKey(new Date(cand.check_out)) === today
+            ? formatKoreanDateKey(new Date(cand.check_out)) === today
             : false;
           // 미퇴근이거나, 오늘 막 퇴근한(자정 넘긴) 기록만 stale log로 유지한다.
           if (!cand.check_out || checkedOutToday) {
@@ -292,7 +290,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     }
     setSubmitting(true);
     try {
-      const today = formatLocalDateKey(new Date());
+      const today = getKoreanTodayString();
       const nowIso = new Date().toISOString();
       if (state === 'before') {
         // 근무유형(work_shifts) 시작시각 기준 지각 판정. 1일근무1일휴무는 근무표(shift_assignments) 배정 기준.
@@ -530,7 +528,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     <div className="m-screen">
       <MobileHeader
         title="출퇴근 체크인"
-        sub={company || '박철홍정형외과'}
+        sub={company || '회사 미지정'}
         back={onBack}
         actions={
           <button type="button" onClick={requestLocation} aria-label="위치 새로고침">
@@ -765,7 +763,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               </div>
               <div>
                 <div className="lbl">출근</div>
-                <div className="sub">{openLog?.check_in ? (openLog.date !== formatLocalDateKey(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
+                <div className="sub">{openLog?.check_in ? (openLog.date !== getKoreanTodayString(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
               </div>
               {openLog?.check_in ? <MChip tone="success">완료</MChip> : <MChip>예정</MChip>}
             </div>
@@ -780,7 +778,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               </div>
               <div>
                 <div className="lbl">퇴근</div>
-                <div className="sub">{openLog?.check_out ? (openLog.date !== formatLocalDateKey(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
+                <div className="sub">{openLog?.check_out ? (openLog.date !== getKoreanTodayString(now) ? '어제 GPS 인증' : 'GPS 인증') : '예정'}</div>
               </div>
               {openLog?.check_out ? <MChip tone="success">완료</MChip> : <MChip>예정</MChip>}
             </div>

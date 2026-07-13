@@ -33,6 +33,7 @@ import SApprovalApproverPicker from './결재선피커';
 import SApprovalCcPicker, { type CcPick } from './참조피커';
 import AttachmentPicker from './AttachmentPicker';
 import { useApprovalFormBase } from './useApprovalFormBase';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 type LeaveKind = '연차' | '반차';
 
@@ -48,7 +49,7 @@ export type SApprovalLeaveFormProps = {
 };
 
 export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApprovalLeaveFormProps) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-leave');
 

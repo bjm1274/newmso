@@ -22,7 +22,7 @@ import {
   boardTypeToCat,
   createBoardPost,
   getSafeAttachments,
-  isVoiceBoardType,
+
   updateBoardPost } from './data-hooks';
 import { uploadBoardAttachments, type DraftAttachment, type UploadProgress, validateFile } from './첨부업로드';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
@@ -50,7 +50,7 @@ export type SFormPostProps = {
 };
 
 const PICKABLE_CATS = BOARD_CATS.filter((c) => c.id !== 'all');
-// 익명 작성을 허용하는 board (PC와 동일 — 자유게시판만; 익명소리함은 강제 익명)
+// 익명 작성을 허용하는 board (자유게시판만 — 익명소리함 보드 폐지)
 const ANONYMOUS_ALLOWED_CATS = new Set<BoardCatId>(['free']);
 
 type Form = {
@@ -102,7 +102,6 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
     setForm((prev) => ({ ...prev, [k]: v }));
 
   const isScheduleCat = form.cat === 'op' || form.cat === 'mri';
-  const isVoiceCat = isVoiceBoardType(BOARD_CATS.find((c) => c.id === form.cat)?.boardType);
   // 일정 게시판은 환자명/날짜로도 게시 가능하므로 제목 없이도 통과 (PC와 동일 유연성)
   const canSubmit = (form.title.trim().length > 0 || (isScheduleCat && schedule.patientName.trim().length > 0)) && !submitting && !uploading;
 
@@ -111,7 +110,7 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
     if (!user?.id) { toast('로그인한 후 글을 등록할 수 있습니다.', 'error'); return; }
     setSubmitting(true);
 
-    const anonymousFinal = isVoiceCat || (ANONYMOUS_ALLOWED_CATS.has(form.cat) && form.anonymous);
+    const anonymousFinal = ANONYMOUS_ALLOWED_CATS.has(form.cat) && form.anonymous;
     const pinFinal = canAdmin && form.pin;
     const scheduledFinal = canAdmin && !isEdit ? form.scheduledPublishAt : '';
     const pollInput = pollDraftToInput(poll);

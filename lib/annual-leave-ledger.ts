@@ -104,7 +104,14 @@ export function calculateApprovedAnnualLeaveUsage(
       return sum;
     }
 
+    // 반차도 연도 clip — 서버 syncAnnualLeaveUsedForStaff 와 동일 (과거 연도 반차 과대합산 방지)
     if (isHalfLeaveType(row?.leave_type)) {
+      const halfClipped = clipDateRangeToYear(
+        row?.start_date as string | null | undefined,
+        row?.end_date as string | null | undefined,
+        year,
+      );
+      if (!halfClipped) return sum;
       return sum + 0.5;
     }
 

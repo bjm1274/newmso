@@ -18,13 +18,10 @@ import type { BoardListPost } from './data-hooks';
 // 권한 — PC canEditPost / canDeletePost 미러
 // ─────────────────────────────────────────────
 
-/** 익명 게시글·익명소리함은 읽음 추적/소유 식별 불가 (PC isAnonymousReadStatusPost 미러) */
+/** 익명 작성 게시글은 읽음 추적/소유 식별 불가 (PC isAnonymousReadStatusPost 미러) */
 export function isAnonymousReadStatusPost(post: BoardListPost | null): boolean {
   if (!post) return false;
-  return (
-    Boolean((post as { is_anonymous?: boolean | null }).is_anonymous) ||
-    String(post.board_type ?? '') === '익명소리함'
-  );
+  return Boolean((post as { is_anonymous?: boolean | null }).is_anonymous);
 }
 
 function isOwnPost(post: BoardListPost | null, userId: string | null | undefined): boolean {

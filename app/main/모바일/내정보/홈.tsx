@@ -20,7 +20,9 @@ import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import MIcon from '../공통/MIcon';
-import { useMonthlyAttendance, useTodayCounts, useLeaveBalance } from './data-hooks';
+import { useMonthlyAttendance, useTodayCounts } from './data-hooks';
+import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import type { MHomeSub, MTab } from '../셸/m-routes';
 
 import { toast } from '@/lib/toast';
@@ -162,11 +164,11 @@ const DEFAULT_QUICK_ITEMS: QuickItem[] = [
 
 /* ─── 컴포넌트 ────────────────────────────────────────────── */
 function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
-  const staffId = typeof user.id === 'string' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const active = isActiveStaff(user);
   const counts = useTodayCounts(staffId);
   const { data: monthlyAttendance } = useMonthlyAttendance(staffId);
-  const { data: leaveBalance } = useLeaveBalance(staffId);
+  const leaveSummary = useAnnualLeaveSummary(staffId);
 
   const [quickItems, setQuickItems] = useState<QuickItem[]>([]);
   const [isEditingMenu, setIsEditingMenu] = useState(false);
@@ -288,12 +290,8 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
     }
   }, [onSub, onSwitchTab]);
 
-  /* 연차 잔여 (간이 계산) */
-  const leaveTotal = leaveBalance ? leaveBalance.total_days : (Number(user.annual_leave_total) || 15);
-  const leaveUsed = leaveBalance ? leaveBalance.used_days : (Number(user.annual_leave_used) || 0);
-  const leaveExpired = leaveBalance ? leaveBalance.expired_days : 0;
-  const leaveCompensated = leaveBalance ? leaveBalance.compensated_days : 0;
-  const leaveRemaining = Math.max(0, leaveTotal - leaveUsed - leaveExpired - leaveCompensated);
+  /* 연차 잔여 — SSOT (15일 폴백 없음) */
+  const leaveRemaining = leaveSummary.loading ? null : leaveSummary.remaining;
   const lateCountLabel = monthlyAttendance ? `${monthlyAttendance.late}회` : '집계 중';
 
   return (
@@ -493,7 +491,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
             >
               {[
                 { label: '이번달 지각', value: lateCountLabel, color: monthlyAttendance?.late && monthlyAttendance.late > 0 ? '#FF3B30' : 'var(--foreground)' },
-                { label: '잔여 연차', value: `${leaveRemaining}일`, color: '#34C759' },
+                { label: '잔여 연차', value: leaveRemaining == null ? '…' : `${leaveRemaining}일`, color: '#34C759' },
                 { label: '미결재', value: `${counts.pendingApproval}건`, color: counts.pendingApproval > 0 ? '#007AFF' : 'var(--foreground)' },
               ].map((st, idx) => (
                 <div
@@ -732,6 +730,43 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   </div>
                   <div>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--foreground)' }}>나의 할 일</div>
+                  </div>
+                  <div className="msm-arrow-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                    <MIcon name="chevR" size={16} color="var(--z-400)" />
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSub('docs')}
+                  aria-label="서류 제출"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    display: 'grid',
+                    gridTemplateColumns: '36px 1fr auto',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '12px 16px',
+                    background: 'transparent',
+                    border: 0,
+                    borderTop: '1px solid rgba(142,142,147,0.12)',
+                    cursor: 'pointer' }}
+                >
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      background: '#5856D6',
+                      color: '#ffffff',
+                      display: 'grid',
+                      placeItems: 'center',
+                      boxShadow: '0 2px 6px rgba(88, 86, 214, 0.2)' }}
+                  >
+                    <MIcon name="fileText" size={16} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--foreground)' }}>서류 제출</div>
                   </div>
                   <div className="msm-arrow-icon" style={{ display: 'flex', alignItems: 'center' }}>
                     <MIcon name="chevR" size={16} color="var(--z-400)" />

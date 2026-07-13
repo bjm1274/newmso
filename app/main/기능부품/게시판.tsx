@@ -476,16 +476,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return;
     }
 
-    if (requestedBoard === '익명소리함') {
-      const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
-      if (!isAdmin) {
-        setPosts([]);
-      } else {
-        setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
-      }
-    } else {
-      setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
-    }
+    setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
     setLoading(false);
   };
 
@@ -1248,7 +1239,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
     setLoading(true);
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
-      const useAnonymous = activeBoard === '익명소리함' || isAnonymous;
+      const useAnonymous = Boolean(isAnonymous);
       const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: activeBoard === '경조사' ? finalTitle : normalizedTitle,
@@ -1329,7 +1320,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
       }
 
       // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드
-      const boardWithAttach = ['공지사항', '자유게시판', '경조사', '익명소리함'];
+      const boardWithAttach = ['공지사항', '자유게시판', '경조사'];
       if (boardWithAttach.includes(activeBoard) && attachmentFiles.length > 0) {
         const uploaded: { url: string; name: string; type: string }[] = [];
         let lastUploadError: string | null = null;
@@ -1934,7 +1925,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                         </div>
                       </div>
                     ) : (
-                      // ─── [일반 게시판 (자유게시판, 익명소리함, 직원제안함 등)] ───
+                      // ─── [일반 게시판 (자유게시판, 직원제안함 등)] ───
                       <div className="space-y-4">
                         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
                           <div className="mb-3 flex items-center justify-between gap-2">
@@ -1982,8 +1973,8 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                           />
                         </div>
 
-                        {activeBoard !== '익명소리함' && (
-                          <div className="flex flex-wrap gap-4 items-center py-2">
+                        <div className="flex flex-wrap gap-4 items-center py-2">
+                          {activeBoard === '자유게시판' && (
                             <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
                               <input
                                 type="checkbox"
@@ -1993,22 +1984,22 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                               />
                               <span>👤 익명 작성</span>
                             </label>
-                            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                              <input
-                                type="checkbox"
-                                checked={hasPoll}
-                                onChange={(e) => setHasPoll(e.target.checked)}
-                                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                              />
-                              <span>📊 투표 추가</span>
-                            </label>
-                          </div>
-                        )}
+                          )}
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
+                            <input
+                              type="checkbox"
+                              checked={hasPoll}
+                              onChange={(e) => setHasPoll(e.target.checked)}
+                              className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                            />
+                            <span>📊 투표 추가</span>
+                          </label>
+                        </div>
                       </div>
                     )}
                     
                     {/* 투표 설정 폼 (투표 추가가 켜진 경우에만) */}
-                    {hasPoll && activeBoard !== '익명소리함' && !isScheduleBoardType(activeBoard) && (
+                    {hasPoll && !isScheduleBoardType(activeBoard) && (
                       <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/30 p-4 space-y-3">
                         <p className="text-xs font-bold text-[var(--accent)]">투표 설정</p>
                         <input
@@ -2282,11 +2273,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
               }}
               canEditPost={canEditPost}
               canDeletePost={canDeletePost}
-              emptyDescription={
-                activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
-                  ? '작성된 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
-                  : '새 게시물이 등록되면 이 목록에 표시됩니다.'
-              }
+              emptyDescription="새 게시물이 등록되면 이 목록에 표시됩니다."
             />
           )}
 
@@ -2333,12 +2320,8 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                 ))
               ) : (
                 <EmptyState
-                  title={activeBoard === '익명소리함' ? '아직 등록된 의견이 없습니다' : '게시물이 없습니다'}
-                  description={
-                    activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
-                      ? '작성된 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
-                      : '새 게시물이 등록되면 이 목록에 표시됩니다.'
-                  }
+                  title="게시물이 없습니다"
+                  description="새 게시물이 등록되면 이 목록에 표시됩니다."
                 />
               )}
             </div>

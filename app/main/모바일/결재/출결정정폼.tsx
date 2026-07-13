@@ -21,6 +21,7 @@ import { MFormHeader, MField, MSegRow, useFieldIdPrefix } from '../인사관리/
 import SApprovalApproverPicker from './결재선피커';
 import SApprovalCcPicker, { type CcPick } from './참조피커';
 import { useApprovalFormBase } from './useApprovalFormBase';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
 
@@ -76,7 +77,7 @@ export default function SApprovalAttendanceFixForm({
   user,
   onCancel,
   onSubmitted }: SApprovalAttendanceFixFormProps) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-attfix');
 

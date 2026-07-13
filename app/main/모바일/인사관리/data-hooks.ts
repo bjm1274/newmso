@@ -22,6 +22,7 @@ import { db, d1 } from '@/lib/db-client';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
+import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
 
 // ─────────────────────────────────────────────────────────────
 // 직원 목록
@@ -89,6 +90,7 @@ export type LeaveHistoryRow = {
   status: '대기' | '승인' | '반려';
   reason?: string | null;
   created_at?: string | null;
+  days?: number;
 };
 
 export type MyLeaveBalance = {
@@ -98,64 +100,25 @@ export type MyLeaveBalance = {
   history: LeaveHistoryRow[];
 };
 
+/** 연차 SSOT 래퍼 — expired/compensated/ledger 포함 (15일 폴백 없음) */
 export function useMyLeaveBalance(staffId: string | null) {
-  const [data, setData] = useState<MyLeaveBalance>({
-    total: 0,
-    used: 0,
-    remaining: 0,
-    history: [] });
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    if (!staffId) {
-      setData({ total: 0, used: 0, remaining: 0, history: [] });
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [staffRes, leaveRes] = await Promise.all([
-        db
-          .from('staff_members')
-          .select('annual_leave_total, annual_leave_used')
-          .eq('id', staffId)
-          .maybeSingle(),
-        db
-          .from('leave_requests')
-          .select('id, leave_type, start_date, end_date, status, reason, created_at')
-          .eq('staff_id', staffId)
-          .order('start_date', { ascending: false })
-          .limit(30),
-      ]);
-      const staffRow = (staffRes.data ?? {}) as Record<string, unknown>;
-      const total = Number(staffRow.annual_leave_total ?? 0);
-      const used = Number(staffRow.annual_leave_used ?? 0);
-      const remaining = Math.max(0, total - used);
-      const history = ((leaveRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
-        id: String(row.id ?? ''),
-        leave_type: String(row.leave_type ?? '연차'),
-        start_date: String(row.start_date ?? ''),
-        end_date: String(row.end_date ?? row.start_date ?? ''),
-        status: ((): '대기' | '승인' | '반려' => {
-          const v = String(row.status ?? '대기');
-          return v === '승인' || v === '반려' ? v : '대기';
-        })(),
-        reason: typeof row.reason === 'string' ? row.reason : null,
-        created_at: typeof row.created_at === 'string' ? row.created_at : null }));
-      setData({ total, used, remaining, history });
-    } catch (err) {
-      console.error('[mobile-hr] my leave load failed', err);
-      setData({ total: 0, used: 0, remaining: 0, history: [] });
-    } finally {
-      setLoading(false);
-    }
-  }, [staffId]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  return { data, loading, reload };
+  const s = useAnnualLeaveSummary(staffId);
+  const data: MyLeaveBalance = {
+    total: s.total,
+    used: s.used,
+    remaining: s.remaining,
+    history: s.history.map((h) => ({
+      id: h.id,
+      leave_type: h.leave_type,
+      start_date: h.start_date,
+      end_date: h.end_date,
+      status: h.status,
+      reason: h.reason,
+      created_at: h.created_at,
+      days: h.days,
+    })),
+  };
+  return { data, loading: s.loading, reload: s.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -184,15 +147,13 @@ export function useMyAttendanceMonth(staffId: string | null, monthKey: string) {
       }
       setLoading(true);
       try {
-        const [yearStr, monthStr] = monthKey.split('-');
-        const year = Number(yearStr);
-        const month = Number(monthStr);
-        if (!year || !month) {
+        // KST 월 경계 — 내정보 useMonthlyAttendance / PC 홈과 동일
+        const { getMonthBoundaries } = await import('@/lib/date-utils');
+        const { startDate: first, endDate: last } = getMonthBoundaries(monthKey);
+        if (!first || !last) {
           setRows([]);
           return;
         }
-        const first = new Date(year, month - 1, 1).toLocaleDateString('en-CA');
-        const last = new Date(year, month, 0).toLocaleDateString('en-CA');
         const { data, error } = await db
           .from('attendance')
           .select('date, check_in, check_out, status')

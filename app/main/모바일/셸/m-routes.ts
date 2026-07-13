@@ -6,13 +6,13 @@
 
 export type MTab = 'notif' | 'mypage' | 'addon' | 'chat' | 'board' | 'approval' | 'hr' | 'stock' | 'admin';
 
-export type MHomeSub = 'attend' | 'leave' | 'records' | 'edit' | 'todo' | 'notifSettings';
+export type MHomeSub = 'attend' | 'leave' | 'records' | 'edit' | 'todo' | 'notifSettings' | 'docs';
 
 export type MRoute =
   | { tab: 'notif' }
   | { tab: 'mypage'; sub?: MHomeSub }
   | { tab: 'addon'; sub?: string }
-  | { tab: 'chat' }
+  | { tab: 'chat'; sub?: string }
   | { tab: 'board' }
   | { tab: 'approval' }
   | { tab: 'hr' }

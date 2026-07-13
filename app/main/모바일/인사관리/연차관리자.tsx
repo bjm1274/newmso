@@ -510,8 +510,9 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
                   </span>
                   <button
                     type="button"
+                    title="연차 사용 촉진 발송은 PC 인사관리에서 지원합니다."
                     onClick={() => {
-                      toast(`${item.staff.name}님께 연차 사용 촉진 안내문을 발송했습니다.`, 'success');
+                      toast('연차 사용 촉진 발송은 PC 인사관리에서 지원합니다.', 'warning');
                     }}
                     style={{
                       padding: '6px 10px',

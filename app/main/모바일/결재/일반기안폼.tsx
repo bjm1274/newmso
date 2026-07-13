@@ -30,6 +30,7 @@ import {
   initSchemaValues,
   missingRequired,
   StructuredFields } from './양식필드';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type SApprovalGenericFormProps = {
   user: ErpUser;
@@ -45,7 +46,7 @@ export default function SApprovalGenericForm({
   formName,
   onCancel,
   onSubmitted }: SApprovalGenericFormProps) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company.trim() : '';
   const fieldId = useFieldIdPrefix('appr-generic');
 

@@ -35,7 +35,10 @@ export type 나의할일Props = {
 
 export default function 나의할일({ user: initialUser, onBack, onSwitchTab }: 나의할일Props) {
   const handleChatNavigate = onSwitchTab
-    ? (roomId: string, messageId: string) => onSwitchTab('chat')
+    ? (roomId: string, messageId: string) => {
+        const sub = messageId ? `room:${roomId}:${messageId}` : `room:${roomId}`;
+        onSwitchTab('chat', sub);
+      }
     : undefined;
 
   const {

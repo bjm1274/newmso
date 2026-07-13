@@ -24,6 +24,8 @@ import HomeTabHeader, { type HomeKpiCard } from './홈탭헤더';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { db } from '@/lib/db-client';
+import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { isActiveStaff } from '@/lib/active-staff';
 import { sendAdminNotifications } from '@/lib/notification-utils';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -145,7 +147,9 @@ function MyPageMain({
 
   // 이번 달 근태 실 데이터
   const [monthlyAttendance, setMonthlyAttendance] = useState<MonthlyAttendance | null>(null);
-  const [leaveBalance, setLeaveBalance] = useState<{ expired: number; compensated: number }>({ expired: 0, compensated: 0 });
+  // 연차 잔여 — SSOT (15일 폴백 없음)
+  const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown> | null);
+  const leaveSummary = useAnnualLeaveSummary(resolvedStaffId);
   const favoritesKey = useMemo(() => {
     const userId = String(user?.id || user?.auth_user_id || user?.employee_no || user?.name || '').trim();
     return userId ? `${FAVORITES_KEY}:${userId}` : FAVORITES_KEY;
@@ -239,28 +243,6 @@ function MyPageMain({
   useEffect(() => {
     void fetchMonthlyAttendanceSummary();
   }, [fetchMonthlyAttendanceSummary]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const loadBalance = async () => {
-      try {
-        const { data } = await db
-          .from('leave_balances')
-          .select('expired_days, compensated_days')
-          .eq('staff_id', user.id)
-          .eq('year', new Date().getFullYear())
-          .maybeSingle();
-        if (data) {
-          setLeaveBalance({
-            expired: Number(data.expired_days) || 0,
-            compensated: Number(data.compensated_days) || 0 });
-        }
-      } catch {
-        // ignore
-      }
-    };
-    void loadBalance();
-  }, [user?.id]);
 
   // JM2/JM3: 인사관리·근태이상 워크센터에서 본인 근태가 보정되면 즉시 재집계.
   //   - 정상 처리 같은 액션이 발생하면 attendance 테이블이 update 되고
@@ -780,10 +762,7 @@ function MyPageMain({
   const joinedAtLabel = formatCompactDate(joinedAt);
   const tenureLabel = getTenureLabel(joinedAt);
   const initial = getUserInitial(profileSummary.name || user.name);
-  const leaveRemaining = Math.max(
-    0,
-    Number(user.annual_leave_total || 15) - Number(user.annual_leave_used || 0) - leaveBalance.expired - leaveBalance.compensated
-  );
+  const leaveRemaining = leaveSummary.loading ? '…' : leaveSummary.remaining;
   const pendingApprovalCount = Math.max(0, Number(user.pending_approval_count ?? 0));
   // 이번 달 근태: 실 데이터(monthlyAttendance) 우선, 없으면 '집계 중'.
   // KPI는 분수 (present / total) 형식 — value.main = present, value.fraction = "/total"

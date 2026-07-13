@@ -41,6 +41,7 @@ import {
   fetchUnreadNotificationCount,
   NOTIFICATION_LIST_UPDATED_EVENT,
   NOTIFICATION_READ_EVENT } from '@/app/main/기능부품/알림시스템/notification-api';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type MobileShellProps = {
   user: ErpUser;
@@ -79,17 +80,18 @@ export default function MobileShell({
   }));
   const [dark, setDark] = useState(false);
   const [chatResetToken, setChatResetToken] = useState(0);
+  const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown>);
 
   const [pendingContract, setPendingContract] = useState<any | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   const checkPendingContracts = useCallback(async () => {
-    if (!user?.id) return;
+    if (!resolvedStaffId) return;
     try {
       const { data, error } = await db
         .from('employment_contracts')
         .select('*')
-        .eq('staff_id', user.id as string)
+        .eq('staff_id', resolvedStaffId)
         .eq('status', '서명대기')
         .order('requested_at', { ascending: false })
         .limit(1)
@@ -107,7 +109,7 @@ export default function MobileShell({
     } catch (e) {
       console.error('[mobile-hr] checkPendingContracts failed', e);
     }
-  }, [user?.id]);
+  }, [resolvedStaffId]);
 
   useEffect(() => {
     void checkPendingContracts();
@@ -129,7 +131,7 @@ export default function MobileShell({
     receiptSignatureData?: string,
     privacyConsent?: boolean | null
   ) => {
-    const currentUserId = typeof user?.id === 'string' ? user.id : null;
+    const currentUserId = resolvedStaffId;
     if (!pendingContract || !currentUserId) return;
     try {
       const { error: updateError } = await db
@@ -205,7 +207,7 @@ export default function MobileShell({
         dedupeKey: `contract-signed:${pendingContract.id}` }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
-      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
+      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: resolvedStaffId, contractId: pendingContract.id } }));
       setPendingContract(null);
       setShowSignaturePad(false);
     } catch (e) {
@@ -214,7 +216,7 @@ export default function MobileShell({
     }
   };
 
-  const userId = typeof user.id === 'string' ? user.id : null;
+  const userId = resolvedStaffId;
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const { rooms, loading: roomsLoading, refresh: refreshRooms } = useChatRoomsForMobile(userId, activeRoomId);
   const totalUnread = rooms.reduce((sum, r) => sum + (r.unread_count || 0), 0);
@@ -341,12 +343,17 @@ export default function MobileShell({
       toast('해당 메뉴에 접근할 권한이 없습니다.', 'warning');
       return;
     }
-    if (tab === 'chat' && route.tab === 'chat') {
+    // 동일 탭 재탭 시 목록 리셋 — room: 딥링크 전환은 유지
+    if (tab === 'chat' && route.tab === 'chat' && !(sub && sub.startsWith('room:'))) {
       setChatResetToken((prev) => prev + 1);
     }
     setRoute({ tab, sub } as any);
     if (targetMenu && setMainMenu) {
       setMainMenu(targetMenu);
+    }
+    // 비-mypage 탭은 mainMenu+subView → route 동기화가 있으므로 sub를 전역에도 반영
+    if (sub !== undefined && setSubView) {
+      setSubView(sub);
     }
   };
 
@@ -395,17 +402,31 @@ export default function MobileShell({
               initialView={(route as any).sub}
             />
           )}
-          {route.tab === 'chat' && (
-            <채팅
-              user={user}
-              rooms={rooms}
-              roomsLoading={roomsLoading}
-              refreshRooms={refreshRooms}
-              onActiveRoomChange={setActiveRoomId}
-              resetToken={chatResetToken}
-              onOpenBoardPost={onOpenBoardPost}
-            />
-          )}
+          {route.tab === 'chat' && (() => {
+            const chatSub = typeof (route as { sub?: string }).sub === 'string'
+              ? (route as { sub?: string }).sub
+              : undefined;
+            let initialRoomId: string | null = null;
+            let initialMessageId: string | null = null;
+            if (chatSub && chatSub.startsWith('room:')) {
+              const parts = chatSub.slice('room:'.length).split(':');
+              initialRoomId = parts[0] || null;
+              initialMessageId = parts[1] || null;
+            }
+            return (
+              <채팅
+                user={user}
+                rooms={rooms}
+                roomsLoading={roomsLoading}
+                refreshRooms={refreshRooms}
+                onActiveRoomChange={setActiveRoomId}
+                resetToken={chatResetToken}
+                onOpenBoardPost={onOpenBoardPost}
+                initialRoomId={initialRoomId}
+                initialMessageId={initialMessageId}
+              />
+            );
+          })()}
           {route.tab === 'board' && (
             <게시판 
               user={user} 

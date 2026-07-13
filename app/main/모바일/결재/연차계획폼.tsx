@@ -19,6 +19,7 @@ import { useApproverLine } from './useApproverLine';
 import ApproverLineSection from './ApproverLineSection';
 import MultiDateCalendar from './달력선택';
 import { submitApprovalDraft } from './기안상신';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export default function SApprovalLeavePlanForm({
   user,
@@ -32,7 +33,7 @@ export default function SApprovalLeavePlanForm({
   onCancel: () => void;
   onSubmitted: () => void;
 }) {
-  const staffId = typeof user.id === 'string' && user.id.trim() !== '' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company.trim() : '';
 
   const leaveBalance = useMyLeaveBalance(staffId);

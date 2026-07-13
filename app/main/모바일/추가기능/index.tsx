@@ -23,6 +23,7 @@
 
 import { useCallback, useState } from 'react';
 import type { ErpUser } from '@/types';
+import { toast } from '@/lib/toast';
 import 허브, { type AddonModuleKey } from './허브';
 import 조직도 from './조직도';
 import 부서재고 from './부서재고';
@@ -67,7 +68,7 @@ type View =
   | { kind: 'guide' }
   | { kind: 'calendar' };
 
-const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
+const MODULE_TO_VIEW: Partial<Record<AddonModuleKey, View>> = {
   org: { kind: 'org' },
   inventory: { kind: 'inventory' },
   worknow: { kind: 'worknow' },
@@ -84,6 +85,7 @@ const MODULE_TO_VIEW: Record<AddonModuleKey, View> = {
   share: { kind: 'share-list' },
   guide: { kind: 'guide' },
   calendar: { kind: 'calendar' },
+  // gemini / esl — PC 전용 (onOpen에서 toast)
 };
 
 export type 추가기능Props = {
@@ -123,7 +125,14 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
         <허브
           user={user}
           onBack={onBack}
-          onOpen={(key: AddonModuleKey) => setView(MODULE_TO_VIEW[key])}
+          onOpen={(key: AddonModuleKey) => {
+            if (key === 'gemini' || key === 'esl') {
+              toast('PC 버전에서 이용 가능합니다', 'info');
+              return;
+            }
+            const next = MODULE_TO_VIEW[key];
+            if (next) setView(next);
+          }}
         />
       );
       break;

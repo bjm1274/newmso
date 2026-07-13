@@ -29,9 +29,23 @@ export type 채팅Props = {
   onActiveRoomChange?: (roomId: string | null) => void;
   resetToken?: number;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
+  /** 딥링크: 방 자동 오픈 */
+  initialRoomId?: string | null;
+  /** 딥링크: 특정 메시지 스크롤 */
+  initialMessageId?: string | null;
 };
 
-function MobileChat({ user, rooms: propsRooms, roomsLoading: propsRoomsLoading, refreshRooms: propsRefreshRooms, onActiveRoomChange, resetToken, onOpenBoardPost }: 채팅Props) {
+function MobileChat({
+  user,
+  rooms: propsRooms,
+  roomsLoading: propsRoomsLoading,
+  refreshRooms: propsRefreshRooms,
+  onActiveRoomChange,
+  resetToken,
+  onOpenBoardPost,
+  initialRoomId,
+  initialMessageId,
+}: 채팅Props) {
   const [view, setView] = useState<ChatView>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
@@ -89,11 +103,19 @@ function MobileChat({ user, rooms: propsRooms, roomsLoading: propsRoomsLoading, 
 
   useSheetHistory(view === 'room' || view === 'new', backToList);
 
+  // 딥링크: initialRoomId 변경 시 방 오픈
+  useEffect(() => {
+    if (initialRoomId) {
+      openRoom(initialRoomId, initialMessageId || undefined);
+    }
+  }, [initialRoomId, initialMessageId, openRoom]);
+
   useEffect(() => {
     if (resetToken !== undefined && resetToken > 0) {
+      if (initialRoomId) return; // deep link wins
       backToList();
     }
-  }, [resetToken, backToList]);
+  }, [resetToken, backToList, initialRoomId]);
 
   const openNew = useCallback(() => {
     setView('new');

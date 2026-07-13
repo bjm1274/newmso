@@ -15,9 +15,13 @@ import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import type { MTab } from '../셸/m-routes';
-import { useMyLeave, type MyLeaveHistory } from './data-hooks';
+import {
+  useAnnualLeaveSummary,
+  type LeaveHistoryStatus,
+} from '@/lib/annual-leave-summary';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
-const STATUS_STYLE: Record<MyLeaveHistory['status'], { bg: string; color: string }> = {
+const STATUS_STYLE: Record<LeaveHistoryStatus, { bg: string; color: string }> = {
   '승인': { bg: 'var(--m-success-soft)', color: 'var(--m-success)' },
   '대기': { bg: 'var(--m-warning-soft)', color: 'var(--m-warning)' },
   '반려': { bg: 'var(--m-danger-soft)', color: 'var(--m-danger)' } };
@@ -29,9 +33,8 @@ export type 연차Props = {
 };
 
 function MobileLeaveBase({ user, onBack, onSwitchTab }: 연차Props) {
-  const staffId = typeof user?.id === 'string' ? user.id : null;
-  const { remaining, total, used, usageRate, history, loading } = useMyLeave(staffId);
-  const currentYear = new Date().getFullYear();
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
+  const { remaining, total, used, usageRate, history, loading, year } = useAnnualLeaveSummary(staffId);
   return (
     <div className="m-screen">
       <MobileHeader title="연차" back={onBack} />
@@ -49,7 +52,7 @@ function MobileLeaveBase({ user, onBack, onSwitchTab }: 연차Props) {
             textAlign: 'center' }}
         >
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-500)' }}>
-            {currentYear}년 잔여 연차
+            {year}년 잔여 연차
           </div>
           <div
             style={{
@@ -136,10 +139,10 @@ function MobileLeaveBase({ user, onBack, onSwitchTab }: 연차Props) {
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.012em' }}>
-                      {h.type} · {h.days}
+                      {h.leave_type} · {h.daysLabel}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 500, marginTop: 2 }}>
-                      {h.date}
+                      {h.dateLabel}
                     </div>
                   </div>
                   <span

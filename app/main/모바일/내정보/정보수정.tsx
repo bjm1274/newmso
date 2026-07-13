@@ -11,7 +11,7 @@
  * JM6: label 연결, button 시맨틱
  */
 
-import { memo, useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { ErpUser } from '@/types';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
@@ -23,6 +23,31 @@ import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { hasPermission } from '@/lib/access-control';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
+
+async function uploadProfilePhoto(file: File, staffId: string): Promise<boolean> {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('staffId', staffId);
+    const res = await fetch('/api/staff/profile-photo/upload', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => null)) as { error?: string } | null;
+      toast(j?.error || '사진 업로드에 실패했습니다.', 'error');
+      return false;
+    }
+    toast('프로필 사진이 저장되었습니다.', 'success');
+    return true;
+  } catch {
+    toast('사진 업로드 중 오류가 발생했습니다.', 'error');
+    return false;
+  }
+}
 
 function getInitial(name?: string | null) {
   return String(name || '').trim().slice(0, 1) || '나';
@@ -65,7 +90,7 @@ export type 정보수정Props = {
 };
 
 function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
-  const staffId = typeof user?.id === 'string' ? user.id : null;
+  const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const name = (user.name || '직원') as string;
   const position = (user.position || '') as string;
   const department = (user.department || '') as string;
@@ -81,8 +106,43 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
     email: typeof user.email === 'string' ? user.email : null,
     phone: typeof user.phone === 'string' ? user.phone : null }));
   const [saving, setSaving] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(() => getProfilePhotoUrl(user));
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { dialog, openPrompt } = useActionDialog();
+
+  const handlePhotoPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!staffId) {
+      toast('직원 정보를 확인할 수 없습니다.', 'warning');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      toast('사진은 4MB 이하로 선택해 주세요.', 'warning');
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const ok = await uploadProfilePhoto(file, String(staffId));
+      if (ok) {
+        const localUrl = URL.createObjectURL(file);
+        setPhotoUrl(localUrl);
+        // 프로필 갱신 이벤트 — 홈 아바타 등 동기화
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('erp-profile-updated', {
+              detail: { user: { ...user, id: staffId }, avatarUrl: localUrl },
+            }),
+          );
+        }
+      }
+    } finally {
+      setPhotoUploading(false);
+    }
+  }, [staffId, user]);
 
   const handleChangePassword = useCallback(async () => {
     const currentPassword = await openPrompt({
@@ -248,23 +308,49 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
             padding: '28px 0 8px' }}
         >
           <div style={{ position: 'relative', width: 80, height: 80 }}>
-            <div
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 24,
-                background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
-                color: '#fff',
-                fontSize: 28,
-                fontWeight: 800,
-                display: 'grid',
-                placeItems: 'center' }}
-            >
-              {initial}
-            </div>
+            {photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={photoUrl}
+                alt="프로필"
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 24,
+                  objectFit: 'cover',
+                  display: 'block',
+                  background: 'var(--z-100)' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 24,
+                  background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+                  color: '#fff',
+                  fontSize: 28,
+                  fontWeight: 800,
+                  display: 'grid',
+                  placeItems: 'center' }}
+              >
+                {initial}
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={handlePhotoPick}
+              aria-hidden
+            />
             <button
               type="button"
               aria-label="프로필 사진 변경"
+              disabled={photoUploading || !staffId}
+              onClick={() => fileInputRef.current?.click()}
               style={{
                 position: 'absolute',
                 bottom: -4,
@@ -276,7 +362,9 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
                 color: '#fff',
                 border: '2px solid var(--m-card)',
                 display: 'grid',
-                placeItems: 'center' }}
+                placeItems: 'center',
+                opacity: photoUploading ? 0.6 : 1,
+                cursor: photoUploading ? 'wait' : 'pointer' }}
             >
               <MIcon name="camera" size={14} />
             </button>

@@ -30,7 +30,9 @@ export type AddonModuleKey =
   | 'mri'
   | 'share'
   | 'guide'
-  | 'calendar';
+  | 'calendar'
+  | 'gemini'
+  | 'esl';
 
 /** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 일치) */
 const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
@@ -50,6 +52,8 @@ const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
   share:     { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'fileText' },
   guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' },
   calendar:  { bg: 'linear-gradient(135deg, #5856D6, #AF52DE)', icon: 'calendar' },
+  gemini:    { bg: 'linear-gradient(135deg, #4285F4, #9B72CB)', icon: 'star' },
+  esl:       { bg: 'linear-gradient(135deg, #636366, #48484A)', icon: 'box' },
 };
 
 type QuickItem = {
@@ -94,6 +98,8 @@ const GROUPS: QuickGroup[] = [
       { id: 'deposit', label: '입금조회' },
       { id: 'closing', label: '마감보고' },
       { id: 'webfax',  label: '웹팩스' },
+      { id: 'gemini',  label: 'Gemini (PC)' },
+      { id: 'esl',     label: 'ESL (PC)' },
     ] },
 ];
 
