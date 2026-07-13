@@ -17,7 +17,7 @@
 // 라우트에서 INSERT/UPDATE 직후 호출.
 // ============================================================
 
-import { sql, eq, desc, and, or } from 'drizzle-orm';
+import { sql, eq, desc } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { chat_rooms, messages } from '../schema';
 
@@ -91,8 +91,7 @@ export async function refreshChatRoomLastMessage(
   }
 
   const deleted =
-    latest.is_deleted === 1 ||
-    latest.is_deleted === true ||
+    Number(latest.is_deleted ?? 0) === 1 ||
     (typeof latest.content === 'string' &&
       (latest.content.trim() === '삭제된 메시지입니다.' ||
         latest.content.trim().startsWith('삭제된 메시지')));
