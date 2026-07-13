@@ -113,9 +113,10 @@ const EMPTY: IOWorkcenterData = {
   loading: true,
   error: null };
 
-export function useIOData(): IOWorkcenterData & { refresh: () => void } {
+export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<IOWorkcenterData>(EMPTY);
   const [refreshCount, setRefreshCount] = useState(0);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   const refresh = () => setRefreshCount((c) => c + 1);
 
@@ -128,20 +129,31 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
         const todayKey = getKoreanTodayString();
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
+        let logsQ = db
+          .from('inventory_logs')
+          .select('*')
+          .gte('created_at', todayKey)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        let ordersQ = db
+          .from('purchase_orders')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        let suppliersQ = db.from('suppliers').select('*').order('name').limit(30);
+        let invQ = db.from('inventory').select('id, item_name, name').limit(2000);
+        if (companyFilter) {
+          logsQ = logsQ.eq('company', companyFilter);
+          ordersQ = ordersQ.eq('company', companyFilter);
+          suppliersQ = suppliersQ.eq('company', companyFilter);
+          invQ = invQ.eq('company', companyFilter);
+        }
+
         const [logsRes, ordersRes, suppliersRes, invRes] = await Promise.all([
-          db
-            .from('inventory_logs')
-            .select('*')
-            .gte('created_at', todayKey)
-            .order('created_at', { ascending: false })
-            .limit(50),
-          db
-            .from('purchase_orders')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(50),
-          db.from('suppliers').select('*').order('name').limit(30),
-          db.from('inventory').select('id, item_name, name').limit(2000),
+          logsQ,
+          ordersQ,
+          suppliersQ,
+          invQ,
         ]);
 
         if (cancelled) return;
@@ -221,7 +233,7 @@ export function useIOData(): IOWorkcenterData & { refresh: () => void } {
     return () => {
       cancelled = true;
     };
-  }, [refreshCount]);
+  }, [refreshCount, companyFilter]);
 
   return { ...state, refresh };
 }

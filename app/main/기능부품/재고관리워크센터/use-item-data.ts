@@ -90,20 +90,23 @@ const EMPTY: ItemWorkcenterData = {
   loading: true,
   error: null };
 
-export function useItemData(): ItemWorkcenterData {
+export function useItemData(userCompany?: string): ItemWorkcenterData {
   const [state, setState] = useState<ItemWorkcenterData>(EMPTY);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
+        let invQ = db
+          .from('inventory')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (companyFilter) invQ = invQ.eq('company', companyFilter);
         const [invRes, catRes] = await Promise.all([
-          db
-            .from('inventory')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(200),
+          invQ,
           db.from('inventory_categories').select('*').order('name').limit(100),
         ]);
 

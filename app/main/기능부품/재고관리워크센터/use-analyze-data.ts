@@ -235,23 +235,30 @@ const EMPTY: AnalyzeWorkcenterData = {
   loading: true,
   error: null };
 
-export function useAnalyzeData(): AnalyzeWorkcenterData {
+export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData {
   const [state, setState] = useState<AnalyzeWorkcenterData>(EMPTY);
+  const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
+        let invQ = db.from('inventory').select('*').limit(800);
+        let logQ = db
+          .from('inventory_logs')
+          .select(
+            'item_id,inventory_id,quantity,unit_price,change_type,type,prev_quantity,next_quantity,created_at,notes',
+          )
+          .order('created_at', { ascending: false })
+          .limit(2000);
+        if (companyFilter) {
+          invQ = invQ.eq('company', companyFilter);
+          logQ = logQ.eq('company', companyFilter);
+        }
         const [invRes, logRes, sessionRes] = await Promise.all([
-          db.from('inventory').select('*').limit(800),
-          db
-            .from('inventory_logs')
-            .select(
-              'item_id,inventory_id,quantity,unit_price,change_type,type,prev_quantity,next_quantity,created_at,notes',
-            )
-            .order('created_at', { ascending: false })
-            .limit(2000),
+          invQ,
+          logQ,
           db
             .from('inventory_count_sessions')
             .select('*')
@@ -299,7 +306,7 @@ export function useAnalyzeData(): AnalyzeWorkcenterData {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [companyFilter]);
 
   return state;
 }
