@@ -729,7 +729,7 @@ CREATE TABLE IF NOT EXISTS document_repository (
   created_by TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT document_repository_category_check CHECK ((category  IN ('규정', '양식', '계약서', '기타'))),
+  -- category CHECK removed 2026-07-14: app uses fine-grained labels (연차/휴가, 근로계약서, …)
   CONSTRAINT document_repository_pkey PRIMARY KEY (id)
 );
 

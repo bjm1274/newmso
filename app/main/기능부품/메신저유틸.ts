@@ -133,7 +133,11 @@ export function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
     const btStr = String(b.last_message_at || b.created_at || 0).replace(' ', 'T');
     const at = new Date(atStr).getTime();
     const bt = new Date(btStr).getTime();
-    return bt - at;
+    const aMs = Number.isFinite(at) ? at : 0;
+    const bMs = Number.isFinite(bt) ? bt : 0;
+    if (bMs !== aMs) return bMs - aMs;
+    // 동일 시각일 때 id 2차 정렬 — fetch 순서 변동으로 목록이 흔들리지 않게
+    return String(a.id || '').localeCompare(String(b.id || ''));
   });
   return notice ? [notice, ...others] : others;
 }

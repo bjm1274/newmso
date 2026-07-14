@@ -54,8 +54,7 @@ function fiscalYearExpiryDate(refYear: number, fiscalStartMonth: number): Date {
 
 /**
  * leave_accruals 기준 발생 일수
- * - annual 원장이 있으면 최신 N년차(annual:N) 1건 days
- * - 없으면 monthly 합 (1년 미만 월차)
+ * - 누적 발생 일수: 모든 monthly 및 annual 원장의 일수 합산
  * - 원장 없고 staff.total 만 있으면 fallback
  */
 export async function resolveGrantedDaysFromAccruals(
@@ -75,24 +74,10 @@ export async function resolveGrantedDaysFromAccruals(
     .from(leaveAccrualsTable)
     .where(eq(leaveAccrualsTable.staff_id, staffId));
 
-  const annuals = rows
-    .filter((r) => r.kind === 'annual')
-    .map((r) => ({
-      n: Number(String(r.period_key || '').replace('annual:', '')) || 0,
-      days: Number(r.days) || 0,
-    }))
-    .filter((r) => r.n >= 1)
-    .sort((a, b) => b.n - a.n);
-
-  if (annuals.length > 0) {
-    return { totalDays: annuals[0]!.days, source: 'annual' };
-  }
-
-  const monthlySum = rows
-    .filter((r) => r.kind === 'monthly')
-    .reduce((s, r) => s + (Number(r.days) || 0), 0);
-  if (monthlySum > 0) {
-    return { totalDays: monthlySum, source: 'monthly' };
+  const totalSum = rows.reduce((s, r) => s + (Number(r.days) || 0), 0);
+  if (totalSum > 0) {
+    const hasAnnual = rows.some((r) => r.kind === 'annual');
+    return { totalDays: totalSum, source: hasAnnual ? 'annual' : 'monthly' };
   }
 
   if (fallbackTotal > 0) {
@@ -171,11 +156,10 @@ export async function recalculateLeaveBalance(
     }
   }
 
-  // 사용: 당해 연도만, staff_members 미기록
+  // 사용: 누적 사용일수 (전체 기간), staff_members 미기록
   let usedDays: number;
   try {
     usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
-      year: targetYear,
       writeStaffMembers: false,
     });
   } catch (syncErr) {

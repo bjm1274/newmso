@@ -4,7 +4,7 @@
  * 읽음시트 — 게시글 읽음 현황 바텀시트.
  * PC `ReadStatusModal`의 데이터(readers/pending)를 모바일 MSheet로 렌더.
  *   - 읽음 / 미확인 2섹션, 각 직원의 부서·직급 표시
- *   - 익명 게시글은 부모에서 열지 않음 (권한읽음.isAnonymousReadStatusPost)
+ *   - 익명 작성·익명 투표 게시글은 부모에서 열지 않음 (권한읽음.isAnonymousReadStatusPost)
  * JM: 단일 책임(표시), JM4(any 금지), JM6(button·aria)
  */
 

@@ -344,7 +344,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   }, [effectiveBoardUserId]);
   const openReadStatusModal = useCallback(async (post: BoardPost) => {
     if (isAnonymousReadStatusPost(post)) {
-      toast('익명 게시글은 읽음 확인을 사용할 수 없습니다.', 'warning');
+      toast('익명 게시글·익명 투표 게시글은 읽음 확인을 사용할 수 없습니다.', 'warning');
       return;
     }
     setReadStatusPost(post);

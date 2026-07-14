@@ -8,9 +8,27 @@ import type { BoardPost } from '@/types';
 
 // ─── 익명 읽음 상태 판별 ───────────────────────────────────────────────────────
 
-/** 익명 작성 게시글은 읽음 상태를 추적하지 않음 (익명소리함 보드 폐지) */
+/** poll JSONB 에 익명 투표 플래그가 있으면 true */
+export function hasAnonymousPoll(post: BoardPost | null | undefined): boolean {
+  let poll: unknown = post?.poll;
+  if (typeof poll === 'string') {
+    try {
+      poll = JSON.parse(poll) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (!poll || typeof poll !== 'object' || Array.isArray(poll)) return false;
+  return Boolean((poll as { anonymous?: unknown }).anonymous);
+}
+
+/**
+ * 읽음 확인/추적 비활성 대상.
+ * - 익명 작성 게시글
+ * - 익명 투표가 있는 게시글 (투표 참여·미참여 노출 방지)
+ */
 export const isAnonymousReadStatusPost = (post: BoardPost | null | undefined): boolean =>
-  Boolean(post?.is_anonymous);
+  Boolean(post?.is_anonymous) || hasAnonymousPoll(post);
 
 // ─── 수술/MRI 신체 부위 목록 ─────────────────────────────────────────────────
 

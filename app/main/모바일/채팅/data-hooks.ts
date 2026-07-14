@@ -113,6 +113,12 @@ function isRoomVisibleToUser(
   return memberIds.includes(String(userId));
 }
 
+function roomActivityMs(room: ChatRoom | null | undefined): number {
+  const raw = String(room?.last_message_at || room?.created_at || 0).replace(' ', 'T');
+  const ms = new Date(raw).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export function useChatRoomsForMobile(
   userId: string | null | undefined,
   activeRoomId?: string | null,
@@ -121,6 +127,10 @@ export function useChatRoomsForMobile(
   const [loading, setLoading] = useState(true);
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
+  // activeRoomId는 unread 계산에만 쓰인다. deps에 넣으면 방 입장마다
+  // refresh identity가 바뀌어 목록 전체 재조회·재정렬이 일어난다.
+  const activeRoomIdRef = useRef(activeRoomId ?? null);
+  activeRoomIdRef.current = activeRoomId ?? null;
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     const currentUserId = userIdRef.current;
@@ -141,8 +151,8 @@ export function useChatRoomsForMobile(
       visible.forEach((room) => {
         const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
         const previousRoom = dedupedRooms.get(roomKey);
-        const previousTime = new Date(previousRoom?.last_message_at || previousRoom?.created_at || 0).getTime();
-        const currentTime = new Date(room?.last_message_at || room?.created_at || 0).getTime();
+        const previousTime = roomActivityMs(previousRoom);
+        const currentTime = roomActivityMs(room);
         if (!previousRoom || currentTime >= previousTime) {
           dedupedRooms.set(roomKey, room);
         }
@@ -162,7 +172,7 @@ export function useChatRoomsForMobile(
         counts = await fetchChatUnreadCountsByRoom(db, {
           rooms: dedupedList,
           userId: currentUserId,
-          activeRoomId: activeRoomId ?? null });
+          activeRoomId: activeRoomIdRef.current });
       } catch {
         counts = {};
       }
@@ -172,6 +182,7 @@ export function useChatRoomsForMobile(
         unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms) }));
       // 폴링이 file:// 로 덮어쓰면 로컬 정리값 유지.
       // 로컬이 「삭제된 메시지입니다.」이면 그것도 폴링 dirty 값보다 우선.
+      // last_message_at 은 정렬 안정성을 위해 서버 값을 우선(로컬이 더 최신일 때만 유지).
       setRooms((prev) => {
         const prevById = new Map(prev.map((r) => [String(r.id), r]));
         return merged.map((room) => {
@@ -185,12 +196,20 @@ export function useChatRoomsForMobile(
             /^[A-Za-z]:[\\/]/.test(newPreview);
           const oldIsDeleted =
             oldPreview === '삭제된 메시지입니다.' || oldPreview.startsWith('삭제된 메시지');
+          const oldAt = roomActivityMs(old);
+          const newAt = roomActivityMs(room);
+          const preferOldAt = oldAt > newAt;
+          const stableAt = preferOldAt
+            ? (old.last_message_at || room.last_message_at)
+            : (room.last_message_at || old.last_message_at);
           if (newIsDirty && oldPreview && (!/^file:\/\//i.test(oldPreview) || oldIsDeleted)) {
             return {
               ...room,
-              last_message: old.last_message,
-              last_message_preview: old.last_message_preview,
-              last_message_at: old.last_message_at || room.last_message_at,
+              last_message: oldIsDeleted ? '삭제된 메시지입니다.' : old.last_message,
+              last_message_preview: oldIsDeleted
+                ? '삭제된 메시지입니다.'
+                : old.last_message_preview,
+              last_message_at: stableAt,
             };
           }
           if (oldIsDeleted && newIsDirty) {
@@ -198,7 +217,16 @@ export function useChatRoomsForMobile(
               ...room,
               last_message: '삭제된 메시지입니다.',
               last_message_preview: '삭제된 메시지입니다.',
-              last_message_at: old.last_message_at || room.last_message_at,
+              last_message_at: stableAt,
+            };
+          }
+          // 서버가 잠깐 과거 타임스탬프를 주면 로컬(더 최신) 미리보기 유지
+          if (preferOldAt && oldPreview && !newIsDirty) {
+            return {
+              ...room,
+              last_message: old.last_message,
+              last_message_preview: old.last_message_preview,
+              last_message_at: old.last_message_at,
             };
           }
           return room;
@@ -209,7 +237,7 @@ export function useChatRoomsForMobile(
     } finally {
       setLoading(false);
     }
-  }, [activeRoomId]);
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -343,6 +371,12 @@ export function useChatMessagesForRoom(
   roomIdRef.current = roomId;
   const oldestRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
+  // 방 전환 레이스: 이전 방 fetch 결과가 늦게 도착해 새 방을 덮지 않도록 generation 가드
+  const fetchGenRef = useRef(0);
+
+  const isStaleRoom = useCallback((expectedRoomId: string, gen: number) => {
+    return fetchGenRef.current !== gen || String(roomIdRef.current || '') !== String(expectedRoomId);
+  }, []);
 
   const fetchAndMergeReactions = useCallback(
     async (rows: ChatMessage[]): Promise<ChatMessage[]> => {
@@ -358,6 +392,7 @@ export function useChatMessagesForRoom(
 
   const refresh = useCallback(async () => {
     const currentRoomId = roomIdRef.current;
+    const gen = fetchGenRef.current;
     if (!currentRoomId) {
       setMessages([]);
       setLoading(false);
@@ -379,6 +414,7 @@ export function useChatMessagesForRoom(
               error: unknown;
             }>,
       );
+      if (isStaleRoom(currentRoomId, gen)) return;
       if (error || !Array.isArray(data)) {
         setMessages([]);
         setHasMore(false);
@@ -387,6 +423,7 @@ export function useChatMessagesForRoom(
         // 화면은 오래된 -> 최신 순으로 정렬
         const ordered = [...data].reverse();
         const withReactions = await fetchAndMergeReactions(ordered);
+        if (isStaleRoom(currentRoomId, gen)) return;
         setMessages(withReactions);
         setHasMore(data.length >= MESSAGES_LIMIT);
         oldestRef.current = withReactions.length > 0
@@ -394,17 +431,21 @@ export function useChatMessagesForRoom(
           : null;
       }
     } catch {
+      if (isStaleRoom(currentRoomId, gen)) return;
       setMessages([]);
       setHasMore(false);
       oldestRef.current = null;
     } finally {
-      setLoading(false);
+      if (!isStaleRoom(currentRoomId, gen)) {
+        setLoading(false);
+      }
     }
-  }, [fetchAndMergeReactions]);
+  }, [fetchAndMergeReactions, isStaleRoom]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlderRef.current) return;
     const currentRoomId = roomIdRef.current;
+    const gen = fetchGenRef.current;
     if (!currentRoomId) return;
     const cursor = oldestRef.current;
     if (!cursor) return;
@@ -426,11 +467,13 @@ export function useChatMessagesForRoom(
               error: unknown;
             }>,
       );
+      if (isStaleRoom(currentRoomId, gen)) return;
       if (error || !Array.isArray(data) || data.length === 0) {
         setHasMore(false);
       } else {
         const ordered = [...data].reverse();
         const withReactions = await fetchAndMergeReactions(ordered);
+        if (isStaleRoom(currentRoomId, gen)) return;
         setMessages((prev) => [...withReactions, ...prev]);
         oldestRef.current = withReactions.length > 0
           ? (withReactions[0].created_at as string | null) || null
@@ -441,19 +484,27 @@ export function useChatMessagesForRoom(
       // 무한스크롤 실패는 silent — 다음 시도 가능
     } finally {
       loadingOlderRef.current = false;
-      setLoadingOlder(false);
+      if (!isStaleRoom(currentRoomId, gen)) {
+        setLoadingOlder(false);
+      }
     }
-  }, [fetchAndMergeReactions, hasMore]);
+  }, [fetchAndMergeReactions, hasMore, isStaleRoom]);
 
   useEffect(() => {
+    // 방 전환 즉시 이전 메시지 비움 — 과거 메시지 깜빡임 방지
+    fetchGenRef.current += 1;
+    loadingOlderRef.current = false;
     if (!roomId) {
       setMessages([]);
       setLoading(false);
       setHasMore(true);
+      setLoadingOlder(false);
       oldestRef.current = null;
       return;
     }
+    setMessages([]);
     setLoading(true);
+    setLoadingOlder(false);
     setHasMore(true);
     oldestRef.current = null;
     void refresh();
@@ -495,14 +546,22 @@ export function useChatMessagesForRoom(
   }, [roomId]);
 
   // 읽음 cursor 업데이트 (조회만, 액션 X 정책상 P0에서도 안전)
+  // 메시지가 실제로 로드된 뒤에만 갱신 — 빈 목록/다른 방 잔여로 인한 조기 poke 방지
   useEffect(() => {
     if (!roomId || !userId) return;
+    if (loading) return;
+    if (messages.length === 0) return;
+    // 현재 방 메시지만 신뢰 (레이스 잔여 방어)
     const lastMsg = messages[messages.length - 1];
+    if (lastMsg && String(lastMsg.room_id || '') && String(lastMsg.room_id) !== String(roomId)) {
+      return;
+    }
     if (lastMsg && String(lastMsg.sender_id) === String(userId)) {
       return; // 본인이 보낸 마지막 메시지이면 커서 업데이트 스킵 (과거값 가드)
     }
     // SQL 포맷으로 전송 (서버도 정규화하지만, 클라·DB 혼재 방지)
     const lastReadAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    let cancelled = false;
     void (async () => {
       try {
         await fetch('/api/chat/read-cursors', {
@@ -510,17 +569,23 @@ export function useChatMessagesForRoom(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomIds: [roomId], readAt: lastReadAt }),
           credentials: 'same-origin' });
-        pokeChannel('mobile-chat-rooms-list');
+        if (!cancelled) {
+          pokeChannel('mobile-chat-rooms-list');
+        }
       } catch {
         // silent
       }
     })();
-  }, [roomId, userId, messages.length]);
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, userId, messages.length, loading]);
 
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
 
   const jumpToMessage = useCallback(async (messageId: string) => {
     const currentRoomId = roomIdRef.current;
+    const gen = fetchGenRef.current;
     if (!currentRoomId || !messageId) return;
 
     try {
@@ -533,6 +598,7 @@ export function useChatMessagesForRoom(
             .eq('id', messageId)
             .limit(1) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
       );
+      if (isStaleRoom(currentRoomId, gen)) return;
       const targetMessage = Array.isArray(targetRows) ? targetRows[0] : null;
       if (!targetMessage || !targetMessage.created_at) return;
 
@@ -562,11 +628,14 @@ export function useChatMessagesForRoom(
             .limit(50) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
       );
 
+      if (isStaleRoom(currentRoomId, gen)) return;
+
       const beforeList = Array.isArray(beforeRows) ? [...beforeRows].reverse() : [];
       const afterList = Array.isArray(afterRows) ? afterRows : [];
       const merged = [...beforeList, ...afterList];
 
       const withReactions = await fetchAndMergeReactions(merged);
+      if (isStaleRoom(currentRoomId, gen)) return;
       setMessages(withReactions);
       setHasMore(beforeList.length >= 50);
       oldestRef.current = withReactions.length > 0
@@ -577,9 +646,11 @@ export function useChatMessagesForRoom(
     } catch (err) {
       console.error('[jumpToMessage] Failed to jump:', err);
     } finally {
-      setLoading(false);
+      if (!isStaleRoom(currentRoomId, gen)) {
+        setLoading(false);
+      }
     }
-  }, [fetchAndMergeReactions]);
+  }, [fetchAndMergeReactions, isStaleRoom]);
 
   const appendOptimistic = useCallback((msg: ChatMessage) => {
     setMessages((prev) => {

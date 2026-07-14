@@ -4,7 +4,7 @@
  * 권한읽음 — 게시글 수정/삭제 권한 판별 + 읽음 현황(board_post_reads) 데이터 훅.
  * PC `app/main/기능부품/게시판.tsx`의 canEditPost/canDeletePost + 읽음 모달 데이터 소스를 모바일로 압축.
  *  - canEditMobilePost / canDeleteMobilePost : 작성자 본인 또는 관리자
- *  - isAnonymousReadStatusPost : 익명 게시글은 읽음 추적 미사용 (PC와 동일)
+ *  - isAnonymousReadStatusPost : 익명 작성·익명 투표 게시글은 읽음 추적 미사용 (PC와 동일)
  *  - useReadStatus : staff_members(audience) + board_post_reads → readers/pending 분리
  * 미러 테이블: board_post_reads(post_id, user_id, read_at), staff_members(id,name,company,company_id,department,position,status)
  * JM: 단일 책임(권한·읽음), JM3(try/catch·실패 무시), JM4(any 금지)
@@ -18,10 +18,34 @@ import type { BoardListPost } from './data-hooks';
 // 권한 — PC canEditPost / canDeletePost 미러
 // ─────────────────────────────────────────────
 
-/** 익명 작성 게시글은 읽음 추적/소유 식별 불가 (PC isAnonymousReadStatusPost 미러) */
-export function isAnonymousReadStatusPost(post: BoardListPost | null): boolean {
+/** 익명 작성 게시글 — 수정/삭제 권한용 (작성자 UI 식별 불가) */
+function isAnonymousAuthorPost(post: BoardListPost | null): boolean {
   if (!post) return false;
   return Boolean((post as { is_anonymous?: boolean | null }).is_anonymous);
+}
+
+/** poll JSONB 익명 투표 여부 */
+function hasAnonymousPoll(post: BoardListPost | null): boolean {
+  if (!post) return false;
+  let poll: unknown = (post as { poll?: unknown }).poll;
+  if (typeof poll === 'string') {
+    try {
+      poll = JSON.parse(poll) as unknown;
+    } catch {
+      return false;
+    }
+  }
+  if (!poll || typeof poll !== 'object' || Array.isArray(poll)) return false;
+  return Boolean((poll as { anonymous?: unknown }).anonymous);
+}
+
+/**
+ * 읽음 추적/현황 비활성 (PC isAnonymousReadStatusPost 미러).
+ * 익명 작성 + 익명 투표 게시글 — 참여/미확인 노출로 익명성 훼손 방지.
+ */
+export function isAnonymousReadStatusPost(post: BoardListPost | null): boolean {
+  if (!post) return false;
+  return isAnonymousAuthorPost(post) || hasAnonymousPoll(post);
 }
 
 function isOwnPost(post: BoardListPost | null, userId: string | null | undefined): boolean {
@@ -37,8 +61,8 @@ export function canEditMobilePost(
   canAdmin: boolean,
 ): boolean {
   if (!post) return false;
-  // 익명 게시글은 작성자 식별 불가 → 관리자만
-  if (isAnonymousReadStatusPost(post)) return canAdmin;
+  // 익명 작성 글만 작성자 식별 불가 → 관리자만 (익명 투표 글은 작성자 수정 가능)
+  if (isAnonymousAuthorPost(post)) return canAdmin;
   return isOwnPost(post, userId) || canAdmin;
 }
 
@@ -49,7 +73,7 @@ export function canDeleteMobilePost(
   canAdmin: boolean,
 ): boolean {
   if (!post) return false;
-  if (isAnonymousReadStatusPost(post)) return canAdmin;
+  if (isAnonymousAuthorPost(post)) return canAdmin;
   return isOwnPost(post, userId) || canAdmin;
 }
 

@@ -1,13 +1,13 @@
 -- ============================================================
--- ëˆ„ë½ í…Œì´ë¸” DDL (information_schema ì¶”ì¶œ ìžë™ ë³€í™˜)
--- ìƒì„±ì¼: 2026-05-17T05:46:35.212Z
--- í…Œì´ë¸” ìˆ˜: 125
--- ì œì™¸: attendances_20260513_bulk_backup
+-- ?„ë½ ?Œì´ë¸?DDL (information_schema ì¶”ì¶œ ?ë™ ë³€??
+-- ?ì„±?? 2026-05-17T05:46:35.212Z
+-- ?Œì´ë¸??? 125
+-- ?œì™¸: attendances_20260513_bulk_backup
 -- ============================================================
 
 PRAGMA foreign_keys = ON;
 
--- â”€â”€ access_logs
+-- ?€?€ access_logs
 CREATE TABLE IF NOT EXISTS access_logs (
   id TEXT NOT NULL,
   user_id TEXT,
@@ -25,7 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_access_logs_company_menu_created_at ON access_log
 CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_access_logs_user_created_at ON access_logs (user_id, created_at DESC);
 
--- â”€â”€ annual_leave_promotion_logs
+-- ?€?€ annual_leave_promotion_logs
 CREATE TABLE IF NOT EXISTS annual_leave_promotion_logs (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_alpl_staff_id ON annual_leave_promotion_logs (sta
 CREATE INDEX IF NOT EXISTS idx_alpl_stage ON annual_leave_promotion_logs (stage);
 CREATE INDEX IF NOT EXISTS idx_annual_leave_promotion_logs_staff_year ON annual_leave_promotion_logs (staff_id, target_year, step);
 
--- â”€â”€ approval_history
+-- ?€?€ approval_history
 CREATE TABLE IF NOT EXISTS approval_history (
   id TEXT NOT NULL,
   approval_id TEXT NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS approval_history (
 
 CREATE INDEX IF NOT EXISTS idx_approval_history_approval ON approval_history (approval_id);
 
--- â”€â”€ approval_templates
+-- ?€?€ approval_templates
 CREATE TABLE IF NOT EXISTS approval_templates (
   id TEXT NOT NULL,
   form_type TEXT NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS approval_templates (
 );
 
 
--- â”€â”€ approvals
+-- ?€?€ approvals
 CREATE TABLE IF NOT EXISTS approvals (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS approvals (
   type TEXT,
   title TEXT NOT NULL,
   content TEXT,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   current_approver_id TEXT,
   meta_data TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS approvals (
 CREATE INDEX IF NOT EXISTS idx_approvals_company_id_status_created_at ON approvals (company_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_approvals_doc_number ON approvals (doc_number) WHERE (doc_number IS NOT NULL);
 
--- â”€â”€ asset_loans
+-- ?€?€ asset_loans
 CREATE TABLE IF NOT EXISTS asset_loans (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -115,20 +115,20 @@ CREATE TABLE IF NOT EXISTS asset_loans (
   returned_at TEXT,
   condition_notes TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT asset_loans_asset_type_check CHECK ((asset_type  IN ('ë…¸íŠ¸ë¶', 'PC', 'ëª¨ë‹ˆí„°', 'í‚¤ë³´ë“œ', 'ë§ˆìš°ìŠ¤', 'íšŒì˜ì‹¤í‚¤', 'ê¸°íƒ€'))),
+  CONSTRAINT asset_loans_asset_type_check CHECK ((asset_type  IN ('?¸íŠ¸ë¶?, 'PC', 'ëª¨ë‹ˆ??, '?¤ë³´??, 'ë§ˆìš°??, '?Œì˜?¤í‚¤', 'ê¸°í?'))),
   CONSTRAINT asset_loans_pkey PRIMARY KEY (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_asset_staff ON asset_loans (staff_id);
 
--- â”€â”€ attendance
+-- ?€?€ attendance
 CREATE TABLE IF NOT EXISTS attendance (
   id TEXT NOT NULL,
   staff_id TEXT,
   date TEXT NOT NULL,
   check_in TEXT,
   check_out TEXT,
-  status TEXT DEFAULT 'ì •ìƒ',
+  status TEXT DEFAULT '?•ìƒ',
   notes TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   company_id TEXT,
@@ -141,14 +141,14 @@ CREATE TABLE IF NOT EXISTS attendance (
 CREATE INDEX IF NOT EXISTS idx_attendance_company_id ON attendance (company_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_staff_date ON attendance (staff_id, date);
 
--- â”€â”€ attendance_corrections
+-- ?€?€ attendance_corrections
 CREATE TABLE IF NOT EXISTS attendance_corrections (
   id TEXT NOT NULL,
   staff_id TEXT,
   original_date TEXT,
   correction_type TEXT,
   reason TEXT,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   attendance_date TEXT,
   requested_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -156,10 +156,10 @@ CREATE TABLE IF NOT EXISTS attendance_corrections (
 );
 
 
--- â”€â”€ attendance_deduction_rules
+-- ?€?€ attendance_deduction_rules
 CREATE TABLE IF NOT EXISTS attendance_deduction_rules (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   late_deduction_type TEXT DEFAULT 'fixed',
   late_deduction_amount INTEGER DEFAULT 10000,
   early_leave_deduction_type TEXT DEFAULT 'fixed',
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS attendance_deduction_rules (
 );
 
 
--- â”€â”€ attendances
+-- ?€?€ attendances
 CREATE TABLE IF NOT EXISTS attendances (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS attendances (
 CREATE INDEX IF NOT EXISTS idx_attendances_staff_date ON attendances (staff_id, work_date);
 CREATE INDEX IF NOT EXISTS idx_attendances_work_date ON attendances (work_date);
 
--- â”€â”€ audit_logs
+-- ?€?€ audit_logs
 CREATE TABLE IF NOT EXISTS audit_logs (
   id TEXT NOT NULL,
   user_id TEXT,
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);
 
--- â”€â”€ backup_restore_runs
+-- ?€?€ backup_restore_runs
 CREATE TABLE IF NOT EXISTS backup_restore_runs (
   id TEXT NOT NULL,
   file_name TEXT NOT NULL,
@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS backup_restore_runs (
 
 CREATE INDEX IF NOT EXISTS idx_backup_restore_runs_started ON backup_restore_runs (started_at DESC);
 
--- â”€â”€ board_post_comments
+-- ?€?€ board_post_comments
 CREATE TABLE IF NOT EXISTS board_post_comments (
   id TEXT NOT NULL,
   post_id TEXT,
@@ -251,7 +251,7 @@ CREATE TABLE IF NOT EXISTS board_post_comments (
 
 CREATE INDEX IF NOT EXISTS idx_board_post_comments_parent_comment_id ON board_post_comments (parent_comment_id);
 
--- â”€â”€ board_post_likes
+-- ?€?€ board_post_likes
 CREATE TABLE IF NOT EXISTS board_post_likes (
   id TEXT NOT NULL,
   post_id TEXT,
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS board_post_likes (
 
 CREATE INDEX IF NOT EXISTS idx_board_post_likes_user_id ON board_post_likes (user_id);
 
--- â”€â”€ board_post_reads
+-- ?€?€ board_post_reads
 CREATE TABLE IF NOT EXISTS board_post_reads (
   id TEXT NOT NULL,
   post_id TEXT NOT NULL,
@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS board_post_reads (
 CREATE INDEX IF NOT EXISTS idx_board_post_reads_post_id ON board_post_reads (post_id);
 CREATE INDEX IF NOT EXISTS idx_board_post_reads_user_id ON board_post_reads (user_id);
 
--- â”€â”€ board_posts
+-- ?€?€ board_posts
 CREATE TABLE IF NOT EXISTS board_posts (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -322,7 +322,7 @@ CREATE INDEX IF NOT EXISTS idx_board_posts_company_id ON board_posts (company_id
 CREATE INDEX IF NOT EXISTS idx_board_posts_company_id_board_type_created_at ON board_posts (company_id, board_type, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_board_posts_schedule_date ON board_posts (schedule_date);
 
--- â”€â”€ certificate_issuances
+-- ?€?€ certificate_issuances
 CREATE TABLE IF NOT EXISTS certificate_issuances (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS certificate_issuances (
 );
 
 
--- â”€â”€ chat_messages
+-- ?€?€ chat_messages
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT NOT NULL,
   room_id TEXT,
@@ -352,7 +352,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 
--- â”€â”€ chat_push_jobs
+-- ?€?€ chat_push_jobs
 CREATE TABLE IF NOT EXISTS chat_push_jobs (
   id TEXT NOT NULL,
   message_id TEXT NOT NULL,
@@ -376,7 +376,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_push_jobs_pending ON chat_push_jobs (process
 CREATE INDEX IF NOT EXISTS idx_chat_push_jobs_processing_started_at ON chat_push_jobs (processing_started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_push_jobs_ready ON chat_push_jobs (next_attempt_at, created_at) WHERE ((processed_at IS NULL) AND (dead_lettered_at IS NULL));
 
--- â”€â”€ chat_room_favorites
+-- ?€?€ chat_room_favorites
 CREATE TABLE IF NOT EXISTS chat_room_favorites (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS chat_room_favorites (
 );
 
 
--- â”€â”€ chat_room_prefs
+-- ?€?€ chat_room_prefs
 CREATE TABLE IF NOT EXISTS chat_room_prefs (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -403,7 +403,7 @@ CREATE TABLE IF NOT EXISTS chat_room_prefs (
 CREATE INDEX IF NOT EXISTS idx_chat_room_prefs_room_id ON chat_room_prefs (room_id);
 CREATE INDEX IF NOT EXISTS idx_chat_room_prefs_user_id ON chat_room_prefs (user_id);
 
--- â”€â”€ chat_rooms
+-- ?€?€ chat_rooms
 CREATE TABLE IF NOT EXISTS chat_rooms (
   id TEXT NOT NULL,
   name TEXT,
@@ -421,7 +421,7 @@ CREATE TABLE IF NOT EXISTS chat_rooms (
 
 CREATE INDEX IF NOT EXISTS idx_chat_rooms_last_message_at_desc ON chat_rooms (last_message_at DESC, created_at DESC);
 
--- â”€â”€ companies
+-- ?€?€ companies
 CREATE TABLE IF NOT EXISTS companies (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -437,11 +437,11 @@ CREATE TABLE IF NOT EXISTS companies (
   payment_day INTEGER DEFAULT 7,
   business_number TEXT,
   seal_url TEXT,
-  leave_policy TEXT DEFAULT 'ìž…ì‚¬ì¼',
+  leave_policy TEXT DEFAULT '?…ì‚¬??,
   unused_leave_compensation INTEGER DEFAULT 0,
   fiscal_year_start_month INTEGER DEFAULT 1,
   CONSTRAINT chk_companies_fiscal_month CHECK (((fiscal_year_start_month >= 1) AND (fiscal_year_start_month <= 12))),
-  CONSTRAINT chk_companies_leave_policy CHECK ((leave_policy  IN ('ìž…ì‚¬ì¼', 'íšŒê³„ì—°ë„'))),
+  CONSTRAINT chk_companies_leave_policy CHECK ((leave_policy  IN ('?…ì‚¬??, '?Œê³„?°ë„'))),
   CONSTRAINT companies_mso_id_fkey FOREIGN KEY (mso_id) REFERENCES companies(id),
   CONSTRAINT companies_name_key UNIQUE (name),
   CONSTRAINT companies_payment_day_check CHECK (((payment_day >= 1) AND (payment_day <= 31))),
@@ -450,7 +450,7 @@ CREATE TABLE IF NOT EXISTS companies (
 );
 
 
--- â”€â”€ company_expenses
+-- ?€?€ company_expenses
 CREATE TABLE IF NOT EXISTS company_expenses (
   id TEXT NOT NULL,
   company TEXT NOT NULL,
@@ -466,10 +466,10 @@ CREATE TABLE IF NOT EXISTS company_expenses (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_company_expenses_company_month ON company_expenses (company, year_month);
 
--- â”€â”€ company_holidays
+-- ?€?€ company_holidays
 CREATE TABLE IF NOT EXISTS company_holidays (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   holiday_date TEXT NOT NULL,
   name TEXT NOT NULL,
   note TEXT,
@@ -483,7 +483,7 @@ CREATE TABLE IF NOT EXISTS company_holidays (
 
 CREATE INDEX IF NOT EXISTS idx_company_holidays_scope_date ON company_holidays (company_name, holiday_date);
 
--- â”€â”€ contract_templates
+-- ?€?€ contract_templates
 CREATE TABLE IF NOT EXISTS contract_templates (
   id TEXT NOT NULL,
   company_name TEXT NOT NULL,
@@ -496,7 +496,7 @@ CREATE TABLE IF NOT EXISTS contract_templates (
 );
 
 
--- â”€â”€ corporate_card_transactions
+-- ?€?€ corporate_card_transactions
 CREATE TABLE IF NOT EXISTS corporate_card_transactions (
   id TEXT NOT NULL,
   card_holder_id TEXT,
@@ -506,18 +506,18 @@ CREATE TABLE IF NOT EXISTS corporate_card_transactions (
   amount INTEGER DEFAULT 0,
   description TEXT,
   receipt_url TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   card_id TEXT,
   CONSTRAINT corporate_card_transactions_card_id_fkey FOREIGN KEY (card_id) REFERENCES corporate_cards(id) ON DELETE SET NULL,
-  CONSTRAINT corporate_card_transactions_category_check CHECK ((category  IN ('ì‹ë¹„', 'êµí†µ', 'ê²½ë¹„', 'ë³µë¦¬í›„ìƒ', 'ì˜ë£Œ', 'ê¸°íƒ€'))),
+  CONSTRAINT corporate_card_transactions_category_check CHECK ((category  IN ('?ë¹„', 'êµí†µ', 'ê²½ë¹„', 'ë³µë¦¬?„ìƒ', '?˜ë£Œ', 'ê¸°í?'))),
   CONSTRAINT corporate_card_transactions_pkey PRIMARY KEY (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_category ON corporate_card_transactions (category);
 CREATE INDEX IF NOT EXISTS idx_card_date ON corporate_card_transactions (transaction_date);
 
--- â”€â”€ corporate_cards
+-- ?€?€ corporate_cards
 CREATE TABLE IF NOT EXISTS corporate_cards (
   id TEXT NOT NULL,
   company_name TEXT NOT NULL,
@@ -533,7 +533,7 @@ CREATE TABLE IF NOT EXISTS corporate_cards (
 
 CREATE INDEX IF NOT EXISTS idx_corporate_cards_company ON corporate_cards (company_name);
 
--- â”€â”€ daily_checks
+-- ?€?€ daily_checks
 CREATE TABLE IF NOT EXISTS daily_checks (
   id TEXT NOT NULL,
   closure_id TEXT,
@@ -546,7 +546,7 @@ CREATE TABLE IF NOT EXISTS daily_checks (
 );
 
 
--- â”€â”€ daily_closure_items
+-- ?€?€ daily_closure_items
 CREATE TABLE IF NOT EXISTS daily_closure_items (
   id TEXT NOT NULL,
   closure_id TEXT,
@@ -561,7 +561,7 @@ CREATE TABLE IF NOT EXISTS daily_closure_items (
 );
 
 
--- â”€â”€ daily_closures
+-- ?€?€ daily_closures
 CREATE TABLE IF NOT EXISTS daily_closures (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -581,7 +581,7 @@ CREATE TABLE IF NOT EXISTS daily_closures (
 );
 
 
--- â”€â”€ delivery_confirmations
+-- ?€?€ delivery_confirmations
 CREATE TABLE IF NOT EXISTS delivery_confirmations (
   id TEXT NOT NULL,
   doc_number TEXT,
@@ -602,7 +602,7 @@ CREATE TABLE IF NOT EXISTS delivery_confirmations (
 
 CREATE INDEX IF NOT EXISTS idx_delivery_confirmations_created_at ON delivery_confirmations (created_at DESC);
 
--- â”€â”€ department_private_inventory_items
+-- ?€?€ department_private_inventory_items
 CREATE TABLE IF NOT EXISTS department_private_inventory_items (
   id TEXT NOT NULL,
   company TEXT NOT NULL,
@@ -633,7 +633,7 @@ CREATE TABLE IF NOT EXISTS department_private_inventory_items (
 CREATE INDEX IF NOT EXISTS department_private_inventory_scope_idx ON department_private_inventory_items (company_id, department, item_name);
 CREATE UNIQUE INDEX IF NOT EXISTS department_private_inventory_unique_item ON department_private_inventory_items (lower(company), lower(department), lower(item_name));
 
--- â”€â”€ department_private_inventory_logs
+-- ?€?€ department_private_inventory_logs
 CREATE TABLE IF NOT EXISTS department_private_inventory_logs (
   id TEXT NOT NULL,
   item_id TEXT NOT NULL,
@@ -659,7 +659,7 @@ CREATE TABLE IF NOT EXISTS department_private_inventory_logs (
 CREATE INDEX IF NOT EXISTS department_private_inventory_logs_item_idx ON department_private_inventory_logs (item_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS department_private_inventory_logs_scope_idx ON department_private_inventory_logs (company_id, department, created_at DESC);
 
--- â”€â”€ device_inspections
+-- ?€?€ device_inspections
 CREATE TABLE IF NOT EXISTS device_inspections (
   id TEXT NOT NULL,
   device_id TEXT,
@@ -675,7 +675,7 @@ CREATE TABLE IF NOT EXISTS device_inspections (
 );
 
 
--- â”€â”€ discharge_reviews
+-- ?€?€ discharge_reviews
 CREATE TABLE IF NOT EXISTS discharge_reviews (
   id TEXT NOT NULL,
   patient_name TEXT NOT NULL,
@@ -707,7 +707,7 @@ CREATE TABLE IF NOT EXISTS discharge_reviews (
 );
 
 
--- â”€â”€ discharge_templates
+-- ?€?€ discharge_templates
 CREATE TABLE IF NOT EXISTS discharge_templates (
   id TEXT DEFAULT 'default',
   items TEXT DEFAULT '[]',
@@ -717,7 +717,7 @@ CREATE TABLE IF NOT EXISTS discharge_templates (
 );
 
 
--- â”€â”€ document_repository
+-- ?€?€ document_repository
 CREATE TABLE IF NOT EXISTS document_repository (
   id TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -725,18 +725,18 @@ CREATE TABLE IF NOT EXISTS document_repository (
   content TEXT,
   file_url TEXT,
   version INTEGER DEFAULT 1,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   created_by TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT document_repository_category_check CHECK ((category  IN ('ê·œì •', 'ì–‘ì‹', 'ê³„ì•½ì„œ', 'ê¸°íƒ€'))),
+  CONSTRAINT document_repository_category_check CHECK ((category  IN ('ê·œì •', '?‘ì‹', 'ê³„ì•½??, 'ê¸°í?'))),
   CONSTRAINT document_repository_pkey PRIMARY KEY (id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_document_repo_category ON document_repository (category);
 CREATE INDEX IF NOT EXISTS idx_document_repo_company ON document_repository (company_name);
 
--- â”€â”€ document_versions
+-- ?€?€ document_versions
 CREATE TABLE IF NOT EXISTS document_versions (
   id TEXT NOT NULL,
   document_id TEXT NOT NULL,
@@ -751,26 +751,26 @@ CREATE TABLE IF NOT EXISTS document_versions (
 
 CREATE INDEX IF NOT EXISTS idx_document_versions_doc ON document_versions (document_id);
 
--- â”€â”€ education_records
+-- ?€?€ education_records
 CREATE TABLE IF NOT EXISTS education_records (
   id TEXT NOT NULL,
   staff_id TEXT,
   education_name TEXT NOT NULL,
   deadline TEXT,
   completed_at TEXT,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT education_records_pkey PRIMARY KEY (id),
   CONSTRAINT education_records_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
 
--- â”€â”€ employment_contracts
+-- ?€?€ employment_contracts
 CREATE TABLE IF NOT EXISTS employment_contracts (
   id TEXT NOT NULL,
   staff_id TEXT,
   contract_type TEXT,
-  status TEXT DEFAULT 'ì„œëª…ëŒ€ê¸°',
+  status TEXT DEFAULT '?œëª…?€ê¸?,
   base_salary INTEGER DEFAULT 0,
   meal_allowance INTEGER DEFAULT 0,
   vehicle_allowance INTEGER DEFAULT 0,
@@ -801,7 +801,7 @@ CREATE TABLE IF NOT EXISTS employment_contracts (
 
 CREATE INDEX IF NOT EXISTS idx_contracts_staff_id ON employment_contracts (staff_id);
 
--- â”€â”€ freelancer_payments
+-- ?€?€ freelancer_payments
 CREATE TABLE IF NOT EXISTS freelancer_payments (
   id TEXT NOT NULL,
   company_name TEXT NOT NULL,
@@ -823,7 +823,7 @@ CREATE TABLE IF NOT EXISTS freelancer_payments (
 
 CREATE INDEX IF NOT EXISTS idx_freelancer_payments_company_month ON freelancer_payments (company_name, year_month, payment_date DESC);
 
--- â”€â”€ generated_reports
+-- ?€?€ generated_reports
 CREATE TABLE IF NOT EXISTS generated_reports (
   id TEXT NOT NULL,
   schedule_id TEXT,
@@ -838,7 +838,7 @@ CREATE TABLE IF NOT EXISTS generated_reports (
 CREATE INDEX IF NOT EXISTS idx_generated_reports_schedule_created ON generated_reports (schedule_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_generated_reports_type_period ON generated_reports (report_type, period);
 
--- â”€â”€ handover_notes
+-- ?€?€ handover_notes
 CREATE TABLE IF NOT EXISTS handover_notes (
   id TEXT NOT NULL,
   content TEXT NOT NULL,
@@ -852,7 +852,7 @@ CREATE TABLE IF NOT EXISTS handover_notes (
 );
 
 
--- â”€â”€ health_checkups
+-- ?€?€ health_checkups
 CREATE TABLE IF NOT EXISTS health_checkups (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -862,7 +862,7 @@ CREATE TABLE IF NOT EXISTS health_checkups (
   checkup_type TEXT,
   scheduled_date TEXT,
   completed_date TEXT,
-  status TEXT DEFAULT 'ì˜ˆì •',
+  status TEXT DEFAULT '?ˆì •',
   hospital TEXT,
   result TEXT,
   memo TEXT,
@@ -871,7 +871,7 @@ CREATE TABLE IF NOT EXISTS health_checkups (
 );
 
 
--- â”€â”€ incident_reports
+-- ?€?€ incident_reports
 CREATE TABLE IF NOT EXISTS incident_reports (
   id TEXT NOT NULL,
   incident_date TEXT,
@@ -886,18 +886,18 @@ CREATE TABLE IF NOT EXISTS incident_reports (
   preventive_measures TEXT,
   reporter_id TEXT,
   reporter_name TEXT,
-  status TEXT DEFAULT 'ë³´ê³ ì™„ë£Œ',
+  status TEXT DEFAULT 'ë³´ê³ ?„ë£Œ',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT incident_reports_pkey PRIMARY KEY (id)
 );
 
 
--- â”€â”€ inventory
+-- ?€?€ inventory
 CREATE TABLE IF NOT EXISTS inventory (
   id TEXT NOT NULL,
   company_id TEXT,
   company TEXT,
-  category TEXT DEFAULT 'ì¼ë°˜',
+  category TEXT DEFAULT '?¼ë°˜',
   item_name TEXT NOT NULL,
   quantity INTEGER DEFAULT 0,
   min_quantity INTEGER DEFAULT 5,
@@ -933,7 +933,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_company_id_item_name ON inventory (comp
 CREATE INDEX IF NOT EXISTS idx_inventory_location ON inventory (location);
 CREATE INDEX IF NOT EXISTS idx_inventory_lot_number ON inventory (lot_number);
 
--- â”€â”€ inventory_categories
+-- ?€?€ inventory_categories
 CREATE TABLE IF NOT EXISTS inventory_categories (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -949,7 +949,7 @@ CREATE TABLE IF NOT EXISTS inventory_categories (
 CREATE INDEX IF NOT EXISTS idx_inventory_categories_parent_id ON inventory_categories (parent_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_categories_parent_name ON inventory_categories (COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'), lower(name));
 
--- â”€â”€ inventory_closing_snapshots
+-- ?€?€ inventory_closing_snapshots
 CREATE TABLE IF NOT EXISTS inventory_closing_snapshots (
   id TEXT NOT NULL,
   closing_month TEXT NOT NULL,
@@ -973,7 +973,7 @@ CREATE TABLE IF NOT EXISTS inventory_closing_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_inventory_closing_snapshots_company_month ON inventory_closing_snapshots (company, closing_month DESC);
 
--- â”€â”€ inventory_cost_entries
+-- ?€?€ inventory_cost_entries
 CREATE TABLE IF NOT EXISTS inventory_cost_entries (
   id TEXT NOT NULL,
   purchase_order_id TEXT,
@@ -1019,7 +1019,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_cost_entries_company_month ON inventory
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_cost_entries_idempotency_key ON inventory_cost_entries (idempotency_key) WHERE (idempotency_key IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_inventory_cost_entries_purchase_order ON inventory_cost_entries (purchase_order_id);
 
--- â”€â”€ inventory_count_sessions
+-- ?€?€ inventory_count_sessions
 CREATE TABLE IF NOT EXISTS inventory_count_sessions (
   id TEXT NOT NULL,
   conducted_by TEXT,
@@ -1038,7 +1038,7 @@ CREATE TABLE IF NOT EXISTS inventory_count_sessions (
 CREATE INDEX IF NOT EXISTS idx_inventory_count_sessions_created_at ON inventory_count_sessions (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_count_sessions_scope_created_at ON inventory_count_sessions (company_id, department, created_at DESC);
 
--- â”€â”€ inventory_logs
+-- ?€?€ inventory_logs
 CREATE TABLE IF NOT EXISTS inventory_logs (
   id TEXT NOT NULL,
   item_id TEXT,
@@ -1077,7 +1077,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_logs_lot_number ON inventory_logs (lot_
 CREATE INDEX IF NOT EXISTS idx_inventory_logs_purchase_order_id ON inventory_logs (purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_logs_scope_created_at ON inventory_logs (company_id, department, created_at DESC);
 
--- â”€â”€ inventory_price_history
+-- ?€?€ inventory_price_history
 CREATE TABLE IF NOT EXISTS inventory_price_history (
   id TEXT NOT NULL,
   inventory_item_id TEXT NOT NULL,
@@ -1101,7 +1101,7 @@ CREATE TABLE IF NOT EXISTS inventory_price_history (
 CREATE INDEX IF NOT EXISTS idx_inventory_price_history_item_recorded_at ON inventory_price_history (inventory_item_id, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_price_history_purchase_order_id ON inventory_price_history (purchase_order_id);
 
--- â”€â”€ inventory_receipts
+-- ?€?€ inventory_receipts
 CREATE TABLE IF NOT EXISTS inventory_receipts (
   id TEXT NOT NULL,
   item_id TEXT,
@@ -1109,7 +1109,7 @@ CREATE TABLE IF NOT EXISTS inventory_receipts (
   unit_price REAL,
   supplier_id TEXT,
   receipt_date TEXT DEFAULT CURRENT_TIMESTAMP,
-  receipt_type TEXT DEFAULT 'ìˆ˜ë™',
+  receipt_type TEXT DEFAULT '?˜ë™',
   lot_number TEXT,
   expiry_date TEXT,
   invoice_number TEXT,
@@ -1123,7 +1123,7 @@ CREATE TABLE IF NOT EXISTS inventory_receipts (
 );
 
 
--- â”€â”€ inventory_transfers
+-- ?€?€ inventory_transfers
 CREATE TABLE IF NOT EXISTS inventory_transfers (
   id TEXT NOT NULL,
   item_id TEXT,
@@ -1136,7 +1136,7 @@ CREATE TABLE IF NOT EXISTS inventory_transfers (
   reason TEXT,
   transferred_by TEXT,
   transferred_by_id TEXT,
-  status TEXT DEFAULT 'ì™„ë£Œ',
+  status TEXT DEFAULT '?„ë£Œ',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   approval_id TEXT,
   purchase_order_id TEXT,
@@ -1150,7 +1150,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_transfers_approval_id ON inventory_tran
 CREATE INDEX IF NOT EXISTS idx_inventory_transfers_created_at ON inventory_transfers (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_transfers_purchase_order_id ON inventory_transfers (purchase_order_id);
 
--- â”€â”€ job_categories
+-- ?€?€ job_categories
 CREATE TABLE IF NOT EXISTS job_categories (
   id TEXT NOT NULL,
   code TEXT NOT NULL,
@@ -1163,7 +1163,7 @@ CREATE TABLE IF NOT EXISTS job_categories (
 );
 
 
--- â”€â”€ job_category_required_trainings
+-- ?€?€ job_category_required_trainings
 CREATE TABLE IF NOT EXISTS job_category_required_trainings (
   id TEXT NOT NULL,
   job_category_id TEXT,
@@ -1184,7 +1184,7 @@ CREATE TABLE IF NOT EXISTS job_category_required_trainings (
 CREATE INDEX IF NOT EXISTS idx_jcrt_applies_to_all ON job_category_required_trainings (applies_to_all);
 CREATE INDEX IF NOT EXISTS idx_jcrt_job_category_id ON job_category_required_trainings (job_category_id);
 
--- â”€â”€ leave_balances
+-- ?€?€ leave_balances
 CREATE TABLE IF NOT EXISTS leave_balances (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1207,7 +1207,7 @@ CREATE TABLE IF NOT EXISTS leave_balances (
 CREATE INDEX IF NOT EXISTS idx_leave_balances_expiry_date ON leave_balances (expiry_date);
 CREATE INDEX IF NOT EXISTS idx_leave_balances_staff_id ON leave_balances (staff_id);
 
--- â”€â”€ leave_requests
+-- ?€?€ leave_requests
 CREATE TABLE IF NOT EXISTS leave_requests (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -1215,7 +1215,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
   start_date TEXT NOT NULL,
   end_date TEXT NOT NULL,
   reason TEXT,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   approved_at TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   company_id TEXT,
@@ -1228,7 +1228,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
 CREATE INDEX IF NOT EXISTS idx_leave_requests_company_id ON leave_requests (company_id);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_staff_id ON leave_requests (staff_id);
 
--- â”€â”€ medical_devices
+-- ?€?€ medical_devices
 CREATE TABLE IF NOT EXISTS medical_devices (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -1245,7 +1245,7 @@ CREATE TABLE IF NOT EXISTS medical_devices (
 );
 
 
--- â”€â”€ message_bookmarks
+-- ?€?€ message_bookmarks
 CREATE TABLE IF NOT EXISTS message_bookmarks (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -1259,12 +1259,12 @@ CREATE TABLE IF NOT EXISTS message_bookmarks (
 
 CREATE INDEX IF NOT EXISTS idx_message_bookmarks_user_message ON message_bookmarks (user_id, message_id);
 
--- â”€â”€ message_reactions
+-- ?€?€ message_reactions
 CREATE TABLE IF NOT EXISTS message_reactions (
   id TEXT NOT NULL,
   message_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
-  emoji TEXT DEFAULT 'ðŸ‘',
+  emoji TEXT DEFAULT '?‘',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT message_reactions_message_id_user_id_emoji_key UNIQUE (message_id, user_id, emoji),
   CONSTRAINT message_reactions_pkey PRIMARY KEY (id)
@@ -1272,7 +1272,7 @@ CREATE TABLE IF NOT EXISTS message_reactions (
 
 CREATE INDEX IF NOT EXISTS idx_message_reactions_msg ON message_reactions (message_id);
 
--- â”€â”€ message_reads
+-- ?€?€ message_reads
 CREATE TABLE IF NOT EXISTS message_reads (
   id TEXT NOT NULL,
   message_id TEXT,
@@ -1286,7 +1286,7 @@ CREATE TABLE IF NOT EXISTS message_reads (
 );
 
 
--- â”€â”€ messages
+-- ?€?€ messages
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT NOT NULL,
   room_id TEXT NOT NULL,
@@ -1314,10 +1314,10 @@ CREATE INDEX IF NOT EXISTS idx_messages_room_created_id_desc ON messages (room_i
 CREATE INDEX IF NOT EXISTS idx_messages_room_unread_count ON messages (room_id, created_at DESC) WHERE (is_deleted = false);
 CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages (sender_id);
 
--- â”€â”€ messenger_drive_links
+-- ?€?€ messenger_drive_links
 CREATE TABLE IF NOT EXISTS messenger_drive_links (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   room_id TEXT,
   name TEXT NOT NULL,
   url TEXT DEFAULT '',
@@ -1335,7 +1335,7 @@ CREATE TABLE IF NOT EXISTS messenger_drive_links (
 CREATE INDEX IF NOT EXISTS idx_messenger_drive_links_company ON messenger_drive_links (company_name, sort_order, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messenger_drive_links_room ON messenger_drive_links (room_id);
 
--- â”€â”€ monthly_off_quota
+-- ?€?€ monthly_off_quota
 CREATE TABLE IF NOT EXISTS monthly_off_quota (
   id TEXT NOT NULL,
   company TEXT NOT NULL,
@@ -1351,7 +1351,7 @@ CREATE TABLE IF NOT EXISTS monthly_off_quota (
 CREATE INDEX IF NOT EXISTS idx_monthly_off_quota_company ON monthly_off_quota (company);
 CREATE INDEX IF NOT EXISTS idx_monthly_off_quota_year_month ON monthly_off_quota (year_month);
 
--- â”€â”€ mri_templates
+-- ?€?€ mri_templates
 CREATE TABLE IF NOT EXISTS mri_templates (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -1362,7 +1362,7 @@ CREATE TABLE IF NOT EXISTS mri_templates (
 );
 
 
--- â”€â”€ notification_templates
+-- ?€?€ notification_templates
 CREATE TABLE IF NOT EXISTS notification_templates (
   id TEXT NOT NULL,
   template_type TEXT NOT NULL,
@@ -1370,14 +1370,14 @@ CREATE TABLE IF NOT EXISTS notification_templates (
   content TEXT NOT NULL,
   variables TEXT DEFAULT '[]',
   is_active INTEGER DEFAULT 1,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT notification_templates_pkey PRIMARY KEY (id),
-  CONSTRAINT notification_templates_template_type_check CHECK ((template_type  IN ('ê¸‰ì—¬ëª…ì„¸', 'íœ´ê°€ìŠ¹ì¸', 'íœ´ê°€ë°˜ë ¤', 'ìž…ì‚¬ì•ˆë‚´', 'í‡´ì‚¬ì•ˆë‚´', 'ê¸°íƒ€')))
+  CONSTRAINT notification_templates_template_type_check CHECK ((template_type  IN ('ê¸‰ì—¬ëª…ì„¸', '?´ê??¹ì¸', '?´ê?ë°˜ë ¤', '?…ì‚¬?ˆë‚´', '?´ì‚¬?ˆë‚´', 'ê¸°í?')))
 );
 
 
--- â”€â”€ notifications
+-- ?€?€ notifications
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT NOT NULL,
   user_id TEXT,
@@ -1393,7 +1393,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications (user_id);
 
--- â”€â”€ official_doc_log
+-- ?€?€ official_doc_log
 CREATE TABLE IF NOT EXISTS official_doc_log (
   id INTEGER NOT NULL,
   sent_date TEXT NOT NULL,
@@ -1411,7 +1411,7 @@ CREATE TABLE IF NOT EXISTS official_doc_log (
 CREATE INDEX IF NOT EXISTS idx_official_doc_log_company ON official_doc_log (company);
 CREATE INDEX IF NOT EXISTS idx_official_doc_log_sent_date ON official_doc_log (sent_date DESC);
 
--- â”€â”€ onboarding_checklists
+-- ?€?€ onboarding_checklists
 CREATE TABLE IF NOT EXISTS onboarding_checklists (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1420,18 +1420,18 @@ CREATE TABLE IF NOT EXISTS onboarding_checklists (
   target_date TEXT,
   completed_at TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT onboarding_checklists_checklist_type_check CHECK ((checklist_type  IN ('ìž…ì‚¬', 'í‡´ì‚¬'))),
+  CONSTRAINT onboarding_checklists_checklist_type_check CHECK ((checklist_type  IN ('?…ì‚¬', '?´ì‚¬'))),
   CONSTRAINT onboarding_checklists_pkey PRIMARY KEY (id),
   CONSTRAINT onboarding_checklists_staff_id_checklist_type_key UNIQUE (staff_id, checklist_type)
 );
 
 CREATE INDEX IF NOT EXISTS idx_onboarding_staff ON onboarding_checklists (staff_id);
 
--- â”€â”€ op_check_templates
+-- ?€?€ op_check_templates
 CREATE TABLE IF NOT EXISTS op_check_templates (
   id TEXT NOT NULL,
   company_id TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   template_scope TEXT DEFAULT 'surgery',
   template_name TEXT NOT NULL,
   surgery_template_id TEXT,
@@ -1454,12 +1454,12 @@ CREATE INDEX IF NOT EXISTS idx_op_check_templates_anesthesia ON op_check_templat
 CREATE INDEX IF NOT EXISTS idx_op_check_templates_company_scope ON op_check_templates (company_id, template_scope, is_active);
 CREATE INDEX IF NOT EXISTS idx_op_check_templates_surgery_name ON op_check_templates (lower(COALESCE(surgery_name, '')));
 
--- â”€â”€ op_patient_checks
+-- ?€?€ op_patient_checks
 CREATE TABLE IF NOT EXISTS op_patient_checks (
   id TEXT NOT NULL,
   schedule_post_id TEXT NOT NULL,
   company_id TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   patient_name TEXT DEFAULT '',
   chart_no TEXT,
   surgery_name TEXT DEFAULT '',
@@ -1485,17 +1485,17 @@ CREATE TABLE IF NOT EXISTS op_patient_checks (
   CONSTRAINT op_patient_checks_created_by_fkey FOREIGN KEY (created_by) REFERENCES staff_members(id) ON DELETE SET NULL,
   CONSTRAINT op_patient_checks_pkey PRIMARY KEY (id),
   CONSTRAINT op_patient_checks_schedule_post_id_key UNIQUE (schedule_post_id),
-  CONSTRAINT op_patient_checks_status_check CHECK ((status  IN ('ì¤€ë¹„ì¤‘', 'ì¤€ë¹„ì™„ë£Œ', 'ìˆ˜ìˆ ì¤‘', 'ì™„ë£Œ'))),
+  CONSTRAINT op_patient_checks_status_check CHECK ((status  IN ('ì¤€ë¹„ì¤‘', 'ì¤€ë¹„ì™„ë£?, '?˜ìˆ ì¤?, '?„ë£Œ'))),
   CONSTRAINT op_patient_checks_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES staff_members(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_op_patient_checks_company_date ON op_patient_checks (company_id, schedule_date DESC, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_op_patient_checks_patient_name ON op_patient_checks (lower(patient_name));
 
--- â”€â”€ org_teams
+-- ?€?€ org_teams
 CREATE TABLE IF NOT EXISTS org_teams (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   division TEXT NOT NULL,
   team_name TEXT NOT NULL,
   sort_order INTEGER DEFAULT 0,
@@ -1506,7 +1506,7 @@ CREATE TABLE IF NOT EXISTS org_teams (
 );
 
 
--- â”€â”€ payroll
+-- ?€?€ payroll
 CREATE TABLE IF NOT EXISTS payroll (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -1524,10 +1524,10 @@ CREATE TABLE IF NOT EXISTS payroll (
 );
 
 
--- â”€â”€ payroll_approval_logs
+-- ?€?€ payroll_approval_logs
 CREATE TABLE IF NOT EXISTS payroll_approval_logs (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   year_month TEXT NOT NULL,
   actor_id TEXT,
   actor_name TEXT NOT NULL,
@@ -1540,13 +1540,13 @@ CREATE TABLE IF NOT EXISTS payroll_approval_logs (
 
 CREATE INDEX IF NOT EXISTS idx_payroll_approval_logs_scope ON payroll_approval_logs (company_name, year_month, created_at DESC);
 
--- â”€â”€ payroll_approval_workflows
+-- ?€?€ payroll_approval_workflows
 CREATE TABLE IF NOT EXISTS payroll_approval_workflows (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   year_month TEXT NOT NULL,
-  step1_status TEXT DEFAULT 'ëŒ€ê¸°',
-  step2_status TEXT DEFAULT 'ëŒ€ê¸°',
+  step1_status TEXT DEFAULT '?€ê¸?,
+  step2_status TEXT DEFAULT '?€ê¸?,
   step1_comment TEXT,
   step2_comment TEXT,
   step1_actor_id TEXT,
@@ -1558,20 +1558,20 @@ CREATE TABLE IF NOT EXISTS payroll_approval_workflows (
   CONSTRAINT payroll_approval_workflows_company_name_year_month_key UNIQUE (company_name, year_month),
   CONSTRAINT payroll_approval_workflows_pkey PRIMARY KEY (id),
   CONSTRAINT payroll_approval_workflows_step1_actor_id_fkey FOREIGN KEY (step1_actor_id) REFERENCES staff_members(id) ON DELETE SET NULL,
-  CONSTRAINT payroll_approval_workflows_step1_status_check CHECK ((step1_status  IN ('ëŒ€ê¸°', 'ìŠ¹ì¸', 'ë³´ë¥˜'))),
+  CONSTRAINT payroll_approval_workflows_step1_status_check CHECK ((step1_status  IN ('?€ê¸?, '?¹ì¸', 'ë³´ë¥˜'))),
   CONSTRAINT payroll_approval_workflows_step2_actor_id_fkey FOREIGN KEY (step2_actor_id) REFERENCES staff_members(id) ON DELETE SET NULL,
-  CONSTRAINT payroll_approval_workflows_step2_status_check CHECK ((step2_status  IN ('ëŒ€ê¸°', 'ìŠ¹ì¸', 'ë³´ë¥˜')))
+  CONSTRAINT payroll_approval_workflows_step2_status_check CHECK ((step2_status  IN ('?€ê¸?, '?¹ì¸', 'ë³´ë¥˜')))
 );
 
 CREATE INDEX IF NOT EXISTS idx_payroll_approval_workflows_scope ON payroll_approval_workflows (company_name, year_month);
 
--- â”€â”€ payroll_bonus_items
+-- ?€?€ payroll_bonus_items
 CREATE TABLE IF NOT EXISTS payroll_bonus_items (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
   company_name TEXT NOT NULL,
   year_month TEXT NOT NULL,
-  category TEXT DEFAULT 'ìƒì—¬',
+  category TEXT DEFAULT '?ì—¬',
   amount INTEGER DEFAULT 0,
   note TEXT,
   created_by TEXT,
@@ -1586,15 +1586,15 @@ CREATE TABLE IF NOT EXISTS payroll_bonus_items (
 CREATE INDEX IF NOT EXISTS idx_payroll_bonus_items_company_month ON payroll_bonus_items (company_name, year_month, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payroll_bonus_items_staff ON payroll_bonus_items (staff_id, year_month);
 
--- â”€â”€ payroll_calendar_items
+-- ?€?€ payroll_calendar_items
 CREATE TABLE IF NOT EXISTS payroll_calendar_items (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   year_month TEXT NOT NULL,
   title TEXT NOT NULL,
   due_date TEXT NOT NULL,
   owner_label TEXT NOT NULL,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   sort_order INTEGER DEFAULT 0,
   created_by TEXT,
   updated_by TEXT,
@@ -1603,13 +1603,13 @@ CREATE TABLE IF NOT EXISTS payroll_calendar_items (
   CONSTRAINT payroll_calendar_items_company_name_year_month_title_key UNIQUE (company_name, year_month, title),
   CONSTRAINT payroll_calendar_items_created_by_fkey FOREIGN KEY (created_by) REFERENCES staff_members(id) ON DELETE SET NULL,
   CONSTRAINT payroll_calendar_items_pkey PRIMARY KEY (id),
-  CONSTRAINT payroll_calendar_items_status_check CHECK ((status  IN ('ëŒ€ê¸°', 'ì§„í–‰', 'ì™„ë£Œ'))),
+  CONSTRAINT payroll_calendar_items_status_check CHECK ((status  IN ('?€ê¸?, 'ì§„í–‰', '?„ë£Œ'))),
   CONSTRAINT payroll_calendar_items_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES staff_members(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_payroll_calendar_items_scope ON payroll_calendar_items (company_name, year_month, sort_order);
 
--- â”€â”€ payroll_deduction_controls
+-- ?€?€ payroll_deduction_controls
 CREATE TABLE IF NOT EXISTS payroll_deduction_controls (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1631,11 +1631,11 @@ CREATE TABLE IF NOT EXISTS payroll_deduction_controls (
 CREATE INDEX IF NOT EXISTS idx_payroll_deduction_controls_company ON payroll_deduction_controls (company_name, is_active, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payroll_deduction_controls_staff ON payroll_deduction_controls (staff_id, is_active);
 
--- â”€â”€ payroll_locks
+-- ?€?€ payroll_locks
 CREATE TABLE IF NOT EXISTS payroll_locks (
   id TEXT NOT NULL,
   year_month TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   locked_at TEXT DEFAULT CURRENT_TIMESTAMP,
   locked_by TEXT,
   memo TEXT,
@@ -1654,10 +1654,10 @@ CREATE TABLE IF NOT EXISTS payroll_locks (
 
 CREATE INDEX IF NOT EXISTS idx_payroll_locks_reopen_status ON payroll_locks (year_month, company_name, reopen_request_status);
 
--- â”€â”€ payroll_policy_versions
+-- ?€?€ payroll_policy_versions
 CREATE TABLE IF NOT EXISTS payroll_policy_versions (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   effective_year INTEGER NOT NULL,
   version_label TEXT NOT NULL,
   snapshot TEXT DEFAULT '{}',
@@ -1670,7 +1670,7 @@ CREATE TABLE IF NOT EXISTS payroll_policy_versions (
 
 CREATE INDEX IF NOT EXISTS idx_payroll_policy_versions_scope ON payroll_policy_versions (company_name, effective_year, created_at DESC);
 
--- â”€â”€ payroll_records
+-- ?€?€ payroll_records
 CREATE TABLE IF NOT EXISTS payroll_records (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1690,7 +1690,7 @@ CREATE TABLE IF NOT EXISTS payroll_records (
   net_pay INTEGER DEFAULT 0,
   attendance_deduction INTEGER DEFAULT 0,
   attendance_deduction_detail TEXT,
-  status TEXT DEFAULT 'ìž„ì‹œ',
+  status TEXT DEFAULT '?„ì‹œ',
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   record_type TEXT DEFAULT 'regular',
   severance_pay INTEGER DEFAULT 0,
@@ -1712,7 +1712,7 @@ CREATE TABLE IF NOT EXISTS payroll_records (
 
 CREATE INDEX IF NOT EXISTS idx_payroll_records_staff_ym ON payroll_records (staff_id, year_month);
 
--- â”€â”€ payroll_retro_adjustments
+-- ?€?€ payroll_retro_adjustments
 CREATE TABLE IF NOT EXISTS payroll_retro_adjustments (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1734,7 +1734,7 @@ CREATE TABLE IF NOT EXISTS payroll_retro_adjustments (
 CREATE INDEX IF NOT EXISTS idx_payroll_retro_adjustments_company ON payroll_retro_adjustments (company_name, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payroll_retro_adjustments_staff ON payroll_retro_adjustments (staff_id, start_month, end_month);
 
--- â”€â”€ personnel_appointments
+-- ?€?€ personnel_appointments
 CREATE TABLE IF NOT EXISTS personnel_appointments (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1750,7 +1750,7 @@ CREATE TABLE IF NOT EXISTS personnel_appointments (
   after_role TEXT,
   reason TEXT,
   memo TEXT,
-  status TEXT DEFAULT 'ë°œë ¹ì™„ë£Œ',
+  status TEXT DEFAULT 'ë°œë ¹?„ë£Œ',
   issued_by TEXT,
   issued_at TEXT DEFAULT CURRENT_TIMESTAMP,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -1759,7 +1759,7 @@ CREATE TABLE IF NOT EXISTS personnel_appointments (
 );
 
 
--- â”€â”€ pinned_messages
+-- ?€?€ pinned_messages
 CREATE TABLE IF NOT EXISTS pinned_messages (
   id TEXT NOT NULL,
   room_id TEXT NOT NULL,
@@ -1772,7 +1772,7 @@ CREATE TABLE IF NOT EXISTS pinned_messages (
 
 CREATE INDEX IF NOT EXISTS idx_pinned_room ON pinned_messages (room_id);
 
--- â”€â”€ poll_votes
+-- ?€?€ poll_votes
 CREATE TABLE IF NOT EXISTS poll_votes (
   id TEXT NOT NULL,
   poll_id TEXT NOT NULL,
@@ -1785,7 +1785,7 @@ CREATE TABLE IF NOT EXISTS poll_votes (
 );
 
 
--- â”€â”€ polls
+-- ?€?€ polls
 CREATE TABLE IF NOT EXISTS polls (
   id TEXT NOT NULL,
   room_id TEXT NOT NULL,
@@ -1799,7 +1799,7 @@ CREATE TABLE IF NOT EXISTS polls (
 
 CREATE INDEX IF NOT EXISTS idx_polls_room ON polls (room_id);
 
--- â”€â”€ popups
+-- ?€?€ popups
 CREATE TABLE IF NOT EXISTS popups (
   id TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -1819,10 +1819,10 @@ CREATE TABLE IF NOT EXISTS popups (
 CREATE INDEX IF NOT EXISTS idx_popups_active_created ON popups (is_active, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_popups_schedule_priority ON popups (is_active, priority DESC, created_at DESC);
 
--- â”€â”€ posts
+-- ?€?€ posts
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT NOT NULL,
-  board_type TEXT DEFAULT 'ê³µì§€ì‚¬í•­',
+  board_type TEXT DEFAULT 'ê³µì??¬í•­',
   title TEXT NOT NULL,
   content TEXT,
   author_id TEXT,
@@ -1837,12 +1837,12 @@ CREATE TABLE IF NOT EXISTS posts (
 
 CREATE INDEX IF NOT EXISTS idx_posts_company_id_created_at ON posts (company_id, created_at DESC);
 
--- â”€â”€ purchase_orders
+-- ?€?€ purchase_orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id TEXT NOT NULL,
   supplier_id TEXT,
   items TEXT NOT NULL,
-  status TEXT DEFAULT 'ëŒ€ê¸°',
+  status TEXT DEFAULT '?€ê¸?,
   total_amount REAL,
   notes TEXT,
   created_by TEXT,
@@ -1900,7 +1900,7 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_inspection_status ON purchase_ord
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_source_supply_approval ON purchase_orders (source_supply_approval_id, source_supply_request_index);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders (status);
 
--- â”€â”€ push_subscriptions
+-- ?€?€ push_subscriptions
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -1921,7 +1921,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_staff_device_unique ON 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_staff_endpoint ON push_subscriptions (staff_id, endpoint);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_staff_id ON push_subscriptions (staff_id);
 
--- â”€â”€ report_schedules
+-- ?€?€ report_schedules
 CREATE TABLE IF NOT EXISTS report_schedules (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -1937,7 +1937,7 @@ CREATE TABLE IF NOT EXISTS report_schedules (
 
 CREATE INDEX IF NOT EXISTS idx_report_schedules_enabled ON report_schedules (enabled, report_type);
 
--- â”€â”€ retirement_pensions
+-- ?€?€ retirement_pensions
 CREATE TABLE IF NOT EXISTS retirement_pensions (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1957,7 +1957,7 @@ CREATE TABLE IF NOT EXISTS retirement_pensions (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_retirement_pensions_staff_id ON retirement_pensions (staff_id);
 CREATE INDEX IF NOT EXISTS idx_retirement_pensions_type ON retirement_pensions (pension_type);
 
--- â”€â”€ reward_discipline
+-- ?€?€ reward_discipline
 CREATE TABLE IF NOT EXISTS reward_discipline (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -1976,12 +1976,12 @@ CREATE TABLE IF NOT EXISTS reward_discipline (
   memo TEXT,
   issued_by TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT reward_discipline_category_check CHECK ((category  IN ('í¬ìƒ', 'ì§•ê³„'))),
+  CONSTRAINT reward_discipline_category_check CHECK ((category  IN ('?¬ìƒ', 'ì§•ê³„'))),
   CONSTRAINT reward_discipline_pkey PRIMARY KEY (id)
 );
 
 
--- â”€â”€ room_notification_settings
+-- ?€?€ room_notification_settings
 CREATE TABLE IF NOT EXISTS room_notification_settings (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -1992,7 +1992,7 @@ CREATE TABLE IF NOT EXISTS room_notification_settings (
 );
 
 
--- â”€â”€ room_read_cursors
+-- ?€?€ room_read_cursors
 CREATE TABLE IF NOT EXISTS room_read_cursors (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -2004,7 +2004,7 @@ CREATE TABLE IF NOT EXISTS room_read_cursors (
 
 CREATE INDEX IF NOT EXISTS idx_room_read_cursors_room_user ON room_read_cursors (room_id, user_id);
 
--- â”€â”€ salary_change_history
+-- ?€?€ salary_change_history
 CREATE TABLE IF NOT EXISTS salary_change_history (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2024,7 +2024,7 @@ CREATE INDEX IF NOT EXISTS idx_salary_change_date ON salary_change_history (effe
 CREATE INDEX IF NOT EXISTS idx_salary_change_staff ON salary_change_history (staff_id);
 CREATE INDEX IF NOT EXISTS idx_salary_change_staff_date ON salary_change_history (staff_id, effective_date);
 
--- â”€â”€ scheduled_messages
+-- ?€?€ scheduled_messages
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id TEXT NOT NULL,
   room_id TEXT NOT NULL,
@@ -2041,7 +2041,7 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_sender ON scheduled_messages (sender_id, is_sent, scheduled_at);
 
--- â”€â”€ shift_assignments
+-- ?€?€ shift_assignments
 CREATE TABLE IF NOT EXISTS shift_assignments (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2057,7 +2057,7 @@ CREATE TABLE IF NOT EXISTS shift_assignments (
 CREATE INDEX IF NOT EXISTS idx_shift_assignments_staff ON shift_assignments (staff_id);
 CREATE INDEX IF NOT EXISTS idx_shift_assignments_work_date ON shift_assignments (work_date);
 
--- â”€â”€ staff_certifications
+-- ?€?€ staff_certifications
 CREATE TABLE IF NOT EXISTS staff_certifications (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -2071,7 +2071,7 @@ CREATE TABLE IF NOT EXISTS staff_certifications (
 );
 
 
--- â”€â”€ staff_evaluations
+-- ?€?€ staff_evaluations
 CREATE TABLE IF NOT EXISTS staff_evaluations (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -2088,7 +2088,7 @@ CREATE TABLE IF NOT EXISTS staff_evaluations (
 
 CREATE INDEX IF NOT EXISTS idx_staff_evaluations_staff_id ON staff_evaluations (staff_id);
 
--- â”€â”€ staff_job_categories
+-- ?€?€ staff_job_categories
 CREATE TABLE IF NOT EXISTS staff_job_categories (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2104,7 +2104,7 @@ CREATE TABLE IF NOT EXISTS staff_job_categories (
 CREATE INDEX IF NOT EXISTS idx_staff_job_categories_job_category_id ON staff_job_categories (job_category_id);
 CREATE INDEX IF NOT EXISTS idx_staff_job_categories_staff_id ON staff_job_categories (staff_id);
 
--- â”€â”€ staff_licenses
+-- ?€?€ staff_licenses
 CREATE TABLE IF NOT EXISTS staff_licenses (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2132,7 +2132,7 @@ CREATE INDEX IF NOT EXISTS idx_staff_licenses_staff_id ON staff_licenses (staff_
 CREATE INDEX IF NOT EXISTS idx_staff_licenses_staff_id_is_primary ON staff_licenses (staff_id, is_primary);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_staff_licenses_staff_number ON staff_licenses (staff_id, license_number) WHERE (license_number IS NOT NULL);
 
--- â”€â”€ staff_members
+-- ?€?€ staff_members
 CREATE TABLE IF NOT EXISTS staff_members (
   id TEXT NOT NULL,
   employee_no TEXT NOT NULL,
@@ -2152,7 +2152,7 @@ CREATE TABLE IF NOT EXISTS staff_members (
   join_date TEXT,
   joined_at TEXT,
   resigned_at TEXT,
-  status TEXT DEFAULT 'ìž¬ì§',
+  status TEXT DEFAULT '?¬ì§',
   role TEXT DEFAULT 'user',
   permissions TEXT DEFAULT '{}',
   password TEXT,
@@ -2207,7 +2207,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_members_auth_user_id ON staff_member
 CREATE INDEX IF NOT EXISTS idx_staff_members_company_id ON staff_members (company_id);
 CREATE INDEX IF NOT EXISTS idx_staff_members_shift_id ON staff_members (shift_id);
 
--- â”€â”€ staff_preferred_off
+-- ?€?€ staff_preferred_off
 CREATE TABLE IF NOT EXISTS staff_preferred_off (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2225,7 +2225,7 @@ CREATE TABLE IF NOT EXISTS staff_preferred_off (
 CREATE INDEX IF NOT EXISTS idx_staff_preferred_off_staff_id ON staff_preferred_off (staff_id);
 CREATE INDEX IF NOT EXISTS idx_staff_preferred_off_year_month ON staff_preferred_off (year_month);
 
--- â”€â”€ staff_shift_assignments
+-- ?€?€ staff_shift_assignments
 CREATE TABLE IF NOT EXISTS staff_shift_assignments (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2245,7 +2245,7 @@ CREATE INDEX IF NOT EXISTS idx_staff_shift_assignments_shift_id ON staff_shift_a
 CREATE INDEX IF NOT EXISTS idx_staff_shift_assignments_staff_id ON staff_shift_assignments (staff_id);
 CREATE INDEX IF NOT EXISTS idx_staff_shift_assignments_staff_id_is_primary ON staff_shift_assignments (staff_id, is_primary);
 
--- â”€â”€ staff_trainings
+-- ?€?€ staff_trainings
 CREATE TABLE IF NOT EXISTS staff_trainings (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2255,14 +2255,14 @@ CREATE TABLE IF NOT EXISTS staff_trainings (
   mandatory INTEGER DEFAULT 1,
   obligation_type TEXT DEFAULT 'legal',
   cycle_months INTEGER,
-  status TEXT DEFAULT 'ë¯¸ì´ìˆ˜',
+  status TEXT DEFAULT 'ë¯¸ì´??,
   completed_at TEXT,
   certificate_url TEXT,
   memo TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT chk_st_obligation_type CHECK ((obligation_type  IN ('legal', 'recommended'))),
-  CONSTRAINT chk_st_status CHECK ((status  IN ('ë¯¸ì´ìˆ˜', 'ì´ìˆ˜ì™„ë£Œ', 'ë©´ì œ', 'ì§„í–‰ì¤‘'))),
+  CONSTRAINT chk_st_status CHECK ((status  IN ('ë¯¸ì´??, '?´ìˆ˜?„ë£Œ', 'ë©´ì œ', 'ì§„í–‰ì¤?))),
   CONSTRAINT staff_trainings_pkey PRIMARY KEY (id),
   CONSTRAINT staff_trainings_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE,
   CONSTRAINT staff_trainings_staff_id_training_code_key UNIQUE (staff_id, training_code)
@@ -2272,7 +2272,7 @@ CREATE INDEX IF NOT EXISTS idx_staff_trainings_staff_id ON staff_trainings (staf
 CREATE INDEX IF NOT EXISTS idx_staff_trainings_status ON staff_trainings (status);
 CREATE INDEX IF NOT EXISTS idx_staff_trainings_training_code ON staff_trainings (training_code);
 
--- â”€â”€ staff_transfer_history
+-- ?€?€ staff_transfer_history
 CREATE TABLE IF NOT EXISTS staff_transfer_history (
   id TEXT NOT NULL,
   staff_id TEXT,
@@ -2288,7 +2288,7 @@ CREATE TABLE IF NOT EXISTS staff_transfer_history (
 );
 
 
--- â”€â”€ suppliers
+-- ?€?€ suppliers
 CREATE TABLE IF NOT EXISTS suppliers (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -2311,7 +2311,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 );
 
 
--- â”€â”€ surgery_templates
+-- ?€?€ surgery_templates
 CREATE TABLE IF NOT EXISTS surgery_templates (
   id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -2322,7 +2322,7 @@ CREATE TABLE IF NOT EXISTS surgery_templates (
 );
 
 
--- â”€â”€ system_configs
+-- ?€?€ system_configs
 CREATE TABLE IF NOT EXISTS system_configs (
   key TEXT NOT NULL,
   value TEXT,
@@ -2332,7 +2332,7 @@ CREATE TABLE IF NOT EXISTS system_configs (
 );
 
 
--- â”€â”€ system_settings
+-- ?€?€ system_settings
 CREATE TABLE IF NOT EXISTS system_settings (
   key TEXT NOT NULL,
   value TEXT,
@@ -2341,7 +2341,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 
--- â”€â”€ tasks
+-- ?€?€ tasks
 CREATE TABLE IF NOT EXISTS tasks (
   id TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -2354,10 +2354,10 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 
--- â”€â”€ tax_free_settings
+-- ?€?€ tax_free_settings
 CREATE TABLE IF NOT EXISTS tax_free_settings (
   id TEXT NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   meal_limit INTEGER DEFAULT 200000,
   vehicle_limit INTEGER DEFAULT 200000,
   childcare_limit INTEGER DEFAULT 100000,
@@ -2374,11 +2374,11 @@ CREATE TABLE IF NOT EXISTS tax_free_settings (
 );
 
 
--- â”€â”€ tax_insurance_rates
+-- ?€?€ tax_insurance_rates
 CREATE TABLE IF NOT EXISTS tax_insurance_rates (
   id TEXT NOT NULL,
   effective_year INTEGER NOT NULL,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   national_pension_rate REAL DEFAULT 0.045,
   health_insurance_rate REAL DEFAULT 0.03545,
   long_term_care_rate REAL DEFAULT 0.00459,
@@ -2390,7 +2390,7 @@ CREATE TABLE IF NOT EXISTS tax_insurance_rates (
 );
 
 
--- â”€â”€ tax_reports
+-- ?€?€ tax_reports
 CREATE TABLE IF NOT EXISTS tax_reports (
   id TEXT NOT NULL,
   year TEXT NOT NULL,
@@ -2406,7 +2406,7 @@ CREATE TABLE IF NOT EXISTS tax_reports (
 
 CREATE INDEX IF NOT EXISTS idx_tax_reports_year_company ON tax_reports (year, company_name, report_type);
 
--- â”€â”€ todo_reminder_logs
+-- ?€?€ todo_reminder_logs
 CREATE TABLE IF NOT EXISTS todo_reminder_logs (
   id TEXT NOT NULL,
   todo_id TEXT NOT NULL,
@@ -2426,7 +2426,7 @@ CREATE TABLE IF NOT EXISTS todo_reminder_logs (
 CREATE INDEX IF NOT EXISTS idx_todo_reminder_logs_created ON todo_reminder_logs (user_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_todo_reminder_logs_unique ON todo_reminder_logs (user_id, todo_id, reminder_at);
 
--- â”€â”€ todos
+-- ?€?€ todos
 CREATE TABLE IF NOT EXISTS todos (
   id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -2454,7 +2454,7 @@ CREATE INDEX IF NOT EXISTS idx_todos_repeat_parent_date ON todos (user_id, repea
 CREATE INDEX IF NOT EXISTS idx_todos_source_message ON todos (user_id, source_room_id, source_message_id) WHERE (source_message_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_todos_user_date ON todos (user_id, task_date);
 
--- â”€â”€ unpaid_absence_records
+-- ?€?€ unpaid_absence_records
 CREATE TABLE IF NOT EXISTS unpaid_absence_records (
   id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
@@ -2471,7 +2471,7 @@ CREATE TABLE IF NOT EXISTS unpaid_absence_records (
 );
 
 
--- â”€â”€ virtual_account_deposits
+-- ?€?€ virtual_account_deposits
 CREATE TABLE IF NOT EXISTS virtual_account_deposits (
   id TEXT NOT NULL,
   company_id TEXT,
@@ -2512,7 +2512,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_virtual_account_deposits_dedupe_key ON vir
 CREATE INDEX IF NOT EXISTS idx_virtual_account_deposits_deposited_at ON virtual_account_deposits (deposited_at DESC);
 CREATE INDEX IF NOT EXISTS idx_virtual_account_deposits_status ON virtual_account_deposits (deposit_status, match_status);
 
--- â”€â”€ wiki_document_versions
+-- ?€?€ wiki_document_versions
 CREATE TABLE IF NOT EXISTS wiki_document_versions (
   id TEXT NOT NULL,
   document_id TEXT NOT NULL,
@@ -2523,7 +2523,7 @@ CREATE TABLE IF NOT EXISTS wiki_document_versions (
   tags TEXT DEFAULT '{}',
   editor_ids TEXT DEFAULT '{}',
   company_id TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   change_summary TEXT,
   restore_of_version_id TEXT,
   created_by TEXT,
@@ -2537,12 +2537,12 @@ CREATE TABLE IF NOT EXISTS wiki_document_versions (
 
 CREATE INDEX IF NOT EXISTS idx_wiki_document_versions_document_created ON wiki_document_versions (document_id, created_at DESC);
 
--- â”€â”€ wiki_documents
+-- ?€?€ wiki_documents
 CREATE TABLE IF NOT EXISTS wiki_documents (
   id TEXT NOT NULL,
   folder_id TEXT NOT NULL,
   company_id TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   title TEXT NOT NULL,
   summary TEXT,
   content TEXT DEFAULT '',
@@ -2563,11 +2563,11 @@ CREATE TABLE IF NOT EXISTS wiki_documents (
 CREATE INDEX IF NOT EXISTS idx_wiki_documents_company_title ON wiki_documents (company_id, title);
 CREATE INDEX IF NOT EXISTS idx_wiki_documents_folder_updated ON wiki_documents (folder_id, updated_at DESC);
 
--- â”€â”€ wiki_folders
+-- ?€?€ wiki_folders
 CREATE TABLE IF NOT EXISTS wiki_folders (
   id TEXT NOT NULL,
   company_id TEXT,
-  company_name TEXT DEFAULT 'ì „ì²´',
+  company_name TEXT DEFAULT '?„ì²´',
   name TEXT NOT NULL,
   description TEXT,
   color TEXT,
@@ -2584,7 +2584,7 @@ CREATE TABLE IF NOT EXISTS wiki_folders (
 
 CREATE INDEX IF NOT EXISTS idx_wiki_folders_company_sort ON wiki_folders (company_id, sort_order, created_at DESC);
 
--- â”€â”€ work_shifts
+-- ?€?€ work_shifts
 CREATE TABLE IF NOT EXISTS work_shifts (
   id TEXT NOT NULL,
   name TEXT NOT NULL,

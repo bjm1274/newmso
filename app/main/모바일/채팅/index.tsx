@@ -76,26 +76,36 @@ function MobileChat({
       return;
     }
     const found = rooms.find((r) => String(r.id) === selectedRoomId) ?? null;
-    if (found) {
-      setSelectedRoom(found);
-    }
+    setSelectedRoom((prev) => {
+      if (found) {
+        // 동일 방이면 참조만 갱신 (미리보기/멤버 등 폴링 반영)
+        if (prev && String(prev.id) === String(found.id) && prev === found) return prev;
+        return found;
+      }
+      // 목록에 아직 없으면, 다른 방 잔여만 제거
+      if (prev && String(prev.id) !== selectedRoomId) return null;
+      return prev;
+    });
   }, [view, selectedRoomId, rooms]);
 
   // rooms가 없을 때 방 진입 시 폴백 — rooms 로드 전 최소 객체로 렌더
   useEffect(() => {
     if (view !== 'room' || !selectedRoomId) return;
-    if (selectedRoom) return;
+    if (rooms.some((r) => String(r.id) === selectedRoomId)) return;
     // rooms 아직 빈 상태면 refresh 트리거
     if (rooms.length === 0) {
       void refreshRooms();
     }
-  }, [view, selectedRoomId, selectedRoom, rooms.length, refreshRooms]);
+  }, [view, selectedRoomId, rooms, refreshRooms]);
 
   const openRoom = useCallback((roomId: string, messageId?: string) => {
+    const found = rooms.find((r) => String(r.id) === roomId) ?? null;
     setSelectedRoomId(roomId);
     setSearchMessageId(messageId || null);
+    // 즉시 동기화 — 이전 방 selectedRoom이 한 프레임 남는 것 방지
+    setSelectedRoom(found);
     setView('room');
-  }, []);
+  }, [rooms]);
 
   const backToList = useCallback(() => {
     setView('list');
@@ -136,14 +146,20 @@ function MobileChat({
   if (view === 'new') {
     contentElement = <SFormChat user={user} onBack={backToList} onCreated={handleCreated} />;
   } else if (view === 'room' && selectedRoomId) {
-    const roomForRender: ChatRoom = selectedRoom ??
+    // selectedRoomId와 id가 일치하는 방만 사용 — 전환 중 이전 방 객체 재사용 금지
+    const matchedRoom =
+      (selectedRoom && String(selectedRoom.id) === selectedRoomId ? selectedRoom : null) ??
+      rooms.find((r) => String(r.id) === selectedRoomId) ??
+      null;
+    const roomForRender: ChatRoom = matchedRoom ??
       ({ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom);
     const membersReady = Array.isArray(roomForRender.members) && roomForRender.members.length > 0;
     contentElement = (
       <SChatRoom
+        key={selectedRoomId}
         user={user}
         room={roomForRender}
-        membersReady={membersReady || Boolean(selectedRoom)}
+        membersReady={membersReady || Boolean(matchedRoom)}
         onBack={backToList}
         recentRooms={rooms}
         onSwitchRoom={openRoom}
