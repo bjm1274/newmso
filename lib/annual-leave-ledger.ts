@@ -68,6 +68,11 @@ export function calculateLeaveDays(startDate: string | null | undefined, endDate
     return 0;
   }
 
+  // 종료 < 시작(데이터 오류)이면 시작일 1일로 처리 — 음수 일수 방지
+  if (end.getTime() < start.getTime()) {
+    return 1;
+  }
+
   const diff = end.getTime() - start.getTime();
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
 }

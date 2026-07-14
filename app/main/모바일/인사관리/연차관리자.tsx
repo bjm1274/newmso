@@ -43,6 +43,10 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
 
   // 전사 연차 리스트 & 대기 결재건 & 소멸대상
   const [requests, setRequests] = useState<LeaveRequestRow[]>([]);
+  /** staff_id → 당해 leave_balances (SSOT) */
+  const [balancesByStaff, setBalancesByStaff] = useState<
+    Record<string, { total: number; used: number; remaining: number; expired: number; compensated: number }>
+  >({});
   const [loading, setLoading] = useState(false);
 
   // 수동 연차 부여 폼 상태
@@ -62,13 +66,34 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
 
   const fetchLeaveData = useCallback(async () => {
     setLoading(true);
+    const year = new Date().getFullYear();
     try {
-      const { data, error } = await db
-        .from('leave_requests')
-        .select('*')
-        .order('start_date', { ascending: false });
-      if (error) throw error;
-      setRequests((data || []) as LeaveRequestRow[]);
+      const [reqRes, balRes] = await Promise.all([
+        db.from('leave_requests').select('*').order('start_date', { ascending: false }),
+        db
+          .from('leave_balances')
+          .select('staff_id, total_days, used_days, remaining_days, expired_days, compensated_days')
+          .eq('year', year),
+      ]);
+      if (reqRes.error) throw reqRes.error;
+      if (balRes.error) throw balRes.error;
+      setRequests((reqRes.data || []) as LeaveRequestRow[]);
+      const map: typeof balancesByStaff = {};
+      for (const row of balRes.data || []) {
+        const sid = String((row as { staff_id?: string }).staff_id ?? '');
+        if (!sid) continue;
+        const total = Number((row as { total_days?: number }).total_days) || 0;
+        const used = Number((row as { used_days?: number }).used_days) || 0;
+        const expired = Number((row as { expired_days?: number }).expired_days) || 0;
+        const compensated = Number((row as { compensated_days?: number }).compensated_days) || 0;
+        const remainingRaw = (row as { remaining_days?: number }).remaining_days;
+        const remaining =
+          remainingRaw != null && !Number.isNaN(Number(remainingRaw))
+            ? Math.max(0, Number(remainingRaw))
+            : Math.max(0, total - used - expired - compensated);
+        map[sid] = { total, used, remaining, expired, compensated };
+      }
+      setBalancesByStaff(map);
     } catch (err) {
       console.error('[AdminLeave] 연차 정보 조회 실패:', err);
     } finally {
@@ -80,19 +105,21 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
     void fetchLeaveData();
   }, [fetchLeaveData, reloadKey]);
 
-  // 대장 탭 계산
+  // 대장 탭 — leave_balances 우선 (staff_members 다년도 누적 필드 미사용)
   const staffLedger = useMemo(() => {
     return activeStaffs.map((s) => {
-      const total = Number(s.annual_leave_total ?? 0);
-      const used = Number(s.annual_leave_used ?? 0);
-      const remaining = Math.max(0, total - used);
+      const bal = balancesByStaff[String(s.id)];
+      const total = bal?.total ?? Number(s.annual_leave_total ?? 0);
+      const used = bal?.used ?? 0;
+      const remaining =
+        bal?.remaining ?? Math.max(0, total - used);
       return {
         staff: s,
         total,
         used,
         remaining };
     });
-  }, [activeStaffs]);
+  }, [activeStaffs, balancesByStaff]);
 
   // 소멸 예정자 계산
   const expiryItems = useMemo<ExpiryItem[]>(() => {

@@ -4,12 +4,15 @@
  * 모든 화면(모바일 홈·내정보 연차·인사 연차·연차계획·PC 홈 KPI·PC 연차패널)은
  * 이 모듈의 계산 또는 useAnnualLeaveSummary 훅만 사용한다.
  *
- * 공식:
+ * 공식 (당해 연도 스코프):
  *   total     = leave_balances.total_days ?? staff.annual_leave_total ?? 0  (15일 폴백 금지)
- *   used      = max(balances.used_days, staff.used, ledger 승인 재집계)
+ *   used      = leave_balances 있으면 max(balance.used, ledger 당해 재집계)
+ *             없으면 ledger 당해 재집계 (staff.annual_leave_used 는 다년도 누적이라 제외)
  *   expired   = leave_balances.expired_days ?? 0
  *   compensated = leave_balances.compensated_days ?? 0
  *   remaining = max(0, total − used − expired − compensated)
+ *
+ * staff.annual_leave_used 를 max()에 넣지 않음 — 레거시 다년도 합이 잔여를 0으로 만드는 버그 방지.
  */
 
 'use client';
@@ -151,10 +154,13 @@ export function computeAnnualLeaveSummary(input: AnnualLeaveSummaryInput): Omit<
     hasBalanceTotal ? input.balanceTotal : (input.staffTotal ?? 0),
   ) || 0;
 
+  // 당해 연도 원장 재집계 (leave_requests 승인분). staff.used 는 다년도 누적이라 쓰지 않음.
   const ledgerUsed = calculateApprovedAnnualLeaveUsage(rows, year);
-  const staffUsed = Number(input.staffUsed ?? 0) || 0;
   const balanceUsed = hasBalanceUsed ? Number(input.balanceUsed) || 0 : 0;
-  const used = Math.max(balanceUsed, staffUsed, ledgerUsed);
+  // balance 행이 있으면 원장과 큰 쪽(미동기화 보완), 없으면 원장만. staff fallback 금지.
+  const used = hasBalanceUsed
+    ? Math.max(balanceUsed, ledgerUsed)
+    : ledgerUsed;
 
   const expired = Number(input.expired ?? 0) || 0;
   const compensated = Number(input.compensated ?? 0) || 0;

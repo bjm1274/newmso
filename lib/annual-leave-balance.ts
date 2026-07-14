@@ -180,7 +180,8 @@ export async function recalculateLeaveBalance(
     });
   } catch (syncErr) {
     console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
-    usedDays = Number(staff.annual_leave_used) || 0;
+    // staff.annual_leave_used 는 다년도 누적이라 폴백 금지 — 실패 시 0 후 재시도 유도
+    usedDays = 0;
   }
 
   // 발생: 원장 우선
