@@ -159,7 +159,7 @@ function MyPageMain({
   // JM2: 동일 id/상태이면 setLatestContract/setPendingContract 호출을 생략하여
   // 자식 컴포넌트에 매번 새 객체 참조가 흘러가지 않도록 한다.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!resolvedStaffId) return;
     let cancelled = false;
     const isSameContract = (
       a: EmploymentContractRecord | null,
@@ -180,7 +180,7 @@ function MyPageMain({
           db
             .from('employment_contracts')
             .select('*')
-            .eq('staff_id', user.id as string)
+            .eq('staff_id', resolvedStaffId)
             .eq('status', '서명대기')
             .order('requested_at', { ascending: false })
             .limit(1)
@@ -188,7 +188,7 @@ function MyPageMain({
           db
             .from('employment_contracts')
             .select('*')
-            .eq('staff_id', user.id as string)
+            .eq('staff_id', resolvedStaffId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
@@ -217,12 +217,12 @@ function MyPageMain({
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [resolvedStaffId]);
 
   // 이번 달 근태 실 데이터 fetch (mount 1회, JM2: realtime 없음)
   const fetchMonthlyAttendanceSummary = useCallback(async () => {
-    const userId = user?.id;
-    if (!userId) return; // JM5: user.id 없으면 skip
+    const userId = resolvedStaffId;
+    if (!userId) return; // JM5: resolvedStaffId 없으면 skip
     const now = new Date();
     // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
     const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
@@ -238,7 +238,7 @@ function MyPageMain({
     } catch {
       // silent fallback: 집계 중 표시 유지
     }
-  }, [user?.id]);
+  }, [resolvedStaffId]);
 
   useEffect(() => {
     void fetchMonthlyAttendanceSummary();
@@ -247,11 +247,11 @@ function MyPageMain({
   // JM2/JM3: 인사관리·근태이상 워크센터에서 본인 근태가 보정되면 즉시 재집계.
   //   - 정상 처리 같은 액션이 발생하면 attendance 테이블이 update 되고
   //     'erp-attendance-updated' 이벤트가 broadcast 된다.
-  //   - 본인(user.id)에 해당할 때만 refetch (다른 사용자 이벤트는 무시 — 불필요한 호출 방지)
+  //   - 본인(resolvedStaffId)에 해당할 때만 refetch (다른 사용자 이벤트는 무시 — 불필요한 호출 방지)
   //   - 안전: 이벤트 detail이 비어 있으면 그냥 refetch (deferred broadcast 호환)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const userId = user?.id ? String(user.id) : '';
+    const userId = resolvedStaffId ? String(resolvedStaffId) : '';
     const handleAttendanceUpdated = (event: Event) => {
       const detail = (event as CustomEvent<{ staffId?: unknown }>).detail;
       const targetId = detail?.staffId ? String(detail.staffId) : '';
@@ -262,7 +262,7 @@ function MyPageMain({
     return () => {
       window.removeEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
     };
-  }, [fetchMonthlyAttendanceSummary, user?.id]);
+  }, [fetchMonthlyAttendanceSummary, resolvedStaffId]);
 
   const handleSignComplete = async (
     signatureDataUrl: string,
@@ -270,7 +270,7 @@ function MyPageMain({
     receiptSignatureData?: string,
     privacyConsent?: boolean | null
   ) => {
-    const currentUserId = typeof user?.id === 'string' ? user.id : null;
+    const currentUserId = resolvedStaffId;
     if (!pendingContract || !currentUserId) return;
     try {
       const { error: updateError } = await db
@@ -347,7 +347,7 @@ function MyPageMain({
         dedupeKey: `contract-signed:${pendingContract.id}` }]);
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
-      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: user?.id, contractId: pendingContract.id } }));
+      window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: resolvedStaffId, contractId: pendingContract.id } }));
       setPendingContract(null);
       setLatestContract({
         ...pendingContract,

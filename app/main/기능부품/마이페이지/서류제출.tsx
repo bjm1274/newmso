@@ -7,6 +7,7 @@ import {
   validateDocUpload } from '@/lib/document-submission-shared';
 import LicenseCESubmit from './면허보수교육제출';
 import { escapeHtml } from '@/lib/escape-html';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 // jsPDF: dynamic import로 전환 (번들 사이즈 최적화)
 
 type ContractRecord = {
@@ -36,6 +37,7 @@ function formatDate(value?: string | null) {
 
 export default function MyDocuments(props: MyDocumentsProps) {
     const user = props.user as { id?: string; name?: string; company?: string } | undefined;
+    const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown> | null);
     const [documents, setDocuments] = useState<any[]>([]);
     const [contracts, setContracts] = useState<ContractRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -49,22 +51,22 @@ export default function MyDocuments(props: MyDocumentsProps) {
 
     useEffect(() => {
         fetchDocuments();
-    }, [user?.id]);
+    }, [resolvedStaffId]);
 
     const fetchDocuments = async () => {
-        if (!user?.id) return;
+        if (!resolvedStaffId) return;
         setIsLoading(true);
         try {
             const [docResult, contractResult] = await Promise.all([
                 db
                     .from('document_repository')
                     .select('*')
-                    .eq('created_by', user.id)
+                    .eq('created_by', resolvedStaffId)
                     .order('created_at', { ascending: false }),
                 db
                     .from('employment_contracts')
                     .select('id, contract_type, status, requested_at, signed_at, signature_data')
-                    .eq('staff_id', user.id)
+                    .eq('staff_id', resolvedStaffId)
                     .order('created_at', { ascending: false }),
             ]);
             if (docResult.error) throw docResult.error;
@@ -116,7 +118,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
         return () => {
             window.removeEventListener('erp-contract-signed', handleContractSigned);
         };
-    }, [user?.id]);
+    }, [resolvedStaffId]);
 
     const openRepositoryDocument = async (document: any) => {
         if (document?.file_url) {

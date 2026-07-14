@@ -19,6 +19,7 @@ import {
   DOC_MAX_FILE_SIZE_LABEL,
   validateDocUpload } from '@/lib/document-submission-shared';
 import { useActionDialog } from '@/app/components/useActionDialog';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 const StaffLicenseSchema = z.object({
   id: z.string(),
@@ -50,6 +51,7 @@ type Props = {
 };
 
 export default function LicenseCESubmit({ user }: Props) {
+  const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown> | null);
   const { dialog, openConfirm } = useActionDialog();
   const [licenses, setLicenses] = useState<StaffLicense[]>([]);
   const [submissions, setSubmissions] = useState<CESubmission[]>([]);
@@ -65,14 +67,14 @@ export default function LicenseCESubmit({ user }: Props) {
   );
 
   const refresh = useCallback(async () => {
-    if (!user?.id) return;
+    if (!resolvedStaffId) return;
     setLoading(true);
     try {
       const [licRes, ceRes] = await Promise.all([
         db
           .from('staff_licenses')
           .select('id, license_type, license_name, expiry_date')
-          .eq('staff_id', user.id)
+          .eq('staff_id', resolvedStaffId)
           .order('is_primary', { ascending: false }),
         fetch('/api/license-ce', { cache: 'no-store' }).then((r) => r.json()),
       ]);
@@ -89,7 +91,7 @@ export default function LicenseCESubmit({ user }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [resolvedStaffId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -99,7 +101,7 @@ export default function LicenseCESubmit({ user }: Props) {
     const file = e.target.files?.[0];
     e.target.value = ''; // 같은 파일 재선택 허용
     if (!file) return;
-    if (!user?.id) return toast('사용자 정보가 없습니다.', 'error');
+    if (!resolvedStaffId) return toast('사용자 정보가 없습니다.', 'error');
     if (!selectedLicense && licenses.length > 0) {
       return toast('어떤 면허에 대한 이수증인지 먼저 선택하세요.', 'warning');
     }

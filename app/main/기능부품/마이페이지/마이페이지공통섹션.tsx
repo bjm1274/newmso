@@ -8,6 +8,7 @@ import { db, d1 } from '@/lib/db-client';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { LucideIcon } from '../조직도서브/조직도측면창';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type ProfileSummary = {
   id: string | null;
@@ -38,10 +39,11 @@ export function PayrollAndCertificatesHub({
   onBack?: () => void;
   onChangeView?: (view: 'salary' | 'certificates') => void;
 }) {
+  const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown> | null);
   const [summary, setSummary] = useState({ salaryCount: 0, certificateCount: 0 });
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!resolvedStaffId) {
       setSummary({ salaryCount: 0, certificateCount: 0 });
       return;
     }
@@ -53,19 +55,19 @@ export function PayrollAndCertificatesHub({
           db
             .from('payroll_records')
             .select('record_type, status, year_month')
-            .eq('staff_id', user.id),
+            .eq('staff_id', resolvedStaffId),
           d1.from('notifications')
             .select('title, body')
-            .eq('user_id', user.id)
+            .eq('user_id', resolvedStaffId)
             .eq('type', '급여명세'),
           db
             .from('certificate_issuances')
             .select('id', { count: 'exact', head: true })
-            .eq('staff_id', user.id),
+            .eq('staff_id', resolvedStaffId),
           db
             .from('approvals')
             .select('id', { count: 'exact', head: true })
-            .eq('sender_id', user.id)
+            .eq('sender_id', resolvedStaffId)
             .eq('status', '승인')
             // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
             .in('type', ['양식신청', '증명서발급']),
@@ -86,7 +88,7 @@ export function PayrollAndCertificatesHub({
     };
 
     void fetchSummary();
-  }, [user?.id]);
+  }, [resolvedStaffId]);
 
   return (
     <div className="space-y-4 p-3 md:p-4">
