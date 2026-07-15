@@ -15,11 +15,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { toast } from '@/lib/toast';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
-import { appendApprovalHistory } from '@/lib/approval-workflow';
+import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
 import { toApproverPick, type ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
 import { generateMobileDocNumber } from './data-hooks';
@@ -159,7 +158,6 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
       const senderName = String(user.name || '').trim() || '이름 없음';
       const senderDepartment = String(user.department || '').trim();
       const senderCompany = company;
-      const firstApproverId = String(approverLine[0]?.id || '');
 
       // doc_number — 회사·일자 시퀀스 생성 (실패 시 silent fallback)
       const docNumber = await generateMobileDocNumber({
@@ -171,59 +169,33 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
         userPermissions:
           (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
 
-      const meta: Record<string, unknown> = {
-        form_slug: params.formSlug,
-        form_name: params.formDisplayName,
-        cc_departments: params.ccDepartments ?? [],
-        cc_users: params.ccUsers ?? [],
-        approver_line: approverLine.map((a) => String(a.id)),
-        approver_line_details: approverLine.map((a) => ({
-          id: String(a.id || ''),
-          name: a.name || '',
-          position: a.position || null,
-          department: a.department || null,
-          company: a.company || null })),
-        approver_line_source: approverManual ? 'mobile_manual' : 'mobile_auto',
-        revision: 1,
-        source_approval_id: null,
-        previous_doc_number: null,
-        client_origin: 'mobile',
-        ...params.extraMeta };
-
       // 첨부 — PC와 동일하게 meta_data.attachments(정본 shape: name/url/mimeType/size)에 기록.
       // 업로드 완료(done)된 항목만 저장. 오프라인 대기(queued)는 URL 미정이라 제외.
       const uploadedAttachments = buildUploadedAttachments();
-      if (uploadedAttachments.length > 0) {
-        meta.attachments = uploadedAttachments;
-      }
-      if (docNumber) {
-        meta.doc_number = docNumber;
-      }
 
-      const row: Record<string, unknown> = {
-        sender_id: staffId,
-        sender_name: senderName,
-        sender_company: senderCompany,
-        sender_department: senderDepartment || null,
-        current_approver_id: firstApproverId,
-        approver_line: approverLine.map((a) => String(a.id)),
-        type: params.typeName,
+      const { row } = buildApprovalSubmitPayload({
+        staffId,
+        senderName,
+        senderCompany,
+        senderDepartment: senderDepartment || null,
+        companyId: user.company_id ?? null,
+        typeName: params.typeName,
         title: params.title,
         content: params.content,
-        meta_data: appendApprovalHistory(meta, {
-          action: 'created',
-          actor_id: staffId,
-          actor_name: senderName,
-          note: '모바일 최초 상신',
-          current_approver_id: firstApproverId,
-          revision: 1 }),
-        status: '대기' };
-      if (user.company_id != null) {
-        row.company_id = user.company_id;
-      }
-      if (docNumber) {
-        row.doc_number = docNumber;
-      }
+        formSlug: params.formSlug,
+        formDisplayName: params.formDisplayName,
+        approverLine,
+        approverLineSource: approverManual ? 'mobile_manual' : 'mobile_auto',
+        docNumber,
+        ccDepartments: params.ccDepartments ?? [],
+        ccUsers: params.ccUsers ?? [],
+        extraMeta: {
+          client_origin: 'mobile',
+          ...params.extraMeta,
+        },
+        attachments: uploadedAttachments,
+        historyNote: '모바일 최초 상신',
+      });
 
       const { queued, error } = await enqueueD1Mutation({
         kind: 'insert',

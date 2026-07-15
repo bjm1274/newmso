@@ -259,6 +259,8 @@ async function erpQueueRetryEntry(type, payload) {
 async function erpSendRetryEntry(entry) {
   const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
 
+  // SSOT: 알림 읽음 = POST /api/notifications/mark-read
+  // (인앱 notification-api.ts 와 동일 엔드포인트/계약)
   if (entry.type === 'mark-read') {
     const response = await fetch('/api/notifications/mark-read', {
       method: 'POST',

@@ -1,6 +1,8 @@
 import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
 import { hasPermission, isAdminUser } from '@/lib/access-control';
+// 읽음 처리 SSOT: POST /api/notifications/mark-read (PUT 은 하위 호환 위임)
+import { handleMarkNotificationsRead } from './_mark-read-handler';
 
 export const dynamic = 'force-dynamic';
 
@@ -251,52 +253,10 @@ export async function POST(request: Request) {
   }
 }
 
-// 3. PUT: 알림 읽음 처리 (단일/벌크/전체)
+// 3. PUT: 알림 읽음 처리 (하위 호환 — SSOT는 POST /api/notifications/mark-read)
+// 신규 클라이언트(인앱 notification-api · SW push-notification-shared)는 mark-read POST 사용.
 export async function PUT(request: Request) {
-  try {
-    const session = await readSessionFromRequest(request);
-    const uid = getUserId(session);
-    if (!uid) {
-      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const d1 = await getD1Binding();
-    if (!d1) {
-      return new Response(JSON.stringify({ ok: false, error: 'D1 binding not available' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const body = await request.json();
-    const readAt = new Date().toISOString();
-
-    if (body.all === true) {
-      // 모든 안읽은 알림 일괄 읽음
-      await d1
-        .prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL')
-        .bind(readAt, uid)
-        .run();
-    } else if (Array.isArray(body.ids) && body.ids.length > 0) {
-      // 벌크 ID 리스트 읽음
-      const placeholders = body.ids.map(() => '?').join(',');
-      const query = `UPDATE notifications SET read_at = ? WHERE user_id = ? AND id IN (${placeholders})`;
-      await d1
-        .prepare(query)
-        .bind(readAt, uid, ...body.ids)
-        .run();
-    } else if (typeof body.id === 'string' && body.id.trim()) {
-      // 단일 알림 읽음
-      await d1
-        .prepare('UPDATE notifications SET read_at = ? WHERE user_id = ? AND id = ?')
-        .bind(readAt, uid, body.id.trim())
-        .run();
-    } else {
-      return new Response(JSON.stringify({ ok: false, error: 'Invalid payload' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  } catch (error: any) {
-    console.error('[PUT /api/notifications] error:', error);
-    return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  }
+  return handleMarkNotificationsRead(request);
 }
 
 // 4. DELETE: 알림 삭제 (단일/벌크)

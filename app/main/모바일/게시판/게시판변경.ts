@@ -14,25 +14,13 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem } from '@/types';
 import { buildAttachmentMetaContent } from '@/app/main/기능부품/게시판공통';
-import type { BoardPollInput, UpdateBoardPostInput } from './data-hooks';
+import {
+  normalizePoll,
+  type BoardPollInput,
+} from '@/app/main/기능부품/게시판서브/create-board-post';
+import type { UpdateBoardPostInput } from './data-hooks';
 
-/** 투표 입력 정규화 — 옵션 2개 미만이면 null (PC와 동일 정책) */
-export function normalizePoll(poll: BoardPollInput | null | undefined): BoardPollInput | null {
-  if (!poll) return null;
-  const options = (Array.isArray(poll.options) ? poll.options : [])
-    .map((o) => String(o ?? '').trim())
-    .filter(Boolean);
-  if (options.length < 2) return null;
-  const normalized: BoardPollInput = {
-    question: String(poll.question ?? '').trim(),
-    options,
-    anonymous: Boolean(poll.anonymous),
-    multiple: Boolean(poll.multiple) };
-  if (poll.prize && poll.prize.name.trim() && poll.prize.winnerCount >= 1) {
-    normalized.prize = { winnerCount: poll.prize.winnerCount, name: poll.prize.name.trim() };
-  }
-  return normalized;
-}
+export { normalizePoll };
 
 // ─────────────────────────────────────────────
 // 게시글 수정(update) — board_posts.update 매핑 (제목/본문/첨부/투표)

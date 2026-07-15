@@ -14,7 +14,7 @@
 import { db } from '@/lib/db-client';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { pokeChannel } from '@/lib/realtime-bus';
-import { triggerMobileChatPush } from './푸시트리거';
+import { triggerChatPush as triggerMobileChatPush } from '@/lib/chat-push-client-trigger';
 import {
   buildChatMessageInsertPayload,
   type MessageRetryPayload } from '@/app/main/기능부품/메신저유틸';

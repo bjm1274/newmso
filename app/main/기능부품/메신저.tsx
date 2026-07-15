@@ -6,6 +6,7 @@ import { toDateKey } from '@/lib/date-utils';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { db, d1 } from '@/lib/db-client';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
+import { triggerChatPush } from '@/lib/chat-push-client-trigger';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import {
   isRelationMarkedMissing,
@@ -1122,41 +1123,8 @@ export default function ChatView({
   }, [selectedRoomId]);
   broadcastChatSyncRef.current = broadcastChatSync;
 
-  const triggerChatPush = useCallback(async (roomId: string, messageId: string) => {
-    try {
-      // 1) 해당 메시지 즉시 푸시 (카톡급)
-      const response = await fetch('/api/notifications/chat-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        keepalive: true,
-        body: JSON.stringify({ roomId, messageId }) });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || `push trigger failed (${response.status})`);
-      }
-
-      // 2) 백업: 큐에 남은 미발송 소량 flush (실패 무시, 비용 가드 limit 5)
-      void fetch('/api/notifications/chat-push-flush', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        keepalive: true,
-        body: JSON.stringify({ limit: 5 }),
-      }).catch(() => {});
-    } catch (error) {
-      logger.error('chat push trigger failed', error);
-      // 실패 시에도 flush로 회수 시도
-      void fetch('/api/notifications/chat-push-flush', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        keepalive: true,
-        body: JSON.stringify({ limit: 8 }),
-      }).catch(() => {});
-    }
-  }, []);
+  // 즉시 푸시 트리거: lib/chat-push-client-trigger (모바일과 동일).
+  // enqueue 는 서버 d1/mutate → chat-push-enqueue 단일 경로.
 
   // D1 polling 기반 typing — emit과 수신 폴링 모두 useChatTypingD1이 담당.
   const { emitTyping: emitTypingState, handleTypingInput } = useChatTypingD1({

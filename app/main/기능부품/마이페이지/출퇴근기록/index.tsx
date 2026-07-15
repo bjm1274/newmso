@@ -22,7 +22,9 @@ import {
   calculateEarlyLeaveMinutes,
   resolveLateThreshold as resolveLateThresholdHelper,
   resolveStaleOpenLog,
-  syncToAttendances as syncToAttendancesHelper } from './checkin-utils';
+  upsertAttendanceCheckIn,
+  upsertAttendanceCheckOut,
+  syncAttendanceToAttendances } from './checkin-utils';
 import {
 COMMUTE_STATUS_LABELS,
 NON_ABSENT_DISPLAY_STATUSES,
@@ -575,7 +577,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
             .eq('staff_id', userId)
             .eq('date', workDate);
 
-          await syncToAttendances(workDate, checkIn, checkOut, '조퇴', { earlyLeaveMinutes });
+          // 단수 status 보정 후 복수 attendances 동기화 (dual-path 헬퍼)
+          await syncAttendanceToAttendances(userId, workDate, {
+            checkIn,
+            checkOut,
+            status: '조퇴',
+            earlyLeaveMinutes,
+          });
         })
       ).catch((err: unknown) => {
         logger.warn('기존 조퇴 기록 보정 실패:', err);
@@ -718,21 +726,6 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       // 날씨 정보 실패 시 무시
     }
   }, []);
-
-  const syncToAttendances = useCallback(
-    async (
-      workDate: string,
-      checkIn: string | null,
-      checkOut: string | null,
-      status: string,
-      options?: { earlyLeaveMinutes?: number | null },
-    ) => {
-      const userId = effectiveUserId;
-      if (!userId) return;
-      await syncToAttendancesHelper(userId, workDate, checkIn, checkOut, status, options);
-    },
-    [effectiveUserId],
-  );
 
   const handleStatusChange = useCallback(
     async (next: WorkStatusLabel) => {
@@ -883,15 +876,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           ? `지각 처리되었습니다. (기준: ${lateThreshold.label})`
           : '정상 출근되었습니다. 오늘도 화이팅!';
 
-        const { data, error } = await db.from('attendance').upsert([{
-          staff_id: userId,
+        const { data, error } = await upsertAttendanceCheckIn({
+          staffId: userId,
           date: today,
-          check_in: timeString,
-          status: finalStatus
-        }], { onConflict: 'staff_id,date' }).select().single();
-
+          checkIn: timeString,
+          status: finalStatus,
+        });
         if (error) throw error;
-        await syncToAttendances(today, timeString, null, finalStatus);
         setTodayLog(data);
         toast(toastMsg, isLate ? 'warning' : 'success');
 
@@ -914,18 +905,17 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         const lateThreshold = await resolveLateThreshold(workDate, userDepartment);
         const earlyLeaveMinutes = calculateEarlyLeaveMinutes(workDate, timeString, lateThreshold);
         const finalStatus = earlyLeaveMinutes > 0 ? '조퇴' : ((targetLog.status as string) || '정상');
-        const { data, error } = await db
-          .from('attendance')
-          .update({ check_out: timeString, status: finalStatus })
-          .eq('staff_id', userId)
-          .eq('date', workDate)
-          .is('check_out', null)
-          .select()
-          .maybeSingle();
-
+        const { data, error } = await upsertAttendanceCheckOut({
+          staffId: userId,
+          date: workDate,
+          checkOut: timeString,
+          status: finalStatus,
+          checkIn: checkInIso,
+          earlyLeaveMinutes,
+          requireOpen: true,
+        });
         if (error) throw error;
         if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
-        await syncToAttendances(workDate, checkInIso, timeString, finalStatus, { earlyLeaveMinutes });
         setTodayLog({ ...data, status: finalStatus });
         toast(
           earlyLeaveMinutes > 0

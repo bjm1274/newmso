@@ -43,7 +43,7 @@ import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { escapeLikePattern } from '@/lib/like-escape';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { fetchReactionsForMessages, mergeReactionsIntoMessages } from './반응';
-import { triggerMobileChatPush } from './푸시트리거';
+import { triggerChatPush as triggerMobileChatPush } from '@/lib/chat-push-client-trigger';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 
 // ─────────────────────────────────────────────

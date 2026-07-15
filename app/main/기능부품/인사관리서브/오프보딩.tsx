@@ -13,7 +13,7 @@ import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
   isMissingColumnError,
   withMissingColumnsFallback } from '@/lib/db-compat';
-import { patchChatRoom } from '@/lib/chat-write-service';
+import { patchChatRoom } from '@/lib/chat-rooms-client';
 import {
   countChecklistDone,
   getDefaultChecklist,

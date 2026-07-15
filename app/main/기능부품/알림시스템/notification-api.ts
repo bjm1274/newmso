@@ -71,44 +71,61 @@ export async function fetchUnreadNotificationCount(): Promise<number> {
   return Number.isFinite(count) ? Math.max(0, count) : 0;
 }
 
-async function mutateNotifications(method: 'PUT' | 'DELETE', body: Record<string, unknown>): Promise<void> {
-  const response = await fetch('/api/notifications', {
-    method,
+/**
+ * SSOT: 알림 읽음 = POST /api/notifications/mark-read
+ * (인앱 UI · Service Worker push-notification-shared.js 동일 계약)
+ * body: { id } | { notification_id } | { ids: string[] } | { all: true }
+ */
+async function markReadMutate(body: Record<string, unknown>): Promise<void> {
+  const response = await fetch('/api/notifications/mark-read', {
+    method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body) });
+    body: JSON.stringify(body),
+  });
+  await parseNotificationResponse(response);
+}
+
+async function deleteNotifications(body: Record<string, unknown>): Promise<void> {
+  const response = await fetch('/api/notifications', {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   await parseNotificationResponse(response);
 }
 
 export async function markNotificationAsRead(id: string): Promise<void> {
   const normalizedId = String(id || '').trim();
   if (!normalizedId) return;
-  await mutateNotifications('PUT', { id: normalizedId });
+  await markReadMutate({ id: normalizedId });
 }
 
 export async function markNotificationsAsRead(ids: readonly string[]): Promise<void> {
   const normalizedIds = Array.from(new Set(ids.map((id) => String(id || '').trim()).filter(Boolean)));
   if (normalizedIds.length === 0) return;
-  await mutateNotifications('PUT', { ids: normalizedIds });
+  await markReadMutate({ ids: normalizedIds });
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
-  await mutateNotifications('PUT', { all: true });
+  await markReadMutate({ all: true });
 }
 
 export async function deleteNotificationById(id: string): Promise<void> {
   const normalizedId = String(id || '').trim();
   if (!normalizedId) return;
-  await mutateNotifications('DELETE', { id: normalizedId });
+  await deleteNotifications({ id: normalizedId });
 }
 
 export async function deleteNotificationsByIds(ids: readonly string[]): Promise<void> {
   const normalizedIds = Array.from(new Set(ids.map((id) => String(id || '').trim()).filter(Boolean)));
   if (normalizedIds.length === 0) return;
-  await mutateNotifications('DELETE', { ids: normalizedIds });
+  await deleteNotifications({ ids: normalizedIds });
 }
 
 export async function cleanupReadNotifications(): Promise<void> {
-  await mutateNotifications('DELETE', { cleanup: true });
+  await deleteNotifications({ cleanup: true });
 }
 
 export function countUnreadNotifications(notifications: readonly { read_at?: unknown }[]): number {

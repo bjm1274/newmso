@@ -26,7 +26,6 @@ import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 import { BOARD_MENU_ITEMS } from './게시판메뉴';
 import {
-  BOARD_AUTO_CHAT_TYPES,
   BOARD_IDS,
   BOARD_POST_OPTIONAL_COLUMNS,
   BOARD_POST_REQUIRED_SELECT_COLUMNS,
@@ -68,6 +67,7 @@ import {
   drawBoardPollPrize,
   type BoardPoll,
   type BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
+import { insertBoardPost } from './게시판서브/create-board-post';
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -1425,10 +1425,10 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         return;
       }
 
-      const { data: insertedPost, error } = await runBoardPostMutation<BoardPost>(
-        (payload) => db.from('board_posts').insert([payload]).select().single(),
-        postData
-      );
+      // create SSOT: insertBoardPost (runBoardPostMutation + notice-broadcast)
+      const { data: insertedPost, error } = await insertBoardPost(postData as Record<string, unknown>, {
+        useAnonymous: Boolean(useAnonymous),
+      });
       if (!error && insertedPost) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
           logger.warn('첨부파일이 저장되지 않았을 수 있습니다. 데이터베이스에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
@@ -1441,32 +1441,6 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         setSelectedPostId(normalizedInsertedPost.id);
         if (isScheduleBoard && normalizedScheduleDate) {
           setCalendarMonth(new Date(`${normalizedScheduleDate}T00:00:00`));
-        }
-        const shouldNotifyImmediately =
-          activeBoard === '경조사' ||
-          (activeBoard === '공지사항' &&
-            (!normalizedScheduledPublishAt || new Date(normalizedScheduledPublishAt).getTime() <= Date.now()));
-        if (shouldNotifyImmediately && BOARD_AUTO_CHAT_TYPES.has(activeBoard)) {
-          // 서버 라우트에 위임: 공지 메시지 insert + 전 직원 알림 + 푸시 디스패치 일괄 처리
-          // (클라이언트 직접 insert 시 RLS·members 빈 배열·실패 무음화 등 다중 원인으로 무음 실패하던 문제 해결)
-          try {
-            const res = await fetch('/api/board/notice-broadcast', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                postId: normalizedInsertedPost.id,
-                useAnonymous: Boolean(useAnonymous) }) });
-            if (!res.ok) {
-              const errBody = await res.json().catch(() => ({}));
-              const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
-              toast(`공지 자동 발송 실패: ${reason}`, 'error');
-              logger.warn('공지 자동 발송 실패:', errBody);
-            }
-          } catch (e) {
-            toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
-            logger.warn('공지 자동 발송 요청 실패:', e);
-          }
         }
       } else {
         const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (((error as Record<string, unknown>)?.message as string || "").includes('column') || ((error as Record<string, unknown>)?.code) === '42703')

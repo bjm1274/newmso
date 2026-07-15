@@ -147,15 +147,19 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
     buildMeta: (v) => ({
       request_category: 'purchase',
       form_fields: fieldsToMeta(FORM_SCHEMAS.purchase, v),
-      // 서버 final inventory_workflow 는 meta_data.items 를 기대 (PC 물품신청 스키마 정합)
+      // 서버 final inventory_workflow / normalizeSupplyRequestItems 는
+      // PC 물품신청 스키마(name/qty/unit/category/dept/purpose) 를 기대
       items: [
         {
           name: String(v.item || '').trim(),
-          quantity: Number(v.qty) || 1,
-          unit: 'EA',
+          qty: Math.max(1, Number(v.qty) || 1),
+          unit: 'EA' as const,
+          category: '',
+          dept: '',
+          purpose: String(v.reason || '').trim(),
+          // 모바일 입력 보조 필드(표시·감사용, normalizer 는 무시)
           estimated_amount: Number(v.amount) || 0,
           vendor: String(v.vendor || '').trim() || null,
-          reason: String(v.reason || '').trim() || null,
         },
       ].filter((row) => row.name),
     }),

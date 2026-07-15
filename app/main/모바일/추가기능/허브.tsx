@@ -12,7 +12,7 @@
  */
 
 import type { ErpUser } from '@/types';
-import { canAccessMainMenu } from '@/lib/access-control';
+import { canAccessExtraFeature, canAccessMainMenu } from '@/lib/access-control';
 import MIcon from '../공통/MIcon';
 
 export type AddonModuleKey =
@@ -34,6 +34,42 @@ export type AddonModuleKey =
   | 'calendar'
   | 'gemini'
   | 'esl';
+
+/**
+ * 모듈 키 → canAccessExtraFeature featureId 매핑.
+ * calendar 는 메인 메뉴 '공유캘린더' 권한 유지 (별도 처리).
+ * parking/webfax/mri/share/guide 는 PC 외부링크·보조 모듈처럼 extra 키 없음 → 허용.
+ */
+export const ADDON_EXTRA_FEATURE_ID: Partial<Record<AddonModuleKey, string>> = {
+  org: '조직도',
+  inventory: '부서별재고',
+  worknow: '근무현황',
+  handoff: '인계노트',
+  eval: '직원평가',
+  discharge: '퇴원심사',
+  consult: '수술상담',
+  opboard: 'OP체크',
+  deposit: '입금실시간조회',
+  closing: '마감보고',
+  gemini: 'Gemini비서',
+  esl: 'ESL관리',
+};
+
+/** 허브 카드 노출 / onOpen 게이트 공용 */
+export function canAccessAddonModule(
+  user: ErpUser | null | undefined,
+  key: AddonModuleKey,
+): boolean {
+  if (key === 'calendar') {
+    return canAccessMainMenu(user as never, '공유캘린더');
+  }
+  const featureId = ADDON_EXTRA_FEATURE_ID[key];
+  if (featureId) {
+    return canAccessExtraFeature(user as never, featureId);
+  }
+  // parking, webfax, mri, share, guide — extra 키 없음
+  return true;
+}
 
 /** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 일치) */
 const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
@@ -111,8 +147,6 @@ export type 허브Props = {
 };
 
 export default function 허브({ user, onBack, onOpen }: 허브Props) {
-  const canCalendar = canAccessMainMenu(user as never, '공유캘린더');
-
   return (
     <div
       className="m-screen"
@@ -192,14 +226,21 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                 gap: 10 }}
             >
               {group.items.map((item) => {
-                if (item.id === 'calendar' && !canCalendar) return null;
+                // 권한 없는 카드 숨김 (calendar 포함 canAccessAddonModule)
+                if (!canAccessAddonModule(user, item.id)) return null;
                 const theme = ADDON_THEMES[item.id] || ADDON_THEMES.org;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     className="macos-glass macos-squircle-sm"
-                    onClick={() => onOpen(item.id)}
+                    onClick={() => {
+                      if (!canAccessAddonModule(user, item.id)) {
+                        // 이중 방어 — 허브 필터 우회 시
+                        return;
+                      }
+                      onOpen(item.id);
+                    }}
                     aria-label={item.label}
                     style={{
                       display: 'flex',

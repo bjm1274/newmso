@@ -37,11 +37,11 @@ export function countActiveFilters(state: ApprovalFilterState): number {
   return n;
 }
 
-/** approvals.type 실제 저장값과 1:1 (작성하기 폼 name / typeName) */
+/** approvals.type 실제 저장값과 1:1 (PC BUILTIN + 작성하기 form name / typeName) */
 const TYPE_OPTIONS: ReadonlyArray<string> = [
   '연차/휴가',
   '연차계획서',
-  '연장근무 신청',
+  '연장근무',
   '출결정정',
   '연차촉진통보서',
   '물품신청',

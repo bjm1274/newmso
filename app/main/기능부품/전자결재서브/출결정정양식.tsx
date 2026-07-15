@@ -6,6 +6,8 @@ import { db } from '@/lib/db-client';
 import { isMissingColumnError } from '@/lib/db-compat';
 import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
+import { applyAttendanceCorrectionStatus } from '@/lib/attendance-sync';
 
 type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
 
@@ -69,12 +71,20 @@ const REASON_BADGE: Record<string, { bg: string; text: string; icon: string }> =
   미체크: { bg: 'bg-slate-100 dark:bg-slate-800',    text: 'text-slate-600 dark:text-slate-400', icon: '❓' },
   미출근: { bg: 'bg-orange-100 dark:bg-orange-900/30',text: 'text-orange-600 dark:text-orange-400',icon: '⚠️' } };
 
+/** 근태 dual-write re-export — lib/attendance-sync 정본. */
+export { applyAttendanceCorrectionStatus as applyCorrectionToAttendance };
+
 export default function AttendanceCorrectionForm({
   user,
   initialSelectedDates = [],
   onConsumeInitialSelectedDates,
   setExtraData,
   setFormTitle }: AttendanceCorrectionFormProps) {
+  // staff_members.id 정합 — raw user.id(auth uuid 등) 사용 금지
+  const staffId = useResolvedStaffId(
+    user && typeof user === 'object' ? (user as Record<string, unknown>) : null,
+  );
+
   const [corrections, setCorrections] = useState<any[]>([]);
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
   const [problemDatesLoading, setProblemDatesLoading] = useState(false);
@@ -105,7 +115,7 @@ export default function AttendanceCorrectionForm({
   }, []);
 
   const fetchProblemDates = useCallback(async () => {
-    if (!user?.id) return;
+    if (!staffId) return;
 
     setProblemDatesLoading(true);
     try {
@@ -126,14 +136,14 @@ export default function AttendanceCorrectionForm({
         // staff_shift_assignments(is_primary) → staff_members.shift_id 폴백
         primaryShiftId,
       ] = await Promise.all([
-        db.from('attendance').select('staff_id, date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
-        db.from('attendances').select('staff_id, work_date, status, check_in_time, check_out_time').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        db.from('attendance').select('staff_id, date, check_in, check_out, status').eq('staff_id', staffId).gte('date', startStr).lte('date', endStr),
+        db.from('attendances').select('staff_id, work_date, status, check_in_time, check_out_time').eq('staff_id', staffId).gte('work_date', startStr).lte('work_date', endStr),
         withAttendanceCorrectionsFallback<any[]>(
-          () => db.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
-          () => db.from('attendance_corrections').select('original_date').eq('staff_id', user.id),
+          () => db.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', staffId),
+          () => db.from('attendance_corrections').select('original_date').eq('staff_id', staffId),
         ).then((r) => r),
-        db.from('shift_assignments').select('work_date, shift_id').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
-        getPrimaryShift(String(user.id)),
+        db.from('shift_assignments').select('work_date, shift_id').eq('staff_id', staffId).gte('work_date', startStr).lte('work_date', endStr),
+        getPrimaryShift(String(staffId)),
       ]);
 
       /* ── 날짜별 배정 Map ── */
@@ -308,7 +318,7 @@ export default function AttendanceCorrectionForm({
     } finally {
       setProblemDatesLoading(false);
     }
-  }, [user?.id]);
+  }, [staffId]);
 
   useEffect(() => {
     fetchCorrections();
@@ -366,6 +376,10 @@ export default function AttendanceCorrectionForm({
   const clearAll = () => setSelectedDates([]);
 
   const handleSubmitCorrection = async () => {
+    if (!staffId) {
+      toast('계정 정보를 확인할 수 없습니다.', 'error');
+      return;
+    }
     if (selectedDates.length === 0 || !reason.trim()) {
       toast('정정할 날짜를 선택하고 사유를 입력해주세요.', 'warning');
       return;
@@ -375,7 +389,7 @@ export default function AttendanceCorrectionForm({
     try {
       const requestedAt = new Date().toISOString();
       const rows = selectedDates.map((selectedDate) => ({
-        staff_id: user.id,
+        staff_id: staffId,
         attendance_date: selectedDate,
         original_date: selectedDate,
         reason: reason.trim(),
@@ -408,30 +422,7 @@ export default function AttendanceCorrectionForm({
     }
   };
 
-  const applyCorrectionToAttendance = async (
-    staffId: string,
-    dateStr: string,
-    correctionTypeValue: string
-  ) => {
-    const statusMap: Record<string, { att: string; atts: string }> = {
-      정상반영: { att: '정상', atts: 'present' },
-      지각처리: { att: '지각', atts: 'late' },
-      결근처리: { att: '결근', atts: 'absent' } };
-
-    const { att, atts } = statusMap[correctionTypeValue] || statusMap[DEFAULT_CORRECTION_TYPE];
-
-    await db.from('attendance').upsert(
-      { staff_id: staffId, date: dateStr, status: att },
-      { onConflict: 'staff_id,date' }
-    );
-
-    await db.from('attendances').upsert(
-      { staff_id: staffId, work_date: dateStr, status: atts },
-      { onConflict: 'staff_id,work_date' }
-    );
-  };
-
-  const myCorrections = corrections.filter((item) => item.staff_id === user.id);
+  const myCorrections = corrections.filter((item) => item.staff_id === staffId);
 
   /* ── 날짜 포맷 헬퍼 ── */
   const fmtDate = (dateStr: string) => {

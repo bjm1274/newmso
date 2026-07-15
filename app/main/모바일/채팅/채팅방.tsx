@@ -70,7 +70,7 @@ import { ThreadSheet } from './스레드시트';
 import { AddMemberSheet } from './멤버관리시트';
 import { PollComposerSheet, PollCard } from './투표';
 import { MessageEditSheet } from './수정시트';
-import { triggerMobileChatPush } from './푸시트리거';
+import { triggerChatPush as triggerMobileChatPush } from '@/lib/chat-push-client-trigger';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type SChatRoomProps = {

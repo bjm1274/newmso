@@ -35,12 +35,18 @@ import AttachmentPicker from './AttachmentPicker';
 import { useApprovalFormBase } from './useApprovalFormBase';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
+/** UI segment id — leave_type 저장값은 toLeaveTypeKey 로 PC 포맷 변환 */
 type LeaveKind = '연차' | '반차';
 
 const KIND_OPTIONS: ReadonlyArray<{ id: LeaveKind; label: string }> = [
   { id: '연차', label: '종일 (1.0)' },
   { id: '반차', label: '반차 (0.5)' },
 ];
+
+/** PC 근태신청양식 DEFAULT / option 과 동일 키 — leave_requests.leave_type + meta.leaveType/vType */
+function toLeaveTypeKey(kind: LeaveKind): string {
+  return kind === '반차' ? '반차 (0.5)' : '연차 (1.0)';
+}
 
 export type SApprovalLeaveFormProps = {
   user: ErpUser;
@@ -148,9 +154,9 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
 
     const senderName = String(user.name || '').trim() || '이름 없음';
     const senderCompany = company;
-    // leave_type / meta.leaveType / meta.vType 동일 키 (kind: '연차'|'반차')
+    // leave_type / meta.leaveType / meta.vType 동일 키 (PC: '연차 (1.0)' | '반차 (0.5)')
     // — 서버 ensureApproved 가 leave_type 완전일치로 대기 row 를 승격
-    const leaveTypeKey = kind;
+    const leaveTypeKey = toLeaveTypeKey(kind);
 
     // 1) leave_requests insert (기존 인사관리 모듈 동일 컬럼)
     let leaveRequestInserted = false;

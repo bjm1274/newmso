@@ -21,15 +21,16 @@ type FormCategory = {
   items: Array<{ slug: string; name: string }>;
 };
 
-// PC slug 그대로 사용 — 정합성 확보
+// PC BUILTIN_FORM_TYPE_DEFINITIONS.name 과 1:1 — approvals.type 저장값 정합
+// (일반기안/연장근무/연차계획은 formName 을 type 으로 그대로 사용)
 const FORM_CATEGORIES: FormCategory[] = [
   {
     g: '근태/휴가',
     items: [
-      { slug: 'leave', name: '연차/휴가 신청' },
+      { slug: 'leave', name: '연차/휴가' },
       { slug: 'annual_plan', name: '연차계획서' },
-      { slug: 'overtime', name: '연장근무 신청' },
-      { slug: 'attendance_fix', name: '출결정정 신청' },
+      { slug: 'overtime', name: '연장근무' },
+      { slug: 'attendance_fix', name: '출결정정' },
       { slug: 'leave_promotion_notice', name: '연차촉진통보서' },
     ] },
   {
@@ -61,7 +62,7 @@ const FORM_CATEGORIES: FormCategory[] = [
     ] },
 ];
 
-// PC와 누락된 슬러그 없는지 점검용 디버그 (런타임 무영향)
+// PC slug/name 누락 점검 (런타임 무영향) — 작성하기 목록 ⊇ 빌트인
 void BUILTIN_FORM_TYPE_DEFINITIONS;
 
 export type SApprovalWriteProps = {

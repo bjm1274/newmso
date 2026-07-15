@@ -26,7 +26,7 @@ import MBtn from '../공통/MBtn';
 import { useMonthlyAttendance } from './data-hooks';
 import {
   resolveCheckInStatus,
-  syncToAttendances,
+  syncAttendanceToAttendances,
   resolveLateThreshold,
   calculateEarlyLeaveMinutes } from '@/app/main/기능부품/마이페이지/출퇴근기록/checkin-utils';
 
@@ -328,16 +328,20 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           onConflict: 'staff_id,date' });
         if (error) throw new Error(error);
         if (queued) {
-          // 낙관적 업데이트 — 큐잉됨
-          setTodayLog({ id: 'pending', date: today, check_in: nowIso, check_out: null });
+          // 낙관적 업데이트 — 큐잉됨 (온라인 복귀 후 flush 시 단수만 재생 → 이후 재동기화)
+          setTodayLog({ id: 'pending', date: today, check_in: nowIso, check_out: null, status: checkInStatus });
           toast('오프라인 — 출근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
           setTodayLog(row || { id: 'upserted', date: today, check_in: nowIso, check_out: null, status: checkInStatus });
           try {
-            await syncToAttendances(staffId, today, nowIso, null, checkInStatus);
+            await syncAttendanceToAttendances(staffId, today, {
+              checkIn: nowIso,
+              checkOut: null,
+              status: checkInStatus,
+            });
           } catch (syncErr) {
-            console.error('syncToAttendances fail', syncErr);
+            console.error('syncAttendanceToAttendances fail', syncErr);
           }
           toast(
             checkInStatus === '지각' ? '지각 처리되었습니다.' : '출근 체크인이 완료되었습니다.',
@@ -374,11 +378,16 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           if (row) setTodayLog(row);
           else if (todayLog) setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
           else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
-          
+
           try {
-            await syncToAttendances(staffId, dateKey, checkInIso, nowIso, finalStatus, { earlyLeaveMinutes });
+            await syncAttendanceToAttendances(staffId, dateKey, {
+              checkIn: checkInIso,
+              checkOut: nowIso,
+              status: finalStatus,
+              earlyLeaveMinutes,
+            });
           } catch (syncErr) {
-            console.error('syncToAttendances fail', syncErr);
+            console.error('syncAttendanceToAttendances fail', syncErr);
           }
 
           toast(
@@ -447,9 +456,14 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
         setStaleLog(row || { ...staleLog, check_out: nowIso, status: finalStatus });
         try {
-          await syncToAttendances(staffId, dateKey, checkInIso, nowIso, finalStatus, { earlyLeaveMinutes });
+          await syncAttendanceToAttendances(staffId, dateKey, {
+            checkIn: checkInIso,
+            checkOut: nowIso,
+            status: finalStatus,
+            earlyLeaveMinutes,
+          });
         } catch (syncErr) {
-          console.error('syncToAttendances fail', syncErr);
+          console.error('syncAttendanceToAttendances fail', syncErr);
         }
         toast(
           finalStatus === '조퇴'

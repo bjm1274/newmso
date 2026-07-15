@@ -8,6 +8,8 @@
  * JM3: try/catch + toast
  * JM4: any 금지, 모든 타입 명시
  * JM5: SQL 인젝션 회피(db eq 사용), 본문은 텍스트 렌더
+ *
+ * 글 작성 create: 기능부품/게시판서브/create-board-post.ts SSOT re-export
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -15,46 +17,28 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost } from '@/types';
 import {
-  BOARD_AUTO_CHAT_TYPES,
   BOARD_COMMENT_SELECT,
   BOARD_POST_OPTIONAL_COLUMNS,
   BOARD_POST_REQUIRED_SELECT_COLUMNS,
-  buildAttachmentMetaContent,
   buildSelectColumns,
   normalizeBoardPost } from '@/app/main/기능부품/게시판공통';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { loadStarSet } from './별표훅';
-import { normalizePoll } from './게시판변경';
 
-/** 공지/경조사 등록 직후 채팅·푸시 방송 (PC notice-broadcast 패리티) */
-async function broadcastNoticeIfNeeded(
-  postId: string,
-  boardType: string,
-  scheduledPublishAt?: string | null,
-  useAnonymous = false,
-): Promise<void> {
-  if (!BOARD_AUTO_CHAT_TYPES.has(boardType)) return;
-  // 예약 발행(미래) 공지는 즉시 방송하지 않음 — PC와 동일
-  if (boardType === '공지사항' && scheduledPublishAt) {
-    const t = new Date(scheduledPublishAt).getTime();
-    if (Number.isFinite(t) && t > Date.now()) return;
-  }
-  try {
-    const res = await fetch('/api/board/notice-broadcast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ postId, useAnonymous: Boolean(useAnonymous) }),
-    });
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
-      toast(`공지 자동 발송 실패: ${reason}`, 'error');
-    }
-  } catch {
-    toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
-  }
-}
+// create / notice-broadcast / author resolve — PC·모바일 공유 SSOT
+export {
+  createBoardPost,
+  insertBoardPost,
+  broadcastNoticeIfNeeded,
+  resolveAuthorStaffId,
+  normalizePoll,
+  isVoiceBoardType,
+  type PostImportance,
+  type BoardPollInput,
+  type ScheduleMetaInput,
+  type CreateBoardPostInput,
+} from '@/app/main/기능부품/게시판서브/create-board-post';
 
 // ─────────────────────────────────────────────
 // 카테고리 정의 — handoff와 1:1
@@ -332,8 +316,9 @@ export type UseBoardDetailResult = {
 
 export function useBoardDetail(
   postId: string | null,
-  user: { id?: string | null; name?: string | null } | null,
+  user: { id?: string | null; name?: string | null; employee_no?: string | null; auth_user_id?: string | null } | null,
 ): UseBoardDetailResult {
+  const resolvedAuthorId = useResolvedStaffId(user as Record<string, unknown> | null | undefined);
   const [post, setPost] = useState<BoardListPost | null>(null);
   const [comments, setComments] = useState<BoardComment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -394,7 +379,9 @@ export function useBoardDetail(
     async (content: string, parentCommentId: string | null = null) => {
       const trimmed = content.trim();
       if (!trimmed || !postId) return false;
-      if (!user?.id) {
+      // resolve 실패 시 raw user.id 폴백
+      const authorId = resolvedAuthorId || (typeof user?.id === 'string' ? user.id : null);
+      if (!authorId) {
         toast('로그인한 후 댓글을 등록할 수 있습니다.', 'error');
         return false;
       }
@@ -404,8 +391,8 @@ export function useBoardDetail(
           .insert([
             {
               post_id: postId,
-              author_id: user.id,
-              author_name: user.name ?? '익명',
+              author_id: authorId,
+              author_name: user?.name ?? '익명',
               content: trimmed,
               parent_comment_id: parentCommentId },
           ])
@@ -421,7 +408,7 @@ export function useBoardDetail(
         return false;
       }
     },
-    [postId, user?.id, user?.name],
+    [postId, resolvedAuthorId, user?.id, user?.name],
   );
 
   const patchPost = useCallback((patch: Partial<BoardListPost>) => {
@@ -438,60 +425,9 @@ export function useBoardDetail(
 export { toggleStarServer, loadStarSet, useStarSet } from './별표훅';
 
 // ─────────────────────────────────────────────
-// 글 작성(insert)
+// 글 작성(insert) — SSOT: 기능부품/게시판서브/create-board-post.ts
+// (타입·createBoardPost·normalizePoll 은 파일 상단 re-export)
 // ─────────────────────────────────────────────
-
-export type PostImportance = 'normal' | 'urgent';
-
-/** board_posts.poll JSONB — PC `게시판서브/board-poll-prize.ts`의 BoardPoll과 동일 형태 */
-export type BoardPollInput = {
-  question: string;
-  options: string[];
-  anonymous: boolean;
-  multiple: boolean;
-  prize?: { winnerCount: number; name: string };
-};
-
-/** 수술/MRI 일정 메타 — PC postData 매핑과 1:1 */
-export type ScheduleMetaInput = {
-  /** 'YYYY-MM-DD' */
-  scheduleDate?: string | null;
-  /** 'HH:mm' */
-  scheduleTime?: string | null;
-  scheduleRoom?: string | null;
-  patientName?: string | null;
-  /** 차트번호 — PC는 content 컬럼에 저장 */
-  chartNo?: string | null;
-  /** '좌' | '우' | '' — title 접두사로 저장 (PC와 동일) */
-  side?: '좌' | '우' | '';
-  fasting?: boolean;
-  inpatient?: boolean;
-  guardian?: boolean;
-  caregiver?: boolean;
-  transfusion?: boolean;
-  /** MRI일정 전용 — 조영제 필요 여부 */
-  contrastRequired?: boolean;
-};
-
-export type CreateBoardPostInput = {
-  catId: BoardCatId;
-  title: string;
-  content: string;
-  attachments?: AttachmentItem[];
-  /** P2: 익명 작성 — 자유/익명 board에서만 의미 있음 */
-  anonymous?: boolean;
-  /** P2: 상단 고정 (관리자 권한 필요 — 호출 측 게이트) */
-  pinned?: boolean;
-  /** P2: 중요도 — 'urgent'일 때 status='중요'로 매핑 (PC와 동일) */
-  importance?: PostImportance;
-  /** P2: 예약 발행 — ISO/HTML datetime-local 값 (빈 문자열은 무시) */
-  scheduledPublishAt?: string | null;
-  /** P3: 투표/설문 — PC board_posts.poll JSONB */
-  poll?: BoardPollInput | null;
-  /** P3: 수술/MRI 일정 메타 — op/mri 카테고리에서만 의미 있음 */
-  schedule?: ScheduleMetaInput | null;
-  user: { id?: string | null; name?: string | null; company?: string | null; company_id?: string | null } | null;
-};
 
 /** 게시글 수정 입력 — board_posts.update 매핑 (제목/본문/첨부/투표) */
 export type UpdateBoardPostInput = {
@@ -500,176 +436,10 @@ export type UpdateBoardPostInput = {
   content: string;
   attachments?: AttachmentItem[];
   /** null이면 기존 투표 제거 (PC editing 시 poll=null과 동일) */
-  poll?: BoardPollInput | null;
+  poll?: import('@/app/main/기능부품/게시판서브/create-board-post').BoardPollInput | null;
 };
 
-function toIsoOrNull(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  // <input type="datetime-local"> → 'YYYY-MM-DDTHH:mm' (TZ 없음). 로컬 시간으로 해석 후 ISO 변환.
-  const d = new Date(trimmed);
-  if (Number.isNaN(d.getTime())) return null;
-  // 미래만 의미 있음 (과거 예약은 즉시 발행과 같으므로 null 처리)
-  if (d.getTime() <= Date.now()) return null;
-  return d.toISOString();
-}
-
-/** @deprecated 익명소리함 보드 폐지 — 항상 false */
-export function isVoiceBoardType(_boardType?: string | null): boolean {
-  return false;
-}
-
-export async function createBoardPost(input: CreateBoardPostInput): Promise<BoardPost | null> {
-  const {
-    catId,
-    title,
-    content,
-    attachments,
-    anonymous = false,
-    pinned = false,
-    importance = 'normal',
-    scheduledPublishAt = null,
-    poll = null,
-    schedule = null,
-    user } = input;
-  const cat = BOARD_CATS.find((c) => c.id === catId);
-  const boardType = cat?.boardType ?? '자유게시판';
-  // 자유게시판 등에서 사용자가 선택한 익명 옵션만 반영 (익명소리함 보드 폐지)
-  const useAnonymous = Boolean(anonymous);
-  if (!user?.id) {
-    toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
-    return null;
-  }
-
-  // 첨부가 있으면 content에 [[ATTACHMENTS_META]]...[[/ATTACHMENTS_META]] 임베드.
-  // 동시에 board_posts.attachments 컬럼에도 시도 (없는 환경에선 withMissingColumnsFallback이 처리).
-  const normalizedAttachments: AttachmentItem[] = Array.isArray(attachments)
-    ? attachments
-        .map((a) => ({
-          name: String(a?.name ?? '').trim(),
-          url: String(a?.url ?? '').trim(),
-          type: String(a?.type ?? '').trim() || undefined,
-          size: typeof a?.size === 'number' ? a.size : undefined }))
-        .filter((a) => a.name && a.url)
-    : [];
-
-  const isSchedule = boardType === '수술일정' || boardType === 'MRI일정';
-
-  // 일정 게시판: PC와 동일하게 content 컬럼에 차트번호를 저장 (본문 입력칸 미사용)
-  const baseContent = isSchedule
-    ? String(schedule?.chartNo ?? '').trim()
-    : content.trim();
-  const finalContent = !isSchedule && normalizedAttachments.length > 0
-    ? buildAttachmentMetaContent(baseContent, normalizedAttachments)
-    : baseContent;
-
-  // 일정 게시판: title 앞에 좌/우 접두사 (PC sidePrefix)
-  const sidePrefix = schedule?.side === '좌' ? '좌측 ' : schedule?.side === '우' ? '우측 ' : '';
-  const finalTitle = isSchedule ? `${sidePrefix}${title.trim()}` : title.trim();
-
-  const scheduledIso = toIsoOrNull(scheduledPublishAt);
-  const statusValue = importance === 'urgent' ? '중요' : null;
-  const normalizedPoll = normalizePoll(poll);
-
-  type InsertPayload = {
-    board_type: string;
-    title: string;
-    content: string;
-    author_id: string | null;
-    author_name: string;
-    company: string | null;
-    company_id: string | null;
-    is_anonymous: boolean;
-    attachments?: AttachmentItem[];
-    is_pinned?: boolean;
-    status?: string | null;
-    scheduled_publish_at?: string | null;
-    poll?: BoardPollInput | null;
-    schedule_date?: string | null;
-    schedule_time?: string | null;
-    schedule_room?: string | null;
-    patient_name?: string | null;
-    surgery_fasting?: boolean | null;
-    surgery_inpatient?: boolean | null;
-    surgery_guardian?: boolean | null;
-    surgery_caregiver?: boolean | null;
-    surgery_transfusion?: boolean | null;
-    mri_contrast_required?: boolean | null;
-  };
-  const payload: InsertPayload = {
-    board_type: boardType,
-    title: finalTitle,
-    content: finalContent,
-    // JM5: 익명일 때 author_id 비식별
-    author_id: useAnonymous ? null : user.id,
-    author_name: useAnonymous ? '익명' : (user.name ?? '익명'),
-    company: useAnonymous ? null : (user.company ?? null),
-    company_id: useAnonymous ? null : (user.company_id ?? null),
-    is_anonymous: useAnonymous };
-  if (normalizedAttachments.length > 0) payload.attachments = normalizedAttachments;
-  if (pinned) payload.is_pinned = true;
-  if (statusValue) payload.status = statusValue;
-  if (scheduledIso) payload.scheduled_publish_at = scheduledIso;
-  if (normalizedPoll) payload.poll = normalizedPoll;
-  if (isSchedule && schedule) {
-    payload.schedule_date = schedule.scheduleDate || null;
-    payload.schedule_time = schedule.scheduleTime || null;
-    payload.schedule_room = schedule.scheduleRoom || null;
-    payload.patient_name = schedule.patientName || null;
-    payload.surgery_fasting = Boolean(schedule.fasting);
-    payload.surgery_inpatient = Boolean(schedule.inpatient);
-    payload.surgery_guardian = Boolean(schedule.guardian);
-    payload.surgery_caregiver = Boolean(schedule.caregiver);
-    payload.surgery_transfusion = Boolean(schedule.transfusion);
-    payload.mri_contrast_required = boardType === 'MRI일정' ? Boolean(schedule.contrastRequired) : null;
-  }
-
-  try {
-    let { data, error } = await db
-      .from('board_posts')
-      .insert([payload])
-      .select()
-      .single();
-    // optional 컬럼이 없는 환경 → 메시지에 등장한 컬럼을 제외하고 재시도 (한 번)
-    if (error) {
-      const msg = String((error as { message?: string }).message ?? '');
-      const optional: Array<keyof InsertPayload> = [
-        'attachments', 'is_pinned', 'status', 'scheduled_publish_at', 'poll',
-        'schedule_date', 'schedule_time', 'schedule_room', 'patient_name',
-        'surgery_fasting', 'surgery_inpatient', 'surgery_guardian',
-        'surgery_caregiver', 'surgery_transfusion', 'mri_contrast_required',
-      ];
-      const toOmit = optional.filter((k) => new RegExp(String(k), 'i').test(msg));
-      if (toOmit.length > 0) {
-        const retryPayload: InsertPayload = { ...payload };
-        toOmit.forEach((k) => { delete retryPayload[k]; });
-        const retry = await db.from('board_posts').insert([retryPayload]).select().single();
-        data = retry.data;
-        error = retry.error;
-      }
-    }
-    if (error) throw error;
-    const inserted = data as BoardPost;
-    // 공지/경조사: PC와 동일하게 notice-broadcast (채팅·인앱·푸시)
-    if (inserted?.id) {
-      await broadcastNoticeIfNeeded(
-        String(inserted.id),
-        boardType,
-        scheduledIso,
-        useAnonymous,
-      );
-    }
-    return inserted;
-  } catch (err) {
-    toast(`등록 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
-    return null;
-  }
-}
-
 // 변경(mutation) 헬퍼는 게시판변경.ts로 분리 (JM 500줄 이내 유지).
-// createBoardPost가 normalizePoll을 사용하므로 상단에서 import (위 import 블록) 후 재노출.
-export { normalizePoll };
 export {
   updateBoardPost,
   deleteBoardPost,
@@ -751,4 +521,3 @@ function inferKind(nameOrUrl: string, explicitType: string): 'image' | 'video' |
   if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
   return 'file';
 }
-

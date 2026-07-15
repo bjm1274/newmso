@@ -18,6 +18,7 @@ import {
   type PushConnectionStatus } from '../../기능부품/알림시스템';
 import { normalizeKeywordList } from '../../기능부품/알림시스템/filter-helpers';
 import { timeAgo } from '@/lib/notification-utils';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type 알림설정Props = {
   user: ErpUser;
@@ -40,7 +41,8 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 function MobileNotificationSettings({ user, onBack }: 알림설정Props) {
-  const userId = typeof user.id === 'string' ? user.id : null;
+  // raw user.id 대신 staff_members.id 해석 (푸시 구독 staffId 정합)
+  const userId = useResolvedStaffId(user as Record<string, unknown>);
   const [settings, setSettings] = useState<NotifSettings>(loadNotifSettings);
   const [keywordInput, setKeywordInput] = useState('');
   const [pushStatus, setPushStatus] = useState<PushConnectionStatus | null>(null);

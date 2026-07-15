@@ -20,9 +20,10 @@ import {
   type BoardCatId,
   type BoardListPost,
   boardTypeToCat,
+  broadcastNoticeIfNeeded,
   createBoardPost,
   getSafeAttachments,
-
+  resolveAuthorStaffId,
   updateBoardPost } from './data-hooks';
 import { uploadBoardAttachments, type DraftAttachment, type UploadProgress, validateFile } from './첨부업로드';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
@@ -175,21 +176,30 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
 
     // 나머지 경로 — enqueueD1Mutation (텍스트 전용 or 오프라인 첨부 포함)
     const importance = form.importance === 'urgent' ? '중요' : null;
+    const authorStaffId = anonymousFinal ? null : await resolveAuthorStaffId(user);
+    if (!anonymousFinal && !authorStaffId) {
+      setSubmitting(false);
+      toast('로그인한 후 글을 등록할 수 있습니다.', 'error');
+      return;
+    }
+    // company/company_id: 익명이어도 유지 (createBoardPost SSOT 패리티)
     const payload: Record<string, unknown> = {
       board_type: boardType,
       title: form.title.trim(), content: form.body.trim(),
-      author_id: anonymousFinal ? null : user.id,
-      author_name: anonymousFinal ? '익명' : (user.name ?? '익명'),
-      company: anonymousFinal ? null : (user.company ?? null),
-      company_id: anonymousFinal ? null : (user.company_id ?? null),
+      author_id: anonymousFinal ? null : authorStaffId,
+      author_name: anonymousFinal ? '익명' : (user?.name ?? '익명'),
+      company: user?.company ?? null,
       is_anonymous: anonymousFinal,
       attachments: attachmentItems };
+    if (user?.company_id) payload.company_id = user.company_id;
     if (pinFinal) payload.is_pinned = true;
     if (importance) payload.status = importance;
+    let scheduledIso: string | null = null;
     if (!hasPendingAtts && scheduledFinal) {
       const d = new Date(scheduledFinal);
       if (!Number.isNaN(d.getTime()) && d.getTime() > Date.now()) {
-        payload.scheduled_publish_at = d.toISOString();
+        scheduledIso = d.toISOString();
+        payload.scheduled_publish_at = scheduledIso;
       }
     }
 
@@ -209,22 +219,8 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
       const row = Array.isArray(data) ? (data as { id: string }[])[0] : (data as { id: string });
       const newId = String(row?.id ?? '');
       // 공지/경조사 즉시 방송 (createBoardPost 경로 외 enqueue 경로 보완)
-      if (newId && (boardType === '공지사항' || boardType === '경조사')) {
-        try {
-          const res = await fetch('/api/board/notice-broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ postId: newId, useAnonymous: anonymousFinal }),
-          });
-          if (!res.ok) {
-            const errBody = await res.json().catch(() => ({}));
-            const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
-            toast(`공지 자동 발송 실패: ${reason}`, 'error');
-          }
-        } catch {
-          toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
-        }
+      if (newId) {
+        await broadcastNoticeIfNeeded(newId, boardType, scheduledIso, anonymousFinal);
       }
       onCreated(newId);
     }

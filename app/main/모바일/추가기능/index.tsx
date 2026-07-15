@@ -24,7 +24,7 @@
 import { useCallback, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
-import 허브, { type AddonModuleKey } from './허브';
+import 허브, { canAccessAddonModule, type AddonModuleKey } from './허브';
 import 조직도 from './조직도';
 import 부서재고 from './부서재고';
 import 근무현황 from './근무현황';
@@ -45,7 +45,6 @@ import 업무공유상세 from './업무공유상세';
 import 업무가이드 from './업무가이드';
 import 공유캘린더 from './공유캘린더';
 import type { OpCheckCard } from './data-hooks';
-import { canAccessMainMenu } from '@/lib/access-control';
 
 type View =
   | { kind: 'hub' }
@@ -97,13 +96,19 @@ export type 추가기능Props = {
 
 export default function 추가기능({ user, onBack, initialView }: 추가기능Props) {
   const [view, setView] = useState<View>(() => {
-    if (initialView && MODULE_TO_VIEW[initialView]) {
-      return MODULE_TO_VIEW[initialView];
+    if (
+      initialView &&
+      MODULE_TO_VIEW[initialView] &&
+      canAccessAddonModule(user, initialView)
+    ) {
+      return MODULE_TO_VIEW[initialView] as View;
     }
     return { kind: 'hub' };
   });
 
-  const enteredViaInitialView = Boolean(initialView && MODULE_TO_VIEW[initialView]);
+  const enteredViaInitialView = Boolean(
+    initialView && MODULE_TO_VIEW[initialView] && canAccessAddonModule(user, initialView),
+  );
 
   const goHub = useCallback(() => setView({ kind: 'hub' }), []);
   /** initialView로 직접 진입했으면 뒤로가기=이전 탭, 아니면 허브로 */
@@ -127,12 +132,17 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
           user={user}
           onBack={onBack}
           onOpen={(key: AddonModuleKey) => {
-            if (key === 'gemini' || key === 'esl') {
-              toast('PC 버전에서 이용 가능합니다', 'info');
+            if (!canAccessAddonModule(user, key)) {
+              toast(
+                key === 'calendar'
+                  ? '공유캘린더 메뉴 권한이 없습니다.'
+                  : '이 추가기능에 대한 권한이 없습니다.',
+                'warning',
+              );
               return;
             }
-            if (key === 'calendar' && !canAccessMainMenu(user as never, '공유캘린더')) {
-              toast('공유캘린더 메뉴 권한이 없습니다.', 'warning');
+            if (key === 'gemini' || key === 'esl') {
+              toast('PC 버전에서 이용 가능합니다', 'info');
               return;
             }
             const next = MODULE_TO_VIEW[key];

@@ -5,7 +5,8 @@
  * 데스크탑·모바일이 공유하는 동일 동작을 한 곳에 모아 회귀를 막는다.
  *
  * - 순수 함수: parseShiftTime, buildShiftBoundary 계열, calculateEarlyLeaveMinutes
- * - Supabase aware: syncToAttendances, resolveLateThreshold, resolveStaleOpenLog
+ * - Supabase aware: resolveLateThreshold, resolveStaleOpenLog
+ * - dual-write: syncToAttendances → lib/attendance-sync (단수→복수 동기화)
  *
  * JM  : 단일 책임(체크인 도메인 헬퍼), 200줄 내외
  * JM3 : 실패는 호출부 try/catch로 위임, 내부에서는 명시 throw + logger.warn
@@ -25,11 +26,15 @@ import { withMissingColumnFallback } from '@/lib/db-compat';
 import type { CommuteLog, ShiftBoundary } from './commute-types';
 import { decideCheckInStatus } from './late-status';
 
-const COMMUTE_STATUS_TO_ATTENDANCES: Record<string, string> = {
-  정상: 'present',
-  지각: 'late',
-  조퇴: 'early_leave',
-  결근: 'absent' };
+// dual-write 정본은 lib/attendance-sync — 하위 호환 re-export
+export {
+  syncAttendanceToAttendances,
+  syncToAttendances,
+  upsertAttendanceCheckIn,
+  upsertAttendanceCheckOut,
+  writeAttendanceStatus,
+  applyAttendanceCorrectionStatus,
+} from '@/lib/attendance-sync';
 
 // ---------------------------------------------------------------------------
 // 순수 함수
@@ -273,52 +278,6 @@ export async function resolveCheckInStatus(
 ): Promise<'정상' | '지각'> {
   const boundary = await resolveLateThreshold(staffId, workDate, fallback, { checkInIso });
   return decideCheckInStatus(boundary, checkInIso);
-}
-
-/**
- * attendance → attendances 동기화. (근태관리메인/급여정산 연계)
- */
-export async function syncToAttendances(
-  staffId: string,
-  workDate: string,
-  checkIn: string | null,
-  checkOut: string | null,
-  status: string,
-  options?: { earlyLeaveMinutes?: number | null },
-): Promise<void> {
-  if (!staffId) return;
-  try {
-    const attStatus = COMMUTE_STATUS_TO_ATTENDANCES[status] || 'present';
-    const mins =
-      checkIn && checkOut
-        ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
-        : null;
-
-    const basePayload = {
-      staff_id: staffId,
-      work_date: workDate,
-      check_in_time: checkIn,
-      check_out_time: checkOut,
-      status: attStatus,
-      work_hours_minutes: mins ?? undefined };
-
-    const earlyLeaveMinutes =
-      attStatus === 'early_leave' ? Math.max(0, Number(options?.earlyLeaveMinutes || 0)) : 0;
-
-    const result = await withMissingColumnFallback(
-      () =>
-        db.from('attendances').upsert(
-          { ...basePayload, early_leave_minutes: earlyLeaveMinutes },
-          { onConflict: 'staff_id,work_date' },
-        ),
-      () => db.from('attendances').upsert(basePayload, { onConflict: 'staff_id,work_date' }),
-      'early_leave_minutes',
-    );
-
-    if (result.error) throw result.error;
-  } catch (syncErr) {
-    logger.warn('출퇴근 동기화 실패:', syncErr);
-  }
 }
 
 /**

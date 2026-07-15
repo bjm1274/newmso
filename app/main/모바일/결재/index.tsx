@@ -58,7 +58,7 @@ export default function 결재({ user, sub }: 결재Props) {
 
   useEffect(() => {
     if (sub === 'compose:leave' || sub === 'compose:연차') {
-      setComposeForm({ slug: 'leave', name: '연차/휴가 신청' });
+      setComposeForm({ slug: 'leave', name: '연차/휴가' });
       setView('compose');
     } else if (sub === 'compose:annual_plan') {
       setComposeForm({ slug: 'annual_plan', name: '연차계획서' });
