@@ -36,6 +36,7 @@ import {
   canAccessChatRoom,
   canChangeChatRoomMembers,
   isNoticeRoomType,
+  isRoomMember,
   loadChatRoomMembership,
   parseMembersField,
 } from '@/lib/chat-room-membership';
@@ -70,7 +71,9 @@ export type PolicyPattern =
   | 'APPROVAL_SCOPE'
   | 'INVENTORY_SCOPE'
   | 'COMPANY_INVENTORY_SCOPE'
-  | 'DEPARTMENT_INVENTORY_SCOPE';
+  | 'DEPARTMENT_INVENTORY_SCOPE'
+  /** 채팅: room 멤버(또는 notice/admin)만 행 접근 — filterByPolicy 에서 배치 평가 */
+  | 'CHAT_ROOM_MEMBER';
 
 export type Op = 'select' | 'insert' | 'update' | 'delete';
 
@@ -319,13 +322,13 @@ export const POLICY_REGISTRY: Registry = {
   popups: PUBLIC_ALL('popups'),
   disciplinary_committees: PUBLIC_ALL('disciplinary_committees'),
 
-  // 채팅 메시지: select는 PUBLIC 유지(조회 스코프는 별도 phase).
-  // INSERT: sender_id=세션 staff + 방 멤버십(notice 예외) — 사칭/비멤버 전송 차단.
-  // UPDATE(soft-delete): 작성자 본인 또는 admin만 (asyncGuards).
-  // hard DELETE는 별도 정책 강화 대상.
+  // 채팅 메시지:
+  // SELECT: CHAT_ROOM_MEMBER — 비멤버 방 메시지 열람 차단 (filterByPolicy 배치)
+  // INSERT: sender_id=세션 staff + 방 멤버십(notice 예외)
+  // UPDATE(soft-delete): 작성자 본인 또는 admin
   messages: {
     table: 'messages',
-    select: 'PUBLIC',
+    select: 'CHAT_ROOM_MEMBER',
     insert: 'PUBLIC',
     update: 'PUBLIC',
     delete: 'PUBLIC',
@@ -333,12 +336,12 @@ export const POLICY_REGISTRY: Registry = {
       insert: messagesInsertGuard,
       update: messagesSelfDeleteGuard } },
 
-  // chat_rooms: select/insert는 PUBLIC 유지(목록 스코프·방생성 강화는 별도).
-  // UPDATE: 멤버(또는 notice/관리 권한)만 — d1/mutate 우회 변조 차단.
-  // 전용 PATCH 라우트(/api/chat-rooms/[id])에서도 동일 규칙 적용.
+  // chat_rooms:
+  // SELECT: CHAT_ROOM_MEMBER — 멤버(또는 notice/admin)만 방 메타 조회
+  // UPDATE: 멤버/notice/관리 권한
   chat_rooms: {
     table: 'chat_rooms',
-    select: 'PUBLIC',
+    select: 'CHAT_ROOM_MEMBER',
     insert: 'PUBLIC',
     update: 'PUBLIC',
     delete: 'PUBLIC',
@@ -887,6 +890,31 @@ async function evalPattern(
     );
   }
 
+  if (pattern === 'CHAT_ROOM_MEMBER') {
+    // 단건 검사 — 배치 SELECT 는 filterByPolicy 전용 경로 사용
+    if (erpCanManageCompany(claims)) return true;
+    const me = claimsStaffIdRaw(claims);
+    if (me === null) return false;
+    // messages 행: room_id
+    const roomId =
+      getField<string>(row, 'room_id') ??
+      (cfg.table === 'chat_rooms' ? getField<string>(row, 'id') : null);
+    if (roomId === null) {
+      // chat_rooms 행에 members 가 있으면 인라인 판정
+      if (Object.prototype.hasOwnProperty.call(row, 'members')) {
+        if (isNoticeRoomType(getField<string>(row, 'type'))) return true;
+        return isRoomMember(parseMembersField(row.members), me);
+      }
+      return false;
+    }
+    if (cfg.table === 'chat_rooms' && isNoticeRoomType(getField<string>(row, 'type'))) {
+      return true;
+    }
+    const room = await loadChatRoomMembership(db, String(roomId));
+    if (!room) return false;
+    return canAccessChatRoom(room, me);
+  }
+
   return false;
 }
 
@@ -951,6 +979,67 @@ export async function assertAccess(args: PolicyCheckArgs): Promise<void> {
 }
 
 /**
+ * messages SELECT — room_id 별 멤버십 1회 조회 후 필터 (N+1 방지).
+ */
+async function filterMessagesByChatRoomMembership<T extends Record<string, unknown>>(
+  db: D1Client,
+  claims: ErpClaims,
+  rows: T[],
+): Promise<T[]> {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return rows;
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return [];
+
+  const roomIds = [
+    ...new Set(
+      rows
+        .map((r) => String(r.room_id ?? '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  const allowed = new Set<string>();
+  await Promise.all(
+    roomIds.map(async (rid) => {
+      const room = await loadChatRoomMembership(db, rid);
+      if (room && canAccessChatRoom(room, me)) allowed.add(rid);
+    }),
+  );
+  return rows.filter((r) => allowed.has(String(r.room_id ?? '').trim()));
+}
+
+/**
+ * chat_rooms SELECT — 행 자체가 방 메타. members/type 으로 판정.
+ * members 가 select 컬럼에 없으면 id로 로드.
+ */
+async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
+  db: D1Client,
+  claims: ErpClaims,
+  rows: T[],
+): Promise<T[]> {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return rows;
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return [];
+
+  const out: T[] = [];
+  for (const row of rows) {
+    const type = row.type != null ? String(row.type) : null;
+    if (isNoticeRoomType(type)) {
+      out.push(row);
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(row, 'members')) {
+      if (isRoomMember(parseMembersField(row.members), me)) out.push(row);
+      continue;
+    }
+    const id = String(row.id ?? '').trim();
+    if (!id) continue;
+    const room = await loadChatRoomMembership(db, id);
+    if (room && canAccessChatRoom(room, me)) out.push(row);
+  }
+  return out;
+}
+
+/**
  * 여러 row를 일괄 필터링 — SELECT 결과를 RLS처럼 적용.
  */
 export async function filterByPolicy<T extends Record<string, unknown>>(
@@ -964,6 +1053,16 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
   if (cfg.select === 'PUBLIC') return rows;
   if (cfg.select === 'AUTHENTICATED') return erpStaffId(claims) !== null ? rows : [];
   if (erpIsAdmin(claims)) return rows;
+
+  // 채팅 멤버 스코프 — 배치 평가
+  if (cfg.select === 'CHAT_ROOM_MEMBER') {
+    if (table === 'messages') {
+      return filterMessagesByChatRoomMembership(db, claims, rows);
+    }
+    if (table === 'chat_rooms') {
+      return filterChatRoomsByMembership(db, claims, rows);
+    }
+  }
 
   const out: T[] = [];
   for (const row of rows) {

@@ -17,14 +17,19 @@ export function getMonthBoundaries(yearMonth: string): { startDate: string; endD
 
 /**
  * 날짜 값을 한국어 표시 포맷으로 변환 (예: "2026-05-02" → "2026. 5. 2.")
- * 값이 없으면 "현재" 반환, 파싱 불가 시 원본 반환
+ * 값이 없으면 "현재" 반환, 파싱 불가 시 원본 반환.
+ * 표시 포맷 SSOT 는 date-formatter.formatDateLabel 과 동일 엔진.
  */
 export function formatDateDisplay(value?: string | null): string {
   if (!value) return '현재';
+  // lazy import 회피 — 동일 로직 (date-formatter 와 일치)
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('ko-KR');
 }
+
+/** 금액 표시 — date-formatter.formatWon 과 동일 SSOT 경로로 re-export */
+export { formatWon } from '@/lib/date-formatter';
 
 /**
  * 한국 시간 기준(UTC+9) 오늘 날짜 문자열 반환 (YYYY-MM-DD)

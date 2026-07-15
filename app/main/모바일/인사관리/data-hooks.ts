@@ -866,24 +866,18 @@ export async function resolveTeamAbnormalForStaff(input: {
       return { ok: true, updatedDates: [] };
     }
 
-    // 2) attendance(단수) — 마이페이지가 즉시 보는 테이블
-    const { error: updErr } = await db
-      .from('attendance')
-      .update({ status: '정상' })
-      .eq('staff_id', targetStaffId)
-      .in('date', dates);
-    if (updErr) throw updErr;
-
-    // 3) attendances(복수) — PC 워크센터가 보는 테이블.
-    //    정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없으므로 status 만 갱신한다.
-    const { error: updAttendancesErr } = await db
-      .from('attendances')
-      .update({ status: 'present' })
-      .eq('staff_id', targetStaffId)
-      .in('work_date', dates);
-    if (updAttendancesErr) {
-      console.warn('[mobile-hr] attendances 보정 실패 — attendance(단수)만 갱신됨', updAttendancesErr);
-    }
+    // 2) dual-write SSOT — attendance + attendances status 동시 정상화
+    const { writeAttendanceStatus } = await import('@/lib/attendance-sync');
+    await Promise.all(
+      dates.map((d) =>
+        writeAttendanceStatus({
+          staffId: targetStaffId,
+          date: d,
+          legacyStatus: '정상',
+          modernStatus: 'present',
+        }),
+      ),
+    );
 
     // 4) 마이페이지 KPI 재집계용 broadcast
     if (typeof window !== 'undefined') {

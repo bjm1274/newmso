@@ -256,6 +256,7 @@ export function useReturnsData(): ReturnsData {
 }
 
 // ─── 금액 포맷 ─────────────────────────────────────────────────
+/** @deprecated import { formatWon } from '@/lib/date-formatter' */
 export function formatWon(n: number): string {
   if (!Number.isFinite(n)) return '₩0';
   return '₩' + Math.round(n).toLocaleString('ko-KR');

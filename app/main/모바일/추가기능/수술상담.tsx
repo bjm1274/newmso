@@ -4,7 +4,7 @@
  * 수술상담 — 모바일 PC 패리티.
  *  · 빠른 기록: op_consultations 테이블 수동 등록 폼 (모바일 전용 경량 흐름).
  *  · 정밀 분석(음성): 데스크톱 SurgeryConsultationView를 next/dynamic 으로 그대로 마운트.
- *    → MediaRecorder 음성 녹음 + /api/consultation/transcribe (Gemini) AI 분석 +
+ *    → MediaRecorder 음성 녹음 + /api/consultation/analyze (Gemini) AI 분석 +
  *      localStorage('erp_consultation_records') 저장까지 PC와 동일하게 동작.
  *    (PC 컴포넌트가 마이크 feature-detect 및 NotAllowedError 토스트를 내장 — 그대로 재사용)
  * "모든 기능 모바일화" 정책: 데스크톱 우회 스텁 제거.
