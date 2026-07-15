@@ -46,11 +46,12 @@ export async function processStaffLeaveExpiry(
   if (!d1) throw new Error('[annual-leave-expiry] D1 binding not available (processStaffLeaveExpiry)');
   const db = getD1Drizzle(d1);
 
-  // leave_balances 업데이트 (소멸 처리)
+  // leave_balances 업데이트 (소멸 처리) — remaining_days 도 0 으로 맞춤
   await db
     .update(leaveBalancesTable)
     .set({
       expired_days: remainingDays,
+      remaining_days: 0,
       expired_at: now.toISOString() })
     .where(
       and(

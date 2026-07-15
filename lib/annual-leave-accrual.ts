@@ -213,8 +213,14 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
 
   for (const s of staffs) {
     result.scanned += 1;
-    // 재직자만
-    if (s.status && s.status !== '재직') {
+    // 재직자만 (공백·null 은 재직으로 간주, '퇴사'/'inactive' 등만 제외)
+    const statusNorm = String(s.status ?? '').trim();
+    if (
+      statusNorm &&
+      statusNorm !== '재직' &&
+      statusNorm.toLowerCase() !== 'active' &&
+      statusNorm !== '재직중'
+    ) {
       result.skipped += 1;
       continue;
     }

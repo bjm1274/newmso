@@ -211,7 +211,9 @@ export async function recalculateLeaveBalance(
     .select({
       id: leaveBalancesTable.id,
       expired_days: leaveBalancesTable.expired_days,
-      compensated_days: leaveBalancesTable.compensated_days })
+      compensated_days: leaveBalancesTable.compensated_days,
+      expired_at: leaveBalancesTable.expired_at,
+      expiry_date: leaveBalancesTable.expiry_date })
     .from(leaveBalancesTable)
     .where(
       and(
@@ -222,16 +224,32 @@ export async function recalculateLeaveBalance(
     .limit(1);
   const existingRow = existingRows[0] ?? null;
 
-  const expiredDays =
+  const todayKey = formatKoreanDateKey(new Date());
+  let expiredDays =
     overrides?.expiredDays !== undefined
       ? Number(overrides.expiredDays)
       : Number(existingRow?.expired_days) || 0;
+  // 만료일 이전이거나 expired_at 미기록이면 소멸일수 유지 금지
+  // (과거 버그로 expired_days=total 로 박혀 잔여 0 고착되던 케이스 복구)
+  if (overrides?.expiredDays === undefined) {
+    const expAt = existingRow?.expired_at ? String(existingRow.expired_at).trim() : '';
+    const expDate = existingRow?.expiry_date
+      ? String(existingRow.expiry_date).slice(0, 10)
+      : expiryDateStr;
+    const notYetExpired = !expAt && (!expDate || expDate > todayKey);
+    if (notYetExpired && expiredDays > 0) {
+      expiredDays = 0;
+    }
+  }
   const compensatedDays =
     overrides?.compensatedDays !== undefined
       ? Number(overrides.compensatedDays)
       : Number(existingRow?.compensated_days) || 0;
 
-  const remainingDays = Math.max(0, totalDays - usedDays - expiredDays - compensatedDays);
+  const remainingDays = Math.max(
+    0,
+    Math.round((totalDays - usedDays - expiredDays - compensatedDays) * 100) / 100,
+  );
 
   if (existingRow?.id) {
     await db
