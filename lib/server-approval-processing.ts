@@ -418,6 +418,7 @@ export async function processFinalApprovalEffects(
         // 연차 부여/차감/사용 후 잔여연차 및 밸런스 테이블 재계산 트리거
         try {
           const { recalculateLeaveBalance } = await import('@/lib/annual-leave-balance');
+          // 당해 연도 잔액 재계산 (year 미지정 시 서버 로컬 연도 — leave_balances.year 와 맞춤)
           await recalculateLeaveBalance(senderId);
         } catch (recalcErr) {
           console.error('[server-approval-processing] recalculateLeaveBalance 실패:', recalcErr);

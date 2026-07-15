@@ -57,7 +57,8 @@ export function BusinessDashboard({
     const minimum = Number(item.min_quantity ?? item.min_stock ?? item.minimum_quantity ?? 0);
     return minimum > 0 && quantity <= minimum;
   }).length;
-  const leaveTotal = activeStaffs.reduce((sum, staff) => sum + Number(staff.annual_leave_total ?? 15), 0);
+  // 15일 폴백 금지 — 직원 필드/잔액 미등록 시 0
+  const leaveTotal = activeStaffs.reduce((sum, staff) => sum + Number(staff.annual_leave_total ?? 0), 0);
   const leaveUsed = activeStaffs.reduce((sum, staff) => sum + Number(staff.annual_leave_used ?? 0), 0);
   const leaveUsageRate = leaveTotal > 0 ? Math.round((leaveUsed / leaveTotal) * 1000) / 10 : 0;
 

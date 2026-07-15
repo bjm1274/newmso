@@ -9,6 +9,17 @@ const {
   Notification,
 } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// Windows 토스트: AppUserModelId 는 ready 이전에 설정해야 Action Center 에 앱 이름으로 표시되고
+// 클릭·포커스가 올바르게 연결된다. (ready 이후 설정 시 팝업이 안 뜨거나 익명 앱으로 뜨는 경우 있음)
+if (process.platform === 'win32') {
+  try {
+    app.setAppUserModelId('com.pchos.allerp');
+  } catch {
+    // ignore
+  }
+}
 
 let mainWindow;
 let tray;
@@ -26,6 +37,15 @@ function showMainWindow() {
 
 function getAppIconPath() {
   return path.join(__dirname, 'icon-new.png');
+}
+
+function logNotification(msg) {
+  try {
+    const logPath = path.join(__dirname, 'permission-log.txt');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] [notif] ${msg}\n`);
+  } catch {
+    // ignore
+  }
 }
 
 function createWindow() {
@@ -86,6 +106,14 @@ function registerDesktopNotificationIpc() {
   ipcMain.handle('allerp:show-notification', (_event, payload = {}) => {
     try {
       if (!Notification.isSupported()) {
+        logNotification('Notification.isSupported() === false — tray balloon fallback');
+        // OS 토스트 미지원 시 트레이 풍선이라도 표시
+        const title = String(payload.title || 'AllERP').trim() || 'AllERP';
+        const body = String(payload.body || '').trim();
+        if (tray && !tray.isDestroyed() && typeof tray.displayBalloon === 'function') {
+          tray.displayBalloon({ title, content: body || '새 알림이 있습니다.', icon: getAppIconPath() });
+          return { ok: true, reason: 'balloon-fallback' };
+        }
         return { ok: false, reason: 'unsupported' };
       }
 
@@ -107,11 +135,16 @@ function registerDesktopNotificationIpc() {
         activeNotificationsByTag.delete(tag);
       }
 
+      const iconPath = getAppIconPath();
+      const hasIcon = fs.existsSync(iconPath);
       const notification = new Notification({
         title,
         body,
-        icon: getAppIconPath(),
+        // Windows: 아이콘 경로 오류 시 토스트 자체가 안 뜨는 경우가 있어 존재할 때만 지정
+        ...(hasIcon ? { icon: iconPath } : {}),
         silent: false,
+        // Windows 10/11 에서 포커스 중에도 표시되도록 urgency 를 높임 (지원 시)
+        urgency: 'normal',
         timeoutType: 'default',
       });
 
@@ -127,6 +160,26 @@ function registerDesktopNotificationIpc() {
         }
       });
 
+      notification.on('show', () => {
+        logNotification(`shown: ${title} | tag=${tag || '-'}`);
+      });
+
+      notification.on('failed', (_e, error) => {
+        logNotification(`failed: ${title} | ${String(error || '')}`);
+        // 네이티브 토스트 실패 시 트레이 풍선 폴백
+        if (tray && !tray.isDestroyed() && typeof tray.displayBalloon === 'function') {
+          try {
+            tray.displayBalloon({
+              title,
+              content: body || '새 알림이 있습니다.',
+              ...(hasIcon ? { icon: iconPath } : {}),
+            });
+          } catch {
+            // ignore
+          }
+        }
+      });
+
       notification.on('close', () => {
         if (tag && activeNotificationsByTag.get(tag) === notification) {
           activeNotificationsByTag.delete(tag);
@@ -138,12 +191,33 @@ function registerDesktopNotificationIpc() {
       }
 
       notification.show();
+
+      // 창이 트레이에 숨겨진 상태면 토스트 + 트레이 풍선 병행 (가시성 확보)
+      const windowHidden =
+        !mainWindow ||
+        mainWindow.isDestroyed() ||
+        !mainWindow.isVisible() ||
+        mainWindow.isMinimized();
+      if (windowHidden && tray && !tray.isDestroyed() && typeof tray.displayBalloon === 'function') {
+        try {
+          tray.displayBalloon({
+            title,
+            content: body || '새 알림이 있습니다.',
+            ...(hasIcon ? { icon: iconPath } : {}),
+          });
+        } catch {
+          // ignore balloon errors
+        }
+      }
+
       return { ok: true };
     } catch (err) {
+      const message = String(err && err.message ? err.message : err || '');
+      logNotification(`error: ${message}`);
       return {
         ok: false,
         reason: 'error',
-        error: String(err && err.message ? err.message : err || ''),
+        error: message,
       };
     }
   });
@@ -165,9 +239,13 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    // 윈도우 알림 등록 (앱 ID 지정 - 알림이 "AllERP"로 표시되고 클릭 동작이 올바르게 연결됨)
+    // AppUserModelId 는 파일 상단(ready 이전)에서 이미 설정. 이중 호출은 무해.
     if (process.platform === 'win32') {
-      app.setAppUserModelId('com.pchos.allerp');
+      try {
+        app.setAppUserModelId('com.pchos.allerp');
+      } catch {
+        // ignore
+      }
     }
 
     // OS가 Electron 프로세스를 절전/일시정지하지 않도록 (트레이 알림 유지)

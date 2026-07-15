@@ -10,7 +10,8 @@
  *             없으면 ledger 당해 재집계 (staff.annual_leave_used 는 다년도 누적이라 제외)
  *   expired   = leave_balances.expired_days ?? 0
  *   compensated = leave_balances.compensated_days ?? 0
- *   remaining = max(0, total − used − expired − compensated)
+ *   remaining = remaining_days 가 있고 used 가 ledger 로 상향되지 않았으면 remaining_days
+ *             아니면 max(0, total − used − expired − compensated)
  *
  * staff.annual_leave_used 를 max()에 넣지 않음 — 레거시 다년도 합이 잔여를 0으로 만드는 버그 방지.
  */
@@ -68,6 +69,8 @@ export type AnnualLeaveSummaryInput = {
   staffUsed?: number | null;
   balanceTotal?: number | null;
   balanceUsed?: number | null;
+  /** leave_balances.remaining_days — 있으면 used 미상향 시 우선 */
+  balanceRemaining?: number | null;
   expired?: number | null;
   compensated?: number | null;
   leaveRows?: Array<Record<string, unknown>> | null;
@@ -90,8 +93,11 @@ export function getLeaveDaysForRow(row: {
   leave_type?: unknown;
   start_date?: unknown;
   end_date?: unknown;
+  days?: unknown;
 }): number {
   if (isHalfLeaveType(row.leave_type)) return 0.5;
+  const dbDays = row.days != null ? Number(row.days) : null;
+  if (dbDays != null && !Number.isNaN(dbDays) && dbDays > 0) return dbDays;
   const start = String(row.start_date ?? '').slice(0, 10);
   const end = String(row.end_date ?? start).slice(0, 10);
   return calculateLeaveDays(start, end);
@@ -147,7 +153,9 @@ export function computeAnnualLeaveSummary(input: AnnualLeaveSummaryInput): Omit<
 
   const hasBalanceTotal = input.balanceTotal != null && !Number.isNaN(Number(input.balanceTotal));
   const hasBalanceUsed = input.balanceUsed != null && !Number.isNaN(Number(input.balanceUsed));
-  const hasBalanceRow = hasBalanceTotal || hasBalanceUsed
+  const hasBalanceRemaining =
+    input.balanceRemaining != null && !Number.isNaN(Number(input.balanceRemaining));
+  const hasBalanceRow = hasBalanceTotal || hasBalanceUsed || hasBalanceRemaining
     || input.expired != null || input.compensated != null;
 
   const total = Number(
@@ -158,13 +166,18 @@ export function computeAnnualLeaveSummary(input: AnnualLeaveSummaryInput): Omit<
   const ledgerUsed = calculateApprovedAnnualLeaveUsage(rows, year);
   const balanceUsed = hasBalanceUsed ? Number(input.balanceUsed) || 0 : 0;
   // balance 행이 있으면 원장과 큰 쪽(미동기화 보완), 없으면 원장만. staff fallback 금지.
+  const usedBoostedByLedger = hasBalanceUsed && ledgerUsed > balanceUsed + 1e-9;
   const used = hasBalanceUsed
     ? Math.max(balanceUsed, ledgerUsed)
     : ledgerUsed;
 
   const expired = Number(input.expired ?? 0) || 0;
   const compensated = Number(input.compensated ?? 0) || 0;
-  const remaining = Math.max(0, total - used - expired - compensated);
+  // remaining_days SSOT: used 가 원장으로 상향되지 않았을 때만 그대로 사용 (관리자 화면과 일치)
+  const remaining =
+    hasBalanceRemaining && !usedBoostedByLedger
+      ? Math.max(0, Number(input.balanceRemaining) || 0)
+      : Math.max(0, total - used - expired - compensated);
   const usageRate = total > 0 ? Math.round((used / total) * 100) : 0;
 
   // 당해 연도 내역만 (KPI used 와 목록 합 일치). 시작·종료 중 하나라도 당해면 포함.
@@ -236,7 +249,7 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
           .maybeSingle(),
         db
           .from('leave_requests')
-          .select('id, leave_type, start_date, end_date, status, reason, approved_at, created_at')
+          .select('id, leave_type, start_date, end_date, days, status, reason, approved_at, created_at')
           .eq('staff_id', staffId)
           .order('start_date', { ascending: false })
           .order('created_at', { ascending: false })
@@ -273,6 +286,7 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
         staffUsed: staff.annual_leave_used,
         balanceTotal: balance?.total_days,
         balanceUsed: balance?.used_days,
+        balanceRemaining: balance?.remaining_days,
         expired: balance?.expired_days,
         compensated: balance?.compensated_days,
         leaveRows: rows,

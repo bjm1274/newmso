@@ -1309,7 +1309,15 @@ export default function NotificationSystem({
       !hasPushSubscriptionActive(effectiveUserId) &&
       !shouldPreferMobileNativePopup
     );
-    if (!suppressLiveDisplay && (!useMobileChatPreview || showMobileToastFallback) && !suppressByRoomPreference) {
+    // Electron 설치형: 시스템 토스트가 Focus Assist 등으로 막혀도 인앱 팝업은 반드시 표시
+    const isElectronClient =
+      typeof navigator !== 'undefined' &&
+      (/Electron/i.test(navigator.userAgent || '') || Boolean(getAllerpDesktopBridge()));
+    if (
+      !suppressLiveDisplay &&
+      (!useMobileChatPreview || showMobileToastFallback || isElectronClient) &&
+      !suppressByRoomPreference
+    ) {
       addToast({
         id: rowId,
         title,
@@ -1402,7 +1410,11 @@ export default function NotificationSystem({
       const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
       const isBackgroundClient =
         typeof document !== 'undefined' && document.visibilityState !== 'visible';
-      const isElectronApp = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+      const isElectronApp =
+        (typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent || '')) ||
+        Boolean(getAllerpDesktopBridge());
+      // Electron: 포그라운드/백그라운드 모두 OS 토스트 요청 (트레이 숨김 시 필수)
+      // 웹: 백그라운드·모바일 네이티브 우선 시만
       const shouldShowSystemNotification =
         isElectronApp ||
         ((
@@ -1425,6 +1437,17 @@ export default function NotificationSystem({
           type,
           title,
           stage: 'system-popup-requested' });
+        sendNotification(title, {
+          body,
+          tag: displayKey || type,
+          data: rowMetadata });
+      } else if (isElectronApp && !wasForegroundPopupAlreadyShown) {
+        // claim 경합 등으로 스킵된 경우에도 Electron 은 한 번 더 네이티브 알림 시도
+        recordNotificationDelivery({
+          notificationId: rowId,
+          type,
+          title,
+          stage: 'system-popup-electron-retry' });
         sendNotification(title, {
           body,
           tag: displayKey || type,

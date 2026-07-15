@@ -53,8 +53,9 @@ function fiscalYearExpiryDate(refYear: number, fiscalStartMonth: number): Date {
 }
 
 /**
- * leave_accruals 기준 발생 일수
- * - 누적 발생 일수: 모든 monthly 및 annual 원장의 일수 합산
+ * leave_accruals 기준 발생 일수 (당해 잔액 SSOT)
+ * - 1년 이상: 최신 annual:N 일수만 (과거 annual 합산 금지 → 15+15=30 버그 방지)
+ * - 1년 미만: monthly 원장 합
  * - 원장 없고 staff.total 만 있으면 fallback
  */
 export async function resolveGrantedDaysFromAccruals(
@@ -74,10 +75,29 @@ export async function resolveGrantedDaysFromAccruals(
     .from(leaveAccrualsTable)
     .where(eq(leaveAccrualsTable.staff_id, staffId));
 
-  const totalSum = rows.reduce((s, r) => s + (Number(r.days) || 0), 0);
-  if (totalSum > 0) {
-    const hasAnnual = rows.some((r) => r.kind === 'annual');
-    return { totalDays: totalSum, source: hasAnnual ? 'annual' : 'monthly' };
+  const annualRows = rows.filter((r) => r.kind === 'annual');
+  if (annualRows.length > 0) {
+    // period_key = 'annual:1' | 'annual:2' … → 가장 큰 N(최신 연차 부여)만 사용
+    let best = annualRows[0];
+    let bestN = -1;
+    for (const r of annualRows) {
+      const n = Number(String(r.period_key ?? '').replace(/^annual:/i, '')) || 0;
+      if (n >= bestN) {
+        bestN = n;
+        best = r;
+      }
+    }
+    const days = Number(best.days) || 0;
+    if (days > 0) {
+      return { totalDays: days, source: 'annual' };
+    }
+  }
+
+  const monthlySum = rows
+    .filter((r) => r.kind === 'monthly')
+    .reduce((s, r) => s + (Number(r.days) || 0), 0);
+  if (monthlySum > 0) {
+    return { totalDays: monthlySum, source: 'monthly' };
   }
 
   if (fallbackTotal > 0) {
@@ -156,11 +176,12 @@ export async function recalculateLeaveBalance(
     }
   }
 
-  // 사용: 누적 사용일수 (전체 기간), staff_members 미기록
+  // 사용: 당해 연도 승인 연차만 (leave_balances.year 스코프). 전 기간 합산 시 잔여 과소 표시됨.
   let usedDays: number;
   try {
     usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
       writeStaffMembers: false,
+      year: targetYear,
     });
   } catch (syncErr) {
     console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);

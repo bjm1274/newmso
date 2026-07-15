@@ -109,6 +109,11 @@ export function calculateApprovedAnnualLeaveUsage(
       return sum;
     }
 
+    // '연차(부여)'는 사용이 아니라 신규 부여 — 서버 sync 와 동일
+    if (String(row?.leave_type ?? '').includes('부여')) {
+      return sum;
+    }
+
     // 반차도 연도 clip — 서버 syncAnnualLeaveUsedForStaff 와 동일 (과거 연도 반차 과대합산 방지)
     if (isHalfLeaveType(row?.leave_type)) {
       const halfClipped = clipDateRangeToYear(
@@ -132,6 +137,19 @@ export function calculateApprovedAnnualLeaveUsage(
 
     if (!clippedRange) {
       return sum;
+    }
+
+    // 당해 연도 안 전부 포함이면 DB days 우선 (서버 sync 와 동일) — 클라이언트/서버 잔여 불일치 방지
+    const startY = String(row?.start_date || '').slice(0, 4);
+    const endY = String(row?.end_date || row?.start_date || '').slice(0, 4);
+    const dbDays = row?.days != null ? Number(row.days) : null;
+    if (
+      startY === String(year) &&
+      endY === String(year) &&
+      dbDays != null &&
+      !Number.isNaN(dbDays)
+    ) {
+      return sum + dbDays;
     }
 
     return (

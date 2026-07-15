@@ -66,7 +66,10 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
 
   const fetchLeaveData = useCallback(async () => {
     setLoading(true);
-    const year = new Date().getFullYear();
+    // KST 기준 연도 — 직원 화면 useAnnualLeaveSummary 와 동일 (로컬 TZ 어긋남 방지)
+    const year = Number(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }),
+    ) || new Date().getFullYear();
     try {
       const [reqRes, balRes] = await Promise.all([
         db.from('leave_requests').select('*').order('start_date', { ascending: false }),

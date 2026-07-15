@@ -324,14 +324,19 @@ export default function ContractMain({
         }));
       }
 
-      // 발송 시 알림함으로 노티 발송
+      // 발송 시 알림함으로 노티 발송 (type: 인사 — 기본 알림 설정에 포함, 직원 마이페이지/모바일 서명 유도)
       await d1.from('notifications').insert(
         checkedIds.map((id: string) => ({
           user_id: String(id),
           title: '계약서 서명 요청',
-          body: `${contractType}발송이 완료되었습니다. 확인 후 서명해 주세요.`,
-          type: 'INFO',
-          read_at: null
+          body: `${contractType} 발송이 완료되었습니다. 확인 후 전자서명해 주세요.`,
+          type: '인사',
+          read_at: null,
+          metadata: {
+            kind: 'employment_contract',
+            contract_type: contractType,
+            open: 'mypage-contract',
+          },
         }))
       );
 

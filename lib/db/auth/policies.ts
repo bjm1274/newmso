@@ -217,7 +217,16 @@ export const POLICY_REGISTRY: Registry = {
   system_configs: PUBLIC_ALL('system_configs'),
   work_shifts: PUBLIC_ALL('work_shifts'),
   contract_templates: PUBLIC_ALL('contract_templates'),
-  employment_contracts: ADMIN_ONLY_ALL('employment_contracts'),
+  // 근로계약서: 본인 조회·서명(update) 필수. 관리자/매니저는 회사 스코프로 발송·관리.
+  // (과거 ADMIN_ONLY → 직원이 발송된 계약서를 조회·서명하지 못하는 장애 원인)
+  employment_contracts: {
+    table: 'employment_contracts',
+    select: 'SELF_OR_SAME_COMPANY',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'SELF_OR_SAME_COMPANY',
+    delete: 'ADMIN_ONLY',
+    staffIdField: 'staff_id',
+  },
   staff_evaluations: PUBLIC_ALL('staff_evaluations'),
   staff_preferred_off: PUBLIC_ALL('staff_preferred_off'),
   monthly_off_quota: PUBLIC_ALL('monthly_off_quota'),
@@ -637,15 +646,14 @@ for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
 
 // ─────────────────────────────────────────────────────────────
 // 민감 테이블 — ADMIN_ONLY (admin/master 역할만 접근 허용)
-// 급여, 급여변경이력, 감사로그, 수술상담, 온보딩체크리스트,
-// 비밀번호재설정토큰 등 PII/보안 데이터.
+// 급여, 급여변경이력, 감사로그, 수술상담, 비밀번호재설정토큰 등 PII/보안 데이터.
+// (onboarding_checklists 는 직원 서명 동기화가 필요해 아래 SELF_OR_SAME_COMPANY 로 분리)
 // ─────────────────────────────────────────────────────────────
 const ADMIN_ONLY_TABLES: string[] = [
   'payroll',
   'salary_change_history',
   'audit_logs',
   'op_consultations',
-  'onboarding_checklists',
   'password_reset_tokens',
 ];
 
@@ -653,6 +661,19 @@ for (const tableName of ADMIN_ONLY_TABLES) {
   if (!POLICY_REGISTRY[tableName]) {
     POLICY_REGISTRY[tableName] = ADMIN_ONLY_ALL(tableName);
   }
+}
+
+// 입사 체크리스트: 본인 서명 완료 시 동기화(update) + 본인/같은 회사 매니저 조회
+// (ADMIN_ONLY 였을 때 직원 서명 후 체크리스트 갱신이 403 으로 실패)
+if (!POLICY_REGISTRY['onboarding_checklists']) {
+  POLICY_REGISTRY['onboarding_checklists'] = {
+    table: 'onboarding_checklists',
+    select: 'SELF_OR_SAME_COMPANY',
+    insert: 'SELF_OR_SAME_COMPANY',
+    update: 'SELF_OR_SAME_COMPANY',
+    delete: 'ADMIN_ONLY',
+    staffIdField: 'staff_id',
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
